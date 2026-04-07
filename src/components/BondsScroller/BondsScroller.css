@@ -1,0 +1,41 @@
+.BondsScroller ::-webkit-scrollbar {
+  width: 5px; /* Ширина всей полосы */
+}
+
+.BondsScroller ::-webkit-scrollbar-track {
+  background: var(--tg-theme-secondary-bg-color); /* Цвет фона трека */
+}
+
+.BondsScroller ::-webkit-scrollbar-thumb {
+  height: 30px; /* Высота бегунка */
+  min-height: 30px; /* Минимальная высота бегунка */
+  max-height: none; /* Нет максимального ограничения */
+  background: var(--tg-theme-hint-color); /* Цвет бегунка */
+  border-radius: 5px; /* Радиус скругления */
+}
+
+/* Анимация плавного появления бегунка */
+.BondsScroller ::-webkit-scrollbar-thumb:hover {
+  background: var(--tg-theme-accent-text-color); /* Темнее при наведении */
+}
+
+div.BondsSpinner > .p-progress-spinner-svg {
+    animation: p-progress-spinner-rotate 5s linear infinite;
+    /*height: 100%;
+    transform-origin: center center;
+    width: 100%;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;*/
+    margin: auto;
+}
+
+div.BondsSpinner > svg > .p-progress-spinner-circle {
+    /*stroke-dasharray: 89, 200;
+    stroke-dashoffset: 0;*/
+    stroke: var(--tg-theme-accent-text-color);
+    animation: p-progress-spinner-dash 5s ease-in-out infinite, p-progress-spinner-color none;
+    /*stroke-linecap: round;*/
+}

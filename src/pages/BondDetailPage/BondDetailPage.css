@@ -1,0 +1,14 @@
+.bg-accent {
+    color: var(--tg-theme-section-bg-color) !important;
+    background-color: var(--tg-theme-accent-text-color) !important;
+}
+
+.bg-hint {
+    color: var(--tg-theme-section-bg-color) !important;
+    background-color: var(--tg-theme-hint-color) !important;
+}
+
+.bg-negative {
+    color: var(--tg-theme-section-bg-color) !important;
+    background-color: var(--tg-theme-text-color) !important;
+}
