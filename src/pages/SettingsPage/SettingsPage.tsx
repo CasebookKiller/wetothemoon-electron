@@ -18,7 +18,7 @@ import { FloatLabel } from 'primereact/floatlabel';
 import { InputTextarea } from 'primereact/inputtextarea';
 import { Button } from 'primereact/button';
 
-import { TopMenu } from '@/components/TopMenu/TopMenu';
+import { TopMenu } from '@/components/BONDS/TopMenu/TopMenu';
 
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 
@@ -54,7 +54,9 @@ export const SettingsPage: FC = () => {
 
   useEffect(() => {
     const data = getItem('tokens');
-    const tokens = JSON.parse(data || '{}');
+    console.log('...data: ', data);
+    console.log('...data type: ', typeof data);
+    const tokens = typeof data === 'string' ? JSON.parse(data || '{}') : data; 
     
     if (data) {
       if (tokens.fullaccess) {

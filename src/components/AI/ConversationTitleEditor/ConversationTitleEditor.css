@@ -1,0 +1,22 @@
+/* components/AI/ConversationTitleEditor/ConversationTitleEditor.css */
+.conversation-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-color);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.conversation-title:hover {
+  background-color: var(--surface-hover);
+}
+
+.p-inputtext {
+  font-size: 14px;
+  padding: 6px 12px;
+}
+
+.p-inputtext:focus {
+  border: 1px solid var(--tg-theme-accent-text-color);
+  box-shadow: 0 0 0 1px var(--tg-theme-accent-text-color);
+}

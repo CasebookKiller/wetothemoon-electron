@@ -1,0 +1,30 @@
+/* components/AI/ConversationPanel/ConversationPanel.css */
+:root {
+  --tg-theme-accent-text-color-alpha-10: rgba(var(--tg-theme-accent-text-color-rgb), 0.1);
+}
+
+.conversation-item {
+  transition: all 0.2s ease;
+  border: 1px solid var(--tg-theme-accent-text-color) !important;
+}
+
+.conversation-item:hover {
+  background-color: var(--surface-hover) !important;
+  border-color: var(--tg-theme-accent-text-color) !important;/*var(--primary-color) !important;*/
+}
+
+.surface-highlight {
+  background-color: var(--tg-theme-accent-text-color-alpha-10) !important;
+  border: 1px solid var(--tg-theme-accent-text-color) !important;
+  border-left: 5px solid var(--tg-theme-accent-text-color) !important;
+  border-right: 5px solid var(--tg-theme-accent-text-color) !important;
+  color: var(--tg-theme-accent-text-color) !important;
+}
+
+.font-bold {
+  font-weight: 600 !important;
+}
+
+.surface-overlay {
+  background-color: var(--surface-overlay) !important;
+}

@@ -1,0 +1,136 @@
+{
+  "id": "electron-forge-vite-config",
+  "title": "Настройка Electron Forge + Vite для TypeScript + React",
+  "description": "Конфигурирование сборки проекта под Electron Forge с использованием Vite в качестве бандлера рендерера",
+  "version": "1.0",
+  "createdAt": "2025-12-01",
+  "updatedAt": "2025-12-01",
+  "role": {
+    "position": "DevOps / Build Engineer",
+    "experience": "4+ года",
+    "specialization": "Electron инфраструктура",
+    "communicationStyle": "инструктивный, с пояснениями",
+    "priorities": ["воспроизводимость сборки", "чистая конфигурация"],
+    "enabled": true
+  },
+  "projectContext": {
+    "technologies": [
+      { "name": "Electron Forge", "version": "7.x", "purpose": "управление приложением" },
+      { "name": "Vite", "version": "5.x", "purpose": "сборка рендерер‑процесса" },
+      { "name": "TypeScript", "version": "5.x", "purpose": "типизация" }
+    ],
+    "architecture": {
+      "type": "Сборочная система",
+      "components": ["forge.config.ts", "vite.config.ts", "tsconfig.json"],
+      "interaction": "Forge запускает Vite для рендерера"
+    },
+    "integrations": [],
+    "standards": [],
+    "fullProjectStructure": {
+      "type": "tree",
+      "content": ".\n  forge.config.ts\n  vite.main.config.ts\n  vite.preload.config.ts\n  vite.renderer.config.ts\n  tsconfig.json",
+      "rootDirectory": "./",
+      "description": "Конфигурационные файлы"
+    },
+    "enabled": true
+  },
+  "taskAndExpectations": {
+    "mainTask": "Настроить Electron Forge для работы с Vite, чтобы рендерер собирался через Vite, а main и preload через esbuild (встроенный в Forge)",
+    "expectedResult": "Рабочие конфигурационные файлы с комментариями",
+    "codeRequirements": ["модульная структура vite.config", "поддержка HMR", "правильные алиасы путей"],
+    "outputFormat": "Три файла конфигурации + пояснения",
+    "enabled": true
+  },
+  "technicalRequirements": {
+    "compatibility": ["Windows", "macOS", "Linux"],
+    "dataHandling": [],
+    "security": [],
+    "performance": ["быстрый HMR"],
+    "enabled": true
+  },
+  "responseStructure": {
+    "sections": [
+      {
+        "name": "forge.config.ts",
+        "required": true,
+        "depth": "detailed",
+        "format": "TypeScript код"
+      },
+      {
+        "name": "vite.renderer.config.ts",
+        "required": true,
+        "depth": "detailed",
+        "format": "TypeScript"
+      },
+      {
+        "name": "tsconfig.json",
+        "required": true,
+        "depth": "detailed",
+        "format": "JSON"
+      }
+    ],
+    "codeFormat": {
+      "syntax": "TypeScript",
+      "indentation": "spaces",
+      "namingConvention": "camelCase"
+    },
+    "enabled": true
+  },
+  "specialScenarios": {
+    "errorHandling": "Обработка ошибок компиляции в разных процессах",
+    "testing": "",
+    "scalability": "Простое добавление новых entry points",
+    "alternativeApproaches": "Использование webpack вместо Vite",
+    "enabled": true
+  },
+  "restrictionsAndRules": {
+    "forbiddenPractices": ["монолитная конфигурация Vite"],
+    "dependenciesPolicy": "Использовать только стабильные версии пакетов",
+    "compliance": [],
+    "environmentConsiderations": ["пути к ресурсам в production"],
+    "enabled": true
+  },
+  "additionalPreferences": {
+    "tone": "профессиональный",
+    "length": "detailed",
+    "preferredPatterns": ["композиция конфигураций"],
+    "specialEmphases": ["чёткая документация настроек"],
+    "enabled": true
+  },
+  "codeContext": {
+    "language": "TypeScript",
+    "sourceType": "multiple-snippets",
+    "codeSources": [
+      {
+        "code": "// forge.config.ts\nimport { defineConfig } from '@electron-forge/core';\nexport default defineConfig({\n  plugins: [ require('@electron-forge/plugin-vite') ]\n});",
+        "purpose": "Конфигурация Forge",
+        "process": "main",
+        "dependencies": ["@electron-forge/plugin-vite"],
+        "problemDescription": "Необходимо добавить настройки сборки"
+      },
+      {
+        "code": "// vite.renderer.config.ts\nimport { defineConfig } from 'vite';\nexport default defineConfig({\n  resolve: {\n    alias: { '@': '/src' }\n  }\n});",
+        "purpose": "Конфигурация Vite для рендерера",
+        "process": "renderer",
+        "dependencies": ["vite"],
+        "problemDescription": "Не настроен плагин React"
+      }
+    ],
+    "purpose": "",
+    "process": "",
+    "dependencies": [],
+    "problemDescription": "",
+    "enabled": true
+  },
+  "developmentContext": {
+    "backendStructure": {
+      "type": "tree",
+      "content": ".",
+      "rootDirectory": "./",
+      "description": "Корневая директория конфигов"
+    },
+    "buildProcess": "electron-forge make",
+    "deploymentStrategy": "Squirrel для Windows, DMG для macOS",
+    "enabled": true
+  }
+}

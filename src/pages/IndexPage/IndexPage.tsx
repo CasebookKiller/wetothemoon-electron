@@ -8,21 +8,24 @@ import React, { useEffect, type FC } from 'react';
 
 import { addLocale, locale as Locale } from 'primereact/api';
 
-import { TopMenu } from '@/components/TopMenu/TopMenu';
+import { TopMenu } from '@/components/BONDS/TopMenu/TopMenu';
 
 import './IndexPage.css';
 import { TemplatePanels } from '@/components/TemplatePanels/TemplatePanels';
 
 import { getTableCount } from '@/supabaseClient';
 
+// @ts-ignore
 import { Accounts } from '@root/api/public';
+
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useAccounts } from '@/hooks/useAccounts';
 import { AxiosResponse } from 'axios';
 import { IAccount } from '@root/api/types';
 
-import { TIAccount } from '@/components/TIAccount/TIAccount';
+import { TIAccount } from '@/components/BONDS/TIAccount/TIAccount';
 import { getPlatform, parseTokens } from '@root/api/methods';
+import MarketStreamTest from '@/components/BONDS/MarketStreamTest/MarketStreamTest';
 
 const lng = 'ru';
 

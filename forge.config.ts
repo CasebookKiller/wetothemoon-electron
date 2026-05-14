@@ -5,11 +5,16 @@ import { MakerDeb } from "@electron-forge/maker-deb";
 import { MakerRpm } from "@electron-forge/maker-rpm";
 import { VitePlugin } from "@electron-forge/plugin-vite";
 import { FusesPlugin } from "@electron-forge/plugin-fuses";
-import { FuseV1Options, FuseVersion } from "@electron/fuses";
+//import { FuseV1Options, FuseVersion } from "@electron/fuses";
 
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
+    extraResource: [
+      'proto', // копируем в ресурсы приложения
+      'dist/preload.js',
+      'assets/ollama-logo.svg'
+    ] // явно копируем скомпилированный прелоад
   },
   rebuildConfig: {},
   makers: [
@@ -34,24 +39,50 @@ const config: ForgeConfig = {
           config: "vite.preload.config.ts",
           target: "preload",
         },
+        {
+          entry: "src/preloadai.ts",
+          config: "vite.preloadai.config.ts",
+          target: "preload",
+        },
+        {
+          entry: "src/preloadpg.ts",
+          config: "vite.preloadpg.config.ts",
+          target: "preload",
+        },
+        {
+          entry: "src/preloadbonds.ts",
+          config: "vite.preloadbonds.config.ts",
+          target: "preload",
+        }
       ],
       renderer: [
         {
           name: "main_window",
           config: "vite.renderer.config.ts",
         },
+        //{
+        //  name: "ai_window",
+        //  config: "vite.ai.config.ts",
+        //},
       ],
     }),
     // Fuses are used to enable/disable various Electron functionality
     // at package time, before code signing the application
     new FusesPlugin({
-      version: FuseVersion.V1,
-      [FuseV1Options.RunAsNode]: false,
-      [FuseV1Options.EnableCookieEncryption]: true,
-      [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
-      [FuseV1Options.EnableNodeCliInspectArguments]: false,
-      [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
-      [FuseV1Options.OnlyLoadAppFromAsar]: true,
+      version: 1,
+      runasnode: false,
+      cookieencryption: true,
+      nodeoptions: false,
+      nodeinspect: false,
+      asarintegrity: true,
+      loadasar: true,
+      //version: FuseVersion.V1,
+      //[FuseV1Options.RunAsNode]: false,
+      //[FuseV1Options.EnableCookieEncryption]: true,
+      //[FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
+      //[FuseV1Options.EnableNodeCliInspectArguments]: false,
+      //[FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
+      //[FuseV1Options.OnlyLoadAppFromAsar]: true,
     }),
   ],
 };

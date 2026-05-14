@@ -4,7 +4,7 @@ import React, { FC } from 'react';
 
 import { Panel } from 'primereact/panel';
 
-import { Link } from '@/components/Link/Link';
+import { Link } from '@/components/COMMON/Link/Link';
 
 import tonSvg from './ton.svg';
 

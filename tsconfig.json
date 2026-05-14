@@ -2,26 +2,28 @@
   "compilerOptions": {
     "jsx": "react-jsx",
     "target": "ESNext",
-    "module": "es2020",
+    "module": "es2022",
     "allowJs": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
     "noImplicitAny": true,
     "sourceMap": true,
     "baseUrl": ".",
+    "rootDir": "./",
     "outDir": "dist",
     "moduleResolution": "node",
     "resolveJsonModule": true,
     "noEmit": true,
     "allowImportingTsExtensions": true,
     "paths": {
-      "@root/*": ["./../src/*"],  // путь к корневому проекту
+      "@root/*": ["./../src/*"],
       "@/*": [
         "./src/*"
       ]
     },
     "types": [
-      "vite/client"
+      "vite/client",
+      "react-syntax-highlighter"
     ],
     "ignoreDeprecations": "6.0"
   }

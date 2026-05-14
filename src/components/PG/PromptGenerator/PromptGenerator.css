@@ -1,0 +1,20 @@
+.force-show-close .p-dialog-header-icon {
+  display: flex !important;
+  background: var(--tg-theme-accent-text-color)!important;
+}
+
+.force-show-close .p-dialog .p-dialog-header-closer {
+  visibility: visible !important;
+  opacity: 1 !important;
+  background: var(--tg-theme-accent-text-color)!important;
+}
+
+.p-dialog-header-icon.p-dialog-header-close.p-link {
+  padding: 0;
+  color: #052e16;
+  background: var(--tg-theme-accent-text-color)!important;
+}
+
+.font-mono {
+  font-family: monospace!important;
+}

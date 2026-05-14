@@ -1,0 +1,81 @@
+{
+  "id": "string",
+  "title": "string",
+  "description": "string",
+  "version": "string",
+  "createdAt": "YYYY-MM-DD",
+  "updatedAt": "YYYY-MM-DD",
+  "role": {
+    "position": "string",
+    "experience": "string",
+    "specialization": "string",
+    "communicationStyle": "string",
+    "priorities": ["string"]
+  },
+  "projectContext": {
+    "technologies": [
+      {
+        "name": "string",
+        "version": "string",
+        "purpose": "string"
+      }
+    ],
+    "architecture": {
+      "type": "string",
+      "components": ["string"],
+      "interaction": "string"
+    },
+    "integrations": [
+      {
+        "service": "string",
+        "purpose": "string"
+      }
+    ],
+    "standards": ["string"]
+  },
+  "taskAndExpectations": {
+    "mainTask": "string",
+    "expectedResult": "string",
+    "codeRequirements": ["string"],
+    "outputFormat": "string"
+  },
+  "technicalRequirements": {
+    "compatibility": ["string"],
+    "dataHandling": ["string"],
+    "security": ["string"],
+    "performance": ["string"]
+  },
+  "responseStructure": {
+    "sections": [
+      {
+        "name": "string",
+        "required": "boolean",
+        "depth": "short | detailed",
+        "format": "string"
+      }
+    ],
+    "codeFormat": {
+      "syntax": "string",
+      "indentation": "spaces | tabs",
+      "namingConvention": "string"
+    }
+  },
+  "specialScenarios": {
+    "errorHandling": "string",
+    "testing": "string",
+    "scalability": "string",
+    "alternativeApproaches": "string"
+  },
+  "restrictionsAndRules": {
+    "forbiddenPractices": ["string"],
+    "dependenciesPolicy": "string",
+    "compliance": ["string"],
+    "environmentConsiderations": ["string"]
+  },
+  "additionalPreferences": {
+    "tone": "string",
+    "length": "concise | detailed",
+    "preferredPatterns": ["string"],
+    "specialEmphases": ["string"]
+  }
+}

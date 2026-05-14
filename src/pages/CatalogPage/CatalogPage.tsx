@@ -16,8 +16,8 @@ import { Button } from 'primereact/button';
 import { Sidebar } from 'primereact/sidebar';
 import { Toolbar } from 'primereact/toolbar';
 
-import { TopMenu } from '@/components/TopMenu/TopMenu';
-import { BondsScroller } from '@/components/BondsScroller/BondsScroller';
+import { TopMenu } from '@/components/BONDS/TopMenu/TopMenu';
+import { BondsScroller } from '@/components/BONDS/BondsScroller/BondsScroller';
 
 import { useUser } from '@/hooks/useUser';
 import { useAuth } from '@/hooks/useAuth';
@@ -167,7 +167,7 @@ export const CatalogPage: FC = React.memo(() => {
 
   useEffect(() => {
     const storage = getItem('tokens');
-    const tokens = JSON.parse(storage || '{}');
+    const tokens = typeof storage === 'string' ? JSON.parse(storage || '{}') : storage; 
     
     if (storage) {
       if (tokens.fullaccess) setFullAccess(tokens.fullaccess);

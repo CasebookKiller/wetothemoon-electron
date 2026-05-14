@@ -1,0 +1,144 @@
+{
+  "id": "optimize-main-process-structure",
+  "title": "Оптимизация структуры файлов main-процесса",
+  "description": "Рефакторинг монолитного main-процесса Electron: разделение на модули, улучшение организации кода",
+  "version": "1.0",
+  "createdAt": "2025-12-01",
+  "updatedAt": "2025-12-01",
+  "role": {
+    "position": "Senior Electron Developer",
+    "experience": "более 5 лет",
+    "specialization": "Electron architecture, Node.js",
+    "communicationStyle": "структурированный, с примерами",
+    "priorities": ["модульность", "читаемость", "сопровождаемость"],
+    "enabled": true
+  },
+  "projectContext": {
+    "technologies": [
+      { "name": "Electron", "version": "28.x", "purpose": "основной фреймворк" },
+      { "name": "TypeScript", "version": "5.x", "purpose": "статическая типизация" },
+      { "name": "Vite", "version": "5.x", "purpose": "сборка рендерер-процесса" }
+    ],
+    "architecture": {
+      "type": "Многослойная (main / preload / renderer)",
+      "components": ["Main Process", "Preload", "Renderer"],
+      "interaction": "IPC через contextBridge и ipcMain.handle"
+    },
+    "integrations": [],
+    "standards": ["SOLID", "Чистая архитектура"],
+    "fullProjectStructure": {
+      "type": "tree",
+      "rootDirectory": "./src/main",
+      "description": "Текущая структура main-процесса (проблемная)",
+      "content": "src/main/\n  index.ts  (800+ строк, всё в одном файле)\n  preload.ts\n  ipc-handlers.ts (не структурирован)"
+    },
+    "enabled": true
+  },
+  "taskAndExpectations": {
+    "mainTask": "Проанализировать существующую структуру main-процесса, выявить проблемные файлы и предложить план рефакторинга с разделением на сервисы (windowService, ipcService, menuService, updaterService и т.д.)",
+    "expectedResult": "Список конкретных файлов с описанием их проблем и предлагаемых изменений по каждому пути",
+    "codeRequirements": [
+      "Сохранить обратную совместимость IPC-каналов",
+      "Использовать паттерн «сервис»",
+      "Каждый сервис — отдельный файл"
+    ],
+    "outputFormat": "Анализ текущих файлов и рекомендуемая новая структура",
+    "enabled": true
+  },
+  "technicalRequirements": {
+    "compatibility": [],
+    "dataHandling": [],
+    "security": ["контекстная изоляция"],
+    "performance": ["уменьшение времени загрузки main процесса"],
+    "enabled": true
+  },
+  "responseStructure": {
+    "sections": [
+      {
+        "name": "Анализ текущих проблем",
+        "required": true,
+        "depth": "detailed",
+        "format": "Markdown список"
+      },
+      {
+        "name": "Предлагаемая структура",
+        "required": true,
+        "depth": "detailed",
+        "format": "Дерево папок и описание модулей"
+      }
+    ],
+    "codeFormat": {
+      "syntax": "TypeScript",
+      "indentation": "spaces",
+      "namingConvention": "camelCase"
+    },
+    "enabled": true
+  },
+  "specialScenarios": {
+    "errorHandling": "Централизованная обработка ошибок в IPC",
+    "testing": "Модульное тестирование сервисов",
+    "scalability": "Лёгкое добавление новых сервисов",
+    "alternativeApproaches": "Использование классовых сервисов или функциональных модулей",
+    "enabled": true
+  },
+  "restrictionsAndRules": {
+    "forbiddenPractices": ["смешивание логики в index.ts", "циклические зависимости"],
+    "dependenciesPolicy": "Минимизация внешних зависимостей в main процессе",
+    "compliance": [],
+    "environmentConsiderations": ["кроссплатформенность путей"],
+    "enabled": true
+  },
+  "additionalPreferences": {
+    "tone": "профессиональный",
+    "length": "detailed",
+    "preferredPatterns": ["инъекция зависимостей", "сервис-ориентированная архитектура"],
+    "specialEmphases": ["чистота кода", "документирование"],
+    "enabled": true
+  },
+  "codeContext": {
+    "language": "TypeScript",
+    "sourceType": "file-paths",
+    "codeSources": [
+      {
+        "path": "src/main/index.ts",
+        "purpose": "Точка входа main процесса",
+        "process": "main",
+        "problemDescription": "Содержит всё: создание окна, регистрацию IPC, меню, автообновление. Более 800 строк, трудно поддерживать."
+      },
+      {
+        "path": "src/main/ipc-handlers.ts",
+        "purpose": "Обработчики IPC",
+        "process": "main",
+        "problemDescription": "Обработчики не сгруппированы по доменам (файлы, настройки, обновления), перемешаны с бизнес-логикой."
+      },
+      {
+        "path": "src/main/window-manager.ts",
+        "purpose": "Управление окнами приложения",
+        "process": "main",
+        "problemDescription": "Дублирование кода создания окон, нет обработки ошибок при создании."
+      },
+      {
+        "path": "src/main/menu.ts",
+        "purpose": "Построение меню",
+        "process": "main",
+        "problemDescription": "Статическое меню без учёта ролей и платформы, встроено прямо в index.ts."
+      }
+    ],
+    "purpose": "Общая цель: разбить монолит на модули",
+    "process": "main",
+    "dependencies": [],
+    "problemDescription": "Сильная связанность, сложно тестировать и расширять",
+    "enabled": true
+  },
+  "developmentContext": {
+    "backendStructure": {
+      "type": "tree",
+      "content": "src/main/\n  services/\n    window/\n    ipc/\n    menu/\n  index.ts (точка входа)",
+      "rootDirectory": "./src/main",
+      "description": "Целевая структура после рефакторинга"
+    },
+    "buildProcess": "Electron Forge + Vite",
+    "deploymentStrategy": "electron-builder",
+    "enabled": true
+  }
+}

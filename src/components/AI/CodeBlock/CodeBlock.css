@@ -1,0 +1,196 @@
+.code-block {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background-color: #1a1a1a;
+  margin: 1rem 0;
+  overflow: hidden;
+  font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.code-header {
+  background-color: #2d3748;
+  padding: 0.5rem 1rem;
+  font-size: 0.75rem;
+  color: #a0aec0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.language-label {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.code-block pre {
+  margin: 0;
+  padding: 1rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+  background: #1a1a1a;
+  color: #e2e8f0;
+}
+
+
+.code-block code {
+  display: block;
+}
+
+.copy-button {
+  background: #4a5568;
+  color: white;
+  border: none;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  transition: background-color 0.2s;
+}
+
+.copy-button:hover {
+  background: #2b6cb0;
+}
+
+.copy-button:active {
+  transform: translateY(1px);
+}
+
+/**/
+.button-group {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.copy-button,
+.save-button {
+  background: #4a5568;
+  color: white;
+  border: none;
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.copy-button:hover,
+.save-button:hover {
+  background: #2b6cb0;
+}
+
+.copy-button.copied {
+  background: #38a169;
+}
+
+.copy-button:active,
+.save-button:active {
+  transform: translateY(1px);
+}
+
+p > code, a > code, li > code, td > code {
+  background-color: #4a5568; /*#656c7647*//*#1a1a1a;*/
+  font-family: 'monospace';
+  white-space: break-spaces;
+  border-radius: 6px;
+  margin: 0;
+  padding: .2em .4em;
+  font-size: 85%;
+}
+
+.code-block pre {
+  margin: 0;
+  padding: 1rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+  background: #1f2937;
+  color: #e2e8f0;
+}
+
+.markdown {
+  font-family: var(--fontStack-sansSerif,-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans",Helvetica,Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji");
+  font-size: 16px;
+  line-height: 1.5;
+  word-wrap: break-word;
+}
+
+.contains-task-list .task-list-item::marker {
+  display: none!important;
+}
+
+blockquote {
+  margin: 0;
+  padding: 0 1em;
+  border-left: .25em solid gray;
+  color: gray;
+}
+
+.markdown-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 0.9rem;
+  /*background-color: #0d1117;*/
+}
+
+.markdown-table th,
+.markdown-table td {
+  border: 1px solid #e5e7eb;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+}
+
+.markdown-table thead {
+  font-weight: 600;
+}
+
+.markdown-table tbody tr:nth-child(even) {
+  background-color: #1f2937;
+}
+
+
+.markdown-table thead tr:hover {
+  background-color: #4a5568;
+}
+
+.markdown-table tbody tr:hover {
+  background-color: #4a5568;
+}
+
+.text-align-left { text-align: left !important; }
+.text-align-center { text-align: center !important; }
+.text-align-right { text-align: right !important; }
+
+/* Списки задач */
+.contains-task-list .task-list-item::marker {
+  content: '';/*content: '☐';*/
+  color: #6b7280;
+  font-size: 1em;
+}
+
+.contains-task-list .task-list-item.checked::marker {
+  content: '';/*content: '✓';*/
+  color: #10b981;
+  font-weight: bold;
+}
+
+/* Вложенные списки */
+.contains-task-list ul li::marker {
+  content: ''; /*content: '▪';*/
+  color: #8b5cf6;
+}
+
+/* Анимация */
+.task-list-item::marker {
+  transition: all 0.2s ease;
+}
+
+.task-list-item:hover::marker {
+  transform: translateX(2px);
+  color: #3730a3;
+}

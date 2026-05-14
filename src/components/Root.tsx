@@ -1,5 +1,4 @@
-import React, { type FC } from 'react';
-import { PrimeReactProvider } from 'primereact/api';
+import { type FC } from 'react';
 
 import { App } from '@/components/App.tsx';
 import { ErrorBoundary } from '@/components/ErrorBoundary.tsx';
@@ -38,17 +37,13 @@ const Inner: FC<InnerProps> = ({ Component, pageProps }) => {
   console.log('Запуск приложения');
   
   return (
-    <React.Fragment>
-      <PrimeReactProvider>
-        <UserProvider>
-          <AccountsProvider>
-            <BondsProvider>
-              <Component {...pageProps}/>
-            </BondsProvider>
-          </AccountsProvider>
-        </UserProvider>
-      </PrimeReactProvider>
-    </React.Fragment>
+    <UserProvider>
+      <AccountsProvider>
+        <BondsProvider>
+          <Component {...pageProps}/>
+        </BondsProvider>
+      </AccountsProvider>
+    </UserProvider>
   );
 };
 

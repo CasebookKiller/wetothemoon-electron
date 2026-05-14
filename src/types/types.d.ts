@@ -3,24 +3,16 @@ declare module "*.module.css" {
   export default classes;
 }
 
+// global.d.ts
+import type { FineTuningData, FineTuningResult, TrainingProgress } from './types';
+
 declare global {
   interface Window {
     electronAPI: {
-      startFineTuning: (data: {
-        dataPath: string;
-        modelName: string;
-        outputDir: string;
-      }) => Promise<{
-        status: 'started' | 'progress' | 'completed' | 'error';
-        message?: string;
-        outputDir?: string;
-      }>;
-      onTrainingProgress: (callback: (progress: {
-        status: string;
-        message?: string;
-        progress?: number;
-      }) => void,
-      ) => void;
+      startFineTuning: (data: FineTuningData) => Promise<FineTuningResult>;
+      onTrainingProgress: (callback: (progress: TrainingProgress) => void) => void;
+      offTrainingProgress: (callback: (progress: TrainingProgress) => void) => void; // Для отписки
     };
   }
 }
+

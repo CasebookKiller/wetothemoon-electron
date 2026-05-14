@@ -98,3 +98,8 @@ out/
 
 # Docs
 docs/
+
+# Training
+training/
+
+clean.sh

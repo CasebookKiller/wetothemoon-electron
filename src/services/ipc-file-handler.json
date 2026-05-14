@@ -1,0 +1,119 @@
+{
+  "id": "ipc-file-handler",
+  "title": "Создание IPC‑обработчика для работы с файловой системой",
+  "description": "Генерация кода для main‑процесса: чтение/запись файлов через IPC",
+  "version": "1.0",
+  "createdAt": "2025-12-01",
+  "updatedAt": "2025-12-01",
+  "role": {
+    "position": "Senior Electron Developer",
+    "experience": "5+ лет разработки десктопных приложений",
+    "specialization": "Electron, Node.js, IPC",
+    "communicationStyle": "четкий, с примерами кода",
+    "priorities": ["безопасность", "чистота кода", "обработка ошибок"],
+    "enabled": true
+  },
+  "projectContext": {
+    "technologies": [
+      { "name": "Electron", "version": "28.x", "purpose": "основа десктопного приложения" },
+      { "name": "TypeScript", "version": "5.x", "purpose": "статическая типизация" },
+      { "name": "Vite", "version": "5.x", "purpose": "сборка рендерер‑процесса" }
+    ],
+    "architecture": {
+      "type": "Electron multi‑process",
+      "components": ["main process", "renderer process", "preload scripts"],
+      "interaction": "IPC через contextBridge и сообщения"
+    },
+    "integrations": [],
+    "standards": ["Electron Security Guidelines", "Node.js best practices"],
+    "fullProjectStructure": {
+      "type": "tree",
+      "rootDirectory": "./",
+      "description": "Типовая структура Electron‑Forge + Vite",
+      "content": "src/\n  main/\n    ipc-handlers.ts\n  preload/\n    index.ts\n  renderer/\n    App.tsx"
+    },
+    "enabled": true
+  },
+  "taskAndExpectations": {
+    "mainTask": "Реализовать IPC‑обработчик в main‑процессе для сохранения JSON‑файлов на диск, с проверкой пути и обработкой ошибок",
+    "expectedResult": "Код обработчика с JSDoc‑комментариями, валидацией пути, поддержкой callback‑подтверждения в рендерер",
+    "codeRequirements": [
+      "Использовать ipcMain.handle",
+      "Валидация пути (запрет выхода за пределы разрешенной директории)",
+      "Асинхронная запись через fs.promises"
+    ],
+    "outputFormat": "TypeScript код + краткое описание использования",
+    "enabled": true
+  },
+  "technicalRequirements": {
+    "compatibility": ["Windows", "macOS", "Linux"],
+    "dataHandling": ["экранирование пути", "проверка типа данных"],
+    "security": ["запрет абсолютных путей вне userData", "валидация расширения файла"],
+    "performance": ["асинхронный ввод‑вывод", "буферизация"],
+    "enabled": true
+  },
+  "responseStructure": {
+    "sections": [
+      {
+        "name": "Реализация",
+        "required": true,
+        "depth": "detailed",
+        "format": "Блок кода TypeScript с комментариями"
+      },
+      {
+        "name": "Пояснение",
+        "required": false,
+        "depth": "short",
+        "format": "Markdown список ключевых моментов"
+      }
+    ],
+    "codeFormat": {
+      "syntax": "TypeScript",
+      "indentation": "spaces",
+      "namingConvention": "camelCase"
+    },
+    "enabled": true
+  },
+  "specialScenarios": {
+    "errorHandling": "Подробная обработка ошибок доступа и существования директории",
+    "testing": "Unit‑тесты с mock‑файловой системой",
+    "scalability": "Обработчик должен легко расширяться для других операций (чтение, удаление)",
+    "alternativeApproaches": "Приведение примера через потоковую запись для больших файлов",
+    "enabled": true
+  },
+  "restrictionsAndRules": {
+    "forbiddenPractices": ["синхронные вызовы fs", "использование eval"],
+    "dependenciesPolicy": "Только встроенные модули Node.js, без сторонних библиотек",
+    "compliance": ["Electron Security Checklist"],
+    "environmentConsiderations": ["пути должны быть относительны app.getPath('userData')"],
+    "enabled": true
+  },
+  "additionalPreferences": {
+    "tone": "профессиональный",
+    "length": "detailed",
+    "preferredPatterns": ["паттерн «Handler» с типизированными аргументами"],
+    "specialEmphases": ["безопасность", "читаемость"],
+    "enabled": true
+  },
+  "codeContext": {
+    "language": "TypeScript",
+    "sourceType": "snippet",
+    "codeSources": "// place your IPC handler here\nipcMain.handle('save-file', async (event, data: MyData) => { ... })",
+    "purpose": "Шаблон IPC‑обработчика записи файла",
+    "process": "main",
+    "dependencies": ["electron", "fs/promises", "path"],
+    "problemDescription": "Необходимо добавить проверку на существование директории",
+    "enabled": true
+  },
+  "developmentContext": {
+    "backendStructure": {
+      "type": "tree",
+      "content": "src/main/ipc-handlers.ts",
+      "rootDirectory": "./src/main",
+      "description": "Файл с обработчиками IPC"
+    },
+    "buildProcess": "Electron Forge + Vite",
+    "deploymentStrategy": "electron-builder для создания установщика",
+    "enabled": true
+  }
+}

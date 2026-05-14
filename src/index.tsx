@@ -16,6 +16,7 @@ import 'primeicons/primeicons.css';
 // Включаем стили пользовательского интерфейса, чтобы наш код мог переопределять CSS пакета.
 import '@/index.css';
 import React, { StrictMode } from 'react';
+import { PrimeReactProvider } from 'primereact/api';
 
 const root = ReactDOM.createRoot(document.getElementById('root')!);
 
@@ -40,9 +41,9 @@ try {
         <React.Fragment>
           {
             strictmode ? 
-              <StrictMode><Root/></StrictMode>
+              <StrictMode><PrimeReactProvider><Root/></PrimeReactProvider></StrictMode>
             : 
-              <Root/>
+              <PrimeReactProvider><Root/></PrimeReactProvider>
           }
         </React.Fragment>
       );

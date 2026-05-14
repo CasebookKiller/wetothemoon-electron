@@ -1,0 +1,128 @@
+{
+  "id": "refactor-project-structure",
+  "title": "Рефакторинг и оптимизация структуры проекта",
+  "description": "Описание проблемных файлов и путей к ним для переработки архитектуры",
+  "version": "1.0",
+  "createdAt": "2025-12-01",
+  "updatedAt": "2025-12-01",
+  "role": {
+    "position": "Software Architect",
+    "experience": "8+ лет",
+    "specialization": "Electron, архитектура десктопных приложений",
+    "communicationStyle": "структурированный, с диаграммами",
+    "priorities": ["модульность", "сопровождаемость"],
+    "enabled": true
+  },
+  "projectContext": {
+    "technologies": [
+      { "name": "Electron", "version": "28.x", "purpose": "десктоп" },
+      { "name": "React", "version": "18.x", "purpose": "UI" },
+      { "name": "Vite", "version": "5.x", "purpose": "сборщик" }
+    ],
+    "architecture": {
+      "type": "Многослойная (main / preload / renderer)",
+      "components": ["renderer UI", "preload API", "main services"],
+      "interaction": "синхронный/асинхронный IPC"
+    },
+    "integrations": [],
+    "standards": ["SOLID", "Feature‑Sliced Design"],
+    "fullProjectStructure": {
+      "type": "tree",
+      "content": "src/\n  main/\n    services/\n  preload/\n  renderer/\n    features/",
+      "rootDirectory": "./src",
+      "description": "Текущая (запутанная) структура"
+    },
+    "enabled": true
+  },
+  "taskAndExpectations": {
+    "mainTask": "Разделить монолитный main‑процесс на сервисы по функциональности, обновить preload‑скрипты для соответствия новой структуре",
+    "expectedResult": "План рефакторинга с указанием путей к файлам и конкретными проблемами",
+    "codeRequirements": ["сохранить обратную совместимость IPC"],
+    "outputFormat": "Список файлов с описанием изменений",
+    "enabled": true
+  },
+  "technicalRequirements": {
+    "compatibility": [],
+    "dataHandling": [],
+    "security": [],
+    "performance": ["снизить связность"],
+    "enabled": true
+  },
+  "responseStructure": {
+    "sections": [
+      {
+        "name": "Анализ текущих проблем",
+        "required": true,
+        "depth": "detailed",
+        "format": "Markdown"
+      }
+    ],
+    "codeFormat": {
+      "syntax": "TypeScript",
+      "indentation": "spaces",
+      "namingConvention": "camelCase"
+    },
+    "enabled": true
+  },
+  "specialScenarios": {
+    "errorHandling": "",
+    "testing": "",
+    "scalability": "Упростить добавление новых фич",
+    "alternativeApproaches": "Возможен переход на модульную архитектуру",
+    "enabled": true
+  },
+  "restrictionsAndRules": {
+    "forbiddenPractices": ["циклические зависимости"],
+    "dependenciesPolicy": "Не добавлять новые пакеты без необходимости",
+    "compliance": [],
+    "environmentConsiderations": [],
+    "enabled": true
+  },
+  "additionalPreferences": {
+    "tone": "профессиональный",
+    "length": "detailed",
+    "preferredPatterns": ["инверсия зависимостей"],
+    "specialEmphases": ["чистота кода"],
+    "enabled": true
+  },
+  "codeContext": {
+    "language": "TypeScript",
+    "sourceType": "file-paths",
+    "codeSources": [
+      {
+        "path": "src/main/index.ts",
+        "purpose": "Основной файл main‑процесса, слишком раздутый (800+ строк)",
+        "process": "main",
+        "problemDescription": "Смешаны создание окна, все IPC‑обработчики и меню"
+      },
+      {
+        "path": "src/preload/index.ts",
+        "purpose": "Preload скрипт, экспонирует более 20 методов",
+        "process": "main",
+        "problemDescription": "Отсутствует разделение по доменам"
+      },
+      {
+        "path": "src/renderer/App.tsx",
+        "purpose": "Корневой компонент, содержит бизнес‑логику",
+        "process": "renderer",
+        "problemDescription": "Много useState и useEffect, не вынесено в кастомные хуки"
+      }
+    ],
+    "purpose": "",
+    "process": "",
+    "dependencies": [],
+    "problemDescription": "",
+    "enabled": true
+  },
+  "developmentContext": {
+    "backendStructure": {
+      "type": "tree",
+      "content": "src/main/services/",
+      "rootDirectory": "./",
+      "description": "Новая папка сервисов"
+    },
+    "buildProcess": "Electron Forge",
+    "deploymentStrategy": "Пакетная сборка",
+    "enabled": true
+  }
+}

@@ -1,0 +1,212 @@
+.chat-button {
+  color: var(--tg-theme-accent-text-color);
+  border-color: var(--tg-theme-accent-text-color);
+}
+
+.chat-button-active {
+  background-color: var(--tg-theme-accent-text-color);
+  color: var(--tg-theme-section-bg-color);
+  border-color: var(--tg-theme-accent-text-color);
+}
+
+
+.sidebar-with-scroll {
+  overflow-y: auto;
+  max-height: 100vh;
+  padding-right: 8px;
+  box-sizing: border-box;
+}
+
+/* Стили для скроллбара (WebKit — Chrome, Safari, Edge) */
+.sidebar-with-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+
+.sidebar-with-scroll::-webkit-scrollbar-track {
+  background: #2c2c2c;
+  border-radius: 3px;
+}
+
+.sidebar-with-scroll::-webkit-scrollbar-thumb {
+  background: var(--tg-theme-accent-text-color);
+  border-radius: 3px;
+}
+
+.sidebar-with-scroll::-webkit-scrollbar-thumb:hover {
+  background: color-mix(
+    in srgb,
+    var(--tg-theme-accent-text-color) 80%,
+    #000000 20%
+  );
+}
+
+/* Фолбэк для Firefox */
+@supports (-moz-appearance: none) {
+  .sidebar-with-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: var(--tg-theme-accent-text-color) #2c2c2c;
+  }
+}
+
+/* Контейнер для списка диалогов с прокруткой */
+.conversation-list {
+  /*max-height: 300px;*/
+  overflow-y: auto;
+  margin-top: 8px;
+}
+
+/* Стили скроллбара для списка диалогов (WebKit) */
+.conversation-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.conversation-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.conversation-list::-webkit-scrollbar-thumb {
+  background: var(--tg-theme-accent-text-color);
+  border-radius: 2px;
+}
+
+.conversation-list::-webkit-scrollbar-thumb:hover {
+  background: color-mix(
+    in srgb,
+    var(--tg-theme-accent-text-color) 80%,
+    #000000 20%
+  );
+}
+
+/* Фолбэк для Firefox в списке диалогов */
+@supports (-moz-appearance: none) {
+  .conversation-list {
+    scrollbar-width: thin;
+    scrollbar-color: var(--tg-theme-accent-text-color) transparent;
+  }
+}
+
+.p-button.p-button-accent, .p-button-group.p-button-accent > .p-button, .p-splitbutton.p-button-accent > .p-button, .p-fileupload-choose.p-button-accent {
+  color: #052e16;
+  background: var(--tg-theme-accent-text-color);
+  border: 1px solid var(--tg-theme-accent-text-color);
+}
+
+.p-button.p-button-accent.p-disabled, .p-button.p-button-accent.p-disabled * {
+  cursor: default;
+  pointer-events: none;
+  user-select: none;
+  color: var(--tg-theme-section-bg-color);
+}
+
+.p-button.p-button-accent.p-disabled, .p-button.p-button-accent.p-disabled * {
+    cursor: default;
+    pointer-events: none;
+    user-select: none;
+    color: var(--tg-theme-section-bg-color);
+}
+
+.p-button.p-button-accent-outlined,
+.p-button-group.p-button-accent-outlined > .p-button,
+.p-splitbutton.p-button-accent-outlined > .p-button,
+.p-fileupload-choose.p-button-accent-outlined {
+  color: var(--tg-theme-accent-text-color);
+  background: transparent;
+  border: 1px solid var(--tg-theme-accent-text-color);
+  transition: all 0.2s ease-in-out;
+}
+
+.p-button.p-button-accent-outlined:hover,
+.p-button-group.p-button-accent-outlined > .p-button:hover,
+.p-splitbutton.p-button-accent-outlined > .p-button:hover,
+.p-fileupload-choose.p-button-accent-outlined:hover {
+  background: var(--tg-theme-accent-text-color);
+  color: var(--tg-theme-section-bg-color);
+  border-color: var(--tg-theme-accent-text-color);
+}
+
+.p-button.p-button-accent-outlined:focus,
+.p-button-group.p-button-accent-outlined > .p-button:focus,
+.p-splitbutton.p-button-accent-outlined > .p-button:focus,
+.p-fileupload-choose.p-button-accent-outlined:focus {
+  box-shadow: 0 0 0 2px rgba(var(--tg-theme-accent-text-rgb), 0.2);
+  outline: none;
+}
+
+.p-button.p-button-accent-outlined.p-disabled,
+.p-button.p-button-accent-outlined.p-disabled *,
+.p-button-group.p-button-accent-outlined > .p-button.p-disabled,
+.p-splitbutton.p-button-accent-outlined > .p-button.p-disabled,
+.p-fileupload-choose.p-button-accent-outlined.p-disabled {
+  cursor: default;
+  pointer-events: none;
+  user-select: none;
+  color: var(--tg-theme-section-bg-color);
+  background: transparent;
+  border: 1px solid var(--tg-theme-section-bg-color);
+  opacity: 0.5;
+}
+
+.p-button.p-button-hint, .p-button-group.p-button-hint > .p-button, .p-splitbutton.p-button-hint > .p-button, .p-fileupload-choose.p-button-hint {
+  color: #e6e6e6;
+  background: var(--tg-theme-hint-color);
+  border: 1px solid var(--tg-theme-hint-color);
+}
+
+.p-selectbutton > .p-button {
+  font-size: 0.75rem;
+  transition: background-color 0.1s, color 0.1s, border-color 0.1s, box-shadow 0.1s;
+}
+
+.p-button.p-highlight {
+  color: var(--tg-theme-section-bg-color);
+  background: var(--tg-theme-accent-text-color);
+  border: 1px solid var(--tg-theme-accent-text-color);
+}
+
+.p-selectbutton-off > .p-selectbutton > .p-button.p-highlight {
+  color: var(--tg-theme-section-bg-color);
+  background: var(--tg-theme-hint-color);
+  border: 1px solid var(--tg-theme-hint-color);
+}
+
+.p-button:not(:disabled):active {
+    background: var(--tg-theme-accent-text-color);
+    color: var(--tg-theme-section-bg-color);
+    border-color: var(--tg-theme-accent-text-color);
+}
+
+.p-button:focus {
+    box-shadow: 0 0 0 2px #1c2127, 0 0 0 4px var(--tg-theme-accent-text-color), 0 1px 2px 0 rgba(0, 0, 0, 0);
+}
+
+.border-accent {
+  border-color: var(--tg-theme-accent-text-color) !important;
+}
+
+.p-button.p-button-accent-outlined {
+    background-color: transparent;
+    color: var(--tg-theme-accent-text-color);
+    border: 1px solid;
+}
+
+.border-hint {
+  border-color: var(--tg-theme-hint-color);
+}
+
+
+/* НАДО ВЫНЕСТИ ОБЩИЕ СТИЛИ В ГЛОБАЛЬНЫЙ CSS */
+
+.p-inputtext:enabled:hover {
+  border-color: var(--tg-theme-accent-text-color);
+}
+
+.p-dropdown:not(.p-disabled):hover {
+    border-color: var(--tg-theme-accent-text-color);
+}
+
+.p-dropdown:not(.p-disabled).p-focus {
+    outline: 0 none;
+    outline-offset: 0;
+    box-shadow: 0 0 0 0.2rem rgba(34, 211, 238, 0.2);
+    border-color: var(--tg-theme-accent-text-color);
+}

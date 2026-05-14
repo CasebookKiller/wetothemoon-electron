@@ -17,6 +17,7 @@ import { getRiskLevel, getRiskLevelText, getSeverity, getStatus, parseTokens } f
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 
 import './BondDetailPage.css';
+import MarketStreamTest from '@/components/BONDS/MarketStreamTest/MarketStreamTest';
 
 interface iedate {
   date: string;
@@ -62,7 +63,7 @@ export const BondDetailPage: FC = () => {
 
   async function getBond(ticker: string, classcode: string) {
     const stored = getItem('user');
-    const user = JSON.parse(stored || '{}');
+    const user = typeof stored === 'string' ? JSON.parse(stored || '{}') : stored;
     
     const data = getItem('tokens');
     const ttoken = parseTokens(data);
@@ -80,7 +81,7 @@ export const BondDetailPage: FC = () => {
 
   async function getBondEvents(from: string, to: string, instrumentId: string, type: string) {
     const stored = getItem('user');
-    const user = JSON.parse(stored || '{}');
+    const user = typeof stored === 'string' ? JSON.parse(stored || '{}') : stored;
     
     const ttoken = parseTokens(getItem('tokens'));
 

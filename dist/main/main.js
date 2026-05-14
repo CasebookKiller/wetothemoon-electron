@@ -23,66 +23,168 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 let electron = require("electron");
 let path = require("path");
 path = __toESM(path);
-let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_electron_squirrel_startup_index_js = require("/home/ll/Документы/GitHub/wetothemoon-project/wetothemoon-electron/node_modules/electron-squirrel-startup/index.js");
-_home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_electron_squirrel_startup_index_js = __toESM(_home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_electron_squirrel_startup_index_js);
-//#region src/main/main.ts
-var mainWindow = null;
-var llamaWindow = null;
-var MAIN_WINDOW_VITE_DEV_SERVER_URL = "http://localhost:5574";
-var LLAMA_WINDOW_VITE_DEV_SERVER_URL = "http://localhost:5575";
-process.on("message", (msg) => {
-	if (msg?.type === "MAIN_WINDOW_READY") {
-		MAIN_WINDOW_VITE_DEV_SERVER_URL = msg.data.url;
-		console.log("Main window URL set to:", MAIN_WINDOW_VITE_DEV_SERVER_URL);
-	} else if (msg?.type === "LLAMA_WINDOW_READY") {
-		LLAMA_WINDOW_VITE_DEV_SERVER_URL = msg.data.url;
-		console.log("Llama window URL set to:", LLAMA_WINDOW_VITE_DEV_SERVER_URL);
+let child_process = require("child_process");
+let fs_promises = require("fs/promises");
+fs_promises = __toESM(fs_promises);
+let fs = require("fs");
+fs = __toESM(fs);
+let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js = require("/home/ll/Документы/GitHub/wetothemoon-project/wetothemoon-electron/node_modules/@grpc/grpc-js/build/src/index.js");
+_home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js = __toESM(_home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js);
+let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_proto_loader_build_src_index_js = require("/home/ll/Документы/GitHub/wetothemoon-project/wetothemoon-electron/node_modules/@grpc/proto-loader/build/src/index.js");
+_home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_proto_loader_build_src_index_js = __toESM(_home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_proto_loader_build_src_index_js);
+//#region src/main/windows/aiWindow.ts
+var aiWindow$1 = null;
+var preloadPath$3 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preloadai.js") : path.default.join(__dirname, "../../dist/main/preloadai.js");
+var createAIWindow = () => {
+	if (aiWindow$1) {
+		aiWindow$1.focus();
+		return;
 	}
-});
-if (_home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_electron_squirrel_startup_index_js.default) electron.app.quit();
-var createWindow = () => {
-	mainWindow = new electron.BrowserWindow({
-		width: 1024,
-		height: 768,
-		webPreferences: {
-			preload: path.default.join(__dirname, "preload.js"),
-			contextIsolation: true,
-			nodeIntegration: false
-		}
-	});
-	if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-		console.log("%cMAIN_WINDOW_VITE_DEV_SERVER_URL: %s", "color: cyan;", MAIN_WINDOW_VITE_DEV_SERVER_URL);
-		mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
-	} else mainWindow.loadFile(path.default.join(__dirname, `../renderer/main_window/index.html`));
-	mainWindow.webContents.openDevTools();
-};
-function createLlamaWindow() {
-	llamaWindow = new electron.BrowserWindow({
+	aiWindow$1 = new electron.BrowserWindow({
 		width: 800,
 		height: 600,
-		title: "Llama Window",
+		title: "Нейро",
 		webPreferences: {
-			preload: path.default.join(__dirname, "preload.js"),
+			preload: preloadPath$3,
 			contextIsolation: true,
 			nodeIntegration: false
 		}
 	});
-	if (LLAMA_WINDOW_VITE_DEV_SERVER_URL) {
-		console.log("%cLLAMA_WINDOW_VITE_DEV_SERVER_URL: %s", "color: cyan;", LLAMA_WINDOW_VITE_DEV_SERVER_URL);
-		llamaWindow.loadURL(LLAMA_WINDOW_VITE_DEV_SERVER_URL);
-	} else llamaWindow.loadFile(path.default.join(__dirname, `../renderer/llama-window/index.html`));
-}
-var menuTemplate = [
+	const mainWindow = getMainWindow();
+	const MAIN_WINDOW_PROD_PATH = getMainWindowProdPath();
+	if (mainWindow && process.env.NODE_ENV === "development") {
+		const url = mainWindow.webContents.getURL() + "/#/ai";
+		aiWindow$1.loadURL(url);
+		aiWindow$1.webContents.openDevTools();
+	} else aiWindow$1.loadFile(MAIN_WINDOW_PROD_PATH);
+	const menu = electron.Menu.buildFromTemplate(aiWindowMenuTemplate);
+	aiWindow$1.setMenu(menu);
+	aiWindow$1.on("closed", () => {
+		aiWindow$1 = null;
+	});
+};
+var getAIWindow = () => aiWindow$1;
+//#endregion
+//#region src/main/windows/mdWindow.ts
+var mdWindow$1 = null;
+var createMDWindow = () => {
+	if (mdWindow$1) {
+		mdWindow$1.focus();
+		return;
+	}
+	mdWindow$1 = new electron.BrowserWindow({
+		width: 800,
+		height: 600,
+		title: "Markdown",
+		webPreferences: {
+			contextIsolation: true,
+			nodeIntegration: false
+		}
+	});
+	const mainWindow = getMainWindow();
+	if (mainWindow && process.env.NODE_ENV === "development") {
+		const url = mainWindow.webContents.getURL() + "/#/md";
+		mdWindow$1.loadURL(url);
+		mdWindow$1.webContents.openDevTools();
+	}
+	mdWindow$1.on("closed", () => {
+		mdWindow$1 = null;
+	});
+};
+var getMDWindow = () => mdWindow$1;
+//#endregion
+//#region src/main/windows/bondsWindow.ts
+var bondsWindow$1 = null;
+var preloadPath$2 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preloadbonds.js") : path.default.join(__dirname, "../../dist/main/preloadbonds.js");
+var createBondsWindow = () => {
+	if (bondsWindow$1) {
+		bondsWindow$1.focus();
+		return;
+	}
+	bondsWindow$1 = new electron.BrowserWindow({
+		width: 1024,
+		height: 768,
+		title: "Облигации",
+		webPreferences: {
+			preload: preloadPath$2,
+			contextIsolation: true,
+			nodeIntegration: false
+		}
+	});
+	const mainWindow = getMainWindow();
+	const MAIN_WINDOW_PROD_PATH = getMainWindowProdPath();
+	if (mainWindow && process.env.NODE_ENV === "development") {
+		const url = mainWindow.webContents.getURL() + "/#/bonds";
+		console.log("%cAI_WINDOW__URL: %s", "color: cyan;", url);
+		bondsWindow$1.loadURL(url);
+		bondsWindow$1.webContents.openDevTools();
+	} else bondsWindow$1.loadFile(MAIN_WINDOW_PROD_PATH);
+	const menu = electron.Menu.buildFromTemplate(bondsWindowMenuTemplate);
+	bondsWindow$1.setMenu(menu);
+	bondsWindow$1.on("closed", () => {
+		bondsWindow$1 = null;
+	});
+};
+var getBondsWindow = () => bondsWindow$1;
+//#endregion
+//#region src/main/windows/pgWindow.ts
+var pgWindow$1 = null;
+var preloadPath$1 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preloadpg.js") : path.default.join(__dirname, "../../dist/main/preloadpg.js");
+var createPGWindow = () => {
+	if (pgWindow$1) {
+		pgWindow$1.focus();
+		return;
+	}
+	pgWindow$1 = new electron.BrowserWindow({
+		width: 800,
+		height: 600,
+		title: "Генератор запросов",
+		webPreferences: {
+			preload: preloadPath$1,
+			contextIsolation: true,
+			nodeIntegration: false
+		}
+	});
+	const mainWindow = getMainWindow();
+	if (mainWindow && process.env.NODE_ENV === "development") {
+		const url = mainWindow.webContents.getURL() + "/#/pg";
+		pgWindow$1.loadURL(url);
+		pgWindow$1.webContents.openDevTools();
+	}
+	pgWindow$1.on("closed", () => {
+		pgWindow$1 = null;
+	});
+};
+var getPGWindow = () => pgWindow$1;
+//#endregion
+//#region src/main/menus/windowMenus.ts
+var mainMenuTemplate = [
 	{
 		label: "Файл",
-		submenu: [{
-			label: "Открыть Нейро",
-			click: createLlamaWindow
-		}, {
-			label: "Выйти",
-			accelerator: "CmdOrCtrl+Q",
-			click: () => electron.app.quit()
-		}]
+		submenu: [
+			{
+				label: "Открыть Нейро",
+				click: createAIWindow
+			},
+			{
+				label: "Открыть Markdown",
+				click: createMDWindow
+			},
+			{
+				label: "Открыть Облигации",
+				click: createBondsWindow
+			},
+			{
+				label: "Открыть Генератор запросов",
+				click: createPGWindow
+			},
+			{ type: "separator" },
+			{
+				label: "Выйти",
+				click: () => electron.app.quit(),
+				accelerator: "CmdOrCtrl+Q"
+			}
+		]
 	},
 	{
 		label: "Правка",
@@ -148,47 +250,1291 @@ var menuTemplate = [
 		role: "windowMenu"
 	}
 ];
-var menu = electron.Menu.buildFromTemplate(menuTemplate);
-electron.Menu.setApplicationMenu(menu);
-electron.app.on("ready", () => {
+var aiWindowMenuTemplate = [
+	{
+		label: "Нейро",
+		submenu: [
+			{
+				label: "Сохранить результат",
+				click: () => {
+					const windows = electron.BrowserWindow.getAllWindows();
+					if (windows.length > 0) windows[0].webContents.send("save-ai-result");
+				}
+			},
+			{
+				label: "Очистить историю",
+				click: () => {
+					const windows = electron.BrowserWindow.getAllWindows();
+					if (windows.length > 0) windows[0].webContents.send("clear-ai-history");
+				}
+			},
+			{ type: "separator" },
+			{
+				label: "Экспорт текущего диалога",
+				click: () => {
+					getAIWindow()?.webContents.send("export-current-conversation", {
+						action: "send-data",
+						timestamp: Date.now(),
+						message: "Выбран пункт меню \"Экспорт текущего диалога\"!"
+					});
+					console.log("Выбран пункт меню \"Экспорт текущего диалога\" - для отправки сообщения React");
+				}
+			},
+			{
+				label: "Экспорт всех диалогов",
+				click: () => {
+					getAIWindow()?.webContents.send("export-all-conversations", {
+						action: "send-data",
+						timestamp: Date.now(),
+						message: "Выбран пункт меню \"Экспорт всех диалогов\"!"
+					});
+					console.log("Выбран пункт меню \"Экспорт всех диалогов\" - для отправки сообщения React");
+				}
+			},
+			{
+				label: "Сохранить в Supabase",
+				click: () => {
+					getAIWindow()?.webContents.send("backup-to-supabase", {
+						action: "send-data",
+						timestamp: Date.now(),
+						message: "Выбран пункт меню \"Сохранить в Supabase\"!"
+					});
+					console.log("Выбран пункт меню \"Сохранить в Supabase\" - для отправки сообщения React");
+				}
+			},
+			{ type: "separator" },
+			{
+				label: "Закрыть окно",
+				accelerator: "CmdOrCtrl+W",
+				role: "close"
+			}
+		]
+	},
+	{
+		label: "Правка",
+		submenu: [
+			{
+				label: "Отменить",
+				accelerator: "CmdOrCtrl+Z",
+				role: "undo"
+			},
+			{
+				label: "Повторить",
+				accelerator: "Shift+CmdOrCtrl+Z",
+				role: "redo"
+			},
+			{ type: "separator" },
+			{
+				label: "Вырезать",
+				accelerator: "CmdOrCtrl+X",
+				role: "cut"
+			},
+			{
+				label: "Копировать",
+				accelerator: "CmdOrCtrl+C",
+				role: "copy"
+			},
+			{
+				label: "Вставить",
+				accelerator: "CmdOrCtrl+V",
+				role: "paste"
+			}
+		]
+	},
+	{
+		label: "Вид",
+		submenu: [{
+			label: "Перезагрузить",
+			accelerator: "CmdOrCtrl+R",
+			role: "reload"
+		}, {
+			label: "Инструменты разработчика",
+			accelerator: process.platform === "darwin" ? "Alt+Cmd+I" : "Ctrl+Shift+I",
+			role: "toggleDevTools"
+		}]
+	},
+	{
+		label: "Окно",
+		submenu: [
+			{
+				label: "Свернуть",
+				accelerator: "CmdOrCtrl+M",
+				role: "minimize"
+			},
+			{
+				label: "Увеличить",
+				role: "zoom"
+			},
+			{
+				label: "Закрыть",
+				accelerator: "CmdOrCtrl+W",
+				role: "close"
+			}
+		],
+		role: "windowMenu"
+	}
+];
+process.platform;
+var bondsWindowMenuTemplate = [
+	{
+		label: "Облигации",
+		submenu: [
+			{
+				label: "Экспорт в JSON",
+				click: () => {
+					const windows = electron.BrowserWindow.getAllWindows();
+					if (windows.length > 0) windows[0].webContents.send("export-bonds-to-json");
+				}
+			},
+			{ type: "separator" },
+			{
+				label: "Закрыть окно",
+				accelerator: "CmdOrCtrl+W",
+				role: "close"
+			}
+		]
+	},
+	{
+		label: "Правка",
+		submenu: [
+			{
+				label: "Отменить",
+				accelerator: "CmdOrCtrl+Z",
+				role: "undo"
+			},
+			{
+				label: "Повторить",
+				accelerator: "Shift+CmdOrCtrl+Z",
+				role: "redo"
+			},
+			{ type: "separator" },
+			{
+				label: "Вырезать",
+				accelerator: "CmdOrCtrl+X",
+				role: "cut"
+			},
+			{
+				label: "Копировать",
+				accelerator: "CmdOrCtrl+C",
+				role: "copy"
+			},
+			{
+				label: "Вставить",
+				accelerator: "CmdOrCtrl+V",
+				role: "paste"
+			}
+		]
+	},
+	{
+		label: "Вид",
+		submenu: [{
+			label: "Перезагрузить",
+			accelerator: "CmdOrCtrl+R",
+			role: "reload"
+		}, {
+			label: "Инструменты разработчика",
+			accelerator: process.platform === "darwin" ? "Alt+Cmd+I" : "Ctrl+Shift+I",
+			role: "toggleDevTools"
+		}]
+	},
+	{
+		label: "Окно",
+		submenu: [
+			{
+				label: "Свернуть",
+				accelerator: "CmdOrCtrl+M",
+				role: "minimize"
+			},
+			{
+				label: "Увеличить",
+				role: "zoom"
+			},
+			{
+				label: "Закрыть",
+				accelerator: "CmdOrCtrl+W",
+				role: "close"
+			}
+		],
+		role: "windowMenu"
+	}
+];
+//#endregion
+//#region src/main/windows/mainWindow.ts
+var mainWindow = null;
+var preloadPath = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var MAIN_WINDOW_VITE_DEV_SERVER_URL = "http://localhost:5173";
+var MAIN_WINDOW_PROD_PATH = path.default.join(__dirname, "../../renderer/main-window/index.html");
+var createMainWindow = () => {
+	mainWindow = new electron.BrowserWindow({
+		width: 1024,
+		height: 768,
+		title: "Мы на Луну!",
+		webPreferences: {
+			preload: preloadPath,
+			contextIsolation: true,
+			nodeIntegration: false
+		}
+	});
+	const menu = electron.Menu.buildFromTemplate(mainMenuTemplate);
+	mainWindow.setMenu(menu);
+	mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
+	mainWindow.webContents.openDevTools();
+	mainWindow.webContents.openDevTools();
+};
+var getMainWindow = () => {
+	return mainWindow;
+};
+var getMainWindowProdPath = () => MAIN_WINDOW_PROD_PATH;
+//#endregion
+//#region src/main/ipcHandlers/aiHandlers.ts
+getAIWindow();
+var callAIAPI = async (prompt) => {
+	const data = await (await fetch("http://localhost:11434/api/generate", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({
+			model: "t-tech/T-lite-it-2.1:q4_K_M",
+			prompt,
+			stream: false
+		})
+	})).json();
+	console.log("callAIAPI response:", data);
+	return data.response || "Нет ответа";
+};
+var registerAIHandlers = () => {
+	electron.ipcMain.handle("send-to-ai", async (event, message) => {
+		try {
+			const response = await callAIAPI(message);
+			console.log("API response:", response);
+			return response;
+		} catch (error) {
+			console.error("AI API error:", error);
+			throw error;
+		}
+	});
+	electron.ipcMain.handle("save-ai-result", (event) => {
+		const window = electron.BrowserWindow.fromWebContents(event.sender);
+		console.log("Saving AI result from:", window?.title);
+	});
+};
+//#endregion
+//#region src/main/training.ts
+var Platform = /* @__PURE__ */ function(Platform) {
+	Platform["AIX"] = "aix";
+	Platform["Android"] = "android";
+	Platform["Darwin"] = "darwin";
+	Platform["FreeBSD"] = "freebsd";
+	Platform["Haiku"] = "haiku";
+	Platform["Linux"] = "linux";
+	Platform["OpenBSD"] = "openbsd";
+	Platform["SunOS"] = "sunos";
+	Platform["Cygwin"] = "cygwin";
+	Platform["NetBSD"] = "netbsd";
+	Platform["Win32"] = "win32";
+	return Platform;
+}(Platform || {});
+var AITrainer = class {
+	pythonPath;
+	constructor() {
+		this.pythonPath = this.detectPython();
+	}
+	detectPython() {
+		if (process.platform === Platform.Win32) return "python";
+		return "python3";
+	}
+	async startFineTuning(data) {
+		return new Promise((resolve) => {
+			if (!data.dataPath || !data.modelName || !data.outputDir) {
+				resolve({
+					status: "error",
+					message: "Недостаточно данных для дообучения"
+				});
+				return;
+			}
+			const args = [
+				path.join(__dirname, "../../training/scripts/fine_tune_llama.py"),
+				"--data-path",
+				data.dataPath,
+				"--model-name",
+				data.modelName,
+				"--output-dir",
+				data.outputDir
+			];
+			const child = (0, child_process.exec)(`${this.pythonPath} ${args.join(" ")}`);
+			child.stdout?.on("data", (data) => {
+				const progress = this.parseProgress(data.toString());
+				if (progress) electron.ipcMain.emit("training-progress", progress);
+			});
+			child.stderr?.on("data", (data) => {
+				console.error(`[Training Error] ${data}`);
+				electron.ipcMain.emit("training-progress", {
+					status: "error",
+					message: data.toString(),
+					progress: 0
+				});
+			});
+			child.on("close", (code) => {
+				if (code === 0) resolve({
+					status: "completed",
+					outputDir: data.outputDir,
+					message: "Дообучение завершено успешно"
+				});
+				else resolve({
+					status: "error",
+					message: `Процесс завершился с кодом ${code}`
+				});
+			});
+			child.on("error", (error) => {
+				resolve({
+					status: "error",
+					message: error.message
+				});
+			});
+		});
+	}
+	parseProgress(output) {
+		const match = output.match(/Progress:\s*(\d+)%/);
+		if (match) {
+			const progress = parseInt(match[1], 10);
+			return {
+				status: "processing",
+				progress,
+				message: `Прогресс: ${progress}%`
+			};
+		}
+		return null;
+	}
+};
+//#endregion
+//#region src/main/ipcHandlers/trainingHandlers.ts
+var registerTrainingHandlers = () => {
+	electron.ipcMain.handle("start-fine-tuning", async (event, data) => {
+		try {
+			for (let i = 0; i <= 100; i += 10) {
+				event.sender.send("training-progress", {
+					status: `Обработка данных...`,
+					progress: i
+				});
+				await new Promise((resolve) => setTimeout(resolve, 500));
+			}
+			return {
+				status: "completed",
+				outputDir: data.outputDir
+			};
+		} catch (error) {
+			return {
+				status: "error",
+				message: error.message
+			};
+		}
+	});
+};
+new AITrainer();
+//#endregion
+//#region src/main/windows/ollamaWindow.ts
+var ollamaWindow$1 = null;
+var createOllamaWindow = () => {
+	if (ollamaWindow$1) {
+		ollamaWindow$1.focus();
+		return;
+	}
+	ollamaWindow$1 = new electron.BrowserWindow({
+		width: 800,
+		height: 600,
+		title: "Клиент Ollama ",
+		webPreferences: {
+			contextIsolation: true,
+			nodeIntegration: false
+		}
+	});
+	const mainWindow = getMainWindow();
+	if (mainWindow && process.env.NODE_ENV === "development") {
+		const url = mainWindow.webContents.getURL() + "/#/ollama";
+		ollamaWindow$1.loadURL(url);
+		ollamaWindow$1.webContents.openDevTools();
+	}
+	ollamaWindow$1.on("closed", () => {
+		ollamaWindow$1 = null;
+	});
+};
+var getOllamaWindow = () => ollamaWindow$1;
+//#endregion
+//#region src/main/ipcHandlers/bondsHandlers.ts
+getBondsWindow();
+var registerBondsHandlers = () => {
+	electron.ipcMain.handle("save-bonds-to-storage", async (event, message) => {
+		try {
+			return {};
+		} catch (error) {
+			console.error("AI API error:", error);
+			throw error;
+		}
+	});
+};
+//#endregion
+//#region src/main/ipcHandlers/dashboardHandlers.ts
+getMainWindow();
+var registerDashboardHandlers = () => {
+	electron.ipcMain.handle("get-tasks", async (event, message) => {
+		try {
+			return {};
+		} catch (error) {
+			console.error("AI API error:", error);
+			throw error;
+		}
+	});
+};
+//#endregion
+//#region src/main/ipcHandlers/mdHandlers.ts
+getMDWindow();
+var registerMDHandlers = () => {
+	electron.ipcMain.handle("get-md-file", async (event, message) => {
+		try {
+			return {};
+		} catch (error) {
+			console.error("AI API error:", error);
+			throw error;
+		}
+	});
+};
+//#endregion
+//#region src/main/ipcHandlers/pgHandlers.ts
+getPGWindow();
+var registerPGHandlers = () => {
+	electron.ipcMain.handle("get-package-dependencies", async () => {
+		try {
+			const packageJsonPath = path.default.join(electron.app.getAppPath(), "package.json");
+			const rawData = await fs_promises.default.readFile(packageJsonPath, "utf-8");
+			const packageJson = JSON.parse(rawData);
+			return {
+				dependencies: packageJson.dependencies || {},
+				devDependencies: packageJson.devDependencies || {},
+				peerDependencies: packageJson.peerDependencies || {}
+			};
+		} catch (error) {
+			console.error("Ошибка чтения package.json:", error);
+			return {
+				dependencies: {},
+				devDependencies: {},
+				peerDependencies: {}
+			};
+		}
+	});
+	electron.ipcMain.handle("get-package-json", async () => {
+		try {
+			const packagePath = path.default.join(electron.app.getAppPath(), "package.json");
+			const rawData = await fs_promises.default.readFile(packagePath, "utf-8");
+			return JSON.parse(rawData);
+		} catch (error) {
+			console.error("Ошибка чтения package.json:", error);
+			return {};
+		}
+	});
+	electron.ipcMain.handle("get-config-file", async (_, fileName, parseJson = true) => {
+		try {
+			const filePath = path.default.join(electron.app.getAppPath(), fileName);
+			await fs_promises.default.access(filePath, fs_promises.default.constants.R_OK);
+			const raw = await fs_promises.default.readFile(filePath, "utf-8");
+			return parseJson ? JSON.parse(raw) : raw;
+		} catch (err) {
+			console.warn(`Конфиг ${fileName} не найден или недоступен:`, err);
+			return null;
+		}
+	});
+	function categorizeFile(fileName) {
+		const ext = (0, path.extname)(fileName).toLowerCase();
+		const base = (0, path.basename)(fileName).toLowerCase();
+		if (base === "package.json" || base === ".eslintrc.json" || base === ".eslintrc.js" || base === ".prettierrc" || base === ".prettierrc.json" || base === "prettier.config.js" || base === "postcss.config.js" || base === "tailwind.config.js" || base === ".env" || base.startsWith(".env.") || base === "forge.config.js" || base === "forge.config.ts" || base === "forge.env.d.ts" || base === "electron-builder.yml" || base === "builder.config.ts") return "config";
+		if (base.startsWith("tsconfig") || base.startsWith("vite") && base.includes("config")) return "config";
+		if (base.match(/\.config\.(js|ts|json|yaml|yml)/)) return "config";
+		if ([".ts", ".tsx"].includes(ext)) return "typescript";
+		if ([".js", ".jsx"].includes(ext)) return "javascript";
+		if ([
+			".css",
+			".scss",
+			".less",
+			".sass"
+		].includes(ext)) return "style";
+		if ([".html", ".htm"].includes(ext)) return "html";
+		if ([".json"].includes(ext)) return "data";
+		if ([".md", ".txt"].includes(ext)) return "documentation";
+		return "other";
+	}
+	async function buildTree(rootPath, currentPath = rootPath) {
+		const entries = await (0, fs_promises.readdir)(currentPath, { withFileTypes: true });
+		const nodes = [];
+		for (const entry of entries) {
+			const fullPath = (0, path.join)(currentPath, entry.name);
+			const relativePath = fullPath.replace(rootPath, "").replace(/^[/\\]/, "");
+			if (entry.isDirectory()) {
+				if (entry.name === "node_modules" || entry.name.startsWith(".")) continue;
+				nodes.push({
+					name: entry.name,
+					path: relativePath,
+					type: "directory",
+					children: await buildTree(rootPath, fullPath)
+				});
+			} else nodes.push({
+				name: entry.name,
+				path: relativePath,
+				type: "file",
+				extension: (0, path.extname)(entry.name).substring(1),
+				category: categorizeFile(entry.name)
+			});
+		}
+		return nodes;
+	}
+	electron.ipcMain.handle("get-project-tree-json", async (_, folderPath) => {
+		return await buildTree(folderPath || electron.app.getAppPath());
+	});
+};
+//#endregion
+//#region src/types/promptgenerator.ts
+var CodeSourceType = /* @__PURE__ */ function(CodeSourceType) {
+	CodeSourceType["Snippet"] = "snippet";
+	CodeSourceType["MultipleSnippets"] = "multiple-snippets";
+	CodeSourceType["FilePaths"] = "file-paths";
+	return CodeSourceType;
+}({});
+/**
+* Валидирует промпт на соответствие структуре
+*/
+function validatePromptTemplate(prompt) {
+	try {
+		return !!prompt.id && !!prompt.title && !!prompt.version && !!prompt.createdAt && !!prompt.updatedAt && validateRole(prompt.role) && validateProjectContext(prompt.projectContext) && (prompt.codeContext ? validateCodeContext(prompt.codeContext) : true);
+	} catch {
+		return false;
+	}
+}
+function validateRole(role) {
+	return !!role.position && !!role.experience && !!role.specialization && !!role.communicationStyle;
+}
+function validateProjectContext(context) {
+	return Array.isArray(context.technologies) && !!context.architecture?.type && Array.isArray(context.architecture?.components);
+}
+function validateCodeContext(context) {
+	if (!context.enabled) return true;
+	if (!context.language) return false;
+	if (context.sourceType === void 0) return !!context.codeSnippet && typeof context.codeSnippet === "string";
+	switch (context.sourceType) {
+		case CodeSourceType.Snippet: return typeof context.codeSources === "string" && !!context.codeSources;
+		case CodeSourceType.MultipleSnippets:
+			if (!Array.isArray(context.codeSources)) return false;
+			return context.codeSources.every((source) => typeof source === "object" && "code" in source && !!source.code);
+		case CodeSourceType.FilePaths:
+			if (!Array.isArray(context.codeSources)) return false;
+			return context.codeSources.every((source) => typeof source === "object" && "path" in source && !!source.path);
+		default: return false;
+	}
+}
+//#endregion
+//#region src/main/main.ts
+var currentStream = null;
+electron.app.whenReady().then(() => {
 	electron.session.defaultSession.setCertificateVerifyProc((request, callback) => {
 		callback(0);
 	});
-	createWindow();
+	createMainWindow();
+	registerDashboardHandlers();
+	registerAIHandlers();
+	registerPGHandlers();
+	registerBondsHandlers();
+	registerMDHandlers();
+	registerTrainingHandlers();
 });
 electron.app.on("window-all-closed", () => {
 	if (process.platform !== "darwin") electron.app.quit();
 });
 electron.app.on("activate", () => {
-	if (electron.BrowserWindow.getAllWindows().length === 0) createWindow();
+	if (electron.BrowserWindow.getAllWindows().length === 0) createMainWindow();
 });
-electron.ipcMain.handle("open-llama-window", () => {
-	if (!llamaWindow) createLlamaWindow();
-	else llamaWindow.focus();
+var aiWindow = getAIWindow();
+electron.ipcMain.handle("open-ai-window", () => {
+	if (!aiWindow) createAIWindow();
+	else aiWindow.focus();
 });
-electron.ipcMain.handle("send-to-llama", async (event, message) => {
+var bondsWindow = getBondsWindow();
+electron.ipcMain.handle("open-bonds-window", () => {
+	if (!bondsWindow) createBondsWindow();
+	else bondsWindow.focus();
+});
+var mdWindow = getMDWindow();
+electron.ipcMain.handle("open-md-window", () => {
+	if (!mdWindow) createMDWindow();
+	else mdWindow.focus();
+});
+var pgWindow = getPGWindow();
+electron.ipcMain.handle("open-pg-window", () => {
+	if (!pgWindow) createPGWindow();
+	else pgWindow.focus();
+});
+var ollamaWindow = getOllamaWindow();
+electron.ipcMain.handle("open-ollama-window", () => {
+	if (!ollamaWindow) createOllamaWindow();
+	else ollamaWindow.focus();
+});
+electron.ipcMain.handle("open-file-picker", async () => {
 	try {
-		const response = await callLlamaAPI(message);
-		console.log("API response:", response);
-		return response;
+		const result = await electron.dialog.showOpenDialog({
+			title: "Выберите файлы для программирования",
+			defaultPath: path.default.join(__dirname, "projects"),
+			buttonLabel: "Выбрать файлы",
+			properties: ["openFile", "multiSelections"],
+			filters: [
+				{
+					name: "Языки программирования",
+					extensions: [
+						"js",
+						"jsx",
+						"ts",
+						"tsx",
+						"d.ts",
+						"py",
+						"pyi",
+						"pyw",
+						"pyd",
+						"rb",
+						"gemspec",
+						"go",
+						"mod",
+						"sum",
+						"rs",
+						"rlib",
+						"php",
+						"phar",
+						"java",
+						"class",
+						"jar",
+						"war",
+						"scala",
+						"kt",
+						"kts",
+						"swift",
+						"cs",
+						"cpp",
+						"cc",
+						"cxx",
+						"c++",
+						"c",
+						"h",
+						"hpp",
+						"sql",
+						"plsql"
+					]
+				},
+				{
+					name: "Конфигурационные файлы",
+					extensions: [
+						"json",
+						"json5",
+						"yaml",
+						"yml",
+						"xml",
+						"xsl",
+						"xslt",
+						"xsd",
+						"toml",
+						"env",
+						"gitignore",
+						"dockerignore",
+						"npmignore",
+						"editorconfig",
+						"prettierrc",
+						"eslintrc",
+						"stylelintrc"
+					]
+				},
+				{
+					name: "Документация и заметки",
+					extensions: [
+						"md",
+						"markdown",
+						"txt",
+						"text",
+						"conf",
+						"ini",
+						"log",
+						"out",
+						"err"
+					]
+				},
+				{
+					name: "Веб‑технологии",
+					extensions: [
+						"html",
+						"htm",
+						"xhtml",
+						"css",
+						"scss",
+						"sass",
+						"less",
+						"css.map",
+						"js.map",
+						"ts.map",
+						"ejs",
+						"mustache",
+						"haml",
+						"pug"
+					]
+				},
+				{
+					name: "Файлы разработки",
+					extensions: [
+						"dockerfile",
+						"gitlab-ci.yml",
+						"travis.yml",
+						"circle.yml",
+						"package.json",
+						"yarn.lock",
+						"package-lock.json",
+						"composer.json",
+						"makefile",
+						"build.xml",
+						"pom.xml",
+						"build.gradle",
+						"gitattributes",
+						"gitmodules"
+					]
+				},
+				{
+					name: "Все файлы",
+					extensions: ["*"]
+				}
+			]
+		});
+		console.log(result);
+		if (!result.canceled && result.filePaths.length > 0) return result.filePaths;
+		else return null;
 	} catch (error) {
-		console.error("Llama API error:", error);
+		console.error("Ошибка в main процессе:", error);
+		return null;
+	}
+});
+var getLanguageFromFilename = (filename) => {
+	const extension = (filename.split(/[\\/]/).pop() || filename).split(".").pop()?.toLowerCase();
+	if (!extension) return "";
+	return {
+		js: "javascript",
+		jsx: "javascript",
+		ts: "typescript",
+		tsx: "typescript",
+		"d.ts": "typescript",
+		py: "python",
+		pyi: "python",
+		pyw: "python",
+		pyd: "python",
+		rb: "ruby",
+		gemspec: "ruby",
+		go: "go",
+		mod: "go",
+		sum: "go",
+		rs: "rust",
+		rlib: "rust",
+		php: "php",
+		phar: "php",
+		java: "java",
+		class: "java",
+		jar: "java",
+		war: "java",
+		scala: "scala",
+		kt: "kotlin",
+		kts: "kotlin",
+		swift: "swift",
+		cs: "csharp",
+		cpp: "cpp",
+		cc: "cpp",
+		cxx: "cpp",
+		"c++": "cpp",
+		c: "c",
+		h: "c",
+		hpp: "cpp",
+		sql: "sql",
+		plsql: "plsql",
+		html: "html",
+		htm: "html",
+		xhtml: "xhtml",
+		css: "css",
+		scss: "scss",
+		sass: "sass",
+		less: "less",
+		"css.map": "css-sourcemap",
+		"js.map": "javascript-sourcemap",
+		"ts.map": "typescript-sourcemap",
+		ejs: "ejs",
+		mustache: "mustache",
+		haml: "haml",
+		pug: "pug",
+		json: "json",
+		json5: "json5",
+		yaml: "yaml",
+		yml: "yaml",
+		xml: "xml",
+		xsl: "xsl",
+		xslt: "xslt",
+		xsd: "xsd",
+		toml: "toml",
+		env: "env",
+		gitignore: "gitignore",
+		dockerignore: "dockerignore",
+		npmignore: "npmignore",
+		editorconfig: "editorconfig",
+		prettierrc: "prettierrc",
+		eslintrc: "eslintrc",
+		stylelintrc: "stylelintrc",
+		md: "markdown",
+		markdown: "markdown",
+		txt: "text",
+		text: "text",
+		conf: "conf",
+		ini: "ini",
+		log: "log",
+		out: "log",
+		err: "log",
+		dockerfile: "dockerfile",
+		"gitlab-ci.yml": "gitlab-ci",
+		"travis.yml": "travis",
+		"circle.yml": "circleci",
+		"package.json": "json",
+		"yarn.lock": "yarn-lock",
+		"package-lock.json": "json",
+		"composer.json": "json",
+		makefile: "makefile",
+		"build.xml": "ant-build",
+		"pom.xml": "maven-pom",
+		"build.gradle": "gradle",
+		gitattributes: "gitattributes",
+		gitmodules: "gitmodules"
+	}[extension] || "";
+};
+electron.ipcMain.handle("read-files-contents", async (event, filePaths) => {
+	const filesContents = [];
+	for (const filePath of filePaths) try {
+		const language = getLanguageFromFilename(filePath);
+		const fileName = path.default.basename(filePath);
+		const content = await new Promise((resolve, reject) => {
+			fs.default.readFile(filePath, "utf-8", (err, data) => {
+				if (err) reject(err);
+				else resolve(data);
+			});
+		});
+		filesContents.push({
+			path: filePath,
+			filename: fileName,
+			content,
+			language
+		});
+	} catch (error) {
+		console.error(`Ошибка при чтении файла ${filePath}:`, error);
+		filesContents.push({
+			path: filePath,
+			filename: path.default.basename(filePath),
+			content: `Ошибка чтения файла: ${error.message}`,
+			language: ""
+		});
+	}
+	return filesContents;
+});
+electron.ipcMain.handle("show-save-dialog", async (event, defaultName) => {
+	const { filePath } = await electron.dialog.showSaveDialog({
+		defaultPath: defaultName,
+		filters: [{
+			name: "JSON",
+			extensions: ["json"]
+		}]
+	});
+	return filePath;
+});
+electron.ipcMain.handle("show-open-dialog", async () => {
+	const { filePaths } = await electron.dialog.showOpenDialog({
+		filters: [{
+			name: "JSON",
+			extensions: ["json"]
+		}],
+		properties: ["openFile"]
+	});
+	return filePaths?.[0];
+});
+electron.ipcMain.handle("save-prompt-template", async (event, template, fileName) => {
+	try {
+		if (!validatePromptTemplate(template)) throw new Error("Невалидный шаблон промпта");
+		const result = await electron.dialog.showSaveDialog({
+			title: "Сохранить промпт‑шаблон",
+			defaultPath: fileName || `${template.title}.json`,
+			filters: [{
+				name: "JSON Files",
+				extensions: ["json"]
+			}, {
+				name: "All Files",
+				extensions: ["*"]
+			}]
+		});
+		if (result.canceled) return {
+			success: false,
+			error: "Сохранение отменено пользователем"
+		};
+		const filePath = result.filePath;
+		await (0, fs_promises.mkdir)(path.default.dirname(filePath), { recursive: true });
+		await (0, fs_promises.writeFile)(filePath, JSON.stringify({
+			...template,
+			createdAt: new Date(template.createdAt).toISOString().split("T")[0],
+			updatedAt: new Date(template.updatedAt).toISOString().split("T")[0]
+		}, null, 2), "utf-8");
+		return {
+			success: true,
+			filePath
+		};
+	} catch (error) {
+		console.error("Ошибка сохранения шаблона:", error);
+		return {
+			success: false,
+			error: error instanceof Error ? error.message : "Неизвестная ошибка"
+		};
+	}
+});
+electron.ipcMain.handle("load-prompt-template", async () => {
+	try {
+		const result = await electron.dialog.showOpenDialog({
+			title: "Загрузить промпт‑шаблон",
+			filters: [{
+				name: "JSON Files",
+				extensions: ["json"]
+			}, {
+				name: "All Files",
+				extensions: ["*"]
+			}],
+			properties: ["openFile"]
+		});
+		if (result.canceled) return {
+			success: false,
+			error: "Загрузка отменена пользователем"
+		};
+		const filePath = result.filePaths[0];
+		const fileContent = await (0, fs_promises.readFile)(filePath, "utf-8");
+		const loadedTemplate = JSON.parse(fileContent);
+		if (!loadedTemplate.id || !loadedTemplate.title) throw new Error("Файл не содержит корректного шаблона промпта");
+		return {
+			success: true,
+			template: loadedTemplate,
+			filePath
+		};
+	} catch (error) {
+		console.error("Ошибка загрузки шаблона:", error);
+		return {
+			success: false,
+			error: error instanceof Error ? error.message : "Неизвестная ошибка"
+		};
+	}
+});
+electron.ipcMain.handle("select-folder", async () => {
+	try {
+		const result = await electron.dialog.showOpenDialog({
+			properties: ["openDirectory"],
+			title: "Выберите корневую директорию проекта"
+		});
+		if (result.canceled) return null;
+		return result.filePaths[0];
+	} catch (error) {
+		console.error("Ошибка при выборе папки:", error);
 		throw error;
 	}
 });
-var callLlamaAPI = async (prompt) => {
-	const data = await (await fetch("http://localhost:11434/api/generate", {
-		method: "POST",
-		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({
-			model: "llama3.2:3b",
-			prompt,
-			stream: false
-		})
-	})).json();
-	console.log("callLlamaAPI response:", data);
-	return data.response || "Нет ответа";
+electron.ipcMain.handle("get-project-tree", async (event, folderPath) => {
+	return new Promise((resolve, reject) => {
+		let command;
+		if (!folderPath || typeof folderPath !== "string") {
+			reject(/* @__PURE__ */ new Error("Некорректный путь к папке"));
+			return;
+		}
+		try {
+			fs.default.accessSync(folderPath, fs.default.constants.R_OK);
+		} catch (err) {
+			reject(/* @__PURE__ */ new Error("Нет доступа к указанной папке или она не существует"));
+			return;
+		}
+		switch (process.platform) {
+			case "win32":
+				command = `tree "${folderPath}" /f /a`;
+				break;
+			case "linux":
+				command = `if command -v tree >/dev/null 2>&1; then
+          tree -a --dirsfirst -L 3 "${folderPath}";  # Ограничиваем глубину до 3 уровней
+        else
+          find "${folderPath}" -type d -print -o -type f -print |
+          sed -e 's;[^/]*/;├── ;g;s;├── ;└── ;' |
+          sed 's;└── ;│   ;g; s;├── ;├── ;g';
+        fi`;
+				break;
+			case "darwin":
+				command = `if command -v tree >/dev/null 2>&1; then
+          tree -a "${folderPath}";
+        else
+          find "${folderPath}" -print | sed -e 's;[^/]*/;|____;g;s;|____|; |;g';
+        fi`;
+				break;
+			default:
+				reject(/* @__PURE__ */ new Error(`Неподдерживаемая операционная система: ${process.platform}`));
+				return;
+		}
+		(0, child_process.exec)(command, { cwd: path.default.dirname(folderPath) }, (error, stdout, stderr) => {
+			if (error) {
+				reject(error);
+				return;
+			}
+			if (stderr) {
+				reject(new Error(stderr));
+				return;
+			}
+			resolve(stdout);
+		});
+	});
+});
+console.log("[Main] registerMDStreamHandlers called");
+var PROTO_PATH = path.default.join(__dirname, "proto", "marketdata.proto");
+console.log("[Main] Proto path:", PROTO_PATH);
+var packageDefinition = _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_proto_loader_build_src_index_js.loadSync(PROTO_PATH, {
+	keepCase: false,
+	longs: String,
+	enums: String,
+	defaults: true,
+	oneofs: true
+});
+var MarketDataStreamService = _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.loadPackageDefinition(packageDefinition).tinkoff.public.invest.api.contract.v1.MarketDataStreamService;
+console.log("[Main] Proto loaded, service:", !!MarketDataStreamService);
+var client = new MarketDataStreamService("invest-public-api.tbank.ru:443", _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.credentials.createSsl(null, null, null, { rejectUnauthorized: false }), { "grpc.ssl_target_name_override": "invest-public-api.tbank.ru" });
+console.log("[Main] gRPC client created");
+electron.ipcMain.handle("md-stream-start", async (_, token, requestBody) => {
+	console.log("[Main] md-stream-start called");
+	console.log("[Main] Token:", token?.slice(0, 12) + "...");
+	console.log("[Main] Request body:", JSON.stringify(requestBody).slice(0, 400));
+	if (currentStream) {
+		console.log("[Main] Stopping previous stream");
+		currentStream.cancel();
+		currentStream = null;
+	}
+	const metadata = new _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.Metadata();
+	metadata.add("Authorization", `Bearer ${token}`);
+	console.log("[Main] Calling MarketDataServerSideStream...");
+	const stream = client.MarketDataServerSideStream(requestBody, metadata);
+	currentStream = stream;
+	console.log("[Main] Stream created");
+	let buffer = "";
+	stream.on("data", (data) => {
+		if (typeof data !== "string" && typeof data !== "object") return;
+		const chunk = typeof data === "string" ? data : JSON.stringify(data);
+		buffer += chunk;
+		let begin = 0;
+		let depth = 0;
+		let inString = false;
+		let escape = false;
+		for (let i = 0; i < buffer.length; i++) {
+			const ch = buffer[i];
+			if (inString) {
+				if (escape) escape = false;
+				else if (ch === "\\") escape = true;
+				else if (ch === "\"") inString = false;
+				continue;
+			}
+			if (ch === "\"") inString = true;
+			else if (ch === "{") {
+				if (depth === 0) begin = i;
+				depth++;
+			} else if (ch === "}") {
+				depth--;
+				if (depth === 0) {
+					const jsonStr = buffer.substring(begin, i + 1);
+					try {
+						JSON.parse(jsonStr);
+						const win = getBondsWindow();
+						if (win && !win.isDestroyed()) win.webContents.send("md-stream-data", jsonStr);
+						else console.warn("[Main] Bonds window not available");
+					} catch {
+						console.warn("[Main] Skipped invalid JSON fragment:", jsonStr.slice(0, 100));
+					}
+				}
+			}
+		}
+		if (depth > 0) buffer = buffer.substring(begin);
+		else buffer = "";
+	});
+	stream.on("status", (status) => {
+		const win = getBondsWindow();
+		if (win) win.webContents.send("md-stream-closed");
+	});
+	stream.on("error", (err) => {
+		const win = getBondsWindow();
+		if (win) win.webContents.send("md-stream-error", err.message);
+	});
+	console.log("[Main] Request sent");
+});
+electron.ipcMain.handle("md-stream-stop", async () => {
+	console.log("[Main] md-stream-stop called");
+	if (currentStream) {
+		currentStream.cancel();
+		currentStream = null;
+	}
+});
+var opsStreams = {
+	portfolio: null,
+	positions: null,
+	operations: null
 };
+var opsClient;
+function ensureOpsClient(mainWindow) {
+	if (opsClient) return opsClient;
+	const OPS_PROTO_PATH = path.default.join(__dirname, "proto", "operations.proto");
+	const packageDefinition = _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_proto_loader_build_src_index_js.loadSync(OPS_PROTO_PATH, {
+		keepCase: false,
+		longs: String,
+		enums: String,
+		defaults: true,
+		oneofs: true
+	});
+	const OperationsStreamService = _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.loadPackageDefinition(packageDefinition).tinkoff.public.invest.api.contract.v1.OperationsStreamService;
+	opsClient = new OperationsStreamService("invest-public-api.tbank.ru:443", _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.credentials.createSsl(null, null, null, { rejectUnauthorized: false }), { "grpc.ssl_target_name_override": "invest-public-api.tbank.ru" });
+	return opsClient;
+}
+electron.ipcMain.handle("ops-stream-start", async (event, streamType, token, requestBody) => {
+	const mainWindow = electron.BrowserWindow.fromWebContents(event.sender) || null;
+	const client = ensureOpsClient(mainWindow);
+	const metadata = new _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.Metadata();
+	metadata.add("Authorization", `Bearer ${token}`);
+	if (opsStreams[streamType]) {
+		opsStreams[streamType].cancel();
+		opsStreams[streamType] = null;
+	}
+	let stream;
+	try {
+		if (streamType === "portfolio") stream = client.PortfolioStream(requestBody, metadata);
+		else if (streamType === "positions") stream = client.PositionsStream(requestBody, metadata);
+		else if (streamType === "operations") stream = client.OperationsStream(requestBody, metadata);
+		else throw new Error(`Unknown stream type: ${streamType}`);
+	} catch (err) {
+		mainWindow?.webContents.send("ops-stream-error", streamType, err.message);
+		return;
+	}
+	opsStreams[streamType] = stream;
+	let buffer = "";
+	stream.on("data", (data) => {
+		const chunk = JSON.stringify(data);
+		buffer += chunk;
+		let begin = 0, depth = 0, inString = false, escape = false;
+		for (let i = 0; i < buffer.length; i++) {
+			const ch = buffer[i];
+			if (inString) {
+				if (escape) escape = false;
+				else if (ch === "\\") escape = true;
+				else if (ch === "\"") inString = false;
+				continue;
+			}
+			if (ch === "\"") inString = true;
+			else if (ch === "{") {
+				if (depth === 0) begin = i;
+				depth++;
+			} else if (ch === "}") {
+				depth--;
+				if (depth === 0) {
+					const jsonStr = buffer.substring(begin, i + 1);
+					try {
+						JSON.parse(jsonStr);
+						mainWindow?.webContents.send(`ops-${streamType}-data`, jsonStr);
+					} catch {}
+				}
+			}
+		}
+		buffer = depth > 0 ? buffer.substring(begin) : "";
+	});
+	stream.on("status", (status) => {
+		mainWindow?.webContents.send(`ops-${streamType}-closed`);
+		opsStreams[streamType] = null;
+	});
+	stream.on("error", (err) => {
+		mainWindow?.webContents.send("ops-stream-error", streamType, err.message);
+		opsStreams[streamType] = null;
+	});
+});
+electron.ipcMain.handle("ops-stream-stop", async () => {
+	for (const key of Object.keys(opsStreams)) {
+		opsStreams[key]?.cancel();
+		opsStreams[key] = null;
+	}
+});
+var ordersStreams = {
+	trades: null,
+	orderState: null
+};
+var ordersClient;
+function ensureOrdersClient() {
+	if (ordersClient) return ordersClient;
+	const PROTO_PATH = path.default.join(__dirname, "proto", "orders.proto");
+	const packageDefinition = _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_proto_loader_build_src_index_js.loadSync(PROTO_PATH, {});
+	const OrdersStreamService = _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.loadPackageDefinition(packageDefinition).tinkoff.public.invest.api.contract.v1.OrdersStreamService;
+	ordersClient = new OrdersStreamService("invest-public-api.tbank.ru:443", _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.credentials.createSsl(null, null, null, { rejectUnauthorized: false }), { "grpc.ssl_target_name_override": "invest-public-api.tbank.ru" });
+	return ordersClient;
+}
+electron.ipcMain.handle("orders-stream-start", async (event, streamType, token, requestBody) => {
+	const mainWindow = electron.BrowserWindow.fromWebContents(event.sender) || null;
+	const client = ensureOrdersClient();
+	const metadata = new _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.Metadata();
+	metadata.add("Authorization", `Bearer ${token}`);
+	if (ordersStreams[streamType]) {
+		ordersStreams[streamType].cancel();
+		ordersStreams[streamType] = null;
+	}
+	let stream;
+	try {
+		if (streamType === "trades") stream = client.TradesStream(requestBody, metadata);
+		else if (streamType === "orderState") stream = client.OrderStateStream(requestBody, metadata);
+		else throw new Error(`Unknown stream type: ${streamType}`);
+	} catch (err) {
+		mainWindow?.webContents.send("orders-stream-error", streamType, err.message);
+		return;
+	}
+	ordersStreams[streamType] = stream;
+	let buffer = "";
+	stream.on("data", (data) => {
+		const chunk = JSON.stringify(data);
+		buffer += chunk;
+		let begin = 0, depth = 0, inString = false, escape = false;
+		for (let i = 0; i < buffer.length; i++) {
+			const ch = buffer[i];
+			if (inString) {
+				if (escape) escape = false;
+				else if (ch === "\\") escape = true;
+				else if (ch === "\"") inString = false;
+				continue;
+			}
+			if (ch === "\"") inString = true;
+			else if (ch === "{") {
+				if (depth === 0) begin = i;
+				depth++;
+			} else if (ch === "}") {
+				depth--;
+				if (depth === 0) {
+					const jsonStr = buffer.substring(begin, i + 1);
+					try {
+						JSON.parse(jsonStr);
+						mainWindow?.webContents.send(`orders-${streamType}-data`, jsonStr);
+					} catch {}
+				}
+			}
+		}
+		buffer = depth > 0 ? buffer.substring(begin) : "";
+	});
+	stream.on("status", () => {
+		mainWindow?.webContents.send(`orders-${streamType}-closed`);
+		ordersStreams[streamType] = null;
+	});
+	stream.on("error", (err) => {
+		mainWindow?.webContents.send("orders-stream-error", streamType, err.message);
+		ordersStreams[streamType] = null;
+	});
+});
+electron.ipcMain.handle("orders-stream-stop", async () => {
+	for (const key of Object.keys(ordersStreams)) {
+		ordersStreams[key]?.cancel();
+		ordersStreams[key] = null;
+	}
+});
 //#endregion
 
 //# sourceMappingURL=main.js.map

@@ -1,0 +1,150 @@
+{
+  "id": "ui-component-preload-api",
+  "title": "Добавление UI‑компонента с интеграцией API через preload",
+  "description": "Создание React‑компонента, вызывающего метод API из main‑процесса через Electron preload",
+  "version": "1.0",
+  "createdAt": "2025-12-01",
+  "updatedAt": "2025-12-01",
+  "role": {
+    "position": "Fullstack Electron Developer",
+    "experience": "3+ года",
+    "specialization": "React, TypeScript, Electron IPC",
+    "communicationStyle": "конструктивный, с пояснениями архитектуры",
+    "priorities": ["безопасный IPC", "переиспользуемость компонентов"],
+    "enabled": true
+  },
+  "projectContext": {
+    "technologies": [
+      { "name": "Electron", "version": "28.x", "purpose": "десктопная оболочка" },
+      { "name": "React", "version": "18.x", "purpose": "UI‑фреймворк" },
+      { "name": "Vite", "version": "5.x", "purpose": "сборка" },
+      { "name": "TypeScript", "version": "5.x", "purpose": "типизация" }
+    ],
+    "architecture": {
+      "type": "Component‑based + IPC",
+      "components": ["React компоненты", "preload скрипты", "main обработчики"],
+      "interaction": "renderer → preload (contextBridge) → main (ipcMain.handle)"
+    },
+    "integrations": [
+      { "service": "internal API", "purpose": "работа с данными" }
+    ],
+    "standards": ["React Hooks", "Electron context isolation"],
+    "fullProjectStructure": {
+      "type": "tree",
+      "rootDirectory": "./",
+      "description": "Структура проекта",
+      "content": "src/\n  main/\n    api-handlers.ts\n  preload/\n    index.ts\n  renderer/\n    components/\n      DataViewer.tsx"
+    },
+    "enabled": true
+  },
+  "taskAndExpectations": {
+    "mainTask": "Реализовать компонент DataViewer, который загружает данные через preload API и отображает в таблице с возможностью сортировки",
+    "expectedResult": "React‑компонент с состояниями загрузки, ошибкой, пустым списком; метод API в preload; обработчик в main",
+    "codeRequirements": [
+      "использовать useEffect для загрузки",
+      "обрабатывать ошибки",
+      "типизировать ответ API"
+    ],
+    "outputFormat": "Три фрагмента кода: компонент, preload‑метод, main‑обработчик",
+    "enabled": true
+  },
+  "technicalRequirements": {
+    "compatibility": ["Electron 28+"],
+    "dataHandling": ["пагинация на стороне main"],
+    "security": ["контекстная изоляция", "ограничить доступ к nodeIntegration"],
+    "performance": ["debounce сортировки", "ленивая подгрузка"],
+    "enabled": true
+  },
+  "responseStructure": {
+    "sections": [
+      {
+        "name": "Код компонента",
+        "required": true,
+        "depth": "detailed",
+        "format": "TypeScript React"
+      },
+      {
+        "name": "Preload",
+        "required": true,
+        "depth": "detailed",
+        "format": "TypeScript"
+      },
+      {
+        "name": "Main handler",
+        "required": true,
+        "depth": "detailed",
+        "format": "TypeScript"
+      }
+    ],
+    "codeFormat": {
+      "syntax": "TypeScript",
+      "indentation": "spaces",
+      "namingConvention": "camelCase"
+    },
+    "enabled": true
+  },
+  "specialScenarios": {
+    "errorHandling": "Обработка сетевых ошибок, таймаутов, невалидных данных",
+    "testing": "Unit‑тесты компонента с React Testing Library",
+    "scalability": "Компонент должен поддерживать виртуализацию при большом объеме данных",
+    "alternativeApproaches": "Использование SWR или React Query для кэширования",
+    "enabled": true
+  },
+  "restrictionsAndRules": {
+    "forbiddenPractices": ["прямые вызовы require в рендерере", "отключение изоляции контекста"],
+    "dependenciesPolicy": "Минимизация зависимостей, предпочтение встроенным API",
+    "compliance": ["Electron Security Best Practices"],
+    "environmentConsiderations": [],
+    "enabled": true
+  },
+  "additionalPreferences": {
+    "tone": "профессиональный",
+    "length": "detailed",
+    "preferredPatterns": ["композиция компонентов", "custom hooks"],
+    "specialEmphases": ["типобезопасность IPC канала"],
+    "enabled": true
+  },
+  "codeContext": {
+    "language": "TypeScript",
+    "sourceType": "multiple-snippets",
+    "codeSources": [
+      {
+        "code": "// React component\nconst DataViewer: React.FC = () => {\n  const [data, setData] = useState<Item[]>([]);\n  useEffect(() => { window.api.getData().then(setData) }, []);\n  return <Table data={data} />;\n}",
+        "purpose": "Компонент отображения данных",
+        "process": "renderer",
+        "dependencies": ["react"],
+        "problemDescription": ""
+      },
+      {
+        "code": "// preload\ncontextBridge.exposeInMainWorld('api', {\n  getData: () => ipcRenderer.invoke('get-data')\n})",
+        "purpose": "Мост к основному процессу",
+        "process": "main",
+        "dependencies": ["electron"],
+        "problemDescription": "Требуется strict typing для возвращаемого значения"
+      },
+      {
+        "code": "// main handler\nipcMain.handle('get-data', async () => {\n  return await fetchData();\n})",
+        "purpose": "Обработчик данных",
+        "process": "main",
+        "dependencies": [],
+        "problemDescription": "Отсутствует обработка ошибок"
+      }
+    ],
+    "purpose": "",
+    "process": "main",
+    "dependencies": [],
+    "problemDescription": "",
+    "enabled": true
+  },
+  "developmentContext": {
+    "backendStructure": {
+      "type": "tree",
+      "content": "src/main/api-handlers.ts",
+      "rootDirectory": "./src/main",
+      "description": "Обработчики API"
+    },
+    "buildProcess": "Electron Forge с плагином Vite",
+    "deploymentStrategy": "Squirrel.Windows / DMG для macOS",
+    "enabled": true
+  }
+}

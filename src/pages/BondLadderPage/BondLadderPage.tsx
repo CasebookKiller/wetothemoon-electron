@@ -11,10 +11,14 @@ import { fetchBonds as Bonds } from '@root/api/public';
 import { useBonds } from '@/hooks/useBonds';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 
-import { TopMenu } from '@/components/TopMenu/TopMenu';
+import { TopMenu } from '@/components/BONDS/TopMenu/TopMenu';
 
 
 import './BondLadderPage.css';
+import MarketStreamTest from '@/components/BONDS/MarketStreamTest/MarketStreamTest';
+import OperationsStreamTest from '@/components/BONDS/OperationsStreamTest/OperationsStreamTest';
+import { OrdersServiceClient } from '@/api/tbank/OrdersService';
+import OrdersStreamTest from '@/components/BONDS/OrdersStreamTest/OrdersStreamTest';
 
 // Функция расчёта номера ступени для облигации
 function calculateStepForBond(
@@ -223,6 +227,12 @@ export const BondLadderPage: FC = () => {
     <React.Fragment>
       <TopMenu/>
 
+      <div className='app p-0'/>
+      
+      {false && <MarketStreamTest />}
+      {false &&<OperationsStreamTest />}
+      {<OrdersStreamTest />}
+      
       <div
         className='my-5 mx-2 app theme-hint-color theme-bg-secondary text-xs'
       >

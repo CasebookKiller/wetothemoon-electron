@@ -11,7 +11,8 @@ export const useAuth = () => {
   useEffect(() => {
     const user = getItem('user');
     if (user) {
-      addUser(JSON.parse(user));
+      const preparedUser = typeof user === 'string' ? JSON.parse(user || '{}') : user;
+      addUser(preparedUser);
     }
   }, [addUser, getItem]);
 

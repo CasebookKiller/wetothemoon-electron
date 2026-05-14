@@ -1,0 +1,14 @@
+.abort-button {
+  background-color: #e53e3e !important;
+  color: white !important;
+}
+
+.abort-button:hover:not(:disabled) {
+  background-color: #c53030 !important;
+}
+
+.abort-button:disabled {
+  background-color: #cbd5e0 !important;
+  color: #718096 !important;
+  cursor: not-allowed;
+}
