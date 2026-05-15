@@ -34,7 +34,7 @@ let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_
 _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_proto_loader_build_src_index_js = __toESM(_home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_proto_loader_build_src_index_js);
 //#region src/main/windows/aiWindow.ts
 var aiWindow$1 = null;
-var preloadPath$3 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preloadai.js") : path.default.join(__dirname, "../../dist/main/preloadai.js");
+var preloadPath$5 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var createAIWindow = () => {
 	if (aiWindow$1) {
 		aiWindow$1.focus();
@@ -45,7 +45,7 @@ var createAIWindow = () => {
 		height: 600,
 		title: "Нейро",
 		webPreferences: {
-			preload: preloadPath$3,
+			preload: preloadPath$5,
 			contextIsolation: true,
 			nodeIntegration: false
 		}
@@ -67,6 +67,7 @@ var getAIWindow = () => aiWindow$1;
 //#endregion
 //#region src/main/windows/mdWindow.ts
 var mdWindow$1 = null;
+var preloadPath$4 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var createMDWindow = () => {
 	if (mdWindow$1) {
 		mdWindow$1.focus();
@@ -77,6 +78,7 @@ var createMDWindow = () => {
 		height: 600,
 		title: "Markdown",
 		webPreferences: {
+			preload: preloadPath$4,
 			contextIsolation: true,
 			nodeIntegration: false
 		}
@@ -95,7 +97,7 @@ var getMDWindow = () => mdWindow$1;
 //#endregion
 //#region src/main/windows/bondsWindow.ts
 var bondsWindow$1 = null;
-var preloadPath$2 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preloadbonds.js") : path.default.join(__dirname, "../../dist/main/preloadbonds.js");
+var preloadPath$3 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var createBondsWindow = () => {
 	if (bondsWindow$1) {
 		bondsWindow$1.focus();
@@ -106,7 +108,7 @@ var createBondsWindow = () => {
 		height: 768,
 		title: "Облигации",
 		webPreferences: {
-			preload: preloadPath$2,
+			preload: preloadPath$3,
 			contextIsolation: true,
 			nodeIntegration: false
 		}
@@ -129,7 +131,7 @@ var getBondsWindow = () => bondsWindow$1;
 //#endregion
 //#region src/main/windows/pgWindow.ts
 var pgWindow$1 = null;
-var preloadPath$1 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preloadpg.js") : path.default.join(__dirname, "../../dist/main/preloadpg.js");
+var preloadPath$2 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var createPGWindow = () => {
 	if (pgWindow$1) {
 		pgWindow$1.focus();
@@ -140,7 +142,7 @@ var createPGWindow = () => {
 		height: 600,
 		title: "Генератор запросов",
 		webPreferences: {
-			preload: preloadPath$1,
+			preload: preloadPath$2,
 			contextIsolation: true,
 			nodeIntegration: false
 		}
@@ -461,7 +463,7 @@ var bondsWindowMenuTemplate = [
 //#endregion
 //#region src/main/windows/mainWindow.ts
 var mainWindow = null;
-var preloadPath = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var preloadPath$1 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var MAIN_WINDOW_VITE_DEV_SERVER_URL = "http://localhost:5173";
 var MAIN_WINDOW_PROD_PATH = path.default.join(__dirname, "../../renderer/main-window/index.html");
 var createMainWindow = () => {
@@ -470,7 +472,7 @@ var createMainWindow = () => {
 		height: 768,
 		title: "Мы на Луну!",
 		webPreferences: {
-			preload: preloadPath,
+			preload: preloadPath$1,
 			contextIsolation: true,
 			nodeIntegration: false
 		}
@@ -616,6 +618,7 @@ new AITrainer();
 //#endregion
 //#region src/main/windows/ollamaWindow.ts
 var ollamaWindow$1 = null;
+var preloadPath = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var createOllamaWindow = () => {
 	if (ollamaWindow$1) {
 		ollamaWindow$1.focus();
@@ -626,6 +629,7 @@ var createOllamaWindow = () => {
 		height: 600,
 		title: "Клиент Ollama ",
 		webPreferences: {
+			preload: preloadPath,
 			contextIsolation: true,
 			nodeIntegration: false
 		}

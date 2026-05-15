@@ -105,3 +105,5 @@ training/
 clean.sh
 
 dist/
+
+*.bak

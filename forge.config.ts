@@ -39,21 +39,21 @@ const config: ForgeConfig = {
           config: "vite.preload.config.ts",
           target: "preload",
         },
-        {
-          entry: "src/preloadai.ts",
-          config: "vite.preloadai.config.ts",
-          target: "preload",
-        },
-        {
-          entry: "src/preloadpg.ts",
-          config: "vite.preloadpg.config.ts",
-          target: "preload",
-        },
-        {
-          entry: "src/preloadbonds.ts",
-          config: "vite.preloadbonds.config.ts",
-          target: "preload",
-        }
+        //{
+        //  entry: "src/preloadai.ts",
+        //  config: "vite.preloadai.config.ts",
+        //  target: "preload",
+        //},
+        //{
+        //  entry: "src/preloadpg.ts",
+        //  config: "vite.preloadpg.config.ts",
+        //  target: "preload",
+        //},
+        //{
+        //  entry: "src/preloadbonds.ts",
+        //  config: "vite.preloadbonds.config.ts",
+        //  target: "preload",
+        //}
       ],
       renderer: [
         {

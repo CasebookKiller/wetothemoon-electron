@@ -1,8 +1,12 @@
 import path from 'path';
-import { BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import { getMainWindow } from './mainWindow';
 
 let mdWindow: BrowserWindow | null = null;
+
+const preloadPath = app.isPackaged
+  ? path.join(process.resourcesPath, 'preload.js')
+  : path.join(__dirname, '../../dist/main/preload.js');
 
 export const createMDWindow = () => {
   if (mdWindow) {
@@ -15,7 +19,7 @@ export const createMDWindow = () => {
     height: 600,
     title: 'Markdown',
     webPreferences: {
-      //preload: path.join(__dirname, '../../../preload.ts'),
+      preload: preloadPath,//path.join(__dirname, '../../../preload.ts'),
       contextIsolation: true,
       nodeIntegration: false,
     }

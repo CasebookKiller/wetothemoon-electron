@@ -4,10 +4,12 @@ import path from 'path';
 
 let pgWindow: BrowserWindow | null = null;
 
+//const preloadPath = app.isPackaged
+//  ? path.join(process.resourcesPath, 'preloadpg.js')
+//  : path.join(__dirname, '../../dist/main/preloadpg.js');
 const preloadPath = app.isPackaged
-  ? path.join(process.resourcesPath, 'preloadpg.js')
-  : path.join(__dirname, '../../dist/main/preloadpg.js');
-
+  ? path.join(process.resourcesPath, 'preload.js')
+  : path.join(__dirname, '../../dist/main/preload.js');
 
 export const createPGWindow = () => {
   if (pgWindow) {

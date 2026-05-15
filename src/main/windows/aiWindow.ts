@@ -6,10 +6,12 @@ import { aiWindowMenuTemplate } from '../menus/windowMenus';
 
 let aiWindow: BrowserWindow | null = null;
 
+//const preloadPath = app.isPackaged
+//  ? path.join(process.resourcesPath, 'preloadai.js')
+//  : path.join(__dirname, '../../dist/main/preloadai.js');
 const preloadPath = app.isPackaged
-  ? path.join(process.resourcesPath, 'preloadai.js')
-  : path.join(__dirname, '../../dist/main/preloadai.js');
-
+  ? path.join(process.resourcesPath, 'preload.js')
+  : path.join(__dirname, '../../dist/main/preload.js');
 
 export const createAIWindow = () => {
   if (aiWindow) {

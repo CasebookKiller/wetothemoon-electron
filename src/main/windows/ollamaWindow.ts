@@ -1,8 +1,11 @@
 import path from 'path';
-import { BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import { getMainWindow } from './mainWindow';
 
 let ollamaWindow: BrowserWindow | null = null;
+const preloadPath = app.isPackaged
+  ? path.join(process.resourcesPath, 'preload.js')
+  : path.join(__dirname, '../../dist/main/preload.js');
 
 export const createOllamaWindow = () => {
   if (ollamaWindow) {
@@ -15,7 +18,7 @@ export const createOllamaWindow = () => {
     height: 600,
     title: 'Клиент Ollama ',
     webPreferences: {
-      //preload: path.join(__dirname, '../../../preload.ts'),
+      preload: preloadPath,//path.join(__dirname, '../../../preload.ts'),
       contextIsolation: true,
       nodeIntegration: false,
     }

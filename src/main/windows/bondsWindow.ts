@@ -6,10 +6,13 @@ import { bondsWindowMenuTemplate } from '../menus/windowMenus';
 
 let bondsWindow: BrowserWindow | null = null;
 
+//const preloadPath = app.isPackaged
+//  ? path.join(process.resourcesPath, 'preloadbonds.js')
+//  : path.join(__dirname, '../../dist/main/preloadbonds.js');
 const preloadPath = app.isPackaged
-  ? path.join(process.resourcesPath, 'preloadbonds.js')
-  : path.join(__dirname, '../../dist/main/preloadbonds.js');
-
+  ? path.join(process.resourcesPath, 'preload.js')
+  : path.join(__dirname, '../../dist/main/preload.js');
+  
 export const createBondsWindow = () => {
   if (bondsWindow) {
     bondsWindow.focus();
