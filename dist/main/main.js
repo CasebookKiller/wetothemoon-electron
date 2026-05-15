@@ -485,9 +485,6 @@ var getMainWindow = () => {
 	return mainWindow;
 };
 var getMainWindowProdPath = () => MAIN_WINDOW_PROD_PATH;
-//#endregion
-//#region src/main/ipcHandlers/aiHandlers.ts
-getAIWindow();
 var callAIAPI = async (prompt) => {
 	const data = await (await fetch("http://localhost:11434/api/generate", {
 		method: "POST",
@@ -519,27 +516,13 @@ var registerAIHandlers = () => {
 };
 //#endregion
 //#region src/main/training.ts
-var Platform = /* @__PURE__ */ function(Platform) {
-	Platform["AIX"] = "aix";
-	Platform["Android"] = "android";
-	Platform["Darwin"] = "darwin";
-	Platform["FreeBSD"] = "freebsd";
-	Platform["Haiku"] = "haiku";
-	Platform["Linux"] = "linux";
-	Platform["OpenBSD"] = "openbsd";
-	Platform["SunOS"] = "sunos";
-	Platform["Cygwin"] = "cygwin";
-	Platform["NetBSD"] = "netbsd";
-	Platform["Win32"] = "win32";
-	return Platform;
-}(Platform || {});
 var AITrainer = class {
 	pythonPath;
 	constructor() {
 		this.pythonPath = this.detectPython();
 	}
 	detectPython() {
-		if (process.platform === Platform.Win32) return "python";
+		if (process.platform === "win32") return "python";
 		return "python3";
 	}
 	async startFineTuning(data) {
@@ -658,9 +641,6 @@ var createOllamaWindow = () => {
 	});
 };
 var getOllamaWindow = () => ollamaWindow$1;
-//#endregion
-//#region src/main/ipcHandlers/bondsHandlers.ts
-getBondsWindow();
 var registerBondsHandlers = () => {
 	electron.ipcMain.handle("save-bonds-to-storage", async (event, message) => {
 		try {
@@ -671,9 +651,6 @@ var registerBondsHandlers = () => {
 		}
 	});
 };
-//#endregion
-//#region src/main/ipcHandlers/dashboardHandlers.ts
-getMainWindow();
 var registerDashboardHandlers = () => {
 	electron.ipcMain.handle("get-tasks", async (event, message) => {
 		try {
@@ -684,9 +661,6 @@ var registerDashboardHandlers = () => {
 		}
 	});
 };
-//#endregion
-//#region src/main/ipcHandlers/mdHandlers.ts
-getMDWindow();
 var registerMDHandlers = () => {
 	electron.ipcMain.handle("get-md-file", async (event, message) => {
 		try {
@@ -697,9 +671,6 @@ var registerMDHandlers = () => {
 		}
 	});
 };
-//#endregion
-//#region src/main/ipcHandlers/pgHandlers.ts
-getPGWindow();
 var registerPGHandlers = () => {
 	electron.ipcMain.handle("get-package-dependencies", async () => {
 		try {
@@ -790,12 +761,6 @@ var registerPGHandlers = () => {
 };
 //#endregion
 //#region src/types/promptgenerator.ts
-var CodeSourceType = /* @__PURE__ */ function(CodeSourceType) {
-	CodeSourceType["Snippet"] = "snippet";
-	CodeSourceType["MultipleSnippets"] = "multiple-snippets";
-	CodeSourceType["FilePaths"] = "file-paths";
-	return CodeSourceType;
-}({});
 /**
 * Валидирует промпт на соответствие структуре
 */
@@ -817,11 +782,11 @@ function validateCodeContext(context) {
 	if (!context.language) return false;
 	if (context.sourceType === void 0) return !!context.codeSnippet && typeof context.codeSnippet === "string";
 	switch (context.sourceType) {
-		case CodeSourceType.Snippet: return typeof context.codeSources === "string" && !!context.codeSources;
-		case CodeSourceType.MultipleSnippets:
+		case "snippet": return typeof context.codeSources === "string" && !!context.codeSources;
+		case "multiple-snippets":
 			if (!Array.isArray(context.codeSources)) return false;
 			return context.codeSources.every((source) => typeof source === "object" && "code" in source && !!source.code);
-		case CodeSourceType.FilePaths:
+		case "file-paths":
 			if (!Array.isArray(context.codeSources)) return false;
 			return context.codeSources.every((source) => typeof source === "object" && "path" in source && !!source.path);
 		default: return false;

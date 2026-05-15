@@ -103,3 +103,5 @@ docs/
 training/
 
 clean.sh
+
+dist/
