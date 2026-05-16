@@ -3,7 +3,7 @@ import { app, BrowserWindow, Menu } from 'electron';
 //import { mainMenuTemplate } from '../menus/windowMenus';
 
 import { resolveAppPath } from '../utils/pathUtils';
-import { mainMenuTemplate } from '../menus/windowMenus';
+//import { mainMenuTemplate } from '../menus/windowMenus';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -44,8 +44,8 @@ export const createMainWindow = (): BrowserWindow => {
   });
 
   // Устанавливаем меню только для этого окна
-  const menu = Menu.buildFromTemplate(mainMenuTemplate);
-  mainWindow.setMenu(menu);
+  //const menu = Menu.buildFromTemplate(mainMenuTemplate);
+  //mainWindow.setMenu(menu);
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);

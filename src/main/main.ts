@@ -49,7 +49,7 @@ app.whenReady().then(() => {
   mainWindow.setMenu(menu);
   
   // Регистрируем обработчики событий, за исключением открытия окон 
-  registerDashboardHandlers();
+  registerDashboardHandlers(mainWindow);
   registerAIHandlers();
   registerPGHandlers();
   registerBondsHandlers();

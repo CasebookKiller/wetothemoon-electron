@@ -32,38 +32,34 @@ let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_
 _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_proto_loader_build_src_index_js = __toESM(_home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_proto_loader_build_src_index_js);
 let fs = require("fs");
 fs = __toESM(fs);
-//#region src/main/windows/aiWindow.ts
-var aiWindow$1 = null;
+//#region src/main/windows/mainWindow.ts
+var mainWindow = null;
 var preloadPath$5 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
-var createAIWindow = () => {
-	if (aiWindow$1) {
-		aiWindow$1.focus();
-		return;
-	}
-	aiWindow$1 = new electron.BrowserWindow({
-		width: 800,
-		height: 600,
-		title: "Нейро",
+var MAIN_WINDOW_VITE_DEV_SERVER_URL = "http://localhost:5173";
+path.default.join(__dirname, "../../renderer/main-window/index.html");
+var createMainWindow = () => {
+	mainWindow = new electron.BrowserWindow({
+		width: 1024,
+		height: 768,
+		title: "Мы на Луну!",
 		webPreferences: {
 			preload: preloadPath$5,
 			contextIsolation: true,
 			nodeIntegration: false
 		}
 	});
-	const mainWindow = getMainWindow();
-	const MAIN_WINDOW_PROD_PATH = getMainWindowProdPath();
-	if (mainWindow && process.env.NODE_ENV === "development") {
-		const url = mainWindow.webContents.getURL() + "/#/ai";
-		aiWindow$1.loadURL(url);
-		aiWindow$1.webContents.openDevTools();
-	} else aiWindow$1.loadFile(MAIN_WINDOW_PROD_PATH);
-	const menu = electron.Menu.buildFromTemplate(aiWindowMenuTemplate);
-	aiWindow$1.setMenu(menu);
-	aiWindow$1.on("closed", () => {
-		aiWindow$1 = null;
-	});
+	mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
+	mainWindow.webContents.openDevTools();
+	mainWindow.webContents.openDevTools();
+	return mainWindow;
 };
-var getAIWindow = () => aiWindow$1;
+//#endregion
+//#region src/main/windows/paths.ts
+var DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL || "http://localhost:5173";
+function getMainWindowProdPath() {
+	if (electron.app.isPackaged) return path.default.join(process.resourcesPath, "index.html");
+	return path.default.join(__dirname, "../../renderer/main-window/index.html");
+}
 //#endregion
 //#region src/main/windows/mdWindow.ts
 var mdWindow$1 = null;
@@ -83,12 +79,8 @@ var createMDWindow = () => {
 			nodeIntegration: false
 		}
 	});
-	const mainWindow = getMainWindow();
-	if (mainWindow && process.env.NODE_ENV === "development") {
-		const url = mainWindow.webContents.getURL() + "/#/md";
-		mdWindow$1.loadURL(url);
-		mdWindow$1.webContents.openDevTools();
-	}
+	if (process.env.NODE_ENV === "development") mdWindow$1.loadURL(`${DEV_SERVER_URL}/#/md`);
+	else mdWindow$1.loadFile(getMainWindowProdPath());
 	mdWindow$1.on("closed", () => {
 		mdWindow$1 = null;
 	});
@@ -113,14 +105,8 @@ var createBondsWindow = () => {
 			nodeIntegration: false
 		}
 	});
-	const mainWindow = getMainWindow();
-	const MAIN_WINDOW_PROD_PATH = getMainWindowProdPath();
-	if (mainWindow && process.env.NODE_ENV === "development") {
-		const url = mainWindow.webContents.getURL() + "/#/bonds";
-		console.log("%cAI_WINDOW__URL: %s", "color: cyan;", url);
-		bondsWindow$1.loadURL(url);
-		bondsWindow$1.webContents.openDevTools();
-	} else bondsWindow$1.loadFile(MAIN_WINDOW_PROD_PATH);
+	if (process.env.NODE_ENV === "development") bondsWindow$1.loadURL(`${DEV_SERVER_URL}/#/bonds`);
+	else bondsWindow$1.loadFile(getMainWindowProdPath());
 	const menu = electron.Menu.buildFromTemplate(bondsWindowMenuTemplate);
 	bondsWindow$1.setMenu(menu);
 	bondsWindow$1.on("closed", () => {
@@ -147,12 +133,8 @@ var createPGWindow = () => {
 			nodeIntegration: false
 		}
 	});
-	const mainWindow = getMainWindow();
-	if (mainWindow && process.env.NODE_ENV === "development") {
-		const url = mainWindow.webContents.getURL() + "/#/pg";
-		pgWindow$1.loadURL(url);
-		pgWindow$1.webContents.openDevTools();
-	}
+	if (process.env.NODE_ENV === "development") pgWindow$1.loadURL(`${DEV_SERVER_URL}/#/pg`);
+	else pgWindow$1.loadFile(getMainWindowProdPath());
 	pgWindow$1.on("closed", () => {
 		pgWindow$1 = null;
 	});
@@ -461,33 +443,33 @@ var bondsWindowMenuTemplate = [
 	}
 ];
 //#endregion
-//#region src/main/windows/mainWindow.ts
-var mainWindow = null;
+//#region src/main/windows/aiWindow.ts
+var aiWindow$1 = null;
 var preloadPath$1 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
-var MAIN_WINDOW_VITE_DEV_SERVER_URL = "http://localhost:5173";
-var MAIN_WINDOW_PROD_PATH = path.default.join(__dirname, "../../renderer/main-window/index.html");
-var createMainWindow = () => {
-	mainWindow = new electron.BrowserWindow({
-		width: 1024,
-		height: 768,
-		title: "Мы на Луну!",
+var createAIWindow = () => {
+	if (aiWindow$1) {
+		aiWindow$1.focus();
+		return;
+	}
+	aiWindow$1 = new electron.BrowserWindow({
+		width: 800,
+		height: 600,
+		title: "Нейро",
 		webPreferences: {
 			preload: preloadPath$1,
 			contextIsolation: true,
 			nodeIntegration: false
 		}
 	});
-	const menu = electron.Menu.buildFromTemplate(mainMenuTemplate);
-	mainWindow.setMenu(menu);
-	mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
-	mainWindow.webContents.openDevTools();
-	mainWindow.webContents.openDevTools();
-	return mainWindow;
+	if (process.env.NODE_ENV === "development") aiWindow$1.loadURL(`${DEV_SERVER_URL}/#/ai`);
+	else aiWindow$1.loadFile(getMainWindowProdPath());
+	const menu = electron.Menu.buildFromTemplate(aiWindowMenuTemplate);
+	aiWindow$1.setMenu(menu);
+	aiWindow$1.on("closed", () => {
+		aiWindow$1 = null;
+	});
 };
-var getMainWindow = () => {
-	return mainWindow;
-};
-var getMainWindowProdPath = () => MAIN_WINDOW_PROD_PATH;
+var getAIWindow = () => aiWindow$1;
 var callAIAPI = async (prompt) => {
 	const data = await (await fetch("http://localhost:11434/api/generate", {
 		method: "POST",
@@ -635,12 +617,8 @@ var createOllamaWindow = () => {
 			nodeIntegration: false
 		}
 	});
-	const mainWindow = getMainWindow();
-	if (mainWindow && process.env.NODE_ENV === "development") {
-		const url = mainWindow.webContents.getURL() + "/#/ollama";
-		ollamaWindow$1.loadURL(url);
-		ollamaWindow$1.webContents.openDevTools();
-	}
+	if (process.env.NODE_ENV === "development") ollamaWindow$1.loadURL(`${DEV_SERVER_URL}/#/ollama`);
+	else ollamaWindow$1.loadFile(getMainWindowProdPath());
 	ollamaWindow$1.on("closed", () => {
 		ollamaWindow$1 = null;
 	});
@@ -656,7 +634,9 @@ var registerBondsHandlers = () => {
 		}
 	});
 };
-var registerDashboardHandlers = () => {
+//#endregion
+//#region src/main/ipcHandlers/dashboardHandlers.ts
+var registerDashboardHandlers = (mainWindow) => {
 	electron.ipcMain.handle("get-tasks", async (event, message) => {
 		try {
 			return {};
@@ -1066,7 +1046,7 @@ electron.app.whenReady().then(() => {
 	const mainWindow = createMainWindow();
 	const menu = electron.Menu.buildFromTemplate(mainMenuTemplate);
 	mainWindow.setMenu(menu);
-	registerDashboardHandlers();
+	registerDashboardHandlers(mainWindow);
 	registerAIHandlers();
 	registerPGHandlers();
 	registerBondsHandlers();
