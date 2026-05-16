@@ -1,8 +1,8 @@
 import path from 'path';
 
 import { app,BrowserWindow, ipcMain, Menu } from 'electron';
-import { getMainWindow, getMainWindowProdPath } from './mainWindow';
 import { bondsWindowMenuTemplate } from '../menus/windowMenus';
+import { DEV_SERVER_URL, getMainWindowProdPath } from './paths';
 
 let bondsWindow: BrowserWindow | null = null;
 
@@ -12,7 +12,7 @@ let bondsWindow: BrowserWindow | null = null;
 const preloadPath = app.isPackaged
   ? path.join(process.resourcesPath, 'preload.js')
   : path.join(__dirname, '../../dist/main/preload.js');
-  
+
 export const createBondsWindow = () => {
   if (bondsWindow) {
     bondsWindow.focus();
@@ -31,17 +31,22 @@ export const createBondsWindow = () => {
   });
 
   // Загружаем ТОТ ЖЕ сервер, но с параметром в URL
-  const mainWindow = getMainWindow();
-  const MAIN_WINDOW_PROD_PATH = getMainWindowProdPath();
-  if (mainWindow && process.env.NODE_ENV === 'development') {
-    const url = mainWindow.webContents.getURL() + '/#/bonds';
-    //const url = MAIN_WINDOW_VITE_DEV_SERVER_URL +`/#/ai`;
-    console.log('%cAI_WINDOW__URL: %s','color: cyan;',url);
-    bondsWindow.loadURL(url);
-    bondsWindow.webContents.openDevTools();
+  //const mainWindow = getMainWindow();
+  //const MAIN_WINDOW_PROD_PATH = getMainWindowProdPath();
+  if (process.env.NODE_ENV === 'development') {
+    bondsWindow.loadURL(`${DEV_SERVER_URL}/#/bonds`);
   } else {
-    bondsWindow.loadFile(MAIN_WINDOW_PROD_PATH); 
+    bondsWindow.loadFile(getMainWindowProdPath());
   }
+  //if (mainWindow && process.env.NODE_ENV === 'development') {
+  //  const url = mainWindow.webContents.getURL() + '/#/bonds';
+  //  //const url = MAIN_WINDOW_VITE_DEV_SERVER_URL +`/#/ai`;
+  //  console.log('%cAI_WINDOW__URL: %s','color: cyan;',url);
+  //  bondsWindow.loadURL(url);
+  //  bondsWindow.webContents.openDevTools();
+  //} else {
+  //  bondsWindow.loadFile(MAIN_WINDOW_PROD_PATH); 
+  //}
 
   // Для разработки можно открыть DevTools, чтобы видеть ошибки
   //if (process.env.NODE_ENV === 'development') {

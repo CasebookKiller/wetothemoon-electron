@@ -1,6 +1,6 @@
 import path from 'path';
 import { app, BrowserWindow, ipcMain } from 'electron';
-import { getMainWindow } from './mainWindow';
+import { DEV_SERVER_URL, getMainWindowProdPath } from './paths';
 
 let mdWindow: BrowserWindow | null = null;
 
@@ -25,14 +25,19 @@ export const createMDWindow = () => {
     }
   });
 
-  const mainWindow = getMainWindow();
-  if (mainWindow && process.env.NODE_ENV === 'development') {
-    const url = mainWindow.webContents.getURL() + '/#/md';
-    mdWindow.loadURL(url);
-    mdWindow.webContents.openDevTools();
+  //const mainWindow = getMainWindow();
+  if (process.env.NODE_ENV === 'development') {
+    mdWindow.loadURL(`${DEV_SERVER_URL}/#/md`);
   } else {
-    // Логика для продакшена
+    mdWindow.loadFile(getMainWindowProdPath());
   }
+  //if (mainWindow && process.env.NODE_ENV === 'development') {
+  //  const url = mainWindow.webContents.getURL() + '/#/md';
+  //  mdWindow.loadURL(url);
+  //  mdWindow.webContents.openDevTools();
+  //} else {
+  //  // Логика для продакшена
+  //}
 
   mdWindow.on('closed', () => {
     mdWindow = null;

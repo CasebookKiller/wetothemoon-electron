@@ -1,8 +1,8 @@
 import path from 'path';
 
 import { app, BrowserWindow, ipcMain, Menu } from 'electron';
-import { getMainWindow, getMainWindowProdPath } from './mainWindow';
 import { aiWindowMenuTemplate } from '../menus/windowMenus';
+import { DEV_SERVER_URL, getMainWindowProdPath } from './paths';
 
 let aiWindow: BrowserWindow | null = null;
 
@@ -31,17 +31,22 @@ export const createAIWindow = () => {
   });
 
   // Загружаем ТОТ ЖЕ сервер, но с параметром в URL
-  const mainWindow = getMainWindow();
-  const MAIN_WINDOW_PROD_PATH = getMainWindowProdPath();
-  if (mainWindow && process.env.NODE_ENV === 'development') {
-    const url = mainWindow.webContents.getURL() + '/#/ai';
-    //const url = MAIN_WINDOW_VITE_DEV_SERVER_URL +`/#/ai`;
-    //console.log('%cAI_WINDOW__URL: %s','color: cyan;',url);
-    aiWindow.loadURL(url);
-    aiWindow.webContents.openDevTools();
+  //const mainWindow = getMainWindow();
+  //const MAIN_WINDOW_PROD_PATH = getMainWindowProdPath();
+  if (process.env.NODE_ENV === 'development') {
+    aiWindow.loadURL(`${DEV_SERVER_URL}/#/ai`);
   } else {
-    aiWindow.loadFile(MAIN_WINDOW_PROD_PATH); 
+    aiWindow.loadFile(getMainWindowProdPath());
   }
+  //if (mainWindow && process.env.NODE_ENV === 'development') {
+  //  const url = mainWindow.webContents.getURL() + '/#/ai';
+  //  //const url = MAIN_WINDOW_VITE_DEV_SERVER_URL +`/#/ai`;
+  //  //console.log('%cAI_WINDOW__URL: %s','color: cyan;',url);
+  //  aiWindow.loadURL(url);
+  //  aiWindow.webContents.openDevTools();
+  //} else {
+  //  aiWindow.loadFile(MAIN_WINDOW_PROD_PATH); 
+  //}
 
   // Для разработки можно открыть DevTools, чтобы видеть ошибки
   //if (process.env.NODE_ENV === 'development') {

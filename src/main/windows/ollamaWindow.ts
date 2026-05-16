@@ -1,6 +1,6 @@
 import path from 'path';
-import { app, BrowserWindow, ipcMain } from 'electron';
-import { getMainWindow } from './mainWindow';
+import { app, BrowserWindow } from 'electron';
+import { DEV_SERVER_URL, getMainWindowProdPath } from './paths';
 
 let ollamaWindow: BrowserWindow | null = null;
 const preloadPath = app.isPackaged
@@ -24,14 +24,19 @@ export const createOllamaWindow = () => {
     }
   });
 
-  const mainWindow = getMainWindow();
-  if (mainWindow && process.env.NODE_ENV === 'development') {
-    const url = mainWindow.webContents.getURL() + '/#/ollama';
-    ollamaWindow.loadURL(url);
-    ollamaWindow.webContents.openDevTools();
+  //const mainWindow = getMainWindow();
+  if (process.env.NODE_ENV === 'development') {
+    ollamaWindow.loadURL(`${DEV_SERVER_URL}/#/ollama`);
   } else {
-    // Логика для продакшена
+    ollamaWindow.loadFile(getMainWindowProdPath());
   }
+  //if (mainWindow && process.env.NODE_ENV === 'development') {
+  //  const url = mainWindow.webContents.getURL() + '/#/ollama';
+  //  ollamaWindow.loadURL(url);
+  //  ollamaWindow.webContents.openDevTools();
+  //} else {
+  //  // Логика для продакшена
+  //}
 
   ollamaWindow.on('closed', () => {
     ollamaWindow = null;
