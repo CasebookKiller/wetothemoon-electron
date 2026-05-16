@@ -26,12 +26,12 @@ path = __toESM(path);
 let child_process = require("child_process");
 let fs_promises = require("fs/promises");
 fs_promises = __toESM(fs_promises);
-let fs = require("fs");
-fs = __toESM(fs);
 let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js = require("/home/ll/Документы/GitHub/wetothemoon-project/wetothemoon-electron/node_modules/@grpc/grpc-js/build/src/index.js");
 _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js = __toESM(_home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js);
 let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_proto_loader_build_src_index_js = require("/home/ll/Документы/GitHub/wetothemoon-project/wetothemoon-electron/node_modules/@grpc/proto-loader/build/src/index.js");
 _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_proto_loader_build_src_index_js = __toESM(_home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_proto_loader_build_src_index_js);
+let fs = require("fs");
+fs = __toESM(fs);
 //#region src/main/windows/aiWindow.ts
 var aiWindow$1 = null;
 var preloadPath$5 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
@@ -764,6 +764,266 @@ var registerPGHandlers = () => {
 	});
 };
 //#endregion
+//#region src/main/streams/marketdata.ts
+var registerMarketdataStreamHandlers = () => {
+	let currentStream = null;
+	console.log("[Main] registerMDStreamHandlers called");
+	const PROTO_PATH = path.default.join(__dirname, "proto", "marketdata.proto");
+	console.log("[Main] Proto path:", PROTO_PATH);
+	const packageDefinition = _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_proto_loader_build_src_index_js.loadSync(PROTO_PATH, {
+		keepCase: false,
+		longs: String,
+		enums: String,
+		defaults: true,
+		oneofs: true
+	});
+	const MarketDataStreamService = _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.loadPackageDefinition(packageDefinition).tinkoff.public.invest.api.contract.v1.MarketDataStreamService;
+	console.log("[Main] Proto loaded, service:", !!MarketDataStreamService);
+	const client = new MarketDataStreamService("invest-public-api.tbank.ru:443", _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.credentials.createSsl(null, null, null, { rejectUnauthorized: false }), { "grpc.ssl_target_name_override": "invest-public-api.tbank.ru" });
+	console.log("[Main] gRPC client created");
+	electron.ipcMain.handle("md-stream-start", async (_, token, requestBody) => {
+		console.log("[Main] md-stream-start called");
+		console.log("[Main] Token:", token?.slice(0, 12) + "...");
+		console.log("[Main] Request body:", JSON.stringify(requestBody).slice(0, 400));
+		if (currentStream) {
+			console.log("[Main] Stopping previous stream");
+			currentStream.cancel();
+			currentStream = null;
+		}
+		const metadata = new _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.Metadata();
+		metadata.add("Authorization", `Bearer ${token}`);
+		console.log("[Main] Calling MarketDataServerSideStream...");
+		const stream = client.MarketDataServerSideStream(requestBody, metadata);
+		currentStream = stream;
+		console.log("[Main] Stream created");
+		let buffer = "";
+		stream.on("data", (data) => {
+			if (typeof data !== "string" && typeof data !== "object") return;
+			const chunk = typeof data === "string" ? data : JSON.stringify(data);
+			buffer += chunk;
+			let begin = 0;
+			let depth = 0;
+			let inString = false;
+			let escape = false;
+			for (let i = 0; i < buffer.length; i++) {
+				const ch = buffer[i];
+				if (inString) {
+					if (escape) escape = false;
+					else if (ch === "\\") escape = true;
+					else if (ch === "\"") inString = false;
+					continue;
+				}
+				if (ch === "\"") inString = true;
+				else if (ch === "{") {
+					if (depth === 0) begin = i;
+					depth++;
+				} else if (ch === "}") {
+					depth--;
+					if (depth === 0) {
+						const jsonStr = buffer.substring(begin, i + 1);
+						try {
+							JSON.parse(jsonStr);
+							const win = getBondsWindow();
+							if (win && !win.isDestroyed()) win.webContents.send("md-stream-data", jsonStr);
+							else console.warn("[Main] Bonds window not available");
+						} catch {
+							console.warn("[Main] Skipped invalid JSON fragment:", jsonStr.slice(0, 100));
+						}
+					}
+				}
+			}
+			if (depth > 0) buffer = buffer.substring(begin);
+			else buffer = "";
+		});
+		stream.on("status", (status) => {
+			const win = getBondsWindow();
+			if (win) win.webContents.send("md-stream-closed");
+		});
+		stream.on("error", (err) => {
+			const win = getBondsWindow();
+			if (win) win.webContents.send("md-stream-error", err.message);
+		});
+		console.log("[Main] Request sent");
+	});
+	electron.ipcMain.handle("md-stream-stop", async () => {
+		console.log("[Main] md-stream-stop called");
+		if (currentStream) {
+			currentStream.cancel();
+			currentStream = null;
+		}
+	});
+};
+//#endregion
+//#region src/main/streams/operations.ts
+var registerOperationsStreamHandlers = () => {
+	let opsStreams = {
+		portfolio: null,
+		positions: null,
+		operations: null
+	};
+	let opsClient;
+	function ensureOpsClient(mainWindow) {
+		if (opsClient) return opsClient;
+		const OPS_PROTO_PATH = path.default.join(__dirname, "proto", "operations.proto");
+		const packageDefinition = _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_proto_loader_build_src_index_js.loadSync(OPS_PROTO_PATH, {
+			keepCase: false,
+			longs: String,
+			enums: String,
+			defaults: true,
+			oneofs: true
+		});
+		const OperationsStreamService = _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.loadPackageDefinition(packageDefinition).tinkoff.public.invest.api.contract.v1.OperationsStreamService;
+		opsClient = new OperationsStreamService("invest-public-api.tbank.ru:443", _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.credentials.createSsl(null, null, null, { rejectUnauthorized: false }), { "grpc.ssl_target_name_override": "invest-public-api.tbank.ru" });
+		return opsClient;
+	}
+	electron.ipcMain.handle("ops-stream-start", async (event, streamType, token, requestBody) => {
+		const mainWindow = electron.BrowserWindow.fromWebContents(event.sender) || null;
+		const client = ensureOpsClient(mainWindow);
+		const metadata = new _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.Metadata();
+		metadata.add("Authorization", `Bearer ${token}`);
+		if (opsStreams[streamType]) {
+			opsStreams[streamType].cancel();
+			opsStreams[streamType] = null;
+		}
+		let stream;
+		try {
+			if (streamType === "portfolio") stream = client.PortfolioStream(requestBody, metadata);
+			else if (streamType === "positions") stream = client.PositionsStream(requestBody, metadata);
+			else if (streamType === "operations") stream = client.OperationsStream(requestBody, metadata);
+			else throw new Error(`Unknown stream type: ${streamType}`);
+		} catch (err) {
+			mainWindow?.webContents.send("ops-stream-error", streamType, err.message);
+			return;
+		}
+		opsStreams[streamType] = stream;
+		let buffer = "";
+		stream.on("data", (data) => {
+			const chunk = JSON.stringify(data);
+			buffer += chunk;
+			let begin = 0, depth = 0, inString = false, escape = false;
+			for (let i = 0; i < buffer.length; i++) {
+				const ch = buffer[i];
+				if (inString) {
+					if (escape) escape = false;
+					else if (ch === "\\") escape = true;
+					else if (ch === "\"") inString = false;
+					continue;
+				}
+				if (ch === "\"") inString = true;
+				else if (ch === "{") {
+					if (depth === 0) begin = i;
+					depth++;
+				} else if (ch === "}") {
+					depth--;
+					if (depth === 0) {
+						const jsonStr = buffer.substring(begin, i + 1);
+						try {
+							JSON.parse(jsonStr);
+							mainWindow?.webContents.send(`ops-${streamType}-data`, jsonStr);
+						} catch {}
+					}
+				}
+			}
+			buffer = depth > 0 ? buffer.substring(begin) : "";
+		});
+		stream.on("status", (status) => {
+			mainWindow?.webContents.send(`ops-${streamType}-closed`);
+			opsStreams[streamType] = null;
+		});
+		stream.on("error", (err) => {
+			mainWindow?.webContents.send("ops-stream-error", streamType, err.message);
+			opsStreams[streamType] = null;
+		});
+	});
+	electron.ipcMain.handle("ops-stream-stop", async () => {
+		for (const key of Object.keys(opsStreams)) {
+			opsStreams[key]?.cancel();
+			opsStreams[key] = null;
+		}
+	});
+};
+//#endregion
+//#region src/main/streams/orders.ts
+var registerOrdersStreamHandlers = () => {
+	let ordersStreams = {
+		trades: null,
+		orderState: null
+	};
+	let ordersClient;
+	function ensureOrdersClient() {
+		if (ordersClient) return ordersClient;
+		const PROTO_PATH = path.default.join(__dirname, "proto", "orders.proto");
+		const packageDefinition = _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_proto_loader_build_src_index_js.loadSync(PROTO_PATH, {});
+		const OrdersStreamService = _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.loadPackageDefinition(packageDefinition).tinkoff.public.invest.api.contract.v1.OrdersStreamService;
+		ordersClient = new OrdersStreamService("invest-public-api.tbank.ru:443", _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.credentials.createSsl(null, null, null, { rejectUnauthorized: false }), { "grpc.ssl_target_name_override": "invest-public-api.tbank.ru" });
+		return ordersClient;
+	}
+	electron.ipcMain.handle("orders-stream-start", async (event, streamType, token, requestBody) => {
+		const mainWindow = electron.BrowserWindow.fromWebContents(event.sender) || null;
+		const client = ensureOrdersClient();
+		const metadata = new _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.Metadata();
+		metadata.add("Authorization", `Bearer ${token}`);
+		if (ordersStreams[streamType]) {
+			ordersStreams[streamType].cancel();
+			ordersStreams[streamType] = null;
+		}
+		let stream;
+		try {
+			if (streamType === "trades") stream = client.TradesStream(requestBody, metadata);
+			else if (streamType === "orderState") stream = client.OrderStateStream(requestBody, metadata);
+			else throw new Error(`Unknown stream type: ${streamType}`);
+		} catch (err) {
+			mainWindow?.webContents.send("orders-stream-error", streamType, err.message);
+			return;
+		}
+		ordersStreams[streamType] = stream;
+		let buffer = "";
+		stream.on("data", (data) => {
+			const chunk = JSON.stringify(data);
+			buffer += chunk;
+			let begin = 0, depth = 0, inString = false, escape = false;
+			for (let i = 0; i < buffer.length; i++) {
+				const ch = buffer[i];
+				if (inString) {
+					if (escape) escape = false;
+					else if (ch === "\\") escape = true;
+					else if (ch === "\"") inString = false;
+					continue;
+				}
+				if (ch === "\"") inString = true;
+				else if (ch === "{") {
+					if (depth === 0) begin = i;
+					depth++;
+				} else if (ch === "}") {
+					depth--;
+					if (depth === 0) {
+						const jsonStr = buffer.substring(begin, i + 1);
+						try {
+							JSON.parse(jsonStr);
+							mainWindow?.webContents.send(`orders-${streamType}-data`, jsonStr);
+						} catch {}
+					}
+				}
+			}
+			buffer = depth > 0 ? buffer.substring(begin) : "";
+		});
+		stream.on("status", () => {
+			mainWindow?.webContents.send(`orders-${streamType}-closed`);
+			ordersStreams[streamType] = null;
+		});
+		stream.on("error", (err) => {
+			mainWindow?.webContents.send("orders-stream-error", streamType, err.message);
+			ordersStreams[streamType] = null;
+		});
+	});
+	electron.ipcMain.handle("orders-stream-stop", async () => {
+		for (const key of Object.keys(ordersStreams)) {
+			ordersStreams[key]?.cancel();
+			ordersStreams[key] = null;
+		}
+	});
+};
+//#endregion
 //#region src/types/promptgenerator.ts
 /**
 * Валидирует промпт на соответствие структуре
@@ -798,7 +1058,6 @@ function validateCodeContext(context) {
 }
 //#endregion
 //#region src/main/main.ts
-var currentStream = null;
 electron.app.whenReady().then(() => {
 	electron.session.defaultSession.setCertificateVerifyProc((request, callback) => {
 		callback(0);
@@ -810,6 +1069,9 @@ electron.app.whenReady().then(() => {
 	registerBondsHandlers();
 	registerMDHandlers();
 	registerTrainingHandlers();
+	registerMarketdataStreamHandlers();
+	registerOperationsStreamHandlers();
+	registerOrdersStreamHandlers();
 });
 electron.app.on("window-all-closed", () => {
 	if (process.platform !== "darwin") electron.app.quit();
@@ -1256,253 +1518,6 @@ electron.ipcMain.handle("get-project-tree", async (event, folderPath) => {
 			resolve(stdout);
 		});
 	});
-});
-console.log("[Main] registerMDStreamHandlers called");
-var PROTO_PATH = path.default.join(__dirname, "proto", "marketdata.proto");
-console.log("[Main] Proto path:", PROTO_PATH);
-var packageDefinition = _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_proto_loader_build_src_index_js.loadSync(PROTO_PATH, {
-	keepCase: false,
-	longs: String,
-	enums: String,
-	defaults: true,
-	oneofs: true
-});
-var MarketDataStreamService = _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.loadPackageDefinition(packageDefinition).tinkoff.public.invest.api.contract.v1.MarketDataStreamService;
-console.log("[Main] Proto loaded, service:", !!MarketDataStreamService);
-var client = new MarketDataStreamService("invest-public-api.tbank.ru:443", _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.credentials.createSsl(null, null, null, { rejectUnauthorized: false }), { "grpc.ssl_target_name_override": "invest-public-api.tbank.ru" });
-console.log("[Main] gRPC client created");
-electron.ipcMain.handle("md-stream-start", async (_, token, requestBody) => {
-	console.log("[Main] md-stream-start called");
-	console.log("[Main] Token:", token?.slice(0, 12) + "...");
-	console.log("[Main] Request body:", JSON.stringify(requestBody).slice(0, 400));
-	if (currentStream) {
-		console.log("[Main] Stopping previous stream");
-		currentStream.cancel();
-		currentStream = null;
-	}
-	const metadata = new _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.Metadata();
-	metadata.add("Authorization", `Bearer ${token}`);
-	console.log("[Main] Calling MarketDataServerSideStream...");
-	const stream = client.MarketDataServerSideStream(requestBody, metadata);
-	currentStream = stream;
-	console.log("[Main] Stream created");
-	let buffer = "";
-	stream.on("data", (data) => {
-		if (typeof data !== "string" && typeof data !== "object") return;
-		const chunk = typeof data === "string" ? data : JSON.stringify(data);
-		buffer += chunk;
-		let begin = 0;
-		let depth = 0;
-		let inString = false;
-		let escape = false;
-		for (let i = 0; i < buffer.length; i++) {
-			const ch = buffer[i];
-			if (inString) {
-				if (escape) escape = false;
-				else if (ch === "\\") escape = true;
-				else if (ch === "\"") inString = false;
-				continue;
-			}
-			if (ch === "\"") inString = true;
-			else if (ch === "{") {
-				if (depth === 0) begin = i;
-				depth++;
-			} else if (ch === "}") {
-				depth--;
-				if (depth === 0) {
-					const jsonStr = buffer.substring(begin, i + 1);
-					try {
-						JSON.parse(jsonStr);
-						const win = getBondsWindow();
-						if (win && !win.isDestroyed()) win.webContents.send("md-stream-data", jsonStr);
-						else console.warn("[Main] Bonds window not available");
-					} catch {
-						console.warn("[Main] Skipped invalid JSON fragment:", jsonStr.slice(0, 100));
-					}
-				}
-			}
-		}
-		if (depth > 0) buffer = buffer.substring(begin);
-		else buffer = "";
-	});
-	stream.on("status", (status) => {
-		const win = getBondsWindow();
-		if (win) win.webContents.send("md-stream-closed");
-	});
-	stream.on("error", (err) => {
-		const win = getBondsWindow();
-		if (win) win.webContents.send("md-stream-error", err.message);
-	});
-	console.log("[Main] Request sent");
-});
-electron.ipcMain.handle("md-stream-stop", async () => {
-	console.log("[Main] md-stream-stop called");
-	if (currentStream) {
-		currentStream.cancel();
-		currentStream = null;
-	}
-});
-var opsStreams = {
-	portfolio: null,
-	positions: null,
-	operations: null
-};
-var opsClient;
-function ensureOpsClient(mainWindow) {
-	if (opsClient) return opsClient;
-	const OPS_PROTO_PATH = path.default.join(__dirname, "proto", "operations.proto");
-	const packageDefinition = _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_proto_loader_build_src_index_js.loadSync(OPS_PROTO_PATH, {
-		keepCase: false,
-		longs: String,
-		enums: String,
-		defaults: true,
-		oneofs: true
-	});
-	const OperationsStreamService = _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.loadPackageDefinition(packageDefinition).tinkoff.public.invest.api.contract.v1.OperationsStreamService;
-	opsClient = new OperationsStreamService("invest-public-api.tbank.ru:443", _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.credentials.createSsl(null, null, null, { rejectUnauthorized: false }), { "grpc.ssl_target_name_override": "invest-public-api.tbank.ru" });
-	return opsClient;
-}
-electron.ipcMain.handle("ops-stream-start", async (event, streamType, token, requestBody) => {
-	const mainWindow = electron.BrowserWindow.fromWebContents(event.sender) || null;
-	const client = ensureOpsClient(mainWindow);
-	const metadata = new _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.Metadata();
-	metadata.add("Authorization", `Bearer ${token}`);
-	if (opsStreams[streamType]) {
-		opsStreams[streamType].cancel();
-		opsStreams[streamType] = null;
-	}
-	let stream;
-	try {
-		if (streamType === "portfolio") stream = client.PortfolioStream(requestBody, metadata);
-		else if (streamType === "positions") stream = client.PositionsStream(requestBody, metadata);
-		else if (streamType === "operations") stream = client.OperationsStream(requestBody, metadata);
-		else throw new Error(`Unknown stream type: ${streamType}`);
-	} catch (err) {
-		mainWindow?.webContents.send("ops-stream-error", streamType, err.message);
-		return;
-	}
-	opsStreams[streamType] = stream;
-	let buffer = "";
-	stream.on("data", (data) => {
-		const chunk = JSON.stringify(data);
-		buffer += chunk;
-		let begin = 0, depth = 0, inString = false, escape = false;
-		for (let i = 0; i < buffer.length; i++) {
-			const ch = buffer[i];
-			if (inString) {
-				if (escape) escape = false;
-				else if (ch === "\\") escape = true;
-				else if (ch === "\"") inString = false;
-				continue;
-			}
-			if (ch === "\"") inString = true;
-			else if (ch === "{") {
-				if (depth === 0) begin = i;
-				depth++;
-			} else if (ch === "}") {
-				depth--;
-				if (depth === 0) {
-					const jsonStr = buffer.substring(begin, i + 1);
-					try {
-						JSON.parse(jsonStr);
-						mainWindow?.webContents.send(`ops-${streamType}-data`, jsonStr);
-					} catch {}
-				}
-			}
-		}
-		buffer = depth > 0 ? buffer.substring(begin) : "";
-	});
-	stream.on("status", (status) => {
-		mainWindow?.webContents.send(`ops-${streamType}-closed`);
-		opsStreams[streamType] = null;
-	});
-	stream.on("error", (err) => {
-		mainWindow?.webContents.send("ops-stream-error", streamType, err.message);
-		opsStreams[streamType] = null;
-	});
-});
-electron.ipcMain.handle("ops-stream-stop", async () => {
-	for (const key of Object.keys(opsStreams)) {
-		opsStreams[key]?.cancel();
-		opsStreams[key] = null;
-	}
-});
-var ordersStreams = {
-	trades: null,
-	orderState: null
-};
-var ordersClient;
-function ensureOrdersClient() {
-	if (ordersClient) return ordersClient;
-	const PROTO_PATH = path.default.join(__dirname, "proto", "orders.proto");
-	const packageDefinition = _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_proto_loader_build_src_index_js.loadSync(PROTO_PATH, {});
-	const OrdersStreamService = _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.loadPackageDefinition(packageDefinition).tinkoff.public.invest.api.contract.v1.OrdersStreamService;
-	ordersClient = new OrdersStreamService("invest-public-api.tbank.ru:443", _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.credentials.createSsl(null, null, null, { rejectUnauthorized: false }), { "grpc.ssl_target_name_override": "invest-public-api.tbank.ru" });
-	return ordersClient;
-}
-electron.ipcMain.handle("orders-stream-start", async (event, streamType, token, requestBody) => {
-	const mainWindow = electron.BrowserWindow.fromWebContents(event.sender) || null;
-	const client = ensureOrdersClient();
-	const metadata = new _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.Metadata();
-	metadata.add("Authorization", `Bearer ${token}`);
-	if (ordersStreams[streamType]) {
-		ordersStreams[streamType].cancel();
-		ordersStreams[streamType] = null;
-	}
-	let stream;
-	try {
-		if (streamType === "trades") stream = client.TradesStream(requestBody, metadata);
-		else if (streamType === "orderState") stream = client.OrderStateStream(requestBody, metadata);
-		else throw new Error(`Unknown stream type: ${streamType}`);
-	} catch (err) {
-		mainWindow?.webContents.send("orders-stream-error", streamType, err.message);
-		return;
-	}
-	ordersStreams[streamType] = stream;
-	let buffer = "";
-	stream.on("data", (data) => {
-		const chunk = JSON.stringify(data);
-		buffer += chunk;
-		let begin = 0, depth = 0, inString = false, escape = false;
-		for (let i = 0; i < buffer.length; i++) {
-			const ch = buffer[i];
-			if (inString) {
-				if (escape) escape = false;
-				else if (ch === "\\") escape = true;
-				else if (ch === "\"") inString = false;
-				continue;
-			}
-			if (ch === "\"") inString = true;
-			else if (ch === "{") {
-				if (depth === 0) begin = i;
-				depth++;
-			} else if (ch === "}") {
-				depth--;
-				if (depth === 0) {
-					const jsonStr = buffer.substring(begin, i + 1);
-					try {
-						JSON.parse(jsonStr);
-						mainWindow?.webContents.send(`orders-${streamType}-data`, jsonStr);
-					} catch {}
-				}
-			}
-		}
-		buffer = depth > 0 ? buffer.substring(begin) : "";
-	});
-	stream.on("status", () => {
-		mainWindow?.webContents.send(`orders-${streamType}-closed`);
-		ordersStreams[streamType] = null;
-	});
-	stream.on("error", (err) => {
-		mainWindow?.webContents.send("orders-stream-error", streamType, err.message);
-		ordersStreams[streamType] = null;
-	});
-});
-electron.ipcMain.handle("orders-stream-stop", async () => {
-	for (const key of Object.keys(ordersStreams)) {
-		ordersStreams[key]?.cancel();
-		ordersStreams[key] = null;
-	}
 });
 //#endregion
 
