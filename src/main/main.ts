@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, session } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, session } from 'electron';
 import { createMainWindow } from './windows/mainWindow.ts';
 //import { setupMenu } from './menus/menuBuilder.ts.old';
 import { registerAIHandlers } from './ipcHandlers/aiHandlers.ts';
@@ -28,6 +28,7 @@ import WebSocket from 'ws';
 
 import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
+import { mainMenuTemplate } from './menus/windowMenus.ts';
 
 let currentStream: grpc.ClientReadableStream<any> | null = null;
 
@@ -43,7 +44,9 @@ app.whenReady().then(() => {
   });
 
   // Создаем главное окно
-  createMainWindow();
+  const mainWindow = createMainWindow();
+  const menu = Menu.buildFromTemplate(mainMenuTemplate);
+  mainWindow.setMenu(menu);
   
   // Регистрируем обработчики событий, за исключением открытия окон 
   registerDashboardHandlers();

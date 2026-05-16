@@ -482,6 +482,7 @@ var createMainWindow = () => {
 	mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
 	mainWindow.webContents.openDevTools();
 	mainWindow.webContents.openDevTools();
+	return mainWindow;
 };
 var getMainWindow = () => {
 	return mainWindow;
@@ -1062,7 +1063,9 @@ electron.app.whenReady().then(() => {
 	electron.session.defaultSession.setCertificateVerifyProc((request, callback) => {
 		callback(0);
 	});
-	createMainWindow();
+	const mainWindow = createMainWindow();
+	const menu = electron.Menu.buildFromTemplate(mainMenuTemplate);
+	mainWindow.setMenu(menu);
 	registerDashboardHandlers();
 	registerAIHandlers();
 	registerPGHandlers();

@@ -1,8 +1,9 @@
 import path from 'path';
 import { app, BrowserWindow, Menu } from 'electron';
-import { mainMenuTemplate } from '../menus/windowMenus';
+//import { mainMenuTemplate } from '../menus/windowMenus';
 
 import { resolveAppPath } from '../utils/pathUtils';
+import { mainMenuTemplate } from '../menus/windowMenus';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -29,7 +30,7 @@ console.log('===========================');
 const MAIN_WINDOW_VITE_DEV_SERVER_URL = 'http://localhost:5173';
 const MAIN_WINDOW_PROD_PATH = path.join(__dirname, '../../renderer/main-window/index.html');
 
-export const createMainWindow = () => {
+export const createMainWindow = (): BrowserWindow => {
   mainWindow = new BrowserWindow({
     width: 1024,
     height: 768,
@@ -58,6 +59,7 @@ export const createMainWindow = () => {
   }
 
   mainWindow.webContents.openDevTools();
+  return mainWindow;  // <-- важно!
 };
 
 export const getMainWindow = (): BrowserWindow | null => {

@@ -1,10 +1,8 @@
-import { app, BrowserWindow, ipcRenderer, MenuItemConstructorOptions } from 'electron';
-import { ipcMain } from 'electron';
+import { app, BrowserWindow, MenuItemConstructorOptions } from 'electron';
 import { createAIWindow, getAIWindow } from '../windows/aiWindow';
 import { createMDWindow } from '../windows/mdWindow';
 import { createBondsWindow } from '../windows/bondsWindow';
 import { createPGWindow } from '../windows/pgWindow';
-import { getMainWindow } from '../windows/mainWindow';
 
 export const mainMenuTemplate: MenuItemConstructorOptions[] = [
   {
