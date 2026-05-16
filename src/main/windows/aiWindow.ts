@@ -14,6 +14,7 @@ const preloadPath = app.isPackaged
   : path.join(__dirname, '../../dist/main/preload.js');
 
 export const createAIWindow = () => {
+  console.log('createAIWindow called');
   if (aiWindow) {
     aiWindow.focus();
     return;
@@ -33,7 +34,7 @@ export const createAIWindow = () => {
   // Загружаем ТОТ ЖЕ сервер, но с параметром в URL
   //const mainWindow = getMainWindow();
   //const MAIN_WINDOW_PROD_PATH = getMainWindowProdPath();
-  if (process.env.NODE_ENV === 'development') {
+  if (process.env.NODE_ENV !== 'production') {
     aiWindow.loadURL(`${DEV_SERVER_URL}/#/ai`);
   } else {
     aiWindow.loadFile(getMainWindowProdPath());

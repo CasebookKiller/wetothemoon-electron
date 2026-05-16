@@ -8,7 +8,10 @@ export const mainMenuTemplate: MenuItemConstructorOptions[] = [
   {
     label: 'Файл',
     submenu: [
-      { label: 'Открыть Нейро', click: createAIWindow },
+      { label: 'Открыть Нейро', click: ()=>{
+        console.log('Открыть Нейро');
+        createAIWindow();
+      } },
       { label: 'Открыть Markdown', click: createMDWindow },
       { label: 'Открыть Облигации', click: createBondsWindow },
       { label: 'Открыть Генератор запросов', click: createPGWindow },

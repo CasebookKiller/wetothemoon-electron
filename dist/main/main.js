@@ -148,7 +148,10 @@ var mainMenuTemplate = [
 		submenu: [
 			{
 				label: "Открыть Нейро",
-				click: createAIWindow
+				click: () => {
+					console.log("Открыть Нейро");
+					createAIWindow();
+				}
 			},
 			{
 				label: "Открыть Markdown",
@@ -444,14 +447,15 @@ var bondsWindowMenuTemplate = [
 ];
 //#endregion
 //#region src/main/windows/aiWindow.ts
-var aiWindow$1 = null;
+var aiWindow = null;
 var preloadPath$1 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var createAIWindow = () => {
-	if (aiWindow$1) {
-		aiWindow$1.focus();
+	console.log("createAIWindow called");
+	if (aiWindow) {
+		aiWindow.focus();
 		return;
 	}
-	aiWindow$1 = new electron.BrowserWindow({
+	aiWindow = new electron.BrowserWindow({
 		width: 800,
 		height: 600,
 		title: "Нейро",
@@ -461,15 +465,15 @@ var createAIWindow = () => {
 			nodeIntegration: false
 		}
 	});
-	if (process.env.NODE_ENV === "development") aiWindow$1.loadURL(`${DEV_SERVER_URL}/#/ai`);
-	else aiWindow$1.loadFile(getMainWindowProdPath());
+	if (process.env.NODE_ENV !== "production") aiWindow.loadURL(`${DEV_SERVER_URL}/#/ai`);
+	else aiWindow.loadFile(getMainWindowProdPath());
 	const menu = electron.Menu.buildFromTemplate(aiWindowMenuTemplate);
-	aiWindow$1.setMenu(menu);
-	aiWindow$1.on("closed", () => {
-		aiWindow$1 = null;
+	aiWindow.setMenu(menu);
+	aiWindow.on("closed", () => {
+		aiWindow = null;
 	});
 };
-var getAIWindow = () => aiWindow$1;
+var getAIWindow = () => aiWindow;
 var callAIAPI = async (prompt) => {
 	const data = await (await fetch("http://localhost:11434/api/generate", {
 		method: "POST",
@@ -1062,10 +1066,10 @@ electron.app.on("window-all-closed", () => {
 electron.app.on("activate", () => {
 	if (electron.BrowserWindow.getAllWindows().length === 0) createMainWindow();
 });
-var aiWindow = getAIWindow();
 electron.ipcMain.handle("open-ai-window", () => {
-	if (!aiWindow) createAIWindow();
-	else aiWindow.focus();
+	const win = getAIWindow();
+	if (win && !win.isDestroyed()) win.focus();
+	else createAIWindow();
 });
 var bondsWindow = getBondsWindow();
 electron.ipcMain.handle("open-bonds-window", () => {

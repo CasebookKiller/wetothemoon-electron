@@ -81,10 +81,11 @@ const aiWindow = getAIWindow();
 
 // API для открытия ai-окна из main-окна
 ipcMain.handle('open-ai-window', () => {
-  if (!aiWindow) {
-    createAIWindow();
+  const win = getAIWindow();
+  if (win && !win.isDestroyed()) {
+    win.focus();
   } else {
-    aiWindow.focus();
+    createAIWindow();
   }
 });
 
