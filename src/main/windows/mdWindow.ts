@@ -9,11 +9,6 @@ const preloadPath = app.isPackaged
   : path.join(__dirname, '../../dist/main/preload.js');
 
 export const createMDWindow = () => {
-  if (mdWindow) {
-    mdWindow.focus();
-    return;
-  }
-
   mdWindow = new BrowserWindow({
     width: 800,
     height: 600,
@@ -42,6 +37,8 @@ export const createMDWindow = () => {
   mdWindow.on('closed', () => {
     mdWindow = null;
   });
+  
+  return mdWindow;
 };
 
 export const getMDWindow = (): BrowserWindow | null => mdWindow;

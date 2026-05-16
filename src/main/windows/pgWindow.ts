@@ -12,11 +12,6 @@ const preloadPath = app.isPackaged
   : path.join(__dirname, '../../dist/main/preload.js');
 
 export const createPGWindow = () => {
-  if (pgWindow) {
-    pgWindow.focus();
-    return;
-  }
-
   pgWindow = new BrowserWindow({
     width: 800,
     height: 600,
@@ -45,6 +40,8 @@ export const createPGWindow = () => {
   pgWindow.on('closed', () => {
     pgWindow = null;
   });
+
+  return pgWindow;
 };
 
 export const getPGWindow = (): BrowserWindow | null => pgWindow;

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, session } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, MenuItemConstructorOptions, session } from 'electron';
 import { createMainWindow } from './windows/mainWindow.ts';
 //import { setupMenu } from './menus/menuBuilder.ts.old';
 import { registerAIHandlers } from './ipcHandlers/aiHandlers.ts';
@@ -28,7 +28,12 @@ import WebSocket from 'ws';
 
 import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
-import { mainMenuTemplate } from './menus/windowMenus.ts';
+import {
+  mainMenuTemplate,
+  aiWindowMenuTemplate,
+  bondsWindowMenuTemplate,
+  mdWindowMenuTemplate
+} from './menus/windowMenus.ts';
 
 let currentStream: grpc.ClientReadableStream<any> | null = null;
 
@@ -46,7 +51,67 @@ app.whenReady().then(() => {
   // Создаем главное окно
   const mainWindow = createMainWindow();
   const menu = Menu.buildFromTemplate(mainMenuTemplate);
+  // Ищем пункт "Открыть Нейро" и назначаем действие
+  const fileMenu = menu.items.find(i => i.label === 'Файл')?.submenu;
+  if (fileMenu) {
+    const openAI = fileMenu.items.find(i => i.label === 'Открыть Нейро');
+    console.log('openAIItem found:', !!openAI);
+    if (openAI) {
+      openAI.click = () => {
+        console.log('click on Open AI');
+        const existing = getAIWindow();
+        if (existing && !existing.isDestroyed()) {
+          existing.focus();
+        } else {
+          const win = createAIWindow();
+          if (win) applyMenuToWindow(win, aiWindowMenuTemplate);
+        }
+      };
+    }
+
+    // Аналогично для остальных пунктов
+    const openMD = fileMenu.items.find(i => i.label === 'Открыть Markdown');
+    if (openMD) {
+      openMD.click = () => {
+        const existing = getMDWindow();
+        if (existing && !existing.isDestroyed()) existing.focus();
+        else {
+          const win = createMDWindow();
+          if (win) applyMenuToWindow(win, mdWindowMenuTemplate);
+        }
+      };
+    }
+
+    const openBonds = fileMenu.items.find(i => i.label === 'Открыть Облигации');
+    if (openBonds) {
+      openBonds.click = () => {
+        const existing = getBondsWindow();
+        if (existing && !existing.isDestroyed()) existing.focus();
+        else {
+          const win = createBondsWindow();
+          if (win) applyMenuToWindow(win, bondsWindowMenuTemplate);
+        }
+      };
+    }
+
+    const openPG = fileMenu.items.find(i => i.label === 'Открыть Генератор запросов');
+    if (openPG) {
+      openPG.click = () => {
+        const existing = getPGWindow();
+        if (existing && !existing.isDestroyed()) existing.focus();
+        else {
+          const win = createPGWindow();
+          if (win) applyMenuToWindow(win, mainMenuTemplate); // или специальный шаблон, если есть
+        }
+      };
+    }
+  }
+
   mainWindow.setMenu(menu);
+  console.log('Menu items:', menu.items.map(i => i.label));
+  //const fileMenu = menu.items.find(i => i.label === 'Файл');
+  //console.log('File submenu items:', fileMenu?.submenu?.items.map(i => i.label));
+
   
   // Регистрируем обработчики событий, за исключением открытия окон 
   registerDashboardHandlers(mainWindow);
@@ -81,11 +146,14 @@ const aiWindow = getAIWindow();
 
 // API для открытия ai-окна из main-окна
 ipcMain.handle('open-ai-window', () => {
-  const win = getAIWindow();
-  if (win && !win.isDestroyed()) {
-    win.focus();
-  } else {
-    createAIWindow();
+  const existing = getAIWindow();
+  if (existing && !existing.isDestroyed()) {
+    existing.focus();
+    return;
+  }
+  const win = createAIWindow(); // теперь возвращает окно
+  if (win) {
+    applyMenuToWindow(win, aiWindowMenuTemplate);
   }
 });
 
@@ -549,5 +617,8 @@ ipcMain.handle('get-project-tree', async (event, folderPath: string) => {
   });
 });
 
-
+function applyMenuToWindow(win: BrowserWindow, template: MenuItemConstructorOptions[]) {
+  const menu = Menu.buildFromTemplate(template);
+  win.setMenu(menu);
+}
 

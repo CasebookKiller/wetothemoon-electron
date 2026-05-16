@@ -61,417 +61,27 @@ function getMainWindowProdPath() {
 	return path.default.join(__dirname, "../../renderer/main-window/index.html");
 }
 //#endregion
-//#region src/main/windows/mdWindow.ts
-var mdWindow$1 = null;
+//#region src/main/windows/aiWindow.ts
+var aiWindow = null;
 var preloadPath$4 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
-var createMDWindow = () => {
-	if (mdWindow$1) {
-		mdWindow$1.focus();
-		return;
-	}
-	mdWindow$1 = new electron.BrowserWindow({
+var createAIWindow = () => {
+	console.log("createAIWindow called");
+	aiWindow = new electron.BrowserWindow({
 		width: 800,
 		height: 600,
-		title: "Markdown",
+		title: "Нейро",
 		webPreferences: {
 			preload: preloadPath$4,
 			contextIsolation: true,
 			nodeIntegration: false
 		}
 	});
-	if (process.env.NODE_ENV === "development") mdWindow$1.loadURL(`${DEV_SERVER_URL}/#/md`);
-	else mdWindow$1.loadFile(getMainWindowProdPath());
-	mdWindow$1.on("closed", () => {
-		mdWindow$1 = null;
-	});
-};
-var getMDWindow = () => mdWindow$1;
-//#endregion
-//#region src/main/windows/bondsWindow.ts
-var bondsWindow$1 = null;
-var preloadPath$3 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
-var createBondsWindow = () => {
-	if (bondsWindow$1) {
-		bondsWindow$1.focus();
-		return;
-	}
-	bondsWindow$1 = new electron.BrowserWindow({
-		width: 1024,
-		height: 768,
-		title: "Облигации",
-		webPreferences: {
-			preload: preloadPath$3,
-			contextIsolation: true,
-			nodeIntegration: false
-		}
-	});
-	if (process.env.NODE_ENV === "development") bondsWindow$1.loadURL(`${DEV_SERVER_URL}/#/bonds`);
-	else bondsWindow$1.loadFile(getMainWindowProdPath());
-	const menu = electron.Menu.buildFromTemplate(bondsWindowMenuTemplate);
-	bondsWindow$1.setMenu(menu);
-	bondsWindow$1.on("closed", () => {
-		bondsWindow$1 = null;
-	});
-};
-var getBondsWindow = () => bondsWindow$1;
-//#endregion
-//#region src/main/windows/pgWindow.ts
-var pgWindow$1 = null;
-var preloadPath$2 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
-var createPGWindow = () => {
-	if (pgWindow$1) {
-		pgWindow$1.focus();
-		return;
-	}
-	pgWindow$1 = new electron.BrowserWindow({
-		width: 800,
-		height: 600,
-		title: "Генератор запросов",
-		webPreferences: {
-			preload: preloadPath$2,
-			contextIsolation: true,
-			nodeIntegration: false
-		}
-	});
-	if (process.env.NODE_ENV === "development") pgWindow$1.loadURL(`${DEV_SERVER_URL}/#/pg`);
-	else pgWindow$1.loadFile(getMainWindowProdPath());
-	pgWindow$1.on("closed", () => {
-		pgWindow$1 = null;
-	});
-};
-var getPGWindow = () => pgWindow$1;
-//#endregion
-//#region src/main/menus/windowMenus.ts
-var mainMenuTemplate = [
-	{
-		label: "Файл",
-		submenu: [
-			{
-				label: "Открыть Нейро",
-				click: () => {
-					console.log("Открыть Нейро");
-					createAIWindow();
-				}
-			},
-			{
-				label: "Открыть Markdown",
-				click: createMDWindow
-			},
-			{
-				label: "Открыть Облигации",
-				click: createBondsWindow
-			},
-			{
-				label: "Открыть Генератор запросов",
-				click: createPGWindow
-			},
-			{ type: "separator" },
-			{
-				label: "Выйти",
-				click: () => electron.app.quit(),
-				accelerator: "CmdOrCtrl+Q"
-			}
-		]
-	},
-	{
-		label: "Правка",
-		submenu: [
-			{
-				label: "Отменить",
-				accelerator: "CmdOrCtrl+Z",
-				role: "undo"
-			},
-			{
-				label: "Повторить",
-				accelerator: "Shift+CmdOrCtrl+Z",
-				role: "redo"
-			},
-			{ type: "separator" },
-			{
-				label: "Вырезать",
-				accelerator: "CmdOrCtrl+X",
-				role: "cut"
-			},
-			{
-				label: "Копировать",
-				accelerator: "CmdOrCtrl+C",
-				role: "copy"
-			},
-			{
-				label: "Вставить",
-				accelerator: "CmdOrCtrl+V",
-				role: "paste"
-			}
-		]
-	},
-	{
-		label: "Вид",
-		submenu: [{
-			label: "Перезагрузить",
-			accelerator: "CmdOrCtrl+R",
-			role: "reload"
-		}, {
-			label: "Инструменты разработчика",
-			accelerator: process.platform === "darwin" ? "Alt+Cmd+I" : "Ctrl+Shift+I",
-			role: "toggleDevTools"
-		}]
-	},
-	{
-		label: "Окно",
-		submenu: [
-			{
-				label: "Свернуть",
-				accelerator: "CmdOrCtrl+M",
-				role: "minimize"
-			},
-			{
-				label: "Увеличить",
-				role: "zoom"
-			},
-			{
-				label: "Закрыть",
-				accelerator: "CmdOrCtrl+W",
-				role: "close"
-			}
-		],
-		role: "windowMenu"
-	}
-];
-var aiWindowMenuTemplate = [
-	{
-		label: "Нейро",
-		submenu: [
-			{
-				label: "Сохранить результат",
-				click: () => {
-					const windows = electron.BrowserWindow.getAllWindows();
-					if (windows.length > 0) windows[0].webContents.send("save-ai-result");
-				}
-			},
-			{
-				label: "Очистить историю",
-				click: () => {
-					const windows = electron.BrowserWindow.getAllWindows();
-					if (windows.length > 0) windows[0].webContents.send("clear-ai-history");
-				}
-			},
-			{ type: "separator" },
-			{
-				label: "Экспорт текущего диалога",
-				click: () => {
-					getAIWindow()?.webContents.send("export-current-conversation", {
-						action: "send-data",
-						timestamp: Date.now(),
-						message: "Выбран пункт меню \"Экспорт текущего диалога\"!"
-					});
-					console.log("Выбран пункт меню \"Экспорт текущего диалога\" - для отправки сообщения React");
-				}
-			},
-			{
-				label: "Экспорт всех диалогов",
-				click: () => {
-					getAIWindow()?.webContents.send("export-all-conversations", {
-						action: "send-data",
-						timestamp: Date.now(),
-						message: "Выбран пункт меню \"Экспорт всех диалогов\"!"
-					});
-					console.log("Выбран пункт меню \"Экспорт всех диалогов\" - для отправки сообщения React");
-				}
-			},
-			{
-				label: "Сохранить в Supabase",
-				click: () => {
-					getAIWindow()?.webContents.send("backup-to-supabase", {
-						action: "send-data",
-						timestamp: Date.now(),
-						message: "Выбран пункт меню \"Сохранить в Supabase\"!"
-					});
-					console.log("Выбран пункт меню \"Сохранить в Supabase\" - для отправки сообщения React");
-				}
-			},
-			{ type: "separator" },
-			{
-				label: "Закрыть окно",
-				accelerator: "CmdOrCtrl+W",
-				role: "close"
-			}
-		]
-	},
-	{
-		label: "Правка",
-		submenu: [
-			{
-				label: "Отменить",
-				accelerator: "CmdOrCtrl+Z",
-				role: "undo"
-			},
-			{
-				label: "Повторить",
-				accelerator: "Shift+CmdOrCtrl+Z",
-				role: "redo"
-			},
-			{ type: "separator" },
-			{
-				label: "Вырезать",
-				accelerator: "CmdOrCtrl+X",
-				role: "cut"
-			},
-			{
-				label: "Копировать",
-				accelerator: "CmdOrCtrl+C",
-				role: "copy"
-			},
-			{
-				label: "Вставить",
-				accelerator: "CmdOrCtrl+V",
-				role: "paste"
-			}
-		]
-	},
-	{
-		label: "Вид",
-		submenu: [{
-			label: "Перезагрузить",
-			accelerator: "CmdOrCtrl+R",
-			role: "reload"
-		}, {
-			label: "Инструменты разработчика",
-			accelerator: process.platform === "darwin" ? "Alt+Cmd+I" : "Ctrl+Shift+I",
-			role: "toggleDevTools"
-		}]
-	},
-	{
-		label: "Окно",
-		submenu: [
-			{
-				label: "Свернуть",
-				accelerator: "CmdOrCtrl+M",
-				role: "minimize"
-			},
-			{
-				label: "Увеличить",
-				role: "zoom"
-			},
-			{
-				label: "Закрыть",
-				accelerator: "CmdOrCtrl+W",
-				role: "close"
-			}
-		],
-		role: "windowMenu"
-	}
-];
-process.platform;
-var bondsWindowMenuTemplate = [
-	{
-		label: "Облигации",
-		submenu: [
-			{
-				label: "Экспорт в JSON",
-				click: () => {
-					const windows = electron.BrowserWindow.getAllWindows();
-					if (windows.length > 0) windows[0].webContents.send("export-bonds-to-json");
-				}
-			},
-			{ type: "separator" },
-			{
-				label: "Закрыть окно",
-				accelerator: "CmdOrCtrl+W",
-				role: "close"
-			}
-		]
-	},
-	{
-		label: "Правка",
-		submenu: [
-			{
-				label: "Отменить",
-				accelerator: "CmdOrCtrl+Z",
-				role: "undo"
-			},
-			{
-				label: "Повторить",
-				accelerator: "Shift+CmdOrCtrl+Z",
-				role: "redo"
-			},
-			{ type: "separator" },
-			{
-				label: "Вырезать",
-				accelerator: "CmdOrCtrl+X",
-				role: "cut"
-			},
-			{
-				label: "Копировать",
-				accelerator: "CmdOrCtrl+C",
-				role: "copy"
-			},
-			{
-				label: "Вставить",
-				accelerator: "CmdOrCtrl+V",
-				role: "paste"
-			}
-		]
-	},
-	{
-		label: "Вид",
-		submenu: [{
-			label: "Перезагрузить",
-			accelerator: "CmdOrCtrl+R",
-			role: "reload"
-		}, {
-			label: "Инструменты разработчика",
-			accelerator: process.platform === "darwin" ? "Alt+Cmd+I" : "Ctrl+Shift+I",
-			role: "toggleDevTools"
-		}]
-	},
-	{
-		label: "Окно",
-		submenu: [
-			{
-				label: "Свернуть",
-				accelerator: "CmdOrCtrl+M",
-				role: "minimize"
-			},
-			{
-				label: "Увеличить",
-				role: "zoom"
-			},
-			{
-				label: "Закрыть",
-				accelerator: "CmdOrCtrl+W",
-				role: "close"
-			}
-		],
-		role: "windowMenu"
-	}
-];
-//#endregion
-//#region src/main/windows/aiWindow.ts
-var aiWindow = null;
-var preloadPath$1 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
-var createAIWindow = () => {
-	console.log("createAIWindow called");
-	if (aiWindow) {
-		aiWindow.focus();
-		return;
-	}
-	aiWindow = new electron.BrowserWindow({
-		width: 800,
-		height: 600,
-		title: "Нейро",
-		webPreferences: {
-			preload: preloadPath$1,
-			contextIsolation: true,
-			nodeIntegration: false
-		}
-	});
 	if (process.env.NODE_ENV !== "production") aiWindow.loadURL(`${DEV_SERVER_URL}/#/ai`);
 	else aiWindow.loadFile(getMainWindowProdPath());
-	const menu = electron.Menu.buildFromTemplate(aiWindowMenuTemplate);
-	aiWindow.setMenu(menu);
 	aiWindow.on("closed", () => {
 		aiWindow = null;
 	});
+	return aiWindow;
 };
 var getAIWindow = () => aiWindow;
 var callAIAPI = async (prompt) => {
@@ -602,6 +212,468 @@ var registerTrainingHandlers = () => {
 	});
 };
 new AITrainer();
+//#endregion
+//#region src/main/menus/windowMenus.ts
+var mainMenuTemplate = [
+	{
+		label: "Файл",
+		submenu: [
+			{
+				label: "Открыть Нейро",
+				id: "open-ai"
+			},
+			{
+				label: "Открыть Markdown",
+				id: "open-md"
+			},
+			{
+				label: "Открыть Облигации",
+				id: "open-bonds"
+			},
+			{
+				label: "Открыть Генератор запросов",
+				id: "open-pg"
+			},
+			{ type: "separator" },
+			{
+				label: "Выйти",
+				click: () => electron.app.quit(),
+				accelerator: "CmdOrCtrl+Q"
+			}
+		]
+	},
+	{
+		label: "Правка",
+		submenu: [
+			{
+				label: "Отменить",
+				accelerator: "CmdOrCtrl+Z",
+				role: "undo"
+			},
+			{
+				label: "Повторить",
+				accelerator: "Shift+CmdOrCtrl+Z",
+				role: "redo"
+			},
+			{ type: "separator" },
+			{
+				label: "Вырезать",
+				accelerator: "CmdOrCtrl+X",
+				role: "cut"
+			},
+			{
+				label: "Копировать",
+				accelerator: "CmdOrCtrl+C",
+				role: "copy"
+			},
+			{
+				label: "Вставить",
+				accelerator: "CmdOrCtrl+V",
+				role: "paste"
+			}
+		]
+	},
+	{
+		label: "Вид",
+		submenu: [{
+			label: "Перезагрузить",
+			accelerator: "CmdOrCtrl+R",
+			role: "reload"
+		}, {
+			label: "Инструменты разработчика",
+			accelerator: process.platform === "darwin" ? "Alt+Cmd+I" : "Ctrl+Shift+I",
+			role: "toggleDevTools"
+		}]
+	},
+	{
+		label: "Окно",
+		submenu: [
+			{
+				label: "Свернуть",
+				accelerator: "CmdOrCtrl+M",
+				role: "minimize"
+			},
+			{
+				label: "Увеличить",
+				role: "zoom"
+			},
+			{
+				label: "Закрыть",
+				accelerator: "CmdOrCtrl+W",
+				role: "close"
+			}
+		],
+		role: "windowMenu"
+	}
+];
+var aiWindowMenuTemplate = [
+	{
+		label: "Нейро",
+		submenu: [
+			{
+				label: "Сохранить результат",
+				click: () => {
+					const windows = electron.BrowserWindow.getAllWindows();
+					if (windows.length > 0) windows[0].webContents.send("save-ai-result");
+				}
+			},
+			{
+				label: "Очистить историю",
+				click: () => {
+					const windows = electron.BrowserWindow.getAllWindows();
+					if (windows.length > 0) windows[0].webContents.send("clear-ai-history");
+				}
+			},
+			{ type: "separator" },
+			{
+				label: "Экспорт текущего диалога",
+				click: () => {
+					electron.BrowserWindow.getAllWindows().find((w) => w.title === "Нейро")?.webContents.send("export-current-conversation", {
+						action: "send-data",
+						timestamp: Date.now(),
+						message: "Выбран пункт меню \"Экспорт текущего диалога\"!"
+					});
+					console.log("Выбран пункт меню \"Экспорт текущего диалога\" - для отправки сообщения React");
+				}
+			},
+			{
+				label: "Экспорт всех диалогов",
+				click: () => {
+					getAIWindow()?.webContents.send("export-all-conversations", {
+						action: "send-data",
+						timestamp: Date.now(),
+						message: "Выбран пункт меню \"Экспорт всех диалогов\"!"
+					});
+					console.log("Выбран пункт меню \"Экспорт всех диалогов\" - для отправки сообщения React");
+				}
+			},
+			{
+				label: "Сохранить в Supabase",
+				click: () => {
+					getAIWindow()?.webContents.send("backup-to-supabase", {
+						action: "send-data",
+						timestamp: Date.now(),
+						message: "Выбран пункт меню \"Сохранить в Supabase\"!"
+					});
+					console.log("Выбран пункт меню \"Сохранить в Supabase\" - для отправки сообщения React");
+				}
+			},
+			{ type: "separator" },
+			{
+				label: "Закрыть окно",
+				accelerator: "CmdOrCtrl+W",
+				role: "close"
+			}
+		]
+	},
+	{
+		label: "Правка",
+		submenu: [
+			{
+				label: "Отменить",
+				accelerator: "CmdOrCtrl+Z",
+				role: "undo"
+			},
+			{
+				label: "Повторить",
+				accelerator: "Shift+CmdOrCtrl+Z",
+				role: "redo"
+			},
+			{ type: "separator" },
+			{
+				label: "Вырезать",
+				accelerator: "CmdOrCtrl+X",
+				role: "cut"
+			},
+			{
+				label: "Копировать",
+				accelerator: "CmdOrCtrl+C",
+				role: "copy"
+			},
+			{
+				label: "Вставить",
+				accelerator: "CmdOrCtrl+V",
+				role: "paste"
+			}
+		]
+	},
+	{
+		label: "Вид",
+		submenu: [{
+			label: "Перезагрузить",
+			accelerator: "CmdOrCtrl+R",
+			role: "reload"
+		}, {
+			label: "Инструменты разработчика",
+			accelerator: process.platform === "darwin" ? "Alt+Cmd+I" : "Ctrl+Shift+I",
+			role: "toggleDevTools"
+		}]
+	},
+	{
+		label: "Окно",
+		submenu: [
+			{
+				label: "Свернуть",
+				accelerator: "CmdOrCtrl+M",
+				role: "minimize"
+			},
+			{
+				label: "Увеличить",
+				role: "zoom"
+			},
+			{
+				label: "Закрыть",
+				accelerator: "CmdOrCtrl+W",
+				role: "close"
+			}
+		],
+		role: "windowMenu"
+	}
+];
+var mdWindowMenuTemplate = [
+	{
+		label: "Markdown-окно",
+		submenu: [
+			{
+				label: "Экспорт в PDF",
+				click: () => {
+					const windows = electron.BrowserWindow.getAllWindows();
+					if (windows.length > 0) windows[0].webContents.send("export-md-to-pdf");
+				}
+			},
+			{
+				label: "Превью",
+				click: () => {
+					const windows = electron.BrowserWindow.getAllWindows();
+					if (windows.length > 0) windows[0].webContents.send("toggle-md-preview");
+				}
+			},
+			{ type: "separator" },
+			{
+				label: "Закрыть окно",
+				accelerator: "CmdOrCtrl+W",
+				role: "close"
+			}
+		]
+	},
+	{
+		label: "Правка",
+		submenu: [
+			{
+				label: "Отменить",
+				accelerator: "CmdOrCtrl+Z",
+				role: "undo"
+			},
+			{
+				label: "Повторить",
+				accelerator: "Shift+CmdOrCtrl+Z",
+				role: "redo"
+			},
+			{ type: "separator" },
+			{
+				label: "Вырезать",
+				accelerator: "CmdOrCtrl+X",
+				role: "cut"
+			},
+			{
+				label: "Копировать",
+				accelerator: "CmdOrCtrl+C",
+				role: "copy"
+			},
+			{
+				label: "Вставить",
+				accelerator: "CmdOrCtrl+V",
+				role: "paste"
+			}
+		]
+	},
+	{
+		label: "Вид",
+		submenu: [{
+			label: "Перезагрузить",
+			accelerator: "CmdOrCtrl+R",
+			role: "reload"
+		}, {
+			label: "Инструменты разработчика",
+			accelerator: process.platform === "darwin" ? "Alt+Cmd+I" : "Ctrl+Shift+I",
+			role: "toggleDevTools"
+		}]
+	},
+	{
+		label: "Окно",
+		submenu: [
+			{
+				label: "Свернуть",
+				accelerator: "CmdOrCtrl+M",
+				role: "minimize"
+			},
+			{
+				label: "Увеличить",
+				role: "zoom"
+			},
+			{
+				label: "Закрыть",
+				accelerator: "CmdOrCtrl+W",
+				role: "close"
+			}
+		],
+		role: "windowMenu"
+	}
+];
+var bondsWindowMenuTemplate = [
+	{
+		label: "Облигации",
+		submenu: [
+			{
+				label: "Экспорт в JSON",
+				click: () => {
+					const windows = electron.BrowserWindow.getAllWindows();
+					if (windows.length > 0) windows[0].webContents.send("export-bonds-to-json");
+				}
+			},
+			{ type: "separator" },
+			{
+				label: "Закрыть окно",
+				accelerator: "CmdOrCtrl+W",
+				role: "close"
+			}
+		]
+	},
+	{
+		label: "Правка",
+		submenu: [
+			{
+				label: "Отменить",
+				accelerator: "CmdOrCtrl+Z",
+				role: "undo"
+			},
+			{
+				label: "Повторить",
+				accelerator: "Shift+CmdOrCtrl+Z",
+				role: "redo"
+			},
+			{ type: "separator" },
+			{
+				label: "Вырезать",
+				accelerator: "CmdOrCtrl+X",
+				role: "cut"
+			},
+			{
+				label: "Копировать",
+				accelerator: "CmdOrCtrl+C",
+				role: "copy"
+			},
+			{
+				label: "Вставить",
+				accelerator: "CmdOrCtrl+V",
+				role: "paste"
+			}
+		]
+	},
+	{
+		label: "Вид",
+		submenu: [{
+			label: "Перезагрузить",
+			accelerator: "CmdOrCtrl+R",
+			role: "reload"
+		}, {
+			label: "Инструменты разработчика",
+			accelerator: process.platform === "darwin" ? "Alt+Cmd+I" : "Ctrl+Shift+I",
+			role: "toggleDevTools"
+		}]
+	},
+	{
+		label: "Окно",
+		submenu: [
+			{
+				label: "Свернуть",
+				accelerator: "CmdOrCtrl+M",
+				role: "minimize"
+			},
+			{
+				label: "Увеличить",
+				role: "zoom"
+			},
+			{
+				label: "Закрыть",
+				accelerator: "CmdOrCtrl+W",
+				role: "close"
+			}
+		],
+		role: "windowMenu"
+	}
+];
+//#endregion
+//#region src/main/windows/bondsWindow.ts
+var bondsWindow$1 = null;
+var preloadPath$3 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var createBondsWindow = () => {
+	bondsWindow$1 = new electron.BrowserWindow({
+		width: 1024,
+		height: 768,
+		title: "Облигации",
+		webPreferences: {
+			preload: preloadPath$3,
+			contextIsolation: true,
+			nodeIntegration: false
+		}
+	});
+	if (process.env.NODE_ENV === "development") bondsWindow$1.loadURL(`${DEV_SERVER_URL}/#/bonds`);
+	else bondsWindow$1.loadFile(getMainWindowProdPath());
+	const menu = electron.Menu.buildFromTemplate(bondsWindowMenuTemplate);
+	bondsWindow$1.setMenu(menu);
+	bondsWindow$1.on("closed", () => {
+		bondsWindow$1 = null;
+	});
+	return bondsWindow$1;
+};
+var getBondsWindow = () => bondsWindow$1;
+//#endregion
+//#region src/main/windows/mdWindow.ts
+var mdWindow$1 = null;
+var preloadPath$2 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var createMDWindow = () => {
+	mdWindow$1 = new electron.BrowserWindow({
+		width: 800,
+		height: 600,
+		title: "Markdown",
+		webPreferences: {
+			preload: preloadPath$2,
+			contextIsolation: true,
+			nodeIntegration: false
+		}
+	});
+	if (process.env.NODE_ENV === "development") mdWindow$1.loadURL(`${DEV_SERVER_URL}/#/md`);
+	else mdWindow$1.loadFile(getMainWindowProdPath());
+	mdWindow$1.on("closed", () => {
+		mdWindow$1 = null;
+	});
+	return mdWindow$1;
+};
+var getMDWindow = () => mdWindow$1;
+//#endregion
+//#region src/main/windows/pgWindow.ts
+var pgWindow$1 = null;
+var preloadPath$1 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var createPGWindow = () => {
+	pgWindow$1 = new electron.BrowserWindow({
+		width: 800,
+		height: 600,
+		title: "Генератор запросов",
+		webPreferences: {
+			preload: preloadPath$1,
+			contextIsolation: true,
+			nodeIntegration: false
+		}
+	});
+	if (process.env.NODE_ENV === "development") pgWindow$1.loadURL(`${DEV_SERVER_URL}/#/pg`);
+	else pgWindow$1.loadFile(getMainWindowProdPath());
+	pgWindow$1.on("closed", () => {
+		pgWindow$1 = null;
+	});
+	return pgWindow$1;
+};
+var getPGWindow = () => pgWindow$1;
 //#endregion
 //#region src/main/windows/ollamaWindow.ts
 var ollamaWindow$1 = null;
@@ -1049,7 +1121,49 @@ electron.app.whenReady().then(() => {
 	});
 	const mainWindow = createMainWindow();
 	const menu = electron.Menu.buildFromTemplate(mainMenuTemplate);
+	const fileMenu = menu.items.find((i) => i.label === "Файл")?.submenu;
+	if (fileMenu) {
+		const openAI = fileMenu.items.find((i) => i.label === "Открыть Нейро");
+		console.log("openAIItem found:", !!openAI);
+		if (openAI) openAI.click = () => {
+			console.log("click on Open AI");
+			const existing = getAIWindow();
+			if (existing && !existing.isDestroyed()) existing.focus();
+			else {
+				const win = createAIWindow();
+				if (win) applyMenuToWindow(win, aiWindowMenuTemplate);
+			}
+		};
+		const openMD = fileMenu.items.find((i) => i.label === "Открыть Markdown");
+		if (openMD) openMD.click = () => {
+			const existing = getMDWindow();
+			if (existing && !existing.isDestroyed()) existing.focus();
+			else {
+				const win = createMDWindow();
+				if (win) applyMenuToWindow(win, mdWindowMenuTemplate);
+			}
+		};
+		const openBonds = fileMenu.items.find((i) => i.label === "Открыть Облигации");
+		if (openBonds) openBonds.click = () => {
+			const existing = getBondsWindow();
+			if (existing && !existing.isDestroyed()) existing.focus();
+			else {
+				const win = createBondsWindow();
+				if (win) applyMenuToWindow(win, bondsWindowMenuTemplate);
+			}
+		};
+		const openPG = fileMenu.items.find((i) => i.label === "Открыть Генератор запросов");
+		if (openPG) openPG.click = () => {
+			const existing = getPGWindow();
+			if (existing && !existing.isDestroyed()) existing.focus();
+			else {
+				const win = createPGWindow();
+				if (win) applyMenuToWindow(win, mainMenuTemplate);
+			}
+		};
+	}
 	mainWindow.setMenu(menu);
+	console.log("Menu items:", menu.items.map((i) => i.label));
 	registerDashboardHandlers(mainWindow);
 	registerAIHandlers();
 	registerPGHandlers();
@@ -1067,9 +1181,13 @@ electron.app.on("activate", () => {
 	if (electron.BrowserWindow.getAllWindows().length === 0) createMainWindow();
 });
 electron.ipcMain.handle("open-ai-window", () => {
-	const win = getAIWindow();
-	if (win && !win.isDestroyed()) win.focus();
-	else createAIWindow();
+	const existing = getAIWindow();
+	if (existing && !existing.isDestroyed()) {
+		existing.focus();
+		return;
+	}
+	const win = createAIWindow();
+	if (win) applyMenuToWindow(win, aiWindowMenuTemplate);
 });
 var bondsWindow = getBondsWindow();
 electron.ipcMain.handle("open-bonds-window", () => {
@@ -1506,6 +1624,10 @@ electron.ipcMain.handle("get-project-tree", async (event, folderPath) => {
 		});
 	});
 });
+function applyMenuToWindow(win, template) {
+	const menu = electron.Menu.buildFromTemplate(template);
+	win.setMenu(menu);
+}
 //#endregion
 
 //# sourceMappingURL=main.js.map

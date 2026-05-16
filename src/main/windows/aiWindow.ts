@@ -1,7 +1,7 @@
 import path from 'path';
 
 import { app, BrowserWindow, ipcMain, Menu } from 'electron';
-import { aiWindowMenuTemplate } from '../menus/windowMenus';
+//import { aiWindowMenuTemplate } from '../menus/windowMenus';
 import { DEV_SERVER_URL, getMainWindowProdPath } from './paths';
 
 let aiWindow: BrowserWindow | null = null;
@@ -15,10 +15,6 @@ const preloadPath = app.isPackaged
 
 export const createAIWindow = () => {
   console.log('createAIWindow called');
-  if (aiWindow) {
-    aiWindow.focus();
-    return;
-  }
 
   aiWindow = new BrowserWindow({
     width: 800,
@@ -55,12 +51,14 @@ export const createAIWindow = () => {
   //}
 
   // Индивидуальное меню для AI-окна
-  const menu = Menu.buildFromTemplate(aiWindowMenuTemplate);
-  aiWindow.setMenu(menu);
+  //const menu = Menu.buildFromTemplate(aiWindowMenuTemplate);
+  //aiWindow.setMenu(menu);
 
   aiWindow.on('closed', () => {
     aiWindow = null;
   });
+
+  return aiWindow;
 };
 
 export const getAIWindow = (): BrowserWindow | null => aiWindow;

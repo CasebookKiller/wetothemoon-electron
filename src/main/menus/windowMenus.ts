@@ -1,32 +1,14 @@
 import { app, BrowserWindow, MenuItemConstructorOptions } from 'electron';
-import { createAIWindow, getAIWindow } from '../windows/aiWindow';
-import { createMDWindow } from '../windows/mdWindow';
-import { createBondsWindow } from '../windows/bondsWindow';
-import { createPGWindow } from '../windows/pgWindow';
+import { getAIWindow } from '../windows/aiWindow';
 
 export const mainMenuTemplate: MenuItemConstructorOptions[] = [
   {
     label: 'Файл',
     submenu: [
-      { label: 'Открыть Нейро', click: ()=>{
-        console.log('Открыть Нейро');
-        createAIWindow();
-      } },
-      { label: 'Открыть Markdown', click: createMDWindow },
-      { label: 'Открыть Облигации', click: createBondsWindow },
-      { label: 'Открыть Генератор запросов', click: createPGWindow },
-      /*{ type: 'separator' },
-      { label: 'Alert', click: () => {
-        //ipcRenderer.invoke('menu-click', 'Alert from menu click!');
-        getMainWindow()?.webContents.send('menu-click', {
-            action: 'send-data',
-            timestamp: Date.now(),
-            message: 'Data from menu click!'
-          });
-          console.log('Menu item clicked - data sent to React');
-          
-        } 
-      },*/
+      { label: 'Открыть Нейро', id: 'open-ai' },   // добавим id для поиска
+      { label: 'Открыть Markdown', id: 'open-md' },
+      { label: 'Открыть Облигации', id: 'open-bonds' },
+      { label: 'Открыть Генератор запросов', id: 'open-pg' },
       { type: 'separator' },
       { label: 'Выйти', click: () => app.quit(), accelerator: 'CmdOrCtrl+Q' }
     ]
@@ -83,8 +65,11 @@ export const aiWindowMenuTemplate: MenuItemConstructorOptions[] = [
       },
       { type: 'separator' },
       { label: 'Экспорт текущего диалога', click: () => {
-        
-        getAIWindow()?.webContents.send('export-current-conversation', {
+          const wins = BrowserWindow.getAllWindows();
+          // предполагаем, что нужное окно – последнее активное или с определённым title
+          // но проще всего найти окно по id или использовать именование. Пока применим поиск по title.
+          const aiWin = wins.find(w => w.title === 'Нейро');
+          aiWin?.webContents.send('export-current-conversation', {
             action: 'send-data',
             timestamp: Date.now(),
             message: 'Выбран пункт меню "Экспорт текущего диалога"!'

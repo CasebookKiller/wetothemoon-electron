@@ -14,11 +14,6 @@ const preloadPath = app.isPackaged
   : path.join(__dirname, '../../dist/main/preload.js');
 
 export const createBondsWindow = () => {
-  if (bondsWindow) {
-    bondsWindow.focus();
-    return;
-  }
-
   bondsWindow = new BrowserWindow({
     width: 1024,
     height: 768,
@@ -60,6 +55,8 @@ export const createBondsWindow = () => {
   bondsWindow.on('closed', () => {
     bondsWindow = null;
   });
+
+  return bondsWindow;
 };
 
 export const getBondsWindow = (): BrowserWindow | null => bondsWindow;
