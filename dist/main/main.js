@@ -58,7 +58,7 @@ var createMainWindow = () => {
 var DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL || "http://localhost:5173";
 function getMainWindowProdPath() {
 	if (electron.app.isPackaged) return path.default.join(process.resourcesPath, "index.html");
-	return path.default.join(__dirname, "../../renderer/main-window/index.html");
+	return path.default.join(__dirname, "../../renderer/index.html");
 }
 //#endregion
 //#region src/main/windows/aiWindow.ts

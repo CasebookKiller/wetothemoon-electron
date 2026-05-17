@@ -7,7 +7,7 @@ import copy from 'rollup-plugin-copy';
 import path from "path";
 
 export default defineConfig({
-  root: path.resolve(__dirname, "src/renderer/main-window/"), // Корень — папка с index.html
+  root: path.resolve(__dirname, "src/renderer/"), // Корень — папка с index.html
   envDir: path.resolve(__dirname), // указываем, где искать .env-файлы
   plugins: [
     copy({
@@ -42,10 +42,10 @@ export default defineConfig({
   },
   build: {
     //outDir: path.resolve(__dirname, "dist/renderer"), //
-    outDir: "dist/renderer/main-window",
+    outDir: "dist/renderer",
     emptyOutDir: true, // Очищать папку перед сборкой
     rollupOptions: {
-      input: path.resolve(__dirname, "src/renderer/main-window/index.html") // Явная точка входа
+      input: path.resolve(__dirname, "src/renderer/index.html") // Явная точка входа
     },
   },
   resolve: {

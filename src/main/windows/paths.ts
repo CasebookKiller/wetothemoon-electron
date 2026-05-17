@@ -9,7 +9,7 @@ export function getMainWindowProdPath(): string {
     return path.join(process.resourcesPath, 'index.html');
   }
   // Путь к index.html главного окна после сборки
-  return path.join(__dirname, '../../renderer/main-window/index.html');
+  return path.join(__dirname, '../../renderer/index.html');
 }
 
 export function loadWindowURL(win: BrowserWindow, hash: string) {
