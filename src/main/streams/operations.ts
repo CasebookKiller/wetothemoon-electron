@@ -4,6 +4,7 @@ import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import { BrowserWindow, ipcMain } from 'electron';
 import { getBondsWindow } from '../windows/bondsWindow';
+import { getProtoPath } from '../utils/protoPath';
 
 export const registerOperationsStreamHandlers = () => {
   // регистрируем обработчики API
@@ -21,7 +22,7 @@ export const registerOperationsStreamHandlers = () => {
   function ensureOpsClient(mainWindow: BrowserWindow) {
     if (opsClient) return opsClient;
     
-    const OPS_PROTO_PATH = path.join(__dirname, 'proto', 'operations.proto');
+    const OPS_PROTO_PATH = getProtoPath('operations.proto');
     const packageDefinition = protoLoader.loadSync(OPS_PROTO_PATH, {
       keepCase: false,
       longs: String,

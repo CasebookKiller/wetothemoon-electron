@@ -4,6 +4,7 @@ import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import { ipcMain } from 'electron';
 import { getBondsWindow } from '../windows/bondsWindow';
+import { getProtoPath } from '../utils/protoPath';
 
 export const registerMarketdataStreamHandlers = () => {
   // регистрируем обработчики API
@@ -12,7 +13,7 @@ export const registerMarketdataStreamHandlers = () => {
 
   console.log('[Main] registerMDStreamHandlers called');
 
-  const PROTO_PATH = path.join(__dirname, 'proto', 'marketdata.proto');
+  const PROTO_PATH = getProtoPath('marketdata.proto');
   console.log('[Main] Proto path:', PROTO_PATH);
 
   const packageDefinition = protoLoader.loadSync(PROTO_PATH, {

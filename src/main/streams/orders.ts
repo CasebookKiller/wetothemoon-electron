@@ -3,6 +3,7 @@ import path from 'path';
 import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import { BrowserWindow, ipcMain } from 'electron';
+import { getProtoPath } from '../utils/protoPath';
 
 export const registerOrdersStreamHandlers = () => {
   // регистрируем обработчики API
@@ -18,7 +19,7 @@ export const registerOrdersStreamHandlers = () => {
 
   function ensureOrdersClient() {
     if (ordersClient) return ordersClient;
-    const PROTO_PATH = path.join(__dirname, 'proto', 'orders.proto'); // ваш файл с OrdersStreamService
+    const PROTO_PATH = getProtoPath('orders.proto'); // ваш файл с OrdersStreamService
     const packageDefinition = protoLoader.loadSync(PROTO_PATH, { /* ... */ });
     const proto = grpc.loadPackageDefinition(packageDefinition) as any;
     const OrdersStreamService = proto.tinkoff.public.invest.api.contract.v1.OrdersStreamService;

@@ -821,11 +821,17 @@ var registerPGHandlers = () => {
 	});
 };
 //#endregion
+//#region src/main/utils/protoPath.ts
+function getProtoPath(protoFileName) {
+	if (electron.app.isPackaged) return path.default.join(process.resourcesPath, "proto", protoFileName);
+	return path.default.join(__dirname, "../../proto", protoFileName);
+}
+//#endregion
 //#region src/main/streams/marketdata.ts
 var registerMarketdataStreamHandlers = () => {
 	let currentStream = null;
 	console.log("[Main] registerMDStreamHandlers called");
-	const PROTO_PATH = path.default.join(__dirname, "proto", "marketdata.proto");
+	const PROTO_PATH = getProtoPath("marketdata.proto");
 	console.log("[Main] Proto path:", PROTO_PATH);
 	const packageDefinition = _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_proto_loader_build_src_index_js.loadSync(PROTO_PATH, {
 		keepCase: false,
@@ -921,7 +927,7 @@ var registerOperationsStreamHandlers = () => {
 	let opsClient;
 	function ensureOpsClient(mainWindow) {
 		if (opsClient) return opsClient;
-		const OPS_PROTO_PATH = path.default.join(__dirname, "proto", "operations.proto");
+		const OPS_PROTO_PATH = getProtoPath("operations.proto");
 		const packageDefinition = _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_proto_loader_build_src_index_js.loadSync(OPS_PROTO_PATH, {
 			keepCase: false,
 			longs: String,
@@ -1009,7 +1015,7 @@ var registerOrdersStreamHandlers = () => {
 	let ordersClient;
 	function ensureOrdersClient() {
 		if (ordersClient) return ordersClient;
-		const PROTO_PATH = path.default.join(__dirname, "proto", "orders.proto");
+		const PROTO_PATH = getProtoPath("orders.proto");
 		const packageDefinition = _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_proto_loader_build_src_index_js.loadSync(PROTO_PATH, {});
 		const OrdersStreamService = _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.loadPackageDefinition(packageDefinition).tinkoff.public.invest.api.contract.v1.OrdersStreamService;
 		ordersClient = new OrdersStreamService("invest-public-api.tbank.ru:443", _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.credentials.createSsl(null, null, null, { rejectUnauthorized: false }), { "grpc.ssl_target_name_override": "invest-public-api.tbank.ru" });

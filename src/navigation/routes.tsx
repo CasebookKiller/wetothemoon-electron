@@ -7,7 +7,7 @@ import { BondLadderPage } from '@/pages/BondLadderPage/BondLadderPage';
 import { SettingsPage } from '@/pages/SettingsPage/SettingsPage';
 import { BondDetailPage } from '@/pages/BondDetailPage/BondDetailPage';
 import { AIPage } from '@/pages/AIPage/AIPage';
-import { MarkdownPage } from '@/pages/MarkdownPage/MakrdownPage';
+import { MarkdownPage } from '@/pages/MarkdownPage/MarkdownPage';
 import { DashboardPage } from '@/pages/DashboardPage/DashboardPage';
 import { PromptGeneratorPage } from '@/pages/PromptGeneratorPage/PromptGeneratorPage';
 import { OllamaPage } from '@/pages/OllamaPage/OllamaPage';
