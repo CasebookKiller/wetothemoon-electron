@@ -19,8 +19,8 @@ import { registerOrdersStreamHandlers } from './streams/orders.ts';
 
 import fs from 'fs';
 import path from 'path';
-import { PromptTemplate, validatePromptTemplate } from '@/types/promptgenerator.ts';
-import { savePromptTemplateToFile } from './promptTemplateSaver.ts';
+import { PromptTemplate, validatePromptTemplate } from '@/shared/types/promptgenerator.ts';
+import { savePromptTemplateToFile } from './services/promptTemplateSaver.ts';
 
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { exec } from 'child_process';

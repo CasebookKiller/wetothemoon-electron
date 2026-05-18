@@ -30,24 +30,3 @@ export const registerTrainingHandlers = () => {
 };
 
 const trainer = new AITrainer();
-
-
-/*
-import { TrainingManager } from './main/trainingManager';
-
-const trainingManager = new TrainingManager();
-
-ipcMain.handle('start-fine-tuning', async (event, data) => {
-  try {
-    const result = await trainingManager.startFineTuning(
-      data.dataPath,
-      data.modelName,
-      data.outputDir
-    );
-    return result;
-  } catch (error) {
-    console.error('Training error:', error);
-    return { status: 'error', message: error.message };
-  }
-});
-*/

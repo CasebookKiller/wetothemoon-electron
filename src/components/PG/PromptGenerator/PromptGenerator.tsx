@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from 'primereact/button';
 
 // Исправленные импорты
-import { CodeFileReference, CodeIndentation, CodeSnippet, CodeSourceType, createPromptTemplate, PromptTemplate, PromptTemplates, ResponseDepth, ResponseLength, Technology, TreeNode } from '@/types/promptgenerator';
+import { CodeFileReference, CodeIndentation, CodeSnippet, CodeSourceType, createPromptTemplate, PromptTemplate, PromptTemplates, ResponseDepth, ResponseLength, Technology, TreeNode } from '@/shared/types/promptgenerator';
 import { PromptTemplateManager } from '@/services/promptTemplateManager'; // Предполагаемый путь
 import { PromptEditorDialog } from './PromptEditorDialog'; // Импорт нового компонента
 
@@ -10,7 +10,7 @@ import './PromptGenerator.css';
 import { TemplateSelectorDialog } from './TemplateSelectorDialog';
 import { examplePromptTemplate } from './examples';
 
-import { PackageJson } from '@/types/types'
+import { PackageJson } from '@/shared/types/types'
 
 const SELECTED_TEMPLATE_ID_KEY = 'selectedTemplateId';
 

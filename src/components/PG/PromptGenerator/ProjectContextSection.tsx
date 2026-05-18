@@ -12,8 +12,8 @@ import {
   Technology,
   Integration,
   TreeNode,
-} from '@/types/promptgenerator';
-import { PackageJson } from '@/types/types';
+} from '@/shared/types/promptgenerator';
+import { PackageJson } from '@/shared/types/types';
 
 interface ProjectContextSectionProps {
   template: PromptTemplate;

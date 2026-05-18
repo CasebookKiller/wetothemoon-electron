@@ -1,4 +1,4 @@
-import { FineTuningData, TrainingProgress } from '@/types/types';
+import { FineTuningData, TrainingProgress } from '@/shared/types/types';
 import React, { useState } from 'react';
 import { finished } from 'stream/promises';
 

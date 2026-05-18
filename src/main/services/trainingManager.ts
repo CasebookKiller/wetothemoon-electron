@@ -1,4 +1,4 @@
-import { ChatSession, Message } from '../types/chat.ts';
+import { ChatSession, Message } from '@/shared/types/chat.ts';
 
 class ChatStorageService {
   private readonly STORAGE_KEY = 'chat_sessions';

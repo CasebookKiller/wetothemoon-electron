@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Tag, Conversation } from '../../../types/chat';
+import { Tag, Conversation } from '../../../shared/types/chat';
 
 import './TagManager.css';
 

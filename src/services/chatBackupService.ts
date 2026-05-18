@@ -1,5 +1,5 @@
 import SBase from '../supabaseClient';
-import { Conversation } from '../types/chat';
+import { Conversation } from '../shared/types/chat';
 
 export class ChatBackupService {
   /**

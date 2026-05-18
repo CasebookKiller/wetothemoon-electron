@@ -13,8 +13,8 @@ import { RestrictionsAndRulesSection } from './RestrictionsAndRulesSection';
 import { AdditionalPreferencesSection } from './AdditionalPreferencesSection';
 import { CodeContextSection } from './CodeContextSection';
 import { DevelopmentContextSection } from './DevelopmentContextSection';
-import { PromptTemplate, TreeNode } from '@/types/promptgenerator';
-import { PackageJson } from '@/types/types';
+import { PromptTemplate, TreeNode } from '@/shared/types/promptgenerator';
+import { PackageJson } from '@/shared/types/types';
 
 interface PromptEditorDialogProps {
   visible: boolean;

@@ -1,6 +1,6 @@
 // components/AI/ConversationPanel/ConversationPanel.tsx
 import React, { useState } from 'react';
-import { ChatState, Conversation } from '../../../types/chat';
+import { ChatState, Conversation } from '../../../shared/types/chat';
 import ConversationTitleEditor from '../ConversationTitleEditor/ConversationTitleEditor';
 
 import './ConversationPanel.css';
@@ -94,44 +94,3 @@ export const ConversationPanel: React.FC<ConversationPanelProps> = ({
     </div>
   );
 };
-
-/*import { Conversation } from '@/types/chat';
-
-interface ConversationPanelProps {
-  conversations: Record<string, Conversation>;
-  currentConversationId: string | null;
-  onConversationSelect: (id: string) => void;
-  onNewConversation: () => void;
-}
-
-export const ConversationPanel: React.FC<ConversationPanelProps> = ({
-  conversations,
-  currentConversationId,
-  onConversationSelect,
-  onNewConversation
-}) => (
-  <>
-    <button
-      onClick={onNewConversation}
-      className="p-button p-button-secondary w-full mb-3"
-    >
-      + Новый диалог
-    </button>
-    <div className="conversation-list">
-      {Object.values(conversations).map(conv => (
-        <button
-          key={conv.id}
-          onClick={() => onConversationSelect(conv.id)}
-          className={`p-button w-full text-left mb-2 ${
-            currentConversationId === conv.id
-              ? 'p-button-primary chat-button-active'
-              : 'p-button-outlined chat-button'
-          }`}
-        >
-          {conv.title}
-        </button>
-      ))}
-    </div>
-  </>
-);
-*/

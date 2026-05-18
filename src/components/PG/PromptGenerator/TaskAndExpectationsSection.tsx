@@ -3,9 +3,9 @@ import { InputTextarea as Textarea } from 'primereact/inputtextarea';
 import { InputText } from 'primereact/inputtext';
 import { Button } from 'primereact/button';
 import { SelectButton } from 'primereact/selectbutton';
-import { PromptTemplate } from '@/types/promptgenerator';
+import { PromptTemplate } from '@/shared/types/promptgenerator';
 import { Divider } from 'primereact/divider';
-import { PackageJson } from '@/types/types';
+import { PackageJson } from '@/shared/types/types';
 
 interface TaskAndExpectationsSectionProps {
   template: PromptTemplate;

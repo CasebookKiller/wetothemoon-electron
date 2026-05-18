@@ -1,4 +1,4 @@
-import { CodeIndentation, PromptTemplate, ResponseLength, CodeSourceType } from '@/types/promptgenerator';
+import { CodeIndentation, PromptTemplate, ResponseLength, CodeSourceType } from '@/shared/types/promptgenerator';
 
 export class PromptTemplateManager {
   private prompts: PromptTemplate[] = [];

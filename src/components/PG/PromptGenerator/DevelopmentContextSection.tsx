@@ -4,9 +4,9 @@ import { InputText } from 'primereact/inputtext';
 import { Button } from 'primereact/button';
 import { SelectButton } from 'primereact/selectbutton';
 import { ProjectStructureComponent } from './ProjectStructureComponent';
-import { ProjectStructure, PromptTemplate, TreeNode } from '@/types/promptgenerator';
+import { ProjectStructure, PromptTemplate, TreeNode } from '@/shared/types/promptgenerator';
 import { Divider } from 'primereact/divider';
-import { PackageJson } from '@/types/types';
+import { PackageJson } from '@/shared/types/types';
 import ignore from 'ignore';
 
 interface DevelopmentContextSectionProps {
@@ -244,123 +244,3 @@ export const DevelopmentContextSection: React.FC<DevelopmentContextSectionProps>
     </section>
   );
 };
-/*
-// DevelopmentContextSection.tsx
-import React from 'react';
-import { InputText } from 'primereact/inputtext';
-import { SelectButton } from 'primereact/selectbutton';
-import { ProjectStructureComponent } from './ProjectStructureComponent';
-import { ProjectStructure, PromptTemplate } from '@/types/promptgenerator';
-import { Divider } from 'primereact/divider';
-import { PackageJson } from '@/types/types';
-
-interface DevelopmentContextSectionProps {
-  template: PromptTemplate;
-  onUpdate: (updates: Partial<PromptTemplate>) => void;
-  packageJson?: PackageJson | null
-}
-
-export const DevelopmentContextSection: React.FC<DevelopmentContextSectionProps> = ({ template, onUpdate, packageJson }) => {
-  // Опции для SelectButton
-  const enabledOptions = [
-    { label: 'Вкл.', value: true },
-    { label: 'Выкл.', value: false }
-  ];
-
-  // Определяем, активна ли секция (по умолчанию — включена)
-  const isSectionEnabled = template.developmentContext?.enabled ?? true;
-
-  const developmentContext = template.developmentContext || {
-    backendStructure: {
-      type: 'tree',
-      content: '',
-      rootDirectory: '',
-      description: ''
-    },
-    buildProcess: '',
-    deploymentStrategy: '',
-    enabled: isSectionEnabled
-  };
-
-  const handleDevelopmentContextChange = (updates: Partial<typeof developmentContext>) => {
-    onUpdate({
-      developmentContext: {
-        ...developmentContext,
-        ...updates
-      }
-    });
-  };
-
-  const handleProjectStructureChange = (projectStructure: ProjectStructure) => {
-    handleDevelopmentContextChange({
-      backendStructure: projectStructure
-    });
-  };
-
-  const handleSectionToggle = (value: boolean) => {
-    handleDevelopmentContextChange({ enabled: value });
-  };
-
-  return (
-    <section className="p-mb-6">
-      {
-        // Заголовок и SelectButton в одной строке
-      }
-      <div className="flex align-items-center justify-content-between mb-4">
-        <h3 className="font-medium text-lg">Контекст разработки</h3>        
-        <div className="ml-1" style={{ minWidth: '100px' }}>
-          <SelectButton
-            value={isSectionEnabled}
-            options={enabledOptions}
-            onChange={(e) => handleSectionToggle(e.value)}
-            optionLabel="label"
-            optionValue="value"
-            className="w-full text-sm m-2"
-          />
-        </div>
-      </div>
-
-      {
-        // Контент секции — показываем только если enabled=true
-      }
-      {isSectionEnabled && (
-        <div>
-          <ProjectStructureComponent
-            value={developmentContext.backendStructure}
-            onChange={handleProjectStructureChange}
-          />
-
-          <div>
-            {
-              // Процесс сборки
-            }
-            <div className="mb-4 text-sm">
-              <label className="block font-medium text-700 mb-2">Процесс сборки:</label>
-              <InputText
-                value={developmentContext.buildProcess}
-                onChange={(e) => handleDevelopmentContextChange({ buildProcess: e.target.value })}
-                placeholder="npm run build, docker build..."
-                className="w-full text-sm"
-              />
-            </div>
-
-            {
-              // Стратегия деплоя
-            }
-            <div className="mb-4 text-sm">
-              <label className="block font-medium text-700 mb-2">Стратегия деплоя:</label>
-              <InputText
-                value={developmentContext.deploymentStrategy}
-                onChange={(e) => handleDevelopmentContextChange({ deploymentStrategy: e.target.value })}
-                placeholder="Docker Compose, Kubernetes, Vercel..."
-                className="w-full text-sm"
-              />
-            </div>
-          </div>
-        </div>
-      )}
-      <Divider />
-    </section>
-  );
-};
-*/

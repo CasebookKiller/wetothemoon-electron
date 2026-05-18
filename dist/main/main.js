@@ -1087,7 +1087,7 @@ var registerOrdersStreamHandlers = () => {
 	});
 };
 //#endregion
-//#region src/types/promptgenerator.ts
+//#region src/shared/types/promptgenerator.ts
 /**
 * Валидирует промпт на соответствие структуре
 */

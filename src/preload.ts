@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
-import { FineTuningData, TrainingProgress } from './types/types';
+import { FineTuningData, TrainingProgress } from './shared/types/types';
 
 try {
   contextBridge.exposeInMainWorld('electronAPI', {

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Accordion, AccordionTab } from 'primereact/accordion';
-import { ChatState, Conversation, ModelSettings, Tag } from '../../../types/chat';
+import { ChatState, Conversation, ModelSettings, Tag } from '../../../shared/types/chat';
 import './Sidebar.css';
 import { ModelSettingsPanel } from '../ModelSettingsPanel/ModelSettingsPanel';
 import { ConversationPanel } from '../ConversationPanel/ConversationPanel';

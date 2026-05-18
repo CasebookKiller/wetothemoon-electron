@@ -16,7 +16,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useBonds } from '@/hooks/useBonds';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 
-import { fetchBond, fetchBonds } from '@/utils/common';
+import { fetchBond, fetchBonds } from '@/shared/utils/common';
 
 import { Link } from '@/components/COMMON/Link/Link';
 import { BookmarkButton } from '@/components/BONDS/BookmarkButton/BookmarkButton';

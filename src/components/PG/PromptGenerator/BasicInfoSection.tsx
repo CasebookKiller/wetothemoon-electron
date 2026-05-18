@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { InputText } from 'primereact/inputtext';
 import { InputTextarea as Textarea } from 'primereact/inputtextarea';
-import { PromptTemplate } from '@/types/promptgenerator';
+import { PromptTemplate } from '@/shared/types/promptgenerator';
 import 'primeflex/primeflex.css'; // Импорт стилей PrimeFlex
 import { Divider } from 'primereact/divider';
-import { PackageJson } from '@/types/types';
+import { PackageJson } from '@/shared/types/types';
 import { Button } from 'primereact/button';
 
 interface BasicInfoSectionProps {

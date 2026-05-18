@@ -9,8 +9,8 @@ import {
   PromptTemplate,
   ResponseDepth,
   CodeIndentation,
-} from '@/types/promptgenerator';
-import { PackageJson } from '@/types/types';
+} from '@/shared/types/promptgenerator';
+import { PackageJson } from '@/shared/types/types';
 
 interface ResponseStructureSectionProps {
   template: PromptTemplate;

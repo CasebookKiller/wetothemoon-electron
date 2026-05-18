@@ -1,5 +1,5 @@
 import React, { Suspense, useState, useEffect } from 'react';
-import { Message } from '../../../types/chat';
+import { Message } from '../../../shared/types/chat';
 import { MarkdownHooks } from 'react-markdown';
 
 import { unified } from 'unified';

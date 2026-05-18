@@ -1,6 +1,6 @@
 // components/AI/ConversationTitleEditor/ConversationTitleEditor.tsx
 import React, { useState, useEffect } from 'react';
-import { Conversation } from '../../../types/chat';
+import { Conversation } from '../../../shared/types/chat';
 
 import './ConversationTitleEditor.css';
 

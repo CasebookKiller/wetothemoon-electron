@@ -27,8 +27,8 @@ import { User } from '@/context/UserContext';
 
 import { classNames } from '@/css/classnames';
 
-import { simpleConnect } from '@/utils/data-utils';
-import { fetchBonds, fetchInstrument, fetchWithToken } from '@/utils/common';
+import { simpleConnect } from '@/shared/utils/data-utils';
+import { fetchBonds, fetchInstrument, fetchWithToken } from '@/shared/utils/common';
 
 import { convertTIBond, getPlatform, parseTokens } from '@root/api/methods';
 import { IBond, TIBond } from '@root/api/types';

@@ -1,7 +1,7 @@
 import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
 import { app } from 'electron';
-import { PromptTemplate, validatePromptTemplate } from '@/types/promptgenerator';
+import { PromptTemplate, validatePromptTemplate } from '@/shared/types/promptgenerator';
 
 /**
  * Сохраняет промпт‑шаблон в файл JSON

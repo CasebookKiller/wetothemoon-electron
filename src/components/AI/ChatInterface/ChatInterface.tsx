@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Message, ModelSettings, ChatState, Conversation, SavedConversation, LocalStorageData, ToolCall, Tag } from '../../../types/chat';
-import { exportConversationToFile, exportAllConversationsToFile } from '../../../utils/chatExport';
+import { Message, ModelSettings, ChatState, Conversation, SavedConversation, LocalStorageData, ToolCall, Tag } from '../../../shared/types/chat';
+import { exportConversationToFile, exportAllConversationsToFile } from '../../../shared/utils/chatExport';
 import { ChatBackupService } from '../../../services/chatBackupService';
 
 import { useLocalStorage } from '../../../hooks/useLocalStorage';

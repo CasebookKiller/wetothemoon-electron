@@ -1,4 +1,4 @@
-import { CodeIndentation, PromptTemplate, ResponseDepth, ResponseLength } from '@/types/promptgenerator';
+import { CodeIndentation, PromptTemplate, ResponseDepth, ResponseLength } from '@/shared/types/promptgenerator';
 
 export const examplePromptTemplate: PromptTemplate = {
   id: "web-app-dev-001",

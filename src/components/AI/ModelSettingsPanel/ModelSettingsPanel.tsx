@@ -1,4 +1,4 @@
-import { ModelSettings } from '@/types/chat';
+import { ModelSettings } from '@/shared/types/chat';
 import React from 'react';
 import { NumberSetting } from '../NumberSetting/NumberSetting';
 import { RangeSetting } from '../RangeSetting/RangeSetting';

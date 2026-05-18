@@ -1,6 +1,6 @@
 import { exec } from 'child_process';
 import * as path from 'path';
-import type { FineTuningData, FineTuningResult, TrainingProgress } from '@/types/types';
+import type { FineTuningData, FineTuningResult, TrainingProgress } from '@/shared/types/types';
 import { ipcMain } from 'electron';
 
 enum Platform {

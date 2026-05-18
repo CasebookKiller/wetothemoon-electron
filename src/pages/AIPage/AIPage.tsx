@@ -3,7 +3,7 @@ import React, { FC } from 'react';
 import './AIPage.css';
 import AIInterface from '@/components/AI/AIInterface/AIInterface';
 import ChatInterface from '@/components/AI/ChatInterface/ChatInterface';
-import { ChatSession } from '@/types/chat';
+import { ChatSession } from '@/shared/types/chat';
 import ChatStorageService from '@/services/chatStorages';
 
 export const AIPage: FC = () => {

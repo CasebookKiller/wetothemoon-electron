@@ -4,7 +4,7 @@ declare module "*.module.css" {
 }
 
 // global.d.ts
-import type { FineTuningData, FineTuningResult, TrainingProgress } from './types';
+import type {FineTuningData, FineTuningResult, TrainingProgress } from './shared/types';
 
 declare global {
   interface Window {
