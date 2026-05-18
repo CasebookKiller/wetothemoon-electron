@@ -1,5 +1,5 @@
-import type { Timestamp, Quotation, MoneyValue, PingDelaySettings } from './commonTypes';
-import type { OrderDirection, OrderType, OrderExecutionReportStatus, TimeInForceType } from './ordersTypes';
+import type { Timestamp, Quotation, MoneyValue, PingDelaySettings } from '../../../api/tbank/commonTypes';
+import type { OrderDirection, OrderType, OrderExecutionReportStatus, TimeInForceType } from '../../../api/tbank/ordersTypes';
 
 export interface TradesStreamRequest {
   accounts?: string[];

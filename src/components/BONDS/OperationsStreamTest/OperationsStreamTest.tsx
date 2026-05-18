@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { OperationsStreamServiceClient } from '@/api/tbank/OperationsStreamService';
+import { OperationsStreamServiceClient } from '@/main/services/tbank/OperationsStreamService';
 
 interface LogEntry {
   time: string;

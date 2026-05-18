@@ -229,9 +229,9 @@ export const BondLadderPage: FC = () => {
 
       <div className='app p-0'/>
       
-      {false && <MarketStreamTest />}
+      {true && <MarketStreamTest />}
       {false && <OperationsStreamTest />}
-      {true && <OrdersStreamTest />}
+      {false && <OrdersStreamTest />}
       
       <div
         className='my-5 mx-2 app theme-hint-color theme-bg-secondary text-xs'

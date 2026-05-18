@@ -1,9 +1,7 @@
-// src/api/tbank/MarketDataStreamService.ts
 const electronAPI = (window as Window & typeof globalThis & { electronAPI?: any })?.electronAPI;
 
 type EventHandler<T> = (data: T) => void;
 
-// src/api/tbank/MarketDataStreamService.ts
 import type {
   MarketDataStreamRequest,
   MarketDataResponse,
