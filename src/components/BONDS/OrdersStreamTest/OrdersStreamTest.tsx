@@ -1,7 +1,7 @@
 // src/components/BONDS/OrdersStreamTest/OrdersStreamTest.tsx
 
 import React, { useEffect, useRef, useState } from 'react';
-import { OrdersStreamServiceClient } from '@/main/services/tbank/OrdersStreamService';
+import { OrdersStreamServiceClient } from '@/main/services/tbank/OrdersStreamGrpcService';
 
 interface LogEntry {
   time: string;

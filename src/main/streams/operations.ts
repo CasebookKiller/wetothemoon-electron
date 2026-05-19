@@ -3,7 +3,6 @@ import path from 'path';
 import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import { BrowserWindow, ipcMain } from 'electron';
-import { getBondsWindow } from '../windows/bondsWindow';
 import { getProtoPath } from '../utils/protoPath';
 
 export const registerOperationsStreamHandlers = () => {

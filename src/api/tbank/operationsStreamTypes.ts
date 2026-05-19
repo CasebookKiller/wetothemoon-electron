@@ -1,4 +1,4 @@
-import type { Timestamp, MoneyValue, Quotation, PingDelaySettings } from '../../../api/tbank/commonTypes';
+import type { Timestamp, MoneyValue, Quotation, PingDelaySettings } from '@/api/tbank/commonTypes';
 import type {
   PortfolioResponse,
   PositionsSecurities,
@@ -8,7 +8,7 @@ import type {
   OperationState,
   InstrumentType,
   PositionsResponse,
-} from '../../../api/tbank/operationsTypes';   // уже существующие типы из REST‑сервиса
+} from '@/api/tbank/operationsTypes';   // уже существующие типы из REST‑сервиса
 
 // ------------------ Enums ------------------
 

@@ -1,7 +1,7 @@
 // src/components/BONDS/MarketStreamTest/MarketStreamTest.tsx
 
 import React, { useEffect, useRef, useState } from 'react';
-import { MarketDataStreamServiceClient } from '@/main/services/tbank/MarketDataStreamService';
+import { MarketDataStreamServiceClient } from '@/main/services/tbank/MarketDataStreamGrpcService';
 import type {
   StreamCandle,
   StreamOrderBook,
@@ -9,7 +9,7 @@ import type {
   StreamTradingStatus,
   StreamLastPrice,
   StreamOpenInterest,
-} from '@/main/services/tbank/marketdataStreamTypes';
+} from '@/api/tbank/marketdataStreamTypes';
 
 interface LogEntry {
   time: string;

@@ -3,7 +3,7 @@ import type {
   TradesStreamResponse,
   OrderStateStreamRequest,
   OrderStateStreamResponse,
-} from './ordersStreamTypes';
+} from '@/api/tbank/ordersStreamTypes';
 
 export class OrdersStreamServiceClient {
   private readonly token: string;

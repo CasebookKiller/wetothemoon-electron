@@ -105,5 +105,6 @@ training/
 clean.sh
 
 dist/
+src/renderer/dist/
 
 *.bak

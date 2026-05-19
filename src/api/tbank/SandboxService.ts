@@ -3,7 +3,7 @@ import { GetOperationsByCursorRequest, GetOperationsByCursorResponse, Operations
 import type { CancelOrderRequest, CancelOrderResponse, GetMaxLotsRequest, GetMaxLotsResponse, GetOrderPriceRequest, GetOrderPriceResponse, GetOrdersRequest, GetOrdersResponse, GetOrderStateRequest, OrderState, PostOrderAsyncRequest, PostOrderAsyncResponse, PostOrderRequest, PostOrderResponse, ReplaceOrderRequest } from './ordersTypes';
 import { CloseSandboxAccountRequest, CloseSandboxAccountResponse, OpenSandboxAccountRequest, OpenSandboxAccountResponse, SandboxPayInRequest, SandboxPayInResponse } from './sandboxTypes';
 import { CancelStopOrderRequest, CancelStopOrderResponse, GetStopOrdersRequest, GetStopOrdersResponse, PostStopOrderRequest, PostStopOrderResponse } from './stopordersTypes';
-import { GetAccountsRequest, GetAccountsResponse } from './UserService';
+import { GetAccountsRequest, GetAccountsResponse } from './usersTypes';
 
 export class SandboxServiceClient {
   private readonly baseUrl: string;
