@@ -12,6 +12,7 @@ try {
     openMDWindow: () => ipcRenderer.invoke('open-md-window'),
     openPGWindow: () => ipcRenderer.invoke('open-pg-window'),
     openOllamaWindow: () => ipcRenderer.invoke('open-ollama-window'),
+    openTasksWindow: () => ipcRenderer.invoke('open-tasks-window'),
     sendMessageToAI: (message: string) =>
       ipcRenderer.invoke('send-to-ai', message).then((response) => {
         console.log(response);
@@ -85,6 +86,7 @@ try {
     },
 
     // ==================== Методы стримов (из preloadbonds.ts) ====================
+    // MarketDataStream
     startMarketStream: (token: string, body: any) =>
       ipcRenderer.invoke('md-stream-start', token, body),
     stopMarketStream: () => ipcRenderer.invoke('md-stream-stop'),
@@ -101,6 +103,7 @@ try {
       ipcRenderer.on('md-stream-error', (_, err: string) => callback(err));
     },
 
+    // OperationsStream
     startOpsStream: (streamType: string, token: string, body: any) =>
       ipcRenderer.invoke('ops-stream-start', streamType, token, body),
     stopOpsStream: () => ipcRenderer.invoke('ops-stream-stop'),
@@ -131,6 +134,7 @@ try {
       );
     },
 
+    // OrdersStream
     startOrdersStream: (streamType: string, token: string, body: any) =>
       ipcRenderer.invoke('orders-stream-start', streamType, token, body),
     stopOrdersStream: () => ipcRenderer.invoke('orders-stream-stop'),
@@ -155,6 +159,10 @@ try {
       );
     },
 
+    // Универсальный вызов Grpc
+    callGrpc: (service: string, method: string, token: string, request?: unknown) =>
+    ipcRenderer.invoke('grpc-call', service, method, token, request),
+
     // ==================== Методы PG (из preloadpg.ts) ====================
     // Универсальный invoke (осторожно, доступен всем окнам!)
     ipcRenderer: {
@@ -169,6 +177,16 @@ try {
       ipcRenderer.invoke('get-config-file', fileName, parseJson),
     getProjectTreeJson: (folderPath?: string) =>
       ipcRenderer.invoke('get-project-tree-json', folderPath),
+
+    // Планировщик
+    tasks: {
+      getAll: () => ipcRenderer.invoke('tasks:getAll'),
+      add: (taskData: any) => ipcRenderer.invoke('tasks:add', taskData),
+      update: (task: any) => ipcRenderer.invoke('tasks:update', task),
+      delete: (id: string) => ipcRenderer.invoke('tasks:delete', id),
+      openWindow: () => ipcRenderer.invoke('tasks:open-window'),
+      onCommand: (callback: (cmd: string, args: any) => void) => { /* ... */ },
+    },
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

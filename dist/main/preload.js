@@ -10,6 +10,7 @@ try {
 		openMDWindow: () => electron.ipcRenderer.invoke("open-md-window"),
 		openPGWindow: () => electron.ipcRenderer.invoke("open-pg-window"),
 		openOllamaWindow: () => electron.ipcRenderer.invoke("open-ollama-window"),
+		openTasksWindow: () => electron.ipcRenderer.invoke("open-tasks-window"),
 		sendMessageToAI: (message) => electron.ipcRenderer.invoke("send-to-ai", message).then((response) => {
 			console.log(response);
 			return response;
@@ -127,13 +128,22 @@ try {
 			electron.ipcRenderer.removeAllListeners("orders-stream-error");
 			electron.ipcRenderer.on("orders-stream-error", (_, streamType, err) => callback(streamType, err));
 		},
+		callGrpc: (service, method, token, request) => electron.ipcRenderer.invoke("grpc-call", service, method, token, request),
 		ipcRenderer: { invoke: (channel, ...args) => electron.ipcRenderer.invoke(channel, ...args) },
 		getProjectTree: (folderPath) => electron.ipcRenderer.invoke("get-project-tree", folderPath),
 		selectFolder: () => electron.ipcRenderer.invoke("select-folder"),
 		getPackageDependencies: () => electron.ipcRenderer.invoke("get-package-dependencies"),
 		getPackageJson: () => electron.ipcRenderer.invoke("get-package-json"),
 		getConfigFile: (fileName, parseJson) => electron.ipcRenderer.invoke("get-config-file", fileName, parseJson),
-		getProjectTreeJson: (folderPath) => electron.ipcRenderer.invoke("get-project-tree-json", folderPath)
+		getProjectTreeJson: (folderPath) => electron.ipcRenderer.invoke("get-project-tree-json", folderPath),
+		tasks: {
+			getAll: () => electron.ipcRenderer.invoke("tasks:getAll"),
+			add: (taskData) => electron.ipcRenderer.invoke("tasks:add", taskData),
+			update: (task) => electron.ipcRenderer.invoke("tasks:update", task),
+			delete: (id) => electron.ipcRenderer.invoke("tasks:delete", id),
+			openWindow: () => electron.ipcRenderer.invoke("tasks:open-window"),
+			onCommand: (callback) => {}
+		}
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {

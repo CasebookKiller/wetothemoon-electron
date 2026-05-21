@@ -32,9 +32,10 @@ let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_
 _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_proto_loader_build_src_index_js = __toESM(_home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_proto_loader_build_src_index_js);
 let fs = require("fs");
 fs = __toESM(fs);
+let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_uuid_dist_node_index_js = require("/home/ll/Документы/GitHub/wetothemoon-project/wetothemoon-electron/node_modules/uuid/dist-node/index.js");
 //#region src/main/windows/mainWindow.ts
 var mainWindow = null;
-var preloadPath$5 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var preloadPath$6 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var MAIN_WINDOW_VITE_DEV_SERVER_URL = "http://localhost:5173";
 path.default.join(__dirname, "../../renderer/main-window/index.html");
 var createMainWindow = () => {
@@ -43,7 +44,7 @@ var createMainWindow = () => {
 		height: 768,
 		title: "Мы на Луну!",
 		webPreferences: {
-			preload: preloadPath$5,
+			preload: preloadPath$6,
 			contextIsolation: true,
 			nodeIntegration: false
 		}
@@ -63,7 +64,7 @@ function getMainWindowProdPath() {
 //#endregion
 //#region src/main/windows/aiWindow.ts
 var aiWindow = null;
-var preloadPath$4 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var preloadPath$5 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var createAIWindow = () => {
 	console.log("createAIWindow called");
 	aiWindow = new electron.BrowserWindow({
@@ -71,7 +72,7 @@ var createAIWindow = () => {
 		height: 600,
 		title: "Нейро",
 		webPreferences: {
-			preload: preloadPath$4,
+			preload: preloadPath$5,
 			contextIsolation: true,
 			nodeIntegration: false
 		}
@@ -606,14 +607,14 @@ var bondsWindowMenuTemplate = [
 //#endregion
 //#region src/main/windows/bondsWindow.ts
 var bondsWindow$1 = null;
-var preloadPath$3 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var preloadPath$4 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var createBondsWindow = () => {
 	bondsWindow$1 = new electron.BrowserWindow({
 		width: 1024,
 		height: 768,
 		title: "Облигации",
 		webPreferences: {
-			preload: preloadPath$3,
+			preload: preloadPath$4,
 			contextIsolation: true,
 			nodeIntegration: false
 		}
@@ -631,14 +632,14 @@ var getBondsWindow = () => bondsWindow$1;
 //#endregion
 //#region src/main/windows/mdWindow.ts
 var mdWindow$1 = null;
-var preloadPath$2 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var preloadPath$3 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var createMDWindow = () => {
 	mdWindow$1 = new electron.BrowserWindow({
 		width: 800,
 		height: 600,
 		title: "Markdown",
 		webPreferences: {
-			preload: preloadPath$2,
+			preload: preloadPath$3,
 			contextIsolation: true,
 			nodeIntegration: false
 		}
@@ -654,14 +655,14 @@ var getMDWindow = () => mdWindow$1;
 //#endregion
 //#region src/main/windows/pgWindow.ts
 var pgWindow$1 = null;
-var preloadPath$1 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var preloadPath$2 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var createPGWindow = () => {
 	pgWindow$1 = new electron.BrowserWindow({
 		width: 800,
 		height: 600,
 		title: "Генератор запросов",
 		webPreferences: {
-			preload: preloadPath$1,
+			preload: preloadPath$2,
 			contextIsolation: true,
 			nodeIntegration: false
 		}
@@ -677,7 +678,7 @@ var getPGWindow = () => pgWindow$1;
 //#endregion
 //#region src/main/windows/ollamaWindow.ts
 var ollamaWindow$1 = null;
-var preloadPath = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var preloadPath$1 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var createOllamaWindow = () => {
 	if (ollamaWindow$1) {
 		ollamaWindow$1.focus();
@@ -688,7 +689,7 @@ var createOllamaWindow = () => {
 		height: 600,
 		title: "Клиент Ollama ",
 		webPreferences: {
-			preload: preloadPath,
+			preload: preloadPath$1,
 			contextIsolation: true,
 			nodeIntegration: false
 		}
@@ -1120,6 +1121,851 @@ function validateCodeContext(context) {
 	}
 }
 //#endregion
+//#region src/main/utils/grpcHelper.ts
+function createGrpcClient(packageName, serviceName) {
+	const PROTO_PATH = getProtoPath(packageName);
+	const packageDefinition = _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_proto_loader_build_src_index_js.loadSync(PROTO_PATH, {
+		keepCase: false,
+		longs: String,
+		enums: String,
+		defaults: true,
+		oneofs: true
+	});
+	const ServiceClient = _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.loadPackageDefinition(packageDefinition).tinkoff.public.invest.api.contract.v1[serviceName];
+	return new ServiceClient("invest-public-api.tbank.ru:443", _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.credentials.createSsl(null, null, null, { rejectUnauthorized: false }), { "grpc.ssl_target_name_override": "invest-public-api.tbank.ru" });
+}
+function createMetadata(token) {
+	const meta = new _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.Metadata();
+	meta.add("Authorization", `Bearer ${token}`);
+	return meta;
+}
+//#endregion
+//#region src/main/services/tbank/UsersGrpcService.ts
+var client$7 = createGrpcClient("users.proto", "UsersService");
+var usersGrpc = {
+	getInfo: (token) => new Promise((resolve, reject) => {
+		client$7.GetInfo({}, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getAccounts: (request, token) => new Promise((resolve, reject) => {
+		client$7.GetAccounts(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getMarginAttributes: (request, token) => new Promise((resolve, reject) => {
+		client$7.GetMarginAttributes(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getUserTariff: (request, token) => new Promise((resolve, reject) => {
+		client$7.GetUserTariff(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	currencyTransfer: (request, token) => new Promise((resolve, reject) => {
+		client$7.CurrencyTransfer(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	payIn: (request, token) => new Promise((resolve, reject) => {
+		client$7.PayIn(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getBankAccounts: (request, token) => new Promise((resolve, reject) => {
+		client$7.GetBankAccounts(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	})
+};
+//#endregion
+//#region src/main/services/tbank/InstrumentsGrpcService.ts
+var client$6 = createGrpcClient("instruments.proto", "InstrumentsService");
+var instrumentsGrpc = {
+	bondBy: (request, token) => new Promise((resolve, reject) => {
+		client$6.BondBy(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	bonds: (request, token) => new Promise((resolve, reject) => {
+		client$6.Bonds(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	createFavoriteGroup: (request, token) => new Promise((resolve, reject) => {
+		client$6.CreateFavoriteGroup(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	currencies: (request, token) => new Promise((resolve, reject) => {
+		client$6.Currencies(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	currencyBy: (request, token) => new Promise((resolve, reject) => {
+		client$6.CurrencyBy(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	deleteFavoriteGroup: (request, token) => new Promise((resolve, reject) => {
+		client$6.DeleteFavoriteGroup(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	editFavorites: (request, token) => new Promise((resolve, reject) => {
+		client$6.EditFavorites(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	etfBy: (request, token) => new Promise((resolve, reject) => {
+		client$6.EtfBy(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	etfs: (request, token) => new Promise((resolve, reject) => {
+		client$6.Etfs(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	findInstrument: (request, token) => new Promise((resolve, reject) => {
+		client$6.FindInstrument(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	futureBy: (request, token) => new Promise((resolve, reject) => {
+		client$6.FutureBy(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	futures: (request, token) => new Promise((resolve, reject) => {
+		client$6.Futures(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getAccruedInterests: (request, token) => new Promise((resolve, reject) => {
+		client$6.GetAccruedInterests(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getAssetBy: (request, token) => new Promise((resolve, reject) => {
+		client$6.GetAssetBy(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getAssetFundamentals: (request, token) => new Promise((resolve, reject) => {
+		client$6.GetAssetFundamentals(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getAssetReports: (request, token) => new Promise((resolve, reject) => {
+		client$6.GetAssetReports(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getAssets: (request, token) => new Promise((resolve, reject) => {
+		client$6.GetAssets(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getBondCoupons: (request, token) => new Promise((resolve, reject) => {
+		client$6.GetBondCoupons(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getBondEvents: (request, token) => new Promise((resolve, reject) => {
+		client$6.GetBondEvents(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getBrandBy: (request, token) => new Promise((resolve, reject) => {
+		client$6.GetBrandBy(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getBrands: (request, token) => new Promise((resolve, reject) => {
+		client$6.GetBrands(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getConsensusForecasts: (request, token) => new Promise((resolve, reject) => {
+		client$6.GetConsensusForecasts(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getCountries: (request, token) => new Promise((resolve, reject) => {
+		client$6.GetCountries(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getDividends: (request, token) => new Promise((resolve, reject) => {
+		client$6.GetDividends(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getFavoriteGroups: (request, token) => new Promise((resolve, reject) => {
+		client$6.GetFavoriteGroups(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getFavorites: (request, token) => new Promise((resolve, reject) => {
+		client$6.GetFavorites(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getForecastBy: (request, token) => new Promise((resolve, reject) => {
+		client$6.GetForecastBy(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getFuturesMargin: (request, token) => new Promise((resolve, reject) => {
+		client$6.GetFuturesMargin(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getInsiderDeals: (request, token) => new Promise((resolve, reject) => {
+		client$6.GetInsiderDeals(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getInstrumentBy: (request, token) => new Promise((resolve, reject) => {
+		client$6.GetInstrumentBy(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getRiskRates: (request, token) => new Promise((resolve, reject) => {
+		client$6.GetRiskRates(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	indicatives: (request, token) => new Promise((resolve, reject) => {
+		client$6.Indicatives(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	optionBy: (request, token) => new Promise((resolve, reject) => {
+		client$6.OptionBy(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	options: (request, token) => new Promise((resolve, reject) => {
+		client$6.Options(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	optionsBy: (request, token) => new Promise((resolve, reject) => {
+		client$6.OptionsBy(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	shareBy: (request, token) => new Promise((resolve, reject) => {
+		client$6.ShareBy(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	shares: (request, token) => new Promise((resolve, reject) => {
+		client$6.Shares(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	structuredNoteBy: (request, token) => new Promise((resolve, reject) => {
+		client$6.StructuredNoteBy(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	structuredNotes: (request, token) => new Promise((resolve, reject) => {
+		client$6.StructuredNotes(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	tradingSchedules: (request, token) => new Promise((resolve, reject) => {
+		client$6.TradingSchedules(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	})
+};
+//#endregion
+//#region src/main/services/tbank/MarketDataGrpcService.ts
+var client$5 = createGrpcClient("marketdata.proto", "MarketDataService");
+var marketDataGrpc = {
+	getCandles: (request, token) => new Promise((resolve, reject) => {
+		client$5.GetCandles(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getClosePrices: (request, token) => new Promise((resolve, reject) => {
+		client$5.GetClosePrices(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getLastPrices: (request, token) => new Promise((resolve, reject) => {
+		client$5.GetLastPrices(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getLastTrades: (request, token) => new Promise((resolve, reject) => {
+		client$5.GetLastTrades(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getMarketValues: (request, token) => new Promise((resolve, reject) => {
+		client$5.GetMarketValues(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getOrderBook: (request, token) => new Promise((resolve, reject) => {
+		client$5.GetOrderBook(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getTechAnalysis: (request, token) => new Promise((resolve, reject) => {
+		client$5.GetTechAnalysis(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getTradingStatus: (request, token) => new Promise((resolve, reject) => {
+		client$5.GetTradingStatus(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getTradingStatuses: (request, token) => new Promise((resolve, reject) => {
+		client$5.GetTradingStatuses(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	})
+};
+//#endregion
+//#region src/main/services/tbank/OperationsGrpcService.ts
+var client$4 = createGrpcClient("operations.proto", "OperationsService");
+var operationsGrpc = {
+	getOperations: (request, token) => new Promise((resolve, reject) => {
+		client$4.GetOperations(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getPortfolio: (request, token) => new Promise((resolve, reject) => {
+		client$4.GetPortfolio(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getPositions: (request, token) => new Promise((resolve, reject) => {
+		client$4.GetPositions(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getWithdrawLimits: (request, token) => new Promise((resolve, reject) => {
+		client$4.GetWithdrawLimits(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getBrokerReport: (request, token) => new Promise((resolve, reject) => {
+		client$4.GetBrokerReport(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getDividendsForeignIssuer: (request, token) => new Promise((resolve, reject) => {
+		client$4.GetDividendsForeignIssuer(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getOperationsByCursor: (request, token) => new Promise((resolve, reject) => {
+		client$4.GetOperationsByCursor(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	})
+};
+//#endregion
+//#region src/main/services/tbank/OrdersGrpcService.ts
+var client$3 = createGrpcClient("orders.proto", "OrdersService");
+var ordersGrpc = {
+	postOrder: (request, token) => new Promise((resolve, reject) => {
+		client$3.PostOrder(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	postOrderAsync: (request, token) => new Promise((resolve, reject) => {
+		client$3.PostOrderAsync(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	cancelOrder: (request, token) => new Promise((resolve, reject) => {
+		client$3.CancelOrder(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getOrderState: (request, token) => new Promise((resolve, reject) => {
+		client$3.GetOrderState(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getOrders: (request, token) => new Promise((resolve, reject) => {
+		client$3.GetOrders(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	replaceOrder: (request, token) => new Promise((resolve, reject) => {
+		client$3.ReplaceOrder(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getMaxLots: (request, token) => new Promise((resolve, reject) => {
+		client$3.GetMaxLots(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getOrderPrice: (request, token) => new Promise((resolve, reject) => {
+		client$3.GetOrderPrice(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	})
+};
+//#endregion
+//#region src/main/services/tbank/StopOrdersGrpcService.ts
+var client$2 = createGrpcClient("stoporders.proto", "StopOrdersService");
+var stopOrdersGrpc = {
+	cancelStopOrder: (request, token) => new Promise((resolve, reject) => {
+		client$2.CancelStopOrder(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getStopOrders: (request, token) => new Promise((resolve, reject) => {
+		client$2.GetStopOrders(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	postStopOrder: (request, token) => new Promise((resolve, reject) => {
+		client$2.PostStopOrder(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	})
+};
+//#endregion
+//#region src/main/services/tbank/SandboxGrpcService.ts
+var client$1 = createGrpcClient("sandbox.proto", "SandboxService");
+var sandboxGrpc = {
+	openSandboxAccount: (request, token) => new Promise((resolve, reject) => {
+		client$1.OpenSandboxAccount(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	closeSandboxAccount: (request, token) => new Promise((resolve, reject) => {
+		client$1.CloseSandboxAccount(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getSandboxAccounts: (request, token) => new Promise((resolve, reject) => {
+		client$1.GetSandboxAccounts(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	sandboxPayIn: (request, token) => new Promise((resolve, reject) => {
+		client$1.SandboxPayIn(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	postSandboxOrder: (request, token) => new Promise((resolve, reject) => {
+		client$1.PostSandboxOrder(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	postSandboxOrderAsync: (request, token) => new Promise((resolve, reject) => {
+		client$1.PostSandboxOrderAsync(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	cancelSandboxOrder: (request, token) => new Promise((resolve, reject) => {
+		client$1.CancelSandboxOrder(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getSandboxOrderState: (request, token) => new Promise((resolve, reject) => {
+		client$1.GetSandboxOrderState(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getSandboxOrders: (request, token) => new Promise((resolve, reject) => {
+		client$1.GetSandboxOrders(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	replaceSandboxOrder: (request, token) => new Promise((resolve, reject) => {
+		client$1.ReplaceSandboxOrder(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getSandboxMaxLots: (request, token) => new Promise((resolve, reject) => {
+		client$1.GetSandboxMaxLots(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getSandboxOrderPrice: (request, token) => new Promise((resolve, reject) => {
+		client$1.GetSandboxOrderPrice(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	cancelSandboxStopOrder: (request, token) => new Promise((resolve, reject) => {
+		client$1.CancelSandboxStopOrder(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getSandboxStopOrders: (request, token) => new Promise((resolve, reject) => {
+		client$1.GetSandboxStopOrders(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	postSandboxStopOrder: (request, token) => new Promise((resolve, reject) => {
+		client$1.PostSandboxStopOrder(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getSandboxOperations: (request, token) => new Promise((resolve, reject) => {
+		client$1.GetSandboxOperations(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getSandboxOperationsByCursor: (request, token) => new Promise((resolve, reject) => {
+		client$1.GetSandboxOperationsByCursor(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getSandboxPortfolio: (request, token) => new Promise((resolve, reject) => {
+		client$1.GetSandboxPortfolio(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getSandboxPositions: (request, token) => new Promise((resolve, reject) => {
+		client$1.GetSandboxPositions(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getSandboxWithdrawLimits: (request, token) => new Promise((resolve, reject) => {
+		client$1.GetSandboxWithdrawLimits(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	})
+};
+//#endregion
+//#region src/main/services/tbank/SignalGrpcService.ts
+var client = createGrpcClient("signals.proto", "SignalService");
+//#endregion
+//#region src/main/ipcHandlers/grpcHandlers.ts
+var grpcServices = {
+	users: usersGrpc,
+	instruments: instrumentsGrpc,
+	marketdata: marketDataGrpc,
+	operations: operationsGrpc,
+	orders: ordersGrpc,
+	stoporders: stopOrdersGrpc,
+	sandbox: sandboxGrpc,
+	signal: {
+		getSignals: (request, token) => new Promise((resolve, reject) => {
+			client.GetSignals(request, createMetadata(token), (err, response) => {
+				if (err) reject(err);
+				else resolve(response);
+			});
+		}),
+		getStrategies: (request, token) => new Promise((resolve, reject) => {
+			client.GetStrategies(request, createMetadata(token), (err, response) => {
+				if (err) reject(err);
+				else resolve(response);
+			});
+		})
+	}
+};
+function registerGrpcHandlers() {
+	electron.ipcMain.handle("grpc-call", async (_, serviceName, methodName, token, request) => {
+		const service = grpcServices[serviceName];
+		if (!service) throw new Error(`Unknown gRPC service: ${serviceName}`);
+		if (typeof service[methodName] !== "function") throw new Error(`Unknown method: ${methodName} in ${serviceName}`);
+		return await service[methodName](request, token);
+	});
+}
+//#endregion
+//#region src/main/services/taskStore.ts
+var DATA_DIR = electron.app.getPath("userData");
+var TASKS_FILE = path.join(DATA_DIR, "tasks.json");
+function readTasks() {
+	try {
+		if (!fs.existsSync(TASKS_FILE)) return [];
+		const raw = fs.readFileSync(TASKS_FILE, "utf-8");
+		return JSON.parse(raw);
+	} catch (err) {
+		console.error("Ошибка чтения tasks.json:", err);
+		return [];
+	}
+}
+function writeTasks(tasks) {
+	try {
+		fs.writeFileSync(TASKS_FILE, JSON.stringify(tasks, null, 2), "utf-8");
+	} catch (err) {
+		console.error("Ошибка записи tasks.json:", err);
+	}
+}
+var TaskStore = class {
+	getAll() {
+		return readTasks();
+	}
+	add(task) {
+		const tasks = readTasks();
+		tasks.push(task);
+		writeTasks(tasks);
+	}
+	update(updated) {
+		writeTasks(readTasks().map((t) => t.id === updated.id ? updated : t));
+	}
+	delete(id) {
+		writeTasks(readTasks().filter((t) => t.id !== id));
+	}
+};
+var taskStore = new TaskStore();
+//#endregion
+//#region src/main/windows/tasksWindow.ts
+var tasksWindow = null;
+var preloadPath = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var createTasksWindow = () => {
+	if (tasksWindow && !tasksWindow.isDestroyed()) {
+		tasksWindow.focus();
+		return tasksWindow;
+	}
+	tasksWindow = new electron.BrowserWindow({
+		width: 900,
+		height: 700,
+		title: "Планировщик задач",
+		webPreferences: {
+			preload: preloadPath,
+			contextIsolation: true,
+			nodeIntegration: false
+		}
+	});
+	if (process.env.NODE_ENV === "development") tasksWindow.loadURL(`${DEV_SERVER_URL}/#/tasks`);
+	else tasksWindow.loadFile(getMainWindowProdPath(), { hash: "/tasks" });
+	tasksWindow.on("closed", () => {
+		tasksWindow = null;
+	});
+	return tasksWindow;
+};
+var getTasksWindow = () => tasksWindow;
+//#endregion
+//#region src/main/ipcHandlers/tasksHandlers.ts
+function registerTasksHandlers() {
+	electron.ipcMain.handle("tasks:getAll", () => {
+		return taskStore.getAll();
+	});
+	electron.ipcMain.handle("tasks:add", (_event, taskData) => {
+		const now = (/* @__PURE__ */ new Date()).toISOString();
+		const newTask = {
+			id: (0, _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_uuid_dist_node_index_js.v4)(),
+			...taskData,
+			createdAt: now,
+			updatedAt: now
+		};
+		taskStore.add(newTask);
+		return newTask;
+	});
+	electron.ipcMain.handle("tasks:update", (_event, task) => {
+		task.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
+		taskStore.update(task);
+		return task;
+	});
+	electron.ipcMain.handle("tasks:delete", (_event, id) => {
+		taskStore.delete(id);
+	});
+	electron.ipcMain.handle("tasks:open-window", () => {
+		const win = getTasksWindow();
+		if (win && !win.isDestroyed()) {
+			win.focus();
+			return;
+		}
+		createTasksWindow();
+	});
+	electron.ipcMain.handle("open-tasks-window", () => {
+		const win = getTasksWindow();
+		if (win && !win.isDestroyed()) {
+			win.focus();
+			return;
+		}
+		createTasksWindow();
+	});
+}
+//#endregion
+//#region src/main/services/scheduler.ts
+var Scheduler = class {
+	timer;
+	CHECK_INTERVAL = 3e4;
+	start() {
+		console.log("[Scheduler] Started");
+		this.checkTasks();
+		this.timer = setInterval(() => this.checkTasks(), this.CHECK_INTERVAL);
+	}
+	stop() {
+		if (this.timer) {
+			clearInterval(this.timer);
+			this.timer = void 0;
+		}
+	}
+	checkTasks() {
+		const now = (/* @__PURE__ */ new Date()).toISOString();
+		const tasks = taskStore.getAll().filter((t) => t.enabled);
+		for (const task of tasks) {
+			if (!task.nextRun) {
+				this.calculateNextRun(task);
+				taskStore.update(task);
+				continue;
+			}
+			if (task.nextRun <= now) {
+				this.executeTask(task);
+				this.calculateNextRun(task);
+				task.lastRun = now;
+				taskStore.update(task);
+			}
+		}
+	}
+	calculateNextRun(task) {
+		const now = /* @__PURE__ */ new Date();
+		switch (task.schedule.type) {
+			case "once":
+				if (!task.lastRun) task.nextRun = task.schedule.value;
+				else task.nextRun = void 0;
+				break;
+			case "interval": {
+				const ms = parseInt(task.schedule.value, 10);
+				const base = task.lastRun ? new Date(task.lastRun) : now;
+				task.nextRun = new Date(base.getTime() + ms).toISOString();
+				break;
+			}
+			case "cron":
+				console.warn("[Scheduler] cron не реализован, пропускаем задачу", task.id);
+				task.nextRun = void 0;
+				break;
+		}
+	}
+	async executeTask(task) {
+		console.log(`[Scheduler] Executing task ${task.id} (${task.name})`);
+		try {
+			switch (task.action.type) {
+				case "reminder":
+					new electron.Notification({
+						title: task.action.payload.title || "Напоминание",
+						body: task.action.payload.body || task.name
+					}).show();
+					break;
+				case "react-command": break;
+				case "main-function":
+					await this.callRegisteredFunction(task.action.payload.functionName, task.action.payload.args);
+					break;
+				case "script": break;
+				default: console.warn(`[Scheduler] Неизвестный тип действия: ${task.action.type}`);
+			}
+		} catch (e) {
+			console.error(`[Scheduler] Ошибка выполнения задачи ${task.id}`, e);
+		}
+	}
+	async callRegisteredFunction(name, args) {
+		if (!name) {
+			console.warn("[Scheduler] Имя функции не задано");
+			return;
+		}
+		const fn = { "refreshBonds": async () => {} }[name];
+		if (fn) await fn();
+		else console.warn(`[Scheduler] Функция ${name} не найдена`);
+	}
+};
+var scheduler = new Scheduler();
+//#endregion
 //#region src/main/main.ts
 electron.app.whenReady().then(() => {
 	electron.session.defaultSession.setCertificateVerifyProc((request, callback) => {
@@ -1179,12 +2025,18 @@ electron.app.whenReady().then(() => {
 	registerMarketdataStreamHandlers();
 	registerOperationsStreamHandlers();
 	registerOrdersStreamHandlers();
+	registerGrpcHandlers();
+	registerTasksHandlers();
+	scheduler.start();
 });
 electron.app.on("window-all-closed", () => {
 	if (process.platform !== "darwin") electron.app.quit();
 });
 electron.app.on("activate", () => {
 	if (electron.BrowserWindow.getAllWindows().length === 0) createMainWindow();
+});
+electron.app.on("before-quit", () => {
+	scheduler.stop();
 });
 electron.ipcMain.handle("open-ai-window", () => {
 	const existing = getAIWindow();

@@ -1,0 +1,170 @@
+// src/main/services/scheduler.ts
+import { taskStore } from './taskStore';
+import { Task } from '@/shared/types/task';
+import { Notification } from 'electron';
+import * as cron from 'node-cron';
+
+class Scheduler {
+  private timer?: NodeJS.Timeout;
+  private readonly CHECK_INTERVAL = 30_000; // 30 секунд
+  private cronJobs: Map<string, cron.ScheduledTask> = new Map();
+
+  start() {
+    console.log('[Scheduler] Started');
+
+    // Загружаем обычные задачи (once, interval)
+    this.checkTasks();
+    this.timer = setInterval(() => this.checkTasks(), this.CHECK_INTERVAL);
+
+    // Регистрируем cron‑задачи
+    const tasks = taskStore.getAll().filter(t => t.enabled && t.schedule.type === 'cron');
+    for (const task of tasks) {
+      this.registerCronJob(task);
+    }
+  }
+
+  stop() {
+    if (this.timer) {
+      clearInterval(this.timer);
+      this.timer = undefined;
+    }
+    for (const [id, job] of this.cronJobs) {
+      job.stop();
+    }
+    this.cronJobs.clear();
+    console.log('[Scheduler] Stopped');
+  }
+
+  /** Перезагружает cron‑задачу при её изменении */
+  refreshCronJob(task: Task) {
+    if (task.schedule.type !== 'cron') return;
+    this.unregisterCronJob(task.id);
+    if (task.enabled) {
+      this.registerCronJob(task);
+    }
+  }
+
+  private registerCronJob(task: Task) {
+    if (!cron.validate(task.schedule.value)) {
+      console.error(`[Scheduler] Некорректное cron-выражение для задачи ${task.id}: ${task.schedule.value}`);
+      return;
+    }
+
+    const job = cron.schedule(task.schedule.value, () => {
+      console.log(`[Scheduler] Cron-запуск задачи ${task.id} (${task.name})`);
+      this.executeTask(task);
+      task.lastRun = new Date().toISOString();
+      taskStore.update(task);
+    }, {
+      timezone: 'Europe/Moscow', // можно вынести в настройки позже
+    });
+
+    this.cronJobs.set(task.id, job);
+    console.log(`[Scheduler] Cron-задача ${task.id} зарегистрирована`);
+  }
+
+  private unregisterCronJob(taskId: string) {
+    const job = this.cronJobs.get(taskId);
+    if (job) {
+      job.stop();
+      this.cronJobs.delete(taskId);
+    }
+  }
+
+  private checkTasks() {
+    const now = new Date().toISOString();
+    const tasks = taskStore.getAll().filter(t => t.enabled && t.schedule.type !== 'cron');
+    
+    for (const task of tasks) {
+      if (!task.nextRun) {
+        this.calculateNextRun(task);
+        taskStore.update(task);
+        continue;
+      }
+      
+      if (task.nextRun <= now) {
+        this.executeTask(task);
+        this.calculateNextRun(task);
+        task.lastRun = now;
+        taskStore.update(task);
+      }
+    }
+  }
+
+  private calculateNextRun(task: Task) {
+    const now = new Date();
+    switch (task.schedule.type) {
+      case 'once': {
+        if (!task.lastRun) {
+          task.nextRun = task.schedule.value; // ожидаем ISO
+        } else {
+          task.nextRun = undefined; // больше не запустится
+        }
+        break;
+      }
+      case 'interval': {
+        const ms = parseInt(task.schedule.value, 10);
+        const base = task.lastRun ? new Date(task.lastRun) : now;
+        task.nextRun = new Date(base.getTime() + ms).toISOString();
+        break;
+      }
+      case 'cron':
+        // cron-задачи управляются отдельно, nextRun не используется
+        task.nextRun = undefined;
+        break;
+    }
+  }
+
+  private async executeTask(task: Task) {
+    console.log(`[Scheduler] Executing task ${task.id} (${task.name})`);
+    try {
+      switch (task.action.type) {
+        case 'reminder':
+          new Notification({
+            title: task.action.payload.title || 'Напоминание',
+            body: task.action.payload.body || task.name,
+          }).show();
+          break;
+        case 'react-command':
+          // Будет реализовано позже (Этап 4)
+          break;
+        case 'main-function': {
+          const { functionName, args } = task.action.payload;
+          if (functionName) {
+            await this.callRegisteredFunction(functionName, args);
+          } else {
+            console.warn(`[Scheduler] Не указано имя функции для задачи ${task.id}`);
+          }
+          break;
+        }
+        case 'script':
+          // запуск дочернего процесса (будет реализовано позже)
+          break;
+        default:
+          console.warn(`[Scheduler] Неизвестный тип действия: ${task.action.type}`);
+      }
+    } catch (e) {
+      console.error(`[Scheduler] Ошибка выполнения задачи ${task.id}`, e);
+    }
+  }
+
+  private async callRegisteredFunction(name: string | undefined, args?: any) {
+    if (!name) {
+      console.warn('[Scheduler] Имя функции не задано');
+      return;
+    }
+    const allowedFunctions: Record<string, () => Promise<void>> = {
+      'refreshBonds': async () => {
+        // вызов сервиса облигаций (будет добавлен позже)
+      }
+    };
+    const fn = allowedFunctions[name];
+    if (fn) {
+      await fn();
+    } else {
+      console.warn(`[Scheduler] Функция ${name} не найдена`);
+    }
+  }
+}
+
+export const scheduler = new Scheduler();

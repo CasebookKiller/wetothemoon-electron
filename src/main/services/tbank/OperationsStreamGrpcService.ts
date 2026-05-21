@@ -5,7 +5,7 @@ import type {
   PositionsStreamResponse,
   OperationsStreamRequest,
   OperationsStreamResponse,
-} from './operationsStreamTypes';
+} from '@/api/tbank/operationsStreamTypes';
 
 export class OperationsStreamServiceClient {
   private readonly token: string;

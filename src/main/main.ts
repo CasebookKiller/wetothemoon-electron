@@ -27,13 +27,16 @@ import { exec } from 'child_process';
 import WebSocket from 'ws';
 
 import * as grpc from '@grpc/grpc-js';
-import * as protoLoader from '@grpc/proto-loader';
+
 import {
   mainMenuTemplate,
   aiWindowMenuTemplate,
   bondsWindowMenuTemplate,
   mdWindowMenuTemplate
 } from './menus/windowMenus.ts';
+import { registerGrpcHandlers } from './ipcHandlers/grpcHandlers.ts';
+import { registerTasksHandlers } from './ipcHandlers/tasksHandlers.ts';
+import { scheduler } from './services/scheduler';
 
 let currentStream: grpc.ClientReadableStream<any> | null = null;
 
@@ -124,6 +127,11 @@ app.whenReady().then(() => {
   registerMarketdataStreamHandlers();
   registerOperationsStreamHandlers();
   registerOrdersStreamHandlers();
+
+  registerGrpcHandlers();
+
+  registerTasksHandlers();
+  scheduler.start();
 });
 
 // Завершать работу, когда закрыты все окна, за исключением macOS. Там это обычное дело
@@ -141,6 +149,10 @@ app.on('activate', () => {
 
 // В этот файл вы можете включить остальную часть основного кода вашего приложения.
 // Вы также можете поместить их в отдельные файлы и импортировать сюда.
+
+app.on('before-quit', () => {
+  scheduler.stop();
+});
 
 const aiWindow = getAIWindow();
 

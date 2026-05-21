@@ -23,6 +23,10 @@ export const ButtonsWindows = () => {
     electronAPI.openOllamaWindow();
   };
 
+  const openTasksWindow = () => {
+    electronAPI.openTasksWindow();
+  };
+
   return (
     <div className="p-fluid">
       <div className="flex justify-content-center align-items-center min-h-screen">
@@ -77,8 +81,7 @@ export const ButtonsWindows = () => {
                 label="План полёта"
                 icon="pi pi-list"
                 className="p-button-lg w-full p-button-raised p-button-accent"
-                onClick={()=>{return null}}
-                disabled={true}
+                onClick={openTasksWindow}
               />
             </div>
             <div className="col-12 md:col-4 w-full">
