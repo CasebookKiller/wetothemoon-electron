@@ -1,4 +1,5 @@
 // src/main/services/scheduler.ts
+import { getTasksWindow } from '@/main/windows/tasksWindow';
 import { taskStore } from './taskStore';
 import { Task } from '@/shared/types/task';
 import { Notification } from 'electron';
@@ -125,9 +126,16 @@ class Scheduler {
             body: task.action.payload.body || task.name,
           }).show();
           break;
-        case 'react-command':
-          // Будет реализовано позже (Этап 4)
+        case 'react-command': {
+          const tasksWin = getTasksWindow();
+          if (tasksWin && !tasksWin.isDestroyed()) {
+            tasksWin.webContents.send('task:react-command', task.action.payload.command, task.action.payload.args);
+            console.log(`[Scheduler] React-команда отправлена: ${task.action.payload.command}`);
+          } else {
+            console.warn('[Scheduler] Окно задач не открыто, команда не отправлена');
+          }
           break;
+        }
         case 'main-function': {
           const { functionName, args } = task.action.payload;
           if (functionName) {

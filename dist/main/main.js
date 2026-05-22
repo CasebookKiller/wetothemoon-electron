@@ -1939,7 +1939,14 @@ var Scheduler = class {
 						body: task.action.payload.body || task.name
 					}).show();
 					break;
-				case "react-command": break;
+				case "react-command": {
+					const tasksWin = getTasksWindow();
+					if (tasksWin && !tasksWin.isDestroyed()) {
+						tasksWin.webContents.send("task:react-command", task.action.payload.command, task.action.payload.args);
+						console.log(`[Scheduler] React-команда отправлена: ${task.action.payload.command}`);
+					} else console.warn("[Scheduler] Окно задач не открыто, команда не отправлена");
+					break;
+				}
 				case "main-function": {
 					const { functionName, args } = task.action.payload;
 					if (functionName) await this.callRegisteredFunction(functionName, args);

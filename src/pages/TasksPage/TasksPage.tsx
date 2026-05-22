@@ -32,6 +32,38 @@ export const TasksPage: React.FC = () => {
     loadTasks();
   }, [loadTasks]);
 
+  useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
+    
+    const setupCommandListener = async () => {
+      const api = (window as any).electronAPI;
+      if (api?.tasks?.onCommand) {
+        unsubscribe = await api.tasks.onCommand((command: string, args: any) => {
+          console.log('[TasksPage] Получена команда:', command, args);
+          
+          // Обработка команд
+          switch (command) {
+            case 'refresh':
+              loadTasks();
+              break;
+            case 'navigate':
+              // например, args содержит путь для перехода
+              console.log('Навигация:', args);
+              break;
+            default:
+              console.warn('Неизвестная команда:', command);
+          }
+        });
+      }
+    };
+
+    setupCommandListener();
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [loadTasks]);
+
   const handleSave = async (task: Task | Omit<Task, 'id'>) => {
     try {
       const api = (window as any).electronAPI;
