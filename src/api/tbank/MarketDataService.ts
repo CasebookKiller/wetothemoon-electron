@@ -1,14 +1,4 @@
-/*
-GetCandles
-GetClosePrices
-GetLastPrices
-GetLastTrades
-GetMarketValues
-GetOrderBook
-GetTechAnalysis
-GetTradingStatus
-GetTradingStatuses
-*/
+// /src/api/tbank/MarketDataService.ts
 
 import type {
   GetCandlesRequest,

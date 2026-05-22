@@ -8,29 +8,45 @@ import { scheduler } from '../services/scheduler';
 export function registerTasksHandlers() {
   // Получить все задачи
   ipcMain.handle('tasks:getAll', () => {
-    return taskStore.getAll();
+    const tasks = taskStore.getAll();
+    console.log('[IPC] tasks:getAll – вернул', tasks.length, 'задач');
+    return tasks;
   });
 
   // Добавить задачу
-  ipcMain.handle('tasks:add', (_event, taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => {
-    const now = new Date().toISOString();
-    const newTask: Task = {
-      id: uuidv4(),
-      ...taskData,
-      createdAt: now,
-      updatedAt: now,
-    };
-    taskStore.add(newTask);
-    scheduler.refreshCronJob(newTask);   // <-- добавить
-    return newTask;
+  ipcMain.handle('tasks:add', async (_event, taskData) => {
+    try {
+      console.log('[tasks:add] Получены данные:', taskData);
+      const now = new Date().toISOString();
+      const newTask: Task = {
+        id: uuidv4(),
+        ...taskData,
+        createdAt: now,
+        updatedAt: now,
+      };
+      console.log('[tasks:add] Создана задача:', newTask.id);
+      taskStore.add(newTask);
+      console.log('[tasks:add] taskStore.add выполнен');
+      scheduler.refreshCronJob(newTask);
+      console.log('[tasks:add] Успешно, возвращаю задачу');
+      return newTask;
+    } catch (e) {
+      console.error('[tasks:add] Ошибка:', e);
+      return null;
+    }
   });
 
-  // Обновить задачу
-  ipcMain.handle('tasks:update', (_event, task: Task) => {
-    task.updatedAt = new Date().toISOString();
-    taskStore.update(task);
-    scheduler.refreshCronJob(task);   // <-- добавить
-    return task;
+  ipcMain.handle('tasks:update', async (_event, task: Task) => {
+    try {
+      console.log('[tasks:update] Обновляю задачу:', task.id);
+      task.updatedAt = new Date().toISOString();
+      taskStore.update(task);
+      scheduler.refreshCronJob(task);
+      return task;
+    } catch (e) {
+      console.error('[tasks:update] Ошибка:', e);
+      return null;
+    }
   });
 
   // Удалить задачу

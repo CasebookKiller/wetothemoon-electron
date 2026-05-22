@@ -1,3 +1,5 @@
+// /src/api/tbank/marketdataTypes.ts
+
 // 1. GetCandles
 
 import type { Timestamp, Quotation } from './commonTypes';

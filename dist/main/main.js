@@ -33,6 +33,8 @@ _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node
 let fs = require("fs");
 fs = __toESM(fs);
 let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_uuid_dist_node_index_js = require("/home/ll/Документы/GitHub/wetothemoon-project/wetothemoon-electron/node_modules/uuid/dist-node/index.js");
+let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_node_cron_dist_esm_node_cron_js = require("/home/ll/Документы/GitHub/wetothemoon-project/wetothemoon-electron/node_modules/node-cron/dist/esm/node-cron.js");
+_home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_node_cron_dist_esm_node_cron_js = __toESM(_home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_node_cron_dist_esm_node_cron_js);
 //#region src/main/windows/mainWindow.ts
 var mainWindow = null;
 var preloadPath$6 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
@@ -1779,6 +1781,7 @@ function registerGrpcHandlers() {
 var DATA_DIR = electron.app.getPath("userData");
 var TASKS_FILE = path.join(DATA_DIR, "tasks.json");
 function readTasks() {
+	console.log("[TaskStore] Читаю файл:", TASKS_FILE);
 	try {
 		if (!fs.existsSync(TASKS_FILE)) return [];
 		const raw = fs.readFileSync(TASKS_FILE, "utf-8");
@@ -1801,11 +1804,14 @@ var TaskStore = class {
 	}
 	add(task) {
 		const tasks = readTasks();
+		console.log("[TaskStore] add – до записи:", tasks.length);
 		tasks.push(task);
 		writeTasks(tasks);
+		console.log("[TaskStore] add – после записи, всего:", tasks.length);
 	}
 	update(updated) {
 		writeTasks(readTasks().map((t) => t.id === updated.id ? updated : t));
+		console.log("[TaskStore] update – обновлена задача", updated.id);
 	}
 	delete(id) {
 		writeTasks(readTasks().filter((t) => t.id !== id));
@@ -1840,66 +1846,57 @@ var createTasksWindow = () => {
 };
 var getTasksWindow = () => tasksWindow;
 //#endregion
-//#region src/main/ipcHandlers/tasksHandlers.ts
-function registerTasksHandlers() {
-	electron.ipcMain.handle("tasks:getAll", () => {
-		return taskStore.getAll();
-	});
-	electron.ipcMain.handle("tasks:add", (_event, taskData) => {
-		const now = (/* @__PURE__ */ new Date()).toISOString();
-		const newTask = {
-			id: (0, _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_uuid_dist_node_index_js.v4)(),
-			...taskData,
-			createdAt: now,
-			updatedAt: now
-		};
-		taskStore.add(newTask);
-		return newTask;
-	});
-	electron.ipcMain.handle("tasks:update", (_event, task) => {
-		task.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
-		taskStore.update(task);
-		return task;
-	});
-	electron.ipcMain.handle("tasks:delete", (_event, id) => {
-		taskStore.delete(id);
-	});
-	electron.ipcMain.handle("tasks:open-window", () => {
-		const win = getTasksWindow();
-		if (win && !win.isDestroyed()) {
-			win.focus();
-			return;
-		}
-		createTasksWindow();
-	});
-	electron.ipcMain.handle("open-tasks-window", () => {
-		const win = getTasksWindow();
-		if (win && !win.isDestroyed()) {
-			win.focus();
-			return;
-		}
-		createTasksWindow();
-	});
-}
-//#endregion
 //#region src/main/services/scheduler.ts
 var Scheduler = class {
 	timer;
 	CHECK_INTERVAL = 3e4;
+	cronJobs = /* @__PURE__ */ new Map();
 	start() {
 		console.log("[Scheduler] Started");
 		this.checkTasks();
 		this.timer = setInterval(() => this.checkTasks(), this.CHECK_INTERVAL);
+		const tasks = taskStore.getAll().filter((t) => t.enabled && t.schedule.type === "cron");
+		for (const task of tasks) this.registerCronJob(task);
 	}
 	stop() {
 		if (this.timer) {
 			clearInterval(this.timer);
 			this.timer = void 0;
 		}
+		for (const [id, job] of this.cronJobs) job.stop();
+		this.cronJobs.clear();
+		console.log("[Scheduler] Stopped");
+	}
+	/** Перезагружает cron‑задачу при её изменении */
+	refreshCronJob(task) {
+		if (task.schedule.type !== "cron") return;
+		this.unregisterCronJob(task.id);
+		if (task.enabled) this.registerCronJob(task);
+	}
+	registerCronJob(task) {
+		if (!_home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_node_cron_dist_esm_node_cron_js.validate(task.schedule.value)) {
+			console.error(`[Scheduler] Некорректное cron-выражение для задачи ${task.id}: ${task.schedule.value}`);
+			return;
+		}
+		const job = _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_node_cron_dist_esm_node_cron_js.schedule(task.schedule.value, () => {
+			console.log(`[Scheduler] Cron-запуск задачи ${task.id} (${task.name})`);
+			this.executeTask(task);
+			task.lastRun = (/* @__PURE__ */ new Date()).toISOString();
+			taskStore.update(task);
+		}, { timezone: "Europe/Moscow" });
+		this.cronJobs.set(task.id, job);
+		console.log(`[Scheduler] Cron-задача ${task.id} зарегистрирована`);
+	}
+	unregisterCronJob(taskId) {
+		const job = this.cronJobs.get(taskId);
+		if (job) {
+			job.stop();
+			this.cronJobs.delete(taskId);
+		}
 	}
 	checkTasks() {
 		const now = (/* @__PURE__ */ new Date()).toISOString();
-		const tasks = taskStore.getAll().filter((t) => t.enabled);
+		const tasks = taskStore.getAll().filter((t) => t.enabled && t.schedule.type !== "cron");
 		for (const task of tasks) {
 			if (!task.nextRun) {
 				this.calculateNextRun(task);
@@ -1928,7 +1925,6 @@ var Scheduler = class {
 				break;
 			}
 			case "cron":
-				console.warn("[Scheduler] cron не реализован, пропускаем задачу", task.id);
 				task.nextRun = void 0;
 				break;
 		}
@@ -1944,9 +1940,12 @@ var Scheduler = class {
 					}).show();
 					break;
 				case "react-command": break;
-				case "main-function":
-					await this.callRegisteredFunction(task.action.payload.functionName, task.action.payload.args);
+				case "main-function": {
+					const { functionName, args } = task.action.payload;
+					if (functionName) await this.callRegisteredFunction(functionName, args);
+					else console.warn(`[Scheduler] Не указано имя функции для задачи ${task.id}`);
 					break;
+				}
 				case "script": break;
 				default: console.warn(`[Scheduler] Неизвестный тип действия: ${task.action.type}`);
 			}
@@ -1965,6 +1964,67 @@ var Scheduler = class {
 	}
 };
 var scheduler = new Scheduler();
+//#endregion
+//#region src/main/ipcHandlers/tasksHandlers.ts
+function registerTasksHandlers() {
+	electron.ipcMain.handle("tasks:getAll", () => {
+		const tasks = taskStore.getAll();
+		console.log("[IPC] tasks:getAll – вернул", tasks.length, "задач");
+		return tasks;
+	});
+	electron.ipcMain.handle("tasks:add", async (_event, taskData) => {
+		try {
+			console.log("[tasks:add] Получены данные:", taskData);
+			const now = (/* @__PURE__ */ new Date()).toISOString();
+			const newTask = {
+				id: (0, _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_uuid_dist_node_index_js.v4)(),
+				...taskData,
+				createdAt: now,
+				updatedAt: now
+			};
+			console.log("[tasks:add] Создана задача:", newTask.id);
+			taskStore.add(newTask);
+			console.log("[tasks:add] taskStore.add выполнен");
+			scheduler.refreshCronJob(newTask);
+			console.log("[tasks:add] Успешно, возвращаю задачу");
+			return newTask;
+		} catch (e) {
+			console.error("[tasks:add] Ошибка:", e);
+			return null;
+		}
+	});
+	electron.ipcMain.handle("tasks:update", async (_event, task) => {
+		try {
+			console.log("[tasks:update] Обновляю задачу:", task.id);
+			task.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
+			taskStore.update(task);
+			scheduler.refreshCronJob(task);
+			return task;
+		} catch (e) {
+			console.error("[tasks:update] Ошибка:", e);
+			return null;
+		}
+	});
+	electron.ipcMain.handle("tasks:delete", (_event, id) => {
+		taskStore.delete(id);
+	});
+	electron.ipcMain.handle("tasks:open-window", () => {
+		const win = getTasksWindow();
+		if (win && !win.isDestroyed()) {
+			win.focus();
+			return;
+		}
+		createTasksWindow();
+	});
+	electron.ipcMain.handle("open-tasks-window", () => {
+		const win = getTasksWindow();
+		if (win && !win.isDestroyed()) {
+			win.focus();
+			return;
+		}
+		createTasksWindow();
+	});
+}
 //#endregion
 //#region src/main/main.ts
 electron.app.whenReady().then(() => {

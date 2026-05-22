@@ -1,4 +1,4 @@
-// marketdata-stream-types.ts (исправленный)
+// /src/api/tbank/marketdataStreamTypes.ts
 import type { Timestamp } from '@/api/tbank/commonTypes'; // Timestamp = string (ISO 8601)
 
 // ---------- Вспомогательные литеральные типы (enum-подобные) ----------

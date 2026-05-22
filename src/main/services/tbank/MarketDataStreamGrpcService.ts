@@ -1,6 +1,4 @@
-const electronAPI = (window as Window & typeof globalThis & { electronAPI?: any })?.electronAPI;
-
-type EventHandler<T> = (data: T) => void;
+// MarketDataStreamGrpcService.ts
 
 import type {
   MarketDataStreamRequest,
