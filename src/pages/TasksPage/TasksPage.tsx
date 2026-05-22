@@ -64,13 +64,20 @@ export const TasksPage: React.FC = () => {
     setDialogVisible(true);
   };
 
-  const header = (
+ const header = (
     <div className="flex align-items-center justify-content-between w-full">
       <span className="app font-size-subheading font-bold">Планировщик задач</span>
+    </div>
+  );
+
+  const emptyState = (
+    <div className="flex flex-column align-items-center justify-content-center py-6 text-color-secondary">
+      <i className="pi pi-calendar text-5xl mb-3" style={{ opacity: 0.3 }}></i>
+      <p className="text-lg mb-3">Нет запланированных задач</p>
       <Button
         icon="pi pi-plus"
-        label="Новая задача"
-        className="p-button-outlined p-button-sm"
+        label="Создать первую задачу"
+        className="p-button-outlined"
         onClick={handleCreateNew}
       />
     </div>
@@ -79,7 +86,21 @@ export const TasksPage: React.FC = () => {
   return (
     <div className="app p-0">
       <Panel header={header} className="shadow-5 mx-1">
-        <TaskList tasks={tasks} onEdit={handleEdit} onDelete={handleDelete} />
+        {tasks.length === 0 ? (
+          emptyState
+        ) : (
+          <>
+            <div className="flex justify-content-end mb-2">
+              <Button
+                icon="pi pi-plus"
+                label="Новая задача"
+                className="p-button-outlined p-button-sm"
+                onClick={handleCreateNew}
+              />
+            </div>
+            <TaskList tasks={tasks} onEdit={handleEdit} onDelete={handleDelete} />
+          </>
+        )}
       </Panel>
 
       <Dialog

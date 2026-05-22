@@ -4,13 +4,12 @@ import { InputText } from 'primereact/inputtext';
 import { InputTextarea } from 'primereact/inputtextarea';
 import { Dropdown } from 'primereact/dropdown';
 import { Checkbox } from 'primereact/checkbox';
+import { Calendar } from 'primereact/calendar';
 import { Task, ActionType, ScheduleType, TaskActionPayload } from '@/shared/types/task';
-import { v4 as uuidv4 } from 'uuid'; // предполагается, что uuid доступен в рендерере
-import { classNames } from '@/css/classnames';
 
 interface TaskFormProps {
   task?: Task;
-  onSave: (task: Task | Omit<Task, 'id'>) => void;  // <-- теперь допускается отсутствие id
+  onSave: (task: Task | Omit<Task, 'id'>) => void;
   onCancel: () => void;
 }
 
@@ -36,6 +35,22 @@ export const TaskForm: React.FC<TaskFormProps> = ({ task, onSave, onCancel }) =>
   const [actionType, setActionType] = useState<ActionType>(task?.action.type || 'reminder');
   const [payload, setPayload] = useState<TaskActionPayload>(task?.action.payload || {});
 
+  // Состояние для календаря
+  const [scheduleDate, setScheduleDate] = useState<Date | null>(
+    task?.schedule.type === 'once' && task.schedule.value
+      ? new Date(task.schedule.value)
+      : null
+  );
+
+  // Сброс даты при смене типа расписания
+  useEffect(() => {
+    if (scheduleType !== 'once') {
+      setScheduleDate(null);
+      setScheduleValue('');
+    }
+  }, [scheduleType]);
+
+  // Заполнение формы при редактировании
   useEffect(() => {
     if (task) {
       setName(task.name);
@@ -44,27 +59,37 @@ export const TaskForm: React.FC<TaskFormProps> = ({ task, onSave, onCancel }) =>
       setScheduleValue(task.schedule.value);
       setActionType(task.action.type);
       setPayload(task.action.payload);
+      if (task.schedule.type === 'once' && task.schedule.value) {
+        setScheduleDate(new Date(task.schedule.value));
+      }
     }
   }, [task]);
 
-const handleSubmit = (e: React.FormEvent) => {
-  e.preventDefault();
-  const now = new Date().toISOString();
-  const taskData = {
-    name,
-    enabled,
-    schedule: { type: scheduleType, value: scheduleValue },
-    action: { type: actionType, payload },
-    createdAt: task?.createdAt || now,
-    updatedAt: now,
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const now = new Date().toISOString();
+    const taskData = {
+      name,
+      enabled,
+      schedule: { type: scheduleType, value: scheduleValue },
+      action: { type: actionType, payload },
+      createdAt: task?.createdAt || now,
+      updatedAt: now,
+    };
+    onSave(task?.id ? { id: task.id, ...taskData } : taskData);
   };
-
-  // Если редактируем, добавляем id
-  onSave(task?.id ? { id: task.id, ...taskData } : taskData);
-};
 
   const updatePayload = (field: keyof TaskActionPayload, value: any) => {
     setPayload(prev => ({ ...prev, [field]: value }));
+  };
+
+  // Безопасный парсинг JSON для аргументов
+  const safeJsonParse = (jsonStr: string) => {
+    try {
+      return JSON.parse(jsonStr);
+    } catch {
+      return jsonStr;
+    }
   };
 
   const renderPayloadFields = () => {
@@ -102,15 +127,8 @@ const handleSubmit = (e: React.FormEvent) => {
             />
             <label className="block mt-2 mb-1">Аргументы (JSON)</label>
             <InputTextarea
-              value={payload.args ? JSON.stringify(payload.args) : ''}
-              onChange={e => {
-                try {
-                  const parsed = JSON.parse(e.target.value);
-                  updatePayload('args', parsed);
-                } catch {
-                  updatePayload('args', e.target.value);
-                }
-              }}
+              value={typeof payload.args === 'object' ? JSON.stringify(payload.args) : payload.args || ''}
+              onChange={e => updatePayload('args', safeJsonParse(e.target.value))}
               rows={3}
               className="w-full"
               placeholder='{"key": "value"}'
@@ -130,15 +148,8 @@ const handleSubmit = (e: React.FormEvent) => {
             />
             <label className="block mt-2 mb-1">Аргументы (JSON)</label>
             <InputTextarea
-              value={payload.args ? JSON.stringify(payload.args) : ''}
-              onChange={e => {
-                try {
-                  const parsed = JSON.parse(e.target.value);
-                  updatePayload('args', parsed);
-                } catch {
-                  updatePayload('args', e.target.value);
-                }
-              }}
+              value={typeof payload.args === 'object' ? JSON.stringify(payload.args) : payload.args || ''}
+              onChange={e => updatePayload('args', safeJsonParse(e.target.value))}
               rows={3}
               className="w-full"
             />
@@ -157,10 +168,8 @@ const handleSubmit = (e: React.FormEvent) => {
             />
             <label className="block mt-2 mb-1">Аргументы (через запятую)</label>
             <InputText
-              value={Array.isArray(payload.args) ? payload.args.join(', ') : ''}
-              onChange={e =>
-                updatePayload('args', e.target.value.split(',').map(s => s.trim()))
-              }
+              value={Array.isArray(payload.args) ? payload.args.join(', ') : payload.args || ''}
+              onChange={e => updatePayload('args', e.target.value.split(',').map(s => s.trim()))}
               className="w-full"
               placeholder="arg1, arg2"
             />
@@ -257,24 +266,39 @@ const handleSubmit = (e: React.FormEvent) => {
       </div>
 
       <div className="field">
-        <label htmlFor="scheduleValue">
-          {scheduleType === 'once' && 'ISO-дата'}
-          {scheduleType === 'interval' && 'Интервал (миллисекунды)'}
-          {scheduleType === 'cron' && 'Cron-выражение'}
+        <label htmlFor={scheduleType === 'once' ? 'scheduleDate' : 'scheduleValue'}>
+          {scheduleType === 'once'
+            ? 'Дата и время'
+            : scheduleType === 'interval'
+            ? 'Интервал (миллисекунды)'
+            : 'Cron-выражение'}
         </label>
-        <InputText
-          id="scheduleValue"
-          value={scheduleValue}
-          onChange={e => setScheduleValue(e.target.value)}
-          required
-          placeholder={
-            scheduleType === 'once'
-              ? '2026-05-21T15:30:00.000Z'
-              : scheduleType === 'interval'
-              ? '60000'
-              : '*/5 * * * *'
-          }
-        />
+        {scheduleType === 'once' ? (
+          <Calendar
+            id="scheduleDate"
+            value={scheduleDate}
+            onChange={(e) => {
+              const value = (e as { value: Date | null }).value;
+              setScheduleDate(value);
+              setScheduleValue(value ? value.toISOString() : '');
+            }}
+            showTime
+            hourFormat="24"
+            dateFormat="dd.mm.yy"
+            placeholder="Выберите дату и время"
+            className="w-full"
+          />
+        ) : (
+          <InputText
+            id="scheduleValue"
+            value={scheduleValue}
+            onChange={e => setScheduleValue(e.target.value)}
+            required
+            placeholder={
+              scheduleType === 'interval' ? '60000' : '*/5 * * * *'
+            }
+          />
+        )}
       </div>
 
       <div className="field">
