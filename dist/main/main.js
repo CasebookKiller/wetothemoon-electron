@@ -30,6 +30,7 @@ let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_
 _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js = __toESM(_home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js);
 let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_proto_loader_build_src_index_js = require("/home/ll/Документы/GitHub/wetothemoon-project/wetothemoon-electron/node_modules/@grpc/proto-loader/build/src/index.js");
 _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_proto_loader_build_src_index_js = __toESM(_home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_proto_loader_build_src_index_js);
+let events = require("events");
 let fs = require("fs");
 fs = __toESM(fs);
 let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_uuid_dist_node_index_js = require("/home/ll/Документы/GitHub/wetothemoon-project/wetothemoon-electron/node_modules/uuid/dist-node/index.js");
@@ -849,6 +850,41 @@ function getProtoPath(protoFileName) {
 	if (electron.app.isPackaged) return path.default.join(process.resourcesPath, "proto", protoFileName);
 	return path.default.join(__dirname, "../../proto", protoFileName);
 }
+var marketDataBus = class MarketDataBus extends events.EventEmitter {
+	static instance;
+	constructor() {
+		super();
+		this.setMaxListeners(50);
+	}
+	static getInstance() {
+		if (!MarketDataBus.instance) MarketDataBus.instance = new MarketDataBus();
+		return MarketDataBus.instance;
+	}
+	onCandle(handler) {
+		this.on("candle", handler);
+		return this;
+	}
+	onTrade(handler) {
+		this.on("trade", handler);
+		return this;
+	}
+	onOrderBook(handler) {
+		this.on("orderbook", handler);
+		return this;
+	}
+	onLastPrice(handler) {
+		this.on("lastPrice", handler);
+		return this;
+	}
+	offCandle(handler) {
+		this.off("candle", handler);
+		return this;
+	}
+	offTrade(handler) {
+		this.off("trade", handler);
+		return this;
+	}
+}.getInstance();
 //#endregion
 //#region src/main/streams/marketdata.ts
 var registerMarketdataStreamHandlers = () => {
@@ -908,7 +944,12 @@ var registerMarketdataStreamHandlers = () => {
 					if (depth === 0) {
 						const jsonStr = buffer.substring(begin, i + 1);
 						try {
-							JSON.parse(jsonStr);
+							const parsed = JSON.parse(jsonStr);
+							if (parsed.candle) marketDataBus.emit("candle", parsed.candle);
+							if (parsed.trade) marketDataBus.emit("trade", parsed.trade);
+							if (parsed.orderbook) marketDataBus.emit("orderbook", parsed.orderbook);
+							if (parsed.lastPrice) marketDataBus.emit("lastPrice", parsed.lastPrice);
+							if (parsed.openInterest) marketDataBus.emit("openInterest", parsed.openInterest);
 							const win = getBondsWindow();
 							if (win && !win.isDestroyed()) win.webContents.send("md-stream-data", jsonStr);
 							else console.warn("[Main] Bonds window not available");

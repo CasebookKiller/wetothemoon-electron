@@ -5,6 +5,7 @@ import * as protoLoader from '@grpc/proto-loader';
 import { ipcMain } from 'electron';
 import { getBondsWindow } from '../windows/bondsWindow';
 import { getProtoPath } from '../utils/protoPath';
+import { marketDataBus } from '../services/marketDataBus';
 
 export const registerMarketdataStreamHandlers = () => {
   // регистрируем обработчики API
@@ -97,8 +98,26 @@ export const registerMarketdataStreamHandlers = () => {
           if (depth === 0) {
             const jsonStr = buffer.substring(begin, i + 1);
             try {
-              // Проверяем, что jsonStr – валидный JSON
-              JSON.parse(jsonStr);
+              const parsed = JSON.parse(jsonStr);          // <-- парсим один раз
+              // 1. Отправляем в шину для всех подписчиков main-процесса
+              if (parsed.candle) {
+                marketDataBus.emit('candle', parsed.candle);
+              }
+              if (parsed.trade) {
+                marketDataBus.emit('trade', parsed.trade);
+              }
+              if (parsed.orderbook) {
+                marketDataBus.emit('orderbook', parsed.orderbook);
+              }
+              if (parsed.lastPrice) {
+                marketDataBus.emit('lastPrice', parsed.lastPrice);
+              }
+              if (parsed.openInterest) {
+                marketDataBus.emit('openInterest', parsed.openInterest);
+              }
+              // … при необходимости добавьте другие типы (tradingStatus, ping)
+
+              // 2. Отправляем в окно BondsWindow (как раньше)
               const win = getBondsWindow();
               if (win && !win.isDestroyed()) {
                 win.webContents.send('md-stream-data', jsonStr);
@@ -106,7 +125,6 @@ export const registerMarketdataStreamHandlers = () => {
                 console.warn('[Main] Bonds window not available');
               }
             } catch {
-              // Невалидный JSON – игнорируем
               console.warn('[Main] Skipped invalid JSON fragment:', jsonStr.slice(0, 100));
             }
           }
