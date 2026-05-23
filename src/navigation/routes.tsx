@@ -12,6 +12,7 @@ import { DashboardPage } from '@/pages/DashboardPage/DashboardPage';
 import { PromptGeneratorPage } from '@/pages/PromptGeneratorPage/PromptGeneratorPage';
 import { OllamaPage } from '@/pages/OllamaPage/OllamaPage';
 import { TasksPage } from '@/pages/TasksPage/TasksPage';
+import { TradingAssistantPage } from '@/pages/TradingAssistantPage/TradingAssistantPage';
 
 export interface Route {
   path: string;
@@ -32,7 +33,8 @@ const bonds: Route = { path: '/bonds', Component: IndexPage, title: 'Облиг�
 const dashboard: Route = { path: '/dashboard', Component: DashboardPage, title: 'ЦУП' };
 const pg: Route = { path: '/pg', Component: PromptGeneratorPage, title: 'Генератор запросов' };
 const ollama: Route = { path: '/ollama', Component: OllamaPage, title: 'Ollama' };
-const tasks: Route = { path: '/tasks', Component: TasksPage, title: 'План полёта' }
+const tasks: Route = { path: '/tasks', Component: TasksPage, title: 'План полёта' };
+const tradingAssistant: Route = { path: '/trading-assistant', Component: TradingAssistantPage, title: 'Трейдер' }
 
 export const routes: Route[] = [];
 
@@ -48,5 +50,6 @@ routes.push(
   bonds,
   pg,
   ollama,
-  tasks
+  tasks,
+  tradingAssistant
 );

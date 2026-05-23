@@ -71,6 +71,7 @@
     "electron-squirrel-startup": "^1.0.1",
     "highlight.js": "^11.11.1",
     "ignore": "^7.0.5",
+    "lightweight-charts": "^5.2.0",
     "node-cron": "^4.2.1",
     "ollama": "^0.6.3",
     "primeflex": "^4.0.0",

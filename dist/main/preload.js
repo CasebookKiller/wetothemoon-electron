@@ -143,7 +143,17 @@ try {
 			delete: (id) => electron.ipcRenderer.invoke("tasks:delete", id),
 			openWindow: () => electron.ipcRenderer.invoke("tasks:open-window"),
 			onCommand: (callback) => {}
-		}
+		},
+		getVolumeProfile: (instrumentUid) => electron.ipcRenderer.invoke("trading-assistant:get-profile", instrumentUid),
+		subscribeTradingAssistant: () => electron.ipcRenderer.send("trading-assistant:subscribe"),
+		onProfileUpdate: (callback) => {
+			electron.ipcRenderer.on("trading-assistant:profile-update", (_, data) => callback(data));
+		},
+		onTradingSignal: (callback) => {
+			electron.ipcRenderer.on("trading-assistant:signal", (_, data) => callback(data));
+		},
+		removeProfileUpdateListener: () => electron.ipcRenderer.removeAllListeners("trading-assistant:profile-update"),
+		removeTradingSignalListener: () => electron.ipcRenderer.removeAllListeners("trading-assistant:signal")
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {

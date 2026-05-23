@@ -240,6 +240,11 @@ export class VolumeProfileEngine extends EventEmitter {
   // Получить последний профиль (можно хранить в Map)
   private profileCache: Map<string, VolumeProfileLevels> = new Map();
 
+  /** Получить последний рассчитанный профиль для инструмента */
+  public getProfile(instrumentUid: string): VolumeProfileLevels | null {
+    return this.profileCache.get(instrumentUid) || null;
+  }
+
   private getLastProfile(uid: string): VolumeProfileLevels | undefined {
     return this.profileCache.get(uid);
   }
@@ -319,3 +324,5 @@ export class VolumeProfileEngine extends EventEmitter {
     // ... (копия onCandle, но вместо recalculateProfile вызываем recalculateProfileWithCache)
   }
 }
+// Экспортируем singleton (создаётся один экземпляр при импорте)
+export const volumeProfileEngine = new VolumeProfileEngine();

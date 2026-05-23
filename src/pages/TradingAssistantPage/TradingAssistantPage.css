@@ -1,0 +1,45 @@
+.trading-assistant {
+  padding: 20px;
+  font-family: Arial, sans-serif;
+}
+
+.instrument-selector {
+  margin-bottom: 15px;
+}
+
+.instrument-selector input {
+  width: 300px;
+  padding: 4px;
+}
+
+.chart-container {
+  width: 100%;
+  height: 400px;
+  margin-bottom: 20px;
+  border: 1px solid #ccc;
+}
+
+.profile-info {
+  background: #f9f9f9;
+  padding: 10px;
+  border-radius: 4px;
+  margin-bottom: 15px;
+}
+
+.signals-log {
+  max-height: 200px;
+  overflow-y: auto;
+  background: #f0f0f0;
+  padding: 10px;
+  border-radius: 4px;
+}
+
+.signals-log ul {
+  list-style: none;
+  padding-left: 0;
+}
+
+.signals-log li {
+  margin-bottom: 5px;
+  font-size: 14px;
+}

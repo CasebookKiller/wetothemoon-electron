@@ -187,6 +187,18 @@ try {
       openWindow: () => ipcRenderer.invoke('tasks:open-window'),
       onCommand: (callback: (cmd: string, args: any) => void) => { /* ... */ },
     },
+
+    // Методы для Trading Assistant
+    getVolumeProfile: (instrumentUid: string) => ipcRenderer.invoke('trading-assistant:get-profile', instrumentUid),
+    subscribeTradingAssistant: () => ipcRenderer.send('trading-assistant:subscribe'),
+    onProfileUpdate: (callback: (profile: any) => void) => {
+      ipcRenderer.on('trading-assistant:profile-update', (_, data) => callback(data));
+    },
+    onTradingSignal: (callback: (signal: any) => void) => {
+      ipcRenderer.on('trading-assistant:signal', (_, data) => callback(data));
+    },
+    removeProfileUpdateListener: () => ipcRenderer.removeAllListeners('trading-assistant:profile-update'),
+    removeTradingSignalListener: () => ipcRenderer.removeAllListeners('trading-assistant:signal'),
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

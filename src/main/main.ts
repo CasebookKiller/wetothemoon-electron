@@ -16,6 +16,8 @@ import { registerPGHandlers } from './ipcHandlers/pgHandlers.ts';
 import { registerMarketdataStreamHandlers } from './streams/marketdata.ts';
 import { registerOperationsStreamHandlers } from './streams/operations.ts';
 import { registerOrdersStreamHandlers } from './streams/orders.ts';
+import { createTradingAssistantWindow, getTradingAssistantWindow } from './windows/tradingAssistantWindow';
+import { registerTradingAssistantHandlers } from './ipcHandlers/tradingAssistantHandlers';
 
 import fs from 'fs';
 import path from 'path';
@@ -118,6 +120,18 @@ app.whenReady().then(() => {
         }
       };
     }
+
+    const openTrading = fileMenu.items.find(i => i.label === 'Открыть Трейдер');
+    if (openTrading) {
+      openTrading.click = () => {
+        const existing = getTradingAssistantWindow();
+        if (existing && !existing.isDestroyed()) existing.focus();
+        else {
+          const win = createTradingAssistantWindow();
+          if (win) applyMenuToWindow(win, mainMenuTemplate); // или специальный шаблон, если есть
+        }
+      };
+    }
   }
 
   mainWindow.setMenu(menu);
@@ -142,6 +156,8 @@ app.whenReady().then(() => {
 
   registerTasksHandlers();
   scheduler.start();
+
+  registerTasksHandlers();
 });
 
 // Завершать работу, когда закрыты все окна, за исключением macOS. Там это обычное дело
