@@ -38,6 +38,14 @@ import { registerGrpcHandlers } from './ipcHandlers/grpcHandlers.ts';
 import { registerTasksHandlers } from './ipcHandlers/tasksHandlers.ts';
 import { scheduler } from './services/scheduler';
 
+import { mkdirSync, existsSync } from 'fs';
+
+const scriptsDir = path.join(app.getPath('userData'), 'scripts');
+if (!existsSync(scriptsDir)) {
+  mkdirSync(scriptsDir, { recursive: true });
+  console.log('[Main] Создана папка для скриптов:', scriptsDir);
+}
+
 let currentStream: grpc.ClientReadableStream<any> | null = null;
 
 let ws: WebSocket | null = null;

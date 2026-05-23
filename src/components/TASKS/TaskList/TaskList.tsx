@@ -40,12 +40,12 @@ export const TaskList: React.FC<TaskListProps> = ({ tasks, onEdit, onDelete }) =
           <div className="flex gap-2">
             <Button
               icon="pi pi-pencil"
-              className="p-button-rounded p-button-text p-button-sm"
+              className="p-button-rounded p-button-text p-button-sm p-button-accent-outlined"
               onClick={() => onEdit(task)}
             />
             <Button
               icon="pi pi-trash"
-              className="p-button-rounded p-button-text p-button-danger p-button-sm"
+              className="p-button-rounded p-button-text p-button-danger p-button-sm p-button-accent-outlined"
               onClick={() => onDelete(task.id)}
             />
           </div>

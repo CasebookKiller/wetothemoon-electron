@@ -606,6 +606,26 @@ var bondsWindowMenuTemplate = [
 		role: "windowMenu"
 	}
 ];
+var tasksWindowMenuTemplate = [{
+	label: "Файл",
+	submenu: [{
+		label: "Закрыть окно",
+		role: "close"
+	}]
+}, {
+	label: "Вид",
+	submenu: [{
+		label: "Обновить",
+		accelerator: "CmdOrCtrl+R",
+		click: (item, focusedWindow) => {
+			const windows = electron.BrowserWindow.getAllWindows();
+			if (windows.length > 0) {
+				windows[0].webContents.send("task:react-command", "refresh", {});
+				console.log("[tasksWindowMenuTemplate] Обновить");
+			}
+		}
+	}]
+}];
 //#endregion
 //#region src/main/windows/bondsWindow.ts
 var bondsWindow$1 = null;
@@ -1837,6 +1857,8 @@ var createTasksWindow = () => {
 			nodeIntegration: false
 		}
 	});
+	const menu = electron.Menu.buildFromTemplate(tasksWindowMenuTemplate);
+	tasksWindow.setMenu(menu);
 	if (process.env.NODE_ENV === "development") tasksWindow.loadURL(`${DEV_SERVER_URL}/#/tasks`);
 	else tasksWindow.loadFile(getMainWindowProdPath(), { hash: "/tasks" });
 	tasksWindow.on("closed", () => {
@@ -1953,7 +1975,39 @@ var Scheduler = class {
 					else console.warn(`[Scheduler] Не указано имя функции для задачи ${task.id}`);
 					break;
 				}
-				case "script": break;
+				case "script": {
+					const scriptPath = task.action.payload.path;
+					if (!scriptPath) {
+						console.warn("[Scheduler] Не указан путь к скрипту");
+						return;
+					}
+					const allowedDir = path.default.join(electron.app.getPath("userData"), "scripts");
+					const resolvedPath = path.default.resolve(scriptPath);
+					if (!resolvedPath.startsWith(allowedDir)) {
+						console.warn(`[Scheduler] Попытка запуска скрипта вне разрешённой папки: ${resolvedPath}`);
+						return;
+					}
+					const args = Array.isArray(task.action.payload.args) ? task.action.payload.args : [];
+					console.log(`[Scheduler] Запуск скрипта: ${resolvedPath} с аргументами:`, args);
+					const child = (0, child_process.spawn)(resolvedPath, args, {
+						shell: true,
+						cwd: path.default.dirname(resolvedPath),
+						env: { ...process.env }
+					});
+					child.stdout?.on("data", (data) => {
+						console.log(`[Script stdout] ${data}`);
+					});
+					child.stderr?.on("data", (data) => {
+						console.error(`[Script stderr] ${data}`);
+					});
+					child.on("close", (code) => {
+						console.log(`[Scheduler] Скрипт завершился с кодом ${code}`);
+					});
+					child.on("error", (err) => {
+						console.error(`[Scheduler] Ошибка запуска скрипта: ${err.message}`);
+					});
+					break;
+				}
 				default: console.warn(`[Scheduler] Неизвестный тип действия: ${task.action.type}`);
 			}
 		} catch (e) {
@@ -2034,6 +2088,11 @@ function registerTasksHandlers() {
 }
 //#endregion
 //#region src/main/main.ts
+var scriptsDir = path.default.join(electron.app.getPath("userData"), "scripts");
+if (!(0, fs.existsSync)(scriptsDir)) {
+	(0, fs.mkdirSync)(scriptsDir, { recursive: true });
+	console.log("[Main] Создана папка для скриптов:", scriptsDir);
+}
 electron.app.whenReady().then(() => {
 	electron.session.defaultSession.setCertificateVerifyProc((request, callback) => {
 		callback(0);

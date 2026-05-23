@@ -6,6 +6,7 @@ import { Dropdown } from 'primereact/dropdown';
 import { Checkbox } from 'primereact/checkbox';
 import { Calendar } from 'primereact/calendar';
 import { Task, ActionType, ScheduleType, TaskActionPayload } from '@/shared/types/task';
+import { CronBuilder } from '../CronBuilder/CronBuilder';
 
 interface TaskFormProps {
   task?: Task;
@@ -173,6 +174,9 @@ export const TaskForm: React.FC<TaskFormProps> = ({ task, onSave, onCancel }) =>
               className="w-full"
               placeholder="arg1, arg2"
             />
+            <small className="text-color-secondary">
+              Скрипт должен находиться в папке скриптов приложения.
+            </small>
           </>
         );
 
@@ -287,6 +291,11 @@ export const TaskForm: React.FC<TaskFormProps> = ({ task, onSave, onCancel }) =>
             dateFormat="dd.mm.yy"
             placeholder="Выберите дату и время"
             className="w-full"
+          />
+        ) : scheduleType === 'cron' ? (
+          <CronBuilder
+            value={scheduleValue}
+            onChange={(cron) => setScheduleValue(cron)}
           />
         ) : (
           <InputText

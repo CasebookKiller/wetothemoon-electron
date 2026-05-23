@@ -1,6 +1,7 @@
 import path from 'path';
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, Menu } from 'electron';
 import { DEV_SERVER_URL, getMainWindowProdPath } from './paths';
+import { tasksWindowMenuTemplate } from '../menus/windowMenus';
 
 let tasksWindow: BrowserWindow | null = null;
 
@@ -26,6 +27,9 @@ export const createTasksWindow = () => {
       nodeIntegration: false,
     },
   });
+
+  const menu = Menu.buildFromTemplate(tasksWindowMenuTemplate);
+  tasksWindow.setMenu(menu);
 
   // Загружаем тот же index.html, но с нужным хешем
   if (process.env.NODE_ENV === 'development') {

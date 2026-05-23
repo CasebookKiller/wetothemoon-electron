@@ -4,6 +4,9 @@ import { taskStore } from './taskStore';
 import { Task } from '@/shared/types/task';
 import { Notification } from 'electron';
 import * as cron from 'node-cron';
+import { spawn } from 'child_process';
+import { app } from 'electron';
+import path from 'path';
 
 class Scheduler {
   private timer?: NodeJS.Timeout;
@@ -145,9 +148,53 @@ class Scheduler {
           }
           break;
         }
-        case 'script':
-          // запуск дочернего процесса (будет реализовано позже)
+        case 'script': {
+          const scriptPath = task.action.payload.path;
+          if (!scriptPath) {
+            console.warn('[Scheduler] Не указан путь к скрипту');
+            return;
+          }
+
+          // Определяем разрешённую папку для скриптов (можно вынести в конфиг)
+          const allowedDir = path.join(app.getPath('userData'), 'scripts');
+          
+          // Проверяем, что скрипт находится внутри разрешённой папки
+          const resolvedPath = path.resolve(scriptPath);
+          if (!resolvedPath.startsWith(allowedDir)) {
+            console.warn(`[Scheduler] Попытка запуска скрипта вне разрешённой папки: ${resolvedPath}`);
+            return;
+          }
+
+          const args = Array.isArray(task.action.payload.args) 
+            ? task.action.payload.args 
+            : [];
+
+          console.log(`[Scheduler] Запуск скрипта: ${resolvedPath} с аргументами:`, args);
+
+          const child = spawn(resolvedPath, args, {
+            shell: true,            // для .bat/.cmd на Windows, можно убрать при необходимости
+            cwd: path.dirname(resolvedPath),
+            env: { ...process.env } // передаём текущее окружение
+          });
+
+          child.stdout?.on('data', (data) => {
+            console.log(`[Script stdout] ${data}`);
+          });
+
+          child.stderr?.on('data', (data) => {
+            console.error(`[Script stderr] ${data}`);
+          });
+
+          child.on('close', (code) => {
+            console.log(`[Scheduler] Скрипт завершился с кодом ${code}`);
+          });
+
+          child.on('error', (err) => {
+            console.error(`[Scheduler] Ошибка запуска скрипта: ${err.message}`);
+          });
+          
           break;
+        }
         default:
           console.warn(`[Scheduler] Неизвестный тип действия: ${task.action.type}`);
       }

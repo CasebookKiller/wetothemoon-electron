@@ -126,7 +126,7 @@ export const TasksPage: React.FC = () => {
               <Button
                 icon="pi pi-plus"
                 label="Новая задача"
-                className="p-button-outlined p-button-sm"
+                className="p-button-outlined p-button-sm p-button-accent"
                 onClick={handleCreateNew}
               />
             </div>

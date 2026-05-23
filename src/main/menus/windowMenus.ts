@@ -228,3 +228,25 @@ export const bondsWindowMenuTemplate: MenuItemConstructorOptions[] = [
     role: 'windowMenu'
   }
 ];
+
+export const tasksWindowMenuTemplate: MenuItemConstructorOptions[] = [
+  {
+    label: 'Файл',
+    submenu: [
+      { label: 'Закрыть окно', role: 'close' }
+    ]
+  },
+  {
+    label: 'Вид',
+    submenu: [
+      { label: 'Обновить', accelerator: 'CmdOrCtrl+R', click: (item, focusedWindow) => {
+        // Отправляем IPC‑сообщение для предпросмотра Markdown
+        const windows = BrowserWindow.getAllWindows();
+        if (windows.length > 0) {
+          windows[0].webContents.send('task:react-command', 'refresh', {});
+          console.log('[tasksWindowMenuTemplate] Обновить');
+        }
+      }}
+    ]
+  }
+];
