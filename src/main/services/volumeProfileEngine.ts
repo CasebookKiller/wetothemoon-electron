@@ -99,7 +99,7 @@ export class VolumeProfileEngine extends EventEmitter {
 
     // Проверяем, закрылась ли свеча (упрощённо: считаем, что каждая свеча — это окончание периода)
     // В реальном стриме свечи приходят уже готовыми (по closed), поэтому сразу пересчитываем профиль
-    this.recalculateProfile(uid, time);
+    this.recalculateProfileWithCache(uid, time);
 
     // Генерация сигналов на основе последней цены и новых уровней
     this.generateSignals(uid, close, time);
