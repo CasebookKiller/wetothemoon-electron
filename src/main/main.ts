@@ -40,6 +40,8 @@ import { scheduler } from './services/scheduler';
 
 import { mkdirSync, existsSync } from 'fs';
 
+import { VolumeProfileEngine } from './services/volumeProfileEngine';
+
 const scriptsDir = path.join(app.getPath('userData'), 'scripts');
 if (!existsSync(scriptsDir)) {
   mkdirSync(scriptsDir, { recursive: true });
@@ -642,3 +644,20 @@ function applyMenuToWindow(win: BrowserWindow, template: MenuItemConstructorOpti
   win.setMenu(menu);
 }
 
+// --- Тестовый блок: проверка VolumeProfileEngine ---
+const engine = new VolumeProfileEngine();
+
+engine.on('profileUpdate', (profile) => {
+  console.log('[VolumeProfile] Обновлён профиль:');
+  console.log(`  Инструмент: ${profile.instrumentUid}`);
+  console.log(`  POC: ${profile.poc}`);
+  console.log(`  Value Area: ${profile.valueAreaLow} – ${profile.valueAreaHigh}`);
+  console.log(`  HVN: ${profile.hvn.join(', ')}`);
+  console.log(`  LVN: ${profile.lvn.join(', ')}`);
+  console.log(`  Суммарный объём: ${profile.totalVolume}`);
+});
+
+engine.on('signal', (signal) => {
+  console.log(`[VolumeProfile] Сигнал: ${signal.message}`);
+});
+// --- конец тестового блока ---

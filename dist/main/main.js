@@ -2128,6 +2128,197 @@ function registerTasksHandlers() {
 	});
 }
 //#endregion
+//#region src/main/services/volumeProfileEngine.ts
+function quotationToNumber(q) {
+	if (!q) return 0;
+	return Number(q.units || "0") + (q.nano || 0) / 1e9;
+}
+var DEFAULT_CONFIG = {
+	valueAreaPercent: 70,
+	hvnMultiplier: 1.5,
+	lvnMultiplier: .5,
+	minVolumeThreshold: 100
+};
+var VolumeProfileEngine = class extends events.EventEmitter {
+	config;
+	volumeByPrice = /* @__PURE__ */ new Map();
+	lastPrice = /* @__PURE__ */ new Map();
+	lastCandleTime = /* @__PURE__ */ new Map();
+	constructor(config = {}) {
+		super();
+		this.config = {
+			...DEFAULT_CONFIG,
+			...config
+		};
+		marketDataBus.onCandle(this.onCandle.bind(this));
+		marketDataBus.onTrade(this.onTrade.bind(this));
+	}
+	onCandle(candle) {
+		const uid = candle.instrumentUid || candle.figi;
+		if (!uid) return;
+		const volume = Number(candle.volume || "0");
+		if (volume <= this.config.minVolumeThreshold) return;
+		const high = quotationToNumber(candle.high);
+		const low = quotationToNumber(candle.low);
+		const close = quotationToNumber(candle.close);
+		const time = candle.time || (/* @__PURE__ */ new Date()).toISOString();
+		this.lastPrice.set(uid, close);
+		const priceRange = high - low;
+		if (priceRange <= 0) this.addVolume(uid, close, volume);
+		else {
+			const levels = Math.round(priceRange);
+			if (levels === 0) this.addVolume(uid, close, volume);
+			else {
+				const volumePerLevel = volume / levels;
+				for (let price = low; price <= high; price++) this.addVolume(uid, price, volumePerLevel);
+			}
+		}
+		this.recalculateProfile(uid, time);
+		this.generateSignals(uid, close, time);
+	}
+	onTrade(trade) {
+		const uid = trade.instrumentUid || trade.figi;
+		if (!uid) return;
+		const price = quotationToNumber(trade.price);
+		this.lastPrice.set(uid, price);
+	}
+	addVolume(uid, price, volume) {
+		if (!this.volumeByPrice.has(uid)) this.volumeByPrice.set(uid, /* @__PURE__ */ new Map());
+		const priceMap = this.volumeByPrice.get(uid);
+		const roundedPrice = Math.round(price * 100) / 100;
+		priceMap.set(roundedPrice, (priceMap.get(roundedPrice) || 0) + volume);
+	}
+	recalculateProfile(uid, timestamp) {
+		const priceMap = this.volumeByPrice.get(uid);
+		if (!priceMap || priceMap.size === 0) return;
+		const sortedEntries = Array.from(priceMap.entries()).sort((a, b) => a[0] - b[0]);
+		const totalVolume = sortedEntries.reduce((sum, [, vol]) => sum + vol, 0);
+		if (totalVolume === 0) return;
+		let poc = sortedEntries[0][0];
+		let maxVol = sortedEntries[0][1];
+		for (const [price, vol] of sortedEntries) if (vol > maxVol) {
+			maxVol = vol;
+			poc = price;
+		}
+		const targetVolume = this.config.valueAreaPercent / 100 * totalVolume;
+		let accumulated = 0;
+		let vaHigh = poc;
+		let vaLow = poc;
+		let pocIndex = sortedEntries.findIndex(([p]) => p === poc);
+		if (pocIndex === -1) pocIndex = 0;
+		let left = pocIndex;
+		let right = pocIndex;
+		accumulated += sortedEntries[pocIndex][1];
+		while (accumulated < targetVolume && (left > 0 || right < sortedEntries.length - 1)) if ((left > 0 ? sortedEntries[left - 1][1] : 0) >= (right < sortedEntries.length - 1 ? sortedEntries[right + 1][1] : 0) && left > 0) {
+			left--;
+			accumulated += sortedEntries[left][1];
+			vaLow = sortedEntries[left][0];
+		} else if (right < sortedEntries.length - 1) {
+			right++;
+			accumulated += sortedEntries[right][1];
+			vaHigh = sortedEntries[right][0];
+		} else if (left > 0) {
+			left--;
+			accumulated += sortedEntries[left][1];
+			vaLow = sortedEntries[left][0];
+		} else break;
+		const avgVolume = totalVolume / sortedEntries.length;
+		const hvn = [];
+		const lvn = [];
+		for (const [price, vol] of sortedEntries) if (vol > avgVolume * this.config.hvnMultiplier) hvn.push(price);
+		else if (vol < avgVolume * this.config.lvnMultiplier && vol > 0) lvn.push(price);
+		const levels = {
+			instrumentUid: uid,
+			timestamp,
+			poc,
+			valueAreaHigh: vaHigh,
+			valueAreaLow: vaLow,
+			hvn,
+			lvn,
+			totalVolume
+		};
+		this.emit("profileUpdate", levels);
+	}
+	generateSignals(uid, currentPrice, time) {
+		if (!this.volumeByPrice.get(uid)) return;
+		const profile = this.getLastProfile(uid);
+		if (!profile) return;
+		const { poc, valueAreaHigh, valueAreaLow, hvn, lvn } = profile;
+		if (currentPrice > poc) this.emitSignal(uid, time, "POC_BREAKOUT_UP", currentPrice, poc, `Цена ${currentPrice} пробила POC ${poc} вверх`);
+		else if (currentPrice < poc) this.emitSignal(uid, time, "POC_BREAKOUT_DOWN", currentPrice, poc, `Цена ${currentPrice} пробила POC ${poc} вниз`);
+		if (currentPrice > valueAreaLow && currentPrice < valueAreaHigh) {}
+	}
+	emitSignal(uid, time, type, price, level, message) {
+		const signal = {
+			instrumentUid: uid,
+			time,
+			type,
+			price,
+			level,
+			message
+		};
+		this.emit("signal", signal);
+	}
+	profileCache = /* @__PURE__ */ new Map();
+	getLastProfile(uid) {
+		return this.profileCache.get(uid);
+	}
+	cacheProfile(profile) {
+		this.profileCache.set(profile.instrumentUid, profile);
+	}
+	recalculateProfileWithCache(uid, timestamp) {
+		const priceMap = this.volumeByPrice.get(uid);
+		if (!priceMap || priceMap.size === 0) return;
+		const sortedEntries = Array.from(priceMap.entries()).sort((a, b) => a[0] - b[0]);
+		const totalVolume = sortedEntries.reduce((sum, [, vol]) => sum + vol, 0);
+		if (totalVolume === 0) return;
+		let poc = sortedEntries[0][0];
+		let maxVol = sortedEntries[0][1];
+		for (const [price, vol] of sortedEntries) if (vol > maxVol) {
+			maxVol = vol;
+			poc = price;
+		}
+		const targetVolume = this.config.valueAreaPercent / 100 * totalVolume;
+		let accumulated = 0;
+		let vaHigh = poc;
+		let vaLow = poc;
+		let pocIndex = sortedEntries.findIndex(([p]) => p === poc);
+		if (pocIndex === -1) pocIndex = 0;
+		let left = pocIndex;
+		let right = pocIndex;
+		accumulated += sortedEntries[pocIndex][1];
+		while (accumulated < targetVolume && (left > 0 || right < sortedEntries.length - 1)) if ((left > 0 ? sortedEntries[left - 1][1] : 0) >= (right < sortedEntries.length - 1 ? sortedEntries[right + 1][1] : 0) && left > 0) {
+			left--;
+			accumulated += sortedEntries[left][1];
+			vaLow = sortedEntries[left][0];
+		} else if (right < sortedEntries.length - 1) {
+			right++;
+			accumulated += sortedEntries[right][1];
+			vaHigh = sortedEntries[right][0];
+		} else if (left > 0) {
+			left--;
+			accumulated += sortedEntries[left][1];
+			vaLow = sortedEntries[left][0];
+		} else break;
+		const avgVolume = totalVolume / sortedEntries.length;
+		const hvn = sortedEntries.filter(([, vol]) => vol > avgVolume * this.config.hvnMultiplier).map(([p]) => p);
+		const lvn = sortedEntries.filter(([, vol]) => vol < avgVolume * this.config.lvnMultiplier && vol > 0).map(([p]) => p);
+		const profile = {
+			instrumentUid: uid,
+			timestamp,
+			poc,
+			valueAreaHigh: vaHigh,
+			valueAreaLow: vaLow,
+			hvn,
+			lvn,
+			totalVolume
+		};
+		this.cacheProfile(profile);
+		this.emit("profileUpdate", profile);
+	}
+	onCandleWithCache(candle) {}
+};
+//#endregion
 //#region src/main/main.ts
 var scriptsDir = path.default.join(electron.app.getPath("userData"), "scripts");
 if (!(0, fs.existsSync)(scriptsDir)) {
@@ -2653,6 +2844,19 @@ function applyMenuToWindow(win, template) {
 	const menu = electron.Menu.buildFromTemplate(template);
 	win.setMenu(menu);
 }
+var engine = new VolumeProfileEngine();
+engine.on("profileUpdate", (profile) => {
+	console.log("[VolumeProfile] Обновлён профиль:");
+	console.log(`  Инструмент: ${profile.instrumentUid}`);
+	console.log(`  POC: ${profile.poc}`);
+	console.log(`  Value Area: ${profile.valueAreaLow} – ${profile.valueAreaHigh}`);
+	console.log(`  HVN: ${profile.hvn.join(", ")}`);
+	console.log(`  LVN: ${profile.lvn.join(", ")}`);
+	console.log(`  Суммарный объём: ${profile.totalVolume}`);
+});
+engine.on("signal", (signal) => {
+	console.log(`[VolumeProfile] Сигнал: ${signal.message}`);
+});
 //#endregion
 
 //# sourceMappingURL=main.js.map
