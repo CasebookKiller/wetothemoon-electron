@@ -38,7 +38,7 @@ let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_
 _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_node_cron_dist_esm_node_cron_js = __toESM(_home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_node_cron_dist_esm_node_cron_js);
 //#region src/main/windows/mainWindow.ts
 var mainWindow = null;
-var preloadPath$6 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var preloadPath$7 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var MAIN_WINDOW_VITE_DEV_SERVER_URL = "http://localhost:5173";
 path.default.join(__dirname, "../../renderer/main-window/index.html");
 var createMainWindow = () => {
@@ -47,7 +47,7 @@ var createMainWindow = () => {
 		height: 768,
 		title: "Мы на Луну!",
 		webPreferences: {
-			preload: preloadPath$6,
+			preload: preloadPath$7,
 			contextIsolation: true,
 			nodeIntegration: false
 		}
@@ -67,7 +67,7 @@ function getMainWindowProdPath() {
 //#endregion
 //#region src/main/windows/aiWindow.ts
 var aiWindow = null;
-var preloadPath$5 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var preloadPath$6 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var createAIWindow = () => {
 	console.log("createAIWindow called");
 	aiWindow = new electron.BrowserWindow({
@@ -75,7 +75,7 @@ var createAIWindow = () => {
 		height: 600,
 		title: "Нейро",
 		webPreferences: {
-			preload: preloadPath$5,
+			preload: preloadPath$6,
 			contextIsolation: true,
 			nodeIntegration: false
 		}
@@ -237,6 +237,10 @@ var mainMenuTemplate = [
 			{
 				label: "Открыть Генератор запросов",
 				id: "open-pg"
+			},
+			{
+				label: "Открыть Трейдер",
+				id: "open-trading"
 			},
 			{ type: "separator" },
 			{
@@ -627,17 +631,34 @@ var tasksWindowMenuTemplate = [{
 		}
 	}]
 }];
+var tradingAssistantWindowMenuTemplate = [{
+	label: "Файл",
+	submenu: [{ role: "close" }]
+}, {
+	label: "Вид",
+	submenu: [
+		{ role: "reload" },
+		{ role: "forceReload" },
+		{ role: "toggleDevTools" },
+		{ type: "separator" },
+		{ role: "resetZoom" },
+		{ role: "zoomIn" },
+		{ role: "zoomOut" },
+		{ type: "separator" },
+		{ role: "togglefullscreen" }
+	]
+}];
 //#endregion
 //#region src/main/windows/bondsWindow.ts
 var bondsWindow$1 = null;
-var preloadPath$4 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var preloadPath$5 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var createBondsWindow = () => {
 	bondsWindow$1 = new electron.BrowserWindow({
 		width: 1024,
 		height: 768,
 		title: "Облигации",
 		webPreferences: {
-			preload: preloadPath$4,
+			preload: preloadPath$5,
 			contextIsolation: true,
 			nodeIntegration: false
 		}
@@ -655,14 +676,14 @@ var getBondsWindow = () => bondsWindow$1;
 //#endregion
 //#region src/main/windows/mdWindow.ts
 var mdWindow$1 = null;
-var preloadPath$3 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var preloadPath$4 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var createMDWindow = () => {
 	mdWindow$1 = new electron.BrowserWindow({
 		width: 800,
 		height: 600,
 		title: "Markdown",
 		webPreferences: {
-			preload: preloadPath$3,
+			preload: preloadPath$4,
 			contextIsolation: true,
 			nodeIntegration: false
 		}
@@ -678,14 +699,14 @@ var getMDWindow = () => mdWindow$1;
 //#endregion
 //#region src/main/windows/pgWindow.ts
 var pgWindow$1 = null;
-var preloadPath$2 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var preloadPath$3 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var createPGWindow = () => {
 	pgWindow$1 = new electron.BrowserWindow({
 		width: 800,
 		height: 600,
 		title: "Генератор запросов",
 		webPreferences: {
-			preload: preloadPath$2,
+			preload: preloadPath$3,
 			contextIsolation: true,
 			nodeIntegration: false
 		}
@@ -701,7 +722,7 @@ var getPGWindow = () => pgWindow$1;
 //#endregion
 //#region src/main/windows/ollamaWindow.ts
 var ollamaWindow$1 = null;
-var preloadPath$1 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var preloadPath$2 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var createOllamaWindow = () => {
 	if (ollamaWindow$1) {
 		ollamaWindow$1.focus();
@@ -712,7 +733,7 @@ var createOllamaWindow = () => {
 		height: 600,
 		title: "Клиент Ollama ",
 		webPreferences: {
-			preload: preloadPath$1,
+			preload: preloadPath$2,
 			contextIsolation: true,
 			nodeIntegration: false
 		}
@@ -1149,6 +1170,256 @@ var registerOrdersStreamHandlers = () => {
 			ordersStreams[key] = null;
 		}
 	});
+};
+//#endregion
+//#region src/main/windows/tradingAssistantWindow.ts
+var tradingAssistantWindow = null;
+var preloadPath$1 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var createTradingAssistantWindow = () => {
+	if (tradingAssistantWindow && !tradingAssistantWindow.isDestroyed()) {
+		tradingAssistantWindow.focus();
+		return tradingAssistantWindow;
+	}
+	tradingAssistantWindow = new electron.BrowserWindow({
+		width: 1200,
+		height: 800,
+		title: "Trading Assistant – Volume Profile",
+		webPreferences: {
+			preload: preloadPath$1,
+			contextIsolation: true,
+			nodeIntegration: false
+		}
+	});
+	if (process.env.NODE_ENV === "development") tradingAssistantWindow.loadURL(`${DEV_SERVER_URL}/#/trading-assistant`);
+	else tradingAssistantWindow.loadFile(getMainWindowProdPath());
+	const menu = electron.Menu.buildFromTemplate(tradingAssistantWindowMenuTemplate);
+	tradingAssistantWindow.setMenu(menu);
+	tradingAssistantWindow.on("closed", () => {
+		tradingAssistantWindow = null;
+	});
+	return tradingAssistantWindow;
+};
+var getTradingAssistantWindow = () => tradingAssistantWindow;
+//#endregion
+//#region src/main/services/volumeProfileEngine.ts
+function quotationToNumber(q) {
+	if (!q) return 0;
+	return Number(q.units || "0") + (q.nano || 0) / 1e9;
+}
+var DEFAULT_CONFIG = {
+	valueAreaPercent: 70,
+	hvnMultiplier: 1.5,
+	lvnMultiplier: .5,
+	minVolumeThreshold: 100
+};
+var VolumeProfileEngine = class extends events.EventEmitter {
+	config;
+	volumeByPrice = /* @__PURE__ */ new Map();
+	lastPrice = /* @__PURE__ */ new Map();
+	lastCandleTime = /* @__PURE__ */ new Map();
+	constructor(config = {}) {
+		super();
+		this.config = {
+			...DEFAULT_CONFIG,
+			...config
+		};
+		marketDataBus.onCandle(this.onCandle.bind(this));
+		marketDataBus.onTrade(this.onTrade.bind(this));
+	}
+	onCandle(candle) {
+		const uid = candle.instrumentUid || candle.figi;
+		if (!uid) return;
+		const volume = Number(candle.volume || "0");
+		if (volume <= this.config.minVolumeThreshold) return;
+		const high = quotationToNumber(candle.high);
+		const low = quotationToNumber(candle.low);
+		const close = quotationToNumber(candle.close);
+		const time = candle.time || (/* @__PURE__ */ new Date()).toISOString();
+		this.lastPrice.set(uid, close);
+		const priceRange = high - low;
+		if (priceRange <= 0) this.addVolume(uid, close, volume);
+		else {
+			const levels = Math.round(priceRange);
+			if (levels === 0) this.addVolume(uid, close, volume);
+			else {
+				const volumePerLevel = volume / levels;
+				for (let price = low; price <= high; price++) this.addVolume(uid, price, volumePerLevel);
+			}
+		}
+		this.recalculateProfileWithCache(uid, time);
+		this.generateSignals(uid, close, time);
+	}
+	onTrade(trade) {
+		const uid = trade.instrumentUid || trade.figi;
+		if (!uid) return;
+		const price = quotationToNumber(trade.price);
+		this.lastPrice.set(uid, price);
+	}
+	addVolume(uid, price, volume) {
+		if (!this.volumeByPrice.has(uid)) this.volumeByPrice.set(uid, /* @__PURE__ */ new Map());
+		const priceMap = this.volumeByPrice.get(uid);
+		const roundedPrice = Math.round(price * 100) / 100;
+		priceMap.set(roundedPrice, (priceMap.get(roundedPrice) || 0) + volume);
+	}
+	recalculateProfile(uid, timestamp) {
+		const priceMap = this.volumeByPrice.get(uid);
+		if (!priceMap || priceMap.size === 0) return;
+		const sortedEntries = Array.from(priceMap.entries()).sort((a, b) => a[0] - b[0]);
+		const totalVolume = sortedEntries.reduce((sum, [, vol]) => sum + vol, 0);
+		if (totalVolume === 0) return;
+		let poc = sortedEntries[0][0];
+		let maxVol = sortedEntries[0][1];
+		for (const [price, vol] of sortedEntries) if (vol > maxVol) {
+			maxVol = vol;
+			poc = price;
+		}
+		const targetVolume = this.config.valueAreaPercent / 100 * totalVolume;
+		let accumulated = 0;
+		let vaHigh = poc;
+		let vaLow = poc;
+		let pocIndex = sortedEntries.findIndex(([p]) => p === poc);
+		if (pocIndex === -1) pocIndex = 0;
+		let left = pocIndex;
+		let right = pocIndex;
+		accumulated += sortedEntries[pocIndex][1];
+		while (accumulated < targetVolume && (left > 0 || right < sortedEntries.length - 1)) if ((left > 0 ? sortedEntries[left - 1][1] : 0) >= (right < sortedEntries.length - 1 ? sortedEntries[right + 1][1] : 0) && left > 0) {
+			left--;
+			accumulated += sortedEntries[left][1];
+			vaLow = sortedEntries[left][0];
+		} else if (right < sortedEntries.length - 1) {
+			right++;
+			accumulated += sortedEntries[right][1];
+			vaHigh = sortedEntries[right][0];
+		} else if (left > 0) {
+			left--;
+			accumulated += sortedEntries[left][1];
+			vaLow = sortedEntries[left][0];
+		} else break;
+		const avgVolume = totalVolume / sortedEntries.length;
+		const hvn = [];
+		const lvn = [];
+		for (const [price, vol] of sortedEntries) if (vol > avgVolume * this.config.hvnMultiplier) hvn.push(price);
+		else if (vol < avgVolume * this.config.lvnMultiplier && vol > 0) lvn.push(price);
+		const levels = {
+			instrumentUid: uid,
+			timestamp,
+			poc,
+			valueAreaHigh: vaHigh,
+			valueAreaLow: vaLow,
+			hvn,
+			lvn,
+			totalVolume
+		};
+		this.emit("profileUpdate", levels);
+	}
+	generateSignals(uid, currentPrice, time) {
+		if (!this.volumeByPrice.get(uid)) return;
+		const profile = this.getLastProfile(uid);
+		if (!profile) return;
+		const { poc, valueAreaHigh, valueAreaLow, hvn, lvn } = profile;
+		if (currentPrice > poc) this.emitSignal(uid, time, "POC_BREAKOUT_UP", currentPrice, poc, `Цена ${currentPrice} пробила POC ${poc} вверх`);
+		else if (currentPrice < poc) this.emitSignal(uid, time, "POC_BREAKOUT_DOWN", currentPrice, poc, `Цена ${currentPrice} пробила POC ${poc} вниз`);
+		if (currentPrice > valueAreaLow && currentPrice < valueAreaHigh) {}
+	}
+	emitSignal(uid, time, type, price, level, message) {
+		const signal = {
+			instrumentUid: uid,
+			time,
+			type,
+			price,
+			level,
+			message
+		};
+		this.emit("signal", signal);
+	}
+	profileCache = /* @__PURE__ */ new Map();
+	/** Получить последний рассчитанный профиль для инструмента */
+	getProfile(instrumentUid) {
+		return this.profileCache.get(instrumentUid) || null;
+	}
+	getLastProfile(uid) {
+		return this.profileCache.get(uid);
+	}
+	cacheProfile(profile) {
+		this.profileCache.set(profile.instrumentUid, profile);
+	}
+	recalculateProfileWithCache(uid, timestamp) {
+		const priceMap = this.volumeByPrice.get(uid);
+		if (!priceMap || priceMap.size === 0) return;
+		const sortedEntries = Array.from(priceMap.entries()).sort((a, b) => a[0] - b[0]);
+		const totalVolume = sortedEntries.reduce((sum, [, vol]) => sum + vol, 0);
+		if (totalVolume === 0) return;
+		let poc = sortedEntries[0][0];
+		let maxVol = sortedEntries[0][1];
+		for (const [price, vol] of sortedEntries) if (vol > maxVol) {
+			maxVol = vol;
+			poc = price;
+		}
+		const targetVolume = this.config.valueAreaPercent / 100 * totalVolume;
+		let accumulated = 0;
+		let vaHigh = poc;
+		let vaLow = poc;
+		let pocIndex = sortedEntries.findIndex(([p]) => p === poc);
+		if (pocIndex === -1) pocIndex = 0;
+		let left = pocIndex;
+		let right = pocIndex;
+		accumulated += sortedEntries[pocIndex][1];
+		while (accumulated < targetVolume && (left > 0 || right < sortedEntries.length - 1)) if ((left > 0 ? sortedEntries[left - 1][1] : 0) >= (right < sortedEntries.length - 1 ? sortedEntries[right + 1][1] : 0) && left > 0) {
+			left--;
+			accumulated += sortedEntries[left][1];
+			vaLow = sortedEntries[left][0];
+		} else if (right < sortedEntries.length - 1) {
+			right++;
+			accumulated += sortedEntries[right][1];
+			vaHigh = sortedEntries[right][0];
+		} else if (left > 0) {
+			left--;
+			accumulated += sortedEntries[left][1];
+			vaLow = sortedEntries[left][0];
+		} else break;
+		const avgVolume = totalVolume / sortedEntries.length;
+		const hvn = sortedEntries.filter(([, vol]) => vol > avgVolume * this.config.hvnMultiplier).map(([p]) => p);
+		const lvn = sortedEntries.filter(([, vol]) => vol < avgVolume * this.config.lvnMultiplier && vol > 0).map(([p]) => p);
+		const profile = {
+			instrumentUid: uid,
+			timestamp,
+			poc,
+			valueAreaHigh: vaHigh,
+			valueAreaLow: vaLow,
+			hvn,
+			lvn,
+			totalVolume
+		};
+		this.cacheProfile(profile);
+		this.emit("profileUpdate", profile);
+	}
+	onCandleWithCache(candle) {}
+};
+var volumeProfileEngine = new VolumeProfileEngine();
+//#endregion
+//#region src/main/ipcHandlers/tradingAssistantHandlers.ts
+var registerTradingAssistantHandlers = () => {
+	electron.ipcMain.handle("trading-assistant:get-profile", (_, instrumentUid) => {
+		const profile = volumeProfileEngine.getProfile(instrumentUid);
+		return profile ? { ...profile } : null;
+	});
+	electron.ipcMain.on("trading-assistant:subscribe", (event) => {
+		const win = electron.BrowserWindow.fromWebContents(event.sender);
+		if (!win) return;
+		const onProfileUpdate = (profile) => {
+			if (!win.isDestroyed()) win.webContents.send("trading-assistant:profile-update", profile);
+		};
+		const onSignal = (signal) => {
+			if (!win.isDestroyed()) win.webContents.send("trading-assistant:signal", signal);
+		};
+		volumeProfileEngine.on("profileUpdate", onProfileUpdate);
+		volumeProfileEngine.on("signal", onSignal);
+		win.on("closed", () => {
+			volumeProfileEngine.off("profileUpdate", onProfileUpdate);
+			volumeProfileEngine.off("signal", onSignal);
+		});
+	});
+	electron.ipcMain.on("trading-assistant:unsubscribe", (event) => {});
 };
 //#endregion
 //#region src/shared/types/promptgenerator.ts
@@ -2180,6 +2451,15 @@ electron.app.whenReady().then(() => {
 				if (win) applyMenuToWindow(win, mainMenuTemplate);
 			}
 		};
+		const openTrading = fileMenu.items.find((i) => i.label === "Открыть Трейдер");
+		if (openTrading) openTrading.click = () => {
+			const existing = getTradingAssistantWindow();
+			if (existing && !existing.isDestroyed()) existing.focus();
+			else {
+				const win = createTradingAssistantWindow();
+				if (win) applyMenuToWindow(win, mainMenuTemplate);
+			}
+		};
 	}
 	mainWindow.setMenu(menu);
 	console.log("Menu items:", menu.items.map((i) => i.label));
@@ -2195,6 +2475,7 @@ electron.app.whenReady().then(() => {
 	registerGrpcHandlers();
 	registerTasksHandlers();
 	scheduler.start();
+	registerTradingAssistantHandlers();
 });
 electron.app.on("window-all-closed", () => {
 	if (process.platform !== "darwin") electron.app.quit();

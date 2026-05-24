@@ -75,18 +75,27 @@ export const TradingAssistantPage: React.FC = () => {
       width: chartContainerRef.current.clientWidth,
       height: 400,
       layout: {
-        background: { type: ColorType.Solid, color: 'white' },
-        textColor: 'black',
+        background: { type: ColorType.Solid, color: '#1e1e1e' }, // тёмный фон
+        textColor: '#d1d4dc', // светлый текст для шкал
       },
       grid: {
-        vertLines: { color: '#e1e1e1' },
-        horzLines: { color: '#e1e1e1' },
+        vertLines: { color: '#2a2e39' },
+        horzLines: { color: '#2a2e39' },
       },
       timeScale: {
         timeVisible: true,
-        secondsVisible: false,
+        borderColor: '#2a2e39',
+      },
+      rightPriceScale: {
+        borderColor: '#2a2e39',
       },
     });
+
+    const testSeries = chart.addSeries(LineSeries, { color: 'yellow', lineWidth: 3 });
+    testSeries.setData([
+      { time: (Math.floor(Date.now() / 1000) - 3600) as Time, value: 320 },
+      { time: (Math.floor(Date.now() / 1000)) as Time, value: 320 },
+    ]);
 
     chartRef.current = chart;
 

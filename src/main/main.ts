@@ -157,7 +157,7 @@ app.whenReady().then(() => {
   registerTasksHandlers();
   scheduler.start();
 
-  registerTasksHandlers();
+  registerTradingAssistantHandlers();
 });
 
 // Завершать работу, когда закрыты все окна, за исключением macOS. Там это обычное дело
