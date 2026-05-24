@@ -71,7 +71,20 @@ export const TradingAssistantPage: React.FC = () => {
   const [valueAreaPercent, setValueAreaPercent] = useState(70);
   const [profileResolution, setProfileResolution] = useState(50);
   const [loading, setLoading] = useState(false);
+  const [autoTrading, setAutoTrading] = useState(false);
+  const [lotQty, setLotQty] = useState(1);
 
+  useEffect(() => {
+    const api = (window as any).electronAPI;
+    if (api) api.getTradingStatus().then((status: boolean) => setAutoTrading(status));
+  }, []);
+
+  const toggleTrading = async () => {
+    const api = (window as any).electronAPI;
+    const newState = !autoTrading;
+    await api.toggleAutoTrading(newState);
+    setAutoTrading(newState);
+  };
   // Запуск бэктеста через IPC
   // Запуск бэктеста
   const runBacktest = async () => {
@@ -290,6 +303,12 @@ export const TradingAssistantPage: React.FC = () => {
     const p = await api.getVolumeProfile(selectedInstrument);
     if (p) setProfile(p);
   };
+  
+  const api = (window as any).electronAPI;
+  if (!api) {
+    console.error('electronAPI не доступен');
+    return;
+  }
 
   return (
     <div className="trading-assistant">
@@ -303,6 +322,18 @@ export const TradingAssistantPage: React.FC = () => {
           onChange={(e) => setSelectedInstrument(e.target.value)}
         />
         <button onClick={loadProfile}>Load Live Profile</button>
+      </div>
+      
+      <div>
+        <button onClick={toggleTrading}>
+          {autoTrading ? 'Stop Auto Trading' : 'Start Auto Trading'}
+        </button>
+        <label> Lots: </label>
+        <input type="number" value={lotQty} onChange={e => {
+          const val = Number(e.target.value);
+          setLotQty(val);
+          api.setLotQuantity(val);
+        }} min={1} />
       </div>
 
       <div className="backtest-panel">

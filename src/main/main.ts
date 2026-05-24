@@ -28,6 +28,7 @@ import { savePromptTemplateToFile } from './services/promptTemplateSaver.ts';
 
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { exec } from 'child_process';
+
 import WebSocket from 'ws';
 
 import * as grpc from '@grpc/grpc-js';
@@ -49,6 +50,10 @@ import { HistoricalDataLoader } from './services/historicalDataLoader.ts';
 import { CandleInterval } from '@/api/tbank/marketdataTypes.ts';
 import { VolumeAccumulationStrategy } from './services/backtest/strategies/VolumeAccumulationStrategy.ts';
 import { BacktestEngine } from './services/backtest/backtestEngine.ts';
+import { OrderManager } from './services/orderManager';
+
+import { connectOrderManager } from './services/tradingConnector';
+import { setOrderManagerInstance } from './ipcHandlers/tradingAssistantHandlers';
 
 const scriptsDir = path.join(app.getPath('userData'), 'scripts');
 if (!existsSync(scriptsDir)) {
@@ -164,6 +169,16 @@ app.whenReady().then(() => {
   scheduler.start();
 
   registerTradingAssistantHandlers();
+
+  // ----------------- Order Manager -----------------
+  const orderManager = new OrderManager({
+    demoMode: true,   // включите false, когда будете готовы к реальной песочнице
+    token: '',        // можно задать позже через UI
+    accountId: '',
+  });
+  connectOrderManager(orderManager);
+  setOrderManagerInstance(orderManager);
+  // -------------------------------------------------
 });
 
 // Завершать работу, когда закрыты все окна, за исключением macOS. Там это обычное дело

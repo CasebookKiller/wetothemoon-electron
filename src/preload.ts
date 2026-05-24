@@ -201,6 +201,10 @@ try {
     removeTradingSignalListener: () => ipcRenderer.removeAllListeners('trading-assistant:signal'),
     runBacktest: (uid: string, dateFrom: string, dateTo: string, interval: string, token: string, params: any) =>
       ipcRenderer.invoke('trading-assistant:run-backtest', uid, dateFrom, dateTo, interval, token, params),
+
+    toggleAutoTrading: (enabled: boolean) => ipcRenderer.invoke('trading-assistant:toggle-trading', enabled),
+    getTradingStatus: () => ipcRenderer.invoke('trading-assistant:get-trading-status'),
+    setLotQuantity: (qty: number) => ipcRenderer.invoke('trading-assistant:set-lot-quantity', qty),
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

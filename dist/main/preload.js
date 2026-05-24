@@ -154,7 +154,10 @@ try {
 		},
 		removeProfileUpdateListener: () => electron.ipcRenderer.removeAllListeners("trading-assistant:profile-update"),
 		removeTradingSignalListener: () => electron.ipcRenderer.removeAllListeners("trading-assistant:signal"),
-		runBacktest: (uid, dateFrom, dateTo, interval, token, params) => electron.ipcRenderer.invoke("trading-assistant:run-backtest", uid, dateFrom, dateTo, interval, token, params)
+		runBacktest: (uid, dateFrom, dateTo, interval, token, params) => electron.ipcRenderer.invoke("trading-assistant:run-backtest", uid, dateFrom, dateTo, interval, token, params),
+		toggleAutoTrading: (enabled) => electron.ipcRenderer.invoke("trading-assistant:toggle-trading", enabled),
+		getTradingStatus: () => electron.ipcRenderer.invoke("trading-assistant:get-trading-status"),
+		setLotQuantity: (qty) => electron.ipcRenderer.invoke("trading-assistant:set-lot-quantity", qty)
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {

@@ -8,6 +8,13 @@ import { HistoricalDataLoader } from '../services/historicalDataLoader';
 import { StreamCandle } from '@/api/tbank/marketdataStreamTypes';
 import { VirtualPortfolio } from '../services/backtest/virtualPortfolio';
 import { BacktestSignal, quotationToNumber } from '../services/backtest/common';
+import { OrderManager } from '../services/orderManager';
+
+let orderManagerInstance: OrderManager | null = null;
+
+export const setOrderManagerInstance = (manager: OrderManager) => {
+  orderManagerInstance = manager;
+};
 
 export const registerTradingAssistantHandlers = () => {
   // Получить текущий профиль по инструменту (по запросу)
@@ -192,6 +199,25 @@ export const registerTradingAssistantHandlers = () => {
     } catch (error) {
       console.error('Backtest error:', error);
       return null;
+    }
+  });
+
+
+  ipcMain.handle('trading-assistant:toggle-trading', async (_, enabled: boolean) => {
+    if (orderManagerInstance) {
+      orderManagerInstance.setRunning(enabled);
+      return true;
+    }
+    return false;
+  });
+
+  ipcMain.handle('trading-assistant:get-trading-status', async () => {
+    return orderManagerInstance ? (orderManagerInstance as any).isRunning : false;
+  });
+
+  ipcMain.handle('trading-assistant:set-lot-quantity', async (_, qty: number) => {
+    if (orderManagerInstance) {
+      (orderManagerInstance as any).config.lotQuantity = qty;
     }
   });
 

@@ -1784,6 +1784,10 @@ function quotationToNumber(q) {
 }
 //#endregion
 //#region src/main/ipcHandlers/tradingAssistantHandlers.ts
+var orderManagerInstance = null;
+var setOrderManagerInstance = (manager) => {
+	orderManagerInstance = manager;
+};
 var registerTradingAssistantHandlers = () => {
 	electron.ipcMain.handle("trading-assistant:get-profile", (_, instrumentUid) => {
 		const profile = volumeProfileEngine.getProfile(instrumentUid);
@@ -1873,6 +1877,19 @@ var registerTradingAssistantHandlers = () => {
 			console.error("Backtest error:", error);
 			return null;
 		}
+	});
+	electron.ipcMain.handle("trading-assistant:toggle-trading", async (_, enabled) => {
+		if (orderManagerInstance) {
+			orderManagerInstance.setRunning(enabled);
+			return true;
+		}
+		return false;
+	});
+	electron.ipcMain.handle("trading-assistant:get-trading-status", async () => {
+		return orderManagerInstance ? orderManagerInstance.isRunning : false;
+	});
+	electron.ipcMain.handle("trading-assistant:set-lot-quantity", async (_, qty) => {
+		if (orderManagerInstance) orderManagerInstance.config.lotQuantity = qty;
 	});
 };
 //#endregion
@@ -2808,6 +2825,128 @@ var BacktestEngine = class {
 	}
 };
 //#endregion
+//#region src/api/tbank/ordersTypes.ts
+/** Тип идентификатора заявки */
+var OrderIdType = /* @__PURE__ */ function(OrderIdType) {
+	/** Тип идентификатора не указан */
+	OrderIdType[OrderIdType["ORDER_ID_TYPE_UNSPECIFIED"] = 0] = "ORDER_ID_TYPE_UNSPECIFIED";
+	/** Биржевой идентификатор */
+	OrderIdType[OrderIdType["ORDER_ID_TYPE_EXCHANGE"] = 1] = "ORDER_ID_TYPE_EXCHANGE";
+	/** Ключ идемпотентности, переданный клиентом */
+	OrderIdType[OrderIdType["ORDER_ID_TYPE_REQUEST"] = 2] = "ORDER_ID_TYPE_REQUEST";
+	return OrderIdType;
+}({});
+/** Направление операции */
+var OrderDirection = /* @__PURE__ */ function(OrderDirection) {
+	/** Значение не указано */
+	OrderDirection[OrderDirection["ORDER_DIRECTION_UNSPECIFIED"] = 0] = "ORDER_DIRECTION_UNSPECIFIED";
+	/** Покупка */
+	OrderDirection[OrderDirection["ORDER_DIRECTION_BUY"] = 1] = "ORDER_DIRECTION_BUY";
+	/** Продажа */
+	OrderDirection[OrderDirection["ORDER_DIRECTION_SELL"] = 2] = "ORDER_DIRECTION_SELL";
+	return OrderDirection;
+}({});
+/** Тип заявки */
+var OrderType = /* @__PURE__ */ function(OrderType) {
+	/** Значение не указано */
+	OrderType[OrderType["ORDER_TYPE_UNSPECIFIED"] = 0] = "ORDER_TYPE_UNSPECIFIED";
+	/** Лимитная */
+	OrderType[OrderType["ORDER_TYPE_LIMIT"] = 1] = "ORDER_TYPE_LIMIT";
+	/** Рыночная */
+	OrderType[OrderType["ORDER_TYPE_MARKET"] = 2] = "ORDER_TYPE_MARKET";
+	/** Лучшая цена */
+	OrderType[OrderType["ORDER_TYPE_BESTPRICE"] = 3] = "ORDER_TYPE_BESTPRICE";
+	return OrderType;
+}({});
+//#endregion
+//#region src/main/services/orderManager.ts
+var OrderManager = class {
+	config;
+	activeOrderId = null;
+	isRunning = false;
+	constructor(config = {}) {
+		this.config = {
+			lotQuantity: 1,
+			useMarketOrder: true,
+			demoMode: true,
+			token: "",
+			accountId: "",
+			...config
+		};
+	}
+	updateConfig(patch) {
+		this.config = {
+			...this.config,
+			...patch
+		};
+	}
+	setRunning(state) {
+		this.isRunning = state;
+		console.log(`[OrderManager] Автоторговля ${state ? "запущена" : "остановлена"}`);
+	}
+	async processSignal(signal) {
+		if (!this.isRunning) {
+			console.log("[OrderManager] Автоторговля выключена, сигнал проигнорирован");
+			return;
+		}
+		if (!this.config.token || !this.config.accountId) {
+			console.warn("[OrderManager] Не заданы токен или accountId");
+			return;
+		}
+		if (this.activeOrderId) {
+			console.log("[OrderManager] Активная заявка уже существует, пропускаем сигнал");
+			return;
+		}
+		const direction = signal.type === "BUY" ? OrderDirection.ORDER_DIRECTION_BUY : OrderDirection.ORDER_DIRECTION_SELL;
+		const quantity = this.config.lotQuantity;
+		const price = signal.price;
+		try {
+			if (this.config.demoMode) {
+				console.log(`[OrderManager][DEMO] ${direction === OrderDirection.ORDER_DIRECTION_BUY ? "BUY" : "SELL"} ${quantity} лотов по цене ${price}`);
+				return;
+			}
+			const orderType = this.config.useMarketOrder ? OrderType.ORDER_TYPE_MARKET : OrderType.ORDER_TYPE_LIMIT;
+			const order = await sandboxGrpc.postSandboxOrder({
+				instrumentId: signal.instrumentUid,
+				direction,
+				orderType,
+				quantity,
+				price: this.config.useMarketOrder ? void 0 : {
+					units: Math.floor(price),
+					nano: Math.round(price % 1 * 1e9)
+				},
+				accountId: this.config.accountId
+			}, this.config.token);
+			this.activeOrderId = order.orderId ?? null;
+			console.log(`[OrderManager] Ордер отправлен: ${this.activeOrderId}`);
+		} catch (error) {
+			console.error("[OrderManager] Ошибка отправки ордера:", error);
+		}
+	}
+	async cancelActiveOrder() {
+		if (!this.activeOrderId || !this.config.token || !this.config.accountId) return;
+		try {
+			await sandboxGrpc.cancelSandboxOrder({
+				orderId: this.activeOrderId,
+				accountId: this.config.accountId,
+				orderIdType: OrderIdType.ORDER_ID_TYPE_EXCHANGE
+			}, this.config.token);
+			console.log(`[OrderManager] Ордер ${this.activeOrderId} отменён`);
+			this.activeOrderId = null;
+		} catch (e) {
+			console.error("[OrderManager] Ошибка отмены ордера:", e);
+		}
+	}
+};
+//#endregion
+//#region src/main/services/tradingConnector.ts
+function connectOrderManager(manager) {
+	volumeProfileEngine.on("signal", (signal) => {
+		console.log("[TradingConnector] Получен сигнал:", signal);
+		manager.processSignal(signal);
+	});
+}
+//#endregion
 //#region src/main/main.ts
 var scriptsDir = path.default.join(electron.app.getPath("userData"), "scripts");
 if (!(0, fs.existsSync)(scriptsDir)) {
@@ -2885,6 +3024,13 @@ electron.app.whenReady().then(() => {
 	registerTasksHandlers();
 	scheduler.start();
 	registerTradingAssistantHandlers();
+	const orderManager = new OrderManager({
+		demoMode: true,
+		token: "",
+		accountId: ""
+	});
+	connectOrderManager(orderManager);
+	setOrderManagerInstance(orderManager);
 });
 electron.app.on("window-all-closed", () => {
 	if (process.platform !== "darwin") electron.app.quit();
