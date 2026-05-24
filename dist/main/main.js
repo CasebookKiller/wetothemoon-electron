@@ -1202,7 +1202,7 @@ var createTradingAssistantWindow = () => {
 var getTradingAssistantWindow = () => tradingAssistantWindow;
 //#endregion
 //#region src/main/services/volumeProfileEngine.ts
-function quotationToNumber(q) {
+function quotationToNumber$1(q) {
 	if (!q) return 0;
 	return Number(q.units || "0") + (q.nano || 0) / 1e9;
 }
@@ -1231,9 +1231,9 @@ var VolumeProfileEngine = class extends events.EventEmitter {
 		if (!uid) return;
 		const volume = Number(candle.volume || "0");
 		if (volume <= this.config.minVolumeThreshold) return;
-		const high = quotationToNumber(candle.high);
-		const low = quotationToNumber(candle.low);
-		const close = quotationToNumber(candle.close);
+		const high = quotationToNumber$1(candle.high);
+		const low = quotationToNumber$1(candle.low);
+		const close = quotationToNumber$1(candle.close);
 		const time = candle.time || (/* @__PURE__ */ new Date()).toISOString();
 		this.lastPrice.set(uid, close);
 		const priceRange = high - low;
@@ -1252,7 +1252,7 @@ var VolumeProfileEngine = class extends events.EventEmitter {
 	onTrade(trade) {
 		const uid = trade.instrumentUid || trade.figi;
 		if (!uid) return;
-		const price = quotationToNumber(trade.price);
+		const price = quotationToNumber$1(trade.price);
 		this.lastPrice.set(uid, price);
 	}
 	addVolume(uid, price, volume) {
@@ -2399,6 +2399,143 @@ function registerTasksHandlers() {
 	});
 }
 //#endregion
+//#region src/api/tbank/marketdataTypes.ts
+/** Интервал свечей */
+var CandleInterval = /* @__PURE__ */ function(CandleInterval) {
+	/** Интервал не определён */
+	CandleInterval[CandleInterval["CANDLE_INTERVAL_UNSPECIFIED"] = 0] = "CANDLE_INTERVAL_UNSPECIFIED";
+	/** 1 минута. Максимальный `limit` — 2400 */
+	CandleInterval[CandleInterval["CANDLE_INTERVAL_1_MIN"] = 1] = "CANDLE_INTERVAL_1_MIN";
+	/** 5 минут. Максимальный `limit` — 2400 */
+	CandleInterval[CandleInterval["CANDLE_INTERVAL_5_MIN"] = 2] = "CANDLE_INTERVAL_5_MIN";
+	/** 15 минут. Максимальный `limit` — 2400 */
+	CandleInterval[CandleInterval["CANDLE_INTERVAL_15_MIN"] = 3] = "CANDLE_INTERVAL_15_MIN";
+	/** 1 час. Максимальный `limit` — 2400 */
+	CandleInterval[CandleInterval["CANDLE_INTERVAL_HOUR"] = 4] = "CANDLE_INTERVAL_HOUR";
+	/** 1 день. Максимальный `limit` — 2400 */
+	CandleInterval[CandleInterval["CANDLE_INTERVAL_DAY"] = 5] = "CANDLE_INTERVAL_DAY";
+	/** 2 минуты. Максимальный `limit` — 1200 */
+	CandleInterval[CandleInterval["CANDLE_INTERVAL_2_MIN"] = 6] = "CANDLE_INTERVAL_2_MIN";
+	/** 3 минуты. Максимальный `limit` — 750 */
+	CandleInterval[CandleInterval["CANDLE_INTERVAL_3_MIN"] = 7] = "CANDLE_INTERVAL_3_MIN";
+	/** 10 минут. Максимальный `limit` — 1200 */
+	CandleInterval[CandleInterval["CANDLE_INTERVAL_10_MIN"] = 8] = "CANDLE_INTERVAL_10_MIN";
+	/** 30 минут. Максимальный `limit` — 1200 */
+	CandleInterval[CandleInterval["CANDLE_INTERVAL_30_MIN"] = 9] = "CANDLE_INTERVAL_30_MIN";
+	/** 2 часа. Максимальный `limit` — 2400 */
+	CandleInterval[CandleInterval["CANDLE_INTERVAL_2_HOUR"] = 10] = "CANDLE_INTERVAL_2_HOUR";
+	/** 4 часа. Максимальный `limit` — 700 */
+	CandleInterval[CandleInterval["CANDLE_INTERVAL_4_HOUR"] = 11] = "CANDLE_INTERVAL_4_HOUR";
+	/** 1 неделя. Максимальный `limit` — 300 */
+	CandleInterval[CandleInterval["CANDLE_INTERVAL_WEEK"] = 12] = "CANDLE_INTERVAL_WEEK";
+	/** 1 месяц. Максимальный `limit` — 120 */
+	CandleInterval[CandleInterval["CANDLE_INTERVAL_MONTH"] = 13] = "CANDLE_INTERVAL_MONTH";
+	/** 5 секунд. Максимальный `limit` — 2500 */
+	CandleInterval[CandleInterval["CANDLE_INTERVAL_5_SEC"] = 14] = "CANDLE_INTERVAL_5_SEC";
+	/** 10 секунд. Максимальный `limit` — 1250 */
+	CandleInterval[CandleInterval["CANDLE_INTERVAL_10_SEC"] = 15] = "CANDLE_INTERVAL_10_SEC";
+	/** 30 секунд. Максимальный `limit` — 2500 */
+	CandleInterval[CandleInterval["CANDLE_INTERVAL_30_SEC"] = 16] = "CANDLE_INTERVAL_30_SEC";
+	return CandleInterval;
+}({});
+/** Тип источника свечи (в запросе) */
+var CandleSourceRequest = /* @__PURE__ */ function(CandleSourceRequest) {
+	/** Все свечи */
+	CandleSourceRequest[CandleSourceRequest["CANDLE_SOURCE_UNSPECIFIED"] = 0] = "CANDLE_SOURCE_UNSPECIFIED";
+	/** Биржевые свечи */
+	CandleSourceRequest[CandleSourceRequest["CANDLE_SOURCE_EXCHANGE"] = 1] = "CANDLE_SOURCE_EXCHANGE";
+	/** Все свечи с учётом торговли по выходным */
+	CandleSourceRequest[CandleSourceRequest["CANDLE_SOURCE_INCLUDE_WEEKEND"] = 3] = "CANDLE_SOURCE_INCLUDE_WEEKEND";
+	return CandleSourceRequest;
+}({});
+//#endregion
+//#region src/main/services/historicalDataLoader.ts
+function quotationToNumber(q) {
+	if (!q) return 0;
+	return Number(q.units || 0) + (q.nano || 0) / 1e9;
+}
+/** Преобразует Timestamp (строка ISO или объект {seconds,nanos}) в ISO-строку */
+function timestampToISO(ts) {
+	if (!ts) return (/* @__PURE__ */ new Date()).toISOString();
+	if (typeof ts === "object" && ts.seconds !== void 0) return (/* @__PURE__ */ new Date(ts.seconds * 1e3)).toISOString();
+	if (typeof ts === "string") return new Date(ts).toISOString();
+	return (/* @__PURE__ */ new Date()).toISOString();
+}
+var HistoricalDataLoader = class {
+	async loadDailyProfile(instrumentUid, from, to, token) {
+		const request = {
+			instrumentId: instrumentUid,
+			interval: CandleInterval.CANDLE_INTERVAL_DAY,
+			from: {
+				seconds: Math.floor(from.getTime() / 1e3),
+				nanos: 0
+			},
+			to: {
+				seconds: Math.floor(to.getTime() / 1e3),
+				nanos: 0
+			},
+			candleSourceType: CandleSourceRequest.CANDLE_SOURCE_EXCHANGE
+		};
+		const candles = (await marketDataGrpc.getCandles(request, token)).candles || [];
+		if (candles.length === 0) return null;
+		const engine = new VolumeProfileEngine();
+		for (const candle of candles) {
+			const open = quotationToNumber(candle.open);
+			const high = quotationToNumber(candle.high);
+			const low = quotationToNumber(candle.low);
+			const close = quotationToNumber(candle.close);
+			const volume = Number(candle.volume || "0");
+			const streamCandle = {
+				instrumentUid,
+				open: {
+					units: open.toString(),
+					nano: 0
+				},
+				high: {
+					units: high.toString(),
+					nano: 0
+				},
+				low: {
+					units: low.toString(),
+					nano: 0
+				},
+				close: {
+					units: close.toString(),
+					nano: 0
+				},
+				volume: volume.toString(),
+				time: timestampToISO(candle.time)
+			};
+			engine.onCandle?.(streamCandle);
+		}
+		return engine.getProfile(instrumentUid);
+	}
+	async loadIntradayCandles(instrumentUid, from, to, token, interval = CandleInterval.CANDLE_INTERVAL_1_MIN) {
+		const request = {
+			instrumentId: instrumentUid,
+			interval,
+			from: {
+				seconds: Math.floor(from.getTime() / 1e3),
+				nanos: 0
+			},
+			to: {
+				seconds: Math.floor(to.getTime() / 1e3),
+				nanos: 0
+			},
+			candleSourceType: CandleSourceRequest.CANDLE_SOURCE_EXCHANGE
+		};
+		return ((await marketDataGrpc.getCandles(request, token)).candles || []).map((candle) => ({
+			instrumentUid,
+			open: candle.open,
+			high: candle.high,
+			low: candle.low,
+			close: candle.close,
+			volume: String(candle.volume || "0"),
+			time: timestampToISO(candle.time)
+		}));
+	}
+};
+//#endregion
 //#region src/main/main.ts
 var scriptsDir = path.default.join(electron.app.getPath("userData"), "scripts");
 if (!(0, fs.existsSync)(scriptsDir)) {
@@ -2934,6 +3071,18 @@ function applyMenuToWindow(win, template) {
 	const menu = electron.Menu.buildFromTemplate(template);
 	win.setMenu(menu);
 }
+(async () => {
+	const loader = new HistoricalDataLoader();
+	const token = process.env.VITE_TReadOnly || "t.rGCSw8v2Wku38hBeDq4vibP1rx2laBEKgYuGNzoclMUJNv99mTsuadh8iNn07y447bwZyelwn5GQNR7wHwmsVA";
+	const uid = "e6123145-9665-43e0-8413-cd61b8aa9b13";
+	try {
+		console.log("[Test] Загружаем дневной профиль за 22 мая...");
+		const profile = await loader.loadDailyProfile(uid, /* @__PURE__ */ new Date("2026-05-22T00:00:00Z"), /* @__PURE__ */ new Date("2026-05-23T00:00:00Z"), token);
+		console.log("[Test] Профиль:", profile);
+	} catch (err) {
+		console.error("[Test] Ошибка:", err);
+	}
+})();
 //#endregion
 
 //# sourceMappingURL=main.js.map

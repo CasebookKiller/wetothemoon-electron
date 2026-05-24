@@ -43,6 +43,7 @@ import { scheduler } from './services/scheduler';
 import { mkdirSync, existsSync } from 'fs';
 
 import { VolumeProfileEngine } from './services/volumeProfileEngine';
+import { HistoricalDataLoader } from './services/historicalDataLoader.ts';
 
 const scriptsDir = path.join(app.getPath('userData'), 'scripts');
 if (!existsSync(scriptsDir)) {
@@ -677,3 +678,24 @@ function applyMenuToWindow(win: BrowserWindow, template: MenuItemConstructorOpti
 //  console.log(`[VolumeProfile] Сигнал: ${signal.message}`);
 //});
 //// --- конец тестового блока ---
+
+
+// Временный тест – удалить после проверки
+(async () => {
+  const loader = new HistoricalDataLoader();
+  const token = process.env.VITE_TReadOnly || 't.rGCSw8v2Wku38hBeDq4vibP1rx2laBEKgYuGNzoclMUJNv99mTsuadh8iNn07y447bwZyelwn5GQNR7wHwmsVA';  // замените на реальный токен
+  const uid = 'e6123145-9665-43e0-8413-cd61b8aa9b13';
+
+  try {
+    console.log('[Test] Загружаем дневной профиль за 22 мая...');
+    const profile = await loader.loadDailyProfile(
+      uid,
+      new Date('2026-05-22T00:00:00Z'),
+      new Date('2026-05-23T00:00:00Z'),
+      token
+    );
+    console.log('[Test] Профиль:', profile);
+  } catch (err) {
+    console.error('[Test] Ошибка:', err);
+  }
+})();
