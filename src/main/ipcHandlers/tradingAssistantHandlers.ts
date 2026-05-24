@@ -69,7 +69,7 @@ export const registerTradingAssistantHandlers = () => {
     const stats = engine.run(strategy, candles);
     const signals = strategy.getSignals();
 
-    return { profile, stats, signals };
+    return { profile, candles, stats, signals };
   } catch (error) {
     console.error('Backtest error:', error);
     return null;

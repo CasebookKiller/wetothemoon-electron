@@ -20,6 +20,7 @@ export interface VolumeProfileLevels {
   hvn: number[];           // High Volume Nodes (цены с объёмом > 1.5 * среднего)
   lvn: number[];           // Low Volume Nodes (цены с объёмом < 0.5 * среднего)
   totalVolume: number;     // суммарный объём за период
+  volumeByPrice: Array<{ price: number; volume: number }>; // <-- новое поле
 }
 
 export interface Signal {
@@ -189,6 +190,12 @@ export class VolumeProfileEngine extends EventEmitter {
       else if (vol < avgVolume * this.config.lvnMultiplier && vol > 0) lvn.push(price);
     }
 
+    // сохраняем карту объёмов для отображения
+    const volumeByPrice = Array.from(priceMap.entries()).map(([price, vol]) => ({
+      price,
+      volume: vol,
+    }));
+
     const levels: VolumeProfileLevels = {
       instrumentUid: uid,
       timestamp,
@@ -198,6 +205,7 @@ export class VolumeProfileEngine extends EventEmitter {
       hvn,
       lvn,
       totalVolume,
+      volumeByPrice: volumeByPrice,
     };
 
     // Сохраняем во внутреннем хранилище и уведомляем подписчиков
@@ -304,6 +312,11 @@ export class VolumeProfileEngine extends EventEmitter {
     const hvn = sortedEntries.filter(([, vol]) => vol > avgVolume * this.config.hvnMultiplier).map(([p]) => p);
     const lvn = sortedEntries.filter(([, vol]) => vol < avgVolume * this.config.lvnMultiplier && vol > 0).map(([p]) => p);
 
+    const volumeByPrice = Array.from(priceMap.entries()).map(([price, vol]) => ({
+      price,
+      volume: vol,
+    }));
+
     const profile: VolumeProfileLevels = {
       instrumentUid: uid,
       timestamp,
@@ -313,6 +326,7 @@ export class VolumeProfileEngine extends EventEmitter {
       hvn,
       lvn,
       totalVolume,
+      volumeByPrice,   // <-- включаем
     };
 
     this.cacheProfile(profile);

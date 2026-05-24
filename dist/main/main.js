@@ -1300,6 +1300,10 @@ var VolumeProfileEngine = class extends events.EventEmitter {
 		const lvn = [];
 		for (const [price, vol] of sortedEntries) if (vol > avgVolume * this.config.hvnMultiplier) hvn.push(price);
 		else if (vol < avgVolume * this.config.lvnMultiplier && vol > 0) lvn.push(price);
+		const volumeByPrice = Array.from(priceMap.entries()).map(([price, vol]) => ({
+			price,
+			volume: vol
+		}));
 		const levels = {
 			instrumentUid: uid,
 			timestamp,
@@ -1308,7 +1312,8 @@ var VolumeProfileEngine = class extends events.EventEmitter {
 			valueAreaLow: vaLow,
 			hvn,
 			lvn,
-			totalVolume
+			totalVolume,
+			volumeByPrice
 		};
 		this.emit("profileUpdate", levels);
 	}
@@ -1380,6 +1385,10 @@ var VolumeProfileEngine = class extends events.EventEmitter {
 		const avgVolume = totalVolume / sortedEntries.length;
 		const hvn = sortedEntries.filter(([, vol]) => vol > avgVolume * this.config.hvnMultiplier).map(([p]) => p);
 		const lvn = sortedEntries.filter(([, vol]) => vol < avgVolume * this.config.lvnMultiplier && vol > 0).map(([p]) => p);
+		const volumeByPrice = Array.from(priceMap.entries()).map(([price, vol]) => ({
+			price,
+			volume: vol
+		}));
 		const profile = {
 			instrumentUid: uid,
 			timestamp,
@@ -1388,7 +1397,8 @@ var VolumeProfileEngine = class extends events.EventEmitter {
 			valueAreaLow: vaLow,
 			hvn,
 			lvn,
-			totalVolume
+			totalVolume,
+			volumeByPrice
 		};
 		this.cacheProfile(profile);
 		this.emit("profileUpdate", profile);
@@ -1721,6 +1731,7 @@ var registerTradingAssistantHandlers = () => {
 			const strategy = new VolumeAccumulationStrategy(instrumentUid, profile);
 			return {
 				profile,
+				candles,
 				stats: new BacktestEngine().run(strategy, candles),
 				signals: strategy.getSignals()
 			};
