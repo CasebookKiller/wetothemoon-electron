@@ -65,22 +65,34 @@ export const TradingAssistantPage: React.FC = () => {
   const [candlesData, setCandlesData] = useState<any[]>([]); // массив свечей в формате для графика
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const [backtestResult, setBacktestResult] = useState<any>(null);
+  const [dateFrom, setDateFrom] = useState('2026-05-22');
+  const [dateTo, setDateTo] = useState('2026-05-22');
+  const [interval, setInterval] = useState('1min');
+  const [valueAreaPercent, setValueAreaPercent] = useState(70);
+  const [profileResolution, setProfileResolution] = useState(50);
+  const [loading, setLoading] = useState(false);
 
   // Запуск бэктеста через IPC
   // Запуск бэктеста
   const runBacktest = async () => {
+    if (loading) return;
+    setLoading(true);
+
     const api = (window as any).electronAPI;
-    if (!api?.runBacktest) {
-      alert('electronAPI.runBacktest не доступен');
-      return;
-    }
+    if (!api?.runBacktest) return;
     const token = import.meta.env.VITE_TReadOnly;
-    const result = await api.runBacktest(selectedInstrument, backtestDate, token);
-    console.log('[Backtest Result]', result); // ← посмотрим весь ответ
+    const result = await api.runBacktest(
+      selectedInstrument,
+      dateFrom,
+      dateTo,
+      interval,
+      token,
+      { valueAreaPercent, profileResolution }
+    );
     if (result) {
-      setProfile(result.profile);           // уже рассчитанный профиль
+      setProfile(result.profile); // последний профиль (или массив профилей?)
       setBacktestSignals(result.signals);
-      setBacktestResult(result);
+      // candles будут объединены за весь период
       if (result.candles?.length) {
         const formatted = result.candles.map((c: any) => ({
           time: (Math.floor(new Date(c.time).getTime() / 1000)) as Time,
@@ -91,9 +103,10 @@ export const TradingAssistantPage: React.FC = () => {
         }));
         setCandlesData(formatted);
       }
-    } else {
-      alert('Ошибка при загрузке данных');
+      setBacktestResult(result);
     }
+    setLoading(false);
+    console.log('[Backtest Result]', result);
   };
 
   // Подписка на live-обновления из VolumeProfileEngine
@@ -293,8 +306,22 @@ export const TradingAssistantPage: React.FC = () => {
       </div>
 
       <div className="backtest-panel">
-        <input type="date" value={backtestDate} onChange={e => setBacktestDate(e.target.value)} />
-        <button onClick={runBacktest}>Run Backtest</button>
+        <label>From:</label>
+        <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+        <label>To:</label>
+        <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} />
+        <label>Interval:</label>
+        <select value={interval} onChange={e => setInterval(e.target.value)}>
+          <option value="1min">1 min</option>
+          <option value="5min">5 min</option>
+          <option value="15min">15 min</option>
+          <option value="1hour">1 hour</option>
+        </select>
+        <label>VA%:</label>
+        <input type="number" value={valueAreaPercent} onChange={e => setValueAreaPercent(Number(e.target.value))} min={50} max={90} step={5} />
+        <label>Resolution:</label>
+        <input type="number" value={profileResolution} onChange={e => setProfileResolution(Number(e.target.value))} min={10} max={200} step={10} />
+        <button disabled={loading} onClick={runBacktest}>Run Backtest</button>
       </div>
 
       <div className="chart-container" ref={chartContainerRef} />
@@ -342,35 +369,34 @@ export const TradingAssistantPage: React.FC = () => {
         </div>
       )}
 
-      {backtestResult?.stats && (
-        <div className="backtest-stats">
-          <h3>Backtest Results</h3>
-          <p>Total Signals: {backtestResult.stats.totalSignals}</p>
-          <p>Buy / Sell: {backtestResult.stats.buySignals} / {backtestResult.stats.sellSignals}</p>
-          <p>Portfolio:</p>
-          <ul>
-            <li>Initial Capital: {backtestResult.stats.portfolio.initialCapital}</li>
-            <li>Final Capital: {backtestResult.stats.portfolio.finalCapital.toFixed(2)}</li>
-            <li>
-              Total Profit: 
-              <span className={backtestResult.stats.portfolio.totalProfit >= 0 ? 'positive' : 'negative'}>
-                {' '}{backtestResult.stats.portfolio.totalProfit.toFixed(2)}{' '}
-                ({backtestResult.stats.portfolio.totalProfitPercent.toFixed(2)}%)
-              </span>
-            </li>
-            <li>Trades: {backtestResult.stats.portfolio.totalTrades} (W: {backtestResult.stats.portfolio.winningTrades}, L: {backtestResult.stats.portfolio.losingTrades})</li>
-            <li>Win Rate: {backtestResult.stats.portfolio.winRate.toFixed(1)}%</li>
-            <li>
-              Max Drawdown: 
-              <span className={backtestResult.stats.portfolio.maxDrawdown >= 0 ? 'negative' : 'positive'}>
-                {' '}{backtestResult.stats.portfolio.maxDrawdown.toFixed(2)}{' '} 
-                ({backtestResult.stats.portfolio.maxDrawdownPercent.toFixed(2)}%)
-              </span>
-            </li>
-            <li>Avg Profit: {backtestResult.stats.portfolio.averageProfit.toFixed(2)}</li>
-          </ul>
-        </div>
-      )}
+      {backtestResult?.stats && backtestResult.stats.portfolio && (
+      <div className="backtest-stats">
+        <h3>Backtest Results</h3>
+        <p>Total Signals: {backtestResult.stats.totalSignals}</p>
+        <p>Buy / Sell: {backtestResult.stats.buySignals} / {backtestResult.stats.sellSignals}</p>
+        <p>Portfolio:</p>
+        <ul>
+          <li>Initial Capital: {backtestResult.stats.portfolio.initialCapital}</li>
+          <li>Final Capital: {backtestResult.stats.portfolio.finalCapital?.toFixed(2)}</li>
+          <li>Total Profit: 
+            <span className={backtestResult.stats.portfolio.totalProfit >= 0 ? 'positive' : 'negative'}>
+              {' '}{backtestResult.stats.portfolio.totalProfit?.toFixed(2)} 
+              {' '}({backtestResult.stats.portfolio.totalProfitPercent?.toFixed(2)}%)
+            </span>
+          </li>
+          <li>Trades: {backtestResult.stats.portfolio.totalTrades} (W: {backtestResult.stats.portfolio.winningTrades}, L: {backtestResult.stats.portfolio.losingTrades})</li>
+          <li>Win Rate: {backtestResult.stats.portfolio.winRate?.toFixed(1)}%</li>
+          <li>
+            Max Drawdown:
+            <span className={backtestResult.stats.portfolio.maxDrawdown >= 0 ? 'positive' : 'negative'}>
+            {' '}{backtestResult.stats.portfolio.maxDrawdown?.toFixed(2)}
+            {' '}({backtestResult.stats.portfolio.maxDrawdownPercent?.toFixed(2)}%)
+            </span>
+          </li>
+          <li>Avg Profit: {backtestResult.stats.portfolio.averageProfit?.toFixed(2)}</li>
+        </ul>
+      </div>
+    )}
 
       {liveSignals.length > 0 && (
         <div className="signals-log">

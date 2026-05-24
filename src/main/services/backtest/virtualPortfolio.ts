@@ -3,8 +3,8 @@ import type { BacktestSignal } from './backtestEngine';
 
 export interface PortfolioConfig {
   initialCapital: number;
-  commissionPercent?: number; // комиссия за сделку, % (пока 0)
-  slippagePercent?: number;   // проскальзывание, % (пока 0)
+  commissionPercent?: number;
+  slippagePercent?: number;
 }
 
 export interface Trade {
@@ -38,6 +38,7 @@ export class VirtualPortfolio {
   private trades: Trade[] = [];
   private openPosition: { type: 'BUY' | 'SELL'; price: number; time: string } | null = null;
   private peakCapital: number;
+  private maxDrawdown: number = 0; // абсолютная максимальная просадка
 
   constructor(config: PortfolioConfig) {
     this.initialCapital = config.initialCapital;
@@ -45,20 +46,13 @@ export class VirtualPortfolio {
     this.peakCapital = config.initialCapital;
   }
 
-  /** Обрабатывает сигнал: если есть открытая позиция, закрывает её по цене сигнала,
-   *  затем открывает новую в соответствии с сигналом.
-   *  Упрощённо: каждый сигнал = закрытие предыдущей + открытие новой.
-   */
   processSignal(signal: BacktestSignal): void {
-    // Если уже есть позиция, закрываем
     if (this.openPosition) {
       this.closePosition(signal.price, signal.time);
     }
-    // Открываем новую
     this.openPosition = { type: signal.type, price: signal.price, time: signal.time };
   }
 
-  /** Закрыть позицию (при завершении бэктеста или перед сменой направления) */
   closePosition(price: number, time: string): void {
     if (!this.openPosition) return;
 
@@ -84,28 +78,20 @@ export class VirtualPortfolio {
       profitPercent,
     });
 
-    // Обновляем пик капитала для расчёта просадки
+    // Обновляем пик капитала
     if (this.capital > this.peakCapital) {
       this.peakCapital = this.capital;
+    }
+
+    // Вычисляем текущую просадку от пика
+    const currentDrawdown = this.peakCapital - this.capital;
+    if (currentDrawdown > this.maxDrawdown) {
+      this.maxDrawdown = currentDrawdown;
     }
 
     this.openPosition = null;
   }
 
-  /** Принудительно закрыть все позиции и вернуть статистику */
-  finalize(): PortfolioStats {
-    // Если осталась открытая позиция, закрываем по последней цене (незавершённая сделка)
-    // Но в бэктесте мы будем закрывать в конце принудительно
-    if (this.openPosition) {
-      // Для простоты: закрываем по той же цене (нулевой профит)
-      // В реальном бэктесте нужно использовать последнюю цену из candles,
-      // поэтому добавим метод finalize(lastPrice).
-      // Пока оставим как есть, вызов будет с lastPrice
-    }
-    return this.getStats();
-  }
-
-  /** Закрыть позицию по последней рыночной цене и вернуть статистику */
   finalizeWithLastPrice(lastPrice: number, time: string): PortfolioStats {
     if (this.openPosition) {
       this.closePosition(lastPrice, time);
@@ -121,9 +107,8 @@ export class VirtualPortfolio {
     const totalProfit = this.capital - this.initialCapital;
     const totalProfitPercent = (totalProfit / this.initialCapital) * 100;
 
-    // Максимальная просадка от пика
-    const maxDrawdown = this.peakCapital - this.capital; // упрощённо, правильнее считать по ходу
-    const maxDrawdownPercent = (maxDrawdown / this.peakCapital) * 100;
+    // Максимальная просадка уже вычислена в процессе
+    const maxDrawdownPercent = this.peakCapital > 0 ? (this.maxDrawdown / this.peakCapital) * 100 : 0;
 
     const averageProfit = totalTrades > 0 ? totalProfit / totalTrades : 0;
     const averageProfitPercent = totalTrades > 0 ? totalProfitPercent / totalTrades : 0;
@@ -137,8 +122,8 @@ export class VirtualPortfolio {
       winningTrades,
       losingTrades,
       winRate,
-      maxDrawdown: Math.max(0, maxDrawdown),
-      maxDrawdownPercent: Math.max(0, maxDrawdownPercent),
+      maxDrawdown: this.maxDrawdown,
+      maxDrawdownPercent,
       averageProfit,
       averageProfitPercent,
     };

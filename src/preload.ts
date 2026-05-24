@@ -199,7 +199,8 @@ try {
     },
     removeProfileUpdateListener: () => ipcRenderer.removeAllListeners('trading-assistant:profile-update'),
     removeTradingSignalListener: () => ipcRenderer.removeAllListeners('trading-assistant:signal'),
-    runBacktest: (uid: string, date: string, token: string) => ipcRenderer.invoke('trading-assistant:run-backtest', uid, date, token),
+    runBacktest: (uid: string, dateFrom: string, dateTo: string, interval: string, token: string, params: any) =>
+      ipcRenderer.invoke('trading-assistant:run-backtest', uid, dateFrom, dateTo, interval, token, params),
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

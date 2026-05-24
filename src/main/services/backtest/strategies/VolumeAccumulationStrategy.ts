@@ -19,10 +19,14 @@ export class VolumeAccumulationStrategy implements IBacktestStrategy {
     this.signals = [];
     this.hasBrokenHigh = false;
     this.hasBrokenLow = false;
+    this.hasPosition = false;   // ← сброс при новом дне
   }
 
+  private hasPosition = false;
+
   onCandle(candle: StreamCandle): void {
-    if (!this.dailyProfile) return;
+    // Если уже есть открытая позиция – не генерируем новые сигналы
+    if (!this.dailyProfile || this.hasPosition) return;
 
     const high = quotationToNumber(candle.high);
     const low = quotationToNumber(candle.low);
@@ -50,6 +54,7 @@ export class VolumeAccumulationStrategy implements IBacktestStrategy {
         reason: `Return to VA after breaking high (VAH=${this.dailyProfile.valueAreaHigh})`,
       });
       this.hasBrokenHigh = false;
+      this.hasPosition = true;   // ← позиция открыта
     }
 
     // Возврат внутрь VA после пробоя Low → сигнал BUY
@@ -62,6 +67,7 @@ export class VolumeAccumulationStrategy implements IBacktestStrategy {
         reason: `Return to VA after breaking low (VAL=${this.dailyProfile.valueAreaLow})`,
       });
       this.hasBrokenLow = false;
+      this.hasPosition = true;   // ← позиция открыта
     }
   }
 

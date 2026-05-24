@@ -56,6 +56,34 @@
 .backtest-panel input {
   padding: 4px;
 }
+.backtest-panel {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 15px;
+}
+.backtest-panel label {
+  font-size: 14px;
+  color: #d1d4dc;
+}
+.backtest-panel input[type="date"],
+.backtest-panel select,
+.backtest-panel input[type="number"] {
+  padding: 4px;
+  background: #2a2e39;
+  color: #d1d4dc;
+  border: 1px solid #555;
+  border-radius: 3px;
+}
+.backtest-panel button {
+  padding: 6px 12px;
+  background: #1976d2;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
 
 .volume-distribution {
   background: #1e1e1e;

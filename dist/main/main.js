@@ -1480,15 +1480,12 @@ var VirtualPortfolio = class {
 	trades = [];
 	openPosition = null;
 	peakCapital;
+	maxDrawdown = 0;
 	constructor(config) {
 		this.initialCapital = config.initialCapital;
 		this.capital = config.initialCapital;
 		this.peakCapital = config.initialCapital;
 	}
-	/** Обрабатывает сигнал: если есть открытая позиция, закрывает её по цене сигнала,
-	*  затем открывает новую в соответствии с сигналом.
-	*  Упрощённо: каждый сигнал = закрытие предыдущей + открытие новой.
-	*/
 	processSignal(signal) {
 		if (this.openPosition) this.closePosition(signal.price, signal.time);
 		this.openPosition = {
@@ -1497,7 +1494,6 @@ var VirtualPortfolio = class {
 			time: signal.time
 		};
 	}
-	/** Закрыть позицию (при завершении бэктеста или перед сменой направления) */
 	closePosition(price, time) {
 		if (!this.openPosition) return;
 		const entry = this.openPosition;
@@ -1516,14 +1512,10 @@ var VirtualPortfolio = class {
 			profitPercent
 		});
 		if (this.capital > this.peakCapital) this.peakCapital = this.capital;
+		const currentDrawdown = this.peakCapital - this.capital;
+		if (currentDrawdown > this.maxDrawdown) this.maxDrawdown = currentDrawdown;
 		this.openPosition = null;
 	}
-	/** Принудительно закрыть все позиции и вернуть статистику */
-	finalize() {
-		if (this.openPosition) {}
-		return this.getStats();
-	}
-	/** Закрыть позицию по последней рыночной цене и вернуть статистику */
 	finalizeWithLastPrice(lastPrice, time) {
 		if (this.openPosition) this.closePosition(lastPrice, time);
 		return this.getStats();
@@ -1535,8 +1527,7 @@ var VirtualPortfolio = class {
 		const winRate = totalTrades > 0 ? winningTrades / totalTrades * 100 : 0;
 		const totalProfit = this.capital - this.initialCapital;
 		const totalProfitPercent = totalProfit / this.initialCapital * 100;
-		const maxDrawdown = this.peakCapital - this.capital;
-		const maxDrawdownPercent = maxDrawdown / this.peakCapital * 100;
+		const maxDrawdownPercent = this.peakCapital > 0 ? this.maxDrawdown / this.peakCapital * 100 : 0;
 		const averageProfit = totalTrades > 0 ? totalProfit / totalTrades : 0;
 		const averageProfitPercent = totalTrades > 0 ? totalProfitPercent / totalTrades : 0;
 		return {
@@ -1548,8 +1539,8 @@ var VirtualPortfolio = class {
 			winningTrades,
 			losingTrades,
 			winRate,
-			maxDrawdown: Math.max(0, maxDrawdown),
-			maxDrawdownPercent: Math.max(0, maxDrawdownPercent),
+			maxDrawdown: this.maxDrawdown,
+			maxDrawdownPercent,
 			averageProfit,
 			averageProfitPercent
 		};
@@ -1608,9 +1599,11 @@ var VolumeAccumulationStrategy = class {
 		this.signals = [];
 		this.hasBrokenHigh = false;
 		this.hasBrokenLow = false;
+		this.hasPosition = false;
 	}
+	hasPosition = false;
 	onCandle(candle) {
-		if (!this.dailyProfile) return;
+		if (!this.dailyProfile || this.hasPosition) return;
 		const high = quotationToNumber$1(candle.high);
 		const low = quotationToNumber$1(candle.low);
 		const close = quotationToNumber$1(candle.close);
@@ -1632,6 +1625,7 @@ var VolumeAccumulationStrategy = class {
 				reason: `Return to VA after breaking high (VAH=${this.dailyProfile.valueAreaHigh})`
 			});
 			this.hasBrokenHigh = false;
+			this.hasPosition = true;
 		}
 		if (this.hasBrokenLow && close > this.dailyProfile.valueAreaLow) {
 			this.signals.push({
@@ -1642,6 +1636,7 @@ var VolumeAccumulationStrategy = class {
 				reason: `Return to VA after breaking low (VAL=${this.dailyProfile.valueAreaLow})`
 			});
 			this.hasBrokenLow = false;
+			this.hasPosition = true;
 		}
 	}
 	getSignals() {
@@ -1841,29 +1836,64 @@ var registerTradingAssistantHandlers = () => {
 		});
 	});
 	electron.ipcMain.on("trading-assistant:unsubscribe", (event) => {});
-	electron.ipcMain.handle("trading-assistant:run-backtest", async (_, instrumentUid, date, token) => {
+	electron.ipcMain.handle("trading-assistant:run-backtest", async (_, instrumentUid, dateFrom, dateTo, intervalStr, token, params) => {
 		const loader = new HistoricalDataLoader();
-		date + "";
-		date + "";
+		dateFrom + "";
+		dateTo + "";
+		const interval = {
+			"1min": CandleInterval.CANDLE_INTERVAL_1_MIN,
+			"5min": CandleInterval.CANDLE_INTERVAL_5_MIN,
+			"15min": CandleInterval.CANDLE_INTERVAL_15_MIN,
+			"1hour": CandleInterval.CANDLE_INTERVAL_HOUR
+		}[intervalStr] || CandleInterval.CANDLE_INTERVAL_1_MIN;
+		const allSignals = [];
+		let totalStats = {
+			totalTrades: 0,
+			winningTrades: 0,
+			totalProfit: 0
+		};
+		const allCandles = [];
+		let lastProfile = null;
 		try {
-			const candles = await loader.loadIntradayCandles(instrumentUid, /* @__PURE__ */ new Date(date + "T07:00:00Z"), /* @__PURE__ */ new Date(date + "T16:00:00Z"), token, CandleInterval.CANDLE_INTERVAL_1_MIN);
-			if (!candles || candles.length === 0) return {
-				profile: null,
-				stats: null,
-				signals: [],
-				candles: []
-			};
-			const profileEngine = new VolumeProfileEngine({ profileResolution: 50 });
-			candles.forEach((candle) => {
-				profileEngine.onCandle?.(candle);
-			});
-			const profile = profileEngine.getProfile(instrumentUid);
-			const strategy = new VolumeAccumulationStrategy(instrumentUid, profile);
+			let currentDate = /* @__PURE__ */ new Date(dateFrom + "T00:00:00Z");
+			const endDate = /* @__PURE__ */ new Date(dateTo + "T00:00:00Z");
+			while (currentDate <= endDate) {
+				const dateStr = currentDate.toISOString().split("T")[0];
+				const dayFrom = /* @__PURE__ */ new Date(dateStr + "T07:00:00Z");
+				const dayTo = /* @__PURE__ */ new Date(dateStr + "T16:00:00Z");
+				const candles = await loader.loadIntradayCandles(instrumentUid, dayFrom, dayTo, token, interval);
+				if (candles.length > 0) {
+					const engine = new VolumeProfileEngine({
+						profileResolution: params.profileResolution || 50,
+						valueAreaPercent: params.valueAreaPercent || 70
+					});
+					candles.forEach((c) => engine.onCandle?.(c));
+					const profile = engine.getProfile(instrumentUid);
+					if (profile) lastProfile = profile;
+					const strategy = new VolumeAccumulationStrategy(instrumentUid, profile);
+					const stats = new BacktestEngine().run(strategy, candles);
+					const signals = strategy.getSignals();
+					allSignals.push(...signals);
+					allCandles.push(...candles);
+					totalStats.totalTrades += stats.portfolio.totalTrades;
+					totalStats.winningTrades += stats.portfolio.winningTrades;
+					totalStats.totalProfit += stats.portfolio.totalProfit;
+				}
+				currentDate.setDate(currentDate.getDate() + 1);
+			}
 			return {
-				profile,
-				stats: new BacktestEngine().run(strategy, candles),
-				signals: strategy.getSignals(),
-				candles
+				profile: lastProfile,
+				stats: {
+					totalSignals: allSignals.length,
+					buySignals: allSignals.filter((s) => s.type === "BUY").length,
+					sellSignals: allSignals.length - allSignals.filter((s) => s.type === "BUY").length,
+					portfolio: {
+						...totalStats,
+						winRate: totalStats.totalTrades > 0 ? totalStats.winningTrades / totalStats.totalTrades * 100 : 0
+					}
+				},
+				signals: allSignals,
+				candles: allCandles
 			};
 		} catch (error) {
 			console.error("Backtest error:", error);
