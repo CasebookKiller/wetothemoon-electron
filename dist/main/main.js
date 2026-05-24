@@ -1202,7 +1202,7 @@ var createTradingAssistantWindow = () => {
 var getTradingAssistantWindow = () => tradingAssistantWindow;
 //#endregion
 //#region src/main/services/volumeProfileEngine.ts
-function quotationToNumber$2(q) {
+function quotationToNumber$3(q) {
 	if (!q) return 0;
 	return Number(q.units || "0") + (q.nano || 0) / 1e9;
 }
@@ -1236,9 +1236,9 @@ var VolumeProfileEngine = class extends events.EventEmitter {
 		if (!uid) return;
 		const volume = Number(candle.volume || "0");
 		if (volume <= this.config.minVolumeThreshold) return;
-		const high = quotationToNumber$2(candle.high);
-		const low = quotationToNumber$2(candle.low);
-		const close = quotationToNumber$2(candle.close);
+		const high = quotationToNumber$3(candle.high);
+		const low = quotationToNumber$3(candle.low);
+		const close = quotationToNumber$3(candle.close);
 		const time = candle.time || (/* @__PURE__ */ new Date()).toISOString();
 		this.lastPrice.set(uid, close);
 		const typicalPrice = (high + low + close) / 3;
@@ -1268,7 +1268,7 @@ var VolumeProfileEngine = class extends events.EventEmitter {
 	onTrade(trade) {
 		const uid = trade.instrumentUid || trade.figi;
 		if (!uid) return;
-		const price = quotationToNumber$2(trade.price);
+		const price = quotationToNumber$3(trade.price);
 		this.lastPrice.set(uid, price);
 	}
 	addVolume(uid, price, volume) {
@@ -1473,21 +1473,125 @@ var CandleSourceRequest = /* @__PURE__ */ function(CandleSourceRequest) {
 	return CandleSourceRequest;
 }({});
 //#endregion
+//#region src/main/services/backtest/virtualPortfolio.ts
+var VirtualPortfolio = class {
+	capital;
+	initialCapital;
+	trades = [];
+	openPosition = null;
+	peakCapital;
+	constructor(config) {
+		this.initialCapital = config.initialCapital;
+		this.capital = config.initialCapital;
+		this.peakCapital = config.initialCapital;
+	}
+	/** Обрабатывает сигнал: если есть открытая позиция, закрывает её по цене сигнала,
+	*  затем открывает новую в соответствии с сигналом.
+	*  Упрощённо: каждый сигнал = закрытие предыдущей + открытие новой.
+	*/
+	processSignal(signal) {
+		if (this.openPosition) this.closePosition(signal.price, signal.time);
+		this.openPosition = {
+			type: signal.type,
+			price: signal.price,
+			time: signal.time
+		};
+	}
+	/** Закрыть позицию (при завершении бэктеста или перед сменой направления) */
+	closePosition(price, time) {
+		if (!this.openPosition) return;
+		const entry = this.openPosition;
+		let profit;
+		if (entry.type === "BUY") profit = price - entry.price;
+		else profit = entry.price - price;
+		const profitPercent = profit / entry.price * 100;
+		this.capital += profit;
+		this.trades.push({
+			type: entry.type,
+			entryPrice: entry.price,
+			exitPrice: price,
+			entryTime: entry.time,
+			exitTime: time,
+			profit,
+			profitPercent
+		});
+		if (this.capital > this.peakCapital) this.peakCapital = this.capital;
+		this.openPosition = null;
+	}
+	/** Принудительно закрыть все позиции и вернуть статистику */
+	finalize() {
+		if (this.openPosition) {}
+		return this.getStats();
+	}
+	/** Закрыть позицию по последней рыночной цене и вернуть статистику */
+	finalizeWithLastPrice(lastPrice, time) {
+		if (this.openPosition) this.closePosition(lastPrice, time);
+		return this.getStats();
+	}
+	getStats() {
+		const totalTrades = this.trades.length;
+		const winningTrades = this.trades.filter((t) => t.profit > 0).length;
+		const losingTrades = totalTrades - winningTrades;
+		const winRate = totalTrades > 0 ? winningTrades / totalTrades * 100 : 0;
+		const totalProfit = this.capital - this.initialCapital;
+		const totalProfitPercent = totalProfit / this.initialCapital * 100;
+		const maxDrawdown = this.peakCapital - this.capital;
+		const maxDrawdownPercent = maxDrawdown / this.peakCapital * 100;
+		const averageProfit = totalTrades > 0 ? totalProfit / totalTrades : 0;
+		const averageProfitPercent = totalTrades > 0 ? totalProfitPercent / totalTrades : 0;
+		return {
+			initialCapital: this.initialCapital,
+			finalCapital: this.capital,
+			totalProfit,
+			totalProfitPercent,
+			totalTrades,
+			winningTrades,
+			losingTrades,
+			winRate,
+			maxDrawdown: Math.max(0, maxDrawdown),
+			maxDrawdownPercent: Math.max(0, maxDrawdownPercent),
+			averageProfit,
+			averageProfitPercent
+		};
+	}
+};
+//#endregion
 //#region src/main/services/backtest/backtestEngine.ts
 var BacktestEngine = class {
+	portfolioConfig;
+	constructor(portfolioConfig) {
+		this.portfolioConfig = {
+			initialCapital: 1e5,
+			...portfolioConfig
+		};
+	}
 	run(strategy, candles) {
 		strategy.reset();
-		for (const candle of candles) strategy.onCandle(candle);
+		const portfolio = new VirtualPortfolio(this.portfolioConfig);
+		for (let i = 0; i < candles.length; i++) {
+			const candle = candles[i];
+			strategy.onCandle(candle);
+			const newSignals = strategy.getSignals();
+			if (newSignals.length > 0) for (const signal of newSignals) portfolio.processSignal(signal);
+		}
+		const lastCandle = candles[candles.length - 1];
+		const lastPrice = quotationToNumber$2(lastCandle.close);
+		portfolio.finalizeWithLastPrice(lastPrice, lastCandle.time || "");
 		const signals = strategy.getSignals();
 		const buy = signals.filter((s) => s.type === "BUY").length;
 		const sell = signals.filter((s) => s.type === "SELL").length;
 		return {
 			totalSignals: signals.length,
 			buySignals: buy,
-			sellSignals: sell
+			sellSignals: sell,
+			portfolio: portfolio.getStats()
 		};
 	}
 };
+function quotationToNumber$2(q) {
+	if (!q) return 0;
+	return Number(q.units || "0") + (q.nano || 0) / 1e9;
+}
 //#endregion
 //#region src/main/services/backtest/strategies/VolumeAccumulationStrategy.ts
 var VolumeAccumulationStrategy = class {
