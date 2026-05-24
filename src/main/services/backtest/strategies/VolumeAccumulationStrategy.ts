@@ -1,7 +1,8 @@
 // src/main/services/backtest/strategies/VolumeAccumulationStrategy.ts
 import type { StreamCandle } from '@/api/tbank/marketdataStreamTypes';
 import type { VolumeProfileLevels } from '../../volumeProfileEngine';
-import type { IBacktestStrategy, BacktestSignal } from '../backtestEngine';
+import type { IBacktestStrategy } from '../backtestEngine';
+import { BacktestSignal } from '../common';
 
 export class VolumeAccumulationStrategy implements IBacktestStrategy {
   private signals: BacktestSignal[] = [];
