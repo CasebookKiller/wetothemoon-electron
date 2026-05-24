@@ -370,33 +370,21 @@ export const TradingAssistantPage: React.FC = () => {
       )}
 
       {backtestResult?.stats && backtestResult.stats.portfolio && (
-      <div className="backtest-stats">
-        <h3>Backtest Results</h3>
-        <p>Total Signals: {backtestResult.stats.totalSignals}</p>
-        <p>Buy / Sell: {backtestResult.stats.buySignals} / {backtestResult.stats.sellSignals}</p>
-        <p>Portfolio:</p>
-        <ul>
-          <li>Initial Capital: {backtestResult.stats.portfolio.initialCapital}</li>
-          <li>Final Capital: {backtestResult.stats.portfolio.finalCapital?.toFixed(2)}</li>
-          <li>Total Profit: 
-            <span className={backtestResult.stats.portfolio.totalProfit >= 0 ? 'positive' : 'negative'}>
-              {' '}{backtestResult.stats.portfolio.totalProfit?.toFixed(2)} 
-              {' '}({backtestResult.stats.portfolio.totalProfitPercent?.toFixed(2)}%)
-            </span>
-          </li>
-          <li>Trades: {backtestResult.stats.portfolio.totalTrades} (W: {backtestResult.stats.portfolio.winningTrades}, L: {backtestResult.stats.portfolio.losingTrades})</li>
-          <li>Win Rate: {backtestResult.stats.portfolio.winRate?.toFixed(1)}%</li>
-          <li>
-            Max Drawdown:
-            <span className={backtestResult.stats.portfolio.maxDrawdown >= 0 ? 'positive' : 'negative'}>
-            {' '}{backtestResult.stats.portfolio.maxDrawdown?.toFixed(2)}
-            {' '}({backtestResult.stats.portfolio.maxDrawdownPercent?.toFixed(2)}%)
-            </span>
-          </li>
-          <li>Avg Profit: {backtestResult.stats.portfolio.averageProfit?.toFixed(2)}</li>
-        </ul>
-      </div>
-    )}
+        <div className="backtest-stats">
+          <h3>Backtest Results</h3>
+          <p>Total Signals: {backtestResult.stats.totalSignals}</p>
+          <p>Buy / Sell: {backtestResult.stats.buySignals} / {backtestResult.stats.sellSignals}</p>
+          <ul>
+            <li>Initial Capital: {backtestResult.stats.portfolio.initialCapital}</li>
+            <li>Final Capital: {backtestResult.stats.portfolio.finalCapital?.toFixed(2)}</li>
+            <li>Total Profit: <span className={backtestResult.stats.portfolio.totalProfit >= 0 ? 'positive' : 'negative'}>{backtestResult.stats.portfolio.totalProfit?.toFixed(2)} ({backtestResult.stats.portfolio.totalProfitPercent?.toFixed(2)}%)</span></li>
+            <li>Trades: {backtestResult.stats.portfolio.totalTrades} (W: {backtestResult.stats.portfolio.winningTrades}, L: {backtestResult.stats.portfolio.losingTrades})</li>
+            <li>Win Rate: {backtestResult.stats.portfolio.winRate?.toFixed(1)}%</li>
+            <li>Max Drawdown: {backtestResult.stats.portfolio.maxDrawdown?.toFixed(2)} ({backtestResult.stats.portfolio.maxDrawdownPercent?.toFixed(2)}%)</li>
+            <li>Avg Profit: {backtestResult.stats.portfolio.averageProfit?.toFixed(2)}</li>
+          </ul>
+        </div>
+      )}
 
       {liveSignals.length > 0 && (
         <div className="signals-log">

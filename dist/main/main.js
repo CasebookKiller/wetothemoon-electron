@@ -1473,117 +1473,6 @@ var CandleSourceRequest = /* @__PURE__ */ function(CandleSourceRequest) {
 	return CandleSourceRequest;
 }({});
 //#endregion
-//#region src/main/services/backtest/virtualPortfolio.ts
-var VirtualPortfolio = class {
-	capital;
-	initialCapital;
-	trades = [];
-	openPosition = null;
-	peakCapital;
-	maxDrawdown = 0;
-	constructor(config) {
-		this.initialCapital = config.initialCapital;
-		this.capital = config.initialCapital;
-		this.peakCapital = config.initialCapital;
-	}
-	processSignal(signal) {
-		if (this.openPosition) this.closePosition(signal.price, signal.time);
-		this.openPosition = {
-			type: signal.type,
-			price: signal.price,
-			time: signal.time
-		};
-	}
-	closePosition(price, time) {
-		if (!this.openPosition) return;
-		const entry = this.openPosition;
-		let profit;
-		if (entry.type === "BUY") profit = price - entry.price;
-		else profit = entry.price - price;
-		const profitPercent = profit / entry.price * 100;
-		this.capital += profit;
-		this.trades.push({
-			type: entry.type,
-			entryPrice: entry.price,
-			exitPrice: price,
-			entryTime: entry.time,
-			exitTime: time,
-			profit,
-			profitPercent
-		});
-		if (this.capital > this.peakCapital) this.peakCapital = this.capital;
-		const currentDrawdown = this.peakCapital - this.capital;
-		if (currentDrawdown > this.maxDrawdown) this.maxDrawdown = currentDrawdown;
-		this.openPosition = null;
-	}
-	finalizeWithLastPrice(lastPrice, time) {
-		if (this.openPosition) this.closePosition(lastPrice, time);
-		return this.getStats();
-	}
-	getStats() {
-		const totalTrades = this.trades.length;
-		const winningTrades = this.trades.filter((t) => t.profit > 0).length;
-		const losingTrades = totalTrades - winningTrades;
-		const winRate = totalTrades > 0 ? winningTrades / totalTrades * 100 : 0;
-		const totalProfit = this.capital - this.initialCapital;
-		const totalProfitPercent = totalProfit / this.initialCapital * 100;
-		const maxDrawdownPercent = this.peakCapital > 0 ? this.maxDrawdown / this.peakCapital * 100 : 0;
-		const averageProfit = totalTrades > 0 ? totalProfit / totalTrades : 0;
-		const averageProfitPercent = totalTrades > 0 ? totalProfitPercent / totalTrades : 0;
-		return {
-			initialCapital: this.initialCapital,
-			finalCapital: this.capital,
-			totalProfit,
-			totalProfitPercent,
-			totalTrades,
-			winningTrades,
-			losingTrades,
-			winRate,
-			maxDrawdown: this.maxDrawdown,
-			maxDrawdownPercent,
-			averageProfit,
-			averageProfitPercent
-		};
-	}
-};
-//#endregion
-//#region src/main/services/backtest/backtestEngine.ts
-var BacktestEngine = class {
-	portfolioConfig;
-	constructor(portfolioConfig) {
-		this.portfolioConfig = {
-			initialCapital: 1e5,
-			...portfolioConfig
-		};
-	}
-	run(strategy, candles) {
-		strategy.reset();
-		const portfolio = new VirtualPortfolio(this.portfolioConfig);
-		for (let i = 0; i < candles.length; i++) {
-			const candle = candles[i];
-			strategy.onCandle(candle);
-			const newSignals = strategy.getSignals();
-			if (newSignals.length > 0) for (const signal of newSignals) portfolio.processSignal(signal);
-		}
-		const lastCandle = candles[candles.length - 1];
-		const lastPrice = quotationToNumber$2(lastCandle.close);
-		portfolio.finalizeWithLastPrice(lastPrice, lastCandle.time || "");
-		const signals = strategy.getSignals();
-		const buy = signals.filter((s) => s.type === "BUY").length;
-		const sell = signals.filter((s) => s.type === "SELL").length;
-		return {
-			totalSignals: signals.length,
-			buySignals: buy,
-			sellSignals: sell,
-			portfolio: portfolio.getStats()
-		};
-	}
-};
-function quotationToNumber$2(q) {
-	if (!q) return 0;
-	return Number(q.units || "0") + (q.nano || 0) / 1e9;
-}
-//#endregion
 //#region src/main/services/backtest/strategies/VolumeAccumulationStrategy.ts
 var VolumeAccumulationStrategy = class {
 	signals = [];
@@ -1604,9 +1493,9 @@ var VolumeAccumulationStrategy = class {
 	hasPosition = false;
 	onCandle(candle) {
 		if (!this.dailyProfile || this.hasPosition) return;
-		const high = quotationToNumber$1(candle.high);
-		const low = quotationToNumber$1(candle.low);
-		const close = quotationToNumber$1(candle.close);
+		const high = quotationToNumber$2(candle.high);
+		const low = quotationToNumber$2(candle.low);
+		const close = quotationToNumber$2(candle.close);
 		const time = candle.time || (/* @__PURE__ */ new Date()).toISOString();
 		if (high > this.dailyProfile.valueAreaHigh) {
 			this.hasBrokenHigh = true;
@@ -1643,7 +1532,7 @@ var VolumeAccumulationStrategy = class {
 		return this.signals;
 	}
 };
-function quotationToNumber$1(q) {
+function quotationToNumber$2(q) {
 	if (!q) return 0;
 	return Number(q.units || 0) + (q.nano || 0) / 1e9;
 }
@@ -1727,7 +1616,7 @@ var marketDataGrpc = {
 };
 //#endregion
 //#region src/main/services/historicalDataLoader.ts
-function quotationToNumber(q) {
+function quotationToNumber$1(q) {
 	if (!q) return 0;
 	return Number(q.units || 0) + (q.nano || 0) / 1e9;
 }
@@ -1757,10 +1646,10 @@ var HistoricalDataLoader = class {
 		if (candles.length === 0) return null;
 		const engine = new VolumeProfileEngine({ profileResolution });
 		for (const candle of candles) {
-			const open = quotationToNumber(candle.open);
-			const high = quotationToNumber(candle.high);
-			const low = quotationToNumber(candle.low);
-			const close = quotationToNumber(candle.close);
+			const open = quotationToNumber$1(candle.open);
+			const high = quotationToNumber$1(candle.high);
+			const low = quotationToNumber$1(candle.low);
+			const close = quotationToNumber$1(candle.close);
 			const volume = Number(candle.volume || "0");
 			const streamCandle = {
 				instrumentUid,
@@ -1813,6 +1702,87 @@ var HistoricalDataLoader = class {
 	}
 };
 //#endregion
+//#region src/main/services/backtest/virtualPortfolio.ts
+var VirtualPortfolio = class {
+	capital;
+	initialCapital;
+	trades = [];
+	openPosition = null;
+	peakCapital;
+	maxDrawdown = 0;
+	constructor(config) {
+		this.initialCapital = config.initialCapital;
+		this.capital = config.initialCapital;
+		this.peakCapital = config.initialCapital;
+	}
+	processSignal(signal) {
+		if (this.openPosition) this.closePosition(signal.price, signal.time);
+		this.openPosition = {
+			type: signal.type,
+			price: signal.price,
+			time: signal.time
+		};
+	}
+	closePosition(price, time) {
+		if (!this.openPosition) return;
+		const entry = this.openPosition;
+		let profit;
+		if (entry.type === "BUY") profit = price - entry.price;
+		else profit = entry.price - price;
+		const profitPercent = profit / entry.price * 100;
+		this.capital += profit;
+		this.trades.push({
+			type: entry.type,
+			entryPrice: entry.price,
+			exitPrice: price,
+			entryTime: entry.time,
+			exitTime: time,
+			profit,
+			profitPercent
+		});
+		if (this.capital > this.peakCapital) this.peakCapital = this.capital;
+		const currentDrawdown = this.peakCapital - this.capital;
+		if (currentDrawdown > this.maxDrawdown) this.maxDrawdown = currentDrawdown;
+		this.openPosition = null;
+	}
+	finalizeWithLastPrice(lastPrice, time) {
+		if (this.openPosition) this.closePosition(lastPrice, time);
+		return this.getStats();
+	}
+	getStats() {
+		const totalTrades = this.trades.length;
+		const winningTrades = this.trades.filter((t) => t.profit > 0).length;
+		const losingTrades = totalTrades - winningTrades;
+		const winRate = totalTrades > 0 ? winningTrades / totalTrades * 100 : 0;
+		const totalProfit = this.capital - this.initialCapital;
+		const totalProfitPercent = totalProfit / this.initialCapital * 100;
+		const maxDrawdownPercent = this.peakCapital > 0 ? this.maxDrawdown / this.peakCapital * 100 : 0;
+		const averageProfit = totalTrades > 0 ? totalProfit / totalTrades : 0;
+		const averageProfitPercent = totalTrades > 0 ? totalProfitPercent / totalTrades : 0;
+		return {
+			initialCapital: this.initialCapital,
+			finalCapital: this.capital,
+			totalProfit,
+			totalProfitPercent,
+			totalTrades,
+			winningTrades,
+			losingTrades,
+			winRate,
+			maxDrawdown: this.maxDrawdown,
+			maxDrawdownPercent,
+			averageProfit,
+			averageProfitPercent
+		};
+	}
+};
+//#endregion
+//#region src/main/services/backtest/common.ts
+/** Преобразует Quotation в число */
+function quotationToNumber(q) {
+	if (!q) return 0;
+	return Number(q.units || "0") + (q.nano || 0) / 1e9;
+}
+//#endregion
 //#region src/main/ipcHandlers/tradingAssistantHandlers.ts
 var registerTradingAssistantHandlers = () => {
 	electron.ipcMain.handle("trading-assistant:get-profile", (_, instrumentUid) => {
@@ -1838,22 +1808,14 @@ var registerTradingAssistantHandlers = () => {
 	electron.ipcMain.on("trading-assistant:unsubscribe", (event) => {});
 	electron.ipcMain.handle("trading-assistant:run-backtest", async (_, instrumentUid, dateFrom, dateTo, intervalStr, token, params) => {
 		const loader = new HistoricalDataLoader();
-		dateFrom + "";
-		dateTo + "";
 		const interval = {
 			"1min": CandleInterval.CANDLE_INTERVAL_1_MIN,
 			"5min": CandleInterval.CANDLE_INTERVAL_5_MIN,
 			"15min": CandleInterval.CANDLE_INTERVAL_15_MIN,
 			"1hour": CandleInterval.CANDLE_INTERVAL_HOUR
 		}[intervalStr] || CandleInterval.CANDLE_INTERVAL_1_MIN;
-		const allSignals = [];
-		let totalStats = {
-			totalTrades: 0,
-			winningTrades: 0,
-			totalProfit: 0
-		};
 		const allCandles = [];
-		let lastProfile = null;
+		const allSignals = [];
 		try {
 			let currentDate = /* @__PURE__ */ new Date(dateFrom + "T00:00:00Z");
 			const endDate = /* @__PURE__ */ new Date(dateTo + "T00:00:00Z");
@@ -1868,30 +1830,42 @@ var registerTradingAssistantHandlers = () => {
 						valueAreaPercent: params.valueAreaPercent || 70
 					});
 					candles.forEach((c) => engine.onCandle?.(c));
-					const profile = engine.getProfile(instrumentUid);
-					if (profile) lastProfile = profile;
-					const strategy = new VolumeAccumulationStrategy(instrumentUid, profile);
-					const stats = new BacktestEngine().run(strategy, candles);
+					const strategy = new VolumeAccumulationStrategy(instrumentUid, engine.getProfile(instrumentUid));
+					candles.forEach((c) => strategy.onCandle(c));
 					const signals = strategy.getSignals();
 					allSignals.push(...signals);
 					allCandles.push(...candles);
-					totalStats.totalTrades += stats.portfolio.totalTrades;
-					totalStats.winningTrades += stats.portfolio.winningTrades;
-					totalStats.totalProfit += stats.portfolio.totalProfit;
 				}
 				currentDate.setDate(currentDate.getDate() + 1);
 			}
+			const portfolio = new VirtualPortfolio({ initialCapital: 1e5 });
+			for (const signal of allSignals) portfolio.processSignal(signal);
+			if (allCandles.length > 0) {
+				const lastCandle = allCandles[allCandles.length - 1];
+				const lastPrice = quotationToNumber(lastCandle.close);
+				portfolio.finalizeWithLastPrice(lastPrice, lastCandle.time || "");
+			} else portfolio.finalizeWithLastPrice(0, "");
+			const stats = portfolio.getStats();
+			const backtestStats = {
+				totalSignals: allSignals.length,
+				buySignals: allSignals.filter((s) => s.type === "BUY").length,
+				sellSignals: allSignals.filter((s) => s.type === "SELL").length,
+				portfolio: stats
+			};
+			let lastProfile = null;
+			if (allCandles.length > 0) {
+				const lastEngine = new VolumeProfileEngine({
+					profileResolution: params.profileResolution || 50,
+					valueAreaPercent: params.valueAreaPercent || 70
+				});
+				const lastDayCandles = allCandles.filter((c) => c.time?.startsWith(dateTo));
+				if (lastDayCandles.length === 0) allCandles.slice(-540).forEach((c) => lastEngine.onCandle?.(c));
+				else lastDayCandles.forEach((c) => lastEngine.onCandle?.(c));
+				lastProfile = lastEngine.getProfile(instrumentUid);
+			}
 			return {
 				profile: lastProfile,
-				stats: {
-					totalSignals: allSignals.length,
-					buySignals: allSignals.filter((s) => s.type === "BUY").length,
-					sellSignals: allSignals.length - allSignals.filter((s) => s.type === "BUY").length,
-					portfolio: {
-						...totalStats,
-						winRate: totalStats.totalTrades > 0 ? totalStats.winningTrades / totalStats.totalTrades * 100 : 0
-					}
-				},
+				stats: backtestStats,
 				signals: allSignals,
 				candles: allCandles
 			};
@@ -2800,6 +2774,39 @@ function registerTasksHandlers() {
 		createTasksWindow();
 	});
 }
+//#endregion
+//#region src/main/services/backtest/backtestEngine.ts
+var BacktestEngine = class {
+	portfolioConfig;
+	constructor(portfolioConfig) {
+		this.portfolioConfig = {
+			initialCapital: 1e5,
+			...portfolioConfig
+		};
+	}
+	run(strategy, candles) {
+		strategy.reset();
+		const portfolio = new VirtualPortfolio(this.portfolioConfig);
+		for (let i = 0; i < candles.length; i++) {
+			const candle = candles[i];
+			strategy.onCandle(candle);
+			const newSignals = strategy.getSignals();
+			if (newSignals.length > 0) for (const signal of newSignals) portfolio.processSignal(signal);
+		}
+		const lastCandle = candles[candles.length - 1];
+		const lastPrice = quotationToNumber(lastCandle.close);
+		portfolio.finalizeWithLastPrice(lastPrice, lastCandle.time || "");
+		const signals = strategy.getSignals();
+		const buy = signals.filter((s) => s.type === "BUY").length;
+		const sell = signals.filter((s) => s.type === "SELL").length;
+		return {
+			totalSignals: signals.length,
+			buySignals: buy,
+			sellSignals: sell,
+			portfolio: portfolio.getStats()
+		};
+	}
+};
 //#endregion
 //#region src/main/main.ts
 var scriptsDir = path.default.join(electron.app.getPath("userData"), "scripts");

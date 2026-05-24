@@ -1,14 +1,8 @@
 // src/main/services/backtest/backtestEngine.ts
 import type { StreamCandle } from '@/api/tbank/marketdataStreamTypes';
 import { VirtualPortfolio, type PortfolioStats, type PortfolioConfig } from './virtualPortfolio';
-
-export interface BacktestSignal {
-  type: 'BUY' | 'SELL';
-  price: number;
-  time: string;
-  instrumentUid: string;
-  reason: string;
-}
+import { quotationToNumber } from './common';
+import { BacktestSignal } from './common';
 
 export interface BacktestStats {
   totalSignals: number;
@@ -69,11 +63,4 @@ export class BacktestEngine {
       portfolio: portfolio.getStats(),
     };
   }
-}
-
-function quotationToNumber(q: any): number {
-  if (!q) return 0;
-  const units = Number(q.units || '0');
-  const nano = q.nano || 0;
-  return units + nano / 1e9;
 }

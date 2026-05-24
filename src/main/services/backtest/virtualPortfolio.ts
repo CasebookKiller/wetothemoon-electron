@@ -1,5 +1,5 @@
 // src/main/services/backtest/virtualPortfolio.ts
-import type { BacktestSignal } from './backtestEngine';
+import type { BacktestSignal } from './common';
 
 export interface PortfolioConfig {
   initialCapital: number;

@@ -2,10 +2,12 @@
 import { ipcMain, BrowserWindow } from 'electron';
 import { VolumeProfileEngine, volumeProfileEngine } from '../services/volumeProfileEngine';
 import { CandleInterval } from '@/api/tbank/marketdataTypes';
-import { BacktestEngine, BacktestSignal } from '../services/backtest/backtestEngine';
+import { BacktestEngine } from '../services/backtest/backtestEngine';
 import { VolumeAccumulationStrategy } from '../services/backtest/strategies/VolumeAccumulationStrategy';
 import { HistoricalDataLoader } from '../services/historicalDataLoader';
 import { StreamCandle } from '@/api/tbank/marketdataStreamTypes';
+import { VirtualPortfolio } from '../services/backtest/virtualPortfolio';
+import { BacktestSignal, quotationToNumber } from '../services/backtest/common';
 
 export const registerTradingAssistantHandlers = () => {
   // Получить текущий профиль по инструменту (по запросу)
@@ -91,20 +93,8 @@ export const registerTradingAssistantHandlers = () => {
   });
   */
 
-  ipcMain.handle('trading-assistant:run-backtest', async (
-    _,
-    instrumentUid: string,
-    dateFrom: string,
-    dateTo: string,
-    intervalStr: string,
-    token: string,
-    params: any
-  ) => {
+  ipcMain.handle('trading-assistant:run-backtest', async (_, instrumentUid: string, dateFrom: string, dateTo: string, intervalStr: string, token: string, params: any) => {
     const loader = new HistoricalDataLoader();
-    const from = new Date(dateFrom + 'T00:00:00Z');
-    const to = new Date(dateTo + 'T23:59:59Z');
-
-    // Преобразование интервала
     const intervalMap: Record<string, CandleInterval> = {
       '1min': CandleInterval.CANDLE_INTERVAL_1_MIN,
       '5min': CandleInterval.CANDLE_INTERVAL_5_MIN,
@@ -113,67 +103,89 @@ export const registerTradingAssistantHandlers = () => {
     };
     const interval = intervalMap[intervalStr] || CandleInterval.CANDLE_INTERVAL_1_MIN;
 
-    const allSignals: BacktestSignal[] = [];
-    let totalStats = { totalTrades: 0, winningTrades: 0, totalProfit: 0 };
     const allCandles: any[] = [];
-    let lastProfile = null;
+    const allSignals: BacktestSignal[] = [];
 
     try {
-      // Цикл по дням
       let currentDate = new Date(dateFrom + 'T00:00:00Z');
       const endDate = new Date(dateTo + 'T00:00:00Z');
+
+      // Собираем свечи и сигналы за каждый день
       while (currentDate <= endDate) {
         const dateStr = currentDate.toISOString().split('T')[0];
-        const dayFrom = new Date(dateStr + 'T07:00:00Z'); // Московская биржа
+        const dayFrom = new Date(dateStr + 'T07:00:00Z');
         const dayTo = new Date(dateStr + 'T16:00:00Z');
 
         const candles = await loader.loadIntradayCandles(
-          instrumentUid,
-          dayFrom,
-          dayTo,
-          token,
-          interval
+          instrumentUid, dayFrom, dayTo, token, interval
         );
 
         if (candles.length > 0) {
-          // Расчёт профиля
+          // Профиль для стратегии (можно пересчитывать каждый день, но стратегия берёт dailyProfile)
           const engine = new VolumeProfileEngine({
             profileResolution: params.profileResolution || 50,
             valueAreaPercent: params.valueAreaPercent || 70,
           });
           candles.forEach(c => (engine as any).onCandle?.(c));
           const profile = engine.getProfile(instrumentUid);
-          if (profile) lastProfile = profile;
 
           // Стратегия
           const strategy = new VolumeAccumulationStrategy(instrumentUid, profile);
-          const btEngine = new BacktestEngine();
-          const stats = btEngine.run(strategy, candles);
+          candles.forEach(c => strategy.onCandle(c));
           const signals = strategy.getSignals();
 
           allSignals.push(...signals);
           allCandles.push(...candles);
-
-          // Агрегация статистики (упрощённо)
-          totalStats.totalTrades += stats.portfolio.totalTrades;
-          totalStats.winningTrades += stats.portfolio.winningTrades;
-          totalStats.totalProfit += stats.portfolio.totalProfit;
         }
 
         currentDate.setDate(currentDate.getDate() + 1);
       }
 
+      // Единый портфель на все сигналы
+      const portfolioConfig = { initialCapital: 100000 };
+      const portfolio = new VirtualPortfolio(portfolioConfig);
+      for (const signal of allSignals) {
+        portfolio.processSignal(signal);
+      }
+      // Закрываем позицию в конце последнего дня по последней цене
+      if (allCandles.length > 0) {
+        const lastCandle = allCandles[allCandles.length - 1];
+        const lastPrice = quotationToNumber(lastCandle.close);
+        portfolio.finalizeWithLastPrice(lastPrice, lastCandle.time || '');
+      } else {
+        portfolio.finalizeWithLastPrice(0, '');
+      }
+
+      const stats = portfolio.getStats();
+      const backtestStats = {
+        totalSignals: allSignals.length,
+        buySignals: allSignals.filter(s => s.type === 'BUY').length,
+        sellSignals: allSignals.filter(s => s.type === 'SELL').length,
+        portfolio: stats,
+      };
+
+      // Профиль за последний день
+      let lastProfile = null;
+      if (allCandles.length > 0) {
+        const lastEngine = new VolumeProfileEngine({
+          profileResolution: params.profileResolution || 50,
+          valueAreaPercent: params.valueAreaPercent || 70,
+        });
+        // Пересчитываем профиль только для последнего дня (можно взять из цикла, но для простоты заново)
+        const lastDayCandles = allCandles.filter(c => c.time?.startsWith(dateTo));
+        if (lastDayCandles.length === 0) {
+          // Если нет свечей за последний день, берём последние свечи
+          const lastDay = allCandles.slice(-540); // примерно 9 часов торгов
+          lastDay.forEach(c => (lastEngine as any).onCandle?.(c));
+        } else {
+          lastDayCandles.forEach(c => (lastEngine as any).onCandle?.(c));
+        }
+        lastProfile = lastEngine.getProfile(instrumentUid);
+      }
+
       return {
         profile: lastProfile,
-        stats: {
-          totalSignals: allSignals.length,
-          buySignals: allSignals.filter(s => s.type === 'BUY').length,
-          sellSignals: allSignals.length - allSignals.filter(s => s.type === 'BUY').length,
-          portfolio: {
-            ...totalStats,
-            winRate: totalStats.totalTrades > 0 ? (totalStats.winningTrades / totalStats.totalTrades) * 100 : 0,
-          },
-        },
+        stats: backtestStats,
         signals: allSignals,
         candles: allCandles,
       };
