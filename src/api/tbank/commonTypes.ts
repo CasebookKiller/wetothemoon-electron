@@ -1,3 +1,5 @@
+// src/api/tbank/commonTypes.ts
+
 /** Дата и время в UTC (google.protobuf.Timestamp) */
 export type Timestamp = string; // ISO 8601
 

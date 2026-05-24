@@ -1202,7 +1202,7 @@ var createTradingAssistantWindow = () => {
 var getTradingAssistantWindow = () => tradingAssistantWindow;
 //#endregion
 //#region src/main/services/volumeProfileEngine.ts
-function quotationToNumber$1(q) {
+function quotationToNumber$2(q) {
 	if (!q) return 0;
 	return Number(q.units || "0") + (q.nano || 0) / 1e9;
 }
@@ -1231,9 +1231,9 @@ var VolumeProfileEngine = class extends events.EventEmitter {
 		if (!uid) return;
 		const volume = Number(candle.volume || "0");
 		if (volume <= this.config.minVolumeThreshold) return;
-		const high = quotationToNumber$1(candle.high);
-		const low = quotationToNumber$1(candle.low);
-		const close = quotationToNumber$1(candle.close);
+		const high = quotationToNumber$2(candle.high);
+		const low = quotationToNumber$2(candle.low);
+		const close = quotationToNumber$2(candle.close);
 		const time = candle.time || (/* @__PURE__ */ new Date()).toISOString();
 		this.lastPrice.set(uid, close);
 		const priceRange = high - low;
@@ -1252,7 +1252,7 @@ var VolumeProfileEngine = class extends events.EventEmitter {
 	onTrade(trade) {
 		const uid = trade.instrumentUid || trade.figi;
 		if (!uid) return;
-		const price = quotationToNumber$1(trade.price);
+		const price = quotationToNumber$2(trade.price);
 		this.lastPrice.set(uid, price);
 	}
 	addVolume(uid, price, volume) {
@@ -2450,7 +2450,7 @@ var CandleSourceRequest = /* @__PURE__ */ function(CandleSourceRequest) {
 }({});
 //#endregion
 //#region src/main/services/historicalDataLoader.ts
-function quotationToNumber(q) {
+function quotationToNumber$1(q) {
 	if (!q) return 0;
 	return Number(q.units || 0) + (q.nano || 0) / 1e9;
 }
@@ -2480,10 +2480,10 @@ var HistoricalDataLoader = class {
 		if (candles.length === 0) return null;
 		const engine = new VolumeProfileEngine();
 		for (const candle of candles) {
-			const open = quotationToNumber(candle.open);
-			const high = quotationToNumber(candle.high);
-			const low = quotationToNumber(candle.low);
-			const close = quotationToNumber(candle.close);
+			const open = quotationToNumber$1(candle.open);
+			const high = quotationToNumber$1(candle.high);
+			const low = quotationToNumber$1(candle.low);
+			const close = quotationToNumber$1(candle.close);
 			const volume = Number(candle.volume || "0");
 			const streamCandle = {
 				instrumentUid,
@@ -2533,6 +2533,82 @@ var HistoricalDataLoader = class {
 			volume: String(candle.volume || "0"),
 			time: timestampToISO(candle.time)
 		}));
+	}
+};
+//#endregion
+//#region src/main/services/backtest/strategies/VolumeAccumulationStrategy.ts
+var VolumeAccumulationStrategy = class {
+	signals = [];
+	dailyProfile = null;
+	instrumentUid;
+	hasBrokenHigh = false;
+	hasBrokenLow = false;
+	constructor(instrumentUid, dailyProfile) {
+		this.instrumentUid = instrumentUid;
+		this.dailyProfile = dailyProfile;
+	}
+	reset() {
+		this.signals = [];
+		this.hasBrokenHigh = false;
+		this.hasBrokenLow = false;
+	}
+	onCandle(candle) {
+		if (!this.dailyProfile) return;
+		const high = quotationToNumber(candle.high);
+		const low = quotationToNumber(candle.low);
+		const close = quotationToNumber(candle.close);
+		const time = candle.time || (/* @__PURE__ */ new Date()).toISOString();
+		if (high > this.dailyProfile.valueAreaHigh) {
+			this.hasBrokenHigh = true;
+			this.hasBrokenLow = false;
+		}
+		if (low < this.dailyProfile.valueAreaLow) {
+			this.hasBrokenLow = true;
+			this.hasBrokenHigh = false;
+		}
+		if (this.hasBrokenHigh && close < this.dailyProfile.valueAreaHigh) {
+			this.signals.push({
+				type: "SELL",
+				price: close,
+				time,
+				instrumentUid: this.instrumentUid,
+				reason: `Return to VA after breaking high (VAH=${this.dailyProfile.valueAreaHigh})`
+			});
+			this.hasBrokenHigh = false;
+		}
+		if (this.hasBrokenLow && close > this.dailyProfile.valueAreaLow) {
+			this.signals.push({
+				type: "BUY",
+				price: close,
+				time,
+				instrumentUid: this.instrumentUid,
+				reason: `Return to VA after breaking low (VAL=${this.dailyProfile.valueAreaLow})`
+			});
+			this.hasBrokenLow = false;
+		}
+	}
+	getSignals() {
+		return this.signals;
+	}
+};
+function quotationToNumber(q) {
+	if (!q) return 0;
+	return Number(q.units || 0) + (q.nano || 0) / 1e9;
+}
+//#endregion
+//#region src/main/services/backtest/backtestEngine.ts
+var BacktestEngine = class {
+	run(strategy, candles) {
+		strategy.reset();
+		for (const candle of candles) strategy.onCandle(candle);
+		const signals = strategy.getSignals();
+		const buy = signals.filter((s) => s.type === "BUY").length;
+		const sell = signals.filter((s) => s.type === "SELL").length;
+		return {
+			totalSignals: signals.length,
+			buySignals: buy,
+			sellSignals: sell
+		};
 	}
 };
 //#endregion
@@ -3076,11 +3152,17 @@ function applyMenuToWindow(win, template) {
 	const token = process.env.VITE_TReadOnly || "t.rGCSw8v2Wku38hBeDq4vibP1rx2laBEKgYuGNzoclMUJNv99mTsuadh8iNn07y447bwZyelwn5GQNR7wHwmsVA";
 	const uid = "e6123145-9665-43e0-8413-cd61b8aa9b13";
 	try {
-		console.log("[Test] Загружаем дневной профиль за 22 мая...");
+		console.log("[Backtest] Загружаем дневной профиль за 22 мая...");
 		const profile = await loader.loadDailyProfile(uid, /* @__PURE__ */ new Date("2026-05-22T00:00:00Z"), /* @__PURE__ */ new Date("2026-05-23T00:00:00Z"), token);
-		console.log("[Test] Профиль:", profile);
+		console.log("[Backtest] Профиль:", profile);
+		console.log("[Backtest] Загружаем минутные свечи за 22 мая...");
+		const candles = await loader.loadIntradayCandles(uid, /* @__PURE__ */ new Date("2026-05-22T07:00:00Z"), /* @__PURE__ */ new Date("2026-05-22T16:00:00Z"), token, CandleInterval.CANDLE_INTERVAL_1_MIN);
+		const strategy = new VolumeAccumulationStrategy(uid, profile);
+		const stats = new BacktestEngine().run(strategy, candles);
+		console.log("[Backtest] Статистика:", stats);
+		console.log("[Backtest] Сигналы:", strategy.getSignals());
 	} catch (err) {
-		console.error("[Test] Ошибка:", err);
+		console.error("[Backtest] Ошибка:", err);
 	}
 })();
 //#endregion

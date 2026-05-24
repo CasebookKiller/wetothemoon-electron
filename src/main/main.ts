@@ -1,3 +1,5 @@
+// src/main/main.ts
+
 import { app, BrowserWindow, dialog, ipcMain, Menu, MenuItemConstructorOptions, session } from 'electron';
 import { createMainWindow } from './windows/mainWindow.ts';
 //import { setupMenu } from './menus/menuBuilder.ts.old';
@@ -44,6 +46,9 @@ import { mkdirSync, existsSync } from 'fs';
 
 import { VolumeProfileEngine } from './services/volumeProfileEngine';
 import { HistoricalDataLoader } from './services/historicalDataLoader.ts';
+import { CandleInterval } from '@/api/tbank/marketdataTypes.ts';
+import { VolumeAccumulationStrategy } from './services/backtest/strategies/VolumeAccumulationStrategy.ts';
+import { BacktestEngine } from './services/backtest/backtestEngine.ts';
 
 const scriptsDir = path.join(app.getPath('userData'), 'scripts');
 if (!existsSync(scriptsDir)) {
@@ -680,22 +685,57 @@ function applyMenuToWindow(win: BrowserWindow, template: MenuItemConstructorOpti
 //// --- конец тестового блока ---
 
 
-// Временный тест – удалить после проверки
+//// Временный тест – удалить после проверки
+//(async () => {
+//  const loader = new HistoricalDataLoader();
+//  const token = process.env.VITE_TReadOnly || 't.rGCSw8v2Wku38hBeDq4vibP1rx2laBEKgYuGNzoclMUJNv99mTsuadh8iNn07y447bwZyelwn5GQNR7wHwmsVA';  // замените на реальный токен
+//  const uid = 'e6123145-9665-43e0-8413-cd61b8aa9b13';
+//
+//  try {
+//    console.log('[Test] Загружаем дневной профиль за 22 мая...');
+//    const profile = await loader.loadDailyProfile(
+//      uid,
+//      new Date('2026-05-22T00:00:00Z'),
+//      new Date('2026-05-23T00:00:00Z'),
+//      token
+//    );
+//    console.log('[Test] Профиль:', profile);
+//  } catch (err) {
+//    console.error('[Test] Ошибка:', err);
+//  }
+//})();
+
 (async () => {
   const loader = new HistoricalDataLoader();
   const token = process.env.VITE_TReadOnly || 't.rGCSw8v2Wku38hBeDq4vibP1rx2laBEKgYuGNzoclMUJNv99mTsuadh8iNn07y447bwZyelwn5GQNR7wHwmsVA';  // замените на реальный токен
   const uid = 'e6123145-9665-43e0-8413-cd61b8aa9b13';
 
   try {
-    console.log('[Test] Загружаем дневной профиль за 22 мая...');
+    console.log('[Backtest] Загружаем дневной профиль за 22 мая...');
     const profile = await loader.loadDailyProfile(
       uid,
       new Date('2026-05-22T00:00:00Z'),
       new Date('2026-05-23T00:00:00Z'),
       token
     );
-    console.log('[Test] Профиль:', profile);
+    console.log('[Backtest] Профиль:', profile);
+
+    console.log('[Backtest] Загружаем минутные свечи за 22 мая...');
+    const candles = await loader.loadIntradayCandles(
+      uid,
+      new Date('2026-05-22T07:00:00Z'),
+      new Date('2026-05-22T16:00:00Z'),
+      token,
+      CandleInterval.CANDLE_INTERVAL_1_MIN
+    );
+
+    const strategy = new VolumeAccumulationStrategy(uid, profile);
+    const engine = new BacktestEngine();
+    const stats = engine.run(strategy, candles);
+
+    console.log('[Backtest] Статистика:', stats);
+    console.log('[Backtest] Сигналы:', strategy.getSignals());
   } catch (err) {
-    console.error('[Test] Ошибка:', err);
+    console.error('[Backtest] Ошибка:', err);
   }
 })();

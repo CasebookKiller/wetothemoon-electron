@@ -1,3 +1,4 @@
+// src/main/services/tbank/OrdersGrpcService.ts
 import { createGrpcClient, createMetadata } from '@/main/utils/grpcHelper';
 import type {
   PostOrderRequest,
