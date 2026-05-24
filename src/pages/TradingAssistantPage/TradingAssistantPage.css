@@ -46,3 +46,13 @@
   margin-bottom: 5px;
   font-size: 14px;
 }
+
+.backtest-panel {
+  margin: 10px 0;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.backtest-panel input {
+  padding: 4px;
+}

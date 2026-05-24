@@ -1397,6 +1397,297 @@ var VolumeProfileEngine = class extends events.EventEmitter {
 };
 var volumeProfileEngine = new VolumeProfileEngine();
 //#endregion
+//#region src/api/tbank/marketdataTypes.ts
+/** Интервал свечей */
+var CandleInterval = /* @__PURE__ */ function(CandleInterval) {
+	/** Интервал не определён */
+	CandleInterval[CandleInterval["CANDLE_INTERVAL_UNSPECIFIED"] = 0] = "CANDLE_INTERVAL_UNSPECIFIED";
+	/** 1 минута. Максимальный `limit` — 2400 */
+	CandleInterval[CandleInterval["CANDLE_INTERVAL_1_MIN"] = 1] = "CANDLE_INTERVAL_1_MIN";
+	/** 5 минут. Максимальный `limit` — 2400 */
+	CandleInterval[CandleInterval["CANDLE_INTERVAL_5_MIN"] = 2] = "CANDLE_INTERVAL_5_MIN";
+	/** 15 минут. Максимальный `limit` — 2400 */
+	CandleInterval[CandleInterval["CANDLE_INTERVAL_15_MIN"] = 3] = "CANDLE_INTERVAL_15_MIN";
+	/** 1 час. Максимальный `limit` — 2400 */
+	CandleInterval[CandleInterval["CANDLE_INTERVAL_HOUR"] = 4] = "CANDLE_INTERVAL_HOUR";
+	/** 1 день. Максимальный `limit` — 2400 */
+	CandleInterval[CandleInterval["CANDLE_INTERVAL_DAY"] = 5] = "CANDLE_INTERVAL_DAY";
+	/** 2 минуты. Максимальный `limit` — 1200 */
+	CandleInterval[CandleInterval["CANDLE_INTERVAL_2_MIN"] = 6] = "CANDLE_INTERVAL_2_MIN";
+	/** 3 минуты. Максимальный `limit` — 750 */
+	CandleInterval[CandleInterval["CANDLE_INTERVAL_3_MIN"] = 7] = "CANDLE_INTERVAL_3_MIN";
+	/** 10 минут. Максимальный `limit` — 1200 */
+	CandleInterval[CandleInterval["CANDLE_INTERVAL_10_MIN"] = 8] = "CANDLE_INTERVAL_10_MIN";
+	/** 30 минут. Максимальный `limit` — 1200 */
+	CandleInterval[CandleInterval["CANDLE_INTERVAL_30_MIN"] = 9] = "CANDLE_INTERVAL_30_MIN";
+	/** 2 часа. Максимальный `limit` — 2400 */
+	CandleInterval[CandleInterval["CANDLE_INTERVAL_2_HOUR"] = 10] = "CANDLE_INTERVAL_2_HOUR";
+	/** 4 часа. Максимальный `limit` — 700 */
+	CandleInterval[CandleInterval["CANDLE_INTERVAL_4_HOUR"] = 11] = "CANDLE_INTERVAL_4_HOUR";
+	/** 1 неделя. Максимальный `limit` — 300 */
+	CandleInterval[CandleInterval["CANDLE_INTERVAL_WEEK"] = 12] = "CANDLE_INTERVAL_WEEK";
+	/** 1 месяц. Максимальный `limit` — 120 */
+	CandleInterval[CandleInterval["CANDLE_INTERVAL_MONTH"] = 13] = "CANDLE_INTERVAL_MONTH";
+	/** 5 секунд. Максимальный `limit` — 2500 */
+	CandleInterval[CandleInterval["CANDLE_INTERVAL_5_SEC"] = 14] = "CANDLE_INTERVAL_5_SEC";
+	/** 10 секунд. Максимальный `limit` — 1250 */
+	CandleInterval[CandleInterval["CANDLE_INTERVAL_10_SEC"] = 15] = "CANDLE_INTERVAL_10_SEC";
+	/** 30 секунд. Максимальный `limit` — 2500 */
+	CandleInterval[CandleInterval["CANDLE_INTERVAL_30_SEC"] = 16] = "CANDLE_INTERVAL_30_SEC";
+	return CandleInterval;
+}({});
+/** Тип источника свечи (в запросе) */
+var CandleSourceRequest = /* @__PURE__ */ function(CandleSourceRequest) {
+	/** Все свечи */
+	CandleSourceRequest[CandleSourceRequest["CANDLE_SOURCE_UNSPECIFIED"] = 0] = "CANDLE_SOURCE_UNSPECIFIED";
+	/** Биржевые свечи */
+	CandleSourceRequest[CandleSourceRequest["CANDLE_SOURCE_EXCHANGE"] = 1] = "CANDLE_SOURCE_EXCHANGE";
+	/** Все свечи с учётом торговли по выходным */
+	CandleSourceRequest[CandleSourceRequest["CANDLE_SOURCE_INCLUDE_WEEKEND"] = 3] = "CANDLE_SOURCE_INCLUDE_WEEKEND";
+	return CandleSourceRequest;
+}({});
+//#endregion
+//#region src/main/services/backtest/backtestEngine.ts
+var BacktestEngine = class {
+	run(strategy, candles) {
+		strategy.reset();
+		for (const candle of candles) strategy.onCandle(candle);
+		const signals = strategy.getSignals();
+		const buy = signals.filter((s) => s.type === "BUY").length;
+		const sell = signals.filter((s) => s.type === "SELL").length;
+		return {
+			totalSignals: signals.length,
+			buySignals: buy,
+			sellSignals: sell
+		};
+	}
+};
+//#endregion
+//#region src/main/services/backtest/strategies/VolumeAccumulationStrategy.ts
+var VolumeAccumulationStrategy = class {
+	signals = [];
+	dailyProfile = null;
+	instrumentUid;
+	hasBrokenHigh = false;
+	hasBrokenLow = false;
+	constructor(instrumentUid, dailyProfile) {
+		this.instrumentUid = instrumentUid;
+		this.dailyProfile = dailyProfile;
+	}
+	reset() {
+		this.signals = [];
+		this.hasBrokenHigh = false;
+		this.hasBrokenLow = false;
+	}
+	onCandle(candle) {
+		if (!this.dailyProfile) return;
+		const high = quotationToNumber$1(candle.high);
+		const low = quotationToNumber$1(candle.low);
+		const close = quotationToNumber$1(candle.close);
+		const time = candle.time || (/* @__PURE__ */ new Date()).toISOString();
+		if (high > this.dailyProfile.valueAreaHigh) {
+			this.hasBrokenHigh = true;
+			this.hasBrokenLow = false;
+		}
+		if (low < this.dailyProfile.valueAreaLow) {
+			this.hasBrokenLow = true;
+			this.hasBrokenHigh = false;
+		}
+		if (this.hasBrokenHigh && close < this.dailyProfile.valueAreaHigh) {
+			this.signals.push({
+				type: "SELL",
+				price: close,
+				time,
+				instrumentUid: this.instrumentUid,
+				reason: `Return to VA after breaking high (VAH=${this.dailyProfile.valueAreaHigh})`
+			});
+			this.hasBrokenHigh = false;
+		}
+		if (this.hasBrokenLow && close > this.dailyProfile.valueAreaLow) {
+			this.signals.push({
+				type: "BUY",
+				price: close,
+				time,
+				instrumentUid: this.instrumentUid,
+				reason: `Return to VA after breaking low (VAL=${this.dailyProfile.valueAreaLow})`
+			});
+			this.hasBrokenLow = false;
+		}
+	}
+	getSignals() {
+		return this.signals;
+	}
+};
+function quotationToNumber$1(q) {
+	if (!q) return 0;
+	return Number(q.units || 0) + (q.nano || 0) / 1e9;
+}
+//#endregion
+//#region src/main/utils/grpcHelper.ts
+function createGrpcClient(packageName, serviceName) {
+	const PROTO_PATH = getProtoPath(packageName);
+	const packageDefinition = _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_proto_loader_build_src_index_js.loadSync(PROTO_PATH, {
+		keepCase: false,
+		longs: String,
+		enums: String,
+		defaults: true,
+		oneofs: true
+	});
+	const ServiceClient = _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.loadPackageDefinition(packageDefinition).tinkoff.public.invest.api.contract.v1[serviceName];
+	return new ServiceClient("invest-public-api.tbank.ru:443", _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.credentials.createSsl(null, null, null, { rejectUnauthorized: false }), { "grpc.ssl_target_name_override": "invest-public-api.tbank.ru" });
+}
+function createMetadata(token) {
+	const meta = new _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.Metadata();
+	meta.add("Authorization", `Bearer ${token}`);
+	return meta;
+}
+//#endregion
+//#region src/main/services/tbank/MarketDataGrpcService.ts
+var client$7 = createGrpcClient("marketdata.proto", "MarketDataService");
+var marketDataGrpc = {
+	getCandles: (request, token) => new Promise((resolve, reject) => {
+		client$7.GetCandles(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getClosePrices: (request, token) => new Promise((resolve, reject) => {
+		client$7.GetClosePrices(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getLastPrices: (request, token) => new Promise((resolve, reject) => {
+		client$7.GetLastPrices(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getLastTrades: (request, token) => new Promise((resolve, reject) => {
+		client$7.GetLastTrades(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getMarketValues: (request, token) => new Promise((resolve, reject) => {
+		client$7.GetMarketValues(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getOrderBook: (request, token) => new Promise((resolve, reject) => {
+		client$7.GetOrderBook(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getTechAnalysis: (request, token) => new Promise((resolve, reject) => {
+		client$7.GetTechAnalysis(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getTradingStatus: (request, token) => new Promise((resolve, reject) => {
+		client$7.GetTradingStatus(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getTradingStatuses: (request, token) => new Promise((resolve, reject) => {
+		client$7.GetTradingStatuses(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	})
+};
+//#endregion
+//#region src/main/services/historicalDataLoader.ts
+function quotationToNumber(q) {
+	if (!q) return 0;
+	return Number(q.units || 0) + (q.nano || 0) / 1e9;
+}
+/** Преобразует Timestamp (строка ISO или объект {seconds,nanos}) в ISO-строку */
+function timestampToISO(ts) {
+	if (!ts) return (/* @__PURE__ */ new Date()).toISOString();
+	if (typeof ts === "object" && ts.seconds !== void 0) return (/* @__PURE__ */ new Date(ts.seconds * 1e3)).toISOString();
+	if (typeof ts === "string") return new Date(ts).toISOString();
+	return (/* @__PURE__ */ new Date()).toISOString();
+}
+var HistoricalDataLoader = class {
+	async loadDailyProfile(instrumentUid, from, to, token) {
+		const request = {
+			instrumentId: instrumentUid,
+			interval: CandleInterval.CANDLE_INTERVAL_DAY,
+			from: {
+				seconds: Math.floor(from.getTime() / 1e3),
+				nanos: 0
+			},
+			to: {
+				seconds: Math.floor(to.getTime() / 1e3),
+				nanos: 0
+			},
+			candleSourceType: CandleSourceRequest.CANDLE_SOURCE_EXCHANGE
+		};
+		const candles = (await marketDataGrpc.getCandles(request, token)).candles || [];
+		if (candles.length === 0) return null;
+		const engine = new VolumeProfileEngine();
+		for (const candle of candles) {
+			const open = quotationToNumber(candle.open);
+			const high = quotationToNumber(candle.high);
+			const low = quotationToNumber(candle.low);
+			const close = quotationToNumber(candle.close);
+			const volume = Number(candle.volume || "0");
+			const streamCandle = {
+				instrumentUid,
+				open: {
+					units: open.toString(),
+					nano: 0
+				},
+				high: {
+					units: high.toString(),
+					nano: 0
+				},
+				low: {
+					units: low.toString(),
+					nano: 0
+				},
+				close: {
+					units: close.toString(),
+					nano: 0
+				},
+				volume: volume.toString(),
+				time: timestampToISO(candle.time)
+			};
+			engine.onCandle?.(streamCandle);
+		}
+		return engine.getProfile(instrumentUid);
+	}
+	async loadIntradayCandles(instrumentUid, from, to, token, interval = CandleInterval.CANDLE_INTERVAL_1_MIN) {
+		const request = {
+			instrumentId: instrumentUid,
+			interval,
+			from: {
+				seconds: Math.floor(from.getTime() / 1e3),
+				nanos: 0
+			},
+			to: {
+				seconds: Math.floor(to.getTime() / 1e3),
+				nanos: 0
+			},
+			candleSourceType: CandleSourceRequest.CANDLE_SOURCE_EXCHANGE
+		};
+		return ((await marketDataGrpc.getCandles(request, token)).candles || []).map((candle) => ({
+			instrumentUid,
+			open: candle.open,
+			high: candle.high,
+			low: candle.low,
+			close: candle.close,
+			volume: String(candle.volume || "0"),
+			time: timestampToISO(candle.time)
+		}));
+	}
+};
+//#endregion
 //#region src/main/ipcHandlers/tradingAssistantHandlers.ts
 var registerTradingAssistantHandlers = () => {
 	electron.ipcMain.handle("trading-assistant:get-profile", (_, instrumentUid) => {
@@ -1420,6 +1711,24 @@ var registerTradingAssistantHandlers = () => {
 		});
 	});
 	electron.ipcMain.on("trading-assistant:unsubscribe", (event) => {});
+	electron.ipcMain.handle("trading-assistant:run-backtest", async (_, instrumentUid, date, token) => {
+		const loader = new HistoricalDataLoader();
+		const from = /* @__PURE__ */ new Date(date + "T00:00:00Z");
+		const to = /* @__PURE__ */ new Date(date + "T23:59:59Z");
+		try {
+			const profile = await loader.loadDailyProfile(instrumentUid, from, to, token);
+			const candles = await loader.loadIntradayCandles(instrumentUid, /* @__PURE__ */ new Date(date + "T07:00:00Z"), /* @__PURE__ */ new Date(date + "T16:00:00Z"), token, CandleInterval.CANDLE_INTERVAL_1_MIN);
+			const strategy = new VolumeAccumulationStrategy(instrumentUid, profile);
+			return {
+				profile,
+				stats: new BacktestEngine().run(strategy, candles),
+				signals: strategy.getSignals()
+			};
+		} catch (error) {
+			console.error("Backtest error:", error);
+			return null;
+		}
+	});
 };
 //#endregion
 //#region src/shared/types/promptgenerator.ts
@@ -1455,66 +1764,47 @@ function validateCodeContext(context) {
 	}
 }
 //#endregion
-//#region src/main/utils/grpcHelper.ts
-function createGrpcClient(packageName, serviceName) {
-	const PROTO_PATH = getProtoPath(packageName);
-	const packageDefinition = _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_proto_loader_build_src_index_js.loadSync(PROTO_PATH, {
-		keepCase: false,
-		longs: String,
-		enums: String,
-		defaults: true,
-		oneofs: true
-	});
-	const ServiceClient = _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.loadPackageDefinition(packageDefinition).tinkoff.public.invest.api.contract.v1[serviceName];
-	return new ServiceClient("invest-public-api.tbank.ru:443", _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.credentials.createSsl(null, null, null, { rejectUnauthorized: false }), { "grpc.ssl_target_name_override": "invest-public-api.tbank.ru" });
-}
-function createMetadata(token) {
-	const meta = new _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.Metadata();
-	meta.add("Authorization", `Bearer ${token}`);
-	return meta;
-}
-//#endregion
 //#region src/main/services/tbank/UsersGrpcService.ts
-var client$7 = createGrpcClient("users.proto", "UsersService");
+var client$6 = createGrpcClient("users.proto", "UsersService");
 var usersGrpc = {
 	getInfo: (token) => new Promise((resolve, reject) => {
-		client$7.GetInfo({}, createMetadata(token), (err, response) => {
+		client$6.GetInfo({}, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getAccounts: (request, token) => new Promise((resolve, reject) => {
-		client$7.GetAccounts(request, createMetadata(token), (err, response) => {
+		client$6.GetAccounts(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getMarginAttributes: (request, token) => new Promise((resolve, reject) => {
-		client$7.GetMarginAttributes(request, createMetadata(token), (err, response) => {
+		client$6.GetMarginAttributes(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getUserTariff: (request, token) => new Promise((resolve, reject) => {
-		client$7.GetUserTariff(request, createMetadata(token), (err, response) => {
+		client$6.GetUserTariff(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	currencyTransfer: (request, token) => new Promise((resolve, reject) => {
-		client$7.CurrencyTransfer(request, createMetadata(token), (err, response) => {
+		client$6.CurrencyTransfer(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	payIn: (request, token) => new Promise((resolve, reject) => {
-		client$7.PayIn(request, createMetadata(token), (err, response) => {
+		client$6.PayIn(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getBankAccounts: (request, token) => new Promise((resolve, reject) => {
-		client$7.GetBankAccounts(request, createMetadata(token), (err, response) => {
+		client$6.GetBankAccounts(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
@@ -1522,303 +1812,244 @@ var usersGrpc = {
 };
 //#endregion
 //#region src/main/services/tbank/InstrumentsGrpcService.ts
-var client$6 = createGrpcClient("instruments.proto", "InstrumentsService");
+var client$5 = createGrpcClient("instruments.proto", "InstrumentsService");
 var instrumentsGrpc = {
 	bondBy: (request, token) => new Promise((resolve, reject) => {
-		client$6.BondBy(request, createMetadata(token), (err, response) => {
+		client$5.BondBy(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	bonds: (request, token) => new Promise((resolve, reject) => {
-		client$6.Bonds(request, createMetadata(token), (err, response) => {
+		client$5.Bonds(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	createFavoriteGroup: (request, token) => new Promise((resolve, reject) => {
-		client$6.CreateFavoriteGroup(request, createMetadata(token), (err, response) => {
+		client$5.CreateFavoriteGroup(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	currencies: (request, token) => new Promise((resolve, reject) => {
-		client$6.Currencies(request, createMetadata(token), (err, response) => {
+		client$5.Currencies(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	currencyBy: (request, token) => new Promise((resolve, reject) => {
-		client$6.CurrencyBy(request, createMetadata(token), (err, response) => {
+		client$5.CurrencyBy(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	deleteFavoriteGroup: (request, token) => new Promise((resolve, reject) => {
-		client$6.DeleteFavoriteGroup(request, createMetadata(token), (err, response) => {
+		client$5.DeleteFavoriteGroup(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	editFavorites: (request, token) => new Promise((resolve, reject) => {
-		client$6.EditFavorites(request, createMetadata(token), (err, response) => {
+		client$5.EditFavorites(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	etfBy: (request, token) => new Promise((resolve, reject) => {
-		client$6.EtfBy(request, createMetadata(token), (err, response) => {
+		client$5.EtfBy(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	etfs: (request, token) => new Promise((resolve, reject) => {
-		client$6.Etfs(request, createMetadata(token), (err, response) => {
+		client$5.Etfs(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	findInstrument: (request, token) => new Promise((resolve, reject) => {
-		client$6.FindInstrument(request, createMetadata(token), (err, response) => {
+		client$5.FindInstrument(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	futureBy: (request, token) => new Promise((resolve, reject) => {
-		client$6.FutureBy(request, createMetadata(token), (err, response) => {
+		client$5.FutureBy(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	futures: (request, token) => new Promise((resolve, reject) => {
-		client$6.Futures(request, createMetadata(token), (err, response) => {
+		client$5.Futures(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getAccruedInterests: (request, token) => new Promise((resolve, reject) => {
-		client$6.GetAccruedInterests(request, createMetadata(token), (err, response) => {
+		client$5.GetAccruedInterests(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getAssetBy: (request, token) => new Promise((resolve, reject) => {
-		client$6.GetAssetBy(request, createMetadata(token), (err, response) => {
+		client$5.GetAssetBy(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getAssetFundamentals: (request, token) => new Promise((resolve, reject) => {
-		client$6.GetAssetFundamentals(request, createMetadata(token), (err, response) => {
+		client$5.GetAssetFundamentals(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getAssetReports: (request, token) => new Promise((resolve, reject) => {
-		client$6.GetAssetReports(request, createMetadata(token), (err, response) => {
+		client$5.GetAssetReports(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getAssets: (request, token) => new Promise((resolve, reject) => {
-		client$6.GetAssets(request, createMetadata(token), (err, response) => {
+		client$5.GetAssets(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getBondCoupons: (request, token) => new Promise((resolve, reject) => {
-		client$6.GetBondCoupons(request, createMetadata(token), (err, response) => {
+		client$5.GetBondCoupons(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getBondEvents: (request, token) => new Promise((resolve, reject) => {
-		client$6.GetBondEvents(request, createMetadata(token), (err, response) => {
+		client$5.GetBondEvents(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getBrandBy: (request, token) => new Promise((resolve, reject) => {
-		client$6.GetBrandBy(request, createMetadata(token), (err, response) => {
+		client$5.GetBrandBy(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getBrands: (request, token) => new Promise((resolve, reject) => {
-		client$6.GetBrands(request, createMetadata(token), (err, response) => {
+		client$5.GetBrands(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getConsensusForecasts: (request, token) => new Promise((resolve, reject) => {
-		client$6.GetConsensusForecasts(request, createMetadata(token), (err, response) => {
+		client$5.GetConsensusForecasts(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getCountries: (request, token) => new Promise((resolve, reject) => {
-		client$6.GetCountries(request, createMetadata(token), (err, response) => {
+		client$5.GetCountries(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getDividends: (request, token) => new Promise((resolve, reject) => {
-		client$6.GetDividends(request, createMetadata(token), (err, response) => {
+		client$5.GetDividends(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getFavoriteGroups: (request, token) => new Promise((resolve, reject) => {
-		client$6.GetFavoriteGroups(request, createMetadata(token), (err, response) => {
+		client$5.GetFavoriteGroups(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getFavorites: (request, token) => new Promise((resolve, reject) => {
-		client$6.GetFavorites(request, createMetadata(token), (err, response) => {
+		client$5.GetFavorites(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getForecastBy: (request, token) => new Promise((resolve, reject) => {
-		client$6.GetForecastBy(request, createMetadata(token), (err, response) => {
+		client$5.GetForecastBy(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getFuturesMargin: (request, token) => new Promise((resolve, reject) => {
-		client$6.GetFuturesMargin(request, createMetadata(token), (err, response) => {
+		client$5.GetFuturesMargin(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getInsiderDeals: (request, token) => new Promise((resolve, reject) => {
-		client$6.GetInsiderDeals(request, createMetadata(token), (err, response) => {
+		client$5.GetInsiderDeals(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getInstrumentBy: (request, token) => new Promise((resolve, reject) => {
-		client$6.GetInstrumentBy(request, createMetadata(token), (err, response) => {
+		client$5.GetInstrumentBy(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getRiskRates: (request, token) => new Promise((resolve, reject) => {
-		client$6.GetRiskRates(request, createMetadata(token), (err, response) => {
+		client$5.GetRiskRates(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	indicatives: (request, token) => new Promise((resolve, reject) => {
-		client$6.Indicatives(request, createMetadata(token), (err, response) => {
+		client$5.Indicatives(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	optionBy: (request, token) => new Promise((resolve, reject) => {
-		client$6.OptionBy(request, createMetadata(token), (err, response) => {
+		client$5.OptionBy(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	options: (request, token) => new Promise((resolve, reject) => {
-		client$6.Options(request, createMetadata(token), (err, response) => {
+		client$5.Options(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	optionsBy: (request, token) => new Promise((resolve, reject) => {
-		client$6.OptionsBy(request, createMetadata(token), (err, response) => {
+		client$5.OptionsBy(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	shareBy: (request, token) => new Promise((resolve, reject) => {
-		client$6.ShareBy(request, createMetadata(token), (err, response) => {
+		client$5.ShareBy(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	shares: (request, token) => new Promise((resolve, reject) => {
-		client$6.Shares(request, createMetadata(token), (err, response) => {
+		client$5.Shares(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	structuredNoteBy: (request, token) => new Promise((resolve, reject) => {
-		client$6.StructuredNoteBy(request, createMetadata(token), (err, response) => {
+		client$5.StructuredNoteBy(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	structuredNotes: (request, token) => new Promise((resolve, reject) => {
-		client$6.StructuredNotes(request, createMetadata(token), (err, response) => {
+		client$5.StructuredNotes(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	tradingSchedules: (request, token) => new Promise((resolve, reject) => {
-		client$6.TradingSchedules(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	})
-};
-//#endregion
-//#region src/main/services/tbank/MarketDataGrpcService.ts
-var client$5 = createGrpcClient("marketdata.proto", "MarketDataService");
-var marketDataGrpc = {
-	getCandles: (request, token) => new Promise((resolve, reject) => {
-		client$5.GetCandles(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	getClosePrices: (request, token) => new Promise((resolve, reject) => {
-		client$5.GetClosePrices(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	getLastPrices: (request, token) => new Promise((resolve, reject) => {
-		client$5.GetLastPrices(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	getLastTrades: (request, token) => new Promise((resolve, reject) => {
-		client$5.GetLastTrades(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	getMarketValues: (request, token) => new Promise((resolve, reject) => {
-		client$5.GetMarketValues(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	getOrderBook: (request, token) => new Promise((resolve, reject) => {
-		client$5.GetOrderBook(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	getTechAnalysis: (request, token) => new Promise((resolve, reject) => {
-		client$5.GetTechAnalysis(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	getTradingStatus: (request, token) => new Promise((resolve, reject) => {
-		client$5.GetTradingStatus(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	getTradingStatuses: (request, token) => new Promise((resolve, reject) => {
-		client$5.GetTradingStatuses(request, createMetadata(token), (err, response) => {
+		client$5.TradingSchedules(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
@@ -2398,219 +2629,6 @@ function registerTasksHandlers() {
 		createTasksWindow();
 	});
 }
-//#endregion
-//#region src/api/tbank/marketdataTypes.ts
-/** Интервал свечей */
-var CandleInterval = /* @__PURE__ */ function(CandleInterval) {
-	/** Интервал не определён */
-	CandleInterval[CandleInterval["CANDLE_INTERVAL_UNSPECIFIED"] = 0] = "CANDLE_INTERVAL_UNSPECIFIED";
-	/** 1 минута. Максимальный `limit` — 2400 */
-	CandleInterval[CandleInterval["CANDLE_INTERVAL_1_MIN"] = 1] = "CANDLE_INTERVAL_1_MIN";
-	/** 5 минут. Максимальный `limit` — 2400 */
-	CandleInterval[CandleInterval["CANDLE_INTERVAL_5_MIN"] = 2] = "CANDLE_INTERVAL_5_MIN";
-	/** 15 минут. Максимальный `limit` — 2400 */
-	CandleInterval[CandleInterval["CANDLE_INTERVAL_15_MIN"] = 3] = "CANDLE_INTERVAL_15_MIN";
-	/** 1 час. Максимальный `limit` — 2400 */
-	CandleInterval[CandleInterval["CANDLE_INTERVAL_HOUR"] = 4] = "CANDLE_INTERVAL_HOUR";
-	/** 1 день. Максимальный `limit` — 2400 */
-	CandleInterval[CandleInterval["CANDLE_INTERVAL_DAY"] = 5] = "CANDLE_INTERVAL_DAY";
-	/** 2 минуты. Максимальный `limit` — 1200 */
-	CandleInterval[CandleInterval["CANDLE_INTERVAL_2_MIN"] = 6] = "CANDLE_INTERVAL_2_MIN";
-	/** 3 минуты. Максимальный `limit` — 750 */
-	CandleInterval[CandleInterval["CANDLE_INTERVAL_3_MIN"] = 7] = "CANDLE_INTERVAL_3_MIN";
-	/** 10 минут. Максимальный `limit` — 1200 */
-	CandleInterval[CandleInterval["CANDLE_INTERVAL_10_MIN"] = 8] = "CANDLE_INTERVAL_10_MIN";
-	/** 30 минут. Максимальный `limit` — 1200 */
-	CandleInterval[CandleInterval["CANDLE_INTERVAL_30_MIN"] = 9] = "CANDLE_INTERVAL_30_MIN";
-	/** 2 часа. Максимальный `limit` — 2400 */
-	CandleInterval[CandleInterval["CANDLE_INTERVAL_2_HOUR"] = 10] = "CANDLE_INTERVAL_2_HOUR";
-	/** 4 часа. Максимальный `limit` — 700 */
-	CandleInterval[CandleInterval["CANDLE_INTERVAL_4_HOUR"] = 11] = "CANDLE_INTERVAL_4_HOUR";
-	/** 1 неделя. Максимальный `limit` — 300 */
-	CandleInterval[CandleInterval["CANDLE_INTERVAL_WEEK"] = 12] = "CANDLE_INTERVAL_WEEK";
-	/** 1 месяц. Максимальный `limit` — 120 */
-	CandleInterval[CandleInterval["CANDLE_INTERVAL_MONTH"] = 13] = "CANDLE_INTERVAL_MONTH";
-	/** 5 секунд. Максимальный `limit` — 2500 */
-	CandleInterval[CandleInterval["CANDLE_INTERVAL_5_SEC"] = 14] = "CANDLE_INTERVAL_5_SEC";
-	/** 10 секунд. Максимальный `limit` — 1250 */
-	CandleInterval[CandleInterval["CANDLE_INTERVAL_10_SEC"] = 15] = "CANDLE_INTERVAL_10_SEC";
-	/** 30 секунд. Максимальный `limit` — 2500 */
-	CandleInterval[CandleInterval["CANDLE_INTERVAL_30_SEC"] = 16] = "CANDLE_INTERVAL_30_SEC";
-	return CandleInterval;
-}({});
-/** Тип источника свечи (в запросе) */
-var CandleSourceRequest = /* @__PURE__ */ function(CandleSourceRequest) {
-	/** Все свечи */
-	CandleSourceRequest[CandleSourceRequest["CANDLE_SOURCE_UNSPECIFIED"] = 0] = "CANDLE_SOURCE_UNSPECIFIED";
-	/** Биржевые свечи */
-	CandleSourceRequest[CandleSourceRequest["CANDLE_SOURCE_EXCHANGE"] = 1] = "CANDLE_SOURCE_EXCHANGE";
-	/** Все свечи с учётом торговли по выходным */
-	CandleSourceRequest[CandleSourceRequest["CANDLE_SOURCE_INCLUDE_WEEKEND"] = 3] = "CANDLE_SOURCE_INCLUDE_WEEKEND";
-	return CandleSourceRequest;
-}({});
-//#endregion
-//#region src/main/services/historicalDataLoader.ts
-function quotationToNumber$1(q) {
-	if (!q) return 0;
-	return Number(q.units || 0) + (q.nano || 0) / 1e9;
-}
-/** Преобразует Timestamp (строка ISO или объект {seconds,nanos}) в ISO-строку */
-function timestampToISO(ts) {
-	if (!ts) return (/* @__PURE__ */ new Date()).toISOString();
-	if (typeof ts === "object" && ts.seconds !== void 0) return (/* @__PURE__ */ new Date(ts.seconds * 1e3)).toISOString();
-	if (typeof ts === "string") return new Date(ts).toISOString();
-	return (/* @__PURE__ */ new Date()).toISOString();
-}
-var HistoricalDataLoader = class {
-	async loadDailyProfile(instrumentUid, from, to, token) {
-		const request = {
-			instrumentId: instrumentUid,
-			interval: CandleInterval.CANDLE_INTERVAL_DAY,
-			from: {
-				seconds: Math.floor(from.getTime() / 1e3),
-				nanos: 0
-			},
-			to: {
-				seconds: Math.floor(to.getTime() / 1e3),
-				nanos: 0
-			},
-			candleSourceType: CandleSourceRequest.CANDLE_SOURCE_EXCHANGE
-		};
-		const candles = (await marketDataGrpc.getCandles(request, token)).candles || [];
-		if (candles.length === 0) return null;
-		const engine = new VolumeProfileEngine();
-		for (const candle of candles) {
-			const open = quotationToNumber$1(candle.open);
-			const high = quotationToNumber$1(candle.high);
-			const low = quotationToNumber$1(candle.low);
-			const close = quotationToNumber$1(candle.close);
-			const volume = Number(candle.volume || "0");
-			const streamCandle = {
-				instrumentUid,
-				open: {
-					units: open.toString(),
-					nano: 0
-				},
-				high: {
-					units: high.toString(),
-					nano: 0
-				},
-				low: {
-					units: low.toString(),
-					nano: 0
-				},
-				close: {
-					units: close.toString(),
-					nano: 0
-				},
-				volume: volume.toString(),
-				time: timestampToISO(candle.time)
-			};
-			engine.onCandle?.(streamCandle);
-		}
-		return engine.getProfile(instrumentUid);
-	}
-	async loadIntradayCandles(instrumentUid, from, to, token, interval = CandleInterval.CANDLE_INTERVAL_1_MIN) {
-		const request = {
-			instrumentId: instrumentUid,
-			interval,
-			from: {
-				seconds: Math.floor(from.getTime() / 1e3),
-				nanos: 0
-			},
-			to: {
-				seconds: Math.floor(to.getTime() / 1e3),
-				nanos: 0
-			},
-			candleSourceType: CandleSourceRequest.CANDLE_SOURCE_EXCHANGE
-		};
-		return ((await marketDataGrpc.getCandles(request, token)).candles || []).map((candle) => ({
-			instrumentUid,
-			open: candle.open,
-			high: candle.high,
-			low: candle.low,
-			close: candle.close,
-			volume: String(candle.volume || "0"),
-			time: timestampToISO(candle.time)
-		}));
-	}
-};
-//#endregion
-//#region src/main/services/backtest/strategies/VolumeAccumulationStrategy.ts
-var VolumeAccumulationStrategy = class {
-	signals = [];
-	dailyProfile = null;
-	instrumentUid;
-	hasBrokenHigh = false;
-	hasBrokenLow = false;
-	constructor(instrumentUid, dailyProfile) {
-		this.instrumentUid = instrumentUid;
-		this.dailyProfile = dailyProfile;
-	}
-	reset() {
-		this.signals = [];
-		this.hasBrokenHigh = false;
-		this.hasBrokenLow = false;
-	}
-	onCandle(candle) {
-		if (!this.dailyProfile) return;
-		const high = quotationToNumber(candle.high);
-		const low = quotationToNumber(candle.low);
-		const close = quotationToNumber(candle.close);
-		const time = candle.time || (/* @__PURE__ */ new Date()).toISOString();
-		if (high > this.dailyProfile.valueAreaHigh) {
-			this.hasBrokenHigh = true;
-			this.hasBrokenLow = false;
-		}
-		if (low < this.dailyProfile.valueAreaLow) {
-			this.hasBrokenLow = true;
-			this.hasBrokenHigh = false;
-		}
-		if (this.hasBrokenHigh && close < this.dailyProfile.valueAreaHigh) {
-			this.signals.push({
-				type: "SELL",
-				price: close,
-				time,
-				instrumentUid: this.instrumentUid,
-				reason: `Return to VA after breaking high (VAH=${this.dailyProfile.valueAreaHigh})`
-			});
-			this.hasBrokenHigh = false;
-		}
-		if (this.hasBrokenLow && close > this.dailyProfile.valueAreaLow) {
-			this.signals.push({
-				type: "BUY",
-				price: close,
-				time,
-				instrumentUid: this.instrumentUid,
-				reason: `Return to VA after breaking low (VAL=${this.dailyProfile.valueAreaLow})`
-			});
-			this.hasBrokenLow = false;
-		}
-	}
-	getSignals() {
-		return this.signals;
-	}
-};
-function quotationToNumber(q) {
-	if (!q) return 0;
-	return Number(q.units || 0) + (q.nano || 0) / 1e9;
-}
-//#endregion
-//#region src/main/services/backtest/backtestEngine.ts
-var BacktestEngine = class {
-	run(strategy, candles) {
-		strategy.reset();
-		for (const candle of candles) strategy.onCandle(candle);
-		const signals = strategy.getSignals();
-		const buy = signals.filter((s) => s.type === "BUY").length;
-		const sell = signals.filter((s) => s.type === "SELL").length;
-		return {
-			totalSignals: signals.length,
-			buySignals: buy,
-			sellSignals: sell
-		};
-	}
-};
 //#endregion
 //#region src/main/main.ts
 var scriptsDir = path.default.join(electron.app.getPath("userData"), "scripts");

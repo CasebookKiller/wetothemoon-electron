@@ -1,6 +1,10 @@
 // src/main/ipcHandlers/tradingAssistantHandlers.ts
 import { ipcMain, BrowserWindow } from 'electron';
 import { volumeProfileEngine } from '../services/volumeProfileEngine';
+import { CandleInterval } from '@/api/tbank/marketdataTypes';
+import { BacktestEngine } from '../services/backtest/backtestEngine';
+import { VolumeAccumulationStrategy } from '../services/backtest/strategies/VolumeAccumulationStrategy';
+import { HistoricalDataLoader } from '../services/historicalDataLoader';
 
 export const registerTradingAssistantHandlers = () => {
   // Получить текущий профиль по инструменту (по запросу)
@@ -43,4 +47,32 @@ export const registerTradingAssistantHandlers = () => {
   ipcMain.on('trading-assistant:unsubscribe', (event) => {
     // Здесь можно реализовать ручную отписку, но автоматическая через closed обычно достаточна
   });
+
+  // Запуск бэктеста
+  ipcMain.handle('trading-assistant:run-backtest', async (_, instrumentUid: string, date: string, token: string) => {
+  const loader = new HistoricalDataLoader();
+  const from = new Date(date + 'T00:00:00Z');
+  const to = new Date(date + 'T23:59:59Z');
+  
+  try {
+    const profile = await loader.loadDailyProfile(instrumentUid, from, to, token);
+    const candles = await loader.loadIntradayCandles(
+      instrumentUid,
+      new Date(date + 'T07:00:00Z'),
+      new Date(date + 'T16:00:00Z'),
+      token,
+      CandleInterval.CANDLE_INTERVAL_1_MIN
+    );
+
+    const strategy = new VolumeAccumulationStrategy(instrumentUid, profile);
+    const engine = new BacktestEngine();
+    const stats = engine.run(strategy, candles);
+    const signals = strategy.getSignals();
+
+    return { profile, stats, signals };
+  } catch (error) {
+    console.error('Backtest error:', error);
+    return null;
+  }
+});
 };

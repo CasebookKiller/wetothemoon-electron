@@ -153,7 +153,8 @@ try {
 			electron.ipcRenderer.on("trading-assistant:signal", (_, data) => callback(data));
 		},
 		removeProfileUpdateListener: () => electron.ipcRenderer.removeAllListeners("trading-assistant:profile-update"),
-		removeTradingSignalListener: () => electron.ipcRenderer.removeAllListeners("trading-assistant:signal")
+		removeTradingSignalListener: () => electron.ipcRenderer.removeAllListeners("trading-assistant:signal"),
+		runBacktest: (uid, date, token) => electron.ipcRenderer.invoke("trading-assistant:run-backtest", uid, date, token)
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {

@@ -8,6 +8,7 @@ import {
   ISeriesApi,
 } from 'lightweight-charts';
 import './TradingAssistantPage.css';
+import { BacktestSignal } from '@/main/services/backtest/backtestEngine';
 
 // Типы (можно импортировать из shared, но для простоты определяем здесь)
 interface VolumeProfileLevels {
@@ -39,6 +40,22 @@ export const TradingAssistantPage: React.FC = () => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const levelSeriesRef = useRef<ISeriesApi<'Line'>[]>([]);
+
+  const [backtestDate, setBacktestDate] = useState('2026-05-22');
+  const [backtestSignals, setBacktestSignals] = useState<BacktestSignal[]>([]);
+  
+  const runBacktest = async () => {
+    const api = (window as any).electronAPI;
+    const token = import.meta.env.VITE_TReadOnly; // потом заменим на получение из защищённого хранилища
+    const result = await api.runBacktest(selectedInstrument, backtestDate, token);
+    if (result) {
+      setProfile(result.profile);
+      setSignals(result.signals); // отобразим в логе
+      setBacktestSignals(result.signals);
+      // Добавим сигналы на график как маркеры
+      // ... (обновление графика)
+    }
+  };
 
   // Подписка на обновления
   useEffect(() => {
@@ -173,6 +190,11 @@ export const TradingAssistantPage: React.FC = () => {
           onChange={(e) => setSelectedInstrument(e.target.value)}
         />
         <button onClick={loadProfile}>Load Profile</button>
+      </div>
+
+      <div className="backtest-panel">
+        <input type="date" value={backtestDate} onChange={e => setBacktestDate(e.target.value)} />
+        <button onClick={runBacktest}>Run Backtest</button>
       </div>
 
       <div className="chart-container" ref={chartContainerRef} />
