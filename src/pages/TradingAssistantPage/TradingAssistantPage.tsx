@@ -351,10 +351,22 @@ export const TradingAssistantPage: React.FC = () => {
           <ul>
             <li>Initial Capital: {backtestResult.stats.portfolio.initialCapital}</li>
             <li>Final Capital: {backtestResult.stats.portfolio.finalCapital.toFixed(2)}</li>
-            <li>Total Profit: {backtestResult.stats.portfolio.totalProfit.toFixed(2)} ({backtestResult.stats.portfolio.totalProfitPercent.toFixed(2)}%)</li>
+            <li>
+              Total Profit: 
+              <span className={backtestResult.stats.portfolio.totalProfit >= 0 ? 'positive' : 'negative'}>
+                {' '}{backtestResult.stats.portfolio.totalProfit.toFixed(2)}{' '}
+                ({backtestResult.stats.portfolio.totalProfitPercent.toFixed(2)}%)
+              </span>
+            </li>
             <li>Trades: {backtestResult.stats.portfolio.totalTrades} (W: {backtestResult.stats.portfolio.winningTrades}, L: {backtestResult.stats.portfolio.losingTrades})</li>
             <li>Win Rate: {backtestResult.stats.portfolio.winRate.toFixed(1)}%</li>
-            <li>Max Drawdown: {backtestResult.stats.portfolio.maxDrawdown.toFixed(2)} ({backtestResult.stats.portfolio.maxDrawdownPercent.toFixed(2)}%)</li>
+            <li>
+              Max Drawdown: 
+              <span className={backtestResult.stats.portfolio.maxDrawdown >= 0 ? 'negative' : 'positive'}>
+                {' '}{backtestResult.stats.portfolio.maxDrawdown.toFixed(2)}{' '} 
+                ({backtestResult.stats.portfolio.maxDrawdownPercent.toFixed(2)}%)
+              </span>
+            </li>
             <li>Avg Profit: {backtestResult.stats.portfolio.averageProfit.toFixed(2)}</li>
           </ul>
         </div>

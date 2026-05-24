@@ -64,7 +64,48 @@
   margin-top: 10px;
   border-radius: 4px;
 }
+
 .volume-distribution ul {
   list-style: none;
   padding-left: 0;
+}
+
+/* Панель статистики PnL */
+.backtest-stats {
+  background: #1e1e1e;
+  color: #d1d4dc;
+  padding: 15px;
+  margin-top: 15px;
+  border-radius: 6px;
+  border: 1px solid #2a2e39;
+  font-size: 14px;
+}
+
+.backtest-stats h3 {
+  margin-top: 0;
+  color: #ffffff;
+  border-bottom: 1px solid #2a2e39;
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+}
+
+.backtest-stats ul {
+  list-style: none;
+  padding-left: 0;
+  margin: 10px 0 0 0;
+}
+
+.backtest-stats li {
+  margin-bottom: 6px;
+  line-height: 1.5;
+}
+
+.backtest-stats .positive {
+  color: #4caf50;
+  font-weight: bold;
+}
+
+.backtest-stats .negative {
+  color: #ef5350;
+  font-weight: bold;
 }
