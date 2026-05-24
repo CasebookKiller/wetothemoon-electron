@@ -31,7 +31,8 @@ export class HistoricalDataLoader {
     instrumentUid: string,
     from: Date,
     to: Date,
-    token: string
+    token: string,
+    profileResolution: number = 50   // <-- новый параметр
   ): Promise<VolumeProfileLevels | null> {
     const request = {
       instrumentId: instrumentUid,
@@ -45,7 +46,7 @@ export class HistoricalDataLoader {
     const candles = response.candles || [];
     if (candles.length === 0) return null;
 
-    const engine = new VolumeProfileEngine();
+    const engine = new VolumeProfileEngine({ profileResolution });
     for (const candle of candles) {
       const open = quotationToNumber(candle.open);
       const high = quotationToNumber(candle.high);

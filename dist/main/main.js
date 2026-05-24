@@ -1210,8 +1210,13 @@ var DEFAULT_CONFIG = {
 	valueAreaPercent: 70,
 	hvnMultiplier: 1.5,
 	lvnMultiplier: .5,
-	minVolumeThreshold: 100
+	minVolumeThreshold: 100,
+	profileResolution: 50
 };
+function normalDensity(x, mean, stdDev) {
+	const exponent = -.5 * Math.pow((x - mean) / stdDev, 2);
+	return 1 / (stdDev * Math.sqrt(2 * Math.PI)) * Math.exp(exponent);
+}
 var VolumeProfileEngine = class extends events.EventEmitter {
 	config;
 	volumeByPrice = /* @__PURE__ */ new Map();
@@ -1236,15 +1241,26 @@ var VolumeProfileEngine = class extends events.EventEmitter {
 		const close = quotationToNumber$2(candle.close);
 		const time = candle.time || (/* @__PURE__ */ new Date()).toISOString();
 		this.lastPrice.set(uid, close);
-		const priceRange = high - low;
-		if (priceRange <= 0) this.addVolume(uid, close, volume);
+		const typicalPrice = (high + low + close) / 3;
+		const range = high - low;
+		if (range <= .001) this.addVolume(uid, close, volume);
 		else {
-			const levels = Math.round(priceRange);
-			if (levels === 0) this.addVolume(uid, close, volume);
-			else {
-				const volumePerLevel = volume / levels;
-				for (let price = low; price <= high; price++) this.addVolume(uid, price, volumePerLevel);
+			const resolution = this.config.profileResolution;
+			const stdDev = range * .15;
+			const densities = [];
+			const prices = [];
+			for (let i = 0; i < resolution; i++) {
+				const price = low + i / (resolution - 1) * range;
+				const density = normalDensity(price, typicalPrice, stdDev);
+				densities.push(density);
+				prices.push(price);
 			}
+			const sumDensity = densities.reduce((a, b) => a + b, 0);
+			if (sumDensity > 0) for (let i = 0; i < resolution; i++) {
+				const weight = densities[i] / sumDensity;
+				this.addVolume(uid, prices[i], volume * weight);
+			}
+			else this.addVolume(uid, close, volume);
 		}
 		this.recalculateProfileWithCache(uid, time);
 		this.generateSignals(uid, close, time);
@@ -1624,7 +1640,7 @@ function timestampToISO(ts) {
 	return (/* @__PURE__ */ new Date()).toISOString();
 }
 var HistoricalDataLoader = class {
-	async loadDailyProfile(instrumentUid, from, to, token) {
+	async loadDailyProfile(instrumentUid, from, to, token, profileResolution = 50) {
 		const request = {
 			instrumentId: instrumentUid,
 			interval: CandleInterval.CANDLE_INTERVAL_DAY,
@@ -1640,7 +1656,7 @@ var HistoricalDataLoader = class {
 		};
 		const candles = (await marketDataGrpc.getCandles(request, token)).candles || [];
 		if (candles.length === 0) return null;
-		const engine = new VolumeProfileEngine();
+		const engine = new VolumeProfileEngine({ profileResolution });
 		for (const candle of candles) {
 			const open = quotationToNumber(candle.open);
 			const high = quotationToNumber(candle.high);
@@ -1723,17 +1739,27 @@ var registerTradingAssistantHandlers = () => {
 	electron.ipcMain.on("trading-assistant:unsubscribe", (event) => {});
 	electron.ipcMain.handle("trading-assistant:run-backtest", async (_, instrumentUid, date, token) => {
 		const loader = new HistoricalDataLoader();
-		const from = /* @__PURE__ */ new Date(date + "T00:00:00Z");
-		const to = /* @__PURE__ */ new Date(date + "T23:59:59Z");
+		date + "";
+		date + "";
 		try {
-			const profile = await loader.loadDailyProfile(instrumentUid, from, to, token);
 			const candles = await loader.loadIntradayCandles(instrumentUid, /* @__PURE__ */ new Date(date + "T07:00:00Z"), /* @__PURE__ */ new Date(date + "T16:00:00Z"), token, CandleInterval.CANDLE_INTERVAL_1_MIN);
+			if (!candles || candles.length === 0) return {
+				profile: null,
+				stats: null,
+				signals: [],
+				candles: []
+			};
+			const profileEngine = new VolumeProfileEngine({ profileResolution: 50 });
+			candles.forEach((candle) => {
+				profileEngine.onCandle?.(candle);
+			});
+			const profile = profileEngine.getProfile(instrumentUid);
 			const strategy = new VolumeAccumulationStrategy(instrumentUid, profile);
 			return {
 				profile,
-				candles,
 				stats: new BacktestEngine().run(strategy, candles),
-				signals: strategy.getSignals()
+				signals: strategy.getSignals(),
+				candles
 			};
 		} catch (error) {
 			console.error("Backtest error:", error);

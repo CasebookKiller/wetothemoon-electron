@@ -56,3 +56,15 @@
 .backtest-panel input {
   padding: 4px;
 }
+
+.volume-distribution {
+  background: #1e1e1e;
+  color: #d1d4dc;
+  padding: 10px;
+  margin-top: 10px;
+  border-radius: 4px;
+}
+.volume-distribution ul {
+  list-style: none;
+  padding-left: 0;
+}

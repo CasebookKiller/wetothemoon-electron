@@ -38,6 +38,7 @@ export interface VolumeProfileConfig {
   hvnMultiplier: number;      // множитель для определения HVN (по умолчанию 1.5)
   lvnMultiplier: number;      // множитель для определения LVN (по умолчанию 0.5)
   minVolumeThreshold: number; // минимальный объём для учёта уровня
+  profileResolution: number;   // <-- новое поле (по умолчанию 50)
 }
 
 const DEFAULT_CONFIG: VolumeProfileConfig = {
@@ -45,7 +46,13 @@ const DEFAULT_CONFIG: VolumeProfileConfig = {
   hvnMultiplier: 1.5,
   lvnMultiplier: 0.5,
   minVolumeThreshold: 100,
+  profileResolution: 50
 };
+
+function normalDensity(x: number, mean: number, stdDev: number): number {
+  const exponent = -0.5 * Math.pow((x - mean) / stdDev, 2);
+  return (1 / (stdDev * Math.sqrt(2 * Math.PI))) * Math.exp(exponent);
+}
 
 export class VolumeProfileEngine extends EventEmitter {
   private config: VolumeProfileConfig;
@@ -65,6 +72,7 @@ export class VolumeProfileEngine extends EventEmitter {
     marketDataBus.onTrade(this.onTrade.bind(this));
   }
 
+  /*
   private onCandle(candle: StreamCandle): void {
     const uid = candle.instrumentUid || candle.figi;
     if (!uid) return;
@@ -103,6 +111,57 @@ export class VolumeProfileEngine extends EventEmitter {
     this.recalculateProfileWithCache(uid, time);
 
     // Генерация сигналов на основе последней цены и новых уровней
+    this.generateSignals(uid, close, time);
+  }*/
+
+  private onCandle(candle: StreamCandle): void {
+    const uid = candle.instrumentUid || candle.figi;
+    if (!uid) return;
+
+    const volume = Number(candle.volume || '0');
+    if (volume <= this.config.minVolumeThreshold) return;
+
+    const high = quotationToNumber(candle.high);
+    const low = quotationToNumber(candle.low);
+    const close = quotationToNumber(candle.close);
+    const time = candle.time || new Date().toISOString();
+
+    this.lastPrice.set(uid, close);
+
+    const typicalPrice = (high + low + close) / 3;
+    const range = high - low;
+
+    if (range <= 0.001) {
+      // Нулевой диапазон – весь объём в цену close
+      this.addVolume(uid, close, volume);
+    } else {
+      const resolution = this.config.profileResolution; // число шагов
+      const spreadFactor = 0.15;  // можно вынести в конфиг
+      const stdDev = range * spreadFactor;
+      
+      const densities: number[] = [];
+      const prices: number[] = [];
+      
+      for (let i = 0; i < resolution; i++) {
+        const price = low + (i / (resolution - 1)) * range;
+        const density = normalDensity(price, typicalPrice, stdDev);
+        densities.push(density);
+        prices.push(price);
+      }
+      
+      const sumDensity = densities.reduce((a, b) => a + b, 0);
+      if (sumDensity > 0) {
+        for (let i = 0; i < resolution; i++) {
+          const weight = densities[i] / sumDensity;
+          this.addVolume(uid, prices[i], volume * weight);
+        }
+      } else {
+        // Fallback
+        this.addVolume(uid, close, volume);
+      }
+    }
+
+    this.recalculateProfileWithCache(uid, time);
     this.generateSignals(uid, close, time);
   }
 

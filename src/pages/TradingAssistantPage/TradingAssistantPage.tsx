@@ -77,6 +77,34 @@ export const TradingAssistantPage: React.FC = () => {
     const result = await api.runBacktest(selectedInstrument, backtestDate, token);
     console.log('[Backtest Result]', result); // ← посмотрим весь ответ
     if (result) {
+      setProfile(result.profile);           // уже рассчитанный профиль
+      setBacktestSignals(result.signals);
+
+      if (result.candles?.length) {
+        const formatted = result.candles.map((c: any) => ({
+          time: (Math.floor(new Date(c.time).getTime() / 1000)) as Time,
+          open: quotationToNumber(c.open),
+          high: quotationToNumber(c.high),
+          low: quotationToNumber(c.low),
+          close: quotationToNumber(c.close),
+        }));
+        setCandlesData(formatted);
+      }
+    } else {
+      alert('Ошибка при загрузке данных');
+    }
+  };
+  /*
+  const runBacktest = async () => {
+    const api = (window as any).electronAPI;
+    if (!api?.runBacktest) {
+      alert('electronAPI.runBacktest не доступен');
+      return;
+    }
+    const token = import.meta.env.VITE_TReadOnly;
+    const result = await api.runBacktest(selectedInstrument, backtestDate, token, 100);
+    console.log('[Backtest Result]', result); // ← посмотрим весь ответ
+    if (result) {
       setProfile(result.profile);
       setBacktestSignals(result.signals);
 
@@ -103,7 +131,7 @@ export const TradingAssistantPage: React.FC = () => {
     } else {
       alert('Ошибка при загрузке данных');
     }
-  };
+  };*/
 
   // Подписка на live-обновления из VolumeProfileEngine
   useEffect(() => {
@@ -203,7 +231,7 @@ export const TradingAssistantPage: React.FC = () => {
       try { chart.removeSeries(series); } catch {}
     });
     levelSeriesRef.current = [];
-    volumeSeriesRef.current = [];
+    //volumeSeriesRef.current = [];
 
     const firstTime = candlesData[0].time;
     const lastTime = candlesData[candlesData.length - 1].time;
@@ -229,14 +257,14 @@ export const TradingAssistantPage: React.FC = () => {
     addHorizontalLine(profile.valueAreaLow, 'green', 'VA Low', 2);
 
     // Теперь добавляем объёмы (гистограмма)
-    if (profile.volumeByPrice && profile.volumeByPrice.length > 0) {
-      const maxVolume = Math.max(...profile.volumeByPrice.map(v => v.volume));
-      profile.volumeByPrice.forEach(({ price, volume }) => {
-        const opacity = volume / maxVolume;
-        const color = `rgba(255, 0, 0, ${opacity})`;
-        addHorizontalLine(price, color, '', 1 + Math.round(opacity * 4)); // толщина зависит от объёма
-      });
-    }
+    //if (profile.volumeByPrice && profile.volumeByPrice.length > 0) {
+    //  const maxVolume = Math.max(...profile.volumeByPrice.map(v => v.volume));
+    //  profile.volumeByPrice.forEach(({ price, volume }) => {
+    //    const opacity = volume / maxVolume;
+    //    const color = `rgba(255, 0, 0, ${opacity})`;
+    //    addHorizontalLine(price, color, '', 1 + Math.round(opacity * 4)); // толщина зависит от объёма
+    //  });
+    //}
 
     // HVN, LVN (если есть) можно добавить поверх, но они уже учтены в гистограмме
   }, [profile, candlesData]);
@@ -332,6 +360,22 @@ export const TradingAssistantPage: React.FC = () => {
       </div>
 
       <div className="chart-container" ref={chartContainerRef} />
+
+      {profile?.volumeByPrice && profile.volumeByPrice.length > 0 && (
+        <div className="volume-distribution">
+          <h3>Volume Distribution (top levels)</h3>
+          <ul>
+            {profile.volumeByPrice
+              .sort((a, b) => b.volume - a.volume)
+              .slice(0, 10)
+              .map(({ price, volume }) => (
+                <li key={price}>
+                  {price.toFixed(2)} – {volume.toFixed(0)}
+                </li>
+              ))}
+          </ul>
+        </div>
+      )}
 
       <div className="profile-info">
         {profile ? (
