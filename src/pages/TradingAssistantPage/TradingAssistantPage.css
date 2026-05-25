@@ -142,3 +142,26 @@
   flex: 1;
   min-width: 0; /* важно для flex-дочерних */
 }
+
+.sandbox-panel {
+  background: #1e1e1e;
+  color: #d1d4dc;
+  padding: 10px;
+  border-radius: 4px;
+  margin-bottom: 15px;
+}
+.sandbox-panel input[type="text"] {
+  background: #2a2e39;
+  color: #d1d4dc;
+  border: 1px solid #555;
+  padding: 3px;
+  border-radius: 3px;
+}
+.sandbox-panel button {
+  padding: 5px 10px;
+  background: #1976d2;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}

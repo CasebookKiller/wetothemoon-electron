@@ -80,26 +80,60 @@ export const TradingAssistantPage: React.FC = () => {
   const [accountId, setAccountId] = useState('');
   const [demoMode, setDemoMode] = useState(true);
 
+  const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([]);
+  const [loadingAccounts, setLoadingAccounts] = useState(false);
+
   const applyConfig = async () => {
     const api = (window as any).electronAPI;
+    if (!api?.updateTradingConfig) {
+      alert('updateTradingConfig not available');
+      return;
+    }
     await api.updateTradingConfig({
       token: sandboxToken,
       accountId,
       demoMode,
     });
+    alert('Config applied');
   };
+
+  const toggleTrading = async () => {
+    const api = (window as any).electronAPI;
+    if (!api?.toggleAutoTrading) {
+      alert('toggleAutoTrading not available');
+      return;
+    }
+    const newState = !autoTrading;
+    await api.toggleAutoTrading(newState);
+    setAutoTrading(newState);
+  };
+
+  const loadAccounts = async () => {
+    const api = (window as any).electronAPI;
+    if (!api?.getSandboxAccounts) return;
+    setLoadingAccounts(true);
+    const list = await api.getSandboxAccounts(sandboxToken);
+    setAccounts(list);
+    setLoadingAccounts(false);
+    if (list.length === 0) {
+      alert('Счета не найдены. Проверьте токен.');
+    } else if (list.length === 1) {
+      // Автовыбор, если один счёт
+      setAccountId(list[0].id);
+    }
+  };
+
+  useEffect(() => {
+    if (sandboxToken) {
+      loadAccounts();
+    }
+  }, [sandboxToken]);
 
   useEffect(() => {
     const api = (window as any).electronAPI;
     if (api) api.getTradingStatus().then((status: boolean) => setAutoTrading(status));
   }, []);
 
-  const toggleTrading = async () => {
-    const api = (window as any).electronAPI;
-    const newState = !autoTrading;
-    await api.toggleAutoTrading(newState);
-    setAutoTrading(newState);
-  };
   // Запуск бэктеста через IPC
   // Запуск бэктеста
   const runBacktest = async () => {
@@ -337,7 +371,47 @@ export const TradingAssistantPage: React.FC = () => {
   return (
     <div className="trading-assistant">
       <h1>Volume Profile Trading Assistant</h1>
-
+      <div className="sandbox-panel">
+        <h3>Sandbox Settings</h3>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <label>
+            Token:
+            <input
+              type="text"
+              value={sandboxToken}
+              onChange={(e) => setSandboxToken(e.target.value)}
+              style={{ width: '300px', marginLeft: '5px' }}
+            />
+          </label>
+          <label>
+            Account ID:
+            <select value={accountId} onChange={(e) => setAccountId(e.target.value)} style={{ width: '200px', marginLeft: '5px' }}>
+              <option value="">-- выберите счёт --</option>
+              {accounts.map(acc => (
+                <option key={acc.id} value={acc.id}>{acc.name || acc.id}</option>
+              ))}
+              {accounts.length === 0 && <option value="">Нет загруженных счетов</option>}
+            </select>
+          </label>
+          <button onClick={loadAccounts} disabled={!sandboxToken || loadingAccounts} style={{ marginLeft: '5px' }}>
+            {loadingAccounts ? 'Загрузка...' : 'Load Accounts'}
+          </button>
+          <label>
+            <input
+              type="checkbox"
+              checked={demoMode}
+              onChange={(e) => setDemoMode(e.target.checked)}
+            />{' '}
+            Demo mode
+          </label>
+        </div>
+        <div style={{ marginTop: '10px' }}>
+          <button onClick={applyConfig}>Apply Config</button>
+          <button onClick={toggleTrading} style={{ marginLeft: '10px' }}>
+            {autoTrading ? 'Stop Auto Trading' : 'Start Auto Trading'}
+          </button>
+        </div>
+      </div>
       <div className="instrument-selector">
         <label>Instrument UID: </label>
         <input
@@ -391,7 +465,7 @@ export const TradingAssistantPage: React.FC = () => {
         )}
         <div className="chart-container" ref={chartContainerRef} style={{ flex: 1 }} />
       </div>
-      
+
       {profile?.volumeByPrice && profile.volumeByPrice.length > 0 && (
         <div className="volume-distribution">
           <h3>Volume Distribution (top levels)</h3>

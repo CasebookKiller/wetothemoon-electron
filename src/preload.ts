@@ -205,6 +205,8 @@ try {
     toggleAutoTrading: (enabled: boolean) => ipcRenderer.invoke('trading-assistant:toggle-trading', enabled),
     getTradingStatus: () => ipcRenderer.invoke('trading-assistant:get-trading-status'),
     setLotQuantity: (qty: number) => ipcRenderer.invoke('trading-assistant:set-lot-quantity', qty),
+
+    getSandboxAccounts: (token: string) => ipcRenderer.invoke('trading-assistant:get-accounts', token),
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

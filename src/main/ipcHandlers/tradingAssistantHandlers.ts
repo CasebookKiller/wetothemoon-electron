@@ -9,6 +9,7 @@ import { StreamCandle } from '@/api/tbank/marketdataStreamTypes';
 import { VirtualPortfolio } from '../services/backtest/virtualPortfolio';
 import { BacktestSignal, quotationToNumber } from '../services/backtest/common';
 import { OrderManager } from '../services/orderManager';
+import { sandboxGrpc } from '../services/tbank/SandboxGrpcService';
 
 let orderManagerInstance: OrderManager | null = null;
 
@@ -218,6 +219,20 @@ export const registerTradingAssistantHandlers = () => {
   ipcMain.handle('trading-assistant:set-lot-quantity', async (_, qty: number) => {
     if (orderManagerInstance) {
       (orderManagerInstance as any).config.lotQuantity = qty;
+    }
+  });
+
+  ipcMain.handle('trading-assistant:get-accounts', async (_, token: string) => {
+    try {
+      const response = await sandboxGrpc.getSandboxAccounts({}, token);
+      const accounts = response.accounts || [];
+      return accounts.map(acc => ({
+        id: acc.id,
+        name: acc.name || acc.id,
+      }));
+    } catch (error: any) {
+      console.error('[GetAccounts] Ошибка:', error);
+      return [];
     }
   });
 

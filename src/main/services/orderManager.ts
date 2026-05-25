@@ -41,7 +41,7 @@ export class OrderManager {
       return;
     }
 
-    // В демо-режиме сразу логируем и выходим, не требуя токен/accountId
+    // Демо-режим должен быть ПЕРВЫМ после проверки isRunning
     if (this.config.demoMode) {
       const direction = signal.type === 'BUY' ? 'BUY' : 'SELL';
       const quantity = this.config.lotQuantity;
@@ -50,13 +50,9 @@ export class OrderManager {
       return;
     }
 
+    // Только потом проверяем токен/accountId
     if (!this.config.token || !this.config.accountId) {
       console.warn('[OrderManager] Не заданы токен или accountId');
-      return;
-    }
-
-    if (this.activeOrderId) {
-      console.log('[OrderManager] Активная заявка уже существует, пропускаем сигнал');
       return;
     }
 

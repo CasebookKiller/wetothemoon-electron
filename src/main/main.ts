@@ -767,7 +767,7 @@ connectOrderManager(orderManagerInstance);
 setOrderManagerInstance(orderManagerInstance);
 
 // Временный тест
-(async () => {
+/*(async () => {
   const token = process.env.VITE_TReadOnly || '';
   console.log('[Token]: ', token);
   if (!token) {
@@ -806,4 +806,4 @@ setOrderManagerInstance(orderManagerInstance);
   } catch (err) {
     console.error('[Demo] Ошибка:', err);
   }
-})();
+})();*/

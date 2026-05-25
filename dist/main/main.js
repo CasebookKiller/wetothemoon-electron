@@ -1784,6 +1784,131 @@ function quotationToNumber(q) {
 	return Number(q.units || "0") + (q.nano || 0) / 1e9;
 }
 //#endregion
+//#region src/main/services/tbank/SandboxGrpcService.ts
+var client$6 = createGrpcClient("sandbox.proto", "SandboxService");
+var sandboxGrpc = {
+	openSandboxAccount: (request, token) => new Promise((resolve, reject) => {
+		client$6.OpenSandboxAccount(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	closeSandboxAccount: (request, token) => new Promise((resolve, reject) => {
+		client$6.CloseSandboxAccount(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getSandboxAccounts: (request, token) => new Promise((resolve, reject) => {
+		client$6.GetSandboxAccounts(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	sandboxPayIn: (request, token) => new Promise((resolve, reject) => {
+		client$6.SandboxPayIn(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	postSandboxOrder: (request, token) => new Promise((resolve, reject) => {
+		client$6.PostSandboxOrder(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	postSandboxOrderAsync: (request, token) => new Promise((resolve, reject) => {
+		client$6.PostSandboxOrderAsync(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	cancelSandboxOrder: (request, token) => new Promise((resolve, reject) => {
+		client$6.CancelSandboxOrder(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getSandboxOrderState: (request, token) => new Promise((resolve, reject) => {
+		client$6.GetSandboxOrderState(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getSandboxOrders: (request, token) => new Promise((resolve, reject) => {
+		client$6.GetSandboxOrders(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	replaceSandboxOrder: (request, token) => new Promise((resolve, reject) => {
+		client$6.ReplaceSandboxOrder(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getSandboxMaxLots: (request, token) => new Promise((resolve, reject) => {
+		client$6.GetSandboxMaxLots(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getSandboxOrderPrice: (request, token) => new Promise((resolve, reject) => {
+		client$6.GetSandboxOrderPrice(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	cancelSandboxStopOrder: (request, token) => new Promise((resolve, reject) => {
+		client$6.CancelSandboxStopOrder(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getSandboxStopOrders: (request, token) => new Promise((resolve, reject) => {
+		client$6.GetSandboxStopOrders(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	postSandboxStopOrder: (request, token) => new Promise((resolve, reject) => {
+		client$6.PostSandboxStopOrder(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getSandboxOperations: (request, token) => new Promise((resolve, reject) => {
+		client$6.GetSandboxOperations(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getSandboxOperationsByCursor: (request, token) => new Promise((resolve, reject) => {
+		client$6.GetSandboxOperationsByCursor(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getSandboxPortfolio: (request, token) => new Promise((resolve, reject) => {
+		client$6.GetSandboxPortfolio(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getSandboxPositions: (request, token) => new Promise((resolve, reject) => {
+		client$6.GetSandboxPositions(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	}),
+	getSandboxWithdrawLimits: (request, token) => new Promise((resolve, reject) => {
+		client$6.GetSandboxWithdrawLimits(request, createMetadata(token), (err, response) => {
+			if (err) reject(err);
+			else resolve(response);
+		});
+	})
+};
+//#endregion
 //#region src/main/ipcHandlers/tradingAssistantHandlers.ts
 var orderManagerInstance$1 = null;
 var setOrderManagerInstance = (manager) => {
@@ -1892,6 +2017,17 @@ var registerTradingAssistantHandlers = () => {
 	electron.ipcMain.handle("trading-assistant:set-lot-quantity", async (_, qty) => {
 		if (orderManagerInstance$1) orderManagerInstance$1.config.lotQuantity = qty;
 	});
+	electron.ipcMain.handle("trading-assistant:get-accounts", async (_, token) => {
+		try {
+			return ((await sandboxGrpc.getSandboxAccounts({}, token)).accounts || []).map((acc) => ({
+				id: acc.id,
+				name: acc.name || acc.id
+			}));
+		} catch (error) {
+			console.error("[GetAccounts] Ошибка:", error);
+			return [];
+		}
+	});
 };
 //#endregion
 //#region src/shared/types/promptgenerator.ts
@@ -1928,46 +2064,46 @@ function validateCodeContext(context) {
 }
 //#endregion
 //#region src/main/services/tbank/UsersGrpcService.ts
-var client$6 = createGrpcClient("users.proto", "UsersService");
+var client$5 = createGrpcClient("users.proto", "UsersService");
 var usersGrpc = {
 	getInfo: (token) => new Promise((resolve, reject) => {
-		client$6.GetInfo({}, createMetadata(token), (err, response) => {
+		client$5.GetInfo({}, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getAccounts: (request, token) => new Promise((resolve, reject) => {
-		client$6.GetAccounts(request, createMetadata(token), (err, response) => {
+		client$5.GetAccounts(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getMarginAttributes: (request, token) => new Promise((resolve, reject) => {
-		client$6.GetMarginAttributes(request, createMetadata(token), (err, response) => {
+		client$5.GetMarginAttributes(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getUserTariff: (request, token) => new Promise((resolve, reject) => {
-		client$6.GetUserTariff(request, createMetadata(token), (err, response) => {
+		client$5.GetUserTariff(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	currencyTransfer: (request, token) => new Promise((resolve, reject) => {
-		client$6.CurrencyTransfer(request, createMetadata(token), (err, response) => {
+		client$5.CurrencyTransfer(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	payIn: (request, token) => new Promise((resolve, reject) => {
-		client$6.PayIn(request, createMetadata(token), (err, response) => {
+		client$5.PayIn(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getBankAccounts: (request, token) => new Promise((resolve, reject) => {
-		client$6.GetBankAccounts(request, createMetadata(token), (err, response) => {
+		client$5.GetBankAccounts(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
@@ -1975,244 +2111,244 @@ var usersGrpc = {
 };
 //#endregion
 //#region src/main/services/tbank/InstrumentsGrpcService.ts
-var client$5 = createGrpcClient("instruments.proto", "InstrumentsService");
+var client$4 = createGrpcClient("instruments.proto", "InstrumentsService");
 var instrumentsGrpc = {
 	bondBy: (request, token) => new Promise((resolve, reject) => {
-		client$5.BondBy(request, createMetadata(token), (err, response) => {
+		client$4.BondBy(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	bonds: (request, token) => new Promise((resolve, reject) => {
-		client$5.Bonds(request, createMetadata(token), (err, response) => {
+		client$4.Bonds(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	createFavoriteGroup: (request, token) => new Promise((resolve, reject) => {
-		client$5.CreateFavoriteGroup(request, createMetadata(token), (err, response) => {
+		client$4.CreateFavoriteGroup(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	currencies: (request, token) => new Promise((resolve, reject) => {
-		client$5.Currencies(request, createMetadata(token), (err, response) => {
+		client$4.Currencies(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	currencyBy: (request, token) => new Promise((resolve, reject) => {
-		client$5.CurrencyBy(request, createMetadata(token), (err, response) => {
+		client$4.CurrencyBy(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	deleteFavoriteGroup: (request, token) => new Promise((resolve, reject) => {
-		client$5.DeleteFavoriteGroup(request, createMetadata(token), (err, response) => {
+		client$4.DeleteFavoriteGroup(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	editFavorites: (request, token) => new Promise((resolve, reject) => {
-		client$5.EditFavorites(request, createMetadata(token), (err, response) => {
+		client$4.EditFavorites(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	etfBy: (request, token) => new Promise((resolve, reject) => {
-		client$5.EtfBy(request, createMetadata(token), (err, response) => {
+		client$4.EtfBy(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	etfs: (request, token) => new Promise((resolve, reject) => {
-		client$5.Etfs(request, createMetadata(token), (err, response) => {
+		client$4.Etfs(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	findInstrument: (request, token) => new Promise((resolve, reject) => {
-		client$5.FindInstrument(request, createMetadata(token), (err, response) => {
+		client$4.FindInstrument(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	futureBy: (request, token) => new Promise((resolve, reject) => {
-		client$5.FutureBy(request, createMetadata(token), (err, response) => {
+		client$4.FutureBy(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	futures: (request, token) => new Promise((resolve, reject) => {
-		client$5.Futures(request, createMetadata(token), (err, response) => {
+		client$4.Futures(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getAccruedInterests: (request, token) => new Promise((resolve, reject) => {
-		client$5.GetAccruedInterests(request, createMetadata(token), (err, response) => {
+		client$4.GetAccruedInterests(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getAssetBy: (request, token) => new Promise((resolve, reject) => {
-		client$5.GetAssetBy(request, createMetadata(token), (err, response) => {
+		client$4.GetAssetBy(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getAssetFundamentals: (request, token) => new Promise((resolve, reject) => {
-		client$5.GetAssetFundamentals(request, createMetadata(token), (err, response) => {
+		client$4.GetAssetFundamentals(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getAssetReports: (request, token) => new Promise((resolve, reject) => {
-		client$5.GetAssetReports(request, createMetadata(token), (err, response) => {
+		client$4.GetAssetReports(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getAssets: (request, token) => new Promise((resolve, reject) => {
-		client$5.GetAssets(request, createMetadata(token), (err, response) => {
+		client$4.GetAssets(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getBondCoupons: (request, token) => new Promise((resolve, reject) => {
-		client$5.GetBondCoupons(request, createMetadata(token), (err, response) => {
+		client$4.GetBondCoupons(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getBondEvents: (request, token) => new Promise((resolve, reject) => {
-		client$5.GetBondEvents(request, createMetadata(token), (err, response) => {
+		client$4.GetBondEvents(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getBrandBy: (request, token) => new Promise((resolve, reject) => {
-		client$5.GetBrandBy(request, createMetadata(token), (err, response) => {
+		client$4.GetBrandBy(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getBrands: (request, token) => new Promise((resolve, reject) => {
-		client$5.GetBrands(request, createMetadata(token), (err, response) => {
+		client$4.GetBrands(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getConsensusForecasts: (request, token) => new Promise((resolve, reject) => {
-		client$5.GetConsensusForecasts(request, createMetadata(token), (err, response) => {
+		client$4.GetConsensusForecasts(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getCountries: (request, token) => new Promise((resolve, reject) => {
-		client$5.GetCountries(request, createMetadata(token), (err, response) => {
+		client$4.GetCountries(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getDividends: (request, token) => new Promise((resolve, reject) => {
-		client$5.GetDividends(request, createMetadata(token), (err, response) => {
+		client$4.GetDividends(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getFavoriteGroups: (request, token) => new Promise((resolve, reject) => {
-		client$5.GetFavoriteGroups(request, createMetadata(token), (err, response) => {
+		client$4.GetFavoriteGroups(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getFavorites: (request, token) => new Promise((resolve, reject) => {
-		client$5.GetFavorites(request, createMetadata(token), (err, response) => {
+		client$4.GetFavorites(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getForecastBy: (request, token) => new Promise((resolve, reject) => {
-		client$5.GetForecastBy(request, createMetadata(token), (err, response) => {
+		client$4.GetForecastBy(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getFuturesMargin: (request, token) => new Promise((resolve, reject) => {
-		client$5.GetFuturesMargin(request, createMetadata(token), (err, response) => {
+		client$4.GetFuturesMargin(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getInsiderDeals: (request, token) => new Promise((resolve, reject) => {
-		client$5.GetInsiderDeals(request, createMetadata(token), (err, response) => {
+		client$4.GetInsiderDeals(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getInstrumentBy: (request, token) => new Promise((resolve, reject) => {
-		client$5.GetInstrumentBy(request, createMetadata(token), (err, response) => {
+		client$4.GetInstrumentBy(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getRiskRates: (request, token) => new Promise((resolve, reject) => {
-		client$5.GetRiskRates(request, createMetadata(token), (err, response) => {
+		client$4.GetRiskRates(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	indicatives: (request, token) => new Promise((resolve, reject) => {
-		client$5.Indicatives(request, createMetadata(token), (err, response) => {
+		client$4.Indicatives(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	optionBy: (request, token) => new Promise((resolve, reject) => {
-		client$5.OptionBy(request, createMetadata(token), (err, response) => {
+		client$4.OptionBy(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	options: (request, token) => new Promise((resolve, reject) => {
-		client$5.Options(request, createMetadata(token), (err, response) => {
+		client$4.Options(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	optionsBy: (request, token) => new Promise((resolve, reject) => {
-		client$5.OptionsBy(request, createMetadata(token), (err, response) => {
+		client$4.OptionsBy(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	shareBy: (request, token) => new Promise((resolve, reject) => {
-		client$5.ShareBy(request, createMetadata(token), (err, response) => {
+		client$4.ShareBy(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	shares: (request, token) => new Promise((resolve, reject) => {
-		client$5.Shares(request, createMetadata(token), (err, response) => {
+		client$4.Shares(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	structuredNoteBy: (request, token) => new Promise((resolve, reject) => {
-		client$5.StructuredNoteBy(request, createMetadata(token), (err, response) => {
+		client$4.StructuredNoteBy(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	structuredNotes: (request, token) => new Promise((resolve, reject) => {
-		client$5.StructuredNotes(request, createMetadata(token), (err, response) => {
+		client$4.StructuredNotes(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	tradingSchedules: (request, token) => new Promise((resolve, reject) => {
-		client$5.TradingSchedules(request, createMetadata(token), (err, response) => {
+		client$4.TradingSchedules(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
@@ -2220,46 +2356,46 @@ var instrumentsGrpc = {
 };
 //#endregion
 //#region src/main/services/tbank/OperationsGrpcService.ts
-var client$4 = createGrpcClient("operations.proto", "OperationsService");
+var client$3 = createGrpcClient("operations.proto", "OperationsService");
 var operationsGrpc = {
 	getOperations: (request, token) => new Promise((resolve, reject) => {
-		client$4.GetOperations(request, createMetadata(token), (err, response) => {
+		client$3.GetOperations(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getPortfolio: (request, token) => new Promise((resolve, reject) => {
-		client$4.GetPortfolio(request, createMetadata(token), (err, response) => {
+		client$3.GetPortfolio(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getPositions: (request, token) => new Promise((resolve, reject) => {
-		client$4.GetPositions(request, createMetadata(token), (err, response) => {
+		client$3.GetPositions(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getWithdrawLimits: (request, token) => new Promise((resolve, reject) => {
-		client$4.GetWithdrawLimits(request, createMetadata(token), (err, response) => {
+		client$3.GetWithdrawLimits(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getBrokerReport: (request, token) => new Promise((resolve, reject) => {
-		client$4.GetBrokerReport(request, createMetadata(token), (err, response) => {
+		client$3.GetBrokerReport(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getDividendsForeignIssuer: (request, token) => new Promise((resolve, reject) => {
-		client$4.GetDividendsForeignIssuer(request, createMetadata(token), (err, response) => {
+		client$3.GetDividendsForeignIssuer(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getOperationsByCursor: (request, token) => new Promise((resolve, reject) => {
-		client$4.GetOperationsByCursor(request, createMetadata(token), (err, response) => {
+		client$3.GetOperationsByCursor(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
@@ -2267,52 +2403,52 @@ var operationsGrpc = {
 };
 //#endregion
 //#region src/main/services/tbank/OrdersGrpcService.ts
-var client$3 = createGrpcClient("orders.proto", "OrdersService");
+var client$2 = createGrpcClient("orders.proto", "OrdersService");
 var ordersGrpc = {
 	postOrder: (request, token) => new Promise((resolve, reject) => {
-		client$3.PostOrder(request, createMetadata(token), (err, response) => {
+		client$2.PostOrder(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	postOrderAsync: (request, token) => new Promise((resolve, reject) => {
-		client$3.PostOrderAsync(request, createMetadata(token), (err, response) => {
+		client$2.PostOrderAsync(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	cancelOrder: (request, token) => new Promise((resolve, reject) => {
-		client$3.CancelOrder(request, createMetadata(token), (err, response) => {
+		client$2.CancelOrder(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getOrderState: (request, token) => new Promise((resolve, reject) => {
-		client$3.GetOrderState(request, createMetadata(token), (err, response) => {
+		client$2.GetOrderState(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getOrders: (request, token) => new Promise((resolve, reject) => {
-		client$3.GetOrders(request, createMetadata(token), (err, response) => {
+		client$2.GetOrders(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	replaceOrder: (request, token) => new Promise((resolve, reject) => {
-		client$3.ReplaceOrder(request, createMetadata(token), (err, response) => {
+		client$2.ReplaceOrder(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getMaxLots: (request, token) => new Promise((resolve, reject) => {
-		client$3.GetMaxLots(request, createMetadata(token), (err, response) => {
+		client$2.GetMaxLots(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getOrderPrice: (request, token) => new Promise((resolve, reject) => {
-		client$3.GetOrderPrice(request, createMetadata(token), (err, response) => {
+		client$2.GetOrderPrice(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
@@ -2320,147 +2456,22 @@ var ordersGrpc = {
 };
 //#endregion
 //#region src/main/services/tbank/StopOrdersGrpcService.ts
-var client$2 = createGrpcClient("stoporders.proto", "StopOrdersService");
+var client$1 = createGrpcClient("stoporders.proto", "StopOrdersService");
 var stopOrdersGrpc = {
 	cancelStopOrder: (request, token) => new Promise((resolve, reject) => {
-		client$2.CancelStopOrder(request, createMetadata(token), (err, response) => {
+		client$1.CancelStopOrder(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getStopOrders: (request, token) => new Promise((resolve, reject) => {
-		client$2.GetStopOrders(request, createMetadata(token), (err, response) => {
+		client$1.GetStopOrders(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	postStopOrder: (request, token) => new Promise((resolve, reject) => {
-		client$2.PostStopOrder(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	})
-};
-//#endregion
-//#region src/main/services/tbank/SandboxGrpcService.ts
-var client$1 = createGrpcClient("sandbox.proto", "SandboxService");
-var sandboxGrpc = {
-	openSandboxAccount: (request, token) => new Promise((resolve, reject) => {
-		client$1.OpenSandboxAccount(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	closeSandboxAccount: (request, token) => new Promise((resolve, reject) => {
-		client$1.CloseSandboxAccount(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	getSandboxAccounts: (request, token) => new Promise((resolve, reject) => {
-		client$1.GetSandboxAccounts(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	sandboxPayIn: (request, token) => new Promise((resolve, reject) => {
-		client$1.SandboxPayIn(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	postSandboxOrder: (request, token) => new Promise((resolve, reject) => {
-		client$1.PostSandboxOrder(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	postSandboxOrderAsync: (request, token) => new Promise((resolve, reject) => {
-		client$1.PostSandboxOrderAsync(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	cancelSandboxOrder: (request, token) => new Promise((resolve, reject) => {
-		client$1.CancelSandboxOrder(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	getSandboxOrderState: (request, token) => new Promise((resolve, reject) => {
-		client$1.GetSandboxOrderState(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	getSandboxOrders: (request, token) => new Promise((resolve, reject) => {
-		client$1.GetSandboxOrders(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	replaceSandboxOrder: (request, token) => new Promise((resolve, reject) => {
-		client$1.ReplaceSandboxOrder(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	getSandboxMaxLots: (request, token) => new Promise((resolve, reject) => {
-		client$1.GetSandboxMaxLots(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	getSandboxOrderPrice: (request, token) => new Promise((resolve, reject) => {
-		client$1.GetSandboxOrderPrice(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	cancelSandboxStopOrder: (request, token) => new Promise((resolve, reject) => {
-		client$1.CancelSandboxStopOrder(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	getSandboxStopOrders: (request, token) => new Promise((resolve, reject) => {
-		client$1.GetSandboxStopOrders(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	postSandboxStopOrder: (request, token) => new Promise((resolve, reject) => {
-		client$1.PostSandboxStopOrder(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	getSandboxOperations: (request, token) => new Promise((resolve, reject) => {
-		client$1.GetSandboxOperations(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	getSandboxOperationsByCursor: (request, token) => new Promise((resolve, reject) => {
-		client$1.GetSandboxOperationsByCursor(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	getSandboxPortfolio: (request, token) => new Promise((resolve, reject) => {
-		client$1.GetSandboxPortfolio(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	getSandboxPositions: (request, token) => new Promise((resolve, reject) => {
-		client$1.GetSandboxPositions(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	getSandboxWithdrawLimits: (request, token) => new Promise((resolve, reject) => {
-		client$1.GetSandboxWithdrawLimits(request, createMetadata(token), (err, response) => {
+		client$1.PostStopOrder(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
@@ -2866,10 +2877,6 @@ var OrderManager = class {
 		}
 		if (!this.config.token || !this.config.accountId) {
 			console.warn("[OrderManager] Не заданы токен или accountId");
-			return;
-		}
-		if (this.activeOrderId) {
-			console.log("[OrderManager] Активная заявка уже существует, пропускаем сигнал");
 			return;
 		}
 		const direction = signal.type === "BUY" ? OrderDirection.ORDER_DIRECTION_BUY : OrderDirection.ORDER_DIRECTION_SELL;
@@ -3471,29 +3478,6 @@ var orderManagerInstance = new OrderManager({
 });
 connectOrderManager(orderManagerInstance);
 setOrderManagerInstance(orderManagerInstance);
-(async () => {
-	const token = process.env.VITE_TReadOnly || "";
-	console.log("[Token]: ", token);
-	if (!token) {
-		console.error("[Demo] Токен не задан, демонстрация пропущена");
-		return;
-	}
-	const uid = "e6123145-9665-43e0-8413-cd61b8aa9b13";
-	const loader = new HistoricalDataLoader();
-	try {
-		const candles = await loader.loadIntradayCandles(uid, /* @__PURE__ */ new Date("2026-05-22T07:00:00Z"), /* @__PURE__ */ new Date("2026-05-22T16:00:00Z"), token, CandleInterval.CANDLE_INTERVAL_1_MIN);
-		const engine = new VolumeProfileEngine({ profileResolution: 50 });
-		candles.forEach((c) => engine.onCandle?.(c));
-		const strategy = new VolumeAccumulationStrategy(uid, engine.getProfile(uid));
-		candles.forEach((c) => strategy.onCandle(c));
-		const signals = strategy.getSignals();
-		console.log(`[Demo] Получено сигналов: ${signals.length}`);
-		orderManagerInstance.setRunning(true);
-		for (const signal of signals) await orderManagerInstance.processSignal(signal);
-	} catch (err) {
-		console.error("[Demo] Ошибка:", err);
-	}
-})();
 //#endregion
 
 //# sourceMappingURL=main.js.map
