@@ -84,6 +84,27 @@ export const TradingAssistantPage: React.FC = () => {
   const [loadingAccounts, setLoadingAccounts] = useState(false);
 
   const [creatingAccount, setCreatingAccount] = useState(false);
+  const [payAmount, setPayAmount] = useState(10000);
+  const [payMessage, setPayMessage] = useState('');
+
+  const handlePayIn = async () => {
+    const api = (window as any).electronAPI;
+    if (!api?.payInSandbox) return;
+    setPayMessage('');
+    const result = await api.payInSandbox(payAmount, accountId);
+    if (result.success) {
+      setPayMessage(`Счёт пополнен. Баланс: ${JSON.stringify(result.balance)}`);
+    } else {
+      setPayMessage(`Ошибка: ${result.error}`);
+    }
+  };
+
+  const sendBacktestToSandbox = async () => {
+    const api = (window as any).electronAPI;
+    if (!api?.sendBacktestSignals) return;
+    await api.sendBacktestSignals(backtestSignals);
+    alert('Сигналы отправлены в OrderManager');
+  };
 
   const applyConfig = async () => {
     const api = (window as any).electronAPI;
@@ -418,11 +439,11 @@ export const TradingAssistantPage: React.FC = () => {
     if (p) setProfile(p);
   };
   
-  const api = (window as any).electronAPI;
-  if (!api) {
-    console.error('electronAPI не доступен');
-    return;
-  }
+  //const api = (window as any).electronAPI;
+  //if (!api) {
+  //  console.error('electronAPI не доступен');
+  //  return;
+  //}
 
   return (
     <div className="trading-assistant">
@@ -472,6 +493,26 @@ export const TradingAssistantPage: React.FC = () => {
           <button onClick={toggleTrading} style={{ marginLeft: '10px' }}>
             {autoTrading ? 'Stop Auto Trading' : 'Start Auto Trading'}
           </button>
+          <label style={{ marginLeft: '10px' }}>
+            Lots:
+            <input
+              type="number"
+              value={lotQty}
+              onChange={e => {
+                const val = Number(e.target.value);
+                setLotQty(val);
+                (window as any).electronAPI.setLotQuantity(val);
+              }}
+              min={1}
+              style={{ width: '60px', marginLeft: '5px' }}
+            />
+          </label>
+          <div className="pay-in-panel" style={{ marginTop: '10px', display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <label>Пополнить на сумму (₽):</label>
+            <input type="number" value={payAmount} onChange={e => setPayAmount(Number(e.target.value))} min={1000} step={1000} style={{ width: '120px', padding: '4px', background: '#2a2e39', color: '#d1d4dc', border: '1px solid #555', borderRadius: '3px' }} />
+            <button onClick={handlePayIn}>Пополнить счёт</button>
+            {payMessage && <p style={{ margin: 0, color: '#4caf50' }}>{payMessage}</p>}
+          </div>
         </div>
       </div>
       <div className="instrument-selector">
@@ -483,19 +524,7 @@ export const TradingAssistantPage: React.FC = () => {
         />
         <button onClick={loadProfile}>Load Live Profile</button>
       </div>
-      
-      <div>
-        <button onClick={toggleTrading}>
-          {autoTrading ? 'Stop Auto Trading' : 'Start Auto Trading'}
-        </button>
-        <label> Lots: </label>
-        <input type="number" value={lotQty} onChange={e => {
-          const val = Number(e.target.value);
-          setLotQty(val);
-          api.setLotQuantity(val);
-        }} min={1} />
-      </div>
-
+    
       <div className="backtest-panel">
         <label>From:</label>
         <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
@@ -587,6 +616,10 @@ export const TradingAssistantPage: React.FC = () => {
           </ul>
         </div>
       )}
+
+      <button onClick={sendBacktestToSandbox} disabled={!backtestSignals.length}>
+        Send to Sandbox
+      </button>
 
       {liveSignals.length > 0 && (
         <div className="signals-log">

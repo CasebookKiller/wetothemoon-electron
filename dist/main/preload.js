@@ -158,9 +158,11 @@ try {
 		toggleAutoTrading: (enabled) => electron.ipcRenderer.invoke("trading-assistant:toggle-trading", enabled),
 		getTradingStatus: () => electron.ipcRenderer.invoke("trading-assistant:get-trading-status"),
 		setLotQuantity: (qty) => electron.ipcRenderer.invoke("trading-assistant:set-lot-quantity", qty),
+		sendBacktestSignals: (signals) => electron.ipcRenderer.invoke("trading-assistant:send-backtest-signals", signals),
 		getSandboxAccounts: (token) => electron.ipcRenderer.invoke("trading-assistant:get-accounts", token),
 		createSandboxAccount: () => electron.ipcRenderer.invoke("trading-assistant:create-account"),
-		closeSandboxAccount: (accountId) => electron.ipcRenderer.invoke("trading-assistant:close-account", accountId)
+		closeSandboxAccount: (accountId) => electron.ipcRenderer.invoke("trading-assistant:close-account", accountId),
+		payInSandbox: (amount, accountId) => electron.ipcRenderer.invoke("trading-assistant:pay-in", amount, accountId)
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {

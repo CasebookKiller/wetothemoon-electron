@@ -206,9 +206,13 @@ try {
     getTradingStatus: () => ipcRenderer.invoke('trading-assistant:get-trading-status'),
     setLotQuantity: (qty: number) => ipcRenderer.invoke('trading-assistant:set-lot-quantity', qty),
 
+    sendBacktestSignals: (signals: any[]) => ipcRenderer.invoke('trading-assistant:send-backtest-signals', signals),
+
     getSandboxAccounts: (token: string) => ipcRenderer.invoke('trading-assistant:get-accounts', token),
     createSandboxAccount: () => ipcRenderer.invoke('trading-assistant:create-account'),
     closeSandboxAccount: (accountId: string) => ipcRenderer.invoke('trading-assistant:close-account', accountId),
+
+    payInSandbox: (amount: number, accountId: string) => ipcRenderer.invoke('trading-assistant:pay-in', amount, accountId),
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

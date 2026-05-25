@@ -2004,6 +2004,14 @@ var registerTradingAssistantHandlers = () => {
 			return null;
 		}
 	});
+	electron.ipcMain.handle("trading-assistant:send-backtest-signals", async (_, signals) => {
+		if (!orderManagerInstance$1) return {
+			success: false,
+			error: "OrderManager не инициализирован"
+		};
+		for (const signal of signals) await orderManagerInstance$1.processSignal(signal);
+		return { success: true };
+	});
 	electron.ipcMain.handle("trading-assistant:toggle-trading", async (_, enabled) => {
 		if (orderManagerInstance$1) {
 			orderManagerInstance$1.setRunning(enabled);
@@ -2065,6 +2073,32 @@ var registerTradingAssistantHandlers = () => {
 			return { success: true };
 		} catch (error) {
 			console.error("[CloseAccount] Ошибка:", error);
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("trading-assistant:pay-in", async (_, amount, accountId) => {
+		const token = process.env.VITE_TSandBox || "";
+		if (!token || !accountId || amount <= 0) return {
+			success: false,
+			error: "Токен, счёт или сумма не заданы"
+		};
+		try {
+			return {
+				success: true,
+				balance: (await sandboxGrpc.sandboxPayIn({
+					accountId,
+					amount: {
+						currency: "RUB",
+						units: Math.floor(amount),
+						nano: Math.round(amount % 1 * 1e9)
+					}
+				}, token)).balance
+			};
+		} catch (error) {
+			console.error("[PayIn] Ошибка:", error);
 			return {
 				success: false,
 				error: error.message

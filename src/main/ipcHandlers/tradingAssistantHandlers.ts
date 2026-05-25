@@ -203,6 +203,13 @@ export const registerTradingAssistantHandlers = () => {
     }
   });
 
+  ipcMain.handle('trading-assistant:send-backtest-signals', async (_, signals: BacktestSignal[]) => {
+    if (!orderManagerInstance) return { success: false, error: 'OrderManager не инициализирован' };
+    for (const signal of signals) {
+      await orderManagerInstance.processSignal(signal);
+    }
+    return { success: true };
+  });
 
   ipcMain.handle('trading-assistant:toggle-trading', async (_, enabled: boolean) => {
     if (orderManagerInstance) {
@@ -265,6 +272,27 @@ export const registerTradingAssistantHandlers = () => {
       return { success: true };
     } catch (error: any) {
       console.error('[CloseAccount] Ошибка:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('trading-assistant:pay-in', async (_, amount: number, accountId: string) => {
+    const token = process.env.VITE_TSandBox || '';
+    if (!token || !accountId || amount <= 0) {
+      return { success: false, error: 'Токен, счёт или сумма не заданы' };
+    }
+    try {
+      const response = await sandboxGrpc.sandboxPayIn({
+        accountId,
+        amount: {
+          currency: 'RUB',
+          units: Math.floor(amount),
+          nano: Math.round((amount % 1) * 1e9),
+        },
+      }, token);
+      return { success: true, balance: response.balance };
+    } catch (error: any) {
+      console.error('[PayIn] Ошибка:', error);
       return { success: false, error: error.message };
     }
   });
