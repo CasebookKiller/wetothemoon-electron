@@ -2018,14 +2018,21 @@ var registerTradingAssistantHandlers = () => {
 		if (orderManagerInstance$1) orderManagerInstance$1.config.lotQuantity = qty;
 	});
 	electron.ipcMain.handle("trading-assistant:get-accounts", async (_, token) => {
+		if (!token) {
+			console.error("[GetAccounts] Токен не передан");
+			return [];
+		}
 		try {
-			return ((await sandboxGrpc.getSandboxAccounts({}, token)).accounts || []).map((acc) => ({
+			console.log("[GetAccounts] Запрос счетов с токеном:", token.slice(0, 10) + "...");
+			const response = await sandboxGrpc.getSandboxAccounts({}, token);
+			console.log("[GetAccounts] Ответ:", response);
+			return (response.accounts || []).map((acc) => ({
 				id: acc.id,
 				name: acc.name || acc.id
 			}));
 		} catch (error) {
-			console.error("[GetAccounts] Ошибка:", error);
-			return [];
+			console.error("[GetAccounts] Ошибка:", error.message || error);
+			throw new Error(error.message || "Неизвестная ошибка");
 		}
 	});
 };

@@ -112,14 +112,20 @@ export const TradingAssistantPage: React.FC = () => {
     const api = (window as any).electronAPI;
     if (!api?.getSandboxAccounts) return;
     setLoadingAccounts(true);
-    const list = await api.getSandboxAccounts(sandboxToken);
-    setAccounts(list);
-    setLoadingAccounts(false);
-    if (list.length === 0) {
-      alert('Счета не найдены. Проверьте токен.');
-    } else if (list.length === 1) {
-      // Автовыбор, если один счёт
-      setAccountId(list[0].id);
+    try {
+      const list = await api.getSandboxAccounts(sandboxToken);
+      setAccounts(list);
+      if (list.length === 0) {
+        alert('Счета не найдены. Проверьте токен и права доступа.');
+      } else if (list.length === 1) {
+        setAccountId(list[0].id);
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert('Ошибка загрузки счетов: ' + (err.message || 'Неизвестная ошибка'));
+      setAccounts([]);
+    } finally {
+      setLoadingAccounts(false);
     }
   };
 

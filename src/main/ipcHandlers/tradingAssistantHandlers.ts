@@ -223,16 +223,23 @@ export const registerTradingAssistantHandlers = () => {
   });
 
   ipcMain.handle('trading-assistant:get-accounts', async (_, token: string) => {
+    if (!token) {
+      console.error('[GetAccounts] Токен не передан');
+      return [];
+    }
     try {
+      console.log('[GetAccounts] Запрос счетов с токеном:', token.slice(0, 10) + '...');
       const response = await sandboxGrpc.getSandboxAccounts({}, token);
+      console.log('[GetAccounts] Ответ:', response);
       const accounts = response.accounts || [];
       return accounts.map(acc => ({
         id: acc.id,
         name: acc.name || acc.id,
       }));
     } catch (error: any) {
-      console.error('[GetAccounts] Ошибка:', error);
-      return [];
+      console.error('[GetAccounts] Ошибка:', error.message || error);
+      // Возвращаем сообщение об ошибке, чтобы UI мог показать
+      throw new Error(error.message || 'Неизвестная ошибка');
     }
   });
 
