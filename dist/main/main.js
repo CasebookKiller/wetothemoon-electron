@@ -3465,8 +3465,8 @@ function applyMenuToWindow(win, template) {
 	win.setMenu(menu);
 }
 var orderManagerInstance = new OrderManager({
-	demoMode: true,
-	token: "",
+	demoMode: false,
+	token: process.env.VITE_TSandBox || "",
 	accountId: ""
 });
 connectOrderManager(orderManagerInstance);

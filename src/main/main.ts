@@ -759,9 +759,9 @@ function applyMenuToWindow(win: BrowserWindow, template: MenuItemConstructorOpti
 */
 // Временный тест: демонстрация работы OrderManager на исторических данных
 const orderManagerInstance = new OrderManager({
-  demoMode: true,
-  token: '',
-  accountId: '',
+  demoMode: false,                         // выключаем демо
+  token: process.env.VITE_TSandBox || '', // токен песочницы из .env
+  accountId: '',                           // пока пусто, введёте в UI
 });
 connectOrderManager(orderManagerInstance);
 setOrderManagerInstance(orderManagerInstance);

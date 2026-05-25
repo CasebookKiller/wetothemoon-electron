@@ -379,8 +379,7 @@ export const TradingAssistantPage: React.FC = () => {
         <button disabled={loading} onClick={runBacktest}>Run Backtest</button>
       </div>
 
-      <div className="chart-container" ref={chartContainerRef} />
-      <div style={{ display: 'flex' }}>
+      <div style={{ display: 'flex', marginBottom: '15px' }}>
         {profile?.volumeByPrice && priceRange.max > 0 && (
           <VolumeProfileBars
             data={profile.volumeByPrice}
@@ -392,7 +391,7 @@ export const TradingAssistantPage: React.FC = () => {
         )}
         <div className="chart-container" ref={chartContainerRef} style={{ flex: 1 }} />
       </div>
-
+      
       {profile?.volumeByPrice && profile.volumeByPrice.length > 0 && (
         <div className="volume-distribution">
           <h3>Volume Distribution (top levels)</h3>
