@@ -1,5 +1,6 @@
 // src/main/main.ts
 
+import 'dotenv/config';
 import { app, BrowserWindow, dialog, ipcMain, Menu, MenuItemConstructorOptions, session } from 'electron';
 import { createMainWindow } from './windows/mainWindow.ts';
 //import { setupMenu } from './menus/menuBuilder.ts.old';
@@ -720,6 +721,7 @@ function applyMenuToWindow(win: BrowserWindow, template: MenuItemConstructorOpti
 //  }
 //})();
 
+/*
 (async () => {
   const loader = new HistoricalDataLoader();
   const token = process.env.VITE_TReadOnly || 't.rGCSw8v2Wku38hBeDq4vibP1rx2laBEKgYuGNzoclMUJNv99mTsuadh8iNn07y447bwZyelwn5GQNR7wHwmsVA';  // замените на реальный токен
@@ -752,5 +754,56 @@ function applyMenuToWindow(win: BrowserWindow, template: MenuItemConstructorOpti
     console.log('[Backtest] Сигналы:', strategy.getSignals());
   } catch (err) {
     console.error('[Backtest] Ошибка:', err);
+  }
+})();
+*/
+// Временный тест: демонстрация работы OrderManager на исторических данных
+const orderManagerInstance = new OrderManager({
+  demoMode: true,
+  token: '',
+  accountId: '',
+});
+connectOrderManager(orderManagerInstance);
+setOrderManagerInstance(orderManagerInstance);
+
+// Временный тест
+(async () => {
+  const token = process.env.VITE_TReadOnly || '';
+  console.log('[Token]: ', token);
+  if (!token) {
+    console.error('[Demo] Токен не задан, демонстрация пропущена');
+    return;
+  }
+
+  const uid = 'e6123145-9665-43e0-8413-cd61b8aa9b13';
+  const loader = new HistoricalDataLoader();
+
+  try {
+    const candles = await loader.loadIntradayCandles(
+      uid,
+      new Date('2026-05-22T07:00:00Z'),
+      new Date('2026-05-22T16:00:00Z'),
+      token,
+      CandleInterval.CANDLE_INTERVAL_1_MIN
+    );
+
+    const engine = new VolumeProfileEngine({ profileResolution: 50 });
+    candles.forEach(c => (engine as any).onCandle?.(c));
+    const profile = engine.getProfile(uid);
+
+    const strategy = new VolumeAccumulationStrategy(uid, profile);
+    candles.forEach(c => strategy.onCandle(c));
+    const signals = strategy.getSignals();
+
+    console.log(`[Demo] Получено сигналов: ${signals.length}`);
+
+    // Включаем автоторговлю (демо)
+    orderManagerInstance.setRunning(true);
+
+    for (const signal of signals) {
+      await orderManagerInstance.processSignal(signal);
+    }
+  } catch (err) {
+    console.error('[Demo] Ошибка:', err);
   }
 })();

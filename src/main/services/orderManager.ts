@@ -40,10 +40,21 @@ export class OrderManager {
       console.log('[OrderManager] Автоторговля выключена, сигнал проигнорирован');
       return;
     }
+
+    // В демо-режиме сразу логируем и выходим, не требуя токен/accountId
+    if (this.config.demoMode) {
+      const direction = signal.type === 'BUY' ? 'BUY' : 'SELL';
+      const quantity = this.config.lotQuantity;
+      const price = signal.price;
+      console.log(`[OrderManager][DEMO] ${direction} ${quantity} лотов по цене ${price}`);
+      return;
+    }
+
     if (!this.config.token || !this.config.accountId) {
       console.warn('[OrderManager] Не заданы токен или accountId');
       return;
     }
+
     if (this.activeOrderId) {
       console.log('[OrderManager] Активная заявка уже существует, пропускаем сигнал');
       return;

@@ -10,6 +10,7 @@ import {
   SeriesMarker,
   createSeriesMarkers,
 } from 'lightweight-charts';
+import VolumeProfileBars from '@/components/TRADING_ASSISTANT/VolumeProfileBars/VolumeProfileBars';
 import './TradingAssistantPage.css';
 
 // Типы (оставлены локально, чтобы не зависеть от импорта из main)
@@ -73,6 +74,20 @@ export const TradingAssistantPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [autoTrading, setAutoTrading] = useState(false);
   const [lotQty, setLotQty] = useState(1);
+  const [priceRange, setPriceRange] = useState({ min: 0, max: 0 });
+
+  const [sandboxToken, setSandboxToken] = useState(import.meta.env.VITE_TSandBox || '');
+  const [accountId, setAccountId] = useState('');
+  const [demoMode, setDemoMode] = useState(true);
+
+  const applyConfig = async () => {
+    const api = (window as any).electronAPI;
+    await api.updateTradingConfig({
+      token: sandboxToken,
+      accountId,
+      demoMode,
+    });
+  };
 
   useEffect(() => {
     const api = (window as any).electronAPI;
@@ -204,6 +219,15 @@ export const TradingAssistantPage: React.FC = () => {
     candleSeries.setData(candlesData);
     chart.timeScale().fitContent();
     candleSeriesRef.current = candleSeries;
+  }, [candlesData]);
+
+  useEffect(() => {
+    if (candlesData.length > 0) {
+      const prices = candlesData.flatMap(c => [c.high, c.low]);
+      const min = Math.min(...prices);
+      const max = Math.max(...prices);
+      setPriceRange({ min, max });
+    }
   }, [candlesData]);
 
   const volumeSeriesRef = useRef<ISeriesApi<'Line'>[]>([]);
@@ -356,6 +380,18 @@ export const TradingAssistantPage: React.FC = () => {
       </div>
 
       <div className="chart-container" ref={chartContainerRef} />
+      <div style={{ display: 'flex' }}>
+        {profile?.volumeByPrice && priceRange.max > 0 && (
+          <VolumeProfileBars
+            data={profile.volumeByPrice}
+            maxVolume={Math.max(...profile.volumeByPrice.map(v => v.volume))}
+            minPrice={priceRange.min}
+            maxPrice={priceRange.max}
+            height={400}
+          />
+        )}
+        <div className="chart-container" ref={chartContainerRef} style={{ flex: 1 }} />
+      </div>
 
       {profile?.volumeByPrice && profile.volumeByPrice.length > 0 && (
         <div className="volume-distribution">

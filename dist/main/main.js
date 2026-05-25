@@ -20,6 +20,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 	enumerable: true
 }) : target, mod));
 //#endregion
+require("/home/ll/Документы/GitHub/wetothemoon-project/wetothemoon-electron/node_modules/dotenv/config.js");
 let electron = require("electron");
 let path = require("path");
 path = __toESM(path);
@@ -1784,9 +1785,9 @@ function quotationToNumber(q) {
 }
 //#endregion
 //#region src/main/ipcHandlers/tradingAssistantHandlers.ts
-var orderManagerInstance = null;
+var orderManagerInstance$1 = null;
 var setOrderManagerInstance = (manager) => {
-	orderManagerInstance = manager;
+	orderManagerInstance$1 = manager;
 };
 var registerTradingAssistantHandlers = () => {
 	electron.ipcMain.handle("trading-assistant:get-profile", (_, instrumentUid) => {
@@ -1879,17 +1880,17 @@ var registerTradingAssistantHandlers = () => {
 		}
 	});
 	electron.ipcMain.handle("trading-assistant:toggle-trading", async (_, enabled) => {
-		if (orderManagerInstance) {
-			orderManagerInstance.setRunning(enabled);
+		if (orderManagerInstance$1) {
+			orderManagerInstance$1.setRunning(enabled);
 			return true;
 		}
 		return false;
 	});
 	electron.ipcMain.handle("trading-assistant:get-trading-status", async () => {
-		return orderManagerInstance ? orderManagerInstance.isRunning : false;
+		return orderManagerInstance$1 ? orderManagerInstance$1.isRunning : false;
 	});
 	electron.ipcMain.handle("trading-assistant:set-lot-quantity", async (_, qty) => {
-		if (orderManagerInstance) orderManagerInstance.config.lotQuantity = qty;
+		if (orderManagerInstance$1) orderManagerInstance$1.config.lotQuantity = qty;
 	});
 };
 //#endregion
@@ -2792,39 +2793,6 @@ function registerTasksHandlers() {
 	});
 }
 //#endregion
-//#region src/main/services/backtest/backtestEngine.ts
-var BacktestEngine = class {
-	portfolioConfig;
-	constructor(portfolioConfig) {
-		this.portfolioConfig = {
-			initialCapital: 1e5,
-			...portfolioConfig
-		};
-	}
-	run(strategy, candles) {
-		strategy.reset();
-		const portfolio = new VirtualPortfolio(this.portfolioConfig);
-		for (let i = 0; i < candles.length; i++) {
-			const candle = candles[i];
-			strategy.onCandle(candle);
-			const newSignals = strategy.getSignals();
-			if (newSignals.length > 0) for (const signal of newSignals) portfolio.processSignal(signal);
-		}
-		const lastCandle = candles[candles.length - 1];
-		const lastPrice = quotationToNumber(lastCandle.close);
-		portfolio.finalizeWithLastPrice(lastPrice, lastCandle.time || "");
-		const signals = strategy.getSignals();
-		const buy = signals.filter((s) => s.type === "BUY").length;
-		const sell = signals.filter((s) => s.type === "SELL").length;
-		return {
-			totalSignals: signals.length,
-			buySignals: buy,
-			sellSignals: sell,
-			portfolio: portfolio.getStats()
-		};
-	}
-};
-//#endregion
 //#region src/api/tbank/ordersTypes.ts
 /** Тип идентификатора заявки */
 var OrderIdType = /* @__PURE__ */ function(OrderIdType) {
@@ -2887,6 +2855,13 @@ var OrderManager = class {
 	async processSignal(signal) {
 		if (!this.isRunning) {
 			console.log("[OrderManager] Автоторговля выключена, сигнал проигнорирован");
+			return;
+		}
+		if (this.config.demoMode) {
+			const direction = signal.type === "BUY" ? "BUY" : "SELL";
+			const quantity = this.config.lotQuantity;
+			const price = signal.price;
+			console.log(`[OrderManager][DEMO] ${direction} ${quantity} лотов по цене ${price}`);
 			return;
 		}
 		if (!this.config.token || !this.config.accountId) {
@@ -3489,22 +3464,34 @@ function applyMenuToWindow(win, template) {
 	const menu = electron.Menu.buildFromTemplate(template);
 	win.setMenu(menu);
 }
+var orderManagerInstance = new OrderManager({
+	demoMode: true,
+	token: "",
+	accountId: ""
+});
+connectOrderManager(orderManagerInstance);
+setOrderManagerInstance(orderManagerInstance);
 (async () => {
-	const loader = new HistoricalDataLoader();
-	const token = process.env.VITE_TReadOnly || "t.rGCSw8v2Wku38hBeDq4vibP1rx2laBEKgYuGNzoclMUJNv99mTsuadh8iNn07y447bwZyelwn5GQNR7wHwmsVA";
+	const token = process.env.VITE_TReadOnly || "";
+	console.log("[Token]: ", token);
+	if (!token) {
+		console.error("[Demo] Токен не задан, демонстрация пропущена");
+		return;
+	}
 	const uid = "e6123145-9665-43e0-8413-cd61b8aa9b13";
+	const loader = new HistoricalDataLoader();
 	try {
-		console.log("[Backtest] Загружаем дневной профиль за 22 мая...");
-		const profile = await loader.loadDailyProfile(uid, /* @__PURE__ */ new Date("2026-05-22T00:00:00Z"), /* @__PURE__ */ new Date("2026-05-23T00:00:00Z"), token);
-		console.log("[Backtest] Профиль:", profile);
-		console.log("[Backtest] Загружаем минутные свечи за 22 мая...");
 		const candles = await loader.loadIntradayCandles(uid, /* @__PURE__ */ new Date("2026-05-22T07:00:00Z"), /* @__PURE__ */ new Date("2026-05-22T16:00:00Z"), token, CandleInterval.CANDLE_INTERVAL_1_MIN);
-		const strategy = new VolumeAccumulationStrategy(uid, profile);
-		const stats = new BacktestEngine().run(strategy, candles);
-		console.log("[Backtest] Статистика:", stats);
-		console.log("[Backtest] Сигналы:", strategy.getSignals());
+		const engine = new VolumeProfileEngine({ profileResolution: 50 });
+		candles.forEach((c) => engine.onCandle?.(c));
+		const strategy = new VolumeAccumulationStrategy(uid, engine.getProfile(uid));
+		candles.forEach((c) => strategy.onCandle(c));
+		const signals = strategy.getSignals();
+		console.log(`[Demo] Получено сигналов: ${signals.length}`);
+		orderManagerInstance.setRunning(true);
+		for (const signal of signals) await orderManagerInstance.processSignal(signal);
 	} catch (err) {
-		console.error("[Backtest] Ошибка:", err);
+		console.error("[Demo] Ошибка:", err);
 	}
 })();
 //#endregion
