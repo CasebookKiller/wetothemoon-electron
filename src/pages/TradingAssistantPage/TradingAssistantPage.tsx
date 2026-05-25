@@ -83,6 +83,8 @@ export const TradingAssistantPage: React.FC = () => {
   const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([]);
   const [loadingAccounts, setLoadingAccounts] = useState(false);
 
+  const [creatingAccount, setCreatingAccount] = useState(false);
+
   const applyConfig = async () => {
     const api = (window as any).electronAPI;
     if (!api?.updateTradingConfig) {
@@ -106,6 +108,54 @@ export const TradingAssistantPage: React.FC = () => {
     const newState = !autoTrading;
     await api.toggleAutoTrading(newState);
     setAutoTrading(newState);
+  };
+
+  const handleCreateAccount = async () => {
+    const api = (window as any).electronAPI;
+    if (!api?.createSandboxAccount) return;
+    setCreatingAccount(true);
+    try {
+      const result = await api.createSandboxAccount();
+      if (result.success) {
+        setAccountId(result.accountId);
+        alert(`Счёт создан: ${result.accountId}`);
+        // Обновим список счетов, если у вас есть loadAccounts
+        if (api.getSandboxAccounts) {
+          const list = await api.getSandboxAccounts(sandboxToken);
+          setAccounts(list);
+        }
+      } else {
+        alert('Ошибка создания счёта: ' + result.error);
+      }
+    } catch (err: any) {
+      alert('Ошибка: ' + err.message);
+    } finally {
+      setCreatingAccount(false);
+    }
+  };
+
+  const handleCloseAccount = async () => {
+    if (!accountId) return;
+    const confirmed = confirm(`Закрыть счёт ${accountId}?`);
+    if (!confirmed) return;
+    const api = (window as any).electronAPI;
+    if (!api?.closeSandboxAccount) return;
+    try {
+      const result = await api.closeSandboxAccount(accountId);
+      if (result.success) {
+        alert('Счёт закрыт');
+        setAccountId('');
+        // Обновим список
+        if (api.getSandboxAccounts) {
+          const list = await api.getSandboxAccounts(sandboxToken);
+          setAccounts(list);
+        }
+      } else {
+        alert('Ошибка: ' + result.error);
+      }
+    } catch (err: any) {
+      alert('Ошибка: ' + err.message);
+    }
   };
 
   const loadAccounts = async () => {
@@ -389,6 +439,12 @@ export const TradingAssistantPage: React.FC = () => {
               style={{ width: '300px', marginLeft: '5px' }}
             />
           </label>
+          <button onClick={handleCreateAccount} disabled={creatingAccount} style={{ marginLeft: '5px' }}>
+            {creatingAccount ? 'Создание...' : 'Создать счёт'}
+          </button>
+          <button onClick={handleCloseAccount} disabled={!accountId} style={{ marginLeft: '5px' }}>
+            Удалить счёт
+          </button>
           <label>
             Account ID:
             <select value={accountId} onChange={(e) => setAccountId(e.target.value)} style={{ width: '200px', marginLeft: '5px' }}>

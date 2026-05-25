@@ -2035,6 +2035,42 @@ var registerTradingAssistantHandlers = () => {
 			throw new Error(error.message || "Неизвестная ошибка");
 		}
 	});
+	electron.ipcMain.handle("trading-assistant:create-account", async () => {
+		const token = process.env.VITE_TSandBox || "";
+		if (!token) return {
+			success: false,
+			error: "Токен песочницы не задан"
+		};
+		try {
+			return {
+				success: true,
+				accountId: (await sandboxGrpc.openSandboxAccount({}, token)).accountId
+			};
+		} catch (error) {
+			console.error("[CreateAccount] Ошибка:", error);
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("trading-assistant:close-account", async (_, accountId) => {
+		const token = process.env.VITE_TSandBox || "";
+		if (!token || !accountId) return {
+			success: false,
+			error: "Токен или accountId не задан"
+		};
+		try {
+			await sandboxGrpc.closeSandboxAccount({ accountId }, token);
+			return { success: true };
+		} catch (error) {
+			console.error("[CloseAccount] Ошибка:", error);
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
 };
 //#endregion
 //#region src/shared/types/promptgenerator.ts

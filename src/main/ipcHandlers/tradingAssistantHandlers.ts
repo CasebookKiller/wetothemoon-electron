@@ -243,4 +243,30 @@ export const registerTradingAssistantHandlers = () => {
     }
   });
 
+  // Создание счёта песочницы
+  ipcMain.handle('trading-assistant:create-account', async () => {
+    const token = process.env.VITE_TSandBox || '';
+    if (!token) return { success: false, error: 'Токен песочницы не задан' };
+    try {
+      const response = await sandboxGrpc.openSandboxAccount({}, token);
+      return { success: true, accountId: response.accountId };
+    } catch (error: any) {
+      console.error('[CreateAccount] Ошибка:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Закрытие счёта песочницы
+  ipcMain.handle('trading-assistant:close-account', async (_, accountId: string) => {
+    const token = process.env.VITE_TSandBox || '';
+    if (!token || !accountId) return { success: false, error: 'Токен или accountId не задан' };
+    try {
+      await sandboxGrpc.closeSandboxAccount({ accountId }, token);
+      return { success: true };
+    } catch (error: any) {
+      console.error('[CloseAccount] Ошибка:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
 };

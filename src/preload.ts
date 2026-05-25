@@ -207,6 +207,8 @@ try {
     setLotQuantity: (qty: number) => ipcRenderer.invoke('trading-assistant:set-lot-quantity', qty),
 
     getSandboxAccounts: (token: string) => ipcRenderer.invoke('trading-assistant:get-accounts', token),
+    createSandboxAccount: () => ipcRenderer.invoke('trading-assistant:create-account'),
+    closeSandboxAccount: (accountId: string) => ipcRenderer.invoke('trading-assistant:close-account', accountId),
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)
