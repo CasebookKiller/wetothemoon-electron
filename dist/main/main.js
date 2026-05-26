@@ -1366,6 +1366,11 @@ var VolumeProfileEngine = class extends events.EventEmitter {
 	getLastProfile(uid) {
 		return this.profileCache.get(uid);
 	}
+	reset(instrumentUid) {
+		this.volumeByPrice.delete(instrumentUid);
+		this.lastSignalDirection.delete(instrumentUid);
+		this.profileCache.delete(instrumentUid);
+	}
 	cacheProfile(profile) {
 		this.profileCache.set(profile.instrumentUid, profile);
 	}
@@ -2158,6 +2163,22 @@ var registerTradingAssistantHandlers = () => {
 			console.error(e);
 			return [];
 		}
+	});
+	electron.ipcMain.handle("trading-assistant:load-historical-profile", async (_, instrumentUid, candles) => {
+		const engine = volumeProfileEngine;
+		candles.forEach((c) => {
+			const streamCandle = {
+				instrumentUid,
+				open: c.open,
+				high: c.high,
+				low: c.low,
+				close: c.close,
+				volume: c.volume?.toString() || "0",
+				time: c.time
+			};
+			engine.onCandle(streamCandle);
+		});
+		return true;
 	});
 	marketDataBus.on("candle", (candle) => {
 		const win = getTradingAssistantWindow();

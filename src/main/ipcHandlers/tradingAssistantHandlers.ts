@@ -350,6 +350,25 @@ export const registerTradingAssistantHandlers = () => {
     }
   });
 
+  ipcMain.handle('trading-assistant:load-historical-profile', async (_, instrumentUid: string, candles: any[]) => {
+    const engine = volumeProfileEngine; // singleton уже есть
+    // Очищаем предыдущие накопления для этого инструмента (если нужно)
+    // engine.reset(instrumentUid); // если метод существует
+    candles.forEach(c => {
+      const streamCandle = {
+        instrumentUid,
+        open: c.open,
+        high: c.high,
+        low: c.low,
+        close: c.close,
+        volume: c.volume?.toString() || '0',
+        time: c.time,
+      };
+      (engine as any).onCandle(streamCandle);
+    });
+    return true;
+  });
+
   // После регистрации всех обработчиков (внутри registerTradingAssistantHandlers):
   marketDataBus.on('candle', (candle: any) => {
     const win = getTradingAssistantWindow();

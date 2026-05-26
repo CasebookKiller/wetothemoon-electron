@@ -360,6 +360,12 @@ export class VolumeProfileEngine extends EventEmitter {
     return this.profileCache.get(uid);
   }
 
+  public reset(instrumentUid: string): void {
+    this.volumeByPrice.delete(instrumentUid);
+    this.lastSignalDirection.delete(instrumentUid);
+    this.profileCache.delete(instrumentUid);
+  }
+
   // При расчёте профиля сохраняем в кеш
   private cacheProfile(profile: VolumeProfileLevels): void {
     this.profileCache.set(profile.instrumentUid, profile);

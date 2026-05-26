@@ -229,7 +229,11 @@ try {
     removeLastPriceListener: () => ipcRenderer.removeAllListeners('last-price-data'),
 
     getTodayCandles: (instrumentUid: string, token: string, interval: string) =>
-      ipcRenderer.invoke('trading-assistant:get-today-candles', instrumentUid, token, interval)
+      ipcRenderer.invoke('trading-assistant:get-today-candles', instrumentUid, token, interval),
+
+    loadHistoricalProfile: (instrumentUid: string, candles: any[]) => 
+      ipcRenderer.invoke('trading-assistant:load-historical-profile', instrumentUid, candles),
+    
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)
