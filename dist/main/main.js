@@ -2130,6 +2130,13 @@ var registerTradingAssistantHandlers = () => {
 			};
 		}
 	});
+	electron.ipcMain.handle("trading-assistant:update-config", async (_, config) => {
+		if (orderManagerInstance$1) {
+			orderManagerInstance$1.updateConfig(config);
+			return true;
+		}
+		return false;
+	});
 };
 //#endregion
 //#region src/shared/types/promptgenerator.ts

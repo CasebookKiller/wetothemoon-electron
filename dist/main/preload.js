@@ -163,7 +163,8 @@ try {
 		createSandboxAccount: () => electron.ipcRenderer.invoke("trading-assistant:create-account"),
 		closeSandboxAccount: (accountId) => electron.ipcRenderer.invoke("trading-assistant:close-account", accountId),
 		payInSandbox: (amount, accountId) => electron.ipcRenderer.invoke("trading-assistant:pay-in", amount, accountId),
-		getBalance: (accountId) => electron.ipcRenderer.invoke("trading-assistant:get-balance", accountId)
+		getBalance: (accountId) => electron.ipcRenderer.invoke("trading-assistant:get-balance", accountId),
+		updateTradingConfig: (config) => electron.ipcRenderer.invoke("trading-assistant:update-config", config)
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {

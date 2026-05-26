@@ -213,7 +213,9 @@ try {
     closeSandboxAccount: (accountId: string) => ipcRenderer.invoke('trading-assistant:close-account', accountId),
 
     payInSandbox: (amount: number, accountId: string) => ipcRenderer.invoke('trading-assistant:pay-in', amount, accountId),
-    getBalance: (accountId: string) => ipcRenderer.invoke('trading-assistant:get-balance', accountId)
+    getBalance: (accountId: string) => ipcRenderer.invoke('trading-assistant:get-balance', accountId),
+
+    updateTradingConfig: (config: any) => ipcRenderer.invoke('trading-assistant:update-config', config),
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

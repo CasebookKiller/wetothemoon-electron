@@ -312,4 +312,12 @@ export const registerTradingAssistantHandlers = () => {
     }
   });
 
+  ipcMain.handle('trading-assistant:update-config', async (_, config: any) => {
+    if (orderManagerInstance) {
+      orderManagerInstance.updateConfig(config);
+      return true;
+    }
+    return false;
+  });
+
 };
