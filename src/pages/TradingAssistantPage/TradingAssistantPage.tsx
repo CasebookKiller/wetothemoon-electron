@@ -5,6 +5,7 @@ import {
   LineSeries,
   CandlestickSeries,
   Time,
+  UTCTimestamp,   // <-- добавьте
   IChartApi,
   ISeriesApi,
   SeriesMarker,
@@ -262,7 +263,6 @@ export const TradingAssistantPage: React.FC = () => {
     if (!api?.onCandle) return;
 
     const handleCandle = (streamCandle: any) => {
-      // Правильно извлекаем время (может быть строкой ISO или объектом {seconds,nanos})
       let timestampMs: number;
       if (typeof streamCandle.time === 'object' && streamCandle.time.seconds) {
         timestampMs = Number(streamCandle.time.seconds) * 1000 + (streamCandle.time.nanos || 0) / 1e6;
@@ -276,7 +276,7 @@ export const TradingAssistantPage: React.FC = () => {
       }
 
       const newCandle = {
-        time: (Math.floor(timestampMs / 1000)) as Time,
+        time: Math.floor(timestampMs / 1000) as UTCTimestamp,   // <-- UTCTimestamp
         open: quotationToNumber(streamCandle.open),
         high: quotationToNumber(streamCandle.high),
         low: quotationToNumber(streamCandle.low),
