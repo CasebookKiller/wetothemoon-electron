@@ -66,6 +66,7 @@ export const TradingAssistantPage: React.FC = () => {
   const [backtestSignals, setBacktestSignals] = useState<BacktestSignal[]>([]);
   const [candlesData, setCandlesData] = useState<any[]>([]); // массив свечей в формате для графика
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
+  const priceLineRef = useRef<ISeriesApi<'Line'> | null>(null);
   const [backtestResult, setBacktestResult] = useState<any>(null);
   const [dateFrom, setDateFrom] = useState('2026-05-22');
   const [dateTo, setDateTo] = useState('2026-05-22');
@@ -356,6 +357,7 @@ export const TradingAssistantPage: React.FC = () => {
       }
     };
     const onSignal = (signal: Signal) => {
+      console.log('[Live Signal]', signal);
       if (signal.instrumentUid === selectedInstrument) {
         setLiveSignals((prev) => [...prev.slice(-50), signal]);
       }
@@ -427,6 +429,23 @@ export const TradingAssistantPage: React.FC = () => {
     candleSeries.setData(candlesData);
     chart.timeScale().fitContent();
     candleSeriesRef.current = candleSeries;
+
+    // --- Линия последней цены ---
+    // Если серия цены ещё не создана, создаём
+    if (!priceLineRef.current) {
+      priceLineRef.current = chart.addSeries(LineSeries, {
+        color: '#2196f3',       // синий
+        lineWidth: 1,
+        priceLineVisible: false,
+        lastValueVisible: true,
+      });
+    }
+    // Обновляем данные линии цены – берём из свечей поле close
+    const priceData = sortedCandles.map(c => ({
+      time: c.time,
+      value: c.close,
+    }));
+    priceLineRef.current.setData(priceData);
   }, [candlesData]);
 
   useEffect(() => {
@@ -743,9 +762,9 @@ export const TradingAssistantPage: React.FC = () => {
         Send to Sandbox
       </button>
 
-      {liveSignals.length > 0 && (
-        <div className="signals-log">
-          <h3>Live Signals</h3>
+      <div className="signals-log">
+        <h3>Live Signals</h3>
+        {liveSignals.length > 0 ? (
           <ul>
             {liveSignals.map((sig, idx) => (
               <li key={idx}>
@@ -753,8 +772,10 @@ export const TradingAssistantPage: React.FC = () => {
               </li>
             ))}
           </ul>
-        </div>
-      )}
+        ) : (
+          <p style={{ color: '#888' }}>Ожидание сигналов...</p>
+        )}
+      </div>
     </div>
   );
 };
