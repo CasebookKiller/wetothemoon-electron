@@ -62,6 +62,8 @@ export class VolumeProfileEngine extends EventEmitter {
   private lastPrice: Map<string, number> = new Map();
   // Время последней обработанной свечи
   private lastCandleTime: Map<string, string> = new Map();
+  private lastSignalDirection: Map<string, string> = new Map(); // <-- НОВОЕ
+
 
   constructor(config: Partial<VolumeProfileConfig> = {}) {
     super();
@@ -271,7 +273,8 @@ export class VolumeProfileEngine extends EventEmitter {
     this.emit('profileUpdate', levels);
   }
 
-  private generateSignals(uid: string, currentPrice: number, time: string): void {
+/*
+    private generateSignals(uid: string, currentPrice: number, time: string): void {
     // Здесь будем проверять простейшие сценарии на основе последнего рассчитанного профиля
     const priceMap = this.volumeByPrice.get(uid);
     if (!priceMap) return;
@@ -288,6 +291,47 @@ export class VolumeProfileEngine extends EventEmitter {
     if (currentPrice > poc) {
       this.emitSignal(uid, time, 'POC_BREAKOUT_UP', currentPrice, poc, `Цена ${currentPrice} пробила POC ${poc} вверх`);
     } else if (currentPrice < poc) {
+      this.emitSignal(uid, time, 'POC_BREAKOUT_DOWN', currentPrice, poc, `Цена ${currentPrice} пробила POC ${poc} вниз`);
+    }
+
+    // Возврат в Value Area
+    if (currentPrice > valueAreaLow && currentPrice < valueAreaHigh) {
+      // Проверим, не вышла ли цена до этого за пределы VA (упрощённо)
+    }
+
+    // Для HVN/LVN можно добавлять по мере реализации
+  }
+*/
+
+  private generateSignals(uid: string, currentPrice: number, time: string): void {
+    // Здесь будем проверять простейшие сценарии на основе последнего рассчитанного профиля
+    const priceMap = this.volumeByPrice.get(uid);
+    if (!priceMap) return;
+
+    // Берём последние уровни (можно сохранять их явно, но для простоты пересчитаем на лету)
+    // В реальной реализации лучше сохранять последний профиль в поле класса
+    // Пока сделаем заглушку-пример
+    const profile = this.getLastProfile(uid);
+    if (!profile) return;
+
+    const { poc, valueAreaHigh, valueAreaLow, hvn, lvn } = profile;
+
+    // Определяем текущее направление пробоя
+    const newDirection = currentPrice > poc ? 'UP' : (currentPrice < poc ? 'DOWN' : null);
+    if (!newDirection) return; // цена равна POC – сигнала нет
+
+    // Проверяем, не отправляли ли мы уже сигнал в этом же направлении
+    const lastDir = this.lastSignalDirection.get(uid);
+    if (lastDir === newDirection) {
+      return; // повторный сигнал в ту же сторону – игнорируем
+    }
+
+    // Сохраняем новое направление и отправляем сигнал
+    this.lastSignalDirection.set(uid, newDirection);
+
+    if (newDirection === 'UP') {
+      this.emitSignal(uid, time, 'POC_BREAKOUT_UP', currentPrice, poc, `Цена ${currentPrice} пробила POC ${poc} вверх`);
+    } else {
       this.emitSignal(uid, time, 'POC_BREAKOUT_DOWN', currentPrice, poc, `Цена ${currentPrice} пробила POC ${poc} вниз`);
     }
 

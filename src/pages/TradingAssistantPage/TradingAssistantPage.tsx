@@ -256,10 +256,10 @@ export const TradingAssistantPage: React.FC = () => {
     }
   }, [accountId]);
 
-  useEffect(() => {
-    const api = (window as any).electronAPI;
-    if (api) api.getTradingStatus().then((status: boolean) => setAutoTrading(status));
-  }, []);
+  //useEffect(() => {
+  //  const api = (window as any).electronAPI;
+  //  if (api) api.getTradingStatus().then((status: boolean) => setAutoTrading(status));
+  //}, []);
 
   // Запуск бэктеста через IPC
   // Запуск бэктеста
