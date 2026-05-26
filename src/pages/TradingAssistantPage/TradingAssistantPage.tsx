@@ -86,6 +86,18 @@ export const TradingAssistantPage: React.FC = () => {
   const [creatingAccount, setCreatingAccount] = useState(false);
   const [payAmount, setPayAmount] = useState(10000);
   const [payMessage, setPayMessage] = useState('');
+  const [balance, setBalance] = useState<string | null>(null);
+
+  const refreshBalance = async () => {
+    const api = (window as any).electronAPI;
+    if (!api?.getBalance || !accountId) return;
+    const result = await api.getBalance(accountId);
+    if (result.success) {
+      setBalance(`Баланс: ${result.balance} ${result.currency}`);
+    } else {
+      setBalance(`Ошибка: ${result.error}`);
+    }
+  };
 
   const handlePayIn = async () => {
     const api = (window as any).electronAPI;
@@ -512,6 +524,10 @@ export const TradingAssistantPage: React.FC = () => {
             <input type="number" value={payAmount} onChange={e => setPayAmount(Number(e.target.value))} min={1000} step={1000} style={{ width: '120px', padding: '4px', background: '#2a2e39', color: '#d1d4dc', border: '1px solid #555', borderRadius: '3px' }} />
             <button onClick={handlePayIn}>Пополнить счёт</button>
             {payMessage && <p style={{ margin: 0, color: '#4caf50' }}>{payMessage}</p>}
+          </div>
+          <div style={{ marginTop: '10px', display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <button onClick={refreshBalance}>Обновить баланс</button>
+            {balance && <span style={{ color: '#d1d4dc' }}>{balance}</span>}
           </div>
         </div>
       </div>
