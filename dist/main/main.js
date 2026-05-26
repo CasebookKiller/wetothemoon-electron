@@ -1879,12 +1879,12 @@ var TrendStrategy = class {
 	}
 	onCandle(candle) {
 		if (!this.dailyProfile || this.hasPosition) return;
-		const now = new Date(candle.time || Date.now()).getTime();
-		if (now - this.lastTradeTime < this.minIntervalMs) return;
 		const high = quotationToNumber(candle.high);
 		const low = quotationToNumber(candle.low);
 		const close = quotationToNumber(candle.close);
 		const time = candle.time || (/* @__PURE__ */ new Date()).toISOString();
+		const now = new Date(time).getTime();
+		if (now - this.lastTradeTime < this.minIntervalMs) return;
 		if (close > this.dailyProfile.valueAreaHigh) this.trendDirection = "UP";
 		else if (close < this.dailyProfile.valueAreaLow) this.trendDirection = "DOWN";
 		else {
@@ -1908,8 +1908,8 @@ var TrendStrategy = class {
 			else if (this.trendDirection === "DOWN" && low < this.hvnLevel) this.hvnBroken = true;
 		}
 		if (this.hvnBroken) {
-			const retestTolerance = .05;
-			if (this.trendDirection === "UP" && close < this.hvnLevel + retestTolerance && close > this.hvnLevel - retestTolerance) {
+			const tolerance = .05;
+			if (this.trendDirection === "UP" && close <= this.hvnLevel + tolerance && close >= this.hvnLevel - tolerance) {
 				this.signals.push({
 					type: "BUY",
 					price: close,
@@ -1917,9 +1917,11 @@ var TrendStrategy = class {
 					instrumentUid: this.instrumentUid,
 					reason: `Тренд вверх, ретест HVN ${this.hvnLevel}`
 				});
+				this.hasPosition = true;
+				this.lastTradeTime = now;
 				this.hvnLevel = null;
 				this.hvnBroken = false;
-			} else if (this.trendDirection === "DOWN" && close > this.hvnLevel - retestTolerance && close < this.hvnLevel + retestTolerance) {
+			} else if (this.trendDirection === "DOWN" && close >= this.hvnLevel - tolerance && close <= this.hvnLevel + tolerance) {
 				this.signals.push({
 					type: "SELL",
 					price: close,
@@ -1927,15 +1929,18 @@ var TrendStrategy = class {
 					instrumentUid: this.instrumentUid,
 					reason: `Тренд вниз, ретест HVN ${this.hvnLevel}`
 				});
-				this.hvnLevel = null;
-				this.hvnBroken = false;
 				this.hasPosition = true;
 				this.lastTradeTime = now;
+				this.hvnLevel = null;
+				this.hvnBroken = false;
 			}
 		}
 	}
 	getSignals() {
 		return this.signals;
+	}
+	clearSignals() {
+		this.signals = [];
 	}
 };
 //#endregion

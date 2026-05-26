@@ -141,7 +141,7 @@ export const registerTradingAssistantHandlers = () => {
           const profile = engine.getProfile(instrumentUid);
 
           // Стратегия
-          // const strategy = new VolumeAccumulationStrategy(instrumentUid, profile);
+          //const strategy = new VolumeAccumulationStrategy(instrumentUid, profile);
           const strategy = new TrendStrategy(instrumentUid, profile);
           candles.forEach(c => strategy.onCandle(c));
           const signals = strategy.getSignals();

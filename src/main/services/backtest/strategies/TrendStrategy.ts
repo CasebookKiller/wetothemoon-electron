@@ -33,49 +33,44 @@ export class TrendStrategy implements IBacktestStrategy {
   }
 
   onCandle(candle: StreamCandle): void {
-    if (!this.dailyProfile || this.hasPosition) return; // не входим, если уже есть позиция
-
-    const now = new Date(candle.time || Date.now()).getTime();
-    if (now - this.lastTradeTime < this.minIntervalMs) return; // кулдаун
+    if (!this.dailyProfile || this.hasPosition) return; // ← ВОТ ЭТА СТРОКА
 
     const high = quotationToNumber(candle.high);
     const low = quotationToNumber(candle.low);
     const close = quotationToNumber(candle.close);
     const time = candle.time || new Date().toISOString();
 
-    // 1. Определяем тренд
+    // Кулдаун между сделками (дополнительная защита)
+    const now = new Date(time).getTime();
+    if (now - this.lastTradeTime < this.minIntervalMs) return;
+
+    // Определяем тренд
     if (close > this.dailyProfile.valueAreaHigh) {
       this.trendDirection = 'UP';
     } else if (close < this.dailyProfile.valueAreaLow) {
       this.trendDirection = 'DOWN';
     } else {
-      // Внутри VA – тренд не определён, сбрасываем состояние
+      // Внутри VA – тренд не определён, сбрасываем
       this.hvnLevel = null;
       this.hvnBroken = false;
       return;
     }
 
-    // 2. Если ещё не выбрали HVN, выбираем ближайший по направлению тренда
+    // Выбор ближайшей HVN
     if (this.hvnLevel === null && this.dailyProfile.hvn.length > 0) {
-      // Для восходящего тренда ищем ближайший HVN ниже текущей цены
-      // Для нисходящего – выше текущей цены
       const hvnList = this.dailyProfile.hvn;
       if (this.trendDirection === 'UP') {
         const candidates = hvnList.filter(level => level < close);
-        if (candidates.length > 0) {
-          this.hvnLevel = Math.max(...candidates); // ближайший снизу
-        }
+        if (candidates.length > 0) this.hvnLevel = Math.max(...candidates);
       } else {
         const candidates = hvnList.filter(level => level > close);
-        if (candidates.length > 0) {
-          this.hvnLevel = Math.min(...candidates); // ближайший сверху
-        }
+        if (candidates.length > 0) this.hvnLevel = Math.min(...candidates);
       }
     }
 
     if (this.hvnLevel === null) return;
 
-    // 3. Проверяем пробой HVN
+    // Проверка пробоя
     if (!this.hvnBroken) {
       if (this.trendDirection === 'UP' && high > this.hvnLevel) {
         this.hvnBroken = true;
@@ -84,11 +79,10 @@ export class TrendStrategy implements IBacktestStrategy {
       }
     }
 
-    // 4. Если пробой был, ждём ретест
+    // Ретест и генерация сигнала
     if (this.hvnBroken) {
-      const retestTolerance = 0.05; // можно вынести в параметры
-      if (this.trendDirection === 'UP' && close < this.hvnLevel + retestTolerance && close > this.hvnLevel - retestTolerance) {
-        // Ретест снизу – вход в лонг
+      const tolerance = 0.05;
+      if (this.trendDirection === 'UP' && close <= this.hvnLevel + tolerance && close >= this.hvnLevel - tolerance) {
         this.signals.push({
           type: 'BUY',
           price: close,
@@ -96,11 +90,11 @@ export class TrendStrategy implements IBacktestStrategy {
           instrumentUid: this.instrumentUid,
           reason: `Тренд вверх, ретест HVN ${this.hvnLevel}`,
         });
-        // Сбрасываем, чтобы искать следующий уровень
+        this.hasPosition = true;          // ← блокируем дальнейшие входы
+        this.lastTradeTime = now;         // ← обновляем время последней сделки
         this.hvnLevel = null;
         this.hvnBroken = false;
-      } else if (this.trendDirection === 'DOWN' && close > this.hvnLevel - retestTolerance && close < this.hvnLevel + retestTolerance) {
-        // Ретест сверху – вход в шорт
+      } else if (this.trendDirection === 'DOWN' && close >= this.hvnLevel - tolerance && close <= this.hvnLevel + tolerance) {
         this.signals.push({
           type: 'SELL',
           price: close,
@@ -108,15 +102,19 @@ export class TrendStrategy implements IBacktestStrategy {
           instrumentUid: this.instrumentUid,
           reason: `Тренд вниз, ретест HVN ${this.hvnLevel}`,
         });
-        this.hvnLevel = null;
-        this.hvnBroken = false;
         this.hasPosition = true;
         this.lastTradeTime = now;
+        this.hvnLevel = null;
+        this.hvnBroken = false;
       }
     }
   }
 
   getSignals(): BacktestSignal[] {
     return this.signals;
+  }
+  
+  clearSignals(): void {
+    this.signals = [];
   }
 }

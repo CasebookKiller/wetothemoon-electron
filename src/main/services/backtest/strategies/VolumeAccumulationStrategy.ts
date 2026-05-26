@@ -75,6 +75,10 @@ export class VolumeAccumulationStrategy implements IBacktestStrategy {
   getSignals(): BacktestSignal[] {
     return this.signals;
   }
+
+  clearSignals(): void {
+    this.signals = [];
+  }
 }
 
 function quotationToNumber(q: any): number {
