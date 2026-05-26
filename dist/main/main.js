@@ -1222,6 +1222,7 @@ var VolumeProfileEngine = class extends events.EventEmitter {
 	volumeByPrice = /* @__PURE__ */ new Map();
 	lastPrice = /* @__PURE__ */ new Map();
 	lastCandleTime = /* @__PURE__ */ new Map();
+	lastSignalDirection = /* @__PURE__ */ new Map();
 	constructor(config = {}) {
 		super();
 		this.config = {
@@ -1338,8 +1339,12 @@ var VolumeProfileEngine = class extends events.EventEmitter {
 		const profile = this.getLastProfile(uid);
 		if (!profile) return;
 		const { poc, valueAreaHigh, valueAreaLow, hvn, lvn } = profile;
-		if (currentPrice > poc) this.emitSignal(uid, time, "POC_BREAKOUT_UP", currentPrice, poc, `Цена ${currentPrice} пробила POC ${poc} вверх`);
-		else if (currentPrice < poc) this.emitSignal(uid, time, "POC_BREAKOUT_DOWN", currentPrice, poc, `Цена ${currentPrice} пробила POC ${poc} вниз`);
+		const newDirection = currentPrice > poc ? "UP" : currentPrice < poc ? "DOWN" : null;
+		if (!newDirection) return;
+		if (this.lastSignalDirection.get(uid) === newDirection) return;
+		this.lastSignalDirection.set(uid, newDirection);
+		if (newDirection === "UP") this.emitSignal(uid, time, "POC_BREAKOUT_UP", currentPrice, poc, `Цена ${currentPrice} пробила POC ${poc} вверх`);
+		else this.emitSignal(uid, time, "POC_BREAKOUT_DOWN", currentPrice, poc, `Цена ${currentPrice} пробила POC ${poc} вниз`);
 		if (currentPrice > valueAreaLow && currentPrice < valueAreaHigh) {}
 	}
 	emitSignal(uid, time, type, price, level, message) {

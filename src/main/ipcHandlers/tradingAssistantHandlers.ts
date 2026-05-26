@@ -10,6 +10,8 @@ import { VirtualPortfolio } from '../services/backtest/virtualPortfolio';
 import { BacktestSignal, quotationToNumber } from '../services/backtest/common';
 import { OrderManager } from '../services/orderManager';
 import { sandboxGrpc } from '../services/tbank/SandboxGrpcService';
+import { marketDataBus } from '../services/marketDataBus';
+import { getTradingAssistantWindow } from '../windows/tradingAssistantWindow';
 
 let orderManagerInstance: OrderManager | null = null;
 
@@ -320,4 +322,11 @@ export const registerTradingAssistantHandlers = () => {
     return false;
   });
 
+  // После регистрации всех обработчиков (внутри registerTradingAssistantHandlers):
+  marketDataBus.on('candle', (candle: any) => {
+    const win = getTradingAssistantWindow();
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('candle-data', candle);
+    }
+  });
 };

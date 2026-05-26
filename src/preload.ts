@@ -216,6 +216,13 @@ try {
     getBalance: (accountId: string) => ipcRenderer.invoke('trading-assistant:get-balance', accountId),
 
     updateTradingConfig: (config: any) => ipcRenderer.invoke('trading-assistant:update-config', config),
+
+    onCandle: (callback: (candle: any) => void) => {
+      const channel = 'candle-data';
+      ipcRenderer.on(channel, (_, candle) => callback(candle));
+    },
+    removeCandleListener: () => ipcRenderer.removeAllListeners('candle-data'),
+    
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

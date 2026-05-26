@@ -256,6 +256,35 @@ export const TradingAssistantPage: React.FC = () => {
     }
   }, [accountId]);
 
+  // Подписка на live-свечи
+  useEffect(() => {
+    const api = (window as any).electronAPI;
+    if (!api?.onCandle) return;
+
+    const handleCandle = (streamCandle: any) => {
+      const time = (Math.floor(new Date(streamCandle.time).getTime() / 1000)) as Time;
+      const newCandle = {
+        time,
+        open: quotationToNumber(streamCandle.open),
+        high: quotationToNumber(streamCandle.high),
+        low: quotationToNumber(streamCandle.low),
+        close: quotationToNumber(streamCandle.close),
+      };
+
+      setCandlesData(prev => {
+        // Проверяем, нет ли уже свечи с таким временем
+        if (prev.some(c => c.time === time)) return prev;
+        // Добавляем новую свечу и удерживаем последние 500 свечей
+        return [...prev.slice(-499), newCandle];
+      });
+    };
+
+    api.onCandle(handleCandle);
+
+    return () => {
+      api.removeCandleListener();
+    };
+  }, []);
   //useEffect(() => {
   //  const api = (window as any).electronAPI;
   //  if (api) api.getTradingStatus().then((status: boolean) => setAutoTrading(status));
