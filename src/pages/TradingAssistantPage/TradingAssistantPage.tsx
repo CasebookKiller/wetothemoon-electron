@@ -615,6 +615,31 @@ export const TradingAssistantPage: React.FC = () => {
       text: sig.reason,
     }));
 
+    // Синхронизация масштаба гистограммы при изменении видимого диапазона
+    useEffect(() => {
+      const chart = chartRef.current;
+      if (!chart) return;
+
+      const timeScale = chart.timeScale();
+      const priceScale = chart.priceScale('right');
+
+      const handler = () => {
+        const range = priceScale.getVisibleRange();
+        if (range) {
+          setPriceRange({ min: range.from, max: range.to });
+        }
+      };
+
+      // В v5.2.0 нет subscribeVisiblePriceRangeChange, поэтому подписываемся на изменение времени
+      // и вручную проверяем видимый диапазон цен.
+      timeScale.subscribeVisibleTimeRangeChange(handler);
+      handler(); // устанавливаем начальное значение
+
+      return () => {
+        timeScale.unsubscribeVisibleTimeRangeChange(handler);
+      };
+    }, [chartRef.current]);
+
     // НОВЫЙ СПОСОБ (v5): создаем примитив для маркеров на основе серии
     const markersPrimitive = createSeriesMarkers(signalSeries, markers);
 
@@ -635,12 +660,6 @@ export const TradingAssistantPage: React.FC = () => {
     const p = await api.getVolumeProfile(selectedInstrument);
     if (p) setProfile(p);
   };
-  
-  //const api = (window as any).electronAPI;
-  //if (!api) {
-  //  console.error('electronAPI не доступен');
-  //  return;
-  //}
 
   return (
     <div className="trading-assistant">
