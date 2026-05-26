@@ -136,6 +136,8 @@ export const TradingAssistantPage: React.FC = () => {
 
   const [displayTimeframe, setDisplayTimeframe] = useState<1 | 5 | 15 | 60>(5); // по умолчанию 5-минутный
 
+  const [strategyType, setStrategyType] = useState('volume_accumulation');
+
   const startStream = async () => {
     const api = (window as any).electronAPI;
     if (!api?.startMarketStream || !api?.getTodayCandles) return;
@@ -416,7 +418,13 @@ export const TradingAssistantPage: React.FC = () => {
       dateTo,
       interval,
       token,
-      { valueAreaPercent, profileResolution }
+      {
+        valueAreaPercent,
+        profileResolution,
+        strategyType,            // ← передаём
+        stopLossPercent: 0.5,   // временно, пока нет полей в UI
+        takeProfitPercent: 1.0,
+      }
     );
     if (result) {
       setProfile(result.profile); // последний профиль (или массив профилей?)
@@ -799,6 +807,11 @@ export const TradingAssistantPage: React.FC = () => {
       </div>
     
       <div className="backtest-panel">
+        <label>Strategy:</label>
+        <select value={strategyType} onChange={e => setStrategyType(e.target.value)}>
+          <option value="volume_accumulation">Volume Accumulation</option>
+          <option value="trend">Trend Strategy</option>
+        </select>
         <label>From:</label>
         <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
         <label>To:</label>

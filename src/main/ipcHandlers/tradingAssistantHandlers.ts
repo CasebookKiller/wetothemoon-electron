@@ -117,10 +117,10 @@ export const registerTradingAssistantHandlers = () => {
     const allCandles: any[] = [];
     const allSignals: BacktestSignal[] = [];
 
-    // Создаём портфель с параметрами стоп-лосс/тейк-профит
+    // Портфель с параметрами стоп‑лосс / тейк‑профит
     const portfolio = new VirtualPortfolio({
       initialCapital: 100000,
-      stopLossPercent: 0.5,   // можно будет брать из params позже
+      stopLossPercent: 0.5,   // можно будет вынести в UI позже
       takeProfitPercent: 1.0,
     });
 
@@ -138,6 +138,7 @@ export const registerTradingAssistantHandlers = () => {
         );
 
         if (candles.length > 0) {
+          // 1. Строим профиль дня
           const engine = new VolumeProfileEngine({
             profileResolution: params.profileResolution || 50,
             valueAreaPercent: params.valueAreaPercent || 70,
@@ -145,18 +146,23 @@ export const registerTradingAssistantHandlers = () => {
           candles.forEach(c => (engine as any).onCandle?.(c));
           const profile = engine.getProfile(instrumentUid);
 
+          // 2. Создаём стратегию и обрабатываем свечи последовательно
+          // const strategy = new VolumeAccumulationStrategy(instrumentUid, profile);
           const strategy = new TrendStrategy(instrumentUid, profile);
 
-          // Обрабатываем свечи последовательно, чтобы стоп/тейк работал
           for (const candle of candles) {
+            // Подаём свечу в стратегию
             strategy.onCandle(candle);
+
+            // Если появились новые сигналы – открываем позиции
             const newSignals = strategy.getSignals();
             for (const signal of newSignals) {
               portfolio.processSignal(signal);
               allSignals.push(signal);
             }
-            strategy.clearSignals();
+            strategy.clearSignals(); // очищаем, чтобы не обрабатывать повторно
 
+            // Проверяем стоп‑лосс / тейк‑профит на этой же свече
             const high = quotationToNumber(candle.high);
             const low = quotationToNumber(candle.low);
             const close = quotationToNumber(candle.close);
@@ -186,7 +192,7 @@ export const registerTradingAssistantHandlers = () => {
         portfolio: stats,
       };
 
-      // Профиль за последний день (без изменений)
+      // Профиль за последний день (как раньше)
       let lastProfile = null;
       if (allCandles.length > 0) {
         const lastEngine = new VolumeProfileEngine({
