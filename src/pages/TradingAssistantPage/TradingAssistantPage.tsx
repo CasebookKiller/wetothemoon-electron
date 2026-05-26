@@ -88,6 +88,36 @@ export const TradingAssistantPage: React.FC = () => {
   const [payMessage, setPayMessage] = useState('');
   const [balance, setBalance] = useState<string | null>(null);
 
+  const [streamActive, setStreamActive] = useState(false);
+  const [streamToken, setStreamToken] = useState(import.meta.env.VITE_TReadOnly || '');
+
+  const startStream = async () => {
+    const api = (window as any).electronAPI;
+    if (!api?.startMarketStream) return;
+    try {
+      await api.startMarketStream(streamToken, {
+        subscribeCandlesRequest: {
+          subscriptionAction: 'SUBSCRIPTION_ACTION_SUBSCRIBE',
+          instruments: [{
+            instrumentId: selectedInstrument,
+            interval: 'SUBSCRIPTION_INTERVAL_ONE_MINUTE'
+          }]
+        }
+      });
+      setStreamActive(true);
+    } catch (err: any) {
+      console.error(err);
+      alert('Ошибка запуска стрима: ' + err.message);
+    }
+  };
+
+  const stopStream = async () => {
+    const api = (window as any).electronAPI;
+    if (!api?.stopMarketStream) return;
+    await api.stopMarketStream();
+    setStreamActive(false);
+  };
+
   const refreshBalance = async () => {
     const api = (window as any).electronAPI;
     if (!api?.getBalance || !accountId) return;
@@ -219,6 +249,12 @@ export const TradingAssistantPage: React.FC = () => {
       loadAccounts();
     }
   }, [sandboxToken]);
+
+  useEffect(() => {
+    if (accountId) {
+      refreshBalance();
+    }
+  }, [accountId]);
 
   useEffect(() => {
     const api = (window as any).electronAPI;
@@ -531,6 +567,25 @@ export const TradingAssistantPage: React.FC = () => {
             <button onClick={refreshBalance}>Обновить баланс</button>
             {balance && <span style={{ color: '#d1d4dc' }}>{balance}</span>}
           </div>
+        </div>
+      </div>
+      <div className="stream-panel" style={{ background: '#1e1e1e', padding: '10px', borderRadius: '4px', marginBottom: '15px' }}>
+        <h3 style={{ margin: '0 0 8px 0' }}>Market Stream</h3>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <label>
+            Token (read‑only):
+            <input
+              type="text"
+              value={streamToken}
+              onChange={(e) => setStreamToken(e.target.value)}
+              style={{ width: '250px', marginLeft: '5px' }}
+            />
+          </label>
+          <button onClick={startStream} disabled={streamActive}>Start Stream</button>
+          <button onClick={stopStream} disabled={!streamActive}>Stop Stream</button>
+          <span style={{ color: streamActive ? '#4caf50' : '#d32f2f', marginLeft: '10px' }}>
+            {streamActive ? '● Stream Active' : '○ Stream Stopped'}
+          </span>
         </div>
       </div>
       <div className="instrument-selector">
