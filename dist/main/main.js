@@ -974,7 +974,6 @@ var registerMarketdataStreamHandlers = () => {
 							if (parsed.openInterest) marketDataBus.emit("openInterest", parsed.openInterest);
 							const win = getBondsWindow();
 							if (win && !win.isDestroyed()) win.webContents.send("md-stream-data", jsonStr);
-							else console.warn("[Main] Bonds window not available");
 						} catch {
 							console.warn("[Main] Skipped invalid JSON fragment:", jsonStr.slice(0, 100));
 						}
@@ -2952,6 +2951,7 @@ var OrderManager = class {
 	config;
 	activeOrderId = null;
 	isRunning = false;
+	lastOrderTime = 0;
 	constructor(config = {}) {
 		this.config = {
 			lotQuantity: 1,
@@ -2975,6 +2975,11 @@ var OrderManager = class {
 	async processSignal(signal) {
 		if (!this.isRunning) {
 			console.log("[OrderManager] Автоторговля выключена, сигнал проигнорирован");
+			return;
+		}
+		const now = Date.now();
+		if (now - this.lastOrderTime < 300 * 1e3) {
+			console.log("[OrderManager] Слишком частые сигналы, пропускаем");
 			return;
 		}
 		if (this.config.demoMode) {
@@ -3010,6 +3015,7 @@ var OrderManager = class {
 			}, this.config.token);
 			this.activeOrderId = order.orderId ?? null;
 			console.log(`[OrderManager] Ордер отправлен: ${this.activeOrderId}`);
+			this.lastOrderTime = now;
 		} catch (error) {
 			console.error("[OrderManager] Ошибка отправки ордера:", error);
 		}

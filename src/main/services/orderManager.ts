@@ -15,6 +15,8 @@ export class OrderManager {
   private activeOrderId: string | null = null;
   private isRunning: boolean = false;
 
+  private lastOrderTime: number = 0;
+
   constructor(config: Partial<OrderManagerConfig> = {}) {
     this.config = {
       lotQuantity: 1,
@@ -38,6 +40,13 @@ export class OrderManager {
   async processSignal(signal: BacktestSignal): Promise<void> {
     if (!this.isRunning) {
       console.log('[OrderManager] Автоторговля выключена, сигнал проигнорирован');
+      return;
+    }
+
+    // Защита от лавины: не чаще одного ордера в 5 минут
+    const now = Date.now();
+    if (now - this.lastOrderTime < 5 * 60 * 1000) {
+      console.log('[OrderManager] Слишком частые сигналы, пропускаем');
       return;
     }
 
@@ -88,6 +97,7 @@ export class OrderManager {
 
       this.activeOrderId = order.orderId ?? null;
       console.log(`[OrderManager] Ордер отправлен: ${this.activeOrderId}`);
+      this.lastOrderTime = now;
     } catch (error) {
       console.error('[OrderManager] Ошибка отправки ордера:', error);
     }

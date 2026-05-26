@@ -122,7 +122,7 @@ export const registerMarketdataStreamHandlers = () => {
               if (win && !win.isDestroyed()) {
                 win.webContents.send('md-stream-data', jsonStr);
               } else {
-                console.warn('[Main] Bonds window not available');
+                // console.warn('[Main] Bonds window not available'); // окно не нужно, данные идут в шину
               }
             } catch {
               console.warn('[Main] Skipped invalid JSON fragment:', jsonStr.slice(0, 100));
