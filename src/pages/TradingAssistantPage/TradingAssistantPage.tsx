@@ -323,7 +323,7 @@ export const TradingAssistantPage: React.FC = () => {
       // candles будут объединены за весь период
       if (result.candles?.length) {
         const formatted = result.candles.map((c: any) => ({
-          time: (Math.floor(new Date(c.time).getTime() / 1000)) as Time,
+          time: (Math.floor(new Date(c.time).getTime() / 1000)) as UTCTimestamp, // <-- замените as Time на as UTCTimestamp
           open: quotationToNumber(c.open),
           high: quotationToNumber(c.high),
           low: quotationToNumber(c.low),
@@ -447,8 +447,8 @@ export const TradingAssistantPage: React.FC = () => {
     //volumeSeriesRef.current = [];
 
     // Проверяем, что время корректно
-    const firstTime = candlesData[0]?.time;
-    const lastTime = candlesData[candlesData.length - 1]?.time;
+    const firstTime = candlesData[0].time as UTCTimestamp;
+    const lastTime = candlesData[candlesData.length - 1].time as UTCTimestamp;
     if (typeof firstTime !== 'number' || typeof lastTime !== 'number') return;
 
     // Сначала рисуем основные уровни POC, VA (как раньше)
