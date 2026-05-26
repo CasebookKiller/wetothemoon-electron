@@ -1656,20 +1656,57 @@ var VirtualPortfolio = class {
 	openPosition = null;
 	peakCapital;
 	maxDrawdown = 0;
+	config;
 	constructor(config) {
-		this.initialCapital = config.initialCapital;
-		this.capital = config.initialCapital;
-		this.peakCapital = config.initialCapital;
+		this.config = {
+			initialCapital: config.initialCapital,
+			commissionPercent: config.commissionPercent ?? 0,
+			slippagePercent: config.slippagePercent ?? 0,
+			stopLossPercent: config.stopLossPercent ?? 0,
+			takeProfitPercent: config.takeProfitPercent ?? 0
+		};
+		this.initialCapital = this.config.initialCapital;
+		this.capital = this.config.initialCapital;
+		this.peakCapital = this.config.initialCapital;
 	}
 	processSignal(signal) {
-		if (this.openPosition) this.closePosition(signal.price, signal.time);
+		if (this.openPosition) this.closePosition(signal.price, signal.time, "SIGNAL");
+		const entryPrice = signal.price;
+		const stopLossPrice = this.config.stopLossPercent > 0 ? signal.type === "BUY" ? entryPrice * (1 - this.config.stopLossPercent / 100) : entryPrice * (1 + this.config.stopLossPercent / 100) : void 0;
+		const takeProfitPrice = this.config.takeProfitPercent > 0 ? signal.type === "BUY" ? entryPrice * (1 + this.config.takeProfitPercent / 100) : entryPrice * (1 - this.config.takeProfitPercent / 100) : void 0;
 		this.openPosition = {
 			type: signal.type,
-			price: signal.price,
-			time: signal.time
+			price: entryPrice,
+			time: signal.time,
+			stopLossPrice,
+			takeProfitPrice
 		};
 	}
-	closePosition(price, time) {
+	checkStopTake(high, low, close, time) {
+		if (!this.openPosition) return;
+		const { type, stopLossPrice, takeProfitPrice } = this.openPosition;
+		if (stopLossPrice !== void 0) {
+			if (type === "BUY" && low <= stopLossPrice) {
+				this.closePosition(stopLossPrice, time, "STOP_LOSS");
+				return;
+			}
+			if (type === "SELL" && high >= stopLossPrice) {
+				this.closePosition(stopLossPrice, time, "STOP_LOSS");
+				return;
+			}
+		}
+		if (takeProfitPrice !== void 0) {
+			if (type === "BUY" && high >= takeProfitPrice) {
+				this.closePosition(takeProfitPrice, time, "TAKE_PROFIT");
+				return;
+			}
+			if (type === "SELL" && low <= takeProfitPrice) {
+				this.closePosition(takeProfitPrice, time, "TAKE_PROFIT");
+				return;
+			}
+		}
+	}
+	closePosition(price, time, reason) {
 		if (!this.openPosition) return;
 		const entry = this.openPosition;
 		let profit;
@@ -1684,7 +1721,8 @@ var VirtualPortfolio = class {
 			entryTime: entry.time,
 			exitTime: time,
 			profit,
-			profitPercent
+			profitPercent,
+			exitReason: reason
 		});
 		if (this.capital > this.peakCapital) this.peakCapital = this.capital;
 		const currentDrawdown = this.peakCapital - this.capital;
@@ -1692,7 +1730,7 @@ var VirtualPortfolio = class {
 		this.openPosition = null;
 	}
 	finalizeWithLastPrice(lastPrice, time) {
-		if (this.openPosition) this.closePosition(lastPrice, time);
+		if (this.openPosition) this.closePosition(lastPrice, time, "END_OF_DAY");
 		return this.getStats();
 	}
 	getStats() {

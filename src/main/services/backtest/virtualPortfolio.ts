@@ -5,8 +5,8 @@ export interface PortfolioConfig {
   initialCapital: number;
   commissionPercent?: number;
   slippagePercent?: number;
-  stopLossPercent?: number;   // ← новое поле
-  takeProfitPercent?: number; // ← новое поле
+  stopLossPercent?: number;
+  takeProfitPercent?: number;
 }
 
 export interface Trade {
@@ -17,6 +17,7 @@ export interface Trade {
   exitTime: string;
   profit: number;
   profitPercent: number;
+  exitReason: 'SIGNAL' | 'STOP_LOSS' | 'TAKE_PROFIT' | 'END_OF_DAY';
 }
 
 export interface PortfolioStats {
@@ -38,24 +39,86 @@ export class VirtualPortfolio {
   private capital: number;
   private initialCapital: number;
   private trades: Trade[] = [];
-  private openPosition: { type: 'BUY' | 'SELL'; price: number; time: string } | null = null;
+  private openPosition: {
+    type: 'BUY' | 'SELL';
+    price: number;
+    time: string;
+    stopLossPrice?: number;
+    takeProfitPrice?: number;
+  } | null = null;
   private peakCapital: number;
-  private maxDrawdown: number = 0; // абсолютная максимальная просадка
+  private maxDrawdown: number = 0;
+  private config: Required<PortfolioConfig>;
 
   constructor(config: PortfolioConfig) {
-    this.initialCapital = config.initialCapital;
-    this.capital = config.initialCapital;
-    this.peakCapital = config.initialCapital;
+    this.config = {
+      initialCapital: config.initialCapital,
+      commissionPercent: config.commissionPercent ?? 0,
+      slippagePercent: config.slippagePercent ?? 0,
+      stopLossPercent: config.stopLossPercent ?? 0,
+      takeProfitPercent: config.takeProfitPercent ?? 0,
+    };
+    this.initialCapital = this.config.initialCapital;
+    this.capital = this.config.initialCapital;
+    this.peakCapital = this.config.initialCapital;
   }
 
   processSignal(signal: BacktestSignal): void {
     if (this.openPosition) {
-      this.closePosition(signal.price, signal.time);
+      this.closePosition(signal.price, signal.time, 'SIGNAL');
     }
-    this.openPosition = { type: signal.type, price: signal.price, time: signal.time };
+
+    const entryPrice = signal.price;
+    const stopLossPrice = this.config.stopLossPercent > 0
+      ? (signal.type === 'BUY'
+          ? entryPrice * (1 - this.config.stopLossPercent / 100)
+          : entryPrice * (1 + this.config.stopLossPercent / 100))
+      : undefined;
+
+    const takeProfitPrice = this.config.takeProfitPercent > 0
+      ? (signal.type === 'BUY'
+          ? entryPrice * (1 + this.config.takeProfitPercent / 100)
+          : entryPrice * (1 - this.config.takeProfitPercent / 100))
+      : undefined;
+
+    this.openPosition = {
+      type: signal.type,
+      price: entryPrice,
+      time: signal.time,
+      stopLossPrice,
+      takeProfitPrice,
+    };
   }
 
-  closePosition(price: number, time: string): void {
+  checkStopTake(high: number, low: number, close: number, time: string): void {
+    if (!this.openPosition) return;
+
+    const { type, stopLossPrice, takeProfitPrice } = this.openPosition;
+
+    if (stopLossPrice !== undefined) {
+      if (type === 'BUY' && low <= stopLossPrice) {
+        this.closePosition(stopLossPrice, time, 'STOP_LOSS');
+        return;
+      }
+      if (type === 'SELL' && high >= stopLossPrice) {
+        this.closePosition(stopLossPrice, time, 'STOP_LOSS');
+        return;
+      }
+    }
+
+    if (takeProfitPrice !== undefined) {
+      if (type === 'BUY' && high >= takeProfitPrice) {
+        this.closePosition(takeProfitPrice, time, 'TAKE_PROFIT');
+        return;
+      }
+      if (type === 'SELL' && low <= takeProfitPrice) {
+        this.closePosition(takeProfitPrice, time, 'TAKE_PROFIT');
+        return;
+      }
+    }
+  }
+
+  private closePosition(price: number, time: string, reason: Trade['exitReason']): void {
     if (!this.openPosition) return;
 
     const entry = this.openPosition;
@@ -78,14 +141,12 @@ export class VirtualPortfolio {
       exitTime: time,
       profit,
       profitPercent,
+      exitReason: reason,
     });
 
-    // Обновляем пик капитала
     if (this.capital > this.peakCapital) {
       this.peakCapital = this.capital;
     }
-
-    // Вычисляем текущую просадку от пика
     const currentDrawdown = this.peakCapital - this.capital;
     if (currentDrawdown > this.maxDrawdown) {
       this.maxDrawdown = currentDrawdown;
@@ -96,7 +157,7 @@ export class VirtualPortfolio {
 
   finalizeWithLastPrice(lastPrice: number, time: string): PortfolioStats {
     if (this.openPosition) {
-      this.closePosition(lastPrice, time);
+      this.closePosition(lastPrice, time, 'END_OF_DAY');
     }
     return this.getStats();
   }
@@ -109,7 +170,6 @@ export class VirtualPortfolio {
     const totalProfit = this.capital - this.initialCapital;
     const totalProfitPercent = (totalProfit / this.initialCapital) * 100;
 
-    // Максимальная просадка уже вычислена в процессе
     const maxDrawdownPercent = this.peakCapital > 0 ? (this.maxDrawdown / this.peakCapital) * 100 : 0;
 
     const averageProfit = totalTrades > 0 ? totalProfit / totalTrades : 0;
