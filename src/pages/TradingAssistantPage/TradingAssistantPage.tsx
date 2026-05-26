@@ -470,8 +470,10 @@ export const TradingAssistantPage: React.FC = () => {
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
-    const chart = createChart(chartContainerRef.current, {
-      width: chartContainerRef.current.clientWidth,
+    const container = chartContainerRef.current;
+    
+    const chart = createChart(container, {
+      width: container.clientWidth,
       height: 400,
       layout: {
         background: { type: ColorType.Solid, color: '#1e1e1e' },
@@ -492,7 +494,30 @@ export const TradingAssistantPage: React.FC = () => {
 
     chartRef.current = chart;
 
+    // --- Подписка на изменение размера контейнера ---
+    const resizeObserver = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        chart.resize(width, height);
+      }
+    });
+    resizeObserver.observe(container);
+
+    // --- Подписка на зум (если ещё нужна) ---
+    const timeScale = chart.timeScale();
+    const priceScale = chart.priceScale('right');
+    const updatePriceRange = () => {
+      const range = priceScale.getVisibleRange();
+      if (range) {
+        setPriceRange({ min: range.from, max: range.to });
+      }
+    };
+    timeScale.subscribeVisibleTimeRangeChange(updatePriceRange);
+    updatePriceRange();
+
     return () => {
+      resizeObserver.disconnect();
+      timeScale.unsubscribeVisibleTimeRangeChange(updatePriceRange);
       chart.remove();
       chartRef.current = null;
     };
@@ -792,7 +817,7 @@ export const TradingAssistantPage: React.FC = () => {
         <button disabled={loading} onClick={runBacktest}>Run Backtest</button>
       </div>
 
-      <div style={{ display: 'flex', marginBottom: '15px' }}>
+      <div className="chart-row">
         {profile?.volumeByPrice && priceRange.max > 0 && (
           <VolumeProfileBars
             data={profile.volumeByPrice}
@@ -802,7 +827,11 @@ export const TradingAssistantPage: React.FC = () => {
             height={400}
           />
         )}
-        <div className="chart-container" ref={chartContainerRef} style={{ flex: 1 }} />
+        <div
+          className="chart-container"
+          ref={chartContainerRef}
+          style={{ flex: 1, minWidth: 0, position: 'relative', overflow: 'hidden' }}
+        />
       </div>
 
       {profile?.volumeByPrice && profile.volumeByPrice.length > 0 && (
