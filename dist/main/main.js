@@ -1202,7 +1202,7 @@ var createTradingAssistantWindow = () => {
 var getTradingAssistantWindow = () => tradingAssistantWindow;
 //#endregion
 //#region src/main/services/volumeProfileEngine.ts
-function quotationToNumber$3(q) {
+function quotationToNumber$2(q) {
 	if (!q) return 0;
 	return Number(q.units || "0") + (q.nano || 0) / 1e9;
 }
@@ -1237,9 +1237,9 @@ var VolumeProfileEngine = class extends events.EventEmitter {
 		if (!uid) return;
 		const volume = Number(candle.volume || "0");
 		if (volume <= this.config.minVolumeThreshold) return;
-		const high = quotationToNumber$3(candle.high);
-		const low = quotationToNumber$3(candle.low);
-		const close = quotationToNumber$3(candle.close);
+		const high = quotationToNumber$2(candle.high);
+		const low = quotationToNumber$2(candle.low);
+		const close = quotationToNumber$2(candle.close);
 		const time = candle.time || (/* @__PURE__ */ new Date()).toISOString();
 		this.lastPrice.set(uid, close);
 		const typicalPrice = (high + low + close) / 3;
@@ -1269,7 +1269,7 @@ var VolumeProfileEngine = class extends events.EventEmitter {
 	onTrade(trade) {
 		const uid = trade.instrumentUid || trade.figi;
 		if (!uid) return;
-		const price = quotationToNumber$3(trade.price);
+		const price = quotationToNumber$2(trade.price);
 		this.lastPrice.set(uid, price);
 	}
 	addVolume(uid, price, volume) {
@@ -1482,70 +1482,6 @@ var CandleSourceRequest = /* @__PURE__ */ function(CandleSourceRequest) {
 	CandleSourceRequest[CandleSourceRequest["CANDLE_SOURCE_INCLUDE_WEEKEND"] = 3] = "CANDLE_SOURCE_INCLUDE_WEEKEND";
 	return CandleSourceRequest;
 }({});
-//#endregion
-//#region src/main/services/backtest/strategies/VolumeAccumulationStrategy.ts
-var VolumeAccumulationStrategy = class {
-	signals = [];
-	dailyProfile = null;
-	instrumentUid;
-	hasBrokenHigh = false;
-	hasBrokenLow = false;
-	constructor(instrumentUid, dailyProfile) {
-		this.instrumentUid = instrumentUid;
-		this.dailyProfile = dailyProfile;
-	}
-	reset() {
-		this.signals = [];
-		this.hasBrokenHigh = false;
-		this.hasBrokenLow = false;
-		this.hasPosition = false;
-	}
-	hasPosition = false;
-	onCandle(candle) {
-		if (!this.dailyProfile || this.hasPosition) return;
-		const high = quotationToNumber$2(candle.high);
-		const low = quotationToNumber$2(candle.low);
-		const close = quotationToNumber$2(candle.close);
-		const time = candle.time || (/* @__PURE__ */ new Date()).toISOString();
-		if (high > this.dailyProfile.valueAreaHigh) {
-			this.hasBrokenHigh = true;
-			this.hasBrokenLow = false;
-		}
-		if (low < this.dailyProfile.valueAreaLow) {
-			this.hasBrokenLow = true;
-			this.hasBrokenHigh = false;
-		}
-		if (this.hasBrokenHigh && close < this.dailyProfile.valueAreaHigh) {
-			this.signals.push({
-				type: "SELL",
-				price: close,
-				time,
-				instrumentUid: this.instrumentUid,
-				reason: `Return to VA after breaking high (VAH=${this.dailyProfile.valueAreaHigh})`
-			});
-			this.hasBrokenHigh = false;
-			this.hasPosition = true;
-		}
-		if (this.hasBrokenLow && close > this.dailyProfile.valueAreaLow) {
-			this.signals.push({
-				type: "BUY",
-				price: close,
-				time,
-				instrumentUid: this.instrumentUid,
-				reason: `Return to VA after breaking low (VAL=${this.dailyProfile.valueAreaLow})`
-			});
-			this.hasBrokenLow = false;
-			this.hasPosition = true;
-		}
-	}
-	getSignals() {
-		return this.signals;
-	}
-};
-function quotationToNumber$2(q) {
-	if (!q) return 0;
-	return Number(q.units || 0) + (q.nano || 0) / 1e9;
-}
 //#endregion
 //#region src/main/utils/grpcHelper.ts
 function createGrpcClient(packageName, serviceName) {
@@ -1918,6 +1854,82 @@ var sandboxGrpc = {
 	})
 };
 //#endregion
+//#region src/main/services/backtest/strategies/TrendStrategy.ts
+var TrendStrategy = class {
+	signals = [];
+	dailyProfile = null;
+	instrumentUid;
+	hvnLevel = null;
+	hvnBroken = false;
+	trendDirection = null;
+	constructor(instrumentUid, dailyProfile) {
+		this.instrumentUid = instrumentUid;
+		this.dailyProfile = dailyProfile;
+	}
+	reset() {
+		this.signals = [];
+		this.hvnLevel = null;
+		this.hvnBroken = false;
+		this.trendDirection = null;
+	}
+	onCandle(candle) {
+		if (!this.dailyProfile) return;
+		const high = quotationToNumber(candle.high);
+		const low = quotationToNumber(candle.low);
+		const close = quotationToNumber(candle.close);
+		const time = candle.time || (/* @__PURE__ */ new Date()).toISOString();
+		if (close > this.dailyProfile.valueAreaHigh) this.trendDirection = "UP";
+		else if (close < this.dailyProfile.valueAreaLow) this.trendDirection = "DOWN";
+		else {
+			this.hvnLevel = null;
+			this.hvnBroken = false;
+			return;
+		}
+		if (this.hvnLevel === null && this.dailyProfile.hvn.length > 0) {
+			const hvnList = this.dailyProfile.hvn;
+			if (this.trendDirection === "UP") {
+				const candidates = hvnList.filter((level) => level < close);
+				if (candidates.length > 0) this.hvnLevel = Math.max(...candidates);
+			} else {
+				const candidates = hvnList.filter((level) => level > close);
+				if (candidates.length > 0) this.hvnLevel = Math.min(...candidates);
+			}
+		}
+		if (this.hvnLevel === null) return;
+		if (!this.hvnBroken) {
+			if (this.trendDirection === "UP" && high > this.hvnLevel) this.hvnBroken = true;
+			else if (this.trendDirection === "DOWN" && low < this.hvnLevel) this.hvnBroken = true;
+		}
+		if (this.hvnBroken) {
+			const retestTolerance = .05;
+			if (this.trendDirection === "UP" && close < this.hvnLevel + retestTolerance && close > this.hvnLevel - retestTolerance) {
+				this.signals.push({
+					type: "BUY",
+					price: close,
+					time,
+					instrumentUid: this.instrumentUid,
+					reason: `Тренд вверх, ретест HVN ${this.hvnLevel}`
+				});
+				this.hvnLevel = null;
+				this.hvnBroken = false;
+			} else if (this.trendDirection === "DOWN" && close > this.hvnLevel - retestTolerance && close < this.hvnLevel + retestTolerance) {
+				this.signals.push({
+					type: "SELL",
+					price: close,
+					time,
+					instrumentUid: this.instrumentUid,
+					reason: `Тренд вниз, ретест HVN ${this.hvnLevel}`
+				});
+				this.hvnLevel = null;
+				this.hvnBroken = false;
+			}
+		}
+	}
+	getSignals() {
+		return this.signals;
+	}
+};
+//#endregion
 //#region src/main/ipcHandlers/tradingAssistantHandlers.ts
 var orderManagerInstance$1 = null;
 var setOrderManagerInstance = (manager) => {
@@ -1969,7 +1981,7 @@ var registerTradingAssistantHandlers = () => {
 						valueAreaPercent: params.valueAreaPercent || 70
 					});
 					candles.forEach((c) => engine.onCandle?.(c));
-					const strategy = new VolumeAccumulationStrategy(instrumentUid, engine.getProfile(instrumentUid));
+					const strategy = new TrendStrategy(instrumentUid, engine.getProfile(instrumentUid));
 					candles.forEach((c) => strategy.onCandle(c));
 					const signals = strategy.getSignals();
 					allSignals.push(...signals);

@@ -12,6 +12,7 @@ import { OrderManager } from '../services/orderManager';
 import { sandboxGrpc } from '../services/tbank/SandboxGrpcService';
 import { marketDataBus } from '../services/marketDataBus';
 import { getTradingAssistantWindow } from '../windows/tradingAssistantWindow';
+import { TrendStrategy } from '../services/backtest/strategies/TrendStrategy';
 
 let orderManagerInstance: OrderManager | null = null;
 
@@ -140,7 +141,8 @@ export const registerTradingAssistantHandlers = () => {
           const profile = engine.getProfile(instrumentUid);
 
           // Стратегия
-          const strategy = new VolumeAccumulationStrategy(instrumentUid, profile);
+          // const strategy = new VolumeAccumulationStrategy(instrumentUid, profile);
+          const strategy = new TrendStrategy(instrumentUid, profile);
           candles.forEach(c => strategy.onCandle(c));
           const signals = strategy.getSignals();
 
