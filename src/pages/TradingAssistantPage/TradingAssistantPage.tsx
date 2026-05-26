@@ -138,14 +138,34 @@ export const TradingAssistantPage: React.FC = () => {
 
   const startStream = async () => {
     const api = (window as any).electronAPI;
-    if (!api?.startMarketStream) return;
+    if (!api?.startMarketStream || !api?.getTodayCandles) return;
+
     try {
+      // 1. Загружаем исторические свечи за сегодня
+      const historical = await api.getTodayCandles(
+        selectedInstrument,
+        streamToken,
+        '1min' // всегда минутные, потому что стрим минутный
+      );
+
+      if (historical && historical.length > 0) {
+        const formatted = historical.map((c: any) => ({
+          time: (Math.floor(new Date(c.time).getTime() / 1000)) as UTCTimestamp,
+          open: quotationToNumber(c.open),
+          high: quotationToNumber(c.high),
+          low: quotationToNumber(c.low),
+          close: quotationToNumber(c.close),
+        }));
+        setCandlesData(formatted);
+      }
+
+      // 2. Запускаем стрим (минутный, как и раньше)
       await api.startMarketStream(streamToken, {
         subscribeCandlesRequest: {
           subscriptionAction: 'SUBSCRIPTION_ACTION_SUBSCRIBE',
           instruments: [{
             instrumentId: selectedInstrument,
-            interval: 'SUBSCRIPTION_INTERVAL_ONE_MINUTE' /// !!!!!!!!!!!!!!! правим здесь
+            interval: 'SUBSCRIPTION_INTERVAL_ONE_MINUTE'
           }]
         }
       });

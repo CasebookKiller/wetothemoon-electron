@@ -2141,6 +2141,24 @@ var registerTradingAssistantHandlers = () => {
 		}
 		return false;
 	});
+	electron.ipcMain.handle("trading-assistant:get-today-candles", async (_, instrumentUid, token, interval) => {
+		const loader = new HistoricalDataLoader();
+		const today = /* @__PURE__ */ new Date();
+		const from = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 7, 0, 0);
+		const to = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
+		const intervalMap = {
+			"1min": CandleInterval.CANDLE_INTERVAL_1_MIN,
+			"5min": CandleInterval.CANDLE_INTERVAL_5_MIN,
+			"15min": CandleInterval.CANDLE_INTERVAL_15_MIN,
+			"1hour": CandleInterval.CANDLE_INTERVAL_HOUR
+		};
+		try {
+			return await loader.loadIntradayCandles(instrumentUid, from, to, token, intervalMap[interval] || CandleInterval.CANDLE_INTERVAL_1_MIN);
+		} catch (e) {
+			console.error(e);
+			return [];
+		}
+	});
 	marketDataBus.on("candle", (candle) => {
 		const win = getTradingAssistantWindow();
 		if (win && !win.isDestroyed()) win.webContents.send("candle-data", candle);

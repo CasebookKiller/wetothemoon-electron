@@ -172,7 +172,8 @@ try {
 		onLastPrice: (callback) => {
 			electron.ipcRenderer.on("last-price-data", (_, data) => callback(data));
 		},
-		removeLastPriceListener: () => electron.ipcRenderer.removeAllListeners("last-price-data")
+		removeLastPriceListener: () => electron.ipcRenderer.removeAllListeners("last-price-data"),
+		getTodayCandles: (instrumentUid, token, interval) => electron.ipcRenderer.invoke("trading-assistant:get-today-candles", instrumentUid, token, interval)
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {

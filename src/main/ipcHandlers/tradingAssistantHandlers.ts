@@ -322,6 +322,34 @@ export const registerTradingAssistantHandlers = () => {
     return false;
   });
 
+  ipcMain.handle('trading-assistant:get-today-candles', async (_, instrumentUid: string, token: string, interval: string) => {
+    const loader = new HistoricalDataLoader();
+    const today = new Date();
+    const from = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 7, 0, 0); // 07:00 МСК
+    const to = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
+
+    const intervalMap: Record<string, CandleInterval> = {
+      '1min': CandleInterval.CANDLE_INTERVAL_1_MIN,
+      '5min': CandleInterval.CANDLE_INTERVAL_5_MIN,
+      '15min': CandleInterval.CANDLE_INTERVAL_15_MIN,
+      '1hour': CandleInterval.CANDLE_INTERVAL_HOUR,
+    };
+
+    try {
+      const candles = await loader.loadIntradayCandles(
+        instrumentUid,
+        from,
+        to,
+        token,
+        intervalMap[interval] || CandleInterval.CANDLE_INTERVAL_1_MIN
+      );
+      return candles;
+    } catch (e) {
+      console.error(e);
+      return [];
+    }
+  });
+
   // После регистрации всех обработчиков (внутри registerTradingAssistantHandlers):
   marketDataBus.on('candle', (candle: any) => {
     const win = getTradingAssistantWindow();
