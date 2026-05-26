@@ -101,7 +101,7 @@ export const TradingAssistantPage: React.FC = () => {
           subscriptionAction: 'SUBSCRIPTION_ACTION_SUBSCRIBE',
           instruments: [{
             instrumentId: selectedInstrument,
-            interval: 'SUBSCRIPTION_INTERVAL_ONE_MINUTE'
+            interval: 'SUBSCRIPTION_INTERVAL_FIVE_MINUTES'
           }]
         }
       });
@@ -284,8 +284,14 @@ export const TradingAssistantPage: React.FC = () => {
       };
 
       setCandlesData(prev => {
+        // Не добавляем свечу, если она уже есть
         if (prev.some(c => c.time === newCandle.time)) return prev;
-        return [...prev.slice(-499), newCandle];
+
+        // Добавляем новую свечу и сортируем по времени
+        const updated = [...prev, newCandle];
+        updated.sort((a, b) => a.time - b.time);
+        // Оставляем последние 500 свечей
+        return updated.slice(-500);
       });
     };
 
@@ -397,7 +403,6 @@ export const TradingAssistantPage: React.FC = () => {
   }, []);
 
   // Отображение свечей при изменении candlesData
-  // Отображение свечей при изменении candlesData
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart || !candlesData.length) return;
@@ -406,6 +411,9 @@ export const TradingAssistantPage: React.FC = () => {
     if (candleSeriesRef.current) {
       chart.removeSeries(candleSeriesRef.current);
     }
+
+    // Сортируем свечи перед отрисовкой (на всякий случай)
+    const sortedCandles = [...candlesData].sort((a, b) => a.time - b.time);
 
     console.log('[Adding candles]', candlesData.slice(0, 2)); // первые две для проверки
     const candleSeries = chart.addSeries(CandlestickSeries, {
@@ -437,7 +445,7 @@ export const TradingAssistantPage: React.FC = () => {
   // Обновление уровней (профиль + гистограмма объёмов)
   useEffect(() => {
     const chart = chartRef.current;
-    if (!chart || !profile || !candlesData.length) return;
+    if (!chart || !profile || !candlesData.length || candlesData.length < 2) return;  // <-- добавьте candlesData.length < 2
 
     // Удаляем старые линии уровней и гистограммы
     [...levelSeriesRef.current, ...volumeSeriesRef.current].forEach((series) => {
