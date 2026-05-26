@@ -117,11 +117,17 @@ export const registerTradingAssistantHandlers = () => {
     const allCandles: any[] = [];
     const allSignals: BacktestSignal[] = [];
 
+    // Создаём портфель с параметрами стоп-лосс/тейк-профит
+    const portfolio = new VirtualPortfolio({
+      initialCapital: 100000,
+      stopLossPercent: 0.5,   // можно будет брать из params позже
+      takeProfitPercent: 1.0,
+    });
+
     try {
       let currentDate = new Date(dateFrom + 'T00:00:00Z');
       const endDate = new Date(dateTo + 'T00:00:00Z');
 
-      // Собираем свечи и сигналы за каждый день
       while (currentDate <= endDate) {
         const dateStr = currentDate.toISOString().split('T')[0];
         const dayFrom = new Date(dateStr + 'T07:00:00Z');
@@ -132,7 +138,6 @@ export const registerTradingAssistantHandlers = () => {
         );
 
         if (candles.length > 0) {
-          // Профиль для стратегии (можно пересчитывать каждый день, но стратегия берёт dailyProfile)
           const engine = new VolumeProfileEngine({
             profileResolution: params.profileResolution || 50,
             valueAreaPercent: params.valueAreaPercent || 70,
@@ -140,26 +145,31 @@ export const registerTradingAssistantHandlers = () => {
           candles.forEach(c => (engine as any).onCandle?.(c));
           const profile = engine.getProfile(instrumentUid);
 
-          // Стратегия
-          //const strategy = new VolumeAccumulationStrategy(instrumentUid, profile);
           const strategy = new TrendStrategy(instrumentUid, profile);
-          candles.forEach(c => strategy.onCandle(c));
-          const signals = strategy.getSignals();
 
-          allSignals.push(...signals);
+          // Обрабатываем свечи последовательно, чтобы стоп/тейк работал
+          for (const candle of candles) {
+            strategy.onCandle(candle);
+            const newSignals = strategy.getSignals();
+            for (const signal of newSignals) {
+              portfolio.processSignal(signal);
+              allSignals.push(signal);
+            }
+            strategy.clearSignals();
+
+            const high = quotationToNumber(candle.high);
+            const low = quotationToNumber(candle.low);
+            const close = quotationToNumber(candle.close);
+            portfolio.checkStopTake(high, low, close, candle.time || '');
+          }
+
           allCandles.push(...candles);
         }
 
         currentDate.setDate(currentDate.getDate() + 1);
       }
 
-      // Единый портфель на все сигналы
-      const portfolioConfig = { initialCapital: 100000 };
-      const portfolio = new VirtualPortfolio(portfolioConfig);
-      for (const signal of allSignals) {
-        portfolio.processSignal(signal);
-      }
-      // Закрываем позицию в конце последнего дня по последней цене
+      // Закрываем позицию в конце последнего дня
       if (allCandles.length > 0) {
         const lastCandle = allCandles[allCandles.length - 1];
         const lastPrice = quotationToNumber(lastCandle.close);
@@ -176,18 +186,16 @@ export const registerTradingAssistantHandlers = () => {
         portfolio: stats,
       };
 
-      // Профиль за последний день
+      // Профиль за последний день (без изменений)
       let lastProfile = null;
       if (allCandles.length > 0) {
         const lastEngine = new VolumeProfileEngine({
           profileResolution: params.profileResolution || 50,
           valueAreaPercent: params.valueAreaPercent || 70,
         });
-        // Пересчитываем профиль только для последнего дня (можно взять из цикла, но для простоты заново)
         const lastDayCandles = allCandles.filter(c => c.time?.startsWith(dateTo));
         if (lastDayCandles.length === 0) {
-          // Если нет свечей за последний день, берём последние свечи
-          const lastDay = allCandles.slice(-540); // примерно 9 часов торгов
+          const lastDay = allCandles.slice(-540);
           lastDay.forEach(c => (lastEngine as any).onCandle?.(c));
         } else {
           lastDayCandles.forEach(c => (lastEngine as any).onCandle?.(c));

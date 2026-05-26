@@ -2019,6 +2019,11 @@ var registerTradingAssistantHandlers = () => {
 		}[intervalStr] || CandleInterval.CANDLE_INTERVAL_1_MIN;
 		const allCandles = [];
 		const allSignals = [];
+		const portfolio = new VirtualPortfolio({
+			initialCapital: 1e5,
+			stopLossPercent: .5,
+			takeProfitPercent: 1
+		});
 		try {
 			let currentDate = /* @__PURE__ */ new Date(dateFrom + "T00:00:00Z");
 			const endDate = /* @__PURE__ */ new Date(dateTo + "T00:00:00Z");
@@ -2034,15 +2039,23 @@ var registerTradingAssistantHandlers = () => {
 					});
 					candles.forEach((c) => engine.onCandle?.(c));
 					const strategy = new TrendStrategy(instrumentUid, engine.getProfile(instrumentUid));
-					candles.forEach((c) => strategy.onCandle(c));
-					const signals = strategy.getSignals();
-					allSignals.push(...signals);
+					for (const candle of candles) {
+						strategy.onCandle(candle);
+						const newSignals = strategy.getSignals();
+						for (const signal of newSignals) {
+							portfolio.processSignal(signal);
+							allSignals.push(signal);
+						}
+						strategy.clearSignals();
+						const high = quotationToNumber(candle.high);
+						const low = quotationToNumber(candle.low);
+						const close = quotationToNumber(candle.close);
+						portfolio.checkStopTake(high, low, close, candle.time || "");
+					}
 					allCandles.push(...candles);
 				}
 				currentDate.setDate(currentDate.getDate() + 1);
 			}
-			const portfolio = new VirtualPortfolio({ initialCapital: 1e5 });
-			for (const signal of allSignals) portfolio.processSignal(signal);
 			if (allCandles.length > 0) {
 				const lastCandle = allCandles[allCandles.length - 1];
 				const lastPrice = quotationToNumber(lastCandle.close);
