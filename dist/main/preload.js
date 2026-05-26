@@ -168,7 +168,11 @@ try {
 		onCandle: (callback) => {
 			electron.ipcRenderer.on("candle-data", (_, candle) => callback(candle));
 		},
-		removeCandleListener: () => electron.ipcRenderer.removeAllListeners("candle-data")
+		removeCandleListener: () => electron.ipcRenderer.removeAllListeners("candle-data"),
+		onLastPrice: (callback) => {
+			electron.ipcRenderer.on("last-price-data", (_, data) => callback(data));
+		},
+		removeLastPriceListener: () => electron.ipcRenderer.removeAllListeners("last-price-data")
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {

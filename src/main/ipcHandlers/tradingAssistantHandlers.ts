@@ -329,4 +329,11 @@ export const registerTradingAssistantHandlers = () => {
       win.webContents.send('candle-data', candle);
     }
   });
+
+  marketDataBus.on('lastPrice', (data: any) => {
+    const win = getTradingAssistantWindow();
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('last-price-data', data);
+    }
+  });
 };

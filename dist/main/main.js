@@ -2145,6 +2145,10 @@ var registerTradingAssistantHandlers = () => {
 		const win = getTradingAssistantWindow();
 		if (win && !win.isDestroyed()) win.webContents.send("candle-data", candle);
 	});
+	marketDataBus.on("lastPrice", (data) => {
+		const win = getTradingAssistantWindow();
+		if (win && !win.isDestroyed()) win.webContents.send("last-price-data", data);
+	});
 };
 //#endregion
 //#region src/shared/types/promptgenerator.ts

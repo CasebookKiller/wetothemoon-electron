@@ -222,7 +222,11 @@ try {
       ipcRenderer.on(channel, (_, candle) => callback(candle));
     },
     removeCandleListener: () => ipcRenderer.removeAllListeners('candle-data'),
-    
+
+    onLastPrice: (callback: (data: any) => void) => {
+      ipcRenderer.on('last-price-data', (_, data) => callback(data));
+    },
+    removeLastPriceListener: () => ipcRenderer.removeAllListeners('last-price-data'),
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

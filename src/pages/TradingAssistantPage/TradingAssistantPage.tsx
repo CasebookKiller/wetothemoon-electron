@@ -51,6 +51,50 @@ function quotationToNumber(q: any): number {
   return units + nano / 1e9;
 }
 
+function aggregateCandles(
+  rawCandles: Array<{ time: UTCTimestamp; open: number; high: number; low: number; close: number }>,
+  targetIntervalMinutes: number = 5
+): Array<{ time: UTCTimestamp; open: number; high: number; low: number; close: number }> {
+  if (rawCandles.length === 0) return [];
+
+  // Сортируем по времени (на всякий случай)
+  const sorted = [...rawCandles].sort((a, b) => a.time - b.time);
+  const result: Array<{ time: UTCTimestamp; open: number; high: number; low: number; close: number }> = [];
+
+  let bucketStart: UTCTimestamp | null = null;
+  let open = 0, high = -Infinity, low = Infinity, close = 0;
+
+  for (const candle of sorted) {
+    // Определяем начало 5-минутного интервала, к которому относится минутная свеча
+    const bucketTime = (Math.floor(candle.time / (targetIntervalMinutes * 60)) * (targetIntervalMinutes * 60)) as UTCTimestamp;
+
+    if (bucketStart === null || bucketTime !== bucketStart) {
+      // Закрываем предыдущий интервал
+      if (bucketStart !== null) {
+        result.push({ time: bucketStart, open, high: high === -Infinity ? open : high, low: low === Infinity ? open : low, close });
+      }
+      // Начинаем новый
+      bucketStart = bucketTime;
+      open = candle.open;
+      high = candle.high;
+      low = candle.low;
+      close = candle.close;
+    } else {
+      // Обновляем high/low/close внутри текущей 5-минутки
+      high = Math.max(high, candle.high);
+      low = Math.min(low, candle.low);
+      close = candle.close; // последняя цена закрытия в интервале
+    }
+  }
+
+  // Не забываем последний интервал
+  if (bucketStart !== null) {
+    result.push({ time: bucketStart, open, high: high === -Infinity ? open : high, low: low === Infinity ? open : low, close });
+  }
+
+  return result;
+}
+
 export const TradingAssistantPage: React.FC = () => {
   const [profile, setProfile] = useState<VolumeProfileLevels | null>(null);
   const [liveSignals, setLiveSignals] = useState<Signal[]>([]);
@@ -102,7 +146,7 @@ export const TradingAssistantPage: React.FC = () => {
           subscriptionAction: 'SUBSCRIPTION_ACTION_SUBSCRIBE',
           instruments: [{
             instrumentId: selectedInstrument,
-            interval: 'SUBSCRIPTION_INTERVAL_FIVE_MINUTES'
+            interval: 'SUBSCRIPTION_INTERVAL_ONE_MINUTE' /// !!!!!!!!!!!!!!! правим здесь
           }]
         }
       });
@@ -298,8 +342,39 @@ export const TradingAssistantPage: React.FC = () => {
 
     api.onCandle(handleCandle);
 
+    /*
+    const handleLastPrice = (lastPriceData: any) => {
+      const price = quotationToNumber(lastPriceData.price);
+      const timestampMs = Number(lastPriceData.time.seconds) * 1000 + (lastPriceData.time.nanos || 0) / 1e6;
+      const time = Math.floor(timestampMs / 1000) as UTCTimestamp;
+
+      setCandlesData(prev => {
+        if (prev.length === 0) return prev;
+
+        const last = prev[prev.length - 1];
+        // Если время последней свечи совпадает с временем lastPrice — обновляем её
+        if (last.time === time) {
+          const updated = [...prev];
+          updated[prev.length - 1] = {
+            ...last,
+            close: price,
+            high: Math.max(last.high, price),
+            low: Math.min(last.low, price),
+          };
+          return updated;
+        }
+        // Если время новее, чем у последней свечи — значит, начинается новая свеча?
+        // Но мы получаем свечи и так, поэтому этот случай обрабатывается в onCandle.
+        return prev;
+      });
+    };
+    */
+   
+    //api.onLastPrice(handleLastPrice);
+
     return () => {
       api.removeCandleListener();
+      //api.removeLastPriceListener?.();
     };
   }, []);
   //useEffect(() => {
@@ -414,10 +489,9 @@ export const TradingAssistantPage: React.FC = () => {
       chart.removeSeries(candleSeriesRef.current);
     }
 
-    // Сортируем свечи перед отрисовкой (на всякий случай)
-    const sortedCandles = [...candlesData].sort((a, b) => a.time - b.time);
+    // Агрегируем минутные свечи в 5-минутные
+    const aggregated = aggregateCandles(candlesData, 5);
 
-    console.log('[Adding candles]', candlesData.slice(0, 2)); // первые две для проверки
     const candleSeries = chart.addSeries(CandlestickSeries, {
       upColor: '#26a69a',
       downColor: '#ef5350',
@@ -425,12 +499,12 @@ export const TradingAssistantPage: React.FC = () => {
       borderDownColor: '#ef5350',
       wickUpColor: '#26a69a',
       wickDownColor: '#ef5350',
-      priceLineVisible: true,      // горизонтальная линия последней цены
-      lastValueVisible: true,      // показывать число последней цены на шкале
+      priceLineVisible: true,
+      lastValueVisible: true,
     });
-    candleSeries.setData(candlesData);
+    candleSeries.setData(aggregated);
     chart.timeScale().fitContent();
-    candleSeriesRef.current = candleSeries
+    candleSeriesRef.current = candleSeries;
     
   }, [candlesData]);
 
