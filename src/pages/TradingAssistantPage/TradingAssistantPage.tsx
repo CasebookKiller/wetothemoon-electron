@@ -53,11 +53,10 @@ function quotationToNumber(q: any): number {
 
 function aggregateCandles(
   rawCandles: Array<{ time: UTCTimestamp; open: number; high: number; low: number; close: number }>,
-  targetIntervalMinutes: number = 5
+  targetIntervalMinutes: number
 ): Array<{ time: UTCTimestamp; open: number; high: number; low: number; close: number }> {
   if (rawCandles.length === 0) return [];
 
-  // Сортируем по времени (на всякий случай)
   const sorted = [...rawCandles].sort((a, b) => a.time - b.time);
   const result: Array<{ time: UTCTimestamp; open: number; high: number; low: number; close: number }> = [];
 
@@ -65,7 +64,6 @@ function aggregateCandles(
   let open = 0, high = -Infinity, low = Infinity, close = 0;
 
   for (const candle of sorted) {
-    // Определяем начало 5-минутного интервала, к которому относится минутная свеча
     const bucketTime = (Math.floor(candle.time / (targetIntervalMinutes * 60)) * (targetIntervalMinutes * 60)) as UTCTimestamp;
 
     if (bucketStart === null || bucketTime !== bucketStart) {
@@ -80,14 +78,13 @@ function aggregateCandles(
       low = candle.low;
       close = candle.close;
     } else {
-      // Обновляем high/low/close внутри текущей 5-минутки
+      // Внутри текущего интервала обновляем high/low/close
       high = Math.max(high, candle.high);
       low = Math.min(low, candle.low);
-      close = candle.close; // последняя цена закрытия в интервале
+      close = candle.close;
     }
   }
 
-  // Не забываем последний интервал
   if (bucketStart !== null) {
     result.push({ time: bucketStart, open, high: high === -Infinity ? open : high, low: low === Infinity ? open : low, close });
   }
@@ -136,6 +133,8 @@ export const TradingAssistantPage: React.FC = () => {
 
   const [streamActive, setStreamActive] = useState(false);
   const [streamToken, setStreamToken] = useState(import.meta.env.VITE_TReadOnly || '');
+
+  const [displayTimeframe, setDisplayTimeframe] = useState<1 | 5 | 15 | 60>(5); // по умолчанию 5-минутный
 
   const startStream = async () => {
     const api = (window as any).electronAPI;
@@ -369,7 +368,7 @@ export const TradingAssistantPage: React.FC = () => {
       });
     };
     */
-   
+
     //api.onLastPrice(handleLastPrice);
 
     return () => {
@@ -490,7 +489,7 @@ export const TradingAssistantPage: React.FC = () => {
     }
 
     // Агрегируем минутные свечи в 5-минутные
-    const aggregated = aggregateCandles(candlesData, 5);
+    const aggregated = aggregateCandles(candlesData, displayTimeframe);
 
     const candleSeries = chart.addSeries(CandlestickSeries, {
       upColor: '#26a69a',
@@ -709,6 +708,15 @@ export const TradingAssistantPage: React.FC = () => {
               style={{ width: '250px', marginLeft: '5px' }}
             />
           </label>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '5px' }}>
+            <label style={{ color: '#d1d4dc' }}>Таймфрейм графика:</label>
+            <select value={displayTimeframe} onChange={e => setDisplayTimeframe(Number(e.target.value) as 1 | 5 | 15 | 60)} style={{ padding: '4px', background: '#2a2e39', color: '#d1d4dc', border: '1px solid #555', borderRadius: '3px' }}>
+              <option value={1}>1 минута</option>
+              <option value={5}>5 минут</option>
+              <option value={15}>15 минут</option>
+              <option value={60}>1 час</option>
+            </select>
+          </div>
           <button onClick={startStream} disabled={streamActive}>Start Stream</button>
           <button onClick={stopStream} disabled={!streamActive}>Stop Stream</button>
           <span style={{ color: streamActive ? '#4caf50' : '#d32f2f', marginLeft: '10px' }}>
