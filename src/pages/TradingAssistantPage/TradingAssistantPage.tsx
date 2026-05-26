@@ -262,9 +262,21 @@ export const TradingAssistantPage: React.FC = () => {
     if (!api?.onCandle) return;
 
     const handleCandle = (streamCandle: any) => {
-      const time = (Math.floor(new Date(streamCandle.time).getTime() / 1000)) as Time;
+      // Правильно извлекаем время (может быть строкой ISO или объектом {seconds,nanos})
+      let timestampMs: number;
+      if (typeof streamCandle.time === 'object' && streamCandle.time.seconds) {
+        timestampMs = Number(streamCandle.time.seconds) * 1000 + (streamCandle.time.nanos || 0) / 1e6;
+      } else {
+        timestampMs = new Date(streamCandle.time).getTime();
+      }
+
+      if (isNaN(timestampMs)) {
+        console.warn('Invalid candle time:', streamCandle.time);
+        return;
+      }
+
       const newCandle = {
-        time,
+        time: (Math.floor(timestampMs / 1000)) as Time,
         open: quotationToNumber(streamCandle.open),
         high: quotationToNumber(streamCandle.high),
         low: quotationToNumber(streamCandle.low),
@@ -272,9 +284,7 @@ export const TradingAssistantPage: React.FC = () => {
       };
 
       setCandlesData(prev => {
-        // Проверяем, нет ли уже свечи с таким временем
-        if (prev.some(c => c.time === time)) return prev;
-        // Добавляем новую свечу и удерживаем последние 500 свечей
+        if (prev.some(c => c.time === newCandle.time)) return prev;
         return [...prev.slice(-499), newCandle];
       });
     };
@@ -436,8 +446,10 @@ export const TradingAssistantPage: React.FC = () => {
     levelSeriesRef.current = [];
     //volumeSeriesRef.current = [];
 
-    const firstTime = candlesData[0].time;
-    const lastTime = candlesData[candlesData.length - 1].time;
+    // Проверяем, что время корректно
+    const firstTime = candlesData[0]?.time;
+    const lastTime = candlesData[candlesData.length - 1]?.time;
+    if (typeof firstTime !== 'number' || typeof lastTime !== 'number') return;
 
     // Сначала рисуем основные уровни POC, VA (как раньше)
     const addHorizontalLine = (price: number, color: string, title: string, lineWidth = 2) => {

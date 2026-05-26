@@ -2141,6 +2141,10 @@ var registerTradingAssistantHandlers = () => {
 		}
 		return false;
 	});
+	marketDataBus.on("candle", (candle) => {
+		const win = getTradingAssistantWindow();
+		if (win && !win.isDestroyed()) win.webContents.send("candle-data", candle);
+	});
 };
 //#endregion
 //#region src/shared/types/promptgenerator.ts
