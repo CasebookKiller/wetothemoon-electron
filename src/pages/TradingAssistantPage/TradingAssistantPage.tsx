@@ -66,7 +66,7 @@ export const TradingAssistantPage: React.FC = () => {
   const [backtestSignals, setBacktestSignals] = useState<BacktestSignal[]>([]);
   const [candlesData, setCandlesData] = useState<any[]>([]); // массив свечей в формате для графика
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
-  const priceLineRef = useRef<ISeriesApi<'Line'> | null>(null);
+  //const priceLineRef = useRef<ISeriesApi<'Line'> | null>(null);
   const [backtestResult, setBacktestResult] = useState<any>(null);
   const [dateFrom, setDateFrom] = useState('2026-05-22');
   const [dateTo, setDateTo] = useState('2026-05-22');
@@ -425,27 +425,13 @@ export const TradingAssistantPage: React.FC = () => {
       borderDownColor: '#ef5350',
       wickUpColor: '#26a69a',
       wickDownColor: '#ef5350',
+      priceLineVisible: true,      // горизонтальная линия последней цены
+      lastValueVisible: true,      // показывать число последней цены на шкале
     });
     candleSeries.setData(candlesData);
     chart.timeScale().fitContent();
-    candleSeriesRef.current = candleSeries;
-
-    // --- Линия последней цены ---
-    // Если серия цены ещё не создана, создаём
-    if (!priceLineRef.current) {
-      priceLineRef.current = chart.addSeries(LineSeries, {
-        color: '#2196f3',       // синий
-        lineWidth: 1,
-        priceLineVisible: false,
-        lastValueVisible: true,
-      });
-    }
-    // Обновляем данные линии цены – берём из свечей поле close
-    const priceData = sortedCandles.map(c => ({
-      time: c.time,
-      value: c.close,
-    }));
-    priceLineRef.current.setData(priceData);
+    candleSeriesRef.current = candleSeries
+    
   }, [candlesData]);
 
   useEffect(() => {
