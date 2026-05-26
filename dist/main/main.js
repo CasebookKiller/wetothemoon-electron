@@ -2105,6 +2105,31 @@ var registerTradingAssistantHandlers = () => {
 			};
 		}
 	});
+	electron.ipcMain.handle("trading-assistant:get-balance", async (_, accountId) => {
+		const token = process.env.VITE_TSandBox || "";
+		if (!token || !accountId) return {
+			success: false,
+			error: "Токен или счёт не заданы"
+		};
+		try {
+			const total = (await sandboxGrpc.getSandboxPortfolio({ accountId }, token)).totalAmountPortfolio;
+			if (!total) return {
+				success: false,
+				error: "Нет данных о балансе"
+			};
+			return {
+				success: true,
+				balance: (Number(total.units || "0") + (total.nano || 0) / 1e9).toFixed(2),
+				currency: total.currency || "RUB"
+			};
+		} catch (error) {
+			console.error("[GetBalance] Ошибка:", error);
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
 };
 //#endregion
 //#region src/shared/types/promptgenerator.ts

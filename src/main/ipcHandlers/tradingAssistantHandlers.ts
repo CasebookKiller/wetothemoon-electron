@@ -297,4 +297,19 @@ export const registerTradingAssistantHandlers = () => {
     }
   });
 
+  ipcMain.handle('trading-assistant:get-balance', async (_, accountId: string) => {
+    const token = process.env.VITE_TSandBox || '';
+    if (!token || !accountId) return { success: false, error: 'Токен или счёт не заданы' };
+    try {
+      const response = await sandboxGrpc.getSandboxPortfolio({ accountId }, token);
+      const total = response.totalAmountPortfolio;
+      if (!total) return { success: false, error: 'Нет данных о балансе' };
+      const balance = Number(total.units || '0') + (total.nano || 0) / 1e9;
+      return { success: true, balance: balance.toFixed(2), currency: total.currency || 'RUB' };
+    } catch (error: any) {
+      console.error('[GetBalance] Ошибка:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
 };

@@ -92,6 +92,7 @@ export const TradingAssistantPage: React.FC = () => {
     const api = (window as any).electronAPI;
     if (!api?.getBalance || !accountId) return;
     const result = await api.getBalance(accountId);
+    console.log('[Portfolio]', result);
     if (result.success) {
       setBalance(`Баланс: ${result.balance} ${result.currency}`);
     } else {
@@ -106,6 +107,7 @@ export const TradingAssistantPage: React.FC = () => {
     const result = await api.payInSandbox(payAmount, accountId);
     if (result.success) {
       setPayMessage(`Счёт пополнен. Баланс: ${JSON.stringify(result.balance)}`);
+      refreshBalance(); // автоматом покажем актуальный баланс
     } else {
       setPayMessage(`Ошибка: ${result.error}`);
     }
