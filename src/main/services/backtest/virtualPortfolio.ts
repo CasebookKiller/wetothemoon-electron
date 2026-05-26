@@ -5,6 +5,8 @@ export interface PortfolioConfig {
   initialCapital: number;
   commissionPercent?: number;
   slippagePercent?: number;
+  stopLossPercent?: number;   // ← новое поле
+  takeProfitPercent?: number; // ← новое поле
 }
 
 export interface Trade {
