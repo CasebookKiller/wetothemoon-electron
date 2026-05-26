@@ -1862,6 +1862,9 @@ var TrendStrategy = class {
 	hvnLevel = null;
 	hvnBroken = false;
 	trendDirection = null;
+	hasPosition = false;
+	lastTradeTime = 0;
+	minIntervalMs = 900 * 1e3;
 	constructor(instrumentUid, dailyProfile) {
 		this.instrumentUid = instrumentUid;
 		this.dailyProfile = dailyProfile;
@@ -1871,9 +1874,13 @@ var TrendStrategy = class {
 		this.hvnLevel = null;
 		this.hvnBroken = false;
 		this.trendDirection = null;
+		this.hasPosition = false;
+		this.lastTradeTime = 0;
 	}
 	onCandle(candle) {
-		if (!this.dailyProfile) return;
+		if (!this.dailyProfile || this.hasPosition) return;
+		const now = new Date(candle.time || Date.now()).getTime();
+		if (now - this.lastTradeTime < this.minIntervalMs) return;
 		const high = quotationToNumber(candle.high);
 		const low = quotationToNumber(candle.low);
 		const close = quotationToNumber(candle.close);
@@ -1922,6 +1929,8 @@ var TrendStrategy = class {
 				});
 				this.hvnLevel = null;
 				this.hvnBroken = false;
+				this.hasPosition = true;
+				this.lastTradeTime = now;
 			}
 		}
 	}

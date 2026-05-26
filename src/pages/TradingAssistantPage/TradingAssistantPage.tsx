@@ -641,7 +641,7 @@ export const TradingAssistantPage: React.FC = () => {
     }));
 
     // Синхронизация масштаба гистограммы при изменении видимого диапазона
-    useEffect(() => {
+    /*useEffect(() => {
       const chart = chartRef.current;
       if (!chart) return;
 
@@ -663,7 +663,7 @@ export const TradingAssistantPage: React.FC = () => {
       return () => {
         timeScale.unsubscribeVisibleTimeRangeChange(handler);
       };
-    }, [chartRef.current]);
+    }, [chartRef.current]);*/
 
     // НОВЫЙ СПОСОБ (v5): создаем примитив для маркеров на основе серии
     const markersPrimitive = createSeriesMarkers(signalSeries, markers);

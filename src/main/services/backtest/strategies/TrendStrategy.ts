@@ -14,6 +14,10 @@ export class TrendStrategy implements IBacktestStrategy {
   private hvnBroken = false;                     // был ли пробой уровня
   private trendDirection: 'UP' | 'DOWN' | null = null;
 
+  private hasPosition = false;
+  private lastTradeTime = 0;
+  private minIntervalMs = 15 * 60 * 1000; // 15 минут
+
   constructor(instrumentUid: string, dailyProfile: VolumeProfileLevels | null) {
     this.instrumentUid = instrumentUid;
     this.dailyProfile = dailyProfile;
@@ -24,10 +28,15 @@ export class TrendStrategy implements IBacktestStrategy {
     this.hvnLevel = null;
     this.hvnBroken = false;
     this.trendDirection = null;
+    this.hasPosition = false;
+    this.lastTradeTime = 0;
   }
 
   onCandle(candle: StreamCandle): void {
-    if (!this.dailyProfile) return;
+    if (!this.dailyProfile || this.hasPosition) return; // не входим, если уже есть позиция
+
+    const now = new Date(candle.time || Date.now()).getTime();
+    if (now - this.lastTradeTime < this.minIntervalMs) return; // кулдаун
 
     const high = quotationToNumber(candle.high);
     const low = quotationToNumber(candle.low);
@@ -101,6 +110,8 @@ export class TrendStrategy implements IBacktestStrategy {
         });
         this.hvnLevel = null;
         this.hvnBroken = false;
+        this.hasPosition = true;
+        this.lastTradeTime = now;
       }
     }
   }
