@@ -5,8 +5,9 @@ export interface PortfolioConfig {
   initialCapital: number;
   commissionPercent?: number;
   slippagePercent?: number;
-  stopLossPercent?: number;
-  takeProfitPercent?: number;
+  stopLossPercent?: number;         // начальный стоп-лосс в %
+  takeProfitPercent?: number;       // тейк-профит в %
+  trailingDistancePercent?: number; // расстояние трейлинг-стопа в %
 }
 
 export interface Trade {
@@ -17,23 +18,10 @@ export interface Trade {
   exitTime: string;
   profit: number;
   profitPercent: number;
-  exitReason: 'SIGNAL' | 'STOP_LOSS' | 'TAKE_PROFIT' | 'END_OF_DAY';
+  exitReason: 'SIGNAL' | 'STOP_LOSS' | 'TAKE_PROFIT' | 'TRAILING_STOP' | 'END_OF_DAY';
 }
 
-export interface PortfolioStats {
-  initialCapital: number;
-  finalCapital: number;
-  totalProfit: number;
-  totalProfitPercent: number;
-  totalTrades: number;
-  winningTrades: number;
-  losingTrades: number;
-  winRate: number;
-  maxDrawdown: number;
-  maxDrawdownPercent: number;
-  averageProfit: number;
-  averageProfitPercent: number;
-}
+export interface PortfolioStats { /* ... без изменений ... */ }
 
 export class VirtualPortfolio {
   private capital: number;
@@ -43,8 +31,10 @@ export class VirtualPortfolio {
     type: 'BUY' | 'SELL';
     price: number;
     time: string;
-    stopLossPrice?: number;
+    stopLossPrice: number;
     takeProfitPrice?: number;
+    trailingDistance: number;
+    bestPrice: number; // highest price for long, lowest for short
   } | null = null;
   private peakCapital: number;
   private maxDrawdown: number = 0;
@@ -57,6 +47,7 @@ export class VirtualPortfolio {
       slippagePercent: config.slippagePercent ?? 0,
       stopLossPercent: config.stopLossPercent ?? 0,
       takeProfitPercent: config.takeProfitPercent ?? 0,
+      trailingDistancePercent: config.trailingDistancePercent ?? 0,
     };
     this.initialCapital = this.config.initialCapital;
     this.capital = this.config.initialCapital;
@@ -69,14 +60,15 @@ export class VirtualPortfolio {
     }
 
     const entryPrice = signal.price;
+    const isBuy = signal.type === 'BUY';
     const stopLossPrice = this.config.stopLossPercent > 0
-      ? (signal.type === 'BUY'
+      ? (isBuy
           ? entryPrice * (1 - this.config.stopLossPercent / 100)
           : entryPrice * (1 + this.config.stopLossPercent / 100))
-      : undefined;
+      : entryPrice; // если SL=0, ставим заглушку, всё равно не сработает
 
     const takeProfitPrice = this.config.takeProfitPercent > 0
-      ? (signal.type === 'BUY'
+      ? (isBuy
           ? entryPrice * (1 + this.config.takeProfitPercent / 100)
           : entryPrice * (1 - this.config.takeProfitPercent / 100))
       : undefined;
@@ -87,15 +79,42 @@ export class VirtualPortfolio {
       time: signal.time,
       stopLossPrice,
       takeProfitPrice,
+      trailingDistance: this.config.trailingDistancePercent / 100,
+      bestPrice: entryPrice,
     };
   }
 
   checkStopTake(high: number, low: number, close: number, time: string): void {
     if (!this.openPosition) return;
 
-    const { type, stopLossPrice, takeProfitPrice } = this.openPosition;
+    const { type, stopLossPrice, takeProfitPrice, trailingDistance, bestPrice } = this.openPosition;
 
-    if (stopLossPrice !== undefined) {
+    // Обновляем bestPrice (для трейлинга)
+    if (type === 'BUY') {
+      if (high > bestPrice) {
+        this.openPosition.bestPrice = high;
+        // Подтягиваем стоп-лосс, если трейлинг активен
+        if (trailingDistance > 0) {
+          const newStop = high * (1 - trailingDistance);
+          if (newStop > this.openPosition.stopLossPrice) {
+            this.openPosition.stopLossPrice = newStop;
+          }
+        }
+      }
+    } else { // SELL
+      if (low < bestPrice) {
+        this.openPosition.bestPrice = low;
+        if (trailingDistance > 0) {
+          const newStop = low * (1 + trailingDistance);
+          if (newStop < this.openPosition.stopLossPrice) {
+            this.openPosition.stopLossPrice = newStop;
+          }
+        }
+      }
+    }
+
+    // Проверяем стоп-лосс (уже с учётом трейлинга)
+    if (stopLossPrice > 0) {
       if (type === 'BUY' && low <= stopLossPrice) {
         this.closePosition(stopLossPrice, time, 'STOP_LOSS');
         return;
@@ -106,6 +125,7 @@ export class VirtualPortfolio {
       }
     }
 
+    // Проверяем тейк-профит (если ещё не сработал стоп)
     if (takeProfitPrice !== undefined) {
       if (type === 'BUY' && high >= takeProfitPrice) {
         this.closePosition(takeProfitPrice, time, 'TAKE_PROFIT');

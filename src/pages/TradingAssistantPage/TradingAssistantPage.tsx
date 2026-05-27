@@ -90,16 +90,12 @@ function aggregateCandles(
 }
 
 const getLastTradingDay = (): Date => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const day = today.getDay(); // 0 = вс, 6 = сб
-  let offset = 1;
-  if (day === 1) offset = 3; // понедельник -> пятница
-  else if (day === 0) offset = 2; // воскресенье -> пятница
-  else if (day === 6) offset = 1; // суббота -> пятница
-  const lastTrading = new Date(today);
-  lastTrading.setDate(today.getDate() - offset);
-  return lastTrading;
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  do {
+    date.setDate(date.getDate());
+  } while (date.getDay() === 0 || date.getDay() === 6);
+  return date;
 };
 
 export const TradingAssistantPage: React.FC = () => {
@@ -140,8 +136,9 @@ export const TradingAssistantPage: React.FC = () => {
     loading: false,
     result: null as any,
     signals: [] as BacktestSignal[],
+    trailingDistancePercent: 0.5,
   });
-  
+
   // Локальные состояния (часто обновляемые)
   const [profile, setProfile] = useState<VolumeProfileLevels | null>(null);
   const [liveSignals, setLiveSignals] = useState<Signal[]>([]);
@@ -333,6 +330,7 @@ export const TradingAssistantPage: React.FC = () => {
         strategyType: backtest.strategyType,
         stopLossPercent: backtest.stopLossPercent,
         takeProfitPercent: backtest.takeProfitPercent,
+        trailingDistancePercent: backtest.trailingDistancePercent,
       }
     );
     if (result) {
@@ -651,6 +649,7 @@ export const TradingAssistantPage: React.FC = () => {
         </label>
         <label>SL%: <input type="number" value={backtest.stopLossPercent} onChange={e => updateBacktest({ stopLossPercent: Number(e.target.value) })} step={0.1} style={{ width: '50px' }} /></label>
         <label>TP%: <input type="number" value={backtest.takeProfitPercent} onChange={e => updateBacktest({ takeProfitPercent: Number(e.target.value) })} step={0.1} style={{ width: '50px' }} /></label>
+        <label>Trail%: <input type="number" value={backtest.trailingDistancePercent} onChange={e => updateBacktest({ trailingDistancePercent: Number(e.target.value) })} step={0.1} style={{ width: '50px' }} /></label>
         <button onClick={runBacktest} disabled={backtest.loading}>Run</button>
         <button onClick={sendBacktestToSandbox} disabled={!backtest.signals.length}>Send to Sandbox</button>
       </div>
