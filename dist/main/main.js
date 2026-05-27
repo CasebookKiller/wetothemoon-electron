@@ -3152,6 +3152,7 @@ var OrderManager = class {
 	activeOrderId = null;
 	isRunning = false;
 	lastOrderTime = 0;
+	activeStopOrderId = null;
 	constructor(config = {}) {
 		this.config = {
 			lotQuantity: 1,
@@ -3159,6 +3160,8 @@ var OrderManager = class {
 			demoMode: true,
 			token: "",
 			accountId: "",
+			stopLossPercent: 0,
+			takeProfitPercent: 0,
 			...config
 		};
 	}
@@ -3173,39 +3176,25 @@ var OrderManager = class {
 		console.log(`[OrderManager] Автоторговля ${state ? "запущена" : "остановлена"}`);
 	}
 	async processSignal(signal) {
-		if (!this.isRunning) {
-			console.log("[OrderManager] Автоторговля выключена, сигнал проигнорирован");
+		if (!this.isRunning) return;
+		if (this.config.demoMode) {
+			console.log(`[OrderManager][DEMO] ${signal.type} ${this.config.lotQuantity} лотов по цене ${signal.price}`);
 			return;
 		}
+		if (!this.config.token || !this.config.accountId) return;
 		const now = Date.now();
 		if (now - this.lastOrderTime < 300 * 1e3) {
-			console.log("[OrderManager] Слишком частые сигналы, пропускаем");
-			return;
-		}
-		if (this.config.demoMode) {
-			const direction = signal.type === "BUY" ? "BUY" : "SELL";
-			const quantity = this.config.lotQuantity;
-			const price = signal.price;
-			console.log(`[OrderManager][DEMO] ${direction} ${quantity} лотов по цене ${price}`);
-			return;
-		}
-		if (!this.config.token || !this.config.accountId) {
-			console.warn("[OrderManager] Не заданы токен или accountId");
+			console.log("[OrderManager] Кулдаун, пропускаем сигнал");
 			return;
 		}
 		const direction = signal.type === "BUY" ? OrderDirection.ORDER_DIRECTION_BUY : OrderDirection.ORDER_DIRECTION_SELL;
 		const quantity = this.config.lotQuantity;
 		const price = signal.price;
 		try {
-			if (this.config.demoMode) {
-				console.log(`[OrderManager][DEMO] ${direction === OrderDirection.ORDER_DIRECTION_BUY ? "BUY" : "SELL"} ${quantity} лотов по цене ${price}`);
-				return;
-			}
-			const orderType = this.config.useMarketOrder ? OrderType.ORDER_TYPE_MARKET : OrderType.ORDER_TYPE_LIMIT;
 			const order = await sandboxGrpc.postSandboxOrder({
 				instrumentId: signal.instrumentUid,
 				direction,
-				orderType,
+				orderType: this.config.useMarketOrder ? OrderType.ORDER_TYPE_MARKET : OrderType.ORDER_TYPE_LIMIT,
 				quantity,
 				price: this.config.useMarketOrder ? void 0 : {
 					units: Math.floor(price),
@@ -3214,10 +3203,56 @@ var OrderManager = class {
 				accountId: this.config.accountId
 			}, this.config.token);
 			this.activeOrderId = order.orderId ?? null;
-			console.log(`[OrderManager] Ордер отправлен: ${this.activeOrderId}`);
 			this.lastOrderTime = now;
+			console.log(`[OrderManager] Ордер отправлен: ${this.activeOrderId}`);
+			await this.placeStopOrders(signal);
 		} catch (error) {
 			console.error("[OrderManager] Ошибка отправки ордера:", error);
+		}
+	}
+	async placeStopOrders(signal) {
+		const { stopLossPercent, takeProfitPercent, lotQuantity, token, accountId } = this.config;
+		if (stopLossPercent <= 0 && takeProfitPercent <= 0) return;
+		if (!accountId || !token || !signal.instrumentUid) return;
+		const entryPrice = signal.price;
+		const isBuy = signal.type === "BUY";
+		if (stopLossPercent > 0) {
+			const slPrice = isBuy ? entryPrice * (1 - stopLossPercent / 100) : entryPrice * (1 + stopLossPercent / 100);
+			try {
+				await sandboxGrpc.postSandboxStopOrder({
+					instrumentId: signal.instrumentUid,
+					direction: isBuy ? OrderDirection.ORDER_DIRECTION_SELL : OrderDirection.ORDER_DIRECTION_BUY,
+					stopOrderType: 1,
+					price: {
+						units: Math.floor(slPrice),
+						nano: Math.round(slPrice % 1 * 1e9)
+					},
+					quantity: lotQuantity,
+					accountId
+				}, token);
+				console.log(`[OrderManager] Стоп-лосс установлен на ${slPrice}`);
+			} catch (e) {
+				console.error("[OrderManager] Ошибка установки стоп-лосса:", e);
+			}
+		}
+		if (takeProfitPercent > 0) {
+			const tpPrice = isBuy ? entryPrice * (1 + takeProfitPercent / 100) : entryPrice * (1 - takeProfitPercent / 100);
+			try {
+				await sandboxGrpc.postSandboxStopOrder({
+					instrumentId: signal.instrumentUid,
+					direction: isBuy ? OrderDirection.ORDER_DIRECTION_SELL : OrderDirection.ORDER_DIRECTION_BUY,
+					stopOrderType: 2,
+					price: {
+						units: Math.floor(tpPrice),
+						nano: Math.round(tpPrice % 1 * 1e9)
+					},
+					quantity: lotQuantity,
+					accountId
+				}, token);
+				console.log(`[OrderManager] Тейк-профит установлен на ${tpPrice}`);
+			} catch (e) {
+				console.error("[OrderManager] Ошибка установки тейк-профита:", e);
+			}
 		}
 	}
 	async cancelActiveOrder() {
