@@ -701,6 +701,38 @@ export const TradingAssistantPage: React.FC = () => {
     </div>
   );
 
+  const renderProfilePanel = () => (
+    <div className="tab-panel">
+      <h3>Volume Profile Data</h3>
+      {profile ? (
+        <>
+          <div style={{ color: '#d1d4dc', marginBottom: '10px' }}>
+            <p>POC: {profile.poc.toFixed(2)}</p>
+            <p>Value Area: {profile.valueAreaLow.toFixed(2)} – {profile.valueAreaHigh.toFixed(2)}</p>
+            <p>Total Volume: {profile.totalVolume}</p>
+          </div>
+          {profile.volumeByPrice && profile.volumeByPrice.length > 0 && (
+            <div>
+              <h4>Top 10 Levels</h4>
+              <ul style={{ color: '#d1d4dc', maxHeight: '200px', overflowY: 'auto' }}>
+                {profile.volumeByPrice
+                  .sort((a, b) => b.volume - a.volume)
+                  .slice(0, 10)
+                  .map(({ price, volume }) => (
+                    <li key={price}>
+                      {price.toFixed(2)} – {volume.toFixed(0)}
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          )}
+        </>
+      ) : (
+        <p style={{ color: '#888' }}>Нет данных профиля</p>
+      )}
+    </div>
+  );
+
   return (
     <div className="trading-assistant">
       <h1>Trading Assistant</h1>
@@ -709,12 +741,14 @@ export const TradingAssistantPage: React.FC = () => {
         <button onClick={() => setActiveTab('stream')} className={activeTab === 'stream' ? 'active' : ''}>Stream</button>
         <button onClick={() => setActiveTab('backtest')} className={activeTab === 'backtest' ? 'active' : ''}>Backtest</button>
         <button onClick={() => setActiveTab('signals')} className={activeTab === 'signals' ? 'active' : ''}>Signals</button>
+        <button onClick={() => setActiveTab('profile')} className={activeTab === 'profile' ? 'active' : ''}>Profile</button>
       </div>
 
       {activeTab === 'sandbox' && renderSandboxPanel()}
       {activeTab === 'stream' && renderStreamPanel()}
       {activeTab === 'backtest' && renderBacktestPanel()}
       {activeTab === 'signals' && renderSignalsPanel()}
+      {activeTab === 'profile' && renderProfilePanel()}
 
       <div className="chart-row">
         {profile?.volumeByPrice && priceRange.max > 0 && (
@@ -725,6 +759,9 @@ export const TradingAssistantPage: React.FC = () => {
               minPrice={priceRange.min}
               maxPrice={priceRange.max}
               height={400}
+              poc={profile.poc}
+              vah={profile.valueAreaHigh}
+              val={profile.valueAreaLow}
             />
           </div>
         )}
