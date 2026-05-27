@@ -89,6 +89,19 @@ function aggregateCandles(
   return result;
 }
 
+const getLastTradingDay = (): Date => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const day = today.getDay(); // 0 = вс, 6 = сб
+  let offset = 1;
+  if (day === 1) offset = 3; // понедельник -> пятница
+  else if (day === 0) offset = 2; // воскресенье -> пятница
+  else if (day === 6) offset = 1; // суббота -> пятница
+  const lastTrading = new Date(today);
+  lastTrading.setDate(today.getDate() - offset);
+  return lastTrading;
+};
+
 export const TradingAssistantPage: React.FC = () => {
   // ---------- Группировка состояний ----------
   const [sandbox, setSandbox] = useState({
@@ -112,9 +125,12 @@ export const TradingAssistantPage: React.FC = () => {
     displayTimeframe: 5 as 1 | 5 | 15 | 60,
   });
 
+  const lastTradingDay = getLastTradingDay();
+  const lastTradingDayStr = lastTradingDay.toISOString().split('T')[0];
+
   const [backtest, setBacktest] = useState({
-    dateFrom: '2026-05-22',
-    dateTo: '2026-05-22',
+    dateFrom: lastTradingDayStr,
+    dateTo: lastTradingDayStr,
     interval: '1min',
     valueAreaPercent: 70,
     profileResolution: 50,
@@ -125,7 +141,7 @@ export const TradingAssistantPage: React.FC = () => {
     result: null as any,
     signals: [] as BacktestSignal[],
   });
-
+  
   // Локальные состояния (часто обновляемые)
   const [profile, setProfile] = useState<VolumeProfileLevels | null>(null);
   const [liveSignals, setLiveSignals] = useState<Signal[]>([]);
@@ -641,7 +657,9 @@ export const TradingAssistantPage: React.FC = () => {
       {backtest.result?.stats && backtest.result.stats.portfolio && (
         <div className="backtest-stats" style={{ marginTop: '8px' }}>
           <p style={{ margin: 0 }}>
-            Signals: {backtest.result.stats.totalSignals}
+            Strategy: {backtest.strategyType === 'trend' ? 'Trend' : 'Volume Accum'}
+            {' | '}Period: {backtest.dateFrom} – {backtest.dateTo}
+            {' | '}Signals: {backtest.result.stats.totalSignals}
             {' | '}Trades: {backtest.result.stats.portfolio.totalTrades}
             (W: {backtest.result.stats.portfolio.winningTrades} / L: {backtest.result.stats.portfolio.losingTrades})
             {' | '}WinRate: {backtest.result.stats.portfolio.winRate?.toFixed(1)}%
