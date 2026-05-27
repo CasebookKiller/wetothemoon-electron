@@ -98,6 +98,14 @@ const getLastTradingDay = (): Date => {
   return date;
 };
 
+const POPULAR_INSTRUMENTS = [
+  { uid: 'e6123145-9665-43e0-8413-cd61b8aa9b13', name: 'Сбербанк' },
+  { uid: 'bb730b70-5c45-4b5f-8f7e-2f5a5b0b1b0c', name: 'Газпром' },
+  { uid: 'a92e2e25-a698-45cc-a781-167cf465257c', name: 'Лукойл' },
+  { uid: '5b8f7e2f-5a5b-4b5f-8f7e-2f5a5b0b1b0c', name: 'Норникель' },
+  //{ uid: '...', name: 'Магнит' }, // добавьте реальные UID
+];
+
 export const TradingAssistantPage: React.FC = () => {
   // ---------- Группировка состояний ----------
   const [sandbox, setSandbox] = useState({
@@ -632,6 +640,13 @@ export const TradingAssistantPage: React.FC = () => {
     <div className="tab-panel">
       <h3>Backtest</h3>
       <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <label>Instrument:
+          <select value={selectedInstrument} onChange={e => setSelectedInstrument(e.target.value)}>
+            {POPULAR_INSTRUMENTS.map(inst => (
+              <option key={inst.uid} value={inst.uid}>{inst.name}</option>
+            ))}
+          </select>
+        </label>
         <label>From: <input type="date" value={backtest.dateFrom} onChange={e => updateBacktest({ dateFrom: e.target.value })} /></label>
         <label>To: <input type="date" value={backtest.dateTo} onChange={e => updateBacktest({ dateTo: e.target.value })} /></label>
         <label>Interval: 

@@ -1730,7 +1730,8 @@ var VirtualPortfolio = class {
 			commissionPercent: config.commissionPercent ?? 0,
 			slippagePercent: config.slippagePercent ?? 0,
 			stopLossPercent: config.stopLossPercent ?? 0,
-			takeProfitPercent: config.takeProfitPercent ?? 0
+			takeProfitPercent: config.takeProfitPercent ?? 0,
+			trailingDistancePercent: config.trailingDistancePercent ?? 0
 		};
 		this.initialCapital = this.config.initialCapital;
 		this.capital = this.config.initialCapital;
@@ -1739,20 +1740,38 @@ var VirtualPortfolio = class {
 	processSignal(signal) {
 		if (this.openPosition) this.closePosition(signal.price, signal.time, "SIGNAL");
 		const entryPrice = signal.price;
-		const stopLossPrice = this.config.stopLossPercent > 0 ? signal.type === "BUY" ? entryPrice * (1 - this.config.stopLossPercent / 100) : entryPrice * (1 + this.config.stopLossPercent / 100) : void 0;
-		const takeProfitPrice = this.config.takeProfitPercent > 0 ? signal.type === "BUY" ? entryPrice * (1 + this.config.takeProfitPercent / 100) : entryPrice * (1 - this.config.takeProfitPercent / 100) : void 0;
+		const isBuy = signal.type === "BUY";
+		const stopLossPrice = this.config.stopLossPercent > 0 ? isBuy ? entryPrice * (1 - this.config.stopLossPercent / 100) : entryPrice * (1 + this.config.stopLossPercent / 100) : entryPrice;
+		const takeProfitPrice = this.config.takeProfitPercent > 0 ? isBuy ? entryPrice * (1 + this.config.takeProfitPercent / 100) : entryPrice * (1 - this.config.takeProfitPercent / 100) : void 0;
 		this.openPosition = {
 			type: signal.type,
 			price: entryPrice,
 			time: signal.time,
 			stopLossPrice,
-			takeProfitPrice
+			takeProfitPrice,
+			trailingDistance: this.config.trailingDistancePercent / 100,
+			bestPrice: entryPrice
 		};
 	}
 	checkStopTake(high, low, close, time) {
 		if (!this.openPosition) return;
-		const { type, stopLossPrice, takeProfitPrice } = this.openPosition;
-		if (stopLossPrice !== void 0) {
+		const { type, stopLossPrice, takeProfitPrice, trailingDistance, bestPrice } = this.openPosition;
+		if (type === "BUY") {
+			if (high > bestPrice) {
+				this.openPosition.bestPrice = high;
+				if (trailingDistance > 0) {
+					const newStop = high * (1 - trailingDistance);
+					if (newStop > this.openPosition.stopLossPrice) this.openPosition.stopLossPrice = newStop;
+				}
+			}
+		} else if (low < bestPrice) {
+			this.openPosition.bestPrice = low;
+			if (trailingDistance > 0) {
+				const newStop = low * (1 + trailingDistance);
+				if (newStop < this.openPosition.stopLossPrice) this.openPosition.stopLossPrice = newStop;
+			}
+		}
+		if (stopLossPrice > 0) {
 			if (type === "BUY" && low <= stopLossPrice) {
 				this.closePosition(stopLossPrice, time, "STOP_LOSS");
 				return;
@@ -2089,7 +2108,8 @@ var registerTradingAssistantHandlers = () => {
 		const portfolio = new VirtualPortfolio({
 			initialCapital: 1e5,
 			stopLossPercent: params.stopLossPercent || 0,
-			takeProfitPercent: params.takeProfitPercent || 0
+			takeProfitPercent: params.takeProfitPercent || 0,
+			trailingDistancePercent: params.trailingDistancePercent || 0
 		});
 		const strategyType = params.strategyType || "volume_accumulation";
 		try {
