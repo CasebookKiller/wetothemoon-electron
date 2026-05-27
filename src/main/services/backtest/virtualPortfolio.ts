@@ -151,7 +151,7 @@ export class VirtualPortfolio {
     } else {
       profit = (entry.price - price) * this.config.lotQuantity;
     }
-
+    console.log(`[Portfolio] LOTS=${this.config.lotQuantity}, PROFIT=${profit}`);
     const profitPercent = (profit / entry.price) * 100;
     this.capital += profit;
 

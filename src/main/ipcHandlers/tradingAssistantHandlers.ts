@@ -123,6 +123,7 @@ export const registerTradingAssistantHandlers = () => {
       stopLossPercent: params.stopLossPercent || 0,
       takeProfitPercent: params.takeProfitPercent || 0,
       trailingDistancePercent: params.trailingDistancePercent || 0,
+      lotQuantity: params.lots || 1,
     });
 
     // --- ВЫБОР СТРАТЕГИИ ---

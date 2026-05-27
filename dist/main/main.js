@@ -1799,6 +1799,7 @@ var VirtualPortfolio = class {
 		let profit;
 		if (entry.type === "BUY") profit = (price - entry.price) * this.config.lotQuantity;
 		else profit = (entry.price - price) * this.config.lotQuantity;
+		console.log(`[Portfolio] LOTS=${this.config.lotQuantity}, PROFIT=${profit}`);
 		const profitPercent = profit / entry.price * 100;
 		this.capital += profit;
 		this.trades.push({
@@ -2355,7 +2356,8 @@ var registerTradingAssistantHandlers = () => {
 			initialCapital: 1e5,
 			stopLossPercent: params.stopLossPercent || 0,
 			takeProfitPercent: params.takeProfitPercent || 0,
-			trailingDistancePercent: params.trailingDistancePercent || 0
+			trailingDistancePercent: params.trailingDistancePercent || 0,
+			lotQuantity: params.lots || 1
 		});
 		const strategyType = params.strategyType || "volume_accumulation";
 		try {
