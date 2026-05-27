@@ -114,6 +114,8 @@ export const TradingAssistantPage: React.FC = () => {
   const [interval, setInterval] = useState('1min');
   const [valueAreaPercent, setValueAreaPercent] = useState(70);
   const [profileResolution, setProfileResolution] = useState(50);
+  const [stopLossPercent, setStopLossPercent] = useState(0.5);
+  const [takeProfitPercent, setTakeProfitPercent] = useState(1.0);
   const [loading, setLoading] = useState(false);
   const [autoTrading, setAutoTrading] = useState(false);
   const [lotQty, setLotQty] = useState(1);
@@ -827,6 +829,11 @@ export const TradingAssistantPage: React.FC = () => {
         <input type="number" value={valueAreaPercent} onChange={e => setValueAreaPercent(Number(e.target.value))} min={50} max={90} step={5} />
         <label>Resolution:</label>
         <input type="number" value={profileResolution} onChange={e => setProfileResolution(Number(e.target.value))} min={10} max={200} step={10} />
+        <label>SL%:</label>
+        <input type="number" value={stopLossPercent} onChange={e => setStopLossPercent(Number(e.target.value))} min={0} max={10} step={0.1} style={{ width: '60px' }} />
+
+        <label>TP%:</label>
+        <input type="number" value={takeProfitPercent} onChange={e => setTakeProfitPercent(Number(e.target.value))} min={0} max={10} step={0.1} style={{ width: '60px' }} />
         <button disabled={loading} onClick={runBacktest}>Run Backtest</button>
       </div>
 
@@ -893,6 +900,7 @@ export const TradingAssistantPage: React.FC = () => {
       {backtestResult?.stats && backtestResult.stats.portfolio && (
         <div className="backtest-stats">
           <h3>Backtest Results</h3>
+          <p>Strategy: {strategyType}</p>
           <p>Total Signals: {backtestResult.stats.totalSignals}</p>
           <p>Buy / Sell: {backtestResult.stats.buySignals} / {backtestResult.stats.sellSignals}</p>
           <ul>

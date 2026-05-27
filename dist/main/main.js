@@ -1202,7 +1202,7 @@ var createTradingAssistantWindow = () => {
 var getTradingAssistantWindow = () => tradingAssistantWindow;
 //#endregion
 //#region src/main/services/volumeProfileEngine.ts
-function quotationToNumber$2(q) {
+function quotationToNumber$3(q) {
 	if (!q) return 0;
 	return Number(q.units || "0") + (q.nano || 0) / 1e9;
 }
@@ -1237,9 +1237,9 @@ var VolumeProfileEngine = class extends events.EventEmitter {
 		if (!uid) return;
 		const volume = Number(candle.volume || "0");
 		if (volume <= this.config.minVolumeThreshold) return;
-		const high = quotationToNumber$2(candle.high);
-		const low = quotationToNumber$2(candle.low);
-		const close = quotationToNumber$2(candle.close);
+		const high = quotationToNumber$3(candle.high);
+		const low = quotationToNumber$3(candle.low);
+		const close = quotationToNumber$3(candle.close);
 		const time = candle.time || (/* @__PURE__ */ new Date()).toISOString();
 		this.lastPrice.set(uid, close);
 		const typicalPrice = (high + low + close) / 3;
@@ -1269,7 +1269,7 @@ var VolumeProfileEngine = class extends events.EventEmitter {
 	onTrade(trade) {
 		const uid = trade.instrumentUid || trade.figi;
 		if (!uid) return;
-		const price = quotationToNumber$2(trade.price);
+		const price = quotationToNumber$3(trade.price);
 		this.lastPrice.set(uid, price);
 	}
 	addVolume(uid, price, volume) {
@@ -1482,6 +1482,73 @@ var CandleSourceRequest = /* @__PURE__ */ function(CandleSourceRequest) {
 	CandleSourceRequest[CandleSourceRequest["CANDLE_SOURCE_INCLUDE_WEEKEND"] = 3] = "CANDLE_SOURCE_INCLUDE_WEEKEND";
 	return CandleSourceRequest;
 }({});
+//#endregion
+//#region src/main/services/backtest/strategies/VolumeAccumulationStrategy.ts
+var VolumeAccumulationStrategy = class {
+	signals = [];
+	dailyProfile = null;
+	instrumentUid;
+	hasBrokenHigh = false;
+	hasBrokenLow = false;
+	constructor(instrumentUid, dailyProfile) {
+		this.instrumentUid = instrumentUid;
+		this.dailyProfile = dailyProfile;
+	}
+	reset() {
+		this.signals = [];
+		this.hasBrokenHigh = false;
+		this.hasBrokenLow = false;
+		this.hasPosition = false;
+	}
+	hasPosition = false;
+	onCandle(candle) {
+		if (!this.dailyProfile || this.hasPosition) return;
+		const high = quotationToNumber$2(candle.high);
+		const low = quotationToNumber$2(candle.low);
+		const close = quotationToNumber$2(candle.close);
+		const time = candle.time || (/* @__PURE__ */ new Date()).toISOString();
+		if (high > this.dailyProfile.valueAreaHigh) {
+			this.hasBrokenHigh = true;
+			this.hasBrokenLow = false;
+		}
+		if (low < this.dailyProfile.valueAreaLow) {
+			this.hasBrokenLow = true;
+			this.hasBrokenHigh = false;
+		}
+		if (this.hasBrokenHigh && close < this.dailyProfile.valueAreaHigh) {
+			this.signals.push({
+				type: "SELL",
+				price: close,
+				time,
+				instrumentUid: this.instrumentUid,
+				reason: `Return to VA after breaking high (VAH=${this.dailyProfile.valueAreaHigh})`
+			});
+			this.hasBrokenHigh = false;
+			this.hasPosition = true;
+		}
+		if (this.hasBrokenLow && close > this.dailyProfile.valueAreaLow) {
+			this.signals.push({
+				type: "BUY",
+				price: close,
+				time,
+				instrumentUid: this.instrumentUid,
+				reason: `Return to VA after breaking low (VAL=${this.dailyProfile.valueAreaLow})`
+			});
+			this.hasBrokenLow = false;
+			this.hasPosition = true;
+		}
+	}
+	getSignals() {
+		return this.signals;
+	}
+	clearSignals() {
+		this.signals = [];
+	}
+};
+function quotationToNumber$2(q) {
+	if (!q) return 0;
+	return Number(q.units || 0) + (q.nano || 0) / 1e9;
+}
 //#endregion
 //#region src/main/utils/grpcHelper.ts
 function createGrpcClient(packageName, serviceName) {
@@ -2021,9 +2088,10 @@ var registerTradingAssistantHandlers = () => {
 		const allSignals = [];
 		const portfolio = new VirtualPortfolio({
 			initialCapital: 1e5,
-			stopLossPercent: .5,
-			takeProfitPercent: 1
+			stopLossPercent: params.stopLossPercent || 0,
+			takeProfitPercent: params.takeProfitPercent || 0
 		});
+		const strategyType = params.strategyType || "volume_accumulation";
 		try {
 			let currentDate = /* @__PURE__ */ new Date(dateFrom + "T00:00:00Z");
 			const endDate = /* @__PURE__ */ new Date(dateTo + "T00:00:00Z");
@@ -2038,7 +2106,10 @@ var registerTradingAssistantHandlers = () => {
 						valueAreaPercent: params.valueAreaPercent || 70
 					});
 					candles.forEach((c) => engine.onCandle?.(c));
-					const strategy = new TrendStrategy(instrumentUid, engine.getProfile(instrumentUid));
+					const profile = engine.getProfile(instrumentUid);
+					let strategy;
+					if (strategyType === "trend") strategy = new TrendStrategy(instrumentUid, profile);
+					else strategy = new VolumeAccumulationStrategy(instrumentUid, profile);
 					for (const candle of candles) {
 						strategy.onCandle(candle);
 						const newSignals = strategy.getSignals();

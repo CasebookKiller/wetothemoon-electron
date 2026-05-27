@@ -2,7 +2,7 @@
 import { ipcMain, BrowserWindow } from 'electron';
 import { VolumeProfileEngine, volumeProfileEngine } from '../services/volumeProfileEngine';
 import { CandleInterval } from '@/api/tbank/marketdataTypes';
-import { BacktestEngine } from '../services/backtest/backtestEngine';
+import { BacktestEngine, IBacktestStrategy } from '../services/backtest/backtestEngine';
 import { VolumeAccumulationStrategy } from '../services/backtest/strategies/VolumeAccumulationStrategy';
 import { HistoricalDataLoader } from '../services/historicalDataLoader';
 import { StreamCandle } from '@/api/tbank/marketdataStreamTypes';
@@ -117,12 +117,14 @@ export const registerTradingAssistantHandlers = () => {
     const allCandles: any[] = [];
     const allSignals: BacktestSignal[] = [];
 
-    // Портфель с параметрами стоп‑лосс / тейк‑профит
     const portfolio = new VirtualPortfolio({
       initialCapital: 100000,
-      stopLossPercent: 0.5,   // можно будет вынести в UI позже
-      takeProfitPercent: 1.0,
+      stopLossPercent: params.stopLossPercent || 0,
+      takeProfitPercent: params.takeProfitPercent || 0,
     });
+
+    // --- ВЫБОР СТРАТЕГИИ ---
+    const strategyType = params.strategyType || 'volume_accumulation'; // по умолчанию первая
 
     try {
       let currentDate = new Date(dateFrom + 'T00:00:00Z');
@@ -138,7 +140,6 @@ export const registerTradingAssistantHandlers = () => {
         );
 
         if (candles.length > 0) {
-          // 1. Строим профиль дня
           const engine = new VolumeProfileEngine({
             profileResolution: params.profileResolution || 50,
             valueAreaPercent: params.valueAreaPercent || 70,
@@ -146,23 +147,24 @@ export const registerTradingAssistantHandlers = () => {
           candles.forEach(c => (engine as any).onCandle?.(c));
           const profile = engine.getProfile(instrumentUid);
 
-          // 2. Создаём стратегию и обрабатываем свечи последовательно
-          // const strategy = new VolumeAccumulationStrategy(instrumentUid, profile);
-          const strategy = new TrendStrategy(instrumentUid, profile);
+          // Создаём стратегию в зависимости от выбора
+          let strategy: IBacktestStrategy;
+          if (strategyType === 'trend') {
+            strategy = new TrendStrategy(instrumentUid, profile);
+          } else {
+            strategy = new VolumeAccumulationStrategy(instrumentUid, profile);
+          }
 
+          // Последовательная обработка свечей
           for (const candle of candles) {
-            // Подаём свечу в стратегию
             strategy.onCandle(candle);
-
-            // Если появились новые сигналы – открываем позиции
             const newSignals = strategy.getSignals();
             for (const signal of newSignals) {
               portfolio.processSignal(signal);
               allSignals.push(signal);
             }
-            strategy.clearSignals(); // очищаем, чтобы не обрабатывать повторно
+            strategy.clearSignals();
 
-            // Проверяем стоп‑лосс / тейк‑профит на этой же свече
             const high = quotationToNumber(candle.high);
             const low = quotationToNumber(candle.low);
             const close = quotationToNumber(candle.close);
@@ -174,6 +176,8 @@ export const registerTradingAssistantHandlers = () => {
 
         currentDate.setDate(currentDate.getDate() + 1);
       }
+
+      // ... остаток без изменений
 
       // Закрываем позицию в конце последнего дня
       if (allCandles.length > 0) {
