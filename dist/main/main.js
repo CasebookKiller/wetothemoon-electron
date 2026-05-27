@@ -5,6 +5,16 @@ var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __esmMin = (fn, res) => () => (fn && (res = fn(fn = 0)), res);
+var __exportAll = (all, no_symbols) => {
+	let target = {};
+	for (var name in all) __defProp(target, name, {
+		get: all[name],
+		enumerable: true
+	});
+	if (!no_symbols) __defProp(target, Symbol.toStringTag, { value: "Module" });
+	return target;
+};
 var __copyProps = (to, from, except, desc) => {
 	if (from && typeof from === "object" || typeof from === "function") for (var keys = __getOwnPropNames(from), i = 0, n = keys.length, key; i < n; i++) {
 		key = keys[i];
@@ -19,6 +29,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 	value: mod,
 	enumerable: true
 }) : target, mod));
+var __toCommonJS = (mod) => __hasOwnProp.call(mod, "module.exports") ? mod["module.exports"] : __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 //#endregion
 require("/home/ll/Документы/GitHub/wetothemoon-project/wetothemoon-electron/node_modules/dotenv/config.js");
 let electron = require("electron");
@@ -872,6 +883,10 @@ function getProtoPath(protoFileName) {
 	if (electron.app.isPackaged) return path.default.join(process.resourcesPath, "proto", protoFileName);
 	return path.default.join(__dirname, "../../proto", protoFileName);
 }
+var init_protoPath = __esmMin((() => {}));
+//#endregion
+//#region src/main/services/marketDataBus.ts
+init_protoPath();
 var marketDataBus = class MarketDataBus extends events.EventEmitter {
 	static instance;
 	constructor() {
@@ -1003,6 +1018,7 @@ var registerMarketdataStreamHandlers = () => {
 };
 //#endregion
 //#region src/main/streams/operations.ts
+init_protoPath();
 var registerOperationsStreamHandlers = () => {
 	let opsStreams = {
 		portfolio: null,
@@ -1092,6 +1108,7 @@ var registerOperationsStreamHandlers = () => {
 };
 //#endregion
 //#region src/main/streams/orders.ts
+init_protoPath();
 var registerOrdersStreamHandlers = () => {
 	let ordersStreams = {
 		trades: null,
@@ -1568,8 +1585,12 @@ function createMetadata(token) {
 	meta.add("Authorization", `Bearer ${token}`);
 	return meta;
 }
+var init_grpcHelper = __esmMin((() => {
+	init_protoPath();
+}));
 //#endregion
 //#region src/main/services/tbank/MarketDataGrpcService.ts
+init_grpcHelper();
 var client$7 = createGrpcClient("marketdata.proto", "MarketDataService");
 var marketDataGrpc = {
 	getCandles: (request, token) => new Promise((resolve, reject) => {
@@ -1854,6 +1875,7 @@ function quotationToNumber(q) {
 }
 //#endregion
 //#region src/main/services/tbank/SandboxGrpcService.ts
+init_grpcHelper();
 var client$6 = createGrpcClient("sandbox.proto", "SandboxService");
 var sandboxGrpc = {
 	openSandboxAccount: (request, token) => new Promise((resolve, reject) => {
@@ -2067,6 +2089,256 @@ var TrendStrategy = class {
 		this.signals = [];
 	}
 };
+//#endregion
+//#region src/main/services/tbank/InstrumentsGrpcService.ts
+var InstrumentsGrpcService_exports = /* @__PURE__ */ __exportAll({ instrumentsGrpc: () => instrumentsGrpc });
+var client$5, instrumentsGrpc;
+var init_InstrumentsGrpcService = __esmMin((() => {
+	init_grpcHelper();
+	client$5 = createGrpcClient("instruments.proto", "InstrumentsService");
+	instrumentsGrpc = {
+		bondBy: (request, token) => new Promise((resolve, reject) => {
+			client$5.BondBy(request, createMetadata(token), (err, response) => {
+				if (err) reject(err);
+				else resolve(response);
+			});
+		}),
+		bonds: (request, token) => new Promise((resolve, reject) => {
+			client$5.Bonds(request, createMetadata(token), (err, response) => {
+				if (err) reject(err);
+				else resolve(response);
+			});
+		}),
+		createFavoriteGroup: (request, token) => new Promise((resolve, reject) => {
+			client$5.CreateFavoriteGroup(request, createMetadata(token), (err, response) => {
+				if (err) reject(err);
+				else resolve(response);
+			});
+		}),
+		currencies: (request, token) => new Promise((resolve, reject) => {
+			client$5.Currencies(request, createMetadata(token), (err, response) => {
+				if (err) reject(err);
+				else resolve(response);
+			});
+		}),
+		currencyBy: (request, token) => new Promise((resolve, reject) => {
+			client$5.CurrencyBy(request, createMetadata(token), (err, response) => {
+				if (err) reject(err);
+				else resolve(response);
+			});
+		}),
+		deleteFavoriteGroup: (request, token) => new Promise((resolve, reject) => {
+			client$5.DeleteFavoriteGroup(request, createMetadata(token), (err, response) => {
+				if (err) reject(err);
+				else resolve(response);
+			});
+		}),
+		editFavorites: (request, token) => new Promise((resolve, reject) => {
+			client$5.EditFavorites(request, createMetadata(token), (err, response) => {
+				if (err) reject(err);
+				else resolve(response);
+			});
+		}),
+		etfBy: (request, token) => new Promise((resolve, reject) => {
+			client$5.EtfBy(request, createMetadata(token), (err, response) => {
+				if (err) reject(err);
+				else resolve(response);
+			});
+		}),
+		etfs: (request, token) => new Promise((resolve, reject) => {
+			client$5.Etfs(request, createMetadata(token), (err, response) => {
+				if (err) reject(err);
+				else resolve(response);
+			});
+		}),
+		findInstrument: (request, token) => new Promise((resolve, reject) => {
+			client$5.FindInstrument(request, createMetadata(token), (err, response) => {
+				if (err) reject(err);
+				else resolve(response);
+			});
+		}),
+		futureBy: (request, token) => new Promise((resolve, reject) => {
+			client$5.FutureBy(request, createMetadata(token), (err, response) => {
+				if (err) reject(err);
+				else resolve(response);
+			});
+		}),
+		futures: (request, token) => new Promise((resolve, reject) => {
+			client$5.Futures(request, createMetadata(token), (err, response) => {
+				if (err) reject(err);
+				else resolve(response);
+			});
+		}),
+		getAccruedInterests: (request, token) => new Promise((resolve, reject) => {
+			client$5.GetAccruedInterests(request, createMetadata(token), (err, response) => {
+				if (err) reject(err);
+				else resolve(response);
+			});
+		}),
+		getAssetBy: (request, token) => new Promise((resolve, reject) => {
+			client$5.GetAssetBy(request, createMetadata(token), (err, response) => {
+				if (err) reject(err);
+				else resolve(response);
+			});
+		}),
+		getAssetFundamentals: (request, token) => new Promise((resolve, reject) => {
+			client$5.GetAssetFundamentals(request, createMetadata(token), (err, response) => {
+				if (err) reject(err);
+				else resolve(response);
+			});
+		}),
+		getAssetReports: (request, token) => new Promise((resolve, reject) => {
+			client$5.GetAssetReports(request, createMetadata(token), (err, response) => {
+				if (err) reject(err);
+				else resolve(response);
+			});
+		}),
+		getAssets: (request, token) => new Promise((resolve, reject) => {
+			client$5.GetAssets(request, createMetadata(token), (err, response) => {
+				if (err) reject(err);
+				else resolve(response);
+			});
+		}),
+		getBondCoupons: (request, token) => new Promise((resolve, reject) => {
+			client$5.GetBondCoupons(request, createMetadata(token), (err, response) => {
+				if (err) reject(err);
+				else resolve(response);
+			});
+		}),
+		getBondEvents: (request, token) => new Promise((resolve, reject) => {
+			client$5.GetBondEvents(request, createMetadata(token), (err, response) => {
+				if (err) reject(err);
+				else resolve(response);
+			});
+		}),
+		getBrandBy: (request, token) => new Promise((resolve, reject) => {
+			client$5.GetBrandBy(request, createMetadata(token), (err, response) => {
+				if (err) reject(err);
+				else resolve(response);
+			});
+		}),
+		getBrands: (request, token) => new Promise((resolve, reject) => {
+			client$5.GetBrands(request, createMetadata(token), (err, response) => {
+				if (err) reject(err);
+				else resolve(response);
+			});
+		}),
+		getConsensusForecasts: (request, token) => new Promise((resolve, reject) => {
+			client$5.GetConsensusForecasts(request, createMetadata(token), (err, response) => {
+				if (err) reject(err);
+				else resolve(response);
+			});
+		}),
+		getCountries: (request, token) => new Promise((resolve, reject) => {
+			client$5.GetCountries(request, createMetadata(token), (err, response) => {
+				if (err) reject(err);
+				else resolve(response);
+			});
+		}),
+		getDividends: (request, token) => new Promise((resolve, reject) => {
+			client$5.GetDividends(request, createMetadata(token), (err, response) => {
+				if (err) reject(err);
+				else resolve(response);
+			});
+		}),
+		getFavoriteGroups: (request, token) => new Promise((resolve, reject) => {
+			client$5.GetFavoriteGroups(request, createMetadata(token), (err, response) => {
+				if (err) reject(err);
+				else resolve(response);
+			});
+		}),
+		getFavorites: (request, token) => new Promise((resolve, reject) => {
+			client$5.GetFavorites(request, createMetadata(token), (err, response) => {
+				if (err) reject(err);
+				else resolve(response);
+			});
+		}),
+		getForecastBy: (request, token) => new Promise((resolve, reject) => {
+			client$5.GetForecastBy(request, createMetadata(token), (err, response) => {
+				if (err) reject(err);
+				else resolve(response);
+			});
+		}),
+		getFuturesMargin: (request, token) => new Promise((resolve, reject) => {
+			client$5.GetFuturesMargin(request, createMetadata(token), (err, response) => {
+				if (err) reject(err);
+				else resolve(response);
+			});
+		}),
+		getInsiderDeals: (request, token) => new Promise((resolve, reject) => {
+			client$5.GetInsiderDeals(request, createMetadata(token), (err, response) => {
+				if (err) reject(err);
+				else resolve(response);
+			});
+		}),
+		getInstrumentBy: (request, token) => new Promise((resolve, reject) => {
+			client$5.GetInstrumentBy(request, createMetadata(token), (err, response) => {
+				if (err) reject(err);
+				else resolve(response);
+			});
+		}),
+		getRiskRates: (request, token) => new Promise((resolve, reject) => {
+			client$5.GetRiskRates(request, createMetadata(token), (err, response) => {
+				if (err) reject(err);
+				else resolve(response);
+			});
+		}),
+		indicatives: (request, token) => new Promise((resolve, reject) => {
+			client$5.Indicatives(request, createMetadata(token), (err, response) => {
+				if (err) reject(err);
+				else resolve(response);
+			});
+		}),
+		optionBy: (request, token) => new Promise((resolve, reject) => {
+			client$5.OptionBy(request, createMetadata(token), (err, response) => {
+				if (err) reject(err);
+				else resolve(response);
+			});
+		}),
+		options: (request, token) => new Promise((resolve, reject) => {
+			client$5.Options(request, createMetadata(token), (err, response) => {
+				if (err) reject(err);
+				else resolve(response);
+			});
+		}),
+		optionsBy: (request, token) => new Promise((resolve, reject) => {
+			client$5.OptionsBy(request, createMetadata(token), (err, response) => {
+				if (err) reject(err);
+				else resolve(response);
+			});
+		}),
+		shareBy: (request, token) => new Promise((resolve, reject) => {
+			client$5.ShareBy(request, createMetadata(token), (err, response) => {
+				if (err) reject(err);
+				else resolve(response);
+			});
+		}),
+		shares: (request, token) => new Promise((resolve, reject) => {
+			client$5.Shares(request, createMetadata(token), (err, response) => {
+				if (err) reject(err);
+				else resolve(response);
+			});
+		}),
+		structuredNoteBy: (request, token) => new Promise((resolve, reject) => {
+			client$5.StructuredNoteBy(request, createMetadata(token), (err, response) => {
+				if (err) reject(err);
+				else resolve(response);
+			});
+		}),
+		structuredNotes: (request, token) => new Promise((resolve, reject) => {
+			client$5.StructuredNotes(request, createMetadata(token), (err, response) => {
+				if (err) reject(err);
+				else resolve(response);
+			});
+		}),
+		tradingSchedules: (request, token) => new Promise((resolve, reject) => {
+			client$5.TradingSchedules(request, createMetadata(token), (err, response) => {
+				if (err) reject(err);
+				else resolve(response);
+			});
+		})
+	};
+}));
 //#endregion
 //#region src/main/ipcHandlers/tradingAssistantHandlers.ts
 var orderManagerInstance$1 = null;
@@ -2348,6 +2620,25 @@ var registerTradingAssistantHandlers = () => {
 		});
 		return true;
 	});
+	electron.ipcMain.handle("trading-assistant:get-all-instruments", async (_, token) => {
+		if (!token) return [];
+		try {
+			const { instrumentsGrpc } = (init_InstrumentsGrpcService(), __toCommonJS(InstrumentsGrpcService_exports));
+			return ((await instrumentsGrpc.getInstruments({
+				instrumentStatus: 2,
+				instrumentType: "share"
+			}, token)).instruments || []).map((inst) => ({
+				uid: inst.uid || inst.figi,
+				name: inst.name || inst.ticker,
+				ticker: inst.ticker,
+				figi: inst.figi,
+				classCode: inst.classCode
+			}));
+		} catch (e) {
+			console.error("[GetAllInstruments]", e);
+			return [];
+		}
+	});
 	marketDataBus.on("candle", (candle) => {
 		const win = getTradingAssistantWindow();
 		if (win && !win.isDestroyed()) win.webContents.send("candle-data", candle);
@@ -2392,291 +2683,47 @@ function validateCodeContext(context) {
 }
 //#endregion
 //#region src/main/services/tbank/UsersGrpcService.ts
-var client$5 = createGrpcClient("users.proto", "UsersService");
+init_grpcHelper();
+var client$4 = createGrpcClient("users.proto", "UsersService");
 var usersGrpc = {
 	getInfo: (token) => new Promise((resolve, reject) => {
-		client$5.GetInfo({}, createMetadata(token), (err, response) => {
+		client$4.GetInfo({}, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getAccounts: (request, token) => new Promise((resolve, reject) => {
-		client$5.GetAccounts(request, createMetadata(token), (err, response) => {
+		client$4.GetAccounts(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getMarginAttributes: (request, token) => new Promise((resolve, reject) => {
-		client$5.GetMarginAttributes(request, createMetadata(token), (err, response) => {
+		client$4.GetMarginAttributes(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getUserTariff: (request, token) => new Promise((resolve, reject) => {
-		client$5.GetUserTariff(request, createMetadata(token), (err, response) => {
+		client$4.GetUserTariff(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	currencyTransfer: (request, token) => new Promise((resolve, reject) => {
-		client$5.CurrencyTransfer(request, createMetadata(token), (err, response) => {
+		client$4.CurrencyTransfer(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	payIn: (request, token) => new Promise((resolve, reject) => {
-		client$5.PayIn(request, createMetadata(token), (err, response) => {
+		client$4.PayIn(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
 	}),
 	getBankAccounts: (request, token) => new Promise((resolve, reject) => {
-		client$5.GetBankAccounts(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	})
-};
-//#endregion
-//#region src/main/services/tbank/InstrumentsGrpcService.ts
-var client$4 = createGrpcClient("instruments.proto", "InstrumentsService");
-var instrumentsGrpc = {
-	bondBy: (request, token) => new Promise((resolve, reject) => {
-		client$4.BondBy(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	bonds: (request, token) => new Promise((resolve, reject) => {
-		client$4.Bonds(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	createFavoriteGroup: (request, token) => new Promise((resolve, reject) => {
-		client$4.CreateFavoriteGroup(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	currencies: (request, token) => new Promise((resolve, reject) => {
-		client$4.Currencies(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	currencyBy: (request, token) => new Promise((resolve, reject) => {
-		client$4.CurrencyBy(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	deleteFavoriteGroup: (request, token) => new Promise((resolve, reject) => {
-		client$4.DeleteFavoriteGroup(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	editFavorites: (request, token) => new Promise((resolve, reject) => {
-		client$4.EditFavorites(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	etfBy: (request, token) => new Promise((resolve, reject) => {
-		client$4.EtfBy(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	etfs: (request, token) => new Promise((resolve, reject) => {
-		client$4.Etfs(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	findInstrument: (request, token) => new Promise((resolve, reject) => {
-		client$4.FindInstrument(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	futureBy: (request, token) => new Promise((resolve, reject) => {
-		client$4.FutureBy(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	futures: (request, token) => new Promise((resolve, reject) => {
-		client$4.Futures(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	getAccruedInterests: (request, token) => new Promise((resolve, reject) => {
-		client$4.GetAccruedInterests(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	getAssetBy: (request, token) => new Promise((resolve, reject) => {
-		client$4.GetAssetBy(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	getAssetFundamentals: (request, token) => new Promise((resolve, reject) => {
-		client$4.GetAssetFundamentals(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	getAssetReports: (request, token) => new Promise((resolve, reject) => {
-		client$4.GetAssetReports(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	getAssets: (request, token) => new Promise((resolve, reject) => {
-		client$4.GetAssets(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	getBondCoupons: (request, token) => new Promise((resolve, reject) => {
-		client$4.GetBondCoupons(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	getBondEvents: (request, token) => new Promise((resolve, reject) => {
-		client$4.GetBondEvents(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	getBrandBy: (request, token) => new Promise((resolve, reject) => {
-		client$4.GetBrandBy(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	getBrands: (request, token) => new Promise((resolve, reject) => {
-		client$4.GetBrands(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	getConsensusForecasts: (request, token) => new Promise((resolve, reject) => {
-		client$4.GetConsensusForecasts(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	getCountries: (request, token) => new Promise((resolve, reject) => {
-		client$4.GetCountries(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	getDividends: (request, token) => new Promise((resolve, reject) => {
-		client$4.GetDividends(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	getFavoriteGroups: (request, token) => new Promise((resolve, reject) => {
-		client$4.GetFavoriteGroups(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	getFavorites: (request, token) => new Promise((resolve, reject) => {
-		client$4.GetFavorites(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	getForecastBy: (request, token) => new Promise((resolve, reject) => {
-		client$4.GetForecastBy(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	getFuturesMargin: (request, token) => new Promise((resolve, reject) => {
-		client$4.GetFuturesMargin(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	getInsiderDeals: (request, token) => new Promise((resolve, reject) => {
-		client$4.GetInsiderDeals(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	getInstrumentBy: (request, token) => new Promise((resolve, reject) => {
-		client$4.GetInstrumentBy(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	getRiskRates: (request, token) => new Promise((resolve, reject) => {
-		client$4.GetRiskRates(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	indicatives: (request, token) => new Promise((resolve, reject) => {
-		client$4.Indicatives(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	optionBy: (request, token) => new Promise((resolve, reject) => {
-		client$4.OptionBy(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	options: (request, token) => new Promise((resolve, reject) => {
-		client$4.Options(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	optionsBy: (request, token) => new Promise((resolve, reject) => {
-		client$4.OptionsBy(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	shareBy: (request, token) => new Promise((resolve, reject) => {
-		client$4.ShareBy(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	shares: (request, token) => new Promise((resolve, reject) => {
-		client$4.Shares(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	structuredNoteBy: (request, token) => new Promise((resolve, reject) => {
-		client$4.StructuredNoteBy(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	structuredNotes: (request, token) => new Promise((resolve, reject) => {
-		client$4.StructuredNotes(request, createMetadata(token), (err, response) => {
-			if (err) reject(err);
-			else resolve(response);
-		});
-	}),
-	tradingSchedules: (request, token) => new Promise((resolve, reject) => {
-		client$4.TradingSchedules(request, createMetadata(token), (err, response) => {
+		client$4.GetBankAccounts(request, createMetadata(token), (err, response) => {
 			if (err) reject(err);
 			else resolve(response);
 		});
@@ -2684,6 +2731,8 @@ var instrumentsGrpc = {
 };
 //#endregion
 //#region src/main/services/tbank/OperationsGrpcService.ts
+init_InstrumentsGrpcService();
+init_grpcHelper();
 var client$3 = createGrpcClient("operations.proto", "OperationsService");
 var operationsGrpc = {
 	getOperations: (request, token) => new Promise((resolve, reject) => {
@@ -2731,6 +2780,7 @@ var operationsGrpc = {
 };
 //#endregion
 //#region src/main/services/tbank/OrdersGrpcService.ts
+init_grpcHelper();
 var client$2 = createGrpcClient("orders.proto", "OrdersService");
 var ordersGrpc = {
 	postOrder: (request, token) => new Promise((resolve, reject) => {
@@ -2784,6 +2834,7 @@ var ordersGrpc = {
 };
 //#endregion
 //#region src/main/services/tbank/StopOrdersGrpcService.ts
+init_grpcHelper();
 var client$1 = createGrpcClient("stoporders.proto", "StopOrdersService");
 var stopOrdersGrpc = {
 	cancelStopOrder: (request, token) => new Promise((resolve, reject) => {
@@ -2807,6 +2858,7 @@ var stopOrdersGrpc = {
 };
 //#endregion
 //#region src/main/services/tbank/SignalGrpcService.ts
+init_grpcHelper();
 var client = createGrpcClient("signals.proto", "SignalService");
 //#endregion
 //#region src/main/ipcHandlers/grpcHandlers.ts

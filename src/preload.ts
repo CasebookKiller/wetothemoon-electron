@@ -234,6 +234,8 @@ try {
     loadHistoricalProfile: (instrumentUid: string, candles: any[]) => 
       ipcRenderer.invoke('trading-assistant:load-historical-profile', instrumentUid, candles),
     
+    getAllInstruments: (token: string) => ipcRenderer.invoke('trading-assistant:get-all-instruments', token)
+
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

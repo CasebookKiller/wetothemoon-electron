@@ -174,7 +174,8 @@ try {
 		},
 		removeLastPriceListener: () => electron.ipcRenderer.removeAllListeners("last-price-data"),
 		getTodayCandles: (instrumentUid, token, interval) => electron.ipcRenderer.invoke("trading-assistant:get-today-candles", instrumentUid, token, interval),
-		loadHistoricalProfile: (instrumentUid, candles) => electron.ipcRenderer.invoke("trading-assistant:load-historical-profile", instrumentUid, candles)
+		loadHistoricalProfile: (instrumentUid, candles) => electron.ipcRenderer.invoke("trading-assistant:load-historical-profile", instrumentUid, candles),
+		getAllInstruments: (token) => electron.ipcRenderer.invoke("trading-assistant:get-all-instruments", token)
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {

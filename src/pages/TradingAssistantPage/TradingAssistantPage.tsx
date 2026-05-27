@@ -155,6 +155,8 @@ export const TradingAssistantPage: React.FC = () => {
   const [autoTrading, setAutoTrading] = useState(false);
   const [selectedInstrument, setSelectedInstrument] = useState('e6123145-9665-43e0-8413-cd61b8aa9b13');
   const [activeTab, setActiveTab] = useState('sandbox');
+  const [availableInstruments, setAvailableInstruments] = useState<Array<{ uid: string; name: string; ticker?: string }>>([]);
+  const [instrumentsLoading, setInstrumentsLoading] = useState(false);
 
   // ... (все остальные refs: chartRef, candleSeriesRef и т.д.)
   const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -163,6 +165,21 @@ export const TradingAssistantPage: React.FC = () => {
   const signalSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<'Line'>[]>([]);
+
+  // ---------- Функции для инструментов ----------
+  const loadAllInstruments = async () => {
+    const api = (window as any).electronAPI;
+    if (!api?.getAllInstruments) return;
+    setInstrumentsLoading(true);
+    try {
+      const list = await api.getAllInstruments(stream.token); // или sandbox.token, но нужен токен с доступом к инструментам (read‑only подойдёт)
+      setAvailableInstruments(list);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setInstrumentsLoading(false);
+    }
+  };
 
   // ---------- Функции для sandbox ----------
   const updateSandbox = (patch: Partial<typeof sandbox>) => setSandbox(prev => ({ ...prev, ...patch }));
@@ -444,6 +461,11 @@ export const TradingAssistantPage: React.FC = () => {
     };
   }, [selectedInstrument]);
 
+  // Инструменты
+  useEffect(() => {
+    if (stream.token) loadAllInstruments();
+  }, [stream.token]);
+
   // Инициализация графика + подписка на зум
   useEffect(() => {
     if (!chartContainerRef.current) return;
@@ -642,8 +664,9 @@ export const TradingAssistantPage: React.FC = () => {
       <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
         <label>Instrument:
           <select value={selectedInstrument} onChange={e => setSelectedInstrument(e.target.value)}>
-            {POPULAR_INSTRUMENTS.map(inst => (
-              <option key={inst.uid} value={inst.uid}>{inst.name}</option>
+            {availableInstruments.length === 0 && <option value="">-- загрузка... --</option>}
+            {availableInstruments.map(inst => (
+              <option key={inst.uid} value={inst.uid}>{inst.name} ({inst.ticker})</option>
             ))}
           </select>
         </label>

@@ -390,6 +390,29 @@ export const registerTradingAssistantHandlers = () => {
     return true;
   });
 
+  ipcMain.handle('trading-assistant:get-all-instruments', async (_, token: string) => {
+    if (!token) return [];
+    try {
+      // Используем существующий InstrumentsGrpcService
+      const { instrumentsGrpc } = require('../services/tbank/InstrumentsGrpcService');
+      const response = await instrumentsGrpc.getInstruments({
+        instrumentStatus: 2, // INSTRUMENT_STATUS_ALL (если нужно только торгуемые — уточните)
+        instrumentType: 'share', // только акции
+      }, token);
+      const instruments = response.instruments || [];
+      return instruments.map((inst: any) => ({
+        uid: inst.uid || inst.figi,
+        name: inst.name || inst.ticker,
+        ticker: inst.ticker,
+        figi: inst.figi,
+        classCode: inst.classCode,
+      }));
+    } catch (e) {
+      console.error('[GetAllInstruments]', e);
+      return [];
+    }
+  });
+
   // После регистрации всех обработчиков (внутри registerTradingAssistantHandlers):
   marketDataBus.on('candle', (candle: any) => {
     const win = getTradingAssistantWindow();
