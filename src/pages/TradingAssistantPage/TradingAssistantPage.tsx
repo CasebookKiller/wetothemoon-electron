@@ -102,6 +102,8 @@ export const TradingAssistantPage: React.FC = () => {
     accounts: [] as Array<{ id: string; name: string }>,
     loadingAccounts: false,
     creatingAccount: false,
+    stopLossPercent: 0.5,
+    takeProfitPercent: 1.0,
   });
 
   const [stream, setStream] = useState({
@@ -231,6 +233,8 @@ export const TradingAssistantPage: React.FC = () => {
       accountId: sandbox.accountId,
       demoMode: sandbox.demoMode,
       lotQuantity: sandbox.lotQty,
+      stopLossPercent: sandbox.stopLossPercent,
+      takeProfitPercent: sandbox.takeProfitPercent,
     });
     alert('Config applied');
   };
@@ -580,6 +584,8 @@ export const TradingAssistantPage: React.FC = () => {
         <button onClick={applyConfig}>Apply Config</button>
         <button onClick={toggleTrading}>{autoTrading ? 'Stop Auto Trading' : 'Start Auto Trading'}</button>
         <label>Lots: <input type="number" value={sandbox.lotQty} onChange={e => updateSandbox({ lotQty: Number(e.target.value) })} min={1} style={{ width: '60px' }} /></label>
+        <label>SL%: <input type="number" value={sandbox.stopLossPercent} onChange={e => updateSandbox({ stopLossPercent: Number(e.target.value) })} step={0.1} style={{ width: '50px' }} /></label>
+        <label>TP%: <input type="number" value={sandbox.takeProfitPercent} onChange={e => updateSandbox({ takeProfitPercent: Number(e.target.value) })} step={0.1} style={{ width: '50px' }} /></label>
         <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
           <input type="number" value={sandbox.payAmount} onChange={e => updateSandbox({ payAmount: Number(e.target.value) })} min={1000} step={1000} style={{ width: '100px' }} />
           <button onClick={handlePayIn}>Пополнить</button>
