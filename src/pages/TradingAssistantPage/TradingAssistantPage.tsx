@@ -670,6 +670,9 @@ export const TradingAssistantPage: React.FC = () => {
             ))}
           </select>
         </label>
+        <button onClick={loadAllInstruments} disabled={instrumentsLoading}>
+          {instrumentsLoading ? 'Загрузка...' : '🔄'}
+        </button>
         <label>From: <input type="date" value={backtest.dateFrom} onChange={e => updateBacktest({ dateFrom: e.target.value })} /></label>
         <label>To: <input type="date" value={backtest.dateTo} onChange={e => updateBacktest({ dateTo: e.target.value })} /></label>
         <label>Interval: 
