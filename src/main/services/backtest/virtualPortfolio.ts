@@ -8,6 +8,7 @@ export interface PortfolioConfig {
   stopLossPercent?: number;         // начальный стоп-лосс в %
   takeProfitPercent?: number;       // тейк-профит в %
   trailingDistancePercent?: number; // расстояние трейлинг-стопа в %
+  lotQuantity?: number;
 }
 
 export interface Trade {
@@ -48,6 +49,7 @@ export class VirtualPortfolio {
       stopLossPercent: config.stopLossPercent ?? 0,
       takeProfitPercent: config.takeProfitPercent ?? 0,
       trailingDistancePercent: config.trailingDistancePercent ?? 0,
+      lotQuantity: config.lotQuantity ?? 1,
     };
     this.initialCapital = this.config.initialCapital;
     this.capital = this.config.initialCapital;
@@ -145,9 +147,9 @@ export class VirtualPortfolio {
     let profit: number;
 
     if (entry.type === 'BUY') {
-      profit = price - entry.price;
+      profit = (price - entry.price) * this.config.lotQuantity;
     } else {
-      profit = entry.price - price;
+      profit = (entry.price - price) * this.config.lotQuantity;
     }
 
     const profitPercent = (profit / entry.price) * 100;

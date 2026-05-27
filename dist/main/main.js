@@ -1731,7 +1731,8 @@ var VirtualPortfolio = class {
 			slippagePercent: config.slippagePercent ?? 0,
 			stopLossPercent: config.stopLossPercent ?? 0,
 			takeProfitPercent: config.takeProfitPercent ?? 0,
-			trailingDistancePercent: config.trailingDistancePercent ?? 0
+			trailingDistancePercent: config.trailingDistancePercent ?? 0,
+			lotQuantity: config.lotQuantity ?? 1
 		};
 		this.initialCapital = this.config.initialCapital;
 		this.capital = this.config.initialCapital;
@@ -1796,8 +1797,8 @@ var VirtualPortfolio = class {
 		if (!this.openPosition) return;
 		const entry = this.openPosition;
 		let profit;
-		if (entry.type === "BUY") profit = price - entry.price;
-		else profit = entry.price - price;
+		if (entry.type === "BUY") profit = (price - entry.price) * this.config.lotQuantity;
+		else profit = (entry.price - price) * this.config.lotQuantity;
 		const profitPercent = profit / entry.price * 100;
 		this.capital += profit;
 		this.trades.push({

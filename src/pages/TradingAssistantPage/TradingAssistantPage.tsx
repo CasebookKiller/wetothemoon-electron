@@ -145,6 +145,7 @@ export const TradingAssistantPage: React.FC = () => {
     result: null as any,
     signals: [] as BacktestSignal[],
     trailingDistancePercent: 0.5,
+    lots: 1,
   });
 
   // Локальные состояния (часто обновляемые)
@@ -356,6 +357,7 @@ export const TradingAssistantPage: React.FC = () => {
         stopLossPercent: backtest.stopLossPercent,
         takeProfitPercent: backtest.takeProfitPercent,
         trailingDistancePercent: backtest.trailingDistancePercent,
+        lots: backtest.lots,   // ← передаём
       }
     );
     if (result) {
@@ -690,6 +692,7 @@ export const TradingAssistantPage: React.FC = () => {
         </label>
         <label>SL%: <input type="number" value={backtest.stopLossPercent} onChange={e => updateBacktest({ stopLossPercent: Number(e.target.value) })} step={0.1} style={{ width: '50px' }} /></label>
         <label>TP%: <input type="number" value={backtest.takeProfitPercent} onChange={e => updateBacktest({ takeProfitPercent: Number(e.target.value) })} step={0.1} style={{ width: '50px' }} /></label>
+        <label>Lots: <input type="number" value={backtest.lots} onChange={e => updateBacktest({ lots: Number(e.target.value) })} min={1} step={1} style={{ width: '60px' }} /></label>
         <label>Trail%: <input type="number" value={backtest.trailingDistancePercent} onChange={e => updateBacktest({ trailingDistancePercent: Number(e.target.value) })} step={0.1} style={{ width: '50px' }} /></label>
         <button onClick={runBacktest} disabled={backtest.loading}>Run</button>
         <button onClick={sendBacktestToSandbox} disabled={!backtest.signals.length}>Send to Sandbox</button>
