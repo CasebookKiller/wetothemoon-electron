@@ -394,17 +394,16 @@ export const registerTradingAssistantHandlers = () => {
   ipcMain.handle('trading-assistant:get-all-instruments', async (_, token: string) => {
     if (!token) return [];
     try {
-      console.log('[GetAllInstruments] Запрос с токеном:', token.slice(0, 10) + '...');
-      const response = await instrumentsGrpc.getInstruments(
+      console.log('[GetAllInstruments] Запрос акций с токеном:', token.slice(0, 10) + '...');
+      const response = await instrumentsGrpc.shares(
         {
-          instrumentStatus: 2, // 2 = INSTRUMENT_STATUS_ALL
-          instrumentType: 1,   // 1 = share (акции)
+          instrumentStatus: 2, // 2 = INSTRUMENT_STATUS_ALL (все акции, включая неторгуемые)
         },
         token
       );
-      console.log('[GetAllInstruments] Получено инструментов:', response.instruments?.length);
+      console.log('[GetAllInstruments] Получено акций:', response.instruments?.length);
       const instruments = response.instruments || [];
-      return instruments.map((inst: any) => ({
+      return instruments.map(inst => ({
         uid: inst.uid || inst.figi,
         name: inst.name || inst.ticker,
         ticker: inst.ticker,
@@ -415,7 +414,7 @@ export const registerTradingAssistantHandlers = () => {
       return [];
     }
   });
-
+  
   // После регистрации всех обработчиков (внутри registerTradingAssistantHandlers):
   marketDataBus.on('candle', (candle: any) => {
     const win = getTradingAssistantWindow();

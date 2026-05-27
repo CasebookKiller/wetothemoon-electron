@@ -2596,12 +2596,9 @@ var registerTradingAssistantHandlers = () => {
 	electron.ipcMain.handle("trading-assistant:get-all-instruments", async (_, token) => {
 		if (!token) return [];
 		try {
-			console.log("[GetAllInstruments] Запрос с токеном:", token.slice(0, 10) + "...");
-			const response = await instrumentsGrpc.getInstruments({
-				instrumentStatus: 2,
-				instrumentType: 1
-			}, token);
-			console.log("[GetAllInstruments] Получено инструментов:", response.instruments?.length);
+			console.log("[GetAllInstruments] Запрос акций с токеном:", token.slice(0, 10) + "...");
+			const response = await instrumentsGrpc.shares({ instrumentStatus: 2 }, token);
+			console.log("[GetAllInstruments] Получено акций:", response.instruments?.length);
 			return (response.instruments || []).map((inst) => ({
 				uid: inst.uid || inst.figi,
 				name: inst.name || inst.ticker,
