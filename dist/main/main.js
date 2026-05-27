@@ -2596,10 +2596,10 @@ var registerTradingAssistantHandlers = () => {
 	electron.ipcMain.handle("trading-assistant:get-all-instruments", async (_, token) => {
 		if (!token) return [];
 		try {
-			console.log("[GetAllInstruments] Запрос акций с токеном:", token.slice(0, 10) + "...");
-			const response = await instrumentsGrpc.shares({ instrumentStatus: 2 }, token);
-			console.log("[GetAllInstruments] Получено акций:", response.instruments?.length);
-			return (response.instruments || []).map((inst) => ({
+			console.log("[GetAllInstruments] Запрос российских акций...");
+			const instruments = ((await instrumentsGrpc.shares({ instrumentStatus: 1 }, token)).instruments || []).filter((inst) => inst.apiTradeAvailableFlag === true && inst.currency?.toLowerCase() === "rub");
+			console.log(`[GetAllInstruments] Найдено ${instruments.length} российских акций`);
+			return instruments.map((inst) => ({
 				uid: inst.uid || inst.figi,
 				name: inst.name || inst.ticker,
 				ticker: inst.ticker,

@@ -1,5 +1,5 @@
 import type { MoneyValue, Quotation, Timestamp } from './commonTypes';
-import { InstrumentType } from './OperationsService';
+import { InstrumentType } from './operationsTypes';
 
 // 1. BondsBy
 

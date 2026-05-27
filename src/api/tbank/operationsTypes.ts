@@ -1,4 +1,4 @@
-import type { MoneyValue, Quotation, Timestamp } from './UserService'; // или путь к вашим общим типам
+import type { MoneyValue, Quotation, Timestamp } from './commonTypes'; // или путь к вашим общим типам
 
 // ==================== Перечисления ====================
 

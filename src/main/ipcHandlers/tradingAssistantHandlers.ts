@@ -394,16 +394,20 @@ export const registerTradingAssistantHandlers = () => {
   ipcMain.handle('trading-assistant:get-all-instruments', async (_, token: string) => {
     if (!token) return [];
     try {
-      console.log('[GetAllInstruments] Запрос акций с токеном:', token.slice(0, 10) + '...');
+      console.log('[GetAllInstruments] Запрос российских акций...');
       const response = await instrumentsGrpc.shares(
         {
-          instrumentStatus: 2, // 2 = INSTRUMENT_STATUS_ALL (все акции, включая неторгуемые)
+          instrumentStatus: 1, // базовый список (торгуемые)
         },
         token
       );
-      console.log('[GetAllInstruments] Получено акций:', response.instruments?.length);
-      const instruments = response.instruments || [];
-      return instruments.map(inst => ({
+      const instruments = (response.instruments || []).filter(
+        (inst: any) =>
+          inst.apiTradeAvailableFlag === true &&
+          inst.currency?.toLowerCase() === 'rub'
+      );
+      console.log(`[GetAllInstruments] Найдено ${instruments.length} российских акций`);
+      return instruments.map((inst: any) => ({
         uid: inst.uid || inst.figi,
         name: inst.name || inst.ticker,
         ticker: inst.ticker,
@@ -414,7 +418,7 @@ export const registerTradingAssistantHandlers = () => {
       return [];
     }
   });
-  
+
   // После регистрации всех обработчиков (внутри registerTradingAssistantHandlers):
   marketDataBus.on('candle', (candle: any) => {
     const win = getTradingAssistantWindow();
