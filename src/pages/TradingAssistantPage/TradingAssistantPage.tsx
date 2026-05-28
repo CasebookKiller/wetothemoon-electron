@@ -519,6 +519,10 @@ export const TradingAssistantPage: React.FC = () => {
     return () => {
       resizeObserver.disconnect();
       timeScale.unsubscribeVisibleTimeRangeChange(updatePriceRange);
+      // Очищаем серии выходов
+      exitMarkersRef.current.forEach(series => {
+        try { chart.removeSeries(series); } catch {}
+      });
       chart.remove();
       chartRef.current = null;
     };
@@ -608,39 +612,37 @@ export const TradingAssistantPage: React.FC = () => {
   }, [backtest.signals]);
 
   const exitMarkersPrimitiveRef = useRef<any>(null);
-
+  // Маркеры выходов (SL, TP, TRAIL, END_OF_DAY)
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart || !backtest.trades.length) return;
 
-    // Удаляем старые серии выходов (если есть)
+    // Очищаем предыдущие серии выходов
     exitMarkersRef.current.forEach(series => {
       try { chart.removeSeries(series); } catch {}
     });
     exitMarkersRef.current = [];
 
-    // Создаём по одной серии для каждого типа выхода, чтобы раскрасить точки
-    const reasons = ['TAKE_PROFIT', 'STOP_LOSS', 'TRAILING_STOP', 'END_OF_DAY', 'SIGNAL'];
-    const colors: Record<string, string> = {
-      TAKE_PROFIT: '#4caf50',
-      STOP_LOSS: '#f44336',
-      TRAILING_STOP: '#2196f3',
-      END_OF_DAY: '#ffeb3b',
-      SIGNAL: '#9e9e9e',
-    };
+    // Цвета и легенда
+    const reasons = [
+      { key: 'TAKE_PROFIT', label: 'TP', color: '#4caf50' },
+      { key: 'STOP_LOSS', label: 'SL', color: '#f44336' },
+      { key: 'TRAILING_STOP', label: 'Trail', color: '#2196f3' },
+      { key: 'END_OF_DAY', label: 'EOD', color: '#ffeb3b' },
+      { key: 'SIGNAL', label: 'Signal', color: '#9e9e9e' },
+    ];
 
-    reasons.forEach(reason => {
-      const tradesOfReason = backtest.trades.filter((t: any) => t.exitReason === reason);
+    reasons.forEach(({ key, color }) => {
+      const tradesOfReason = backtest.trades.filter((t: any) => t.exitReason === key);
       if (tradesOfReason.length === 0) return;
 
       const series = chart.addSeries(LineSeries, {
         lineVisible: false,
         lastValueVisible: false,
         pointMarkersVisible: true,
-        pointMarkersRadius: 4,
-        color: colors[reason],
+        pointMarkersRadius: 5,          // увеличенный радиус
+        color: color,
       });
-      exitMarkersRef.current.push(series);
 
       const data = tradesOfReason.map((trade: any) => ({
         time: (Math.floor(new Date(trade.exitTime).getTime() / 1000)) as Time,
@@ -648,15 +650,13 @@ export const TradingAssistantPage: React.FC = () => {
       }));
 
       series.setData(data);
-      // Сохранять все серии не обязательно, можно просто собрать в массив,
-      // но для очистки мы их удалим в следующем цикле.
-      // Поэтому сохраним их в exitMarkersRef как массив.
+      exitMarkersRef.current.push(series);
     });
 
     // Подгоняем масштаб
     chart.timeScale().fitContent();
   }, [backtest.trades]);
-  // Маркеры выходов (SL, TP, TRAIL, END_OF_DAY)
+  
 /*  useEffect(() => {
     const chart = chartRef.current;
     console.log('[Exit Markers] chart:', !!chart, 'trades:', backtest.trades.length);
@@ -985,6 +985,22 @@ export const TradingAssistantPage: React.FC = () => {
           </div>
         )}
         <div className="chart-container" ref={chartContainerRef} />
+        {backtest.trades.length > 0 && (
+          <div style={{ display: 'flex', gap: '12px', marginTop: '8px', flexWrap: 'wrap' }}>
+            {[
+              { label: 'Take Profit', color: '#4caf50' },
+              { label: 'Stop Loss', color: '#f44336' },
+              { label: 'Trailing Stop', color: '#2196f3' },
+              { label: 'End of Day', color: '#ffeb3b' },
+              { label: 'Signal', color: '#9e9e9e' },
+            ].map(item => (
+              <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#d1d4dc', fontSize: '12px' }}>
+                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: item.color }} />
+                {item.label}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
