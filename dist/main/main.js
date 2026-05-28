@@ -1810,7 +1810,7 @@ var VirtualPortfolio = class {
 		const lots = this.openPosition.lotQuantity ?? 1;
 		if (entry.type === "BUY") profit = (price - entry.price) * lots;
 		else profit = (entry.price - price) * lots;
-		console.log(`[Portfolio] LOTS=${this.config.lotQuantity}, PROFIT=${profit}`);
+		console.log(`[Portfolio] LOTS=${lots}, PROFIT=${profit}`);
 		const profitPercent = profit / entry.price * 100;
 		this.capital += profit;
 		this.trades.push({

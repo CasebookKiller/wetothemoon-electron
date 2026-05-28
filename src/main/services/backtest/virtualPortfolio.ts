@@ -38,6 +38,7 @@ export class VirtualPortfolio {
     takeProfitPrice?: number;
     trailingDistance: number;
     bestPrice: number; // highest price for long, lowest for short
+    lotQuantity?: number;   // <-- добавлено
   } | null = null;
   private peakCapital: number;
   private maxDrawdown: number = 0;
@@ -165,7 +166,7 @@ export class VirtualPortfolio {
     } else {
       profit = (entry.price - price) * lots;
     }
-    console.log(`[Portfolio] LOTS=${this.config.lotQuantity}, PROFIT=${profit}`);
+    console.log(`[Portfolio] LOTS=${lots}, PROFIT=${profit}`);
     const profitPercent = (profit / entry.price) * 100;
     this.capital += profit;
 
