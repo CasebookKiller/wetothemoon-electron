@@ -1857,6 +1857,9 @@ var VirtualPortfolio = class {
 			averageProfitPercent
 		};
 	}
+	getTrades() {
+		return this.trades;
+	}
 };
 //#endregion
 //#region src/main/services/backtest/common.ts
@@ -2420,6 +2423,7 @@ var registerTradingAssistantHandlers = () => {
 				sellSignals: allSignals.filter((s) => s.type === "SELL").length,
 				portfolio: stats
 			};
+			const trades = portfolio.getTrades();
 			let lastProfile = null;
 			if (allCandles.length > 0) {
 				const lastEngine = new VolumeProfileEngine({
@@ -2435,7 +2439,8 @@ var registerTradingAssistantHandlers = () => {
 				profile: lastProfile,
 				stats: backtestStats,
 				signals: allSignals,
-				candles: allCandles
+				candles: allCandles,
+				trades
 			};
 		} catch (error) {
 			console.error("Backtest error:", error);

@@ -127,7 +127,7 @@ export const registerTradingAssistantHandlers = () => {
       positionSizing: params.positionSizing || 'fixed',
       riskPercent: params.riskPercent || 1,
     });
-    
+
     // --- ВЫБОР СТРАТЕГИИ ---
     const strategyType = params.strategyType || 'volume_accumulation'; // по умолчанию первая
 
@@ -200,6 +200,7 @@ export const registerTradingAssistantHandlers = () => {
         sellSignals: allSignals.filter(s => s.type === 'SELL').length,
         portfolio: stats,
       };
+      const trades = portfolio.getTrades();
 
       // Профиль за последний день (как раньше)
       let lastProfile = null;
@@ -223,6 +224,7 @@ export const registerTradingAssistantHandlers = () => {
         stats: backtestStats,
         signals: allSignals,
         candles: allCandles,
+        trades,                // ← массив сделок
       };
     } catch (error) {
       console.error('Backtest error:', error);

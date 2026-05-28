@@ -98,14 +98,6 @@ const getLastTradingDay = (): Date => {
   return date;
 };
 
-const POPULAR_INSTRUMENTS = [
-  { uid: 'e6123145-9665-43e0-8413-cd61b8aa9b13', name: 'Сбербанк' },
-  { uid: 'bb730b70-5c45-4b5f-8f7e-2f5a5b0b1b0c', name: 'Газпром' },
-  { uid: 'a92e2e25-a698-45cc-a781-167cf465257c', name: 'Лукойл' },
-  { uid: '5b8f7e2f-5a5b-4b5f-8f7e-2f5a5b0b1b0c', name: 'Норникель' },
-  //{ uid: '...', name: 'Магнит' }, // добавьте реальные UID
-];
-
 export const TradingAssistantPage: React.FC = () => {
   // ---------- Группировка состояний ----------
   const [sandbox, setSandbox] = useState({
@@ -148,6 +140,7 @@ export const TradingAssistantPage: React.FC = () => {
     lots: 1,
     positionSizing: 'fixed' as 'fixed' | 'dynamic',  // ← добавить
     riskPercent: 1.0,                                 // ← добавить
+    trades: [] as any[],
   });
 
   // Локальные состояния (часто обновляемые)
@@ -160,7 +153,8 @@ export const TradingAssistantPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('sandbox');
   const [availableInstruments, setAvailableInstruments] = useState<Array<{ uid: string; name: string; ticker?: string }>>([]);
   const [instrumentsLoading, setInstrumentsLoading] = useState(false);
-
+  const [copied, setCopied] = useState(false);
+  
   // ... (все остальные refs: chartRef, candleSeriesRef и т.д.)
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -168,6 +162,7 @@ export const TradingAssistantPage: React.FC = () => {
   const signalSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<'Line'>[]>([]);
+  const exitMarkersRef = useRef<ISeriesApi<'Line'> | null>(null);
 
   // ---------- Функции для инструментов ----------
   const loadAllInstruments = async () => {
@@ -367,7 +362,11 @@ export const TradingAssistantPage: React.FC = () => {
     );
     if (result) {
       setProfile(result.profile);
-      updateBacktest({ signals: result.signals, result });
+        updateBacktest({
+        signals: result.signals,
+        result,
+        trades: result.trades || [],   // ← сохраняем
+      });
       if (result.candles?.length) {
         const formatted = result.candles.map((c: any) => ({
           time: (Math.floor(new Date(c.time).getTime() / 1000)) as UTCTimestamp,
@@ -609,6 +608,39 @@ export const TradingAssistantPage: React.FC = () => {
     signalSeriesRef.current = signalSeries;
   }, [backtest.signals]);
 
+  // Маркеры выходов (SL, TP, TRAIL, END_OF_DAY)
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart || !backtest.trades.length) return;
+
+    // Удаляем предыдущую серию маркеров
+    if (exitMarkersRef.current) {
+      chart.removeSeries(exitMarkersRef.current);
+    }
+
+    const exitSeries = chart.addSeries(LineSeries, {
+      lineVisible: false,
+      lastValueVisible: false,
+    });
+
+    const markers: SeriesMarker<Time>[] = backtest.trades.map((trade: any) => ({
+      time: (Math.floor(new Date(trade.exitTime).getTime() / 1000)) as Time,
+      position: 'inBar', // или 'aboveBar' / 'belowBar' — на ваш вкус
+      color:
+        trade.exitReason === 'TAKE_PROFIT' ? '#4caf50' :
+        trade.exitReason === 'STOP_LOSS' ? '#f44336' :
+        trade.exitReason === 'TRAILING_STOP' ? '#2196f3' : '#9e9e9e',
+      shape:
+        trade.exitReason === 'TAKE_PROFIT' ? 'circle' :
+        trade.exitReason === 'STOP_LOSS' ? 'square' :
+        trade.exitReason === 'TRAILING_STOP' ? 'diamond' : 'cross',
+      text: `${trade.exitReason} @ ${trade.exitPrice}`,
+    }));
+
+    createSeriesMarkers(exitSeries, markers);
+    exitMarkersRef.current = exitSeries;
+  }, [backtest.trades]);
+
   const loadProfile = async () => {
     const api = (window as any).electronAPI;
     if (!api) return;
@@ -665,78 +697,117 @@ export const TradingAssistantPage: React.FC = () => {
     </div>
   );
 
-  const renderBacktestPanel = () => (
-    <div className="tab-panel">
-      <h3>Backtest</h3>
-      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-        <label>Instrument:
-          <select value={selectedInstrument} onChange={e => setSelectedInstrument(e.target.value)}>
-            {availableInstruments.length === 0 && <option value="">-- загрузка... --</option>}
-            {availableInstruments.map(inst => (
-              <option key={inst.uid} value={inst.uid}>{inst.name} ({inst.ticker})</option>
-            ))}
-          </select>
-        </label>
-        <button onClick={loadAllInstruments} disabled={instrumentsLoading} style={{ marginLeft: '5px' }}>
-          {instrumentsLoading ? '...' : '🔄'}
-        </button>
-        <label>From: <input type="date" value={backtest.dateFrom} onChange={e => updateBacktest({ dateFrom: e.target.value })} /></label>
-        <label>To: <input type="date" value={backtest.dateTo} onChange={e => updateBacktest({ dateTo: e.target.value })} /></label>
-        <label>Interval: 
-          <select value={backtest.interval} onChange={e => updateBacktest({ interval: e.target.value })}>
-            <option value="1min">1m</option><option value="5min">5m</option><option value="15min">15m</option><option value="1hour">1h</option>
-          </select>
-        </label>
-        <label>VA%: <input type="number" value={backtest.valueAreaPercent} onChange={e => updateBacktest({ valueAreaPercent: Number(e.target.value) })} min={50} max={90} step={5} style={{ width: '60px' }} /></label>
-        <label>Res: <input type="number" value={backtest.profileResolution} onChange={e => updateBacktest({ profileResolution: Number(e.target.value) })} min={10} max={200} step={10} style={{ width: '60px' }} /></label>
-        <label>Strategy: 
-          <select value={backtest.strategyType} onChange={e => updateBacktest({ strategyType: e.target.value })}>
-            <option value="volume_accumulation">Vol Accum</option>
-            <option value="trend">Trend</option>
-          </select>
-        </label>
-        <label>SL%: <input type="number" value={backtest.stopLossPercent} onChange={e => updateBacktest({ stopLossPercent: Number(e.target.value) })} step={0.1} style={{ width: '50px' }} /></label>
-        <label>TP%: <input type="number" value={backtest.takeProfitPercent} onChange={e => updateBacktest({ takeProfitPercent: Number(e.target.value) })} step={0.1} style={{ width: '50px' }} /></label>
-        <label>Lots: <input type="number" value={backtest.lots} onChange={e => updateBacktest({ lots: Number(e.target.value) })} min={1} step={1} style={{ width: '60px' }} /></label>
-        <label>Size:
-          <select value={backtest.positionSizing} onChange={e => updateBacktest({ positionSizing: e.target.value as 'fixed' | 'dynamic' })}>
-            <option value="fixed">Fixed</option>
-            <option value="dynamic">Dynamic</option>
-          </select>
-        </label>
-        {backtest.positionSizing === 'dynamic' && (
-          <label>Risk%: <input type="number" value={backtest.riskPercent} onChange={e => updateBacktest({ riskPercent: Number(e.target.value) })} step={0.1} style={{ width: '50px' }} /></label>
-        )}
-        <label>Trail%: <input type="number" value={backtest.trailingDistancePercent} onChange={e => updateBacktest({ trailingDistancePercent: Number(e.target.value) })} step={0.1} style={{ width: '50px' }} /></label>
-        <button onClick={runBacktest} disabled={backtest.loading}>Run</button>
-        <button onClick={sendBacktestToSandbox} disabled={!backtest.signals.length}>Send to Sandbox</button>
-      </div>
-      {backtest.result?.stats && backtest.result.stats.portfolio && (
-        <div className="backtest-stats" style={{ marginTop: '8px' }}>
-          <p style={{ margin: 0 }}>
-            Instrument: {selectedInstrument}
-            {' | '}Strategy: {backtest.strategyType === 'trend' ? 'Trend' : 'Volume Accum'}
-            {' | '}Period: {backtest.dateFrom} – {backtest.dateTo}
-            {' | '}Signals: {backtest.result.stats.totalSignals}
-            {' | '}Trades: {backtest.result.stats.portfolio.totalTrades}
-            (W: {backtest.result.stats.portfolio.winningTrades} / L: {backtest.result.stats.portfolio.losingTrades})
-            {' | '}WinRate: {backtest.result.stats.portfolio.winRate?.toFixed(1)}%
-            {' | '}Profit: <span className={backtest.result.stats.portfolio.totalProfit >= 0 ? 'positive' : 'negative'}>
-              {backtest.result.stats.portfolio.totalProfit?.toFixed(2)} ({backtest.result.stats.portfolio.totalProfitPercent?.toFixed(2)}%)
-            </span>
-            {' | '}MaxDD: {backtest.result.stats.portfolio.maxDrawdown?.toFixed(2)} ({backtest.result.stats.portfolio.maxDrawdownPercent?.toFixed(2)}%)
-            {backtest.result.stats.portfolio.initialCapital && (
-              <> | Capital: {backtest.result.stats.portfolio.initialCapital} → {backtest.result.stats.portfolio.finalCapital?.toFixed(2)}</>
-            )}
-            {' | '}Lots: {backtest.lots}
-            {' | '}SL: {backtest.stopLossPercent}%
-            {' | '}TP: {backtest.takeProfitPercent}%
-            {' | '}Trail: {backtest.trailingDistancePercent}%
-          </p>
+  const renderBacktestPanel = () => { 
+    const stats = backtest.result?.stats;
+    const portfolio = stats?.portfolio;
+    const sizingStr = backtest.positionSizing === 'dynamic'
+      ? `Dynamic (Risk ${backtest.riskPercent}%)`
+      : 'Fixed';
+
+    // Текст для копирования (можно скопировать и отображаемую строку, но лучше сформировать вручную без HTML)
+    const copyText = [
+      `Instrument: ${availableInstruments.find(inst => inst.uid === selectedInstrument)?.name}`,
+      `Strategy: ${backtest.strategyType === 'trend' ? 'Trend' : 'Volume Accum'}`,
+      `Period: ${backtest.dateFrom} – ${backtest.dateTo}`,
+      `Signals: ${stats?.totalSignals}`,
+      `Trades: ${portfolio?.totalTrades} (W: ${portfolio?.winningTrades} / L: ${portfolio?.losingTrades})`,
+      `WinRate: ${portfolio?.winRate?.toFixed(1)}%`,
+      `Profit: ${portfolio?.totalProfit?.toFixed(2)} (${portfolio?.totalProfitPercent?.toFixed(2)}%)`,
+      `MaxDD: ${portfolio?.maxDrawdown?.toFixed(2)} (${portfolio?.maxDrawdownPercent?.toFixed(2)}%)`,
+      portfolio?.initialCapital ? `Capital: ${portfolio.initialCapital} → ${portfolio.finalCapital?.toFixed(2)}` : '',
+      `Lots: ${backtest.lots}`,
+      `SL: ${backtest.stopLossPercent}%`,
+      `TP: ${backtest.takeProfitPercent}%`,
+      `Trail: ${backtest.trailingDistancePercent}%`,
+      `Sizing: ${sizingStr}`,
+    ].filter(Boolean).join(' | ');
+
+    const handleCopy = () => {
+      navigator.clipboard.writeText(copyText).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      });
+    };
+
+    return (
+      <div className="tab-panel">
+        <h3>Backtest</h3>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <label>Instrument:
+            <select value={selectedInstrument} onChange={e => setSelectedInstrument(e.target.value)}>
+              {availableInstruments.length === 0 && <option value="">-- загрузка... --</option>}
+              {availableInstruments.map(inst => (
+                <option key={inst.uid} value={inst.uid}>{inst.name} ({inst.ticker})</option>
+              ))}
+            </select>
+          </label>
+          <button onClick={loadAllInstruments} disabled={instrumentsLoading} style={{ marginLeft: '5px' }}>
+            {instrumentsLoading ? '...' : '🔄'}
+          </button>
+          <label>From: <input type="date" value={backtest.dateFrom} onChange={e => updateBacktest({ dateFrom: e.target.value })} /></label>
+          <label>To: <input type="date" value={backtest.dateTo} onChange={e => updateBacktest({ dateTo: e.target.value })} /></label>
+          <label>Interval: 
+            <select value={backtest.interval} onChange={e => updateBacktest({ interval: e.target.value })}>
+              <option value="1min">1m</option><option value="5min">5m</option><option value="15min">15m</option><option value="1hour">1h</option>
+            </select>
+          </label>
+          <label>VA%: <input type="number" value={backtest.valueAreaPercent} onChange={e => updateBacktest({ valueAreaPercent: Number(e.target.value) })} min={50} max={90} step={5} style={{ width: '60px' }} /></label>
+          <label>Res: <input type="number" value={backtest.profileResolution} onChange={e => updateBacktest({ profileResolution: Number(e.target.value) })} min={10} max={200} step={10} style={{ width: '60px' }} /></label>
+          <label>Strategy: 
+            <select value={backtest.strategyType} onChange={e => updateBacktest({ strategyType: e.target.value })}>
+              <option value="volume_accumulation">Vol Accum</option>
+              <option value="trend">Trend</option>
+            </select>
+          </label>
+          <label>SL%: <input type="number" value={backtest.stopLossPercent} onChange={e => updateBacktest({ stopLossPercent: Number(e.target.value) })} step={0.1} style={{ width: '50px' }} /></label>
+          <label>TP%: <input type="number" value={backtest.takeProfitPercent} onChange={e => updateBacktest({ takeProfitPercent: Number(e.target.value) })} step={0.1} style={{ width: '50px' }} /></label>
+          <label>Lots: <input type="number" value={backtest.lots} onChange={e => updateBacktest({ lots: Number(e.target.value) })} min={1} step={1} style={{ width: '60px' }} /></label>
+          <label>Size:
+            <select value={backtest.positionSizing} onChange={e => updateBacktest({ positionSizing: e.target.value as 'fixed' | 'dynamic' })}>
+              <option value="fixed">Fixed</option>
+              <option value="dynamic">Dynamic</option>
+            </select>
+          </label>
+          {backtest.positionSizing === 'dynamic' && (
+            <label>Risk%: <input type="number" value={backtest.riskPercent} onChange={e => updateBacktest({ riskPercent: Number(e.target.value) })} step={0.1} style={{ width: '50px' }} /></label>
+          )}
+          <label>Trail%: <input type="number" value={backtest.trailingDistancePercent} onChange={e => updateBacktest({ trailingDistancePercent: Number(e.target.value) })} step={0.1} style={{ width: '50px' }} /></label>
+          <button onClick={runBacktest} disabled={backtest.loading}>Run</button>
+          <button onClick={sendBacktestToSandbox} disabled={!backtest.signals.length}>Send to Sandbox</button>
         </div>
-      )}
-    </div>
-  );
+        {backtest.result?.stats && backtest.result.stats.portfolio && (
+          <div className="backtest-stats" style={{ marginTop: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <p style={{ margin: 0, flex: 1 }}>
+              Instrument: {availableInstruments.find(inst => inst.uid === selectedInstrument)?.name}
+              {' | '}Strategy: {backtest.strategyType === 'trend' ? 'Trend' : 'Volume Accum'}
+                {' | '}Period: {backtest.dateFrom} – {backtest.dateTo}
+                {' | '}Signals: {stats.totalSignals}
+                {' | '}Trades: {portfolio.totalTrades}
+                (W: {portfolio.winningTrades} / L: {portfolio.losingTrades})
+                {' | '}WinRate: {portfolio.winRate?.toFixed(1)}%
+                {' | '}Profit: <span className={portfolio.totalProfit >= 0 ? 'positive' : 'negative'}>
+                  {portfolio.totalProfit?.toFixed(2)} ({portfolio.totalProfitPercent?.toFixed(2)}%)
+                </span>
+                {' | '}MaxDD: {portfolio.maxDrawdown?.toFixed(2)} ({portfolio.maxDrawdownPercent?.toFixed(2)}%)
+                {portfolio.initialCapital && (
+                  <> | Capital: {portfolio.initialCapital} → {portfolio.finalCapital?.toFixed(2)}</>
+                )}
+                {' | '}Lots: {backtest.lots}
+                {' | '}SL: {backtest.stopLossPercent}%
+                {' | '}TP: {backtest.takeProfitPercent}%
+                {' | '}Trail: {backtest.trailingDistancePercent}%
+                {' | '}Sizing: {sizingStr}
+              </p>
+              <button onClick={handleCopy} style={{ padding: '2px 8px', background: '#2a2e39', color: '#d1d4dc', border: '1px solid #555', borderRadius: '3px', cursor: 'pointer' }}>
+                {copied ? '✓' : '📋'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const renderSignalsPanel = () => (
     <div className="tab-panel">
@@ -781,6 +852,40 @@ export const TradingAssistantPage: React.FC = () => {
     </div>
   );
 
+  const renderTradesPanel = () => (
+    <div className="tab-panel">
+      <h3>Trade History</h3>
+      {backtest.trades.length > 0 ? (
+        <div style={{ maxHeight: '400px', overflowY: 'auto', color: '#d1d4dc' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                <th>Type</th><th>Entry Time</th><th>Exit Time</th>
+                <th>Entry Price</th><th>Exit Price</th><th>Profit</th>
+                <th>Exit Reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              {backtest.trades.map((t: any, idx: number) => (
+                <tr key={idx} style={{ borderBottom: '1px solid #444' }}>
+                  <td style={{ color: t.type === 'BUY' ? '#4caf50' : '#f44336' }}>{t.type}</td>
+                  <td>{new Date(t.entryTime).toLocaleString()}</td>
+                  <td>{new Date(t.exitTime).toLocaleString()}</td>
+                  <td>{t.entryPrice.toFixed(2)}</td>
+                  <td>{t.exitPrice.toFixed(2)}</td>
+                  <td className={t.profit >= 0 ? 'positive' : 'negative'}>{t.profit.toFixed(2)}</td>
+                  <td>{t.exitReason}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p style={{ color: '#888' }}>No trades yet</p>
+      )}
+    </div>
+  );
+
   return (
     <div className="trading-assistant">
       <h1>Trading Assistant</h1>
@@ -790,6 +895,7 @@ export const TradingAssistantPage: React.FC = () => {
         <button onClick={() => setActiveTab('backtest')} className={activeTab === 'backtest' ? 'active' : ''}>Backtest</button>
         <button onClick={() => setActiveTab('signals')} className={activeTab === 'signals' ? 'active' : ''}>Signals</button>
         <button onClick={() => setActiveTab('profile')} className={activeTab === 'profile' ? 'active' : ''}>Profile</button>
+        <button onClick={() => setActiveTab('trades')} className={activeTab === 'trades' ? 'active' : ''}>Trades</button>
       </div>
 
       {activeTab === 'sandbox' && renderSandboxPanel()}
@@ -797,6 +903,7 @@ export const TradingAssistantPage: React.FC = () => {
       {activeTab === 'backtest' && renderBacktestPanel()}
       {activeTab === 'signals' && renderSignalsPanel()}
       {activeTab === 'profile' && renderProfilePanel()}
+      {activeTab === 'trades' && renderTradesPanel()}
 
       <div className="chart-row">
         {profile?.volumeByPrice && priceRange.max > 0 && (

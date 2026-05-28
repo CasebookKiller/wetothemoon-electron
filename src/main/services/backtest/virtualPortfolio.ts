@@ -227,4 +227,8 @@ export class VirtualPortfolio {
       averageProfitPercent,
     };
   }
+
+  getTrades(): Trade[] {
+    return this.trades;
+  }
 }
