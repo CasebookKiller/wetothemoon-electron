@@ -162,7 +162,7 @@ export const TradingAssistantPage: React.FC = () => {
   const signalSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<'Line'>[]>([]);
-  const exitMarkersRef = useRef<ISeriesApi<'Line'> | null>(null);
+  const exitMarkersRef = useRef<ISeriesApi<'Line'>[]>([]);
 
   // ---------- Функции для инструментов ----------
   const loadAllInstruments = async () => {
@@ -496,6 +496,7 @@ export const TradingAssistantPage: React.FC = () => {
     });
 
     chartRef.current = chart;
+    (window as any).__CHART__ = chart;
 
     // Подписка на изменение размера контейнера
     const resizeObserver = new ResizeObserver(entries => {
@@ -610,34 +611,47 @@ export const TradingAssistantPage: React.FC = () => {
 
   useEffect(() => {
     const chart = chartRef.current;
-    console.log('[Exit Markers] chart:', !!chart, 'trades:', backtest.trades.length);
     if (!chart || !backtest.trades.length) return;
 
-    // Удаляем всё, что могло остаться от предыдущих маркеров
-    if (exitMarkersRef.current) {
-      try { chart.removeSeries(exitMarkersRef.current); } catch {}
-      exitMarkersRef.current = null;
-    }
-
-    // Создаём новую серию
-    const exitSeries = chart.addSeries(LineSeries, {
-      lineVisible: false,
-      lastValueVisible: false,
+    // Удаляем старые серии выходов (если есть)
+    exitMarkersRef.current.forEach(series => {
+      try { chart.removeSeries(series); } catch {}
     });
+    exitMarkersRef.current = [];
 
-    // Крупные белые круги для гарантированной видимости
-    const markers: SeriesMarker<Time>[] = backtest.trades.map((trade: any) => ({
-      time: (Math.floor(new Date(trade.exitTime).getTime() / 1000)) as Time,
-      position: 'inBar',
-      color: '#ffffff',   // белый
-      shape: 'circle',
-      size: 10,           // очень крупно
-      text: '',
-    }));
+    // Создаём по одной серии для каждого типа выхода, чтобы раскрасить точки
+    const reasons = ['TAKE_PROFIT', 'STOP_LOSS', 'TRAILING_STOP', 'END_OF_DAY', 'SIGNAL'];
+    const colors: Record<string, string> = {
+      TAKE_PROFIT: '#4caf50',
+      STOP_LOSS: '#f44336',
+      TRAILING_STOP: '#2196f3',
+      END_OF_DAY: '#ffeb3b',
+      SIGNAL: '#9e9e9e',
+    };
 
-    console.log('[Exit Markers] markers count:', markers.length);
-    createSeriesMarkers(exitSeries, markers);
-    exitMarkersRef.current = exitSeries;
+    reasons.forEach(reason => {
+      const tradesOfReason = backtest.trades.filter((t: any) => t.exitReason === reason);
+      if (tradesOfReason.length === 0) return;
+
+      const series = chart.addSeries(LineSeries, {
+        lineVisible: false,
+        lastValueVisible: false,
+        pointMarkersVisible: true,
+        pointMarkersRadius: 4,
+        color: colors[reason],
+      });
+      exitMarkersRef.current.push(series);
+
+      const data = tradesOfReason.map((trade: any) => ({
+        time: (Math.floor(new Date(trade.exitTime).getTime() / 1000)) as Time,
+        value: trade.exitPrice,
+      }));
+
+      series.setData(data);
+      // Сохранять все серии не обязательно, можно просто собрать в массив,
+      // но для очистки мы их удалим в следующем цикле.
+      // Поэтому сохраним их в exitMarkersRef как массив.
+    });
 
     // Подгоняем масштаб
     chart.timeScale().fitContent();
