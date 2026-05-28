@@ -24,7 +24,20 @@ export interface Trade {
   exitReason: 'SIGNAL' | 'STOP_LOSS' | 'TAKE_PROFIT' | 'TRAILING_STOP' | 'END_OF_DAY';
 }
 
-export interface PortfolioStats { /* ... без изменений ... */ }
+export interface PortfolioStats {
+  initialCapital: number;
+  finalCapital: number;
+  totalProfit: number;
+  totalProfitPercent: number;
+  totalTrades: number;
+  winningTrades: number;
+  losingTrades: number;
+  winRate: number;
+  maxDrawdown: number;
+  maxDrawdownPercent: number;
+  averageProfit: number;
+  averageProfitPercent: number;
+}
 
 export class VirtualPortfolio {
   private capital: number;

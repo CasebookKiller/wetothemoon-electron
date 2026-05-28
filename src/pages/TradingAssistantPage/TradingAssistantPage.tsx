@@ -623,19 +623,20 @@ export const TradingAssistantPage: React.FC = () => {
       lastValueVisible: false,
     });
 
-    const markers: SeriesMarker<Time>[] = backtest.trades.map((trade: any) => ({
-      time: (Math.floor(new Date(trade.exitTime).getTime() / 1000)) as Time,
-      position: 'inBar', // или 'aboveBar' / 'belowBar' — на ваш вкус
-      color:
-        trade.exitReason === 'TAKE_PROFIT' ? '#4caf50' :
-        trade.exitReason === 'STOP_LOSS' ? '#f44336' :
-        trade.exitReason === 'TRAILING_STOP' ? '#2196f3' : '#9e9e9e',
-      shape:
-        trade.exitReason === 'TAKE_PROFIT' ? 'circle' :
-        trade.exitReason === 'STOP_LOSS' ? 'square' :
-        trade.exitReason === 'TRAILING_STOP' ? 'diamond' : 'cross',
-      text: `${trade.exitReason} @ ${trade.exitPrice}`,
-    }));
+  const markers: SeriesMarker<Time>[] = backtest.trades.map((trade: any) => ({
+    time: (Math.floor(new Date(trade.exitTime).getTime() / 1000)) as Time,
+    position: 'inBar',
+    color:
+      trade.exitReason === 'TAKE_PROFIT' ? '#4caf50' :
+      trade.exitReason === 'STOP_LOSS' ? '#f44336' :
+      trade.exitReason === 'TRAILING_STOP' ? '#2196f3' : '#9e9e9e',
+    shape:
+      trade.exitReason === 'TAKE_PROFIT' ? 'circle' :
+      trade.exitReason === 'STOP_LOSS' ? 'square' :
+      trade.exitReason === 'TRAILING_STOP' ? 'arrowUp' :
+                                        'arrowDown',   // вместо 'cross'
+    text: `${trade.exitReason} @ ${trade.exitPrice}`,
+  }));
 
     createSeriesMarkers(exitSeries, markers);
     exitMarkersRef.current = exitSeries;
