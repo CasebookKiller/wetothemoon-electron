@@ -985,23 +985,24 @@ export const TradingAssistantPage: React.FC = () => {
           </div>
         )}
         <div className="chart-container" ref={chartContainerRef} />
-        {backtest.trades.length > 0 && (
-          <div style={{ display: 'flex', gap: '12px', marginTop: '8px', flexWrap: 'wrap' }}>
-            {[
-              { label: 'Take Profit', color: '#4caf50' },
-              { label: 'Stop Loss', color: '#f44336' },
-              { label: 'Trailing Stop', color: '#2196f3' },
-              { label: 'End of Day', color: '#ffeb3b' },
-              { label: 'Signal', color: '#9e9e9e' },
-            ].map(item => (
-              <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#d1d4dc', fontSize: '12px' }}>
-                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: item.color }} />
-                {item.label}
-              </div>
-            ))}
-          </div>
-        )}
       </div>
+      {/* Легенда маркеров – теперь под графиком */}
+      {backtest.trades.length > 0 && (
+        <div style={{ display: 'flex', gap: '12px', marginTop: '4px', flexWrap: 'wrap' }}>
+          {[
+            { label: 'Take Profit', color: '#4caf50' },
+            { label: 'Stop Loss', color: '#f44336' },
+            { label: 'Trailing Stop', color: '#2196f3' },
+            { label: 'End of Day', color: '#ffeb3b' },
+            { label: 'Signal', color: '#9e9e9e' },
+          ].map(item => (
+            <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#d1d4dc', fontSize: '11px' }}>
+              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: item.color }} />
+              {item.label}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
