@@ -626,23 +626,26 @@ export const TradingAssistantPage: React.FC = () => {
 
     const markers: SeriesMarker<Time>[] = backtest.trades.map((trade: any) => ({
       time: (Math.floor(new Date(trade.exitTime).getTime() / 1000)) as Time,
-      position: 'inBar',
+      position: 'aboveBar',  // маркер над свечой
       color:
         trade.exitReason === 'TAKE_PROFIT' ? '#4caf50' :
         trade.exitReason === 'STOP_LOSS' ? '#f44336' :
-        trade.exitReason === 'TRAILING_STOP' ? '#2196f3' : '#ffeb3b', // ярко-жёлтый для остальных
+        trade.exitReason === 'TRAILING_STOP' ? '#2196f3' : '#ffeb3b',
       shape:
         trade.exitReason === 'TAKE_PROFIT' ? 'circle' :
         trade.exitReason === 'STOP_LOSS' ? 'square' :
         trade.exitReason === 'TRAILING_STOP' ? 'arrowUp' : 'arrowDown',
       text: `${trade.exitReason} @ ${trade.exitPrice}`,
-      size: 3, // делаем крупнее (по умолчанию 2)
+      size: 5,               // очень крупный, чтобы точно увидеть
     }));
 
     console.log('[Exit Markers] markers count:', markers.length);
     createSeriesMarkers(exitSeries, markers);
-    exitMarkersRef.current = exitSeries;
+
+    // Принудительно подгоняем масштаб, чтобы все маркеры попали в видимую область
     chart.timeScale().fitContent();
+
+    exitMarkersRef.current = exitSeries;
   }, [backtest.trades]);
 
 
