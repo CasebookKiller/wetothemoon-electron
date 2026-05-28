@@ -361,12 +361,10 @@ export const TradingAssistantPage: React.FC = () => {
       }
     );
     if (result) {
+      console.log('[Backtest Trades]', result.trades);
       setProfile(result.profile);
-        updateBacktest({
-        signals: result.signals,
-        result,
-        trades: result.trades || [],   // ← сохраняем
-      });
+      updateBacktest({ signals: result.signals, result, trades: result.trades || [] });
+      console.log('[Backtest State]', backtest.trades);
       if (result.candles?.length) {
         const formatted = result.candles.map((c: any) => ({
           time: (Math.floor(new Date(c.time).getTime() / 1000)) as UTCTimestamp,
@@ -610,6 +608,8 @@ export const TradingAssistantPage: React.FC = () => {
 
   // Маркеры выходов (SL, TP, TRAIL, END_OF_DAY)
   useEffect(() => {
+    console.log('[Exit Markers] trades count:', backtest.trades.length);
+
     const chart = chartRef.current;
     if (!chart || !backtest.trades.length) return;
 
@@ -622,7 +622,7 @@ export const TradingAssistantPage: React.FC = () => {
       lineVisible: false,
       lastValueVisible: false,
     });
-
+/*
   const markers: SeriesMarker<Time>[] = backtest.trades.map((trade: any) => ({
     time: (Math.floor(new Date(trade.exitTime).getTime() / 1000)) as Time,
     position: 'inBar',
@@ -637,10 +637,21 @@ export const TradingAssistantPage: React.FC = () => {
                                         'arrowDown',   // вместо 'cross'
     text: `${trade.exitReason} @ ${trade.exitPrice}`,
   }));
+*/
+const markers: SeriesMarker<Time>[] = [
+  {
+    time: candlesData[0]?.time ?? (Date.now()/1000) as Time,
+    position: 'inBar',
+    color: '#ff0',
+    shape: 'circle',
+    text: 'test',
+  },
+];
 
     createSeriesMarkers(exitSeries, markers);
     exitMarkersRef.current = exitSeries;
   }, [backtest.trades]);
+
 
   const loadProfile = async () => {
     const api = (window as any).electronAPI;
