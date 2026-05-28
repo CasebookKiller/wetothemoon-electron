@@ -146,6 +146,8 @@ export const TradingAssistantPage: React.FC = () => {
     signals: [] as BacktestSignal[],
     trailingDistancePercent: 0.5,
     lots: 1,
+    positionSizing: 'fixed' as 'fixed' | 'dynamic',  // ← добавить
+    riskPercent: 1.0,                                 // ← добавить
   });
 
   // Локальные состояния (часто обновляемые)
