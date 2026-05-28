@@ -9,6 +9,8 @@ export interface PortfolioConfig {
   takeProfitPercent?: number;       // тейк-профит в %
   trailingDistancePercent?: number; // расстояние трейлинг-стопа в %
   lotQuantity?: number;
+  positionSizing?: 'fixed' | 'dynamic';
+  riskPercent?: number;
 }
 
 export interface Trade {
@@ -50,6 +52,8 @@ export class VirtualPortfolio {
       takeProfitPercent: config.takeProfitPercent ?? 0,
       trailingDistancePercent: config.trailingDistancePercent ?? 0,
       lotQuantity: config.lotQuantity ?? 1,
+      positionSizing: config.positionSizing ?? 'fixed',
+      riskPercent: config.riskPercent ?? 1,
     };
     this.initialCapital = this.config.initialCapital;
     this.capital = this.config.initialCapital;
@@ -63,6 +67,14 @@ export class VirtualPortfolio {
 
     const entryPrice = signal.price;
     const isBuy = signal.type === 'BUY';
+    let lotQty = this.config.lotQuantity;
+    if (this.config.positionSizing === 'dynamic' && this.config.stopLossPercent > 0) {
+      const riskAmount = (this.capital * this.config.riskPercent) / 100;
+      const stopDistance = entryPrice * (this.config.stopLossPercent / 100);
+      lotQty = Math.floor(riskAmount / stopDistance);
+      if (lotQty < 1) lotQty = 1;
+    }
+    // используйте lotQty вместо this.config.lotQuantity при расчёте прибыли
     const stopLossPrice = this.config.stopLossPercent > 0
       ? (isBuy
           ? entryPrice * (1 - this.config.stopLossPercent / 100)
@@ -83,6 +95,7 @@ export class VirtualPortfolio {
       takeProfitPrice,
       trailingDistance: this.config.trailingDistancePercent / 100,
       bestPrice: entryPrice,
+      lotQuantity: lotQty,
     };
   }
 
@@ -146,10 +159,11 @@ export class VirtualPortfolio {
     const entry = this.openPosition;
     let profit: number;
 
+    const lots = this.openPosition.lotQuantity ?? 1;
     if (entry.type === 'BUY') {
-      profit = (price - entry.price) * this.config.lotQuantity;
+      profit = (price - entry.price) * lots;
     } else {
-      profit = (entry.price - price) * this.config.lotQuantity;
+      profit = (entry.price - price) * lots;
     }
     console.log(`[Portfolio] LOTS=${this.config.lotQuantity}, PROFIT=${profit}`);
     const profitPercent = (profit / entry.price) * 100;

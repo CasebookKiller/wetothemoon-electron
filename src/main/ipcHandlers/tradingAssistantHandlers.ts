@@ -124,8 +124,10 @@ export const registerTradingAssistantHandlers = () => {
       takeProfitPercent: params.takeProfitPercent || 0,
       trailingDistancePercent: params.trailingDistancePercent || 0,
       lotQuantity: params.lots || 1,
+      positionSizing: params.positionSizing || 'fixed',
+      riskPercent: params.riskPercent || 1,
     });
-
+    
     // --- ВЫБОР СТРАТЕГИИ ---
     const strategyType = params.strategyType || 'volume_accumulation'; // по умолчанию первая
 

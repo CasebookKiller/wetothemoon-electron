@@ -1732,7 +1732,9 @@ var VirtualPortfolio = class {
 			stopLossPercent: config.stopLossPercent ?? 0,
 			takeProfitPercent: config.takeProfitPercent ?? 0,
 			trailingDistancePercent: config.trailingDistancePercent ?? 0,
-			lotQuantity: config.lotQuantity ?? 1
+			lotQuantity: config.lotQuantity ?? 1,
+			positionSizing: config.positionSizing ?? "fixed",
+			riskPercent: config.riskPercent ?? 1
 		};
 		this.initialCapital = this.config.initialCapital;
 		this.capital = this.config.initialCapital;
@@ -1742,6 +1744,13 @@ var VirtualPortfolio = class {
 		if (this.openPosition) this.closePosition(signal.price, signal.time, "SIGNAL");
 		const entryPrice = signal.price;
 		const isBuy = signal.type === "BUY";
+		let lotQty = this.config.lotQuantity;
+		if (this.config.positionSizing === "dynamic" && this.config.stopLossPercent > 0) {
+			const riskAmount = this.capital * this.config.riskPercent / 100;
+			const stopDistance = entryPrice * (this.config.stopLossPercent / 100);
+			lotQty = Math.floor(riskAmount / stopDistance);
+			if (lotQty < 1) lotQty = 1;
+		}
 		const stopLossPrice = this.config.stopLossPercent > 0 ? isBuy ? entryPrice * (1 - this.config.stopLossPercent / 100) : entryPrice * (1 + this.config.stopLossPercent / 100) : entryPrice;
 		const takeProfitPrice = this.config.takeProfitPercent > 0 ? isBuy ? entryPrice * (1 + this.config.takeProfitPercent / 100) : entryPrice * (1 - this.config.takeProfitPercent / 100) : void 0;
 		this.openPosition = {
@@ -1751,7 +1760,8 @@ var VirtualPortfolio = class {
 			stopLossPrice,
 			takeProfitPrice,
 			trailingDistance: this.config.trailingDistancePercent / 100,
-			bestPrice: entryPrice
+			bestPrice: entryPrice,
+			lotQuantity: lotQty
 		};
 	}
 	checkStopTake(high, low, close, time) {
@@ -1797,8 +1807,9 @@ var VirtualPortfolio = class {
 		if (!this.openPosition) return;
 		const entry = this.openPosition;
 		let profit;
-		if (entry.type === "BUY") profit = (price - entry.price) * this.config.lotQuantity;
-		else profit = (entry.price - price) * this.config.lotQuantity;
+		const lots = this.openPosition.lotQuantity ?? 1;
+		if (entry.type === "BUY") profit = (price - entry.price) * lots;
+		else profit = (entry.price - price) * lots;
 		console.log(`[Portfolio] LOTS=${this.config.lotQuantity}, PROFIT=${profit}`);
 		const profitPercent = profit / entry.price * 100;
 		this.capital += profit;
@@ -2357,7 +2368,9 @@ var registerTradingAssistantHandlers = () => {
 			stopLossPercent: params.stopLossPercent || 0,
 			takeProfitPercent: params.takeProfitPercent || 0,
 			trailingDistancePercent: params.trailingDistancePercent || 0,
-			lotQuantity: params.lots || 1
+			lotQuantity: params.lots || 1,
+			positionSizing: params.positionSizing || "fixed",
+			riskPercent: params.riskPercent || 1
 		});
 		const strategyType = params.strategyType || "volume_accumulation";
 		try {

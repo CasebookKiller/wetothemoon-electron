@@ -359,6 +359,8 @@ export const TradingAssistantPage: React.FC = () => {
         takeProfitPercent: backtest.takeProfitPercent,
         trailingDistancePercent: backtest.trailingDistancePercent,
         lots: backtest.lots,   // ← передаём
+        positionSizing: backtest.positionSizing,
+        riskPercent: backtest.riskPercent,
       }
     );
     if (result) {
@@ -694,6 +696,15 @@ export const TradingAssistantPage: React.FC = () => {
         <label>SL%: <input type="number" value={backtest.stopLossPercent} onChange={e => updateBacktest({ stopLossPercent: Number(e.target.value) })} step={0.1} style={{ width: '50px' }} /></label>
         <label>TP%: <input type="number" value={backtest.takeProfitPercent} onChange={e => updateBacktest({ takeProfitPercent: Number(e.target.value) })} step={0.1} style={{ width: '50px' }} /></label>
         <label>Lots: <input type="number" value={backtest.lots} onChange={e => updateBacktest({ lots: Number(e.target.value) })} min={1} step={1} style={{ width: '60px' }} /></label>
+        <label>Size:
+          <select value={backtest.positionSizing} onChange={e => updateBacktest({ positionSizing: e.target.value as 'fixed' | 'dynamic' })}>
+            <option value="fixed">Fixed</option>
+            <option value="dynamic">Dynamic</option>
+          </select>
+        </label>
+        {backtest.positionSizing === 'dynamic' && (
+          <label>Risk%: <input type="number" value={backtest.riskPercent} onChange={e => updateBacktest({ riskPercent: Number(e.target.value) })} step={0.1} style={{ width: '50px' }} /></label>
+        )}
         <label>Trail%: <input type="number" value={backtest.trailingDistancePercent} onChange={e => updateBacktest({ trailingDistancePercent: Number(e.target.value) })} step={0.1} style={{ width: '50px' }} /></label>
         <button onClick={runBacktest} disabled={backtest.loading}>Run</button>
         <button onClick={sendBacktestToSandbox} disabled={!backtest.signals.length}>Send to Sandbox</button>
@@ -701,7 +712,8 @@ export const TradingAssistantPage: React.FC = () => {
       {backtest.result?.stats && backtest.result.stats.portfolio && (
         <div className="backtest-stats" style={{ marginTop: '8px' }}>
           <p style={{ margin: 0 }}>
-            Strategy: {backtest.strategyType === 'trend' ? 'Trend' : 'Volume Accum'}
+            Instrument: {selectedInstrument}
+            {' | '}Strategy: {backtest.strategyType === 'trend' ? 'Trend' : 'Volume Accum'}
             {' | '}Period: {backtest.dateFrom} – {backtest.dateTo}
             {' | '}Signals: {backtest.result.stats.totalSignals}
             {' | '}Trades: {backtest.result.stats.portfolio.totalTrades}
@@ -714,6 +726,10 @@ export const TradingAssistantPage: React.FC = () => {
             {backtest.result.stats.portfolio.initialCapital && (
               <> | Capital: {backtest.result.stats.portfolio.initialCapital} → {backtest.result.stats.portfolio.finalCapital?.toFixed(2)}</>
             )}
+            {' | '}Lots: {backtest.lots}
+            {' | '}SL: {backtest.stopLossPercent}%
+            {' | '}TP: {backtest.takeProfitPercent}%
+            {' | '}Trail: {backtest.trailingDistancePercent}%
           </p>
         </div>
       )}
