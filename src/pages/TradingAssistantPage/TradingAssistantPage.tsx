@@ -606,27 +606,70 @@ export const TradingAssistantPage: React.FC = () => {
     signalSeriesRef.current = signalSeries;
   }, [backtest.signals]);
 
-  // Маркеры выходов (SL, TP, TRAIL, END_OF_DAY)
+  const exitMarkersPrimitiveRef = useRef<any>(null);
+
   useEffect(() => {
     const chart = chartRef.current;
     console.log('[Exit Markers] chart:', !!chart, 'trades:', backtest.trades.length);
     if (!chart || !backtest.trades.length) return;
 
-    // Удаляем предыдущую серию маркеров
+    // Удаляем всё, что могло остаться от предыдущих маркеров
     if (exitMarkersRef.current) {
-      console.log('[Exit Markers] removing previous series');
-      chart.removeSeries(exitMarkersRef.current);
+      try { chart.removeSeries(exitMarkersRef.current); } catch {}
+      exitMarkersRef.current = null;
+    }
+
+    // Создаём новую серию
+    const exitSeries = chart.addSeries(LineSeries, {
+      lineVisible: false,
+      lastValueVisible: false,
+    });
+
+    // Крупные белые круги для гарантированной видимости
+    const markers: SeriesMarker<Time>[] = backtest.trades.map((trade: any) => ({
+      time: (Math.floor(new Date(trade.exitTime).getTime() / 1000)) as Time,
+      position: 'inBar',
+      color: '#ffffff',   // белый
+      shape: 'circle',
+      size: 10,           // очень крупно
+      text: '',
+    }));
+
+    console.log('[Exit Markers] markers count:', markers.length);
+    createSeriesMarkers(exitSeries, markers);
+    exitMarkersRef.current = exitSeries;
+
+    // Подгоняем масштаб
+    chart.timeScale().fitContent();
+  }, [backtest.trades]);
+  // Маркеры выходов (SL, TP, TRAIL, END_OF_DAY)
+/*  useEffect(() => {
+    const chart = chartRef.current;
+    console.log('[Exit Markers] chart:', !!chart, 'trades:', backtest.trades.length);
+    if (!chart || !backtest.trades.length) return;
+
+    // Удаляем предыдущий примитив и серию, если они есть
+    if (exitMarkersPrimitiveRef.current) {
+      try {
+        exitMarkersPrimitiveRef.current.detach();
+      } catch {}
+      exitMarkersPrimitiveRef.current = null;
+    }
+    if (exitMarkersRef.current) {
+      try {
+        chart.removeSeries(exitMarkersRef.current);
+      } catch {}
+      exitMarkersRef.current = null;
     }
 
     const exitSeries = chart.addSeries(LineSeries, {
       lineVisible: false,
       lastValueVisible: false,
     });
-    console.log('[Exit Markers] series created');
 
     const markers: SeriesMarker<Time>[] = backtest.trades.map((trade: any) => ({
       time: (Math.floor(new Date(trade.exitTime).getTime() / 1000)) as Time,
-      position: 'aboveBar',  // маркер над свечой
+      position: 'aboveBar',
       color:
         trade.exitReason === 'TAKE_PROFIT' ? '#4caf50' :
         trade.exitReason === 'STOP_LOSS' ? '#f44336' :
@@ -636,19 +679,18 @@ export const TradingAssistantPage: React.FC = () => {
         trade.exitReason === 'STOP_LOSS' ? 'square' :
         trade.exitReason === 'TRAILING_STOP' ? 'arrowUp' : 'arrowDown',
       text: `${trade.exitReason} @ ${trade.exitPrice}`,
-      size: 5,               // очень крупный, чтобы точно увидеть
+      size: 5,
     }));
 
     console.log('[Exit Markers] markers count:', markers.length);
-    createSeriesMarkers(exitSeries, markers);
-
-    // Принудительно подгоняем масштаб, чтобы все маркеры попали в видимую область
-    chart.timeScale().fitContent();
-
+    const primitive = createSeriesMarkers(exitSeries, markers);
+    exitMarkersPrimitiveRef.current = primitive;
     exitMarkersRef.current = exitSeries;
+
+    // Подгоняем масштаб
+    chart.timeScale().fitContent();
   }, [backtest.trades]);
-
-
+*/
   const loadProfile = async () => {
     const api = (window as any).electronAPI;
     if (!api) return;
