@@ -608,13 +608,13 @@ export const TradingAssistantPage: React.FC = () => {
 
   // Маркеры выходов (SL, TP, TRAIL, END_OF_DAY)
   useEffect(() => {
-    console.log('[Exit Markers] trades count:', backtest.trades.length);
-
     const chart = chartRef.current;
+    console.log('[Exit Markers] chart:', !!chart, 'trades:', backtest.trades.length);
     if (!chart || !backtest.trades.length) return;
 
     // Удаляем предыдущую серию маркеров
     if (exitMarkersRef.current) {
+      console.log('[Exit Markers] removing previous series');
       chart.removeSeries(exitMarkersRef.current);
     }
 
@@ -622,34 +622,27 @@ export const TradingAssistantPage: React.FC = () => {
       lineVisible: false,
       lastValueVisible: false,
     });
-/*
-  const markers: SeriesMarker<Time>[] = backtest.trades.map((trade: any) => ({
-    time: (Math.floor(new Date(trade.exitTime).getTime() / 1000)) as Time,
-    position: 'inBar',
-    color:
-      trade.exitReason === 'TAKE_PROFIT' ? '#4caf50' :
-      trade.exitReason === 'STOP_LOSS' ? '#f44336' :
-      trade.exitReason === 'TRAILING_STOP' ? '#2196f3' : '#9e9e9e',
-    shape:
-      trade.exitReason === 'TAKE_PROFIT' ? 'circle' :
-      trade.exitReason === 'STOP_LOSS' ? 'square' :
-      trade.exitReason === 'TRAILING_STOP' ? 'arrowUp' :
-                                        'arrowDown',   // вместо 'cross'
-    text: `${trade.exitReason} @ ${trade.exitPrice}`,
-  }));
-*/
-const markers: SeriesMarker<Time>[] = [
-  {
-    time: candlesData[0]?.time ?? (Date.now()/1000) as Time,
-    position: 'inBar',
-    color: '#ff0',
-    shape: 'circle',
-    text: 'test',
-  },
-];
+    console.log('[Exit Markers] series created');
 
+    const markers: SeriesMarker<Time>[] = backtest.trades.map((trade: any) => ({
+      time: (Math.floor(new Date(trade.exitTime).getTime() / 1000)) as Time,
+      position: 'inBar',
+      color:
+        trade.exitReason === 'TAKE_PROFIT' ? '#4caf50' :
+        trade.exitReason === 'STOP_LOSS' ? '#f44336' :
+        trade.exitReason === 'TRAILING_STOP' ? '#2196f3' : '#ffeb3b', // ярко-жёлтый для остальных
+      shape:
+        trade.exitReason === 'TAKE_PROFIT' ? 'circle' :
+        trade.exitReason === 'STOP_LOSS' ? 'square' :
+        trade.exitReason === 'TRAILING_STOP' ? 'arrowUp' : 'arrowDown',
+      text: `${trade.exitReason} @ ${trade.exitPrice}`,
+      size: 3, // делаем крупнее (по умолчанию 2)
+    }));
+
+    console.log('[Exit Markers] markers count:', markers.length);
     createSeriesMarkers(exitSeries, markers);
     exitMarkersRef.current = exitSeries;
+    chart.timeScale().fitContent();
   }, [backtest.trades]);
 
 
