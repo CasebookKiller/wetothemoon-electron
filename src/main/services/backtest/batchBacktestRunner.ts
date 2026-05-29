@@ -25,6 +25,8 @@ export interface BatchResultItem {
   signals: number;
 }
 
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 export class BatchBacktestRunner {
   async run(
     instrumentUids: string[],
@@ -57,7 +59,6 @@ export class BatchBacktestRunner {
           volumeFilterPeriod: params.volumeFilterPeriod,
         };
 
-        // Создаём стратегию ОДИН раз на весь период (без профиля, обновим позже)
         const strategy = strategyType === 'trend'
           ? new TrendStrategy(uid, null as any, strategyOptions)
           : new VolumeAccumulationStrategy(uid, null as any, strategyOptions);
@@ -74,33 +75,32 @@ export class BatchBacktestRunner {
             const dayTo = new Date(dateStr + 'T16:00:00Z');
 
             try {
+              // Добавляем задержку перед каждым запросом, чтобы не превысить лимит API
+              await delay(500);
               const candles = await loader.loadIntradayCandles(uid, dayFrom, dayTo, token, interval);
               if (candles.length > 0) {
-                // Профиль за текущий день
                 const engine = new VolumeProfileEngine({ profileResolution, valueAreaPercent });
                 candles.forEach(c => (engine as any).onCandle?.(c));
                 const profile = engine.getProfile(uid);
 
-                // Обновляем профиль в существующей стратегии
                 if (profile) {
                   strategy.updateProfile(profile);
-                }
 
-                // Прогоняем свечи дня
-                for (const candle of candles) {
-                  strategy.onCandle(candle);
-                  const newSignals = strategy.getSignals();
-                  totalSignals += newSignals.length;
+                  for (const candle of candles) {
+                    strategy.onCandle(candle);
+                    const newSignals = strategy.getSignals();
+                    totalSignals += newSignals.length;
 
-                  for (const signal of newSignals) {
-                    portfolio.processSignal(signal);
+                    for (const signal of newSignals) {
+                      portfolio.processSignal(signal);
+                    }
+                    strategy.clearSignals();
+
+                    const high = quotationToNumber(candle.high);
+                    const low = quotationToNumber(candle.low);
+                    const close = quotationToNumber(candle.close);
+                    portfolio.checkStopTake(high, low, close, candle.time || '');
                   }
-                  strategy.clearSignals();
-
-                  const high = quotationToNumber(candle.high);
-                  const low = quotationToNumber(candle.low);
-                  const close = quotationToNumber(candle.close);
-                  portfolio.checkStopTake(high, low, close, candle.time || '');
                 }
               }
             } catch (e: any) {
@@ -110,7 +110,6 @@ export class BatchBacktestRunner {
           currentDate.setDate(currentDate.getDate() + 1);
         }
 
-        // Закрываем позицию в конце периода
         portfolio.finalizeWithLastPrice(0, '');
 
         const resultItem: BatchResultItem = {

@@ -108,8 +108,10 @@ export class VolumeAccumulationStrategy implements IBacktestStrategy {
 
   updateProfile(profile: VolumeProfileLevels): void {
     this.dailyProfile = profile;
-    this.hasPosition = false;               // ← сброс позиции
-    this.lastSignalDirection = null;   // если используете
+    this.hasPosition = false;
+    this.hasBrokenHigh = false;   // ← сброс
+    this.hasBrokenLow = false;    // ← сброс
+    this.volumeHistory = [];      // ← очистка истории объёмов
   }
 }
 

@@ -147,6 +147,9 @@ export class TrendStrategy implements IBacktestStrategy {
   updateProfile(profile: VolumeProfileLevels): void {
     this.dailyProfile = profile;
     this.hasPosition = false;
-    this.lastTradeTime = 0;   // сброс кулдауна (если есть)
+    this.hvnLevel = null;
+    this.hvnBroken = false;
+    this.trendDirection = null;
+    this.volumeHistory = [];
   }
 }

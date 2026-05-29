@@ -1560,7 +1560,9 @@ var VolumeAccumulationStrategy = class {
 	updateProfile(profile) {
 		this.dailyProfile = profile;
 		this.hasPosition = false;
-		this.lastSignalDirection = null;
+		this.hasBrokenHigh = false;
+		this.hasBrokenLow = false;
+		this.volumeHistory = [];
 	}
 };
 function quotationToNumber$2(q) {
@@ -2115,7 +2117,10 @@ var TrendStrategy = class {
 	updateProfile(profile) {
 		this.dailyProfile = profile;
 		this.hasPosition = false;
-		this.lastTradeTime = 0;
+		this.hvnLevel = null;
+		this.hvnBroken = false;
+		this.trendDirection = null;
+		this.volumeHistory = [];
 	}
 };
 //#endregion
@@ -2365,6 +2370,7 @@ var instrumentsGrpc = {
 };
 //#endregion
 //#region src/main/services/backtest/batchBacktestRunner.ts
+var delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 var BatchBacktestRunner = class {
 	async run(instrumentUids, dateFrom, dateTo, interval, token, paramSets, strategyType, profileResolution, valueAreaPercent, onProgress) {
 		const loader = new HistoricalDataLoader();
@@ -2393,6 +2399,7 @@ var BatchBacktestRunner = class {
 					const dayFrom = /* @__PURE__ */ new Date(dateStr + "T07:00:00Z");
 					const dayTo = /* @__PURE__ */ new Date(dateStr + "T16:00:00Z");
 					try {
+						await delay(500);
 						const candles = await loader.loadIntradayCandles(uid, dayFrom, dayTo, token, interval);
 						if (candles.length > 0) {
 							const engine = new VolumeProfileEngine({
@@ -2401,17 +2408,19 @@ var BatchBacktestRunner = class {
 							});
 							candles.forEach((c) => engine.onCandle?.(c));
 							const profile = engine.getProfile(uid);
-							if (profile) strategy.updateProfile(profile);
-							for (const candle of candles) {
-								strategy.onCandle(candle);
-								const newSignals = strategy.getSignals();
-								totalSignals += newSignals.length;
-								for (const signal of newSignals) portfolio.processSignal(signal);
-								strategy.clearSignals();
-								const high = quotationToNumber(candle.high);
-								const low = quotationToNumber(candle.low);
-								const close = quotationToNumber(candle.close);
-								portfolio.checkStopTake(high, low, close, candle.time || "");
+							if (profile) {
+								strategy.updateProfile(profile);
+								for (const candle of candles) {
+									strategy.onCandle(candle);
+									const newSignals = strategy.getSignals();
+									totalSignals += newSignals.length;
+									for (const signal of newSignals) portfolio.processSignal(signal);
+									strategy.clearSignals();
+									const high = quotationToNumber(candle.high);
+									const low = quotationToNumber(candle.low);
+									const close = quotationToNumber(candle.close);
+									portfolio.checkStopTake(high, low, close, candle.time || "");
+								}
 							}
 						}
 					} catch (e) {
