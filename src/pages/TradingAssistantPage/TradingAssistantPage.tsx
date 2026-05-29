@@ -1,4 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { Dialog } from 'primereact/dialog';
+import { Checkbox } from 'primereact/checkbox';
+import { InputText } from 'primereact/inputtext';
 import {
   createChart,
   ColorType,
@@ -171,6 +174,10 @@ export const TradingAssistantPage: React.FC = () => {
   const [availableInstruments, setAvailableInstruments] = useState<Array<{ uid: string; name: string; ticker?: string }>>([]);
   const [instrumentsLoading, setInstrumentsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  const [showInstrumentDialog, setShowInstrumentDialog] = useState(false);
+  const [instrumentFilter, setInstrumentFilter] = useState('');
+  const [tempSelectedInstruments, setTempSelectedInstruments] = useState<string[]>([]);
   
   // ... (все остальные refs: chartRef, candleSeriesRef и т.д.)
   const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -1000,19 +1007,73 @@ export const TradingAssistantPage: React.FC = () => {
       <div className="tab-panel">
         <h3>Batch Backtest</h3>
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '10px' }}>
-          <label>Instruments:
-            <select
-              multiple
-              value={batchInstruments}
-              onChange={e => setBatchInstruments(Array.from(e.target.selectedOptions, o => o.value))}
-              style={{ width: '200px', height: '100px' }}
+          <div style={{ display: 'flex', gap: '5px', alignItems: 'center', marginBottom: '10px' }}>
+            <label>Instruments:</label>
+            <button
+              onClick={() => {
+                setTempSelectedInstruments([...batchInstruments]);
+                setShowInstrumentDialog(true);
+              }}
+              style={{ padding: '4px 12px', background: '#2a2e39', color: '#d1d4dc', border: '1px solid #555', borderRadius: '3px', cursor: 'pointer' }}
             >
-              {availableInstruments.map(inst => (
-                <option key={inst.uid} value={inst.uid}>{inst.name} ({inst.ticker})</option>
-              ))}
-            </select>
-            <br/><small>Ctrl+Click для выбора нескольких</small>
-          </label>
+              {batchInstruments.length > 0 ? `Выбрано: ${batchInstruments.length}` : 'Выбрать инструменты'}
+            </button>
+            {batchInstruments.length > 0 && (
+              <span style={{ color: '#888', fontSize: '12px' }}>
+                {batchInstruments.map(uid => {
+                  const inst = availableInstruments.find(i => i.uid === uid);
+                  return inst ? inst.ticker || inst.name : uid;
+                }).join(', ')}
+              </span>
+            )}
+          </div>
+
+          <Dialog
+            header="Выбор инструментов для Batch"
+            visible={showInstrumentDialog}
+            style={{ width: '450px', maxHeight: '600px' }}
+            onHide={() => setShowInstrumentDialog(false)}
+            footer={
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                <button onClick={() => setShowInstrumentDialog(false)} style={{ padding: '6px 12px', background: '#444', color: '#d1d4dc', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>Отмена</button>
+                <button onClick={() => {
+                  setBatchInstruments(tempSelectedInstruments);
+                  setShowInstrumentDialog(false);
+                }} style={{ padding: '6px 12px', background: '#1976d2', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>Применить</button>
+              </div>
+            }
+          >
+            <div style={{ marginBottom: '10px' }}>
+              <InputText
+                placeholder="Поиск инструмента..."
+                value={instrumentFilter}
+                onChange={e => setInstrumentFilter(e.target.value)}
+                style={{ width: '100%', padding: '6px', background: '#2a2e39', color: '#d1d4dc', border: '1px solid #555', borderRadius: '3px' }}
+              />
+            </div>
+            <div style={{ maxHeight: '350px', overflowY: 'auto', color: '#d1d4dc' }}>
+              {availableInstruments
+                .filter(inst => inst.name.toLowerCase().includes(instrumentFilter.toLowerCase()) || inst.ticker?.toLowerCase().includes(instrumentFilter.toLowerCase()))
+                .map(inst => (
+                  <div key={inst.uid} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0', borderBottom: '1px solid #333' }}>
+                    <Checkbox
+                      inputId={`inst-${inst.uid}`}
+                      checked={tempSelectedInstruments.includes(inst.uid)}
+                      onChange={(e) => {
+                        if (e.checked) {
+                          setTempSelectedInstruments(prev => [...prev, inst.uid]);
+                        } else {
+                          setTempSelectedInstruments(prev => prev.filter(id => id !== inst.uid));
+                        }
+                      }}
+                    />
+                    <label htmlFor={`inst-${inst.uid}`} style={{ cursor: 'pointer', flex: 1 }}>
+                      {inst.name} ({inst.ticker})
+                    </label>
+                  </div>
+                ))}
+            </div>
+          </Dialog>
           <label>SL%: <input type="text" value={batchParams.slValues} onChange={e => setBatchParams({ ...batchParams, slValues: e.target.value })} style={{ width: '80px' }} /></label>
           <label>TP%: <input type="text" value={batchParams.tpValues} onChange={e => setBatchParams({ ...batchParams, tpValues: e.target.value })} style={{ width: '80px' }} /></label>
           <label>Trail%: <input type="text" value={batchParams.trailValues} onChange={e => setBatchParams({ ...batchParams, trailValues: e.target.value })} style={{ width: '80px' }} /></label>

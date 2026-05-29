@@ -225,3 +225,17 @@
   flex-wrap: wrap;
   justify-content: flex-start;
 }
+.p-dialog .p-dialog-header,
+.p-dialog .p-dialog-content,
+.p-dialog .p-dialog-footer {
+  background: #1e1e1e;
+  color: #d1d4dc;
+  border: none;
+}
+.p-dialog .p-dialog-header .p-dialog-title {
+  color: #ffffff;
+}
+.p-checkbox .p-checkbox-box {
+  background: #2a2e39;
+  border-color: #555;
+}
