@@ -16,6 +16,7 @@ export interface IBacktestStrategy {
   getSignals(): BacktestSignal[];
   reset(): void;
   clearSignals(): void;
+  updateProfile(profile: any): void;   // ← новый метод
 }
 
 export class BacktestEngine {

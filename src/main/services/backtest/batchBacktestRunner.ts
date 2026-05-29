@@ -21,7 +21,7 @@ export interface BatchParams {
 export interface BatchResultItem {
   instrumentUid: string;
   params: BatchParams;
-  stats: any; // PortfolioStats
+  stats: any;
   signals: number;
 }
 
@@ -37,12 +37,10 @@ export class BatchBacktestRunner {
     profileResolution: number,
     valueAreaPercent: number,
     onProgress: (item: BatchResultItem) => void
-  ): Promise<BatchResultItem[]> {
+  ): Promise<void> {
     const loader = new HistoricalDataLoader();
-    const results: BatchResultItem[] = [];
 
     for (const uid of instrumentUids) {
-      // Для каждого набора параметров создаём портфель и стратегию, затем идём по дням
       for (const params of paramSets) {
         const portfolio = new VirtualPortfolio({
           initialCapital: 100000,
@@ -53,6 +51,16 @@ export class BatchBacktestRunner {
           positionSizing: params.positionSizing,
           riskPercent: params.riskPercent,
         });
+
+        const strategyOptions = {
+          volumeFilterEnabled: params.volumeFilterEnabled,
+          volumeFilterPeriod: params.volumeFilterPeriod,
+        };
+
+        // Создаём стратегию ОДИН раз на весь период (без профиля, обновим позже)
+        const strategy = strategyType === 'trend'
+          ? new TrendStrategy(uid, null, strategyOptions)
+          : new VolumeAccumulationStrategy(uid, null, strategyOptions);
 
         let totalSignals = 0;
         let currentDate = new Date(dateFrom + 'T00:00:00Z');
@@ -73,14 +81,8 @@ export class BatchBacktestRunner {
                 candles.forEach(c => (engine as any).onCandle?.(c));
                 const profile = engine.getProfile(uid);
 
-                // Стратегия с опциями
-                const strategyOptions = {
-                  volumeFilterEnabled: params.volumeFilterEnabled,
-                  volumeFilterPeriod: params.volumeFilterPeriod,
-                };
-                const strategy = strategyType === 'trend'
-                  ? new TrendStrategy(uid, profile, strategyOptions)
-                  : new VolumeAccumulationStrategy(uid, profile, strategyOptions);
+                // Обновляем профиль в существующей стратегии
+                strategy.updateProfile(profile);
 
                 // Прогоняем свечи дня
                 for (const candle of candles) {
@@ -108,12 +110,15 @@ export class BatchBacktestRunner {
 
         // Закрываем позицию в конце периода
         portfolio.finalizeWithLastPrice(0, '');
-        const resultItem = { instrumentUid: uid, params, stats: portfolio.getStats(), signals: totalSignals };
+
+        const resultItem: BatchResultItem = {
+          instrumentUid: uid,
+          params,
+          stats: portfolio.getStats(),
+          signals: totalSignals,
+        };
         onProgress(resultItem);
-        results.push(resultItem);
       }
     }
-
-    return results;
   }
 }

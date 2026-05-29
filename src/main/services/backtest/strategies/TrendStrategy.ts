@@ -143,4 +143,8 @@ export class TrendStrategy implements IBacktestStrategy {
   clearSignals(): void {
     this.signals = [];
   }
+
+  updateProfile(profile: VolumeProfileLevels): void {
+    this.dailyProfile = profile;
+  }
 }

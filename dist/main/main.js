@@ -1556,6 +1556,9 @@ var VolumeAccumulationStrategy = class {
 	clearSignals() {
 		this.signals = [];
 	}
+	updateProfile(profile) {
+		this.dailyProfile = profile;
+	}
 };
 function quotationToNumber$2(q) {
 	if (!q) return 0;
@@ -2106,6 +2109,9 @@ var TrendStrategy = class {
 	clearSignals() {
 		this.signals = [];
 	}
+	updateProfile(profile) {
+		this.dailyProfile = profile;
+	}
 };
 //#endregion
 //#region src/main/services/tbank/InstrumentsGrpcService.ts
@@ -2357,7 +2363,6 @@ var instrumentsGrpc = {
 var BatchBacktestRunner = class {
 	async run(instrumentUids, dateFrom, dateTo, interval, token, paramSets, strategyType, profileResolution, valueAreaPercent, onProgress) {
 		const loader = new HistoricalDataLoader();
-		const results = [];
 		for (const uid of instrumentUids) for (const params of paramSets) {
 			const portfolio = new VirtualPortfolio({
 				initialCapital: 1e5,
@@ -2368,6 +2373,11 @@ var BatchBacktestRunner = class {
 				positionSizing: params.positionSizing,
 				riskPercent: params.riskPercent
 			});
+			const strategyOptions = {
+				volumeFilterEnabled: params.volumeFilterEnabled,
+				volumeFilterPeriod: params.volumeFilterPeriod
+			};
+			const strategy = strategyType === "trend" ? new TrendStrategy(uid, null, strategyOptions) : new VolumeAccumulationStrategy(uid, null, strategyOptions);
 			let totalSignals = 0;
 			let currentDate = /* @__PURE__ */ new Date(dateFrom + "T00:00:00Z");
 			const endDate = /* @__PURE__ */ new Date(dateTo + "T00:00:00Z");
@@ -2386,11 +2396,7 @@ var BatchBacktestRunner = class {
 							});
 							candles.forEach((c) => engine.onCandle?.(c));
 							const profile = engine.getProfile(uid);
-							const strategyOptions = {
-								volumeFilterEnabled: params.volumeFilterEnabled,
-								volumeFilterPeriod: params.volumeFilterPeriod
-							};
-							const strategy = strategyType === "trend" ? new TrendStrategy(uid, profile, strategyOptions) : new VolumeAccumulationStrategy(uid, profile, strategyOptions);
+							strategy.updateProfile(profile);
 							for (const candle of candles) {
 								strategy.onCandle(candle);
 								const newSignals = strategy.getSignals();
@@ -2410,16 +2416,13 @@ var BatchBacktestRunner = class {
 				currentDate.setDate(currentDate.getDate() + 1);
 			}
 			portfolio.finalizeWithLastPrice(0, "");
-			const resultItem = {
+			onProgress({
 				instrumentUid: uid,
 				params,
 				stats: portfolio.getStats(),
 				signals: totalSignals
-			};
-			onProgress(resultItem);
-			results.push(resultItem);
+			});
 		}
-		return results;
 	}
 };
 //#endregion

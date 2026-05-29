@@ -104,6 +104,10 @@ export class VolumeAccumulationStrategy implements IBacktestStrategy {
   clearSignals(): void {
     this.signals = [];
   }
+
+  updateProfile(profile: VolumeProfileLevels): void {
+    this.dailyProfile = profile;
+  }
 }
 
 function quotationToNumber(q: any): number {
