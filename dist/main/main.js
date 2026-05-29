@@ -1831,6 +1831,7 @@ var VirtualPortfolio = class {
 		const entry = this.openPosition;
 		let profit;
 		const lots = this.openPosition.lotQuantity ?? 1;
+		console.log(`[DEBUG] entry.price=${entry.price}, price=${price}, lots=${lots}`);
 		if (entry.type === "BUY") profit = (price - entry.price) * lots;
 		else profit = (entry.price - price) * lots;
 		console.log(`[Portfolio] LOTS=${lots}, PROFIT=${profit}`);
@@ -2393,6 +2394,7 @@ var BatchBacktestRunner = class {
 			};
 			const strategy = strategyType === "trend" ? new TrendStrategy(uid, null, strategyOptions) : new VolumeAccumulationStrategy(uid, null, strategyOptions);
 			let totalSignals = 0;
+			let lastClose = 0;
 			let currentDate = /* @__PURE__ */ new Date(dateFrom + "T00:00:00Z");
 			const endDate = /* @__PURE__ */ new Date(dateTo + "T00:00:00Z");
 			while (currentDate <= endDate) {
@@ -2401,38 +2403,44 @@ var BatchBacktestRunner = class {
 					const dateStr = currentDate.toISOString().split("T")[0];
 					const dayFrom = /* @__PURE__ */ new Date(dateStr + "T07:00:00Z");
 					const dayTo = /* @__PURE__ */ new Date(dateStr + "T16:00:00Z");
-					try {
-						await delay(500);
-						const candles = await loader.loadIntradayCandles(uid, dayFrom, dayTo, token, interval);
-						if (candles.length > 0) {
-							const engine = new VolumeProfileEngine({
-								profileResolution,
-								valueAreaPercent
-							});
-							candles.forEach((c) => engine.onCandle?.(c));
-							const profile = engine.getProfile(uid);
-							if (profile) {
-								strategy.updateProfile(profile);
-								for (const candle of candles) {
-									strategy.onCandle(candle);
-									const newSignals = strategy.getSignals();
-									totalSignals += newSignals.length;
-									for (const signal of newSignals) portfolio.processSignal(signal);
-									strategy.clearSignals();
-									const high = quotationToNumber(candle.high);
-									const low = quotationToNumber(candle.low);
-									const close = quotationToNumber(candle.close);
-									portfolio.checkStopTake(high, low, close, candle.time || "");
-								}
+					let candles = [];
+					let retries = 3;
+					while (retries > 0) try {
+						await delay(1e3);
+						candles = await loader.loadIntradayCandles(uid, dayFrom, dayTo, token, interval);
+						break;
+					} catch (e) {
+						retries--;
+						console.warn(`[Batch] Ошибка загрузки за ${dateStr}, осталось попыток: ${retries}`, e.message);
+						if (retries > 0) await delay(2e3);
+					}
+					if (candles.length > 0) {
+						const engine = new VolumeProfileEngine({
+							profileResolution,
+							valueAreaPercent
+						});
+						candles.forEach((c) => engine.onCandle?.(c));
+						const profile = engine.getProfile(uid);
+						if (profile) {
+							strategy.updateProfile(profile);
+							for (const candle of candles) {
+								strategy.onCandle(candle);
+								const newSignals = strategy.getSignals();
+								totalSignals += newSignals.length;
+								for (const signal of newSignals) portfolio.processSignal(signal);
+								strategy.clearSignals();
+								const high = quotationToNumber(candle.high);
+								const low = quotationToNumber(candle.low);
+								const close = quotationToNumber(candle.close);
+								lastClose = close;
+								portfolio.checkStopTake(high, low, close, candle.time || "");
 							}
 						}
-					} catch (e) {
-						console.warn(`[Batch] Ошибка загрузки за ${dateStr}:`, e.message);
 					}
 				}
 				currentDate.setDate(currentDate.getDate() + 1);
 			}
-			portfolio.finalizeWithLastPrice(0, "");
+			portfolio.finalizeWithLastPrice(lastClose, "");
 			onProgress({
 				instrumentUid: uid,
 				params,
@@ -3354,6 +3362,12 @@ var OrderManager = class {
 	isRunning = false;
 	lastOrderTime = 0;
 	activeStopOrderId = null;
+	trailingActive = false;
+	trailingPercent = 0;
+	trailingInstrumentUid = null;
+	trailingEntryPrice = null;
+	trailingStopOrderId = null;
+	trailingInterval = null;
 	constructor(config = {}) {
 		this.config = {
 			lotQuantity: 1,
@@ -3407,6 +3421,7 @@ var OrderManager = class {
 			this.lastOrderTime = now;
 			console.log(`[OrderManager] Ордер отправлен: ${this.activeOrderId}`);
 			await this.placeStopOrders(signal);
+			if (this.config.trailingEnabled && this.activeStopOrderId) this.startTrailing(signal.instrumentUid, signal.price, this.activeStopOrderId, this.config.trailingPercent);
 		} catch (error) {
 			console.error("[OrderManager] Ошибка отправки ордера:", error);
 		}
@@ -3468,6 +3483,60 @@ var OrderManager = class {
 			this.activeOrderId = null;
 		} catch (e) {
 			console.error("[OrderManager] Ошибка отмены ордера:", e);
+		}
+	}
+	startTrailing(instrumentUid, entryPrice, stopOrderId, trailPercent) {
+		this.trailingActive = true;
+		this.trailingInstrumentUid = instrumentUid;
+		this.trailingEntryPrice = entryPrice;
+		this.trailingStopOrderId = stopOrderId;
+		this.trailingPercent = trailPercent;
+		this.trailingInterval = setInterval(() => this.checkAndUpdateTrailing(), 1e4);
+	}
+	stopTrailing() {
+		this.trailingActive = false;
+		if (this.trailingInterval) {
+			clearInterval(this.trailingInterval);
+			this.trailingInterval = null;
+		}
+		this.trailingInstrumentUid = null;
+		this.trailingEntryPrice = null;
+		this.trailingStopOrderId = null;
+	}
+	async checkAndUpdateTrailing() {
+		if (!this.trailingActive || !this.trailingStopOrderId || !this.trailingInstrumentUid || !this.trailingEntryPrice) return;
+		try {
+			const lastPrice = await this.getLastPrice(this.trailingInstrumentUid);
+			if (!lastPrice) return;
+			const newStopPrice = lastPrice * (1 - this.trailingPercent / 100);
+			if (newStopPrice > this.trailingEntryPrice || false) {
+				await sandboxGrpc.replaceSandboxOrder({
+					accountId: this.config.accountId,
+					orderId: this.trailingStopOrderId,
+					price: {
+						units: Math.floor(newStopPrice),
+						nano: Math.round(newStopPrice % 1 * 1e9)
+					},
+					quantity: this.config.lotQuantity,
+					direction: OrderDirection.ORDER_DIRECTION_SELL
+				}, this.config.token);
+				this.trailingEntryPrice = newStopPrice;
+				console.log(`[OrderManager] Трейлинг‑стоп обновлён до ${newStopPrice}`);
+			}
+		} catch (e) {
+			console.error("[OrderManager] Ошибка трейлинга:", e);
+		}
+	}
+	async getLastPrice(instrumentUid) {
+		try {
+			const p = (await sandboxGrpc.getLastPrices({
+				instrumentId: [instrumentUid],
+				lastPriceType: 1
+			}, this.config.token)).lastPrices?.[0]?.price;
+			return p ? Number(p.units) + Number(p.nano) / 1e9 : null;
+		} catch (e) {
+			console.error("[OrderManager] Не удалось получить lastPrice:", e);
+			return null;
 		}
 	}
 };

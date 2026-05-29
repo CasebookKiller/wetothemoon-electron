@@ -10,6 +10,8 @@ export interface OrderManagerConfig {
   accountId: string;
   stopLossPercent?: number;
   takeProfitPercent?: number;
+  trailingEnabled?: boolean;
+  trailingPercent?: number;
 }
 
 export class OrderManager {
@@ -18,6 +20,12 @@ export class OrderManager {
   private isRunning: boolean = false;
   private lastOrderTime: number = 0;
   private activeStopOrderId: string | null = null;
+  private trailingActive = false;
+  private trailingPercent = 0;
+  private trailingInstrumentUid: string | null = null;
+  private trailingEntryPrice: number | null = null;
+  private trailingStopOrderId: string | null = null;
+  private trailingInterval: NodeJS.Timeout | null = null;
 
   constructor(config: Partial<OrderManagerConfig> = {}) {
     this.config = {
@@ -78,6 +86,10 @@ export class OrderManager {
 
       // Устанавливаем стоп-лосс и тейк-профит, если заданы проценты
       await this.placeStopOrders(signal);
+
+      if (this.config.trailingEnabled && this.activeStopOrderId) {
+        this.startTrailing(signal.instrumentUid, signal.price, this.activeStopOrderId, this.config.trailingPercent);
+      }
     } catch (error) {
       console.error('[OrderManager] Ошибка отправки ордера:', error);
     }
@@ -150,5 +162,53 @@ export class OrderManager {
     } catch (e) {
       console.error('[OrderManager] Ошибка отмены ордера:', e);
     }
+  }
+
+  startTrailing(instrumentUid: string, entryPrice: number, stopOrderId: string, trailPercent: number): void {
+    this.trailingActive = true;
+    this.trailingInstrumentUid = instrumentUid;
+    this.trailingEntryPrice = entryPrice;
+    this.trailingStopOrderId = stopOrderId;
+    this.trailingPercent = trailPercent;
+    this.trailingInterval = setInterval(() => this.checkAndUpdateTrailing(), 10_000);
+  }
+
+  stopTrailing(): void {
+    this.trailingActive = false;
+    if (this.trailingInterval) { clearInterval(this.trailingInterval); this.trailingInterval = null; }
+    this.trailingInstrumentUid = null;
+    this.trailingEntryPrice = null;
+    this.trailingStopOrderId = null;
+  }
+
+  private async checkAndUpdateTrailing(): Promise<void> {
+    if (!this.trailingActive || !this.trailingStopOrderId || !this.trailingInstrumentUid || !this.trailingEntryPrice) return;
+    try {
+      const lastPrice = await this.getLastPrice(this.trailingInstrumentUid);
+      if (!lastPrice) return;
+      const isBuy = true; // для лонга; при необходимости адаптируйте
+      const newStopPrice = isBuy
+        ? lastPrice * (1 - this.trailingPercent / 100)
+        : lastPrice * (1 + this.trailingPercent / 100);
+      if ((isBuy && newStopPrice > this.trailingEntryPrice) || (!isBuy && newStopPrice < this.trailingEntryPrice)) {
+        await sandboxGrpc.replaceSandboxOrder({
+          accountId: this.config.accountId,
+          orderId: this.trailingStopOrderId,
+          price: { units: Math.floor(newStopPrice), nano: Math.round((newStopPrice % 1) * 1e9) },
+          quantity: this.config.lotQuantity,
+          direction: isBuy ? OrderDirection.ORDER_DIRECTION_SELL : OrderDirection.ORDER_DIRECTION_BUY,
+        }, this.config.token);
+        this.trailingEntryPrice = newStopPrice;
+        console.log(`[OrderManager] Трейлинг‑стоп обновлён до ${newStopPrice}`);
+      }
+    } catch (e) { console.error('[OrderManager] Ошибка трейлинга:', e); }
+  }
+
+  private async getLastPrice(instrumentUid: string): Promise<number | null> {
+    try {
+      const resp = await sandboxGrpc.getLastPrices({ instrumentId: [instrumentUid], lastPriceType: 1 }, this.config.token);
+      const p = resp.lastPrices?.[0]?.price;
+      return p ? Number(p.units) + Number(p.nano) / 1e9 : null;
+    } catch (e) { console.error('[OrderManager] Не удалось получить lastPrice:', e); return null; }
   }
 }

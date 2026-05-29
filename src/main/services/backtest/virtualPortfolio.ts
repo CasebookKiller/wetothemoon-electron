@@ -178,6 +178,7 @@ export class VirtualPortfolio {
     let profit: number;
 
     const lots = this.openPosition.lotQuantity ?? 1;
+    console.log(`[DEBUG] entry.price=${entry.price}, price=${price}, lots=${lots}`);
     if (entry.type === 'BUY') {
       profit = (price - entry.price) * lots;
     } else {

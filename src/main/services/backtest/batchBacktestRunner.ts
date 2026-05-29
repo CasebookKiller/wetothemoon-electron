@@ -64,6 +64,7 @@ export class BatchBacktestRunner {
           : new VolumeAccumulationStrategy(uid, null as any, strategyOptions);
 
         let totalSignals = 0;
+        let lastClose = 0;                     // ← новая переменная
         let currentDate = new Date(dateFrom + 'T00:00:00Z');
         const endDate = new Date(dateTo + 'T00:00:00Z');
 
@@ -74,43 +75,53 @@ export class BatchBacktestRunner {
             const dayFrom = new Date(dateStr + 'T07:00:00Z');
             const dayTo = new Date(dateStr + 'T16:00:00Z');
 
-            try {
-              // Добавляем задержку перед каждым запросом, чтобы не превысить лимит API
-              await delay(500);
-              const candles = await loader.loadIntradayCandles(uid, dayFrom, dayTo, token, interval);
-              if (candles.length > 0) {
-                const engine = new VolumeProfileEngine({ profileResolution, valueAreaPercent });
-                candles.forEach(c => (engine as any).onCandle?.(c));
-                const profile = engine.getProfile(uid);
+            // Повторные попытки для каждого дня
+            let candles: any[] = [];
+            let retries = 3;
+            while (retries > 0) {
+              try {
+                await delay(1000);
+                candles = await loader.loadIntradayCandles(uid, dayFrom, dayTo, token, interval);
+                break;
+              } catch (e: any) {
+                retries--;
+                console.warn(`[Batch] Ошибка загрузки за ${dateStr}, осталось попыток: ${retries}`, e.message);
+                if (retries > 0) await delay(2000);
+              }
+            }
 
-                if (profile) {
-                  strategy.updateProfile(profile);
+            if (candles.length > 0) {
+              const engine = new VolumeProfileEngine({ profileResolution, valueAreaPercent });
+              candles.forEach(c => (engine as any).onCandle?.(c));
+              const profile = engine.getProfile(uid);
 
-                  for (const candle of candles) {
-                    strategy.onCandle(candle);
-                    const newSignals = strategy.getSignals();
-                    totalSignals += newSignals.length;
+              if (profile) {
+                strategy.updateProfile(profile);
 
-                    for (const signal of newSignals) {
-                      portfolio.processSignal(signal);
-                    }
-                    strategy.clearSignals();
+                for (const candle of candles) {
+                  strategy.onCandle(candle);
+                  const newSignals = strategy.getSignals();
+                  totalSignals += newSignals.length;
 
-                    const high = quotationToNumber(candle.high);
-                    const low = quotationToNumber(candle.low);
-                    const close = quotationToNumber(candle.close);
-                    portfolio.checkStopTake(high, low, close, candle.time || '');
+                  for (const signal of newSignals) {
+                    portfolio.processSignal(signal);
                   }
+                  strategy.clearSignals();
+
+                  const high = quotationToNumber(candle.high);
+                  const low = quotationToNumber(candle.low);
+                  const close = quotationToNumber(candle.close);
+                  lastClose = close;          // ← запоминаем последнюю цену
+                  portfolio.checkStopTake(high, low, close, candle.time || '');
                 }
               }
-            } catch (e: any) {
-              console.warn(`[Batch] Ошибка загрузки за ${dateStr}:`, e.message);
             }
           }
           currentDate.setDate(currentDate.getDate() + 1);
         }
 
-        portfolio.finalizeWithLastPrice(0, '');
+        // Закрываем позицию по реальной последней цене, а не по 0
+        portfolio.finalizeWithLastPrice(lastClose, '');
 
         const resultItem: BatchResultItem = {
           instrumentUid: uid,
