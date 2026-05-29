@@ -1493,6 +1493,7 @@ var VolumeAccumulationStrategy = class {
 	volumeFilterEnabled;
 	volumeFilterPeriod;
 	volumeHistory = [];
+	lastSignalDirection = null;
 	constructor(instrumentUid, dailyProfile, options) {
 		this.instrumentUid = instrumentUid;
 		this.dailyProfile = dailyProfile;
@@ -1558,6 +1559,8 @@ var VolumeAccumulationStrategy = class {
 	}
 	updateProfile(profile) {
 		this.dailyProfile = profile;
+		this.hasPosition = false;
+		this.lastSignalDirection = null;
 	}
 };
 function quotationToNumber$2(q) {
@@ -2111,6 +2114,8 @@ var TrendStrategy = class {
 	}
 	updateProfile(profile) {
 		this.dailyProfile = profile;
+		this.hasPosition = false;
+		this.lastTradeTime = 0;
 	}
 };
 //#endregion

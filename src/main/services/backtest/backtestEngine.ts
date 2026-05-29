@@ -3,6 +3,7 @@ import type { StreamCandle } from '@/api/tbank/marketdataStreamTypes';
 import { VirtualPortfolio, type PortfolioStats, type PortfolioConfig } from './virtualPortfolio';
 import { quotationToNumber } from './common';
 import type { BacktestSignal } from './common';
+import { VolumeProfileLevels } from '../volumeProfileEngine';
 
 export interface BacktestStats {
   totalSignals: number;
@@ -16,7 +17,7 @@ export interface IBacktestStrategy {
   getSignals(): BacktestSignal[];
   reset(): void;
   clearSignals(): void;
-  updateProfile(profile: any): void;   // ← новый метод
+  updateProfile(profile: VolumeProfileLevels): void;
 }
 
 export class BacktestEngine {

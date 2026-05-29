@@ -13,6 +13,7 @@ export class VolumeAccumulationStrategy implements IBacktestStrategy {
   private volumeFilterEnabled: boolean;
   private volumeFilterPeriod: number;
   private volumeHistory: number[] = [];
+  private lastSignalDirection: string | null = null;
 
   constructor(
     instrumentUid: string,
@@ -107,6 +108,8 @@ export class VolumeAccumulationStrategy implements IBacktestStrategy {
 
   updateProfile(profile: VolumeProfileLevels): void {
     this.dailyProfile = profile;
+    this.hasPosition = false;               // ← сброс позиции
+    this.lastSignalDirection = null;   // если используете
   }
 }
 
