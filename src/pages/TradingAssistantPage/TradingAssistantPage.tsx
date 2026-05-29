@@ -141,7 +141,24 @@ export const TradingAssistantPage: React.FC = () => {
     positionSizing: 'fixed' as 'fixed' | 'dynamic',  // ← добавить
     riskPercent: 1.0,                                 // ← добавить
     trades: [] as any[],
+    volumeFilterEnabled: false,
+    volumeFilterPeriod: 20,
   });
+
+  const [batchParams, setBatchParams] = useState({
+    slValues: '1,1.5,2',
+    tpValues: '2,3,4',
+    trailValues: '0.5,1',
+    lotsValues: '10',
+    positionSizing: 'dynamic' as 'fixed' | 'dynamic',
+    riskPercent: 1,
+    volumeFilterEnabled: false,
+    volumeFilterPeriod: 20,
+    strategyType: 'volume_accumulation',
+  });
+  const [batchInstruments, setBatchInstruments] = useState<string[]>([]);
+  const [batchResults, setBatchResults] = useState<any[]>([]);
+  const [batchRunning, setBatchRunning] = useState(false);
 
   // Локальные состояния (часто обновляемые)
   const [profile, setProfile] = useState<VolumeProfileLevels | null>(null);
@@ -358,6 +375,8 @@ export const TradingAssistantPage: React.FC = () => {
         lots: backtest.lots,   // ← передаём
         positionSizing: backtest.positionSizing,
         riskPercent: backtest.riskPercent,
+        volumeFilterEnabled: backtest.volumeFilterEnabled,
+        volumeFilterPeriod: backtest.volumeFilterPeriod,
       }
     );
     if (result) {
@@ -611,7 +630,6 @@ export const TradingAssistantPage: React.FC = () => {
     signalSeriesRef.current = signalSeries;
   }, [backtest.signals]);
 
-  const exitMarkersPrimitiveRef = useRef<any>(null);
   // Маркеры выходов (SL, TP, TRAIL, END_OF_DAY)
   useEffect(() => {
     const chart = chartRef.current;
@@ -656,55 +674,7 @@ export const TradingAssistantPage: React.FC = () => {
     // Подгоняем масштаб
     chart.timeScale().fitContent();
   }, [backtest.trades]);
-  
-/*  useEffect(() => {
-    const chart = chartRef.current;
-    console.log('[Exit Markers] chart:', !!chart, 'trades:', backtest.trades.length);
-    if (!chart || !backtest.trades.length) return;
 
-    // Удаляем предыдущий примитив и серию, если они есть
-    if (exitMarkersPrimitiveRef.current) {
-      try {
-        exitMarkersPrimitiveRef.current.detach();
-      } catch {}
-      exitMarkersPrimitiveRef.current = null;
-    }
-    if (exitMarkersRef.current) {
-      try {
-        chart.removeSeries(exitMarkersRef.current);
-      } catch {}
-      exitMarkersRef.current = null;
-    }
-
-    const exitSeries = chart.addSeries(LineSeries, {
-      lineVisible: false,
-      lastValueVisible: false,
-    });
-
-    const markers: SeriesMarker<Time>[] = backtest.trades.map((trade: any) => ({
-      time: (Math.floor(new Date(trade.exitTime).getTime() / 1000)) as Time,
-      position: 'aboveBar',
-      color:
-        trade.exitReason === 'TAKE_PROFIT' ? '#4caf50' :
-        trade.exitReason === 'STOP_LOSS' ? '#f44336' :
-        trade.exitReason === 'TRAILING_STOP' ? '#2196f3' : '#ffeb3b',
-      shape:
-        trade.exitReason === 'TAKE_PROFIT' ? 'circle' :
-        trade.exitReason === 'STOP_LOSS' ? 'square' :
-        trade.exitReason === 'TRAILING_STOP' ? 'arrowUp' : 'arrowDown',
-      text: `${trade.exitReason} @ ${trade.exitPrice}`,
-      size: 5,
-    }));
-
-    console.log('[Exit Markers] markers count:', markers.length);
-    const primitive = createSeriesMarkers(exitSeries, markers);
-    exitMarkersPrimitiveRef.current = primitive;
-    exitMarkersRef.current = exitSeries;
-
-    // Подгоняем масштаб
-    chart.timeScale().fitContent();
-  }, [backtest.trades]);
-*/
   const loadProfile = async () => {
     const api = (window as any).electronAPI;
     if (!api) return;
@@ -836,6 +806,17 @@ export const TradingAssistantPage: React.FC = () => {
             <label>Risk%: <input type="number" value={backtest.riskPercent} onChange={e => updateBacktest({ riskPercent: Number(e.target.value) })} step={0.1} style={{ width: '50px' }} /></label>
           )}
           <label>Trail%: <input type="number" value={backtest.trailingDistancePercent} onChange={e => updateBacktest({ trailingDistancePercent: Number(e.target.value) })} step={0.1} style={{ width: '50px' }} /></label>
+          <label>
+            <input
+              type="checkbox"
+              checked={backtest.volumeFilterEnabled}
+              onChange={e => updateBacktest({ volumeFilterEnabled: e.target.checked })}
+            />
+            Vol Filt
+          </label>
+          {backtest.volumeFilterEnabled && (
+            <label>Per: <input type="number" value={backtest.volumeFilterPeriod} onChange={e => updateBacktest({ volumeFilterPeriod: Number(e.target.value) })} min={5} max={100} step={5} style={{ width: '50px' }} /></label>
+          )}
           <button onClick={runBacktest} disabled={backtest.loading}>Run</button>
           <button onClick={sendBacktestToSandbox} disabled={!backtest.signals.length}>Send to Sandbox</button>
         </div>
@@ -950,6 +931,170 @@ export const TradingAssistantPage: React.FC = () => {
     </div>
   );
 
+  const renderBatchPanel = () => {
+    const runBatch = async () => {
+      const api = (window as any).electronAPI;
+      if (!api?.batchBacktest) return;
+      setBatchRunning(true);
+
+      // Преобразуем строки в массивы чисел
+      const slArr = batchParams.slValues.split(',').map(Number);
+      const tpArr = batchParams.tpValues.split(',').map(Number);
+      const trailArr = batchParams.trailValues.split(',').map(Number);
+      const lotsArr = batchParams.lotsValues.split(',').map(Number);
+
+      // Генерируем все комбинации параметров
+      const paramSets: any[] = [];
+      for (const sl of slArr) {
+        for (const tp of tpArr) {
+          for (const trail of trailArr) {
+            for (const lots of lotsArr) {
+              paramSets.push({
+                stopLossPercent: sl,
+                takeProfitPercent: tp,
+                trailingDistancePercent: trail,
+                lots,
+                positionSizing: batchParams.positionSizing,
+                riskPercent: batchParams.riskPercent,
+                volumeFilterEnabled: batchParams.volumeFilterEnabled,
+                volumeFilterPeriod: batchParams.volumeFilterPeriod,
+              });
+            }
+          }
+        }
+      }
+
+      const results = await api.batchBacktest(
+        batchInstruments,
+        backtest.dateFrom,
+        backtest.dateTo,
+        backtest.interval,
+        stream.token, // токен для загрузки свечей
+        paramSets,
+        batchParams.strategyType,
+        backtest.profileResolution,
+        backtest.valueAreaPercent
+      );
+
+      setBatchResults(results);
+      setBatchRunning(false);
+    };
+
+    const exportCSV = () => {
+      const header = 'Instrument,SL%,TP%,Trail%,Lots,Sizing,Risk%,VolFilt,Period,Signals,Trades,WinRate,Profit,MaxDD,Capital';
+      const rows = batchResults.map(r => {
+        const s = r.stats;
+        return `${r.instrumentUid},${r.params.stopLossPercent},${r.params.takeProfitPercent},${r.params.trailingDistancePercent},${r.params.lots},${r.params.positionSizing},${r.params.riskPercent},${r.params.volumeFilterEnabled},${r.params.volumeFilterPeriod},${r.signals},${s.totalTrades},${s.winRate?.toFixed(1)}%,${s.totalProfit?.toFixed(2)},${s.maxDrawdown?.toFixed(2)},${s.initialCapital}→${s.finalCapital?.toFixed(2)}`;
+      }).join('\n');
+
+      const blob = new Blob([header + '\n' + rows], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'batch_results.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+
+    return (
+      <div className="tab-panel">
+        <h3>Batch Backtest</h3>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '10px' }}>
+          <label>Instruments:
+            <select
+              multiple
+              value={batchInstruments}
+              onChange={e => setBatchInstruments(Array.from(e.target.selectedOptions, o => o.value))}
+              style={{ width: '200px', height: '100px' }}
+            >
+              {availableInstruments.map(inst => (
+                <option key={inst.uid} value={inst.uid}>{inst.name} ({inst.ticker})</option>
+              ))}
+            </select>
+            <br/><small>Ctrl+Click для выбора нескольких</small>
+          </label>
+          <label>SL%: <input type="text" value={batchParams.slValues} onChange={e => setBatchParams({ ...batchParams, slValues: e.target.value })} style={{ width: '80px' }} /></label>
+          <label>TP%: <input type="text" value={batchParams.tpValues} onChange={e => setBatchParams({ ...batchParams, tpValues: e.target.value })} style={{ width: '80px' }} /></label>
+          <label>Trail%: <input type="text" value={batchParams.trailValues} onChange={e => setBatchParams({ ...batchParams, trailValues: e.target.value })} style={{ width: '80px' }} /></label>
+          <label>Lots: <input type="text" value={batchParams.lotsValues} onChange={e => setBatchParams({ ...batchParams, lotsValues: e.target.value })} style={{ width: '80px' }} /></label>
+          <label>Size:
+            <select value={batchParams.positionSizing} onChange={e => setBatchParams({ ...batchParams, positionSizing: e.target.value as 'fixed' | 'dynamic' })}>
+              <option value="fixed">Fixed</option>
+              <option value="dynamic">Dynamic</option>
+            </select>
+          </label>
+          {batchParams.positionSizing === 'dynamic' && (
+            <label>Risk%: <input type="number" value={batchParams.riskPercent} onChange={e => setBatchParams({ ...batchParams, riskPercent: Number(e.target.value) })} step={0.1} style={{ width: '50px' }} /></label>
+          )}
+          <label>
+            <input type="checkbox" checked={batchParams.volumeFilterEnabled} onChange={e => setBatchParams({ ...batchParams, volumeFilterEnabled: e.target.checked })} /> VolFilt
+          </label>
+          {batchParams.volumeFilterEnabled && (
+            <label>Per: <input type="number" value={batchParams.volumeFilterPeriod} onChange={e => setBatchParams({ ...batchParams, volumeFilterPeriod: Number(e.target.value) })} min={5} max={100} step={5} style={{ width: '50px' }} /></label>
+          )}
+          <label>Strategy:
+            <select value={batchParams.strategyType} onChange={e => setBatchParams({ ...batchParams, strategyType: e.target.value })}>
+              <option value="volume_accumulation">Vol Accum</option>
+              <option value="trend">Trend</option>
+            </select>
+          </label>
+          <button onClick={runBatch} disabled={batchRunning}>{batchRunning ? 'Running...' : 'Run Batch'}</button>
+          <button onClick={exportCSV} disabled={batchResults.length === 0}>Export CSV</button>
+        </div>
+
+        {batchResults.length > 0 && (
+          <div style={{ maxHeight: '400px', overflowY: 'auto', color: '#d1d4dc' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  <th>Instrument</th>
+                  <th>SL%</th>
+                  <th>TP%</th>
+                  <th>Trail%</th>
+                  <th>Lots</th>
+                  <th>Sizing</th>
+                  <th>Risk%</th>
+                  <th>VolFilt</th>
+                  <th>Period</th>
+                  <th>Signals</th>
+                  <th>Trades</th>
+                  <th>WinRate</th>
+                  <th>Profit</th>
+                  <th>MaxDD</th>
+                  <th>Capital</th>
+                </tr>
+              </thead>
+              <tbody>
+                {batchResults.map((r, idx) => {
+                  const s = r.stats;
+                  return (
+                    <tr key={idx} style={{ borderBottom: '1px solid #444' }}>
+                      <td>{r.instrumentUid}</td>
+                      <td>{r.params.stopLossPercent}</td>
+                      <td>{r.params.takeProfitPercent}</td>
+                      <td>{r.params.trailingDistancePercent}</td>
+                      <td>{r.params.lots}</td>
+                      <td>{r.params.positionSizing}</td>
+                      <td>{r.params.riskPercent}</td>
+                      <td>{r.params.volumeFilterEnabled ? 'Y' : 'N'}</td>
+                      <td>{r.params.volumeFilterPeriod}</td>
+                      <td>{r.signals}</td>
+                      <td>{s.totalTrades}</td>
+                      <td>{s.winRate?.toFixed(1)}%</td>
+                      <td>{s.totalProfit?.toFixed(2)}</td>
+                      <td>{s.maxDrawdown?.toFixed(2)}</td>
+                      <td>{s.initialCapital}→{s.finalCapital?.toFixed(2)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="trading-assistant">
       <h1>Trading Assistant</h1>
@@ -957,6 +1102,7 @@ export const TradingAssistantPage: React.FC = () => {
         <button onClick={() => setActiveTab('sandbox')} className={activeTab === 'sandbox' ? 'active' : ''}>Sandbox</button>
         <button onClick={() => setActiveTab('stream')} className={activeTab === 'stream' ? 'active' : ''}>Stream</button>
         <button onClick={() => setActiveTab('backtest')} className={activeTab === 'backtest' ? 'active' : ''}>Backtest</button>
+        <button onClick={() => setActiveTab('batch')} className={activeTab === 'batch' ? 'active' : ''}>Batch</button>
         <button onClick={() => setActiveTab('signals')} className={activeTab === 'signals' ? 'active' : ''}>Signals</button>
         <button onClick={() => setActiveTab('profile')} className={activeTab === 'profile' ? 'active' : ''}>Profile</button>
         <button onClick={() => setActiveTab('trades')} className={activeTab === 'trades' ? 'active' : ''}>Trades</button>
@@ -968,6 +1114,7 @@ export const TradingAssistantPage: React.FC = () => {
       {activeTab === 'signals' && renderSignalsPanel()}
       {activeTab === 'profile' && renderProfilePanel()}
       {activeTab === 'trades' && renderTradesPanel()}
+      {activeTab === 'batch' && renderBatchPanel()}
 
       <div className="chart-row">
         {profile?.volumeByPrice && priceRange.max > 0 && (

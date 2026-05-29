@@ -1,19 +1,20 @@
 // src/main/ipcHandlers/tradingAssistantHandlers.ts
 import { ipcMain, BrowserWindow } from 'electron';
-import { VolumeProfileEngine, volumeProfileEngine } from '../services/volumeProfileEngine';
+import { VolumeProfileEngine, volumeProfileEngine } from '@/main/services/volumeProfileEngine';
 import { CandleInterval } from '@/api/tbank/marketdataTypes';
-import { BacktestEngine, IBacktestStrategy } from '../services/backtest/backtestEngine';
-import { VolumeAccumulationStrategy } from '../services/backtest/strategies/VolumeAccumulationStrategy';
-import { HistoricalDataLoader } from '../services/historicalDataLoader';
+import { BacktestEngine, IBacktestStrategy } from '@/main/services/backtest/backtestEngine';
+import { VolumeAccumulationStrategy } from '@/main/services/backtest/strategies/VolumeAccumulationStrategy';
+import { HistoricalDataLoader } from '@/main/services/historicalDataLoader';
 import { StreamCandle } from '@/api/tbank/marketdataStreamTypes';
-import { VirtualPortfolio } from '../services/backtest/virtualPortfolio';
-import { BacktestSignal, quotationToNumber } from '../services/backtest/common';
-import { OrderManager } from '../services/orderManager';
-import { sandboxGrpc } from '../services/tbank/SandboxGrpcService';
-import { marketDataBus } from '../services/marketDataBus';
-import { getTradingAssistantWindow } from '../windows/tradingAssistantWindow';
-import { TrendStrategy } from '../services/backtest/strategies/TrendStrategy';
-import { instrumentsGrpc } from '../services/tbank/InstrumentsGrpcService';
+import { VirtualPortfolio } from '@/main/services/backtest/virtualPortfolio';
+import { BacktestSignal, quotationToNumber } from '@/main/services/backtest/common';
+import { OrderManager } from '@/main/services/orderManager';
+import { sandboxGrpc } from '@/main/services/tbank/SandboxGrpcService';
+import { marketDataBus } from '@/main/services/marketDataBus';
+import { getTradingAssistantWindow } from '@/main/windows/tradingAssistantWindow';
+import { TrendStrategy } from '@/main/services/backtest/strategies/TrendStrategy';
+import { instrumentsGrpc } from '@/main/services/tbank/InstrumentsGrpcService';
+import { BatchBacktestRunner } from '@/main/services/backtest/batchBacktestRunner';
 
 let orderManagerInstance: OrderManager | null = null;
 
@@ -157,7 +158,10 @@ export const registerTradingAssistantHandlers = () => {
           if (strategyType === 'trend') {
             strategy = new TrendStrategy(instrumentUid, profile);
           } else {
-            strategy = new VolumeAccumulationStrategy(instrumentUid, profile);
+            strategy = new VolumeAccumulationStrategy(instrumentUid, profile, {
+              volumeFilterEnabled: params.volumeFilterEnabled,
+              volumeFilterPeriod: params.volumeFilterPeriod,
+            });
           }
 
           // Последовательная обработка свечей
@@ -230,6 +234,30 @@ export const registerTradingAssistantHandlers = () => {
       console.error('Backtest error:', error);
       return null;
     }
+  });
+
+  ipcMain.handle('trading-assistant:batch-backtest', async (_, instrumentUids: string[], dateFrom: string, dateTo: string, intervalStr: string, token: string, paramSets: any[], strategyType: string, profileResolution: number, valueAreaPercent: number) => {
+    const intervalMap: Record<string, CandleInterval> = {
+      '1min': CandleInterval.CANDLE_INTERVAL_1_MIN,
+      '5min': CandleInterval.CANDLE_INTERVAL_5_MIN,
+      '15min': CandleInterval.CANDLE_INTERVAL_15_MIN,
+      '1hour': CandleInterval.CANDLE_INTERVAL_HOUR,
+    };
+    const interval = intervalMap[intervalStr] || CandleInterval.CANDLE_INTERVAL_1_MIN;
+
+    const runner = new BatchBacktestRunner();
+    const results = await runner.run(
+      instrumentUids,
+      dateFrom,
+      dateTo,
+      interval,
+      token,
+      paramSets,
+      strategyType,
+      profileResolution,
+      valueAreaPercent
+    );
+    return results;
   });
 
   ipcMain.handle('trading-assistant:send-backtest-signals', async (_, signals: BacktestSignal[]) => {

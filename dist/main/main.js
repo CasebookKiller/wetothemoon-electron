@@ -1490,15 +1490,21 @@ var VolumeAccumulationStrategy = class {
 	instrumentUid;
 	hasBrokenHigh = false;
 	hasBrokenLow = false;
-	constructor(instrumentUid, dailyProfile) {
+	volumeFilterEnabled;
+	volumeFilterPeriod;
+	volumeHistory = [];
+	constructor(instrumentUid, dailyProfile, options) {
 		this.instrumentUid = instrumentUid;
 		this.dailyProfile = dailyProfile;
+		this.volumeFilterEnabled = options?.volumeFilterEnabled ?? false;
+		this.volumeFilterPeriod = options?.volumeFilterPeriod ?? 20;
 	}
 	reset() {
 		this.signals = [];
 		this.hasBrokenHigh = false;
 		this.hasBrokenLow = false;
 		this.hasPosition = false;
+		this.volumeHistory = [];
 	}
 	hasPosition = false;
 	onCandle(candle) {
@@ -1507,6 +1513,12 @@ var VolumeAccumulationStrategy = class {
 		const low = quotationToNumber$2(candle.low);
 		const close = quotationToNumber$2(candle.close);
 		const time = candle.time || (/* @__PURE__ */ new Date()).toISOString();
+		const volume = Number(candle.volume || "0");
+		this.volumeHistory.push(volume);
+		if (this.volumeHistory.length > this.volumeFilterPeriod) this.volumeHistory.shift();
+		if (this.volumeFilterEnabled && this.volumeHistory.length >= this.volumeFilterPeriod) {
+			if (volume < this.volumeHistory.reduce((a, b) => a + b, 0) / this.volumeHistory.length) return;
+		}
 		if (high > this.dailyProfile.valueAreaHigh) {
 			this.hasBrokenHigh = true;
 			this.hasBrokenLow = false;
@@ -2005,9 +2017,14 @@ var TrendStrategy = class {
 	hasPosition = false;
 	lastTradeTime = 0;
 	minIntervalMs = 900 * 1e3;
-	constructor(instrumentUid, dailyProfile) {
+	volumeFilterEnabled;
+	volumeFilterPeriod;
+	volumeHistory = [];
+	constructor(instrumentUid, dailyProfile, options) {
 		this.instrumentUid = instrumentUid;
 		this.dailyProfile = dailyProfile;
+		this.volumeFilterEnabled = options?.volumeFilterEnabled ?? false;
+		this.volumeFilterPeriod = options?.volumeFilterPeriod ?? 20;
 	}
 	reset() {
 		this.signals = [];
@@ -2016,6 +2033,7 @@ var TrendStrategy = class {
 		this.trendDirection = null;
 		this.hasPosition = false;
 		this.lastTradeTime = 0;
+		this.volumeHistory = [];
 	}
 	onCandle(candle) {
 		if (!this.dailyProfile || this.hasPosition) return;
@@ -2023,6 +2041,12 @@ var TrendStrategy = class {
 		const low = quotationToNumber(candle.low);
 		const close = quotationToNumber(candle.close);
 		const time = candle.time || (/* @__PURE__ */ new Date()).toISOString();
+		const volume = Number(candle.volume || "0");
+		this.volumeHistory.push(volume);
+		if (this.volumeHistory.length > this.volumeFilterPeriod) this.volumeHistory.shift();
+		if (this.volumeFilterEnabled && this.volumeHistory.length >= this.volumeFilterPeriod) {
+			if (volume < this.volumeHistory.reduce((a, b) => a + b, 0) / this.volumeHistory.length) return;
+		}
 		const now = new Date(time).getTime();
 		if (now - this.lastTradeTime < this.minIntervalMs) return;
 		if (close > this.dailyProfile.valueAreaHigh) this.trendDirection = "UP";
@@ -2329,6 +2353,63 @@ var instrumentsGrpc = {
 	})
 };
 //#endregion
+//#region src/main/services/backtest/batchBacktestRunner.ts
+var BatchBacktestRunner = class {
+	async run(instrumentUids, dateFrom, dateTo, interval, token, paramSets, strategyType, profileResolution, valueAreaPercent) {
+		const loader = new HistoricalDataLoader();
+		const results = [];
+		for (const uid of instrumentUids) {
+			const candles = await loader.loadIntradayCandles(uid, /* @__PURE__ */ new Date(dateFrom + "T07:00:00Z"), /* @__PURE__ */ new Date(dateTo + "T16:00:00Z"), token, interval);
+			if (candles.length === 0) continue;
+			const engine = new VolumeProfileEngine({
+				profileResolution,
+				valueAreaPercent
+			});
+			candles.forEach((c) => engine.onCandle?.(c));
+			const profile = engine.getProfile(uid);
+			for (const params of paramSets) {
+				const strategy = strategyType === "trend" ? new TrendStrategy(uid, profile, {
+					volumeFilterEnabled: params.volumeFilterEnabled,
+					volumeFilterPeriod: params.volumeFilterPeriod
+				}) : new VolumeAccumulationStrategy(uid, profile, {
+					volumeFilterEnabled: params.volumeFilterEnabled,
+					volumeFilterPeriod: params.volumeFilterPeriod
+				});
+				const portfolio = new VirtualPortfolio({
+					initialCapital: 1e5,
+					stopLossPercent: params.stopLossPercent,
+					takeProfitPercent: params.takeProfitPercent,
+					trailingDistancePercent: params.trailingDistancePercent,
+					lotQuantity: params.lots,
+					positionSizing: params.positionSizing,
+					riskPercent: params.riskPercent
+				});
+				for (const candle of candles) {
+					strategy.onCandle(candle);
+					const newSignals = strategy.getSignals();
+					for (const signal of newSignals) portfolio.processSignal(signal);
+					strategy.clearSignals();
+					const high = quotationToNumber(candle.high);
+					const low = quotationToNumber(candle.low);
+					const close = quotationToNumber(candle.close);
+					portfolio.checkStopTake(high, low, close, candle.time || "");
+				}
+				const lastCandle = candles[candles.length - 1];
+				const lastClose = quotationToNumber(lastCandle.close);
+				portfolio.finalizeWithLastPrice(lastClose, lastCandle.time || "");
+				results.push({
+					instrumentUid: uid,
+					instrumentName: void 0,
+					params,
+					stats: portfolio.getStats(),
+					signals: strategy.getSignals().length
+				});
+			}
+		}
+		return results;
+	}
+};
+//#endregion
 //#region src/main/ipcHandlers/tradingAssistantHandlers.ts
 var orderManagerInstance$1 = null;
 var setOrderManagerInstance = (manager) => {
@@ -2393,7 +2474,10 @@ var registerTradingAssistantHandlers = () => {
 					const profile = engine.getProfile(instrumentUid);
 					let strategy;
 					if (strategyType === "trend") strategy = new TrendStrategy(instrumentUid, profile);
-					else strategy = new VolumeAccumulationStrategy(instrumentUid, profile);
+					else strategy = new VolumeAccumulationStrategy(instrumentUid, profile, {
+						volumeFilterEnabled: params.volumeFilterEnabled,
+						volumeFilterPeriod: params.volumeFilterPeriod
+					});
 					for (const candle of candles) {
 						strategy.onCandle(candle);
 						const newSignals = strategy.getSignals();
@@ -2446,6 +2530,15 @@ var registerTradingAssistantHandlers = () => {
 			console.error("Backtest error:", error);
 			return null;
 		}
+	});
+	electron.ipcMain.handle("trading-assistant:batch-backtest", async (_, instrumentUids, dateFrom, dateTo, intervalStr, token, paramSets, strategyType, profileResolution, valueAreaPercent) => {
+		const interval = {
+			"1min": CandleInterval.CANDLE_INTERVAL_1_MIN,
+			"5min": CandleInterval.CANDLE_INTERVAL_5_MIN,
+			"15min": CandleInterval.CANDLE_INTERVAL_15_MIN,
+			"1hour": CandleInterval.CANDLE_INTERVAL_HOUR
+		}[intervalStr] || CandleInterval.CANDLE_INTERVAL_1_MIN;
+		return await new BatchBacktestRunner().run(instrumentUids, dateFrom, dateTo, interval, token, paramSets, strategyType, profileResolution, valueAreaPercent);
 	});
 	electron.ipcMain.handle("trading-assistant:send-backtest-signals", async (_, signals) => {
 		if (!orderManagerInstance$1) return {

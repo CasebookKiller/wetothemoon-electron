@@ -10,10 +10,19 @@ export class VolumeAccumulationStrategy implements IBacktestStrategy {
   private instrumentUid: string;
   private hasBrokenHigh = false;
   private hasBrokenLow = false;
+  private volumeFilterEnabled: boolean;
+  private volumeFilterPeriod: number;
+  private volumeHistory: number[] = [];
 
-  constructor(instrumentUid: string, dailyProfile: VolumeProfileLevels | null) {
+  constructor(
+    instrumentUid: string,
+    dailyProfile: VolumeProfileLevels | null,
+    options?: { volumeFilterEnabled?: boolean; volumeFilterPeriod?: number }
+  ) {
     this.instrumentUid = instrumentUid;
     this.dailyProfile = dailyProfile;
+    this.volumeFilterEnabled = options?.volumeFilterEnabled ?? false;
+    this.volumeFilterPeriod = options?.volumeFilterPeriod ?? 20;
   }
 
   reset(): void {
@@ -21,6 +30,7 @@ export class VolumeAccumulationStrategy implements IBacktestStrategy {
     this.hasBrokenHigh = false;
     this.hasBrokenLow = false;
     this.hasPosition = false;   // ← сброс при новом дне
+    this.volumeHistory = [];
   }
 
   private hasPosition = false;
@@ -33,6 +43,21 @@ export class VolumeAccumulationStrategy implements IBacktestStrategy {
     const low = quotationToNumber(candle.low);
     const close = quotationToNumber(candle.close);
     const time = candle.time || new Date().toISOString();
+
+    // Сохраняем объём текущей свечи
+    const volume = Number(candle.volume || '0');
+    this.volumeHistory.push(volume);
+    if (this.volumeHistory.length > this.volumeFilterPeriod) {
+      this.volumeHistory.shift();
+    }
+
+    // Проверка фильтра по объёму
+    if (this.volumeFilterEnabled && this.volumeHistory.length >= this.volumeFilterPeriod) {
+      const avgVolume = this.volumeHistory.reduce((a, b) => a + b, 0) / this.volumeHistory.length;
+      if (volume < avgVolume) {
+        return; // объём ниже среднего – игнорируем сигнал
+      }
+    }
 
     // Отслеживаем выход выше Value Area High
     if (high > this.dailyProfile.valueAreaHigh) {

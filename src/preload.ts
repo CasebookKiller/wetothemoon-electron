@@ -234,7 +234,10 @@ try {
     loadHistoricalProfile: (instrumentUid: string, candles: any[]) => 
       ipcRenderer.invoke('trading-assistant:load-historical-profile', instrumentUid, candles),
     
-    getAllInstruments: (token: string) => ipcRenderer.invoke('trading-assistant:get-all-instruments', token)
+    getAllInstruments: (token: string) => ipcRenderer.invoke('trading-assistant:get-all-instruments', token),
+
+    batchBacktest: (instrumentUids: string[], dateFrom: string, dateTo: string, interval: string, token: string, paramSets: any[], strategyType: string, profileResolution: number, valueAreaPercent: number) =>
+      ipcRenderer.invoke('trading-assistant:batch-backtest', instrumentUids, dateFrom, dateTo, interval, token, paramSets, strategyType, profileResolution, valueAreaPercent),
 
   });
 

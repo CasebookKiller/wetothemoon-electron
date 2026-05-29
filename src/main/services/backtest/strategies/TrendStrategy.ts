@@ -18,9 +18,19 @@ export class TrendStrategy implements IBacktestStrategy {
   private lastTradeTime = 0;
   private minIntervalMs = 15 * 60 * 1000; // 15 минут
 
-  constructor(instrumentUid: string, dailyProfile: VolumeProfileLevels | null) {
+  private volumeFilterEnabled: boolean;
+  private volumeFilterPeriod: number;
+  private volumeHistory: number[] = [];
+
+  constructor(
+    instrumentUid: string,
+    dailyProfile: VolumeProfileLevels | null,
+    options?: { volumeFilterEnabled?: boolean; volumeFilterPeriod?: number }
+  ) {
     this.instrumentUid = instrumentUid;
     this.dailyProfile = dailyProfile;
+    this.volumeFilterEnabled = options?.volumeFilterEnabled ?? false;
+    this.volumeFilterPeriod = options?.volumeFilterPeriod ?? 20;
   }
 
   reset(): void {
@@ -30,6 +40,7 @@ export class TrendStrategy implements IBacktestStrategy {
     this.trendDirection = null;
     this.hasPosition = false;
     this.lastTradeTime = 0;
+    this.volumeHistory = [];
   }
 
   onCandle(candle: StreamCandle): void {
@@ -39,6 +50,21 @@ export class TrendStrategy implements IBacktestStrategy {
     const low = quotationToNumber(candle.low);
     const close = quotationToNumber(candle.close);
     const time = candle.time || new Date().toISOString();
+    
+    // Сохраняем объём текущей свечи
+    const volume = Number(candle.volume || '0');
+    this.volumeHistory.push(volume);
+    if (this.volumeHistory.length > this.volumeFilterPeriod) {
+      this.volumeHistory.shift();
+    }
+
+    // Проверка фильтра по объёму
+    if (this.volumeFilterEnabled && this.volumeHistory.length >= this.volumeFilterPeriod) {
+      const avgVolume = this.volumeHistory.reduce((a, b) => a + b, 0) / this.volumeHistory.length;
+      if (volume < avgVolume) {
+        return; // объём ниже среднего – игнорируем сигнал
+      }
+    }
 
     // Кулдаун между сделками (дополнительная защита)
     const now = new Date(time).getTime();
