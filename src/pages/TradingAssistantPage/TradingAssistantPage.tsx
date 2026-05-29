@@ -149,10 +149,30 @@ export const TradingAssistantPage: React.FC = () => {
   });
 
   const [batchParams, setBatchParams] = useState({
+    slMode: 'manual' as 'manual' | 'range',
     slValues: '1,1.5,2',
+    slMin: 0.5,
+    slMax: 2.0,
+    slStep: 0.5,
+
+    tpMode: 'manual' as 'manual' | 'range',
     tpValues: '2,3,4',
+    tpMin: 1.0,
+    tpMax: 5.0,
+    tpStep: 1.0,
+
+    trailMode: 'manual' as 'manual' | 'range',
     trailValues: '0.5,1',
+    trailMin: 0.0,
+    trailMax: 2.0,
+    trailStep: 0.5,
+
+    lotsMode: 'manual' as 'manual' | 'range',
     lotsValues: '10',
+    lotsMin: 1,
+    lotsMax: 20,
+    lotsStep: 1,
+
     positionSizing: 'dynamic' as 'fixed' | 'dynamic',
     riskPercent: 1,
     volumeFilterEnabled: false,
@@ -938,6 +958,15 @@ export const TradingAssistantPage: React.FC = () => {
     </div>
   );
 
+  function generateValuesFromRange(min: number, max: number, step: number): number[] {
+    const values: number[] = [];
+    if (step <= 0) return [min];
+    for (let v = min; v <= max + 0.0001; v += step) {
+      values.push(Math.round(v * 100) / 100); // округление до 2 знаков
+    }
+    return values;
+  }
+
   const renderBatchPanel = () => {
     const runBatch = async () => {
       const api = (window as any).electronAPI;
@@ -945,10 +974,21 @@ export const TradingAssistantPage: React.FC = () => {
       setBatchRunning(true);
 
       // Преобразуем строки в массивы чисел
-      const slArr = batchParams.slValues.split(',').map(Number);
-      const tpArr = batchParams.tpValues.split(',').map(Number);
-      const trailArr = batchParams.trailValues.split(',').map(Number);
-      const lotsArr = batchParams.lotsValues.split(',').map(Number);
+      const slArr = batchParams.slMode === 'range'
+        ? generateValuesFromRange(batchParams.slMin, batchParams.slMax, batchParams.slStep)
+        : batchParams.slValues.split(',').map(Number);
+
+      const tpArr = batchParams.tpMode === 'range'
+        ? generateValuesFromRange(batchParams.tpMin, batchParams.tpMax, batchParams.tpStep)
+        : batchParams.tpValues.split(',').map(Number);
+
+      const trailArr = batchParams.trailMode === 'range'
+        ? generateValuesFromRange(batchParams.trailMin, batchParams.trailMax, batchParams.trailStep)
+        : batchParams.trailValues.split(',').map(Number);
+
+      const lotsArr = batchParams.lotsMode === 'range'
+        ? generateValuesFromRange(batchParams.lotsMin, batchParams.lotsMax, batchParams.lotsStep)
+        : batchParams.lotsValues.split(',').map(Number);
 
       // Генерируем все комбинации параметров
       const paramSets: any[] = [];
@@ -1074,10 +1114,67 @@ export const TradingAssistantPage: React.FC = () => {
                 ))}
             </div>
           </Dialog>
-          <label>SL%: <input type="text" value={batchParams.slValues} onChange={e => setBatchParams({ ...batchParams, slValues: e.target.value })} style={{ width: '80px' }} /></label>
-          <label>TP%: <input type="text" value={batchParams.tpValues} onChange={e => setBatchParams({ ...batchParams, tpValues: e.target.value })} style={{ width: '80px' }} /></label>
-          <label>Trail%: <input type="text" value={batchParams.trailValues} onChange={e => setBatchParams({ ...batchParams, trailValues: e.target.value })} style={{ width: '80px' }} /></label>
+          <label>SL%:
+            <select value={batchParams.slMode} onChange={e => setBatchParams({ ...batchParams, slMode: e.target.value as 'manual' | 'range' })}>
+              <option value="manual">Ручной</option>
+              <option value="range">Диапазон</option>
+            </select>
+            {batchParams.slMode === 'manual' ? (
+              <input type="text" value={batchParams.slValues} onChange={e => setBatchParams({ ...batchParams, slValues: e.target.value })} style={{ width: '80px' }} />
+            ) : (
+              <span>
+                <input type="number" value={batchParams.slMin} onChange={e => setBatchParams({ ...batchParams, slMin: Number(e.target.value) })} step={0.1} style={{ width: '60px' }} />
+                <input type="number" value={batchParams.slMax} onChange={e => setBatchParams({ ...batchParams, slMax: Number(e.target.value) })} step={0.1} style={{ width: '60px' }} />
+                <input type="number" value={batchParams.slStep} onChange={e => setBatchParams({ ...batchParams, slStep: Number(e.target.value) })} step={0.1} style={{ width: '60px' }} />
+              </span>
+            )}
+          </label>
+          <label>TP%:
+            <select value={batchParams.tpMode} onChange={e => setBatchParams({ ...batchParams, tpMode: e.target.value as 'manual' | 'range' })}>
+              <option value="manual">Ручной</option>
+              <option value="range">Диапазон</option>
+            </select>
+            {batchParams.tpMode === 'manual' ? (
+              <input type="text" value={batchParams.tpValues} onChange={e => setBatchParams({ ...batchParams, tpValues: e.target.value })} style={{ width: '80px' }} />
+            ) : (
+              <span>
+                <input type="number" value={batchParams.tpMin} onChange={e => setBatchParams({ ...batchParams, tpMin: Number(e.target.value) })} step={0.1} style={{ width: '60px' }} />
+                <input type="number" value={batchParams.tpMax} onChange={e => setBatchParams({ ...batchParams, tpMax: Number(e.target.value) })} step={0.1} style={{ width: '60px' }} />
+                <input type="number" value={batchParams.tpStep} onChange={e => setBatchParams({ ...batchParams, tpStep: Number(e.target.value) })} step={0.1} style={{ width: '60px' }} />
+              </span>
+            )}
+          </label>
+          <label>Trail%:
+            <select value={batchParams.trailMode} onChange={e => setBatchParams({ ...batchParams, trailMode: e.target.value as 'manual' | 'range' })}>
+              <option value="manual">Ручной</option>
+              <option value="range">Диапазон</option>
+            </select>
+            {batchParams.trailMode === 'manual' ? (
+              <input type="text" value={batchParams.trailValues} onChange={e => setBatchParams({ ...batchParams, trailValues: e.target.value })} style={{ width: '80px' }} />
+            ) : (
+              <span>
+                <input type="number" value={batchParams.trailMin} onChange={e => setBatchParams({ ...batchParams, trailMin: Number(e.target.value) })} step={0.1} style={{ width: '60px' }} />
+                <input type="number" value={batchParams.trailMax} onChange={e => setBatchParams({ ...batchParams, trailMax: Number(e.target.value) })} step={0.1} style={{ width: '60px' }} />
+                <input type="number" value={batchParams.trailStep} onChange={e => setBatchParams({ ...batchParams, trailStep: Number(e.target.value) })} step={0.1} style={{ width: '60px' }} />
+              </span>
+            )}
+          </label>
           <label>Lots: <input type="text" value={batchParams.lotsValues} onChange={e => setBatchParams({ ...batchParams, lotsValues: e.target.value })} style={{ width: '80px' }} /></label>
+          <label>Lots:
+            <select value={batchParams.lotsMode} onChange={e => setBatchParams({ ...batchParams, lotsMode: e.target.value as 'manual' | 'range' })}>
+              <option value="manual">Ручной</option>
+              <option value="range">Диапазон</option>
+            </select>
+            {batchParams.lotsMode === 'manual' ? (
+              <input type="text" value={batchParams.lotsValues} onChange={e => setBatchParams({ ...batchParams, lotsValues: e.target.value })} style={{ width: '80px' }} />
+            ) : (
+              <span>
+                <input type="number" value={batchParams.lotsMin} onChange={e => setBatchParams({ ...batchParams, lotsMin: Number(e.target.value) })} step={0.1} style={{ width: '60px' }} />
+                <input type="number" value={batchParams.lotsMax} onChange={e => setBatchParams({ ...batchParams, lotsMax: Number(e.target.value) })} step={0.1} style={{ width: '60px' }} />
+                <input type="number" value={batchParams.lotsStep} onChange={e => setBatchParams({ ...batchParams, lotsStep: Number(e.target.value) })} step={0.1} style={{ width: '60px' }} />
+              </span>
+            )}
+          </label>
           <label>Size:
             <select value={batchParams.positionSizing} onChange={e => setBatchParams({ ...batchParams, positionSizing: e.target.value as 'fixed' | 'dynamic' })}>
               <option value="fixed">Fixed</option>
