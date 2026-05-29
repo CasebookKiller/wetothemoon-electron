@@ -235,7 +235,7 @@ export const registerTradingAssistantHandlers = () => {
       return null;
     }
   });
-  
+
   ipcMain.handle('trading-assistant:batch-backtest', async (event, instrumentUids: string[], dateFrom: string, dateTo: string, intervalStr: string, token: string, paramSets: any[], strategyType: string, profileResolution: number, valueAreaPercent: number) => {
     const intervalMap: Record<string, CandleInterval> = {
       '1min': CandleInterval.CANDLE_INTERVAL_1_MIN,
@@ -293,23 +293,29 @@ export const registerTradingAssistantHandlers = () => {
   });
 
   ipcMain.handle('trading-assistant:get-accounts', async (_, token: string) => {
-    if (!token) {
-      console.error('[GetAccounts] Токен не передан');
-      return [];
-    }
-    try {
-      console.log('[GetAccounts] Запрос счетов с токеном:', token.slice(0, 10) + '...');
-      const response = await sandboxGrpc.getSandboxAccounts({}, token);
-      console.log('[GetAccounts] Ответ:', response);
-      const accounts = response.accounts || [];
-      return accounts.map(acc => ({
-        id: acc.id,
-        name: acc.name || acc.id,
-      }));
-    } catch (error: any) {
-      console.error('[GetAccounts] Ошибка:', error.message || error);
-      // Возвращаем сообщение об ошибке, чтобы UI мог показать
-      throw new Error(error.message || 'Неизвестная ошибка');
+    if (!token) return [];
+
+    const maxRetries = 3;
+    let attempt = 0;
+
+    while (attempt < maxRetries) {
+      try {
+        console.log(`[GetAccounts] Попытка ${attempt + 1} из ${maxRetries}`);
+        const response = await sandboxGrpc.getSandboxAccounts({}, token);
+        const accounts = response.accounts || [];
+        console.log(`[GetAccounts] Получено ${accounts.length} счетов`);
+        return accounts.map(acc => ({
+          id: acc.id,
+          name: acc.name || acc.id,
+        }));
+      } catch (error: any) {
+        attempt++;
+        console.error(`[GetAccounts] Ошибка (попытка ${attempt}):`, error.message);
+        if (attempt >= maxRetries) {
+          throw new Error(error.message || 'Неизвестная ошибка');
+        }
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
     }
   });
 
@@ -432,30 +438,41 @@ export const registerTradingAssistantHandlers = () => {
 
   ipcMain.handle('trading-assistant:get-all-instruments', async (_, token: string) => {
     if (!token) return [];
-    try {
-      console.log('[GetAllInstruments] Запрос российских акций...');
-      const response = await instrumentsGrpc.shares(
-        {
-          instrumentStatus: 1, // базовый список (торгуемые)
-        },
-        token
-      );
-      const instruments = (response.instruments || []).filter(
-        (inst: any) =>
-          inst.apiTradeAvailableFlag === true &&
-          inst.currency?.toLowerCase() === 'rub'
-      );
-      console.log(`[GetAllInstruments] Найдено ${instruments.length} российских акций`);
-      return instruments.map((inst: any) => ({
-        uid: inst.uid || inst.figi,
-        name: inst.name || inst.ticker,
-        ticker: inst.ticker,
-        figi: inst.figi,
-      }));
-    } catch (e: any) {
-      console.error('[GetAllInstruments] Ошибка:', e.message || e);
-      return [];
+
+    const maxRetries = 3;
+    let attempt = 0;
+
+    while (attempt < maxRetries) {
+      try {
+        console.log(`[GetAllInstruments] Попытка ${attempt + 1} из ${maxRetries}`);
+        const response = await instrumentsGrpc.shares(
+          { instrumentStatus: 1 }, // базовый список (торгуемые)
+          token
+        );
+        const instruments = (response.instruments || []).filter(
+          (inst: any) =>
+            inst.apiTradeAvailableFlag === true &&
+            inst.currency?.toLowerCase() === 'rub'
+        );
+        console.log(`[GetAllInstruments] Найдено ${instruments.length} российских акций`);
+        return instruments.map((inst: any) => ({
+          uid: inst.uid || inst.figi,
+          name: inst.name || inst.ticker,
+          ticker: inst.ticker,
+          figi: inst.figi,
+        }));
+      } catch (e: any) {
+        attempt++;
+        console.error(`[GetAllInstruments] Ошибка (попытка ${attempt}):`, e.message);
+        if (attempt >= maxRetries) {
+          // Все попытки исчерпаны – возвращаем пустой массив
+          return [];
+        }
+        // Ждём перед следующей попыткой
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
     }
+    return [];
   });
 
   // После регистрации всех обработчиков (внутри registerTradingAssistantHandlers):

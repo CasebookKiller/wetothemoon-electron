@@ -88,12 +88,16 @@ export class VirtualPortfolio {
       lotQty = Math.floor(riskAmount / stopDistance);
       if (lotQty < 1) lotQty = 1;
     }
-    // используйте lotQty вместо this.config.lotQuantity при расчёте прибыли
+    // Ограничение: не больше, чем можем купить на текущий капитал
+    const maxLotsByCapital = Math.floor(this.capital / entryPrice);
+    lotQty = Math.min(lotQty, maxLotsByCapital);
+    if (lotQty < 1) lotQty = 1;
+
     const stopLossPrice = this.config.stopLossPercent > 0
       ? (isBuy
           ? entryPrice * (1 - this.config.stopLossPercent / 100)
           : entryPrice * (1 + this.config.stopLossPercent / 100))
-      : entryPrice; // если SL=0, ставим заглушку, всё равно не сработает
+      : entryPrice;
 
     const takeProfitPrice = this.config.takeProfitPercent > 0
       ? (isBuy

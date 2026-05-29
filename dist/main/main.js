@@ -1771,6 +1771,9 @@ var VirtualPortfolio = class {
 			lotQty = Math.floor(riskAmount / stopDistance);
 			if (lotQty < 1) lotQty = 1;
 		}
+		const maxLotsByCapital = Math.floor(this.capital / entryPrice);
+		lotQty = Math.min(lotQty, maxLotsByCapital);
+		if (lotQty < 1) lotQty = 1;
 		const stopLossPrice = this.config.stopLossPercent > 0 ? isBuy ? entryPrice * (1 - this.config.stopLossPercent / 100) : entryPrice * (1 + this.config.stopLossPercent / 100) : entryPrice;
 		const takeProfitPrice = this.config.takeProfitPercent > 0 ? isBuy ? entryPrice * (1 + this.config.takeProfitPercent / 100) : entryPrice * (1 - this.config.takeProfitPercent / 100) : void 0;
 		this.openPosition = {
@@ -2603,21 +2606,22 @@ var registerTradingAssistantHandlers = () => {
 		if (orderManagerInstance$1) orderManagerInstance$1.config.lotQuantity = qty;
 	});
 	electron.ipcMain.handle("trading-assistant:get-accounts", async (_, token) => {
-		if (!token) {
-			console.error("[GetAccounts] Токен не передан");
-			return [];
-		}
-		try {
-			console.log("[GetAccounts] Запрос счетов с токеном:", token.slice(0, 10) + "...");
-			const response = await sandboxGrpc.getSandboxAccounts({}, token);
-			console.log("[GetAccounts] Ответ:", response);
-			return (response.accounts || []).map((acc) => ({
+		if (!token) return [];
+		const maxRetries = 3;
+		let attempt = 0;
+		while (attempt < maxRetries) try {
+			console.log(`[GetAccounts] Попытка ${attempt + 1} из ${maxRetries}`);
+			const accounts = (await sandboxGrpc.getSandboxAccounts({}, token)).accounts || [];
+			console.log(`[GetAccounts] Получено ${accounts.length} счетов`);
+			return accounts.map((acc) => ({
 				id: acc.id,
 				name: acc.name || acc.id
 			}));
 		} catch (error) {
-			console.error("[GetAccounts] Ошибка:", error.message || error);
-			throw new Error(error.message || "Неизвестная ошибка");
+			attempt++;
+			console.error(`[GetAccounts] Ошибка (попытка ${attempt}):`, error.message);
+			if (attempt >= maxRetries) throw new Error(error.message || "Неизвестная ошибка");
+			await new Promise((resolve) => setTimeout(resolve, 1e3));
 		}
 	});
 	electron.ipcMain.handle("trading-assistant:create-account", async () => {
@@ -2750,8 +2754,10 @@ var registerTradingAssistantHandlers = () => {
 	});
 	electron.ipcMain.handle("trading-assistant:get-all-instruments", async (_, token) => {
 		if (!token) return [];
-		try {
-			console.log("[GetAllInstruments] Запрос российских акций...");
+		const maxRetries = 3;
+		let attempt = 0;
+		while (attempt < maxRetries) try {
+			console.log(`[GetAllInstruments] Попытка ${attempt + 1} из ${maxRetries}`);
 			const instruments = ((await instrumentsGrpc.shares({ instrumentStatus: 1 }, token)).instruments || []).filter((inst) => inst.apiTradeAvailableFlag === true && inst.currency?.toLowerCase() === "rub");
 			console.log(`[GetAllInstruments] Найдено ${instruments.length} российских акций`);
 			return instruments.map((inst) => ({
@@ -2761,9 +2767,12 @@ var registerTradingAssistantHandlers = () => {
 				figi: inst.figi
 			}));
 		} catch (e) {
-			console.error("[GetAllInstruments] Ошибка:", e.message || e);
-			return [];
+			attempt++;
+			console.error(`[GetAllInstruments] Ошибка (попытка ${attempt}):`, e.message);
+			if (attempt >= maxRetries) return [];
+			await new Promise((resolve) => setTimeout(resolve, 1e3));
 		}
+		return [];
 	});
 	marketDataBus.on("candle", (candle) => {
 		const win = getTradingAssistantWindow();

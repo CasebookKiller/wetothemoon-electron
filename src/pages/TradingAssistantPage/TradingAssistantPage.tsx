@@ -1026,6 +1026,18 @@ export const TradingAssistantPage: React.FC = () => {
       });
 
       const paramSets = generateParamSets();
+      const uniqueParamSets = paramSets.filter((set, index, self) =>
+        index === self.findIndex(s =>
+          s.stopLossPercent === set.stopLossPercent &&
+          s.takeProfitPercent === set.takeProfitPercent &&
+          s.trailingDistancePercent === set.trailingDistancePercent &&
+          s.lots === set.lots &&
+          s.positionSizing === set.positionSizing &&
+          s.riskPercent === set.riskPercent &&
+          s.volumeFilterEnabled === set.volumeFilterEnabled &&
+          s.volumeFilterPeriod === set.volumeFilterPeriod
+        )
+      );
 
       api.batchBacktest(
         batchInstruments,
@@ -1033,7 +1045,7 @@ export const TradingAssistantPage: React.FC = () => {
         backtest.dateTo,
         backtest.interval,
         stream.token,
-        paramSets,
+        uniqueParamSets,          // ← вместо paramSets
         batchParams.strategyType,
         backtest.profileResolution,
         backtest.valueAreaPercent
