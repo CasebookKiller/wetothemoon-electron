@@ -236,28 +236,30 @@ export const registerTradingAssistantHandlers = () => {
     }
   });
 
-  ipcMain.handle('trading-assistant:batch-backtest', async (_, instrumentUids: string[], dateFrom: string, dateTo: string, intervalStr: string, token: string, paramSets: any[], strategyType: string, profileResolution: number, valueAreaPercent: number) => {
-    const intervalMap: Record<string, CandleInterval> = {
-      '1min': CandleInterval.CANDLE_INTERVAL_1_MIN,
-      '5min': CandleInterval.CANDLE_INTERVAL_5_MIN,
-      '15min': CandleInterval.CANDLE_INTERVAL_15_MIN,
-      '1hour': CandleInterval.CANDLE_INTERVAL_HOUR,
-    };
+  ipcMain.on('trading-assistant:batch-backtest', async (event, instrumentUids: string[], dateFrom: string, dateTo: string, intervalStr: string, token: string, paramSets: any[], strategyType: string, profileResolution: number, valueAreaPercent: number) => {
+    const intervalMap: Record<string, CandleInterval> = { /* ... как раньше */ };
     const interval = intervalMap[intervalStr] || CandleInterval.CANDLE_INTERVAL_1_MIN;
 
     const runner = new BatchBacktestRunner();
-    const results = await runner.run(
-      instrumentUids,
-      dateFrom,
-      dateTo,
-      interval,
-      token,
-      paramSets,
-      strategyType,
-      profileResolution,
-      valueAreaPercent
-    );
-    return results;
+    const total = instrumentUids.length * paramSets.length;
+    let completed = 0;
+
+    // Передаём колбэк для отправки промежуточных результатов
+    await runner.run(
+    instrumentUids, dateFrom, dateTo, interval, token, paramSets,
+    strategyType, profileResolution, valueAreaPercent,
+    (item) => {
+      completed++;
+      event.sender.send('trading-assistant:batch-progress', {
+        item,
+        completed,
+        total,
+      });
+    }
+  );
+
+  return { completed }; // финальный ответ
+    
   });
 
   ipcMain.handle('trading-assistant:send-backtest-signals', async (_, signals: BacktestSignal[]) => {

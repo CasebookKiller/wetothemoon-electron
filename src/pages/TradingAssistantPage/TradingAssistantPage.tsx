@@ -183,39 +183,44 @@ export const TradingAssistantPage: React.FC = () => {
   const [batchResults, setBatchResults] = useState<any[]>([]);
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchProgress, setBatchProgress] = useState<{ completed: number; total: number } | null>(null);
-  
-  const runBatch = () => {
-    const api = (window as any).electronAPI;
-    if (!api?.batchBacktest) return;
 
-    // Очищаем старые результаты и подписываемся на прогресс
-    setBatchResults([]);
-    setBatchProgress({ completed: 0, total: 0 });
+  const generateParamSets = () => {
+    const slValues = batchParams.slMode === 'range'
+      ? generateValuesFromRange(batchParams.slMin, batchParams.slMax, batchParams.slStep)
+      : batchParams.slValues.split(',').map(Number);
 
-    api.removeBatchListeners();
-    api.onBatchProgress((data: any) => {
-      setBatchResults(prev => [...prev, data.item]);
-      setBatchProgress({ completed: data.completed, total: data.total });
-    });
-    api.onBatchComplete(() => {
-      setBatchProgress(null); // скрываем прогресс-бар
-    });
+    const tpValues = batchParams.tpMode === 'range'
+      ? generateValuesFromRange(batchParams.tpMin, batchParams.tpMax, batchParams.tpStep)
+      : batchParams.tpValues.split(',').map(Number);
 
-    // Формируем paramSets как раньше
-    const paramSets = generateParamSets();
-    
-    // Запускаем batch (без await, потому что результат придёт через события)
-    api.batchBacktest(
-      batchInstruments,
-      backtest.dateFrom,
-      backtest.dateTo,
-      backtest.interval,
-      stream.token,
-      paramSets,
-      batchParams.strategyType,
-      backtest.profileResolution,
-      backtest.valueAreaPercent
-    );
+    const trailValues = batchParams.trailMode === 'range'
+      ? generateValuesFromRange(batchParams.trailMin, batchParams.trailMax, batchParams.trailStep)
+      : batchParams.trailValues.split(',').map(Number);
+
+    const lotsValues = batchParams.lotsMode === 'range'
+      ? generateValuesFromRange(batchParams.lotsMin, batchParams.lotsMax, batchParams.lotsStep)
+      : batchParams.lotsValues.split(',').map(Number);
+
+    const paramSets: any[] = [];
+    for (const sl of slValues) {
+      for (const tp of tpValues) {
+        for (const trail of trailValues) {
+          for (const lots of lotsValues) {
+            paramSets.push({
+              stopLossPercent: sl,
+              takeProfitPercent: tp,
+              trailingDistancePercent: trail,
+              lots,
+              positionSizing: batchParams.positionSizing,
+              riskPercent: batchParams.riskPercent,
+              volumeFilterEnabled: batchParams.volumeFilterEnabled,
+              volumeFilterPeriod: batchParams.volumeFilterPeriod,
+            });
+          }
+        }
+      }
+    }
+    return paramSets;
   };
 
   // Локальные состояния (часто обновляемые)
@@ -1003,63 +1008,36 @@ export const TradingAssistantPage: React.FC = () => {
   }
 
   const renderBatchPanel = () => {
-    const runBatch = async () => {
+    
+    const runBatch = () => {
       const api = (window as any).electronAPI;
       if (!api?.batchBacktest) return;
-      setBatchRunning(true);
 
-      // Преобразуем строки в массивы чисел
-      const slArr = batchParams.slMode === 'range'
-        ? generateValuesFromRange(batchParams.slMin, batchParams.slMax, batchParams.slStep)
-        : batchParams.slValues.split(',').map(Number);
+      setBatchResults([]);
+      setBatchProgress({ completed: 0, total: 0 });
 
-      const tpArr = batchParams.tpMode === 'range'
-        ? generateValuesFromRange(batchParams.tpMin, batchParams.tpMax, batchParams.tpStep)
-        : batchParams.tpValues.split(',').map(Number);
+      api.removeBatchListeners();
+      api.onBatchProgress((data: any) => {
+        setBatchResults(prev => [...prev, data.item]);
+        setBatchProgress({ completed: data.completed, total: data.total });
+      });
+      api.onBatchComplete(() => {
+        setBatchProgress(null);
+      });
 
-      const trailArr = batchParams.trailMode === 'range'
-        ? generateValuesFromRange(batchParams.trailMin, batchParams.trailMax, batchParams.trailStep)
-        : batchParams.trailValues.split(',').map(Number);
+      const paramSets = generateParamSets();
 
-      const lotsArr = batchParams.lotsMode === 'range'
-        ? generateValuesFromRange(batchParams.lotsMin, batchParams.lotsMax, batchParams.lotsStep)
-        : batchParams.lotsValues.split(',').map(Number);
-
-      // Генерируем все комбинации параметров
-      const paramSets: any[] = [];
-      for (const sl of slArr) {
-        for (const tp of tpArr) {
-          for (const trail of trailArr) {
-            for (const lots of lotsArr) {
-              paramSets.push({
-                stopLossPercent: sl,
-                takeProfitPercent: tp,
-                trailingDistancePercent: trail,
-                lots,
-                positionSizing: batchParams.positionSizing,
-                riskPercent: batchParams.riskPercent,
-                volumeFilterEnabled: batchParams.volumeFilterEnabled,
-                volumeFilterPeriod: batchParams.volumeFilterPeriod,
-              });
-            }
-          }
-        }
-      }
-
-      const results = await api.batchBacktest(
+      api.batchBacktest(
         batchInstruments,
         backtest.dateFrom,
         backtest.dateTo,
         backtest.interval,
-        stream.token, // токен для загрузки свечей
+        stream.token,
         paramSets,
         batchParams.strategyType,
         backtest.profileResolution,
         backtest.valueAreaPercent
       );
-
-      setBatchResults(results);
-      setBatchRunning(false);
     };
 
     const exportCSV = () => {
