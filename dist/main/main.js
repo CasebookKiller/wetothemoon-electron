@@ -2544,8 +2544,13 @@ var registerTradingAssistantHandlers = () => {
 			return null;
 		}
 	});
-	electron.ipcMain.on("trading-assistant:batch-backtest", async (event, instrumentUids, dateFrom, dateTo, intervalStr, token, paramSets, strategyType, profileResolution, valueAreaPercent) => {
-		const interval = {}[intervalStr] || CandleInterval.CANDLE_INTERVAL_1_MIN;
+	electron.ipcMain.handle("trading-assistant:batch-backtest", async (event, instrumentUids, dateFrom, dateTo, intervalStr, token, paramSets, strategyType, profileResolution, valueAreaPercent) => {
+		const interval = {
+			"1min": CandleInterval.CANDLE_INTERVAL_1_MIN,
+			"5min": CandleInterval.CANDLE_INTERVAL_5_MIN,
+			"15min": CandleInterval.CANDLE_INTERVAL_15_MIN,
+			"1hour": CandleInterval.CANDLE_INTERVAL_HOUR
+		}[intervalStr] || CandleInterval.CANDLE_INTERVAL_1_MIN;
 		const runner = new BatchBacktestRunner();
 		const total = instrumentUids.length * paramSets.length;
 		let completed = 0;
