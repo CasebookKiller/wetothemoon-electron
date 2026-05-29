@@ -3379,6 +3379,7 @@ var OrderManager = class {
 			takeProfitPercent: 0,
 			trailingEnabled: false,
 			trailingPercent: 1,
+			marketDataToken: "",
 			...config
 		};
 	}
@@ -3529,16 +3530,20 @@ var OrderManager = class {
 		}
 	}
 	async getLastPrice(instrumentUid) {
-		try {
-			const p = (await sandboxGrpc.getLastPrices({
-				instrumentId: [instrumentUid],
-				lastPriceType: 1
-			}, this.config.token)).lastPrices?.[0]?.price;
-			return p ? Number(p.units) + Number(p.nano) / 1e9 : null;
-		} catch (e) {
-			console.error("[OrderManager] Не удалось получить lastPrice:", e);
+		if (!this.config.marketDataToken) {
+			console.warn("[OrderManager] Не задан marketDataToken");
 			return null;
 		}
+		try {
+			const price = (await marketDataGrpc.getLastPrices({
+				instrumentId: [instrumentUid],
+				lastPriceType: 1
+			}, this.config.marketDataToken)).lastPrices?.[0]?.price;
+			if (price) return Number(price.units) + Number(price.nano) / 1e9;
+		} catch (e) {
+			console.error("[OrderManager] Не удалось получить lastPrice:", e);
+		}
+		return null;
 	}
 };
 //#endregion

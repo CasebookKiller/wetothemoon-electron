@@ -1,6 +1,7 @@
 import { sandboxGrpc } from './tbank/SandboxGrpcService';
 import { OrderDirection, OrderType, OrderIdType } from '@/api/tbank/ordersTypes';
 import type { BacktestSignal } from './backtest/common';
+import { marketDataGrpc } from './tbank/MarketDataGrpcService';  // <-- новый импорт (в начале файла)
 
 export interface OrderManagerConfig {
   lotQuantity: number;
@@ -12,6 +13,7 @@ export interface OrderManagerConfig {
   takeProfitPercent?: number;
   trailingEnabled?: boolean;
   trailingPercent?: number;
+  marketDataToken?: string;  // токен для рыночных данных (read-only)
 }
 
 export class OrderManager {
@@ -38,6 +40,7 @@ export class OrderManager {
       takeProfitPercent: 0,
       trailingEnabled: false,
       trailingPercent: 1,
+      marketDataToken: '',
       ...config,
     };
   }
@@ -207,10 +210,25 @@ export class OrderManager {
   }
 
   private async getLastPrice(instrumentUid: string): Promise<number | null> {
+    if (!this.config.marketDataToken) {
+      console.warn('[OrderManager] Не задан marketDataToken');
+      return null;
+    }
     try {
-      const resp = await sandboxGrpc.getLastPrices({ instrumentId: [instrumentUid], lastPriceType: 1 }, this.config.token);
-      const p = resp.lastPrices?.[0]?.price;
-      return p ? Number(p.units) + Number(p.nano) / 1e9 : null;
-    } catch (e) { console.error('[OrderManager] Не удалось получить lastPrice:', e); return null; }
+      const response = await marketDataGrpc.getLastPrices(
+        {
+          instrumentId: [instrumentUid],
+          lastPriceType: 1, // LAST_PRICE_EXCHANGE
+        },
+        this.config.marketDataToken   // передаём read-only токен
+      );
+      const price = response.lastPrices?.[0]?.price;
+      if (price) {
+        return Number(price.units) + Number(price.nano) / 1e9;
+      }
+    } catch (e) {
+      console.error('[OrderManager] Не удалось получить lastPrice:', e);
+    }
+    return null;
   }
 }
