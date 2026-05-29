@@ -16,7 +16,6 @@ export interface BatchParams {
   riskPercent: number;
   volumeFilterEnabled: boolean;
   volumeFilterPeriod: number;
-  // можно добавить интервал, стратегию и т.д.
 }
 
 export interface BatchResultItem {
@@ -43,28 +42,45 @@ export class BatchBacktestRunner {
     const results: BatchResultItem[] = [];
 
     for (const uid of instrumentUids) {
-      // Загружаем свечи за весь период (используем по дням, как в обычном бэктесте)
-      // Для простоты загружаем все свечи одним запросом (если период большой – может быть много, но пока допустим)
-      const candles = await loader.loadIntradayCandles(
-        uid,
-        new Date(dateFrom + 'T07:00:00Z'),
-        new Date(dateTo + 'T16:00:00Z'),
-        token,
-        interval
-      );
+      // Загружаем свечи за каждый рабочий день периода
+      const allCandles: any[] = [];
+      let currentDate = new Date(dateFrom + 'T00:00:00Z');
+      const endDate = new Date(dateTo + 'T00:00:00Z');
 
-      if (candles.length === 0) continue;
+      while (currentDate <= endDate) {
+        const dayOfWeek = currentDate.getDay(); // 0 = вс, 6 = сб
+        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+          const dateStr = currentDate.toISOString().split('T')[0];
+          const dayFrom = new Date(dateStr + 'T07:00:00Z');
+          const dayTo = new Date(dateStr + 'T16:00:00Z');
 
-      // Строим профиль (один на весь период или по дням? Пока упростим – на все свечи)
+          try {
+            const candles = await loader.loadIntradayCandles(uid, dayFrom, dayTo, token, interval);
+            allCandles.push(...candles);
+          } catch (e: any) {
+            console.warn(`[Batch] Ошибка загрузки за ${dateStr}:`, e.message);
+          }
+        }
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+
+      if (allCandles.length === 0) continue;
+
+      // Строим профиль на все свечи периода
       const engine = new VolumeProfileEngine({ profileResolution, valueAreaPercent });
-      candles.forEach(c => (engine as any).onCandle?.(c));
+      allCandles.forEach(c => (engine as any).onCandle?.(c));
       const profile = engine.getProfile(uid);
 
       // Для каждого набора параметров
       for (const params of paramSets) {
+        const strategyOptions = {
+          volumeFilterEnabled: params.volumeFilterEnabled,
+          volumeFilterPeriod: params.volumeFilterPeriod,
+        };
+
         const strategy = strategyType === 'trend'
-          ? new TrendStrategy(uid, profile, { volumeFilterEnabled: params.volumeFilterEnabled, volumeFilterPeriod: params.volumeFilterPeriod })
-          : new VolumeAccumulationStrategy(uid, profile, { volumeFilterEnabled: params.volumeFilterEnabled, volumeFilterPeriod: params.volumeFilterPeriod });
+          ? new TrendStrategy(uid, profile, strategyOptions)
+          : new VolumeAccumulationStrategy(uid, profile, strategyOptions);
 
         const portfolio = new VirtualPortfolio({
           initialCapital: 100000,
@@ -77,26 +93,27 @@ export class BatchBacktestRunner {
         });
 
         // Прогоняем свечи последовательно
-        for (const candle of candles) {
+        for (const candle of allCandles) {
           strategy.onCandle(candle);
           const newSignals = strategy.getSignals();
           for (const signal of newSignals) {
             portfolio.processSignal(signal);
           }
           strategy.clearSignals();
+
           const high = quotationToNumber(candle.high);
           const low = quotationToNumber(candle.low);
           const close = quotationToNumber(candle.close);
           portfolio.checkStopTake(high, low, close, candle.time || '');
         }
 
-        const lastCandle = candles[candles.length - 1];
+        // Закрываем позицию в конце периода
+        const lastCandle = allCandles[allCandles.length - 1];
         const lastClose = quotationToNumber(lastCandle.close);
         portfolio.finalizeWithLastPrice(lastClose, lastCandle.time || '');
 
         results.push({
           instrumentUid: uid,
-          instrumentName: undefined, // можно будет подставить из кэша инструментов
           params,
           stats: portfolio.getStats(),
           signals: strategy.getSignals().length,

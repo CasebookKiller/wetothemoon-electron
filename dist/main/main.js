@@ -2359,22 +2359,37 @@ var BatchBacktestRunner = class {
 		const loader = new HistoricalDataLoader();
 		const results = [];
 		for (const uid of instrumentUids) {
-			const candles = await loader.loadIntradayCandles(uid, /* @__PURE__ */ new Date(dateFrom + "T07:00:00Z"), /* @__PURE__ */ new Date(dateTo + "T16:00:00Z"), token, interval);
-			if (candles.length === 0) continue;
+			const allCandles = [];
+			let currentDate = /* @__PURE__ */ new Date(dateFrom + "T00:00:00Z");
+			const endDate = /* @__PURE__ */ new Date(dateTo + "T00:00:00Z");
+			while (currentDate <= endDate) {
+				const dayOfWeek = currentDate.getDay();
+				if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+					const dateStr = currentDate.toISOString().split("T")[0];
+					const dayFrom = /* @__PURE__ */ new Date(dateStr + "T07:00:00Z");
+					const dayTo = /* @__PURE__ */ new Date(dateStr + "T16:00:00Z");
+					try {
+						const candles = await loader.loadIntradayCandles(uid, dayFrom, dayTo, token, interval);
+						allCandles.push(...candles);
+					} catch (e) {
+						console.warn(`[Batch] Ошибка загрузки за ${dateStr}:`, e.message);
+					}
+				}
+				currentDate.setDate(currentDate.getDate() + 1);
+			}
+			if (allCandles.length === 0) continue;
 			const engine = new VolumeProfileEngine({
 				profileResolution,
 				valueAreaPercent
 			});
-			candles.forEach((c) => engine.onCandle?.(c));
+			allCandles.forEach((c) => engine.onCandle?.(c));
 			const profile = engine.getProfile(uid);
 			for (const params of paramSets) {
-				const strategy = strategyType === "trend" ? new TrendStrategy(uid, profile, {
+				const strategyOptions = {
 					volumeFilterEnabled: params.volumeFilterEnabled,
 					volumeFilterPeriod: params.volumeFilterPeriod
-				}) : new VolumeAccumulationStrategy(uid, profile, {
-					volumeFilterEnabled: params.volumeFilterEnabled,
-					volumeFilterPeriod: params.volumeFilterPeriod
-				});
+				};
+				const strategy = strategyType === "trend" ? new TrendStrategy(uid, profile, strategyOptions) : new VolumeAccumulationStrategy(uid, profile, strategyOptions);
 				const portfolio = new VirtualPortfolio({
 					initialCapital: 1e5,
 					stopLossPercent: params.stopLossPercent,
@@ -2384,7 +2399,7 @@ var BatchBacktestRunner = class {
 					positionSizing: params.positionSizing,
 					riskPercent: params.riskPercent
 				});
-				for (const candle of candles) {
+				for (const candle of allCandles) {
 					strategy.onCandle(candle);
 					const newSignals = strategy.getSignals();
 					for (const signal of newSignals) portfolio.processSignal(signal);
@@ -2394,12 +2409,11 @@ var BatchBacktestRunner = class {
 					const close = quotationToNumber(candle.close);
 					portfolio.checkStopTake(high, low, close, candle.time || "");
 				}
-				const lastCandle = candles[candles.length - 1];
+				const lastCandle = allCandles[allCandles.length - 1];
 				const lastClose = quotationToNumber(lastCandle.close);
 				portfolio.finalizeWithLastPrice(lastClose, lastCandle.time || "");
 				results.push({
 					instrumentUid: uid,
-					instrumentName: void 0,
 					params,
 					stats: portfolio.getStats(),
 					signals: strategy.getSignals().length
