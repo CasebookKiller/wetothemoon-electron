@@ -3377,6 +3377,8 @@ var OrderManager = class {
 			accountId: "",
 			stopLossPercent: 0,
 			takeProfitPercent: 0,
+			trailingEnabled: false,
+			trailingPercent: 1,
 			...config
 		};
 	}
@@ -3517,8 +3519,7 @@ var OrderManager = class {
 						units: Math.floor(newStopPrice),
 						nano: Math.round(newStopPrice % 1 * 1e9)
 					},
-					quantity: this.config.lotQuantity,
-					direction: OrderDirection.ORDER_DIRECTION_SELL
+					quantity: this.config.lotQuantity
 				}, this.config.token);
 				this.trailingEntryPrice = newStopPrice;
 				console.log(`[OrderManager] Трейлинг‑стоп обновлён до ${newStopPrice}`);
