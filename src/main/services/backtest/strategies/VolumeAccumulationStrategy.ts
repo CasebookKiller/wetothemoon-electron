@@ -16,7 +16,7 @@ export class VolumeAccumulationStrategy implements IBacktestStrategy {
 
   constructor(
     instrumentUid: string,
-    dailyProfile: VolumeProfileLevels | null,
+    dailyProfile: VolumeProfileLevels | null,   // ← добавлено | null
     options?: { volumeFilterEnabled?: boolean; volumeFilterPeriod?: number }
   ) {
     this.instrumentUid = instrumentUid;
