@@ -2396,7 +2396,7 @@ var BatchBacktestRunner = class {
 							});
 							candles.forEach((c) => engine.onCandle?.(c));
 							const profile = engine.getProfile(uid);
-							strategy.updateProfile(profile);
+							if (profile) strategy.updateProfile(profile);
 							for (const candle of candles) {
 								strategy.onCandle(candle);
 								const newSignals = strategy.getSignals();

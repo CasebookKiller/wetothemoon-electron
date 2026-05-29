@@ -59,8 +59,8 @@ export class BatchBacktestRunner {
 
         // Создаём стратегию ОДИН раз на весь период (без профиля, обновим позже)
         const strategy = strategyType === 'trend'
-          ? new TrendStrategy(uid, null, strategyOptions)
-          : new VolumeAccumulationStrategy(uid, null, strategyOptions);
+          ? new TrendStrategy(uid, null as any, strategyOptions)
+          : new VolumeAccumulationStrategy(uid, null as any, strategyOptions);
 
         let totalSignals = 0;
         let currentDate = new Date(dateFrom + 'T00:00:00Z');
@@ -82,7 +82,9 @@ export class BatchBacktestRunner {
                 const profile = engine.getProfile(uid);
 
                 // Обновляем профиль в существующей стратегии
-                strategy.updateProfile(profile);
+                if (profile) {
+                  strategy.updateProfile(profile);
+                }
 
                 // Прогоняем свечи дня
                 for (const candle of candles) {
