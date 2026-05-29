@@ -239,6 +239,17 @@ try {
     batchBacktest: (instrumentUids: string[], dateFrom: string, dateTo: string, interval: string, token: string, paramSets: any[], strategyType: string, profileResolution: number, valueAreaPercent: number) =>
       ipcRenderer.invoke('trading-assistant:batch-backtest', instrumentUids, dateFrom, dateTo, interval, token, paramSets, strategyType, profileResolution, valueAreaPercent),
 
+    onBatchProgress: (callback: (data: any) => void) => {
+      ipcRenderer.on('trading-assistant:batch-progress', (_, data) => callback(data));
+    },
+    onBatchComplete: (callback: (data: any) => void) => {
+      ipcRenderer.on('trading-assistant:batch-complete', (_, data) => callback(data));
+    },
+    removeBatchListeners: () => {
+      ipcRenderer.removeAllListeners('trading-assistant:batch-progress');
+      ipcRenderer.removeAllListeners('trading-assistant:batch-complete');
+    }
+
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

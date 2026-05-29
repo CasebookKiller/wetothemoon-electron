@@ -182,6 +182,41 @@ export const TradingAssistantPage: React.FC = () => {
   const [batchInstruments, setBatchInstruments] = useState<string[]>([]);
   const [batchResults, setBatchResults] = useState<any[]>([]);
   const [batchRunning, setBatchRunning] = useState(false);
+  const [batchProgress, setBatchProgress] = useState<{ completed: number; total: number } | null>(null);
+  
+  const runBatch = () => {
+    const api = (window as any).electronAPI;
+    if (!api?.batchBacktest) return;
+
+    // Очищаем старые результаты и подписываемся на прогресс
+    setBatchResults([]);
+    setBatchProgress({ completed: 0, total: 0 });
+
+    api.removeBatchListeners();
+    api.onBatchProgress((data: any) => {
+      setBatchResults(prev => [...prev, data.item]);
+      setBatchProgress({ completed: data.completed, total: data.total });
+    });
+    api.onBatchComplete(() => {
+      setBatchProgress(null); // скрываем прогресс-бар
+    });
+
+    // Формируем paramSets как раньше
+    const paramSets = generateParamSets();
+    
+    // Запускаем batch (без await, потому что результат придёт через события)
+    api.batchBacktest(
+      batchInstruments,
+      backtest.dateFrom,
+      backtest.dateTo,
+      backtest.interval,
+      stream.token,
+      paramSets,
+      batchParams.strategyType,
+      backtest.profileResolution,
+      backtest.valueAreaPercent
+    );
+  };
 
   // Локальные состояния (часто обновляемые)
   const [profile, setProfile] = useState<VolumeProfileLevels | null>(null);
@@ -1159,7 +1194,6 @@ export const TradingAssistantPage: React.FC = () => {
               </span>
             )}
           </label>
-          <label>Lots: <input type="text" value={batchParams.lotsValues} onChange={e => setBatchParams({ ...batchParams, lotsValues: e.target.value })} style={{ width: '80px' }} /></label>
           <label>Lots:
             <select value={batchParams.lotsMode} onChange={e => setBatchParams({ ...batchParams, lotsMode: e.target.value as 'manual' | 'range' })}>
               <option value="manual">Ручной</option>
@@ -1199,6 +1233,12 @@ export const TradingAssistantPage: React.FC = () => {
           <button onClick={runBatch} disabled={batchRunning}>{batchRunning ? 'Running...' : 'Run Batch'}</button>
           <button onClick={exportCSV} disabled={batchResults.length === 0}>Export CSV</button>
         </div>
+        {batchProgress && (
+          <div style={{ marginTop: '10px', color: '#d1d4dc' }}>
+            <progress value={batchProgress.completed} max={batchProgress.total} style={{ width: '100%' }} />
+            <span>{batchProgress.completed} / {batchProgress.total}</span>
+          </div>
+        )}
 
         {batchResults.length > 0 && (
           <div style={{ maxHeight: '400px', overflowY: 'auto', color: '#d1d4dc' }}>

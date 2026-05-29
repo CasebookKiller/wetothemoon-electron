@@ -176,7 +176,17 @@ try {
 		getTodayCandles: (instrumentUid, token, interval) => electron.ipcRenderer.invoke("trading-assistant:get-today-candles", instrumentUid, token, interval),
 		loadHistoricalProfile: (instrumentUid, candles) => electron.ipcRenderer.invoke("trading-assistant:load-historical-profile", instrumentUid, candles),
 		getAllInstruments: (token) => electron.ipcRenderer.invoke("trading-assistant:get-all-instruments", token),
-		batchBacktest: (instrumentUids, dateFrom, dateTo, interval, token, paramSets, strategyType, profileResolution, valueAreaPercent) => electron.ipcRenderer.invoke("trading-assistant:batch-backtest", instrumentUids, dateFrom, dateTo, interval, token, paramSets, strategyType, profileResolution, valueAreaPercent)
+		batchBacktest: (instrumentUids, dateFrom, dateTo, interval, token, paramSets, strategyType, profileResolution, valueAreaPercent) => electron.ipcRenderer.invoke("trading-assistant:batch-backtest", instrumentUids, dateFrom, dateTo, interval, token, paramSets, strategyType, profileResolution, valueAreaPercent),
+		onBatchProgress: (callback) => {
+			electron.ipcRenderer.on("trading-assistant:batch-progress", (_, data) => callback(data));
+		},
+		onBatchComplete: (callback) => {
+			electron.ipcRenderer.on("trading-assistant:batch-complete", (_, data) => callback(data));
+		},
+		removeBatchListeners: () => {
+			electron.ipcRenderer.removeAllListeners("trading-assistant:batch-progress");
+			electron.ipcRenderer.removeAllListeners("trading-assistant:batch-complete");
+		}
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {
