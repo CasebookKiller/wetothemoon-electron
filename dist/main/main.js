@@ -2452,9 +2452,9 @@ var BatchBacktestRunner = class {
 };
 //#endregion
 //#region src/main/ipcHandlers/tradingAssistantHandlers.ts
-var orderManagerInstance$1 = null;
+var orderManagerInstance = null;
 var setOrderManagerInstance = (manager) => {
-	orderManagerInstance$1 = manager;
+	orderManagerInstance = manager;
 };
 var registerTradingAssistantHandlers = () => {
 	electron.ipcMain.handle("trading-assistant:get-profile", (_, instrumentUid) => {
@@ -2593,25 +2593,25 @@ var registerTradingAssistantHandlers = () => {
 		return { completed };
 	});
 	electron.ipcMain.handle("trading-assistant:send-backtest-signals", async (_, signals) => {
-		if (!orderManagerInstance$1) return {
+		if (!orderManagerInstance) return {
 			success: false,
 			error: "OrderManager не инициализирован"
 		};
-		for (const signal of signals) await orderManagerInstance$1.processSignal(signal);
+		for (const signal of signals) await orderManagerInstance.processSignal(signal);
 		return { success: true };
 	});
 	electron.ipcMain.handle("trading-assistant:toggle-trading", async (_, enabled) => {
-		if (orderManagerInstance$1) {
-			orderManagerInstance$1.setRunning(enabled);
+		if (orderManagerInstance) {
+			orderManagerInstance.setRunning(enabled);
 			return true;
 		}
 		return false;
 	});
 	electron.ipcMain.handle("trading-assistant:get-trading-status", async () => {
-		return orderManagerInstance$1 ? orderManagerInstance$1.isRunning : false;
+		return orderManagerInstance ? orderManagerInstance.isRunning : false;
 	});
 	electron.ipcMain.handle("trading-assistant:set-lot-quantity", async (_, qty) => {
-		if (orderManagerInstance$1) orderManagerInstance$1.config.lotQuantity = qty;
+		if (orderManagerInstance) orderManagerInstance.config.lotQuantity = qty;
 	});
 	electron.ipcMain.handle("trading-assistant:get-accounts", async (_, token) => {
 		if (!token) return [];
@@ -2720,8 +2720,8 @@ var registerTradingAssistantHandlers = () => {
 		}
 	});
 	electron.ipcMain.handle("trading-assistant:update-config", async (_, config) => {
-		if (orderManagerInstance$1) {
-			orderManagerInstance$1.updateConfig(config);
+		if (orderManagerInstance) {
+			orderManagerInstance.updateConfig(config);
 			return true;
 		}
 		return false;
@@ -4097,13 +4097,6 @@ function applyMenuToWindow(win, template) {
 	const menu = electron.Menu.buildFromTemplate(template);
 	win.setMenu(menu);
 }
-var orderManagerInstance = new OrderManager({
-	demoMode: false,
-	token: process.env.VITE_TSandBox || "",
-	accountId: ""
-});
-connectOrderManager(orderManagerInstance);
-setOrderManagerInstance(orderManagerInstance);
 //#endregion
 
 //# sourceMappingURL=main.js.map

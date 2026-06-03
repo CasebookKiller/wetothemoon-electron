@@ -1,7 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { Dialog } from 'primereact/dialog';
-import { Checkbox } from 'primereact/checkbox';
-import { InputText } from 'primereact/inputtext';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   createChart,
   ColorType,
@@ -9,43 +6,22 @@ import {
   CandlestickSeries,
   Time,
   UTCTimestamp,
-  IChartApi,
-  ISeriesApi,
   SeriesMarker,
   createSeriesMarkers,
 } from 'lightweight-charts';
 import VolumeProfileBars from '@/components/TRADING_ASSISTANT/VolumeProfileBars/VolumeProfileBars';
 import './TradingAssistantPage.css';
-
-// Типы (оставлены локально)
-interface VolumeProfileLevels {
-  instrumentUid: string;
-  timestamp: string;
-  poc: number;
-  valueAreaHigh: number;
-  valueAreaLow: number;
-  hvn: number[];
-  lvn: number[];
-  totalVolume: number;
-  volumeByPrice: Array<{ price: number; volume: number }>;
-}
-
-interface Signal {
-  instrumentUid: string;
-  time: string;
-  type: string;
-  price: number;
-  level: number;
-  message: string;
-}
-
-interface BacktestSignal {
-  type: 'BUY' | 'SELL';
-  price: number;
-  time: string;
-  instrumentUid: string;
-  reason: string;
-}
+import { Button } from 'primereact/button';
+import { Card } from 'primereact/card';
+import { Checkbox } from 'primereact/checkbox';
+import { Dropdown } from 'primereact/dropdown';
+import { InputNumber } from 'primereact/inputnumber';
+import { InputText } from 'primereact/inputtext';
+import { TabView, TabPanel } from 'primereact/tabview';
+import { Dialog } from 'primereact/dialog';
+import { ProgressBar } from 'primereact/progressbar';
+import { Signal } from '@/api/tbank/signalTypes';
+import { VolumeProfileLevels } from '@/main/services/volumeProfileEngine';
 
 function quotationToNumber(q: any): number {
   if (!q) return 0;
@@ -92,17 +68,9 @@ function aggregateCandles(
   return result;
 }
 
-const getLastTradingDay = (): Date => {
-  const date = new Date();
-  date.setHours(0, 0, 0, 0);
-  do {
-    date.setDate(date.getDate());
-  } while (date.getDay() === 0 || date.getDay() === 6);
-  return date;
-};
-
 export const TradingAssistantPage: React.FC = () => {
-  // ---------- Группировка состояний ----------
+  // ========== СОСТОЯНИЯ ==========
+  // Песочница
   const [sandbox, setSandbox] = useState({
     token: import.meta.env.VITE_TSandBox || '',
     accountId: '',
@@ -118,18 +86,17 @@ export const TradingAssistantPage: React.FC = () => {
     takeProfitPercent: 1.0,
   });
 
+  // Стрим
   const [stream, setStream] = useState({
     active: false,
     token: import.meta.env.VITE_TReadOnly || '',
     displayTimeframe: 5 as 1 | 5 | 15 | 60,
   });
 
-  const lastTradingDay = getLastTradingDay();
-  const lastTradingDayStr = lastTradingDay.toISOString().split('T')[0];
-
+  // Бэктест
   const [backtest, setBacktest] = useState({
-    dateFrom: lastTradingDayStr,
-    dateTo: lastTradingDayStr,
+    dateFrom: '2026-05-26',
+    dateTo: '2026-05-26',
     interval: '1min',
     valueAreaPercent: 70,
     profileResolution: 50,
@@ -138,123 +105,95 @@ export const TradingAssistantPage: React.FC = () => {
     takeProfitPercent: 1.0,
     loading: false,
     result: null as any,
-    signals: [] as BacktestSignal[],
+    signals: [] as any[],
     trailingDistancePercent: 0.5,
     lots: 1,
-    positionSizing: 'fixed' as 'fixed' | 'dynamic',  // ← добавить
-    riskPercent: 1.0,                                 // ← добавить
+    positionSizing: 'fixed' as 'fixed' | 'dynamic',
+    riskPercent: 1.0,
     trades: [] as any[],
     volumeFilterEnabled: false,
     volumeFilterPeriod: 20,
   });
 
+  // Batch (пока упрощённо)
   const [batchParams, setBatchParams] = useState({
-    slMode: 'manual' as 'manual' | 'range',
     slValues: '1,1.5,2',
-    slMin: 0.5,
-    slMax: 2.0,
-    slStep: 0.5,
-
-    tpMode: 'manual' as 'manual' | 'range',
     tpValues: '2,3,4',
-    tpMin: 1.0,
-    tpMax: 5.0,
-    tpStep: 1.0,
-
-    trailMode: 'manual' as 'manual' | 'range',
     trailValues: '0.5,1',
-    trailMin: 0.0,
-    trailMax: 2.0,
-    trailStep: 0.5,
-
-    lotsMode: 'manual' as 'manual' | 'range',
     lotsValues: '10',
-    lotsMin: 1,
-    lotsMax: 20,
-    lotsStep: 1,
-
     positionSizing: 'dynamic' as 'fixed' | 'dynamic',
     riskPercent: 1,
     volumeFilterEnabled: false,
     volumeFilterPeriod: 20,
     strategyType: 'volume_accumulation',
+    trailingDistancePercent: 0.5,
+    lots: 1,
+    slMode: 'range',
+    tpMode: 'range',
+    trailMode: 'range',
+    lotsMode: 'range',
+    tpMin: 1,
+    tpMax: 4,
+    tpStep: 0.5,
+    slMin: 1,
+    slMax: 2,
+    slStep: 0.5,
+    trailMin: 0.5,
+    trailMax: 1,
+    trailStep: 0.5,
+    lotsMin: 10,
+    lotsMax: 20,
+    lotsStep: 10,
+    loading: false,
+    result: null as any,
+    trades: [] as any[],
+    
   });
   const [batchInstruments, setBatchInstruments] = useState<string[]>([]);
   const [batchResults, setBatchResults] = useState<any[]>([]);
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchProgress, setBatchProgress] = useState<{ completed: number; total: number } | null>(null);
 
-  const generateParamSets = () => {
-    const slValues = batchParams.slMode === 'range'
-      ? generateValuesFromRange(batchParams.slMin, batchParams.slMax, batchParams.slStep)
-      : batchParams.slValues.split(',').map(Number);
-
-    const tpValues = batchParams.tpMode === 'range'
-      ? generateValuesFromRange(batchParams.tpMin, batchParams.tpMax, batchParams.tpStep)
-      : batchParams.tpValues.split(',').map(Number);
-
-    const trailValues = batchParams.trailMode === 'range'
-      ? generateValuesFromRange(batchParams.trailMin, batchParams.trailMax, batchParams.trailStep)
-      : batchParams.trailValues.split(',').map(Number);
-
-    const lotsValues = batchParams.lotsMode === 'range'
-      ? generateValuesFromRange(batchParams.lotsMin, batchParams.lotsMax, batchParams.lotsStep)
-      : batchParams.lotsValues.split(',').map(Number);
-
-    const paramSets: any[] = [];
-    for (const sl of slValues) {
-      for (const tp of tpValues) {
-        for (const trail of trailValues) {
-          for (const lots of lotsValues) {
-            paramSets.push({
-              stopLossPercent: sl,
-              takeProfitPercent: tp,
-              trailingDistancePercent: trail,
-              lots,
-              positionSizing: batchParams.positionSizing,
-              riskPercent: batchParams.riskPercent,
-              volumeFilterEnabled: batchParams.volumeFilterEnabled,
-              volumeFilterPeriod: batchParams.volumeFilterPeriod,
-            });
-          }
-        }
-      }
-    }
-    return paramSets;
-  };
-
-  // Локальные состояния (часто обновляемые)
-  const [profile, setProfile] = useState<VolumeProfileLevels | null>(null);
-  const [liveSignals, setLiveSignals] = useState<Signal[]>([]);
-  const [candlesData, setCandlesData] = useState<any[]>([]);
-  const [priceRange, setPriceRange] = useState({ min: 0, max: 0 });
+  // Профиль и сигналы (пустые, будут наполняться позже)
+  const [profile, setProfile] = useState<any>(null);
+  const [liveSignals, setLiveSignals] = useState<any[]>([]);
   const [autoTrading, setAutoTrading] = useState(false);
   const [selectedInstrument, setSelectedInstrument] = useState('e6123145-9665-43e0-8413-cd61b8aa9b13');
-  const [activeTab, setActiveTab] = useState('sandbox');
   const [availableInstruments, setAvailableInstruments] = useState<Array<{ uid: string; name: string; ticker?: string }>>([]);
   const [instrumentsLoading, setInstrumentsLoading] = useState(false);
-  const [copied, setCopied] = useState(false);
+
+  // Активная вкладка
+  const [activeTab, setActiveTab] = useState('sandbox');
+  
+  const [candlesData, setCandlesData] = useState<any[]>([]);
+  const [priceRange, setPriceRange] = useState({ min: 0, max: 0 });
 
   const [showInstrumentDialog, setShowInstrumentDialog] = useState(false);
   const [instrumentFilter, setInstrumentFilter] = useState('');
   const [tempSelectedInstruments, setTempSelectedInstruments] = useState<string[]>([]);
-  
-  // ... (все остальные refs: chartRef, candleSeriesRef и т.д.)
-  const chartContainerRef = useRef<HTMLDivElement>(null);
-  const chartRef = useRef<IChartApi | null>(null);
-  const levelSeriesRef = useRef<ISeriesApi<'Line'>[]>([]);
-  const signalSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
-  const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
-  const volumeSeriesRef = useRef<ISeriesApi<'Line'>[]>([]);
-  const exitMarkersRef = useRef<ISeriesApi<'Line'>[]>([]);
 
-  // ---------- Функции для инструментов ----------
+  // ========== REFS ДЛЯ ГРАФИКА ==========
+  const chartContainerRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<any>(null);
+  const levelSeriesRef = useRef<any[]>([]);
+  const signalSeriesRef = useRef<any>(null);
+  const candleSeriesRef = useRef<any>(null);
+  const exitMarkersRef = useRef<any[]>([]);
+
+  // ========== ФУНКЦИИ ==========
+
+  // --- Общие хелперы ---
+  const updateSandbox = (patch: Partial<typeof sandbox>) => setSandbox(prev => ({ ...prev, ...patch }));
+  const updateStream = (patch: Partial<typeof stream>) => setStream(prev => ({ ...prev, ...patch }));
+  const updateBacktest = (patch: Partial<typeof backtest>) => setBacktest(prev => ({ ...prev, ...patch }));
+
+  // --- Инструменты ---
   const loadAllInstruments = async () => {
     const api = (window as any).electronAPI;
     if (!api?.getAllInstruments) return;
     setInstrumentsLoading(true);
     try {
-      const list = await api.getAllInstruments(stream.token); // или sandbox.token, но нужен токен с доступом к инструментам (read‑only подойдёт)
+      const list = await api.getAllInstruments(stream.token);
       setAvailableInstruments(list);
     } catch (e) {
       console.error(e);
@@ -263,9 +202,7 @@ export const TradingAssistantPage: React.FC = () => {
     }
   };
 
-  // ---------- Функции для sandbox ----------
-  const updateSandbox = (patch: Partial<typeof sandbox>) => setSandbox(prev => ({ ...prev, ...patch }));
-
+  // --- Sandbox ---
   const loadAccounts = async () => {
     const api = (window as any).electronAPI;
     if (!api?.getSandboxAccounts) return;
@@ -367,14 +304,13 @@ export const TradingAssistantPage: React.FC = () => {
     setAutoTrading(newState);
   };
 
-  // ---------- Функции для stream ----------
-  const updateStream = (patch: Partial<typeof stream>) => setStream(prev => ({ ...prev, ...patch }));
-
+  // --- Stream ---
   const startStream = async () => {
     const api = (window as any).electronAPI;
-    if (!api?.startMarketStream || !api?.getTodayCandles) return;
+    if (!api?.startMarketStream || !api?.getTodayCandles || !api?.loadHistoricalProfile) return;
 
     try {
+      // 1. Загружаем исторические свечи за сегодня
       const historical = await api.getTodayCandles(
         selectedInstrument,
         stream.token,
@@ -382,6 +318,7 @@ export const TradingAssistantPage: React.FC = () => {
       );
 
       if (historical && historical.length > 0) {
+        // Форматируем для графика
         const formatted = historical.map((c: any) => ({
           time: (Math.floor(new Date(c.time).getTime() / 1000)) as UTCTimestamp,
           open: quotationToNumber(c.open),
@@ -390,8 +327,12 @@ export const TradingAssistantPage: React.FC = () => {
           close: quotationToNumber(c.close),
         }));
         setCandlesData(formatted);
+
+        // Отправляем историю в движок профиля
+        await api.loadHistoricalProfile(selectedInstrument, historical);
       }
 
+      // 2. Запускаем live-стрим
       await api.startMarketStream(stream.token, {
         subscribeCandlesRequest: {
           subscriptionAction: 'SUBSCRIPTION_ACTION_SUBSCRIBE',
@@ -415,17 +356,13 @@ export const TradingAssistantPage: React.FC = () => {
     updateStream({ active: false });
   };
 
-  // ---------- Функции для backtest ----------
-  const updateBacktest = (patch: Partial<typeof backtest>) => setBacktest(prev => ({ ...prev, ...patch }));
-
+  // --- Backtest ---
   const runBacktest = async () => {
     if (backtest.loading) return;
     updateBacktest({ loading: true });
-
     const api = (window as any).electronAPI;
     if (!api?.runBacktest) return;
     const token = import.meta.env.VITE_TReadOnly;
-    console.log('Sending lots:', backtest.lots);
     const result = await api.runBacktest(
       selectedInstrument,
       backtest.dateFrom,
@@ -439,7 +376,7 @@ export const TradingAssistantPage: React.FC = () => {
         stopLossPercent: backtest.stopLossPercent,
         takeProfitPercent: backtest.takeProfitPercent,
         trailingDistancePercent: backtest.trailingDistancePercent,
-        lots: backtest.lots,   // ← передаём
+        lots: backtest.lots,
         positionSizing: backtest.positionSizing,
         riskPercent: backtest.riskPercent,
         volumeFilterEnabled: backtest.volumeFilterEnabled,
@@ -447,10 +384,6 @@ export const TradingAssistantPage: React.FC = () => {
       }
     );
     if (result) {
-      console.log('[Backtest Trades]', result.trades);
-      setProfile(result.profile);
-      updateBacktest({ signals: result.signals, result, trades: result.trades || [] });
-      console.log('[Backtest State]', backtest.trades);
       if (result.candles?.length) {
         const formatted = result.candles.map((c: any) => ({
           time: (Math.floor(new Date(c.time).getTime() / 1000)) as UTCTimestamp,
@@ -461,9 +394,10 @@ export const TradingAssistantPage: React.FC = () => {
         }));
         setCandlesData(formatted);
       }
+      setProfile(result.profile);
+      updateBacktest({ signals: result.signals, result, trades: result.trades || [] });
     }
     updateBacktest({ loading: false });
-    console.log('[Backtest Result]', result);
   };
 
   const sendBacktestToSandbox = async () => {
@@ -473,7 +407,7 @@ export const TradingAssistantPage: React.FC = () => {
     alert('Сигналы отправлены в OrderManager');
   };
 
-  // ---------- Жизненные циклы и подписки ----------
+  // --- Эффекты (жизненные циклы) ---
   useEffect(() => {
     if (sandbox.token) loadAccounts();
   }, [sandbox.token]);
@@ -482,7 +416,10 @@ export const TradingAssistantPage: React.FC = () => {
     if (sandbox.accountId) refreshBalance();
   }, [sandbox.accountId]);
 
-  // Подписка на live-свечи
+  useEffect(() => {
+    if (stream.token) loadAllInstruments();
+  }, [stream.token]);
+
   useEffect(() => {
     const api = (window as any).electronAPI;
     if (!api?.onCandle) return;
@@ -494,11 +431,7 @@ export const TradingAssistantPage: React.FC = () => {
       } else {
         timestampMs = new Date(streamCandle.time).getTime();
       }
-
-      if (isNaN(timestampMs)) {
-        console.warn('Invalid candle time:', streamCandle.time);
-        return;
-      }
+      if (isNaN(timestampMs)) return;
 
       const newCandle = {
         time: Math.floor(timestampMs / 1000) as UTCTimestamp,
@@ -510,59 +443,118 @@ export const TradingAssistantPage: React.FC = () => {
 
       setCandlesData(prev => {
         if (prev.some(c => c.time === newCandle.time)) return prev;
-        const updated = [...prev, newCandle];
-        updated.sort((a, b) => a.time - b.time);
+        const updated = [...prev, newCandle].sort((a, b) => a.time - b.time);
         return updated.slice(-500);
       });
     };
 
     api.onCandle(handleCandle);
-
-    return () => {
-      api.removeCandleListener();
-    };
+    return () => { api.removeCandleListener(); };
   }, []);
 
-  // Подписка на профиль и сигналы
-  useEffect(() => {
+  // ========== BATCH FUNCTIONS ==========
+  function generateValuesFromRange(min: number, max: number, step: number): number[] {
+    const values: number[] = [];
+    if (step <= 0) return [min];
+    for (let v = min; v <= max + 0.0001; v += step) {
+      values.push(Math.round(v * 100) / 100);
+    }
+    return values;
+  }
+
+  const generateParamSets = () => {
+    const slValues = batchParams.slValues.split(',').map(Number);
+    const tpValues = batchParams.tpValues.split(',').map(Number);
+    const trailValues = batchParams.trailValues.split(',').map(Number);
+    const lotsValues = batchParams.lotsValues.split(',').map(Number);
+
+    const paramSets: any[] = [];
+    for (const sl of slValues) {
+      for (const tp of tpValues) {
+        for (const trail of trailValues) {
+          for (const lots of lotsValues) {
+            paramSets.push({
+              stopLossPercent: sl,
+              takeProfitPercent: tp,
+              trailingDistancePercent: trail,
+              lots,
+              positionSizing: batchParams.positionSizing,
+              riskPercent: batchParams.riskPercent,
+              volumeFilterEnabled: batchParams.volumeFilterEnabled,
+              volumeFilterPeriod: batchParams.volumeFilterPeriod,
+            });
+          }
+        }
+      }
+    }
+    return paramSets;
+  };
+
+  const runBatch = () => {
     const api = (window as any).electronAPI;
-    if (!api) return;
+    if (!api?.batchBacktest) return;
 
-    api.subscribeTradingAssistant();
+    setBatchResults([]);
+    setBatchProgress({ completed: 0, total: 0 });
 
-    const onProfile = (newProfile: VolumeProfileLevels) => {
-      if (newProfile.instrumentUid === selectedInstrument) {
-        setProfile(newProfile);
-      }
-    };
-    const onSignal = (signal: Signal) => {
-      console.log('[Live Signal]', signal);
-      if (signal.instrumentUid === selectedInstrument) {
-        setLiveSignals(prev => [...prev.slice(-50), signal]);
-      }
-    };
+    api.removeBatchListeners();
+    api.onBatchProgress((data: any) => {
+      setBatchResults(prev => [...prev, data.item]);
+      setBatchProgress({ completed: data.completed, total: data.total });
+    });
+    api.onBatchComplete(() => {
+      setBatchProgress(null);
+    });
 
-    api.onProfileUpdate(onProfile);
-    api.onTradingSignal(onSignal);
+    const paramSets = generateParamSets();
+    const uniqueParamSets = paramSets.filter((set, index, self) =>
+      index === self.findIndex(s =>
+        s.stopLossPercent === set.stopLossPercent &&
+        s.takeProfitPercent === set.takeProfitPercent &&
+        s.trailingDistancePercent === set.trailingDistancePercent &&
+        s.lots === set.lots &&
+        s.positionSizing === set.positionSizing &&
+        s.riskPercent === set.riskPercent &&
+        s.volumeFilterEnabled === set.volumeFilterEnabled &&
+        s.volumeFilterPeriod === set.volumeFilterPeriod
+      )
+    );
 
-    return () => {
-      api.removeProfileUpdateListener();
-      api.removeTradingSignalListener();
-    };
-  }, [selectedInstrument]);
+    api.batchBacktest(
+      batchInstruments,
+      backtest.dateFrom,
+      backtest.dateTo,
+      backtest.interval,
+      stream.token,
+      uniqueParamSets,
+      batchParams.strategyType,
+      backtest.profileResolution,
+      backtest.valueAreaPercent
+    );
+  };
 
-  // Инструменты
-  useEffect(() => {
-    if (stream.token) loadAllInstruments();
-  }, [stream.token]);
+  const exportCSV = () => {
+    const header = 'Instrument,SL%,TP%,Trail%,Lots,Sizing,Risk%,VolFilt,Period,Signals,Trades,WinRate,Profit,MaxDD,Capital';
+    const rows = batchResults.map(r => {
+      const s = r.stats;
+      return `${r.instrumentUid},${r.params.stopLossPercent},${r.params.takeProfitPercent},${r.params.trailingDistancePercent},${r.params.lots},${r.params.positionSizing},${r.params.riskPercent},${r.params.volumeFilterEnabled},${r.params.volumeFilterPeriod},${r.signals},${s.totalTrades},${s.winRate?.toFixed(1)}%,${s.totalProfit?.toFixed(2)},${s.maxDrawdown?.toFixed(2)},${s.initialCapital}→${s.finalCapital?.toFixed(2)}`;
+    }).join('\n');
 
-  // Инициализация графика + подписка на зум
+    const blob = new Blob([header + '\n' + rows], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'batch_results.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // ========== ЭФФЕКТЫ ГРАФИКА ==========
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
-    const container = chartContainerRef.current;
-    const chart = createChart(container, {
-      width: container.clientWidth,
+    const chart = createChart(chartContainerRef.current, {
+      width: chartContainerRef.current.clientWidth,
       height: 400,
       layout: {
         background: { type: ColorType.Solid, color: '#1e1e1e' },
@@ -572,27 +564,13 @@ export const TradingAssistantPage: React.FC = () => {
         vertLines: { color: '#2a2e39' },
         horzLines: { color: '#2a2e39' },
       },
-      timeScale: {
-        timeVisible: true,
-        borderColor: '#2a2e39',
-      },
-      rightPriceScale: {
-        borderColor: '#2a2e39',
-      },
+      timeScale: { timeVisible: true, borderColor: '#2a2e39' },
+      rightPriceScale: { borderColor: '#2a2e39' },
     });
 
     chartRef.current = chart;
-    (window as any).__CHART__ = chart;
 
-    // Подписка на изменение размера контейнера
-    const resizeObserver = new ResizeObserver(entries => {
-      for (const entry of entries) {
-        const { width, height } = entry.contentRect;
-        chart.resize(width, height);
-      }
-    });
-    resizeObserver.observe(container);
-
+    // Подписка на изменение видимого диапазона цен (для гистограммы)
     const timeScale = chart.timeScale();
     const priceScale = chart.priceScale('right');
     const updatePriceRange = () => {
@@ -600,15 +578,19 @@ export const TradingAssistantPage: React.FC = () => {
       if (range) setPriceRange({ min: range.from, max: range.to });
     };
     timeScale.subscribeVisibleTimeRangeChange(updatePriceRange);
-    updatePriceRange();
+    updatePriceRange(); // начальное значение
+
+    const resizeObserver = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        chart.resize(width, height);
+      }
+    });
+    resizeObserver.observe(chartContainerRef.current);
 
     return () => {
-      resizeObserver.disconnect();
       timeScale.unsubscribeVisibleTimeRangeChange(updatePriceRange);
-      // Очищаем серии выходов
-      exitMarkersRef.current.forEach(series => {
-        try { chart.removeSeries(series); } catch {}
-      });
+      resizeObserver.disconnect();
       chart.remove();
       chartRef.current = null;
     };
@@ -637,6 +619,11 @@ export const TradingAssistantPage: React.FC = () => {
     });
     candleSeries.setData(aggregated);
     chart.timeScale().fitContent();
+    // Принудительно обновляем priceRange, чтобы гистограмма синхронизировалась
+    //setTimeout(() => {
+    //  const range = chart.priceScale('right').getVisibleRange();
+    //  if (range) setPriceRange({ min: range.from, max: range.to });
+    //}, 0);
     candleSeriesRef.current = candleSeries;
   }, [candlesData, stream.displayTimeframe]);
 
@@ -645,7 +632,7 @@ export const TradingAssistantPage: React.FC = () => {
     const chart = chartRef.current;
     if (!chart || !profile || !candlesData.length || candlesData.length < 2) return;
 
-    [...levelSeriesRef.current, ...volumeSeriesRef.current].forEach(series => {
+    [...levelSeriesRef.current, ...exitMarkersRef.current].forEach(series => {
       try { chart.removeSeries(series); } catch {}
     });
     levelSeriesRef.current = [];
@@ -697,24 +684,22 @@ export const TradingAssistantPage: React.FC = () => {
     signalSeriesRef.current = signalSeries;
   }, [backtest.signals]);
 
-  // Маркеры выходов (SL, TP, TRAIL, END_OF_DAY)
+  // Маркеры выходов
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart || !backtest.trades.length) return;
 
-    // Очищаем предыдущие серии выходов
     exitMarkersRef.current.forEach(series => {
       try { chart.removeSeries(series); } catch {}
     });
     exitMarkersRef.current = [];
 
-    // Цвета и легенда
     const reasons = [
-      { key: 'TAKE_PROFIT', label: 'TP', color: '#4caf50' },
-      { key: 'STOP_LOSS', label: 'SL', color: '#f44336' },
-      { key: 'TRAILING_STOP', label: 'Trail', color: '#2196f3' },
-      { key: 'END_OF_DAY', label: 'EOD', color: '#ffeb3b' },
-      { key: 'SIGNAL', label: 'Signal', color: '#9e9e9e' },
+      { key: 'TAKE_PROFIT', color: '#4caf50' },
+      { key: 'STOP_LOSS', color: '#f44336' },
+      { key: 'TRAILING_STOP', color: '#2196f3' },
+      { key: 'END_OF_DAY', color: '#ffeb3b' },
+      { key: 'SIGNAL', color: '#9e9e9e' },
     ];
 
     reasons.forEach(({ key, color }) => {
@@ -725,8 +710,8 @@ export const TradingAssistantPage: React.FC = () => {
         lineVisible: false,
         lastValueVisible: false,
         pointMarkersVisible: true,
-        pointMarkersRadius: 5,          // увеличенный радиус
-        color: color,
+        pointMarkersRadius: 5,
+        color,
       });
 
       const data = tradesOfReason.map((trade: any) => ({
@@ -738,391 +723,625 @@ export const TradingAssistantPage: React.FC = () => {
       exitMarkersRef.current.push(series);
     });
 
-    // Подгоняем масштаб
     chart.timeScale().fitContent();
   }, [backtest.trades]);
 
-  const loadProfile = async () => {
+  // ProfileUpdate
+  useEffect(() => {
     const api = (window as any).electronAPI;
     if (!api) return;
-    const p = await api.getVolumeProfile(selectedInstrument);
-    if (p) setProfile(p);
-  };
 
-  // ---------- Рендер панелей ----------
-  const renderSandboxPanel = () => (
-    <div className="tab-panel">
-      <h3>Sandbox Settings</h3>
-      <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', alignItems: 'center' }}>
-        <input type="text" placeholder="Token" value={sandbox.token} onChange={e => updateSandbox({ token: e.target.value })} style={{ width: '200px' }} />
-        <button onClick={handleCreateAccount} disabled={sandbox.creatingAccount}>{sandbox.creatingAccount ? '...' : 'Создать счёт'}</button>
-        <button onClick={handleCloseAccount} disabled={!sandbox.accountId}>Удалить счёт</button>
-        <select value={sandbox.accountId} onChange={e => updateSandbox({ accountId: e.target.value })} style={{ width: '180px' }}>
-          <option value="">-- счёт --</option>
-          {sandbox.accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name || acc.id}</option>)}
-        </select>
-        <button onClick={loadAccounts} disabled={!sandbox.token || sandbox.loadingAccounts}>Load Accounts</button>
-        <label><input type="checkbox" checked={sandbox.demoMode} onChange={e => updateSandbox({ demoMode: e.target.checked })} /> Demo</label>
-      </div>
-      <div style={{ marginTop: '8px', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-        <button onClick={applyConfig}>Apply Config</button>
-        <button onClick={toggleTrading}>{autoTrading ? 'Stop Auto Trading' : 'Start Auto Trading'}</button>
-        <label>Lots: <input type="number" value={sandbox.lotQty} onChange={e => updateSandbox({ lotQty: Number(e.target.value) })} min={1} style={{ width: '60px' }} /></label>
-        <label>SL%: <input type="number" value={sandbox.stopLossPercent} onChange={e => updateSandbox({ stopLossPercent: Number(e.target.value) })} step={0.1} style={{ width: '50px' }} /></label>
-        <label>TP%: <input type="number" value={sandbox.takeProfitPercent} onChange={e => updateSandbox({ takeProfitPercent: Number(e.target.value) })} step={0.1} style={{ width: '50px' }} /></label>
-        <label><input type="checkbox" checked={sandbox.trailingEnabled} onChange={e => updateSandbox({ trailingEnabled: e.target.checked })} /> Trailing</label>
-        {sandbox.trailingEnabled && <label>Trail%: <input type="number" value={sandbox.trailingPercent} onChange={e => updateSandbox({ trailingPercent: Number(e.target.value) })} step={0.1} style={{ width: '50px' }} /></label>}
-        <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
-          <input type="number" value={sandbox.payAmount} onChange={e => updateSandbox({ payAmount: Number(e.target.value) })} min={1000} step={1000} style={{ width: '100px' }} />
-          <button onClick={handlePayIn}>Пополнить</button>
-          {sandbox.payMessage && <span style={{ color: '#4caf50' }}>{sandbox.payMessage}</span>}
-        </div>
-        <button onClick={refreshBalance}>Баланс</button>
-        {sandbox.balance && <span style={{ color: '#d1d4dc' }}>{sandbox.balance}</span>}
-      </div>
-    </div>
-  );
+    api.subscribeTradingAssistant();
 
-  const renderStreamPanel = () => (
-    <div className="tab-panel">
-      <h3>Market Stream</h3>
-      <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-        <input type="text" placeholder="Read-only token" value={stream.token} onChange={e => updateStream({ token: e.target.value })} style={{ width: '200px' }} />
-        <label>TF: 
-          <select value={stream.displayTimeframe} onChange={e => updateStream({ displayTimeframe: Number(e.target.value) as 1 | 5 | 15 | 60 })} style={{ marginLeft: '4px' }}>
-            <option value={1}>1m</option><option value={5}>5m</option><option value={15}>15m</option><option value={60}>1h</option>
-          </select>
-        </label>
-        <button onClick={startStream} disabled={stream.active}>Start Stream</button>
-        <button onClick={stopStream} disabled={!stream.active}>Stop Stream</button>
-        <span style={{ color: stream.active ? '#4caf50' : '#d32f2f' }}>{stream.active ? '● Live' : '○ Stopped'}</span>
-      </div>
-    </div>
-  );
-
-  const renderBacktestPanel = () => { 
-    const stats = backtest.result?.stats;
-    const portfolio = stats?.portfolio;
-    const sizingStr = backtest.positionSizing === 'dynamic'
-      ? `Dynamic (Risk ${backtest.riskPercent}%)`
-      : 'Fixed';
-
-    // Текст для копирования (можно скопировать и отображаемую строку, но лучше сформировать вручную без HTML)
-    const copyText = [
-      `Instrument: ${availableInstruments.find(inst => inst.uid === selectedInstrument)?.name}`,
-      `Strategy: ${backtest.strategyType === 'trend' ? 'Trend' : 'Volume Accum'}`,
-      `Period: ${backtest.dateFrom} – ${backtest.dateTo}`,
-      `Signals: ${stats?.totalSignals}`,
-      `Trades: ${portfolio?.totalTrades} (W: ${portfolio?.winningTrades} / L: ${portfolio?.losingTrades})`,
-      `WinRate: ${portfolio?.winRate?.toFixed(1)}%`,
-      `Profit: ${portfolio?.totalProfit?.toFixed(2)} (${portfolio?.totalProfitPercent?.toFixed(2)}%)`,
-      `MaxDD: ${portfolio?.maxDrawdown?.toFixed(2)} (${portfolio?.maxDrawdownPercent?.toFixed(2)}%)`,
-      portfolio?.initialCapital ? `Capital: ${portfolio.initialCapital} → ${portfolio.finalCapital?.toFixed(2)}` : '',
-      `Lots: ${backtest.lots}`,
-      `SL: ${backtest.stopLossPercent}%`,
-      `TP: ${backtest.takeProfitPercent}%`,
-      `Trail: ${backtest.trailingDistancePercent}%`,
-      `Sizing: ${sizingStr}`,
-    ].filter(Boolean).join(' | ');
-
-    const handleCopy = () => {
-      navigator.clipboard.writeText(copyText).then(() => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      });
+    const onProfile = (newProfile: VolumeProfileLevels) => {
+      console.log('[Profile Update]', newProfile);                  // <-- лог
+      console.log('[Profile volumeByPrice]', newProfile.volumeByPrice?.length); // <-- лог
+      if (newProfile.instrumentUid === selectedInstrument) {
+        setProfile(newProfile);
+      }
+    };
+    const onSignal = (signal: Signal) => {
+      if (signal.instrumentUid === selectedInstrument) {
+        setLiveSignals(prev => [...prev.slice(-50), signal]);
+      }
     };
 
-    return (
-      <div className="tab-panel">
-        <h3>Backtest</h3>
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <label>Instrument:
-            <select value={selectedInstrument} onChange={e => setSelectedInstrument(e.target.value)}>
-              {availableInstruments.length === 0 && <option value="">-- загрузка... --</option>}
-              {availableInstruments.map(inst => (
-                <option key={inst.uid} value={inst.uid}>{inst.name} ({inst.ticker})</option>
-              ))}
-            </select>
-          </label>
-          <button onClick={loadAllInstruments} disabled={instrumentsLoading} style={{ marginLeft: '5px' }}>
-            {instrumentsLoading ? '...' : '🔄'}
-          </button>
-          <label>From: <input type="date" value={backtest.dateFrom} onChange={e => updateBacktest({ dateFrom: e.target.value })} /></label>
-          <label>To: <input type="date" value={backtest.dateTo} onChange={e => updateBacktest({ dateTo: e.target.value })} /></label>
-          <label>Interval: 
-            <select value={backtest.interval} onChange={e => updateBacktest({ interval: e.target.value })}>
-              <option value="1min">1m</option><option value="5min">5m</option><option value="15min">15m</option><option value="1hour">1h</option>
-            </select>
-          </label>
-          <label>VA%: <input type="number" value={backtest.valueAreaPercent} onChange={e => updateBacktest({ valueAreaPercent: Number(e.target.value) })} min={50} max={90} step={5} style={{ width: '60px' }} /></label>
-          <label>Res: <input type="number" value={backtest.profileResolution} onChange={e => updateBacktest({ profileResolution: Number(e.target.value) })} min={10} max={200} step={10} style={{ width: '60px' }} /></label>
-          <label>Strategy: 
-            <select value={backtest.strategyType} onChange={e => updateBacktest({ strategyType: e.target.value })}>
-              <option value="volume_accumulation">Vol Accum</option>
-              <option value="trend">Trend</option>
-            </select>
-          </label>
-          <label>SL%: <input type="number" value={backtest.stopLossPercent} onChange={e => updateBacktest({ stopLossPercent: Number(e.target.value) })} step={0.1} style={{ width: '50px' }} /></label>
-          <label>TP%: <input type="number" value={backtest.takeProfitPercent} onChange={e => updateBacktest({ takeProfitPercent: Number(e.target.value) })} step={0.1} style={{ width: '50px' }} /></label>
-          <label>Lots: <input type="number" value={backtest.lots} onChange={e => updateBacktest({ lots: Number(e.target.value) })} min={1} step={1} style={{ width: '60px' }} /></label>
-          <label>Size:
-            <select value={backtest.positionSizing} onChange={e => updateBacktest({ positionSizing: e.target.value as 'fixed' | 'dynamic' })}>
-              <option value="fixed">Fixed</option>
-              <option value="dynamic">Dynamic</option>
-            </select>
-          </label>
-          {backtest.positionSizing === 'dynamic' && (
-            <label>Risk%: <input type="number" value={backtest.riskPercent} onChange={e => updateBacktest({ riskPercent: Number(e.target.value) })} step={0.1} style={{ width: '50px' }} /></label>
-          )}
-          <label>Trail%: <input type="number" value={backtest.trailingDistancePercent} onChange={e => updateBacktest({ trailingDistancePercent: Number(e.target.value) })} step={0.1} style={{ width: '50px' }} /></label>
-          <label>
-            <input
-              type="checkbox"
-              checked={backtest.volumeFilterEnabled}
-              onChange={e => updateBacktest({ volumeFilterEnabled: e.target.checked })}
-            />
-            Vol Filt
-          </label>
-          {backtest.volumeFilterEnabled && (
-            <label>Per: <input type="number" value={backtest.volumeFilterPeriod} onChange={e => updateBacktest({ volumeFilterPeriod: Number(e.target.value) })} min={5} max={100} step={5} style={{ width: '50px' }} /></label>
-          )}
-          <button onClick={runBacktest} disabled={backtest.loading}>Run</button>
-          <button onClick={sendBacktestToSandbox} disabled={!backtest.signals.length}>Send to Sandbox</button>
-        </div>
-        {backtest.result?.stats && backtest.result.stats.portfolio && (
-          <div className="backtest-stats" style={{ marginTop: '8px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <p style={{ margin: 0, flex: 1 }}>
-              Instrument: {availableInstruments.find(inst => inst.uid === selectedInstrument)?.name}
-              {' | '}Strategy: {backtest.strategyType === 'trend' ? 'Trend' : 'Volume Accum'}
-                {' | '}Period: {backtest.dateFrom} – {backtest.dateTo}
-                {' | '}Signals: {stats.totalSignals}
-                {' | '}Trades: {portfolio.totalTrades}
-                (W: {portfolio.winningTrades} / L: {portfolio.losingTrades})
-                {' | '}WinRate: {portfolio.winRate?.toFixed(1)}%
-                {' | '}Profit: <span className={portfolio.totalProfit >= 0 ? 'positive' : 'negative'}>
-                  {portfolio.totalProfit?.toFixed(2)} ({portfolio.totalProfitPercent?.toFixed(2)}%)
+    api.onProfileUpdate(onProfile);
+    api.onTradingSignal(onSignal);
+
+    return () => {
+      api.removeProfileUpdateListener();
+      api.removeTradingSignalListener();
+    };
+  }, [selectedInstrument]);
+
+  return (
+    <div className="trading-assistant" style={{ padding: '5px', color: '#fff', background: '#1e1e1e' }}>
+
+      <TabView>
+        {/* ========== SANDBOX ========== */}
+        <TabPanel header="Sandbox">
+          <Card className="surface-ground p-0">
+            {/* Первая строка: токен, кнопки счетов, выбор счёта */}
+            <div className="p-2">
+              <div className="p-col-12 flex align-items-center">
+                <label className="p-mr-2 p-mb-0">Token</label>
+                <InputText
+                  value={sandbox.token}
+                  onChange={e => updateSandbox({ token: e.target.value })}
+                  className="p-inputtext-sm p-1 px-2 mr-2"
+                  placeholder="Sandbox token"
+                  style={{ flex: 1 }}
+                />
+                <Button
+                  label="Load"
+                  onClick={loadAccounts}
+                  disabled={!sandbox.token || sandbox.loadingAccounts}
+                  className="p-button-sm p-button-secondary border-round-sm p-1 px-3 mr-1"
+                />
+                <Button
+                  label="Create"
+                  onClick={handleCreateAccount}
+                  disabled={sandbox.creatingAccount}
+                  className="p-button-sm p-button-success border-round-sm p-1 px-3 mr-1"
+                />
+                <Button
+                  label="Delete"
+                  onClick={handleCloseAccount}
+                  disabled={!sandbox.accountId}
+                  className="p-button-sm p-button-danger border-round-sm p-1 px-3 mr-2"
+                />
+                <Dropdown
+                  value={sandbox.accountId}
+                  options={sandbox.accounts.map((a: any) => ({ label: a.name || a.id, value: a.id }))}
+                  onChange={e => updateSandbox({ accountId: e.value })}
+                  placeholder="Account"
+                  className="p-inputtext-sm"
+                  style={{ minWidth: '180px' }}
+                />
+              </div>
+            </div>
+
+            {/* Вторая строка: торговля, параметры, пополнение */}
+            <div className="flex align-items-center flex-wrap mt-1">
+              <div className="flex align-items-center flex-wrap">
+                <Checkbox checked={sandbox.demoMode} onChange={e => updateSandbox({ demoMode: e.checked })} />
+                <label className="p-1 mr-1 border-round-sm">Demo</label>
+                <Button
+                  label={autoTrading ? 'Stop' : 'Start'}
+                  onClick={toggleTrading}
+                  className={`p-button-sm ${autoTrading ? 'p-button-danger' : 'p-button-success'} border-round-sm p-1 px-2 mr-1`}
+                />
+                <Button label="Apply" onClick={applyConfig} className="p-button-sm p-button-secondary border-round-sm p-1 px-2 mr-1" />
+              
+                <label className="mx-1">Lots</label>
+                <InputNumber
+                  id="lotQty"
+                  value={sandbox.lotQty}
+                  onValueChange={e => updateSandbox({ lotQty: e.value ?? 1 })}
+                  min={1}
+                  showButtons
+                  mode='decimal'
+                  buttonLayout='horizontal'
+                  decrementButtonClassName='lotQtyDec'
+                  incrementButtonClassName='lotQtyInc'
+                  size={1}
+                  className='mr-2'
+                />
+                <label className="mr-1">SL%</label>
+                <InputNumber
+                  value={sandbox.stopLossPercent}
+                  onValueChange={e => updateSandbox({ stopLossPercent: e.value ?? 0 })}
+                  step={0.1}
+                  min={0}
+                  size={2}
+                  className='mr-1'
+                />
+                <label className="mr-1">TP%</label>
+                <InputNumber
+                  value={sandbox.takeProfitPercent}
+                  onValueChange={e => updateSandbox({ takeProfitPercent: e.value ?? 0 })}
+                  step={0.1}
+                  min={0}
+                  size={2}
+                  className='mr-2'
+                />
+                <label className="mr-1">Pay (RUB)</label>
+                <InputNumber
+                  value={sandbox.payAmount}
+                  onValueChange={e => updateSandbox({ payAmount: e.value ?? 1000 })}
+                  min={1000}
+                  step={1000}
+                  size={4}
+                  className='mr-1'
+                />
+                <Button label="Deposit" onClick={handlePayIn} className="p-button-sm border-round-sm p-1 px-3 mr-1" />
+                <Button label="Balance" onClick={refreshBalance} className="p-button-sm border-round-sm p-button-info p-1 px-3 mr-1" />
+                {sandbox.balance && <span className="p-text-nowrap p-ml-1">{sandbox.balance}</span>}
+                {sandbox.payMessage && <span className="p-ml-1" style={{ color: '#4caf50' }}>{sandbox.payMessage}</span>}
+              </div>
+            </div>
+          </Card>
+        </TabPanel>
+
+        {/* ========== STREAM ========== */}
+        <TabPanel header="Stream">
+          <Card className="surface-ground p-0">
+            <div className="p-2">
+              <div className="flex align-items-center flex-wrap">
+                <label className="mr-2 mb-0">Token</label>
+                <InputText
+                  value={stream.token}
+                  onChange={e => updateStream({ token: e.target.value })}
+                  className="p-inputtext-sm flex-1 mr-2"
+                  placeholder="Read-only token"
+                />
+                <label className="mr-2 mb-0">TF</label>
+                <Dropdown
+                  value={stream.displayTimeframe}
+                  options={[{label:'1m',value:1},{label:'5m',value:5},{label:'15m',value:15},{label:'1h',value:60}]}
+                  onChange={e => updateStream({ displayTimeframe: e.value })}
+                  className="p-inputtext-sm mr-2"
+                />
+                <Button
+                  label="Start"
+                  onClick={startStream}
+                  disabled={stream.active}
+                  className="p-button-sm border-round-sm p-1 px-3 mr-1"
+                />
+                <Button
+                  label="Stop"
+                  onClick={stopStream}
+                  disabled={!stream.active}
+                  className="p-button-sm p-button-danger border-round-sm p-1 px-3 mr-1"
+                />
+                <span className="ml-2" style={{ color: stream.active ? '#4caf50' : '#d32f2f' }}>
+                  {stream.active ? '● Live' : '○ Stopped'}
                 </span>
-                {' | '}MaxDD: {portfolio.maxDrawdown?.toFixed(2)} ({portfolio.maxDrawdownPercent?.toFixed(2)}%)
-                {portfolio.initialCapital && (
-                  <> | Capital: {portfolio.initialCapital} → {portfolio.finalCapital?.toFixed(2)}</>
+              </div>
+            </div>
+          </Card>
+        </TabPanel>
+
+        {/* ========== BACKTEST ========== */}
+        <TabPanel header="Backtest">
+          <Card className="surface-ground p-0">
+            <div className="p-2">
+              <div className="flex align-items-center flex-wrap">
+                <label className="mr-2 mb-0">Instr</label>
+                <Dropdown
+                  value={selectedInstrument}
+                  options={availableInstruments.map(i => ({ label: `${i.name} (${i.ticker})`, value: i.uid }))}
+                  onChange={e => setSelectedInstrument(e.value)}
+                  placeholder="Select"
+                  filter
+                  className="p-inputtext-sm flex-1 mr-2"
+                />
+                <Button
+                  icon="pi pi-refresh"
+                  onClick={loadAllInstruments}
+                  disabled={instrumentsLoading}
+                  className="p-button-sm p-button-secondary p-1 px-3 mr-2"
+                />
+                <label className="mr-1 mb-0">From</label>
+                <InputText
+                  type="date"
+                  value={backtest.dateFrom}
+                  onChange={e => updateBacktest({ dateFrom: e.target.value })}
+                  className="p-inputtext-sm mr-2"
+                  style={{ width: '130px' }}
+                />
+                <label className="mr-1 mb-0">To</label>
+                <InputText
+                  type="date"
+                  value={backtest.dateTo}
+                  onChange={e => updateBacktest({ dateTo: e.target.value })}
+                  className="p-inputtext-sm mr-2"
+                  style={{ width: '130px' }}
+                />
+                <label className="mr-1 mb-0">Int</label>
+                <Dropdown
+                  value={backtest.interval}
+                  options={['1min','5min','15min','1hour']}
+                  onChange={e => updateBacktest({ interval: e.value })}
+                  className="p-inputtext-sm mr-2"
+                  style={{ width: '80px' }}
+                />
+                <label className="mr-1 mb-0">VA%</label>
+                <InputNumber
+                  value={backtest.valueAreaPercent}
+                  onValueChange={e => updateBacktest({ valueAreaPercent: e.value ?? 70 })}
+                  min={50} max={90} step={5}
+                  size={2}
+                  className="mr-2"
+                />
+                <label className="mr-1 mb-0">Res</label>
+                <InputNumber
+                  value={backtest.profileResolution}
+                  onValueChange={e => updateBacktest({ profileResolution: e.value ?? 50 })}
+                  min={10} max={200} step={10}
+                  size={2}
+                  className="mr-2"
+                />
+              </div>
+              <div className="flex align-items-center flex-wrap mt-2">
+                <label className="mr-1 mb-0">Strat</label>
+                <Dropdown
+                  value={backtest.strategyType}
+                  options={['volume_accumulation','trend']}
+                  onChange={e => updateBacktest({ strategyType: e.value })}
+                  className="p-inputtext-sm mr-2"
+                  style={{ width: '120px' }}
+                />
+                <label className="mr-1 mb-0">SL%</label>
+                <InputNumber value={backtest.stopLossPercent} onValueChange={e => updateBacktest({ stopLossPercent: e.value ?? 0 })} step={0.1} min={0} size={2} className="mr-2" />
+                <label className="mr-1 mb-0">TP%</label>
+                <InputNumber value={backtest.takeProfitPercent} onValueChange={e => updateBacktest({ takeProfitPercent: e.value ?? 0 })} step={0.1} min={0} size={2} className="mr-2" />
+                <label className="mr-1 mb-0">Trail%</label>
+                <InputNumber value={backtest.trailingDistancePercent} onValueChange={e => updateBacktest({ trailingDistancePercent: e.value ?? 0 })} step={0.1} min={0} size={2} className="mr-2" />
+                <label className="mr-1 mb-0">Lots</label>
+                <InputNumber value={backtest.lots} onValueChange={e => updateBacktest({ lots: e.value ?? 1 })} min={1} step={1} size={2} className="mr-2" />
+                <label className="mr-1 mb-0">Size</label>
+                <Dropdown value={backtest.positionSizing} options={['fixed','dynamic']} onChange={e => updateBacktest({ positionSizing: e.value })} className="p-inputtext-sm mr-2" style={{ width: '100px' }} />
+                {backtest.positionSizing === 'dynamic' && (
+                  <>
+                    <label className="mr-1 mb-0">Risk%</label>
+                    <InputNumber value={backtest.riskPercent} onValueChange={e => updateBacktest({ riskPercent: e.value ?? 1 })} step={0.1} min={0} size={2} className="mr-2" />
+                  </>
                 )}
-                {' | '}Lots: {backtest.lots}
-                {' | '}SL: {backtest.stopLossPercent}%
-                {' | '}TP: {backtest.takeProfitPercent}%
-                {' | '}Trail: {backtest.trailingDistancePercent}%
-                {' | '}Sizing: {sizingStr}
-              </p>
-              <button onClick={handleCopy} style={{ padding: '2px 8px', background: '#2a2e39', color: '#d1d4dc', border: '1px solid #555', borderRadius: '3px', cursor: 'pointer' }}>
-                {copied ? '✓' : '📋'}
-              </button>
+                <Button
+                  label="Run"
+                  onClick={runBacktest}
+                  disabled={backtest.loading}
+                  className="p-button-sm border-round-sm p-1 px-3 mr-2"
+                />
+                <Button
+                  label="Send to Sandbox"
+                  onClick={sendBacktestToSandbox}
+                  disabled={!backtest.signals.length}
+                  className="p-button-sm p-button-warning border-round-sm p-1 px-3"
+                />
+              </div>
+              {backtest.result?.stats && (
+                <div className="mt-2">
+                  <p className="text-sm" style={{ wordBreak: 'break-all' }}>
+                    Strategy: {backtest.strategyType} | Period: {backtest.dateFrom} – {backtest.dateTo} | Signals: {backtest.result.stats.totalSignals} | Trades: {backtest.result.stats.portfolio.totalTrades} (W: {backtest.result.stats.portfolio.winningTrades} / L: {backtest.result.stats.portfolio.losingTrades}) | WinRate: {backtest.result.stats.portfolio.winRate?.toFixed(1)}% | Profit: {backtest.result.stats.portfolio.totalProfit?.toFixed(2)} ({backtest.result.stats.portfolio.totalProfitPercent?.toFixed(2)}%) | MaxDD: {backtest.result.stats.portfolio.maxDrawdown?.toFixed(2)} ({backtest.result.stats.portfolio.maxDrawdownPercent?.toFixed(2)}%)
+                  </p>
+                </div>
+              )}
             </div>
-          </div>
-        )}
-      </div>
-    );
-  };
+          </Card>
+        </TabPanel>
 
-  const renderSignalsPanel = () => (
-    <div className="tab-panel">
-      <h3>Live Signals</h3>
-      <ul style={{ color: '#d1d4dc', maxHeight: '200px', overflowY: 'auto' }}>
-        {liveSignals.map((sig, idx) => (
-          <li key={idx}><strong>{sig.type}</strong>: {sig.message} @ {sig.price}</li>
-        ))}
-      </ul>
-    </div>
-  );
+        {/* ========== BATCH ============= */}
+        <TabPanel header="Batch">
+          <Card className="surface-ground p-0">
+            <div className="p-2">
+              {/* Выбор инструментов, Position Sizing, Volume Filter, Strategy, Buttons */}
+              <div className="p-col-12 p-md-6">
+                <div className="flex align-items-center mt-1 gap-2">
+                  <div className="p-inputgroup align-items-center mr-1">
+                    <label>Instruments: </label>
+                    <InputText value={`${batchInstruments.length} selected`} readOnly className="p-inputtext-sm mr-1" />
+                    <Button icon="pi pi-search" onClick={() => {
+                      setTempSelectedInstruments([...batchInstruments]);
+                      setShowInstrumentDialog(true);
+                    }} className="p-button-secondary p-button-sm border-round-sm p-1 px-3" />
+                    {batchInstruments.length > 0 && (
+                    <small className="p-mt-1" style={{ color: '#888' }}>
+                      {batchInstruments.map(uid => {
+                        const inst = availableInstruments.find(i => i.uid === uid);
+                        return inst ? inst.ticker || inst.name : uid;
+                      }).join(', ')}
+                    </small>
+                  )}
+                  </div>
+                  {/* Strategy */}
+                  <div className="flex align-items-center flex-1">
+                    <label className="mr-1">Strategy:</label>
+                    <Dropdown
+                      value={batchParams.strategyType}
+                      options={['volume_accumulation','trend']}
+                      onChange={e => setBatchParams({ ...batchParams, strategyType: e.value })}
+                      className="p-inputtext-sm w-full"
+                    />
+                  </div>
+                  {/* Size & Risk */}
+                  <div className="flex align-items-center flex-1">
+                    <label className="mr-1">Size:</label>
+                    <Dropdown
+                      value={batchParams.positionSizing}
+                      options={['fixed','dynamic']}
+                      onChange={e => setBatchParams({ ...batchParams, positionSizing: e.value })}
+                      className="p-inputtext-sm w-full"
+                    />
+                    {batchParams.positionSizing === 'dynamic' && (
+                      <>
+                        <label className="ml-1 mr-1">Risk%:</label>
+                        <InputText
+                          value={batchParams.riskPercent.toString()}
+                          onChange={e => setBatchParams({ ...batchParams, riskPercent: Number(e.target.value) })}
+                          className="p-inputtext-sm w-full"
+                          style={{ minWidth: '70px' }}
+                        />
+                      </>
+                    )}
+                  </div>
+                  {/* Vol Filter */}
+                  <div className="flex align-items-center flex-1">
+                    <Checkbox
+                      checked={batchParams.volumeFilterEnabled}
+                      onChange={e => setBatchParams({ ...batchParams, volumeFilterEnabled: e.checked ?? false })}
+                    />
+                    <label className="ml-1 mr-1" style={{minWidth: '70px'}}>Vol Filter</label>
+                    {batchParams.volumeFilterEnabled && (
+                      <InputText
+                        value={batchParams.volumeFilterPeriod.toString()}
+                        onChange={e => setBatchParams({ ...batchParams, volumeFilterPeriod: Number(e.target.value) })}
+                        placeholder="Period"
+                        className="p-inputtext-sm flex-1"
+                        style={{ minWidth: '80px' }}
+                      />
+                    )}
+                  </div>
+                  <div className="flex flex-grow-1 align-items-center mt-1 gap-2">
+                    <Button label="Run Batch" onClick={runBatch} disabled={batchRunning} className="flex-grow-1 p-button-sm border-round-sm p-1 px-3 mr-1" />
+                    <Button label="Export CSV" onClick={exportCSV} disabled={batchResults.length === 0} className="flex-grow-1 p-button-sm p-button-secondary border-round-sm p-1 px-3" />
+                  </div>
+                </div>
+              </div>
 
-  const renderProfilePanel = () => (
-    <div className="tab-panel">
-      <h3>Volume Profile Data</h3>
-      {profile ? (
-        <>
-          <div style={{ color: '#d1d4dc', marginBottom: '10px' }}>
-            <p>POC: {profile.poc.toFixed(2)}</p>
-            <p>Value Area: {profile.valueAreaLow.toFixed(2)} – {profile.valueAreaHigh.toFixed(2)}</p>
-            <p>Total Volume: {profile.totalVolume}</p>
-          </div>
-          {profile.volumeByPrice && profile.volumeByPrice.length > 0 && (
-            <div>
-              <h4>Top 10 Levels</h4>
-              <ul style={{ color: '#d1d4dc', maxHeight: '200px', overflowY: 'auto' }}>
-                {profile.volumeByPrice
-                  .sort((a, b) => b.volume - a.volume)
-                  .slice(0, 10)
-                  .map(({ price, volume }) => (
-                    <li key={price}>
-                      {price.toFixed(2)} – {volume.toFixed(0)}
-                    </li>
-                  ))}
-              </ul>
+              {/* SL, TP, Trail, Lots */}
+              <div className="p-col-12 p-md-6">      
+                <div className="p-inputgroup align-items-center mt-1">
+                  <div className='p-inputgroup align-items-center mr-2'>
+                    <label className='mr-1'>SL %:</label>
+                    <Dropdown
+                      value={batchParams.slMode}
+                      options={['manual', 'range']}
+                      onChange={e => setBatchParams({ ...batchParams, slMode: e.value })}
+                      className="p-inputtext-sm"
+                      style={{ maxWidth: '110px' }}
+                    />
+                    {batchParams.slMode === 'manual' ? (
+                      <InputText
+                        value={batchParams.slValues}
+                        onChange={e => setBatchParams({ ...batchParams, slValues: e.target.value })}
+                        className="p-inputtext-sm"
+                        placeholder="1,1.5,2"
+                      />
+                    ) : (
+                      <>
+                        <InputText
+                          value={batchParams.slMin.toString()}
+                          onChange={e => setBatchParams({ ...batchParams, slMin: Number(e.target.value) })}
+                          placeholder="Мин"
+                          style={{ maxWidth: '70px' }}
+                          className="p-inputtext-sm"
+                        />
+                        <InputText
+                          value={batchParams.slMax.toString()}
+                          onChange={e => setBatchParams({ ...batchParams, slMax: Number(e.target.value) })}
+                          placeholder="Макс"
+                          style={{ maxWidth: '70px' }}
+                          className="p-inputtext-sm"
+                        />
+                        <InputText
+                          value={batchParams.slStep.toString()}
+                          onChange={e => setBatchParams({ ...batchParams, slStep: Number(e.target.value) })}
+                          placeholder="Шаг"
+                          style={{ maxWidth: '70px' }}
+                          className="p-inputtext-sm"
+                        />
+                      </>
+                    )}
+                  </div>
+                  <div className='p-inputgroup align-items-center mr-2'>
+                    <label className='mr-1'>TP %:</label>
+                    <Dropdown
+                      value={batchParams.tpMode}
+                      options={['manual', 'range']}
+                      onChange={e => setBatchParams({ ...batchParams, tpMode: e.value })}
+                      className="p-inputtext-sm"
+                      style={{ maxWidth: '110px' }}
+                    />
+                    {batchParams.tpMode === 'manual' ? (
+                      <InputText
+                        value={batchParams.tpValues}
+                        onChange={e => setBatchParams({ ...batchParams, tpValues: e.target.value })}
+                        className="p-inputtext-sm"
+                        placeholder="2,3,4"
+                      />
+                    ) : (
+                      <>
+                        <InputText
+                          value={batchParams.tpMin.toString()}
+                          onChange={e => setBatchParams({ ...batchParams, tpMin: Number(e.target.value) })}
+                          placeholder="Мин"
+                          style={{ maxWidth: '70px' }}
+                          className="p-inputtext-sm"
+                        />
+                        <InputText
+                          value={batchParams.tpMax.toString()}
+                          onChange={e => setBatchParams({ ...batchParams, tpMax: Number(e.target.value) })}
+                          placeholder="Макс"
+                          style={{ maxWidth: '70px' }}
+                          className="p-inputtext-sm"
+                        />
+                        <InputText
+                          value={batchParams.tpStep.toString()}
+                          onChange={e => setBatchParams({ ...batchParams, tpStep: Number(e.target.value) })}
+                          placeholder="Шаг"
+                          style={{ maxWidth: '70px' }}
+                          className="p-inputtext-sm"
+                        />
+                      </>
+                    )}
+                  </div>
+                  <div className='p-inputgroup align-items-center mr-2'>
+                    <label className='mr-1'>Trail %</label>
+                    <Dropdown
+                      value={batchParams.trailMode}
+                      options={['manual', 'range']}
+                      onChange={e => setBatchParams({ ...batchParams, trailMode: e.value })}
+                      className="p-inputtext-sm"
+                      style={{ maxWidth: '110px' }}
+                    />
+                    {batchParams.trailMode === 'manual' ? (
+                      <InputText
+                        value={batchParams.trailValues}
+                        onChange={e => setBatchParams({ ...batchParams, trailValues: e.target.value })}
+                        className="p-inputtext-sm"
+                        placeholder="0.5,1"
+                      />
+                    ) : (
+                      <>
+                        <InputText
+                          value={batchParams.trailMin.toString()}
+                          onChange={e => setBatchParams({ ...batchParams, trailMin: Number(e.target.value) })}
+                          placeholder="Мин"
+                          style={{ maxWidth: '70px' }}
+                          className="p-inputtext-sm"
+                        />
+                        <InputText
+                          value={batchParams.trailMax.toString()}
+                          onChange={e => setBatchParams({ ...batchParams, trailMax: Number(e.target.value) })}
+                          placeholder="Макс"
+                          style={{ maxWidth: '70px' }}
+                          className="p-inputtext-sm"
+                        />
+                        <InputText
+                          value={batchParams.trailStep.toString()}
+                          onChange={e => setBatchParams({ ...batchParams, trailStep: Number(e.target.value) })}
+                          placeholder="Шаг"
+                          style={{ maxWidth: '70px' }}
+                          className="p-inputtext-sm"
+                        />
+                      </>
+                    )}
+                  </div>
+                  <label className='mr-1'>Lots:</label>
+                  <Dropdown
+                    value={batchParams.lotsMode}
+                    options={['manual', 'range']}
+                    onChange={e => setBatchParams({ ...batchParams, lotsMode: e.value })}
+                    className="p-inputtext-sm"
+                    style={{ width: '110px' }}
+                  />
+                  {batchParams.lotsMode === 'manual' ? (
+                    <InputText
+                      value={batchParams.lotsValues}
+                      onChange={e => setBatchParams({ ...batchParams, lotsValues: e.target.value })}
+                      className="p-inputtext-sm"
+                      placeholder="10"
+                    />
+                  ) : (
+                    <>
+                      <InputText
+                        value={batchParams.lotsMin.toString()}
+                        onChange={e => setBatchParams({ ...batchParams, lotsMin: Number(e.target.value) })}
+                        placeholder="Мин"
+                        style={{ width: '70px' }}
+                        className="p-inputtext-sm"
+                      />
+                      <InputText
+                        value={batchParams.lotsMax.toString()}
+                        onChange={e => setBatchParams({ ...batchParams, lotsMax: Number(e.target.value) })}
+                        placeholder="Макс"
+                        style={{ width: '70px' }}
+                        className="p-inputtext-sm"
+                      />
+                      <InputText
+                        value={batchParams.lotsStep.toString()}
+                        onChange={e => setBatchParams({ ...batchParams, lotsStep: Number(e.target.value) })}
+                        placeholder="Шаг"
+                        style={{ width: '70px' }}
+                        className="p-inputtext-sm"
+                      />
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Position Sizing, Volume Filter, Strategy, Buttons */}
+              <div className="p-col-12 p-md-6">
+                
+              </div>
             </div>
-          )}
-        </>
-      ) : (
-        <p style={{ color: '#888' }}>Нет данных профиля</p>
-      )}
-    </div>
-  );
 
-  const renderTradesPanel = () => (
-    <div className="tab-panel">
-      <h3>Trade History</h3>
-      {backtest.trades.length > 0 ? (
-        <div style={{ maxHeight: '400px', overflowY: 'auto', color: '#d1d4dc' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr>
-                <th>Type</th><th>Entry Time</th><th>Exit Time</th>
-                <th>Entry Price</th><th>Exit Price</th><th>Profit</th>
-                <th>Exit Reason</th>
-              </tr>
-            </thead>
-            <tbody>
-              {backtest.trades.map((t: any, idx: number) => (
-                <tr key={idx} style={{ borderBottom: '1px solid #444' }}>
-                  <td style={{ color: t.type === 'BUY' ? '#4caf50' : '#f44336' }}>{t.type}</td>
-                  <td>{new Date(t.entryTime).toLocaleString()}</td>
-                  <td>{new Date(t.exitTime).toLocaleString()}</td>
-                  <td>{t.entryPrice.toFixed(2)}</td>
-                  <td>{t.exitPrice.toFixed(2)}</td>
-                  <td className={t.profit >= 0 ? 'positive' : 'negative'}>{t.profit.toFixed(2)}</td>
-                  <td>{t.exitReason}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <p style={{ color: '#888' }}>No trades yet</p>
-      )}
-    </div>
-  );
-
-  function generateValuesFromRange(min: number, max: number, step: number): number[] {
-    const values: number[] = [];
-    if (step <= 0) return [min];
-    for (let v = min; v <= max + 0.0001; v += step) {
-      values.push(Math.round(v * 100) / 100); // округление до 2 знаков
-    }
-    return values;
-  }
-
-  const renderBatchPanel = () => {
-    
-    const runBatch = () => {
-      const api = (window as any).electronAPI;
-      if (!api?.batchBacktest) return;
-
-      setBatchResults([]);
-      setBatchProgress({ completed: 0, total: 0 });
-
-      api.removeBatchListeners();
-      api.onBatchProgress((data: any) => {
-        setBatchResults(prev => [...prev, data.item]);
-        setBatchProgress({ completed: data.completed, total: data.total });
-      });
-      api.onBatchComplete(() => {
-        setBatchProgress(null);
-      });
-
-      const paramSets = generateParamSets();
-      const uniqueParamSets = paramSets.filter((set, index, self) =>
-        index === self.findIndex(s =>
-          s.stopLossPercent === set.stopLossPercent &&
-          s.takeProfitPercent === set.takeProfitPercent &&
-          s.trailingDistancePercent === set.trailingDistancePercent &&
-          s.lots === set.lots &&
-          s.positionSizing === set.positionSizing &&
-          s.riskPercent === set.riskPercent &&
-          s.volumeFilterEnabled === set.volumeFilterEnabled &&
-          s.volumeFilterPeriod === set.volumeFilterPeriod
-        )
-      );
-
-      api.batchBacktest(
-        batchInstruments,
-        backtest.dateFrom,
-        backtest.dateTo,
-        backtest.interval,
-        stream.token,
-        uniqueParamSets,          // ← вместо paramSets
-        batchParams.strategyType,
-        backtest.profileResolution,
-        backtest.valueAreaPercent
-      );
-    };
-
-    const exportCSV = () => {
-      const header = 'Instrument,SL%,TP%,Trail%,Lots,Sizing,Risk%,VolFilt,Period,Signals,Trades,WinRate,Profit,MaxDD,Capital';
-      const rows = batchResults.map(r => {
-        const s = r.stats;
-        return `${r.instrumentUid},${r.params.stopLossPercent},${r.params.takeProfitPercent},${r.params.trailingDistancePercent},${r.params.lots},${r.params.positionSizing},${r.params.riskPercent},${r.params.volumeFilterEnabled},${r.params.volumeFilterPeriod},${r.signals},${s.totalTrades},${s.winRate?.toFixed(1)}%,${s.totalProfit?.toFixed(2)},${s.maxDrawdown?.toFixed(2)},${s.initialCapital}→${s.finalCapital?.toFixed(2)}`;
-      }).join('\n');
-
-      const blob = new Blob([header + '\n' + rows], { type: 'text/csv' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'batch_results.csv';
-      a.click();
-      URL.revokeObjectURL(url);
-    };
-
-    return (
-      <div className="tab-panel">
-        <h3>Batch Backtest</h3>
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '10px' }}>
-          <div style={{ display: 'flex', gap: '5px', alignItems: 'center', marginBottom: '10px' }}>
-            <label>Instruments:</label>
-            <button
-              onClick={() => {
-                setTempSelectedInstruments([...batchInstruments]);
-                setShowInstrumentDialog(true);
-              }}
-              style={{ padding: '4px 12px', background: '#2a2e39', color: '#d1d4dc', border: '1px solid #555', borderRadius: '3px', cursor: 'pointer' }}
-            >
-              {batchInstruments.length > 0 ? `Выбрано: ${batchInstruments.length}` : 'Выбрать инструменты'}
-            </button>
-            {batchInstruments.length > 0 && (
-              <span style={{ color: '#888', fontSize: '12px' }}>
-                {batchInstruments.map(uid => {
-                  const inst = availableInstruments.find(i => i.uid === uid);
-                  return inst ? inst.ticker || inst.name : uid;
-                }).join(', ')}
-              </span>
+            {/* Progress & Results */}
+            {batchProgress && (
+              <div className="p-mt-2">
+                <ProgressBar value={Math.round(batchProgress.total > 0 ? (batchProgress.completed / batchProgress.total) * 100 : 0)} />
+                <span className="p-ml-2">{batchProgress.completed} / {batchProgress.total}</span>
+              </div>
             )}
-          </div>
+            {batchResults.length > 0 && (
+              <div className="p-mt-2" style={{ maxHeight: '400px', overflowY: 'auto', color: '#d1d4dc' }}>
+                <table className="p-datatable-table" style={{ width: '100%', fontSize: '0.85rem' }}>
+                  <thead>
+                    <tr>
+                      <th>Instrument</th><th>SL%</th><th>TP%</th><th>Trail%</th><th>Lots</th>
+                      <th>Sizing</th><th>Risk%</th><th>VolFilt</th><th>Period</th>
+                      <th>Signals</th><th>Trades</th><th>WinRate</th><th>Profit</th><th>MaxDD</th><th>Capital</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {batchResults.map((r, idx) => (
+                      <tr key={idx}>
+                        <td>{r.instrumentUid.slice(0,8)}</td>
+                        <td>{r.params.stopLossPercent}</td>
+                        <td>{r.params.takeProfitPercent}</td>
+                        <td>{r.params.trailingDistancePercent}</td>
+                        <td>{r.params.lots}</td>
+                        <td>{r.params.positionSizing}</td>
+                        <td>{r.params.riskPercent}</td>
+                        <td>{r.params.volumeFilterEnabled ? 'Y' : 'N'}</td>
+                        <td>{r.params.volumeFilterPeriod}</td>
+                        <td>{r.signals}</td>
+                        <td>{r.stats.totalTrades}</td>
+                        <td>{r.stats.winRate?.toFixed(1)}%</td>
+                        <td>{r.stats.totalProfit?.toFixed(2)}</td>
+                        <td>{r.stats.maxDrawdown?.toFixed(2)}</td>
+                        <td>{r.stats.initialCapital}→{r.stats.finalCapital?.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
 
+          {/* Диалог выбора инструментов */}
           <Dialog
             header="Выбор инструментов для Batch"
             visible={showInstrumentDialog}
             style={{ width: '450px', maxHeight: '600px' }}
             onHide={() => setShowInstrumentDialog(false)}
             footer={
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                <button onClick={() => setShowInstrumentDialog(false)} style={{ padding: '6px 12px', background: '#444', color: '#d1d4dc', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>Отмена</button>
-                <button onClick={() => {
+              <div className="p-d-flex p-jc-end p-gap-2">
+                <Button label="Отмена" onClick={() => setShowInstrumentDialog(false)} className="p-button-sm p-button-secondary" />
+                <Button label="Применить" onClick={() => {
                   setBatchInstruments(tempSelectedInstruments);
                   setShowInstrumentDialog(false);
-                }} style={{ padding: '6px 12px', background: '#1976d2', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>Применить</button>
+                }} className="p-button-sm" />
               </div>
             }
           >
-            <div style={{ marginBottom: '10px' }}>
+            <div className="p-mb-2">
               <InputText
                 placeholder="Поиск инструмента..."
                 value={instrumentFilter}
                 onChange={e => setInstrumentFilter(e.target.value)}
-                style={{ width: '100%', padding: '6px', background: '#2a2e39', color: '#d1d4dc', border: '1px solid #555', borderRadius: '3px' }}
+                className="p-inputtext-sm"
+                style={{ width: '100%' }}
               />
             </div>
             <div style={{ maxHeight: '350px', overflowY: 'auto', color: '#d1d4dc' }}>
               {availableInstruments
                 .filter(inst => inst.name.toLowerCase().includes(instrumentFilter.toLowerCase()) || inst.ticker?.toLowerCase().includes(instrumentFilter.toLowerCase()))
                 .map(inst => (
-                  <div key={inst.uid} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0', borderBottom: '1px solid #333' }}>
+                  <div key={inst.uid} className="p-field-checkbox p-mb-1">
                     <Checkbox
                       inputId={`inst-${inst.uid}`}
                       checked={tempSelectedInstruments.includes(inst.uid)}
@@ -1134,184 +1353,101 @@ export const TradingAssistantPage: React.FC = () => {
                         }
                       }}
                     />
-                    <label htmlFor={`inst-${inst.uid}`} style={{ cursor: 'pointer', flex: 1 }}>
-                      {inst.name} ({inst.ticker})
-                    </label>
+                    <label htmlFor={`inst-${inst.uid}`}>{inst.name} ({inst.ticker})</label>
                   </div>
                 ))}
             </div>
           </Dialog>
-          <label>SL%:
-            <select value={batchParams.slMode} onChange={e => setBatchParams({ ...batchParams, slMode: e.target.value as 'manual' | 'range' })}>
-              <option value="manual">Ручной</option>
-              <option value="range">Диапазон</option>
-            </select>
-            {batchParams.slMode === 'manual' ? (
-              <input type="text" value={batchParams.slValues} onChange={e => setBatchParams({ ...batchParams, slValues: e.target.value })} style={{ width: '80px' }} />
-            ) : (
-              <span>
-                <input type="number" value={batchParams.slMin} onChange={e => setBatchParams({ ...batchParams, slMin: Number(e.target.value) })} step={0.1} style={{ width: '60px' }} />
-                <input type="number" value={batchParams.slMax} onChange={e => setBatchParams({ ...batchParams, slMax: Number(e.target.value) })} step={0.1} style={{ width: '60px' }} />
-                <input type="number" value={batchParams.slStep} onChange={e => setBatchParams({ ...batchParams, slStep: Number(e.target.value) })} step={0.1} style={{ width: '60px' }} />
-              </span>
-            )}
-          </label>
-          <label>TP%:
-            <select value={batchParams.tpMode} onChange={e => setBatchParams({ ...batchParams, tpMode: e.target.value as 'manual' | 'range' })}>
-              <option value="manual">Ручной</option>
-              <option value="range">Диапазон</option>
-            </select>
-            {batchParams.tpMode === 'manual' ? (
-              <input type="text" value={batchParams.tpValues} onChange={e => setBatchParams({ ...batchParams, tpValues: e.target.value })} style={{ width: '80px' }} />
-            ) : (
-              <span>
-                <input type="number" value={batchParams.tpMin} onChange={e => setBatchParams({ ...batchParams, tpMin: Number(e.target.value) })} step={0.1} style={{ width: '60px' }} />
-                <input type="number" value={batchParams.tpMax} onChange={e => setBatchParams({ ...batchParams, tpMax: Number(e.target.value) })} step={0.1} style={{ width: '60px' }} />
-                <input type="number" value={batchParams.tpStep} onChange={e => setBatchParams({ ...batchParams, tpStep: Number(e.target.value) })} step={0.1} style={{ width: '60px' }} />
-              </span>
-            )}
-          </label>
-          <label>Trail%:
-            <select value={batchParams.trailMode} onChange={e => setBatchParams({ ...batchParams, trailMode: e.target.value as 'manual' | 'range' })}>
-              <option value="manual">Ручной</option>
-              <option value="range">Диапазон</option>
-            </select>
-            {batchParams.trailMode === 'manual' ? (
-              <input type="text" value={batchParams.trailValues} onChange={e => setBatchParams({ ...batchParams, trailValues: e.target.value })} style={{ width: '80px' }} />
-            ) : (
-              <span>
-                <input type="number" value={batchParams.trailMin} onChange={e => setBatchParams({ ...batchParams, trailMin: Number(e.target.value) })} step={0.1} style={{ width: '60px' }} />
-                <input type="number" value={batchParams.trailMax} onChange={e => setBatchParams({ ...batchParams, trailMax: Number(e.target.value) })} step={0.1} style={{ width: '60px' }} />
-                <input type="number" value={batchParams.trailStep} onChange={e => setBatchParams({ ...batchParams, trailStep: Number(e.target.value) })} step={0.1} style={{ width: '60px' }} />
-              </span>
-            )}
-          </label>
-          <label>Lots:
-            <select value={batchParams.lotsMode} onChange={e => setBatchParams({ ...batchParams, lotsMode: e.target.value as 'manual' | 'range' })}>
-              <option value="manual">Ручной</option>
-              <option value="range">Диапазон</option>
-            </select>
-            {batchParams.lotsMode === 'manual' ? (
-              <input type="text" value={batchParams.lotsValues} onChange={e => setBatchParams({ ...batchParams, lotsValues: e.target.value })} style={{ width: '80px' }} />
-            ) : (
-              <span>
-                <input type="number" value={batchParams.lotsMin} onChange={e => setBatchParams({ ...batchParams, lotsMin: Number(e.target.value) })} step={0.1} style={{ width: '60px' }} />
-                <input type="number" value={batchParams.lotsMax} onChange={e => setBatchParams({ ...batchParams, lotsMax: Number(e.target.value) })} step={0.1} style={{ width: '60px' }} />
-                <input type="number" value={batchParams.lotsStep} onChange={e => setBatchParams({ ...batchParams, lotsStep: Number(e.target.value) })} step={0.1} style={{ width: '60px' }} />
-              </span>
-            )}
-          </label>
-          <label>Size:
-            <select value={batchParams.positionSizing} onChange={e => setBatchParams({ ...batchParams, positionSizing: e.target.value as 'fixed' | 'dynamic' })}>
-              <option value="fixed">Fixed</option>
-              <option value="dynamic">Dynamic</option>
-            </select>
-          </label>
-          {batchParams.positionSizing === 'dynamic' && (
-            <label>Risk%: <input type="number" value={batchParams.riskPercent} onChange={e => setBatchParams({ ...batchParams, riskPercent: Number(e.target.value) })} step={0.1} style={{ width: '50px' }} /></label>
-          )}
-          <label>
-            <input type="checkbox" checked={batchParams.volumeFilterEnabled} onChange={e => setBatchParams({ ...batchParams, volumeFilterEnabled: e.target.checked })} /> VolFilt
-          </label>
-          {batchParams.volumeFilterEnabled && (
-            <label>Per: <input type="number" value={batchParams.volumeFilterPeriod} onChange={e => setBatchParams({ ...batchParams, volumeFilterPeriod: Number(e.target.value) })} min={5} max={100} step={5} style={{ width: '50px' }} /></label>
-          )}
-          <label>Strategy:
-            <select value={batchParams.strategyType} onChange={e => setBatchParams({ ...batchParams, strategyType: e.target.value })}>
-              <option value="volume_accumulation">Vol Accum</option>
-              <option value="trend">Trend</option>
-            </select>
-          </label>
-          <button onClick={runBatch} disabled={batchRunning}>{batchRunning ? 'Running...' : 'Run Batch'}</button>
-          <button onClick={exportCSV} disabled={batchResults.length === 0}>Export CSV</button>
-        </div>
-        {batchProgress && (
-          <div style={{ marginTop: '10px', color: '#d1d4dc' }}>
-            <progress value={batchProgress.completed} max={batchProgress.total} style={{ width: '100%' }} />
-            <span>{batchProgress.completed} / {batchProgress.total}</span>
-          </div>
-        )}
+        </TabPanel>
 
-        {batchResults.length > 0 && (
-          <div style={{ maxHeight: '400px', overflowY: 'auto', color: '#d1d4dc' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  <th>Instrument</th>
-                  <th>SL%</th>
-                  <th>TP%</th>
-                  <th>Trail%</th>
-                  <th>Lots</th>
-                  <th>Sizing</th>
-                  <th>Risk%</th>
-                  <th>VolFilt</th>
-                  <th>Period</th>
-                  <th>Signals</th>
-                  <th>Trades</th>
-                  <th>WinRate</th>
-                  <th>Profit</th>
-                  <th>MaxDD</th>
-                  <th>Capital</th>
-                </tr>
-              </thead>
-              <tbody>
-                {batchResults.map((r, idx) => {
-                  const s = r.stats;
-                  return (
-                    <tr key={idx} style={{ borderBottom: '1px solid #444' }}>
-                      <td>{r.instrumentUid}</td>
-                      <td>{r.params.stopLossPercent}</td>
-                      <td>{r.params.takeProfitPercent}</td>
-                      <td>{r.params.trailingDistancePercent}</td>
-                      <td>{r.params.lots}</td>
-                      <td>{r.params.positionSizing}</td>
-                      <td>{r.params.riskPercent}</td>
-                      <td>{r.params.volumeFilterEnabled ? 'Y' : 'N'}</td>
-                      <td>{r.params.volumeFilterPeriod}</td>
-                      <td>{r.signals}</td>
-                      <td>{s.totalTrades}</td>
-                      <td>{s.winRate?.toFixed(1)}%</td>
-                      <td>{s.totalProfit?.toFixed(2)}</td>
-                      <td>{s.maxDrawdown?.toFixed(2)}</td>
-                      <td>{s.initialCapital}→{s.finalCapital?.toFixed(2)}</td>
+        {/* ========== SIGNALS =========== */}
+        <TabPanel header="Signals">
+          <Card className="surface-ground p-2">
+            <h4 className="p-mb-2">Live Signals</h4>
+            {liveSignals.length > 0 ? (
+              <ul className="p-pl-3" style={{ color: '#d1d4dc', maxHeight: '200px', overflowY: 'auto' }}>
+                {liveSignals.map((sig, idx) => (
+                  <li key={idx}><strong>{sig.type}</strong>: {sig.message} @ {sig.price}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-center text-500">Ожидание сигналов...</p>
+            )}
+          </Card>
+        </TabPanel>
+
+        {/* ========== PROFILE =========== */}
+        <TabPanel header="Profile">
+          <Card className="surface-ground p-2">
+            <h4 className="p-mb-2">Volume Profile Data</h4>
+            {profile ? (
+              <>
+                <div className="p-mb-2" style={{ color: '#d1d4dc' }}>
+                  <p>POC: {profile.poc.toFixed(2)}</p>
+                  <p>Value Area: {profile.valueAreaLow.toFixed(2)} – {profile.valueAreaHigh.toFixed(2)}</p>
+                  <p>Total Volume: {profile.totalVolume}</p>
+                </div>
+                {profile.volumeByPrice?.length > 0 && (
+                  <>
+                    <h5>Top 10 Levels</h5>
+                    <ul className="p-pl-3" style={{ color: '#d1d4dc', maxHeight: '200px', overflowY: 'auto' }}>
+                      {profile.volumeByPrice
+                        .sort((a: any, b: any) => b.volume - a.volume)
+                        .slice(0, 10)
+                        .map(({ price, volume }: any) => (
+                          <li key={price}>{price.toFixed(2)} – {volume.toFixed(0)}</li>
+                        ))}
+                    </ul>
+                  </>
+                )}
+              </>
+            ) : (
+              <p className="text-center text-500">Нет данных профиля</p>
+            )}
+          </Card>
+        </TabPanel>
+
+        {/* ========== TRADES ============ */}
+        <TabPanel header="Trades">
+          <Card className="surface-ground p-2">
+            <h4 className="p-mb-2">Trade History</h4>
+            {backtest.trades.length > 0 ? (
+              <div style={{ maxHeight: '400px', overflowY: 'auto', color: '#d1d4dc' }}>
+                <table className="p-datatable-table" style={{ width: '100%', fontSize: '0.85rem' }}>
+                  <thead>
+                    <tr>
+                      <th>Type</th><th>Entry Time</th><th>Exit Time</th>
+                      <th>Entry Price</th><th>Exit Price</th><th>Profit</th>
+                      <th>Exit Reason</th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  return (
-    <div className="trading-assistant">
-      <h1>Trading Assistant</h1>
-      <div className="tabs">
-        <button onClick={() => setActiveTab('sandbox')} className={activeTab === 'sandbox' ? 'active' : ''}>Sandbox</button>
-        <button onClick={() => setActiveTab('stream')} className={activeTab === 'stream' ? 'active' : ''}>Stream</button>
-        <button onClick={() => setActiveTab('backtest')} className={activeTab === 'backtest' ? 'active' : ''}>Backtest</button>
-        <button onClick={() => setActiveTab('batch')} className={activeTab === 'batch' ? 'active' : ''}>Batch</button>
-        <button onClick={() => setActiveTab('signals')} className={activeTab === 'signals' ? 'active' : ''}>Signals</button>
-        <button onClick={() => setActiveTab('profile')} className={activeTab === 'profile' ? 'active' : ''}>Profile</button>
-        <button onClick={() => setActiveTab('trades')} className={activeTab === 'trades' ? 'active' : ''}>Trades</button>
-      </div>
-
-      {activeTab === 'sandbox' && renderSandboxPanel()}
-      {activeTab === 'stream' && renderStreamPanel()}
-      {activeTab === 'backtest' && renderBacktestPanel()}
-      {activeTab === 'signals' && renderSignalsPanel()}
-      {activeTab === 'profile' && renderProfilePanel()}
-      {activeTab === 'trades' && renderTradesPanel()}
-      {activeTab === 'batch' && renderBatchPanel()}
-
+                  </thead>
+                  <tbody>
+                    {backtest.trades.map((t: any, idx: number) => (
+                      <tr key={idx} style={{ borderBottom: '1px solid #444' }}>
+                        <td style={{ color: t.type === 'BUY' ? '#4caf50' : '#f44336' }}>{t.type}</td>
+                        <td>{new Date(t.entryTime).toLocaleString()}</td>
+                        <td>{new Date(t.exitTime).toLocaleString()}</td>
+                        <td>{t.entryPrice.toFixed(2)}</td>
+                        <td>{t.exitPrice.toFixed(2)}</td>
+                        <td className={t.profit >= 0 ? 'text-green-500' : 'text-red-500'}>{t.profit.toFixed(2)}</td>
+                        <td>{t.exitReason}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-center text-500">No trades yet</p>
+            )}
+          </Card>
+        </TabPanel>
+      </TabView>
       <div className="chart-row">
         {profile?.volumeByPrice && priceRange.max > 0 && (
           <div className="volume-profile-container">
             <VolumeProfileBars
               data={profile.volumeByPrice}
-              maxVolume={Math.max(...profile.volumeByPrice.map(v => v.volume))}
+              maxVolume={Math.max(...profile.volumeByPrice.map((v: any) => v.volume))}
               minPrice={priceRange.min}
               maxPrice={priceRange.max}
               height={400}
@@ -1323,23 +1459,6 @@ export const TradingAssistantPage: React.FC = () => {
         )}
         <div className="chart-container" ref={chartContainerRef} />
       </div>
-      {/* Легенда маркеров – теперь под графиком */}
-      {backtest.trades.length > 0 && (
-        <div style={{ display: 'flex', gap: '12px', marginTop: '4px', flexWrap: 'wrap' }}>
-          {[
-            { label: 'Take Profit', color: '#4caf50' },
-            { label: 'Stop Loss', color: '#f44336' },
-            { label: 'Trailing Stop', color: '#2196f3' },
-            { label: 'End of Day', color: '#ffeb3b' },
-            { label: 'Signal', color: '#9e9e9e' },
-          ].map(item => (
-            <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#d1d4dc', fontSize: '11px' }}>
-              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: item.color }} />
-              {item.label}
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 };

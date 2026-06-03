@@ -758,14 +758,14 @@ function applyMenuToWindow(win: BrowserWindow, template: MenuItemConstructorOpti
 })();
 */
 // Временный тест: демонстрация работы OrderManager на исторических данных
-const orderManagerInstance = new OrderManager({
-  demoMode: false,                         // выключаем демо
-  token: process.env.VITE_TSandBox || '', // токен песочницы из .env
-  accountId: '',                           // пока пусто, введёте в UI
-  marketDataToken: process.env.VITE_TReadOnly || '',   // токен для рыночных данных
-});
-connectOrderManager(orderManagerInstance);
-setOrderManagerInstance(orderManagerInstance);
+//const orderManagerInstance = new OrderManager({
+//  demoMode: false,                         // выключаем демо
+//  token: process.env.VITE_TSandBox || '', // токен песочницы из .env
+//  accountId: '',                           // пока пусто, введёте в UI
+//  marketDataToken: process.env.VITE_TReadOnly || '',   // токен для рыночных данных
+//});
+//connectOrderManager(orderManagerInstance);
+//setOrderManagerInstance(orderManagerInstance);
 
 // Временный тест
 /*(async () => {

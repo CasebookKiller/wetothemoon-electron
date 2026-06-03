@@ -7,13 +7,6 @@
   padding: 4px;
 }
 
-.chart-container {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  position: relative;
-}
-
 .profile-info {
   background: #1e1e1e;
   padding: 10px;
@@ -130,12 +123,6 @@
   font-weight: bold;
 }
 
-.chart-container {
-  flex: 1;
-  min-width: 0;         /* ← обязательно для flex-дочернего */
-  overflow: hidden;     /* ← обрезает всё, что вылезает */
-}
-
 /* Контейнер строки графика */
 .trading-assistant .chart-row {
   display: flex;
@@ -203,10 +190,12 @@
 
 /* График */
 .chart-container {
+  height: 400px;
   flex: 1;
-  min-width: 0;          /* важно для flex-дочерних */
+  min-width: 0;
   overflow: hidden;
   position: relative;
+  background: #1e1e1e;   /* ← обязательно */
 }
 
 .tab-panel table {
@@ -238,4 +227,62 @@
 .p-checkbox .p-checkbox-box {
   background: #2a2e39;
   border-color: #555;
+}
+
+.p-card .p-card-body {
+  padding: 0.5rem;
+}
+
+.p-card .p-card-content {
+  padding: 0.5rem 0;
+}
+
+.p-tabview .p-tabview-panels {
+  background: #1f2937;
+  padding: 0.5rem;
+  border: 0 none;
+  color: rgba(255, 255, 255, 0.87);
+  border-bottom-right-radius: 6px;
+  border-bottom-left-radius: 6px;
+}
+
+button.lotQtyDec {
+  padding: 0.5rem 1rem!important;
+  max-height: 27.2px!important;
+  min-height: 27.2px!important;
+  height: 27.2px!important;
+  border-top-left-radius: 0.25rem!important;
+  border-bottom-left-radius: 0.25rem!important;
+  border-top-right-radius: 0px;
+  border-bottom-right-radius: 0px;
+
+}
+
+button.lotQtyInc {
+  padding: 0.5rem 1rem!important;
+  max-height: 27.2px!important;
+  min-height: 27.2px!important;
+  height: 27.2px!important;
+  border-top-right-radius: 0.25rem!important;
+  border-bottom-right-radius: 0.25rem!important;
+  border-top-left-radius: 0px;
+  border-bottom-left-radius: 0px;
+
+}
+
+.chart-row {
+  display: flex;
+  margin-top: 10px;
+}
+.volume-profile-container {
+  width: 100px;
+  flex-shrink: 0;
+}
+.chart-container {
+  height: 400px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  position: relative;
+  background: #1e1e1e;
 }
