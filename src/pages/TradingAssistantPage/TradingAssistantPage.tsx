@@ -1352,6 +1352,7 @@ export const TradingAssistantPage: React.FC = () => {
                           setTempSelectedInstruments(prev => prev.filter(id => id !== inst.uid));
                         }
                       }}
+                      className='mr-1'
                     />
                     <label htmlFor={`inst-${inst.uid}`}>{inst.name} ({inst.ticker})</label>
                   </div>
