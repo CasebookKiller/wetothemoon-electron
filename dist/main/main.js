@@ -2678,6 +2678,40 @@ var FVGVolumeStrategy = class {
 	}
 };
 //#endregion
+//#region src/api/tbank/ordersTypes.ts
+/** Тип идентификатора заявки */
+var OrderIdType = /* @__PURE__ */ function(OrderIdType) {
+	/** Тип идентификатора не указан */
+	OrderIdType[OrderIdType["ORDER_ID_TYPE_UNSPECIFIED"] = 0] = "ORDER_ID_TYPE_UNSPECIFIED";
+	/** Биржевой идентификатор */
+	OrderIdType[OrderIdType["ORDER_ID_TYPE_EXCHANGE"] = 1] = "ORDER_ID_TYPE_EXCHANGE";
+	/** Ключ идемпотентности, переданный клиентом */
+	OrderIdType[OrderIdType["ORDER_ID_TYPE_REQUEST"] = 2] = "ORDER_ID_TYPE_REQUEST";
+	return OrderIdType;
+}({});
+/** Направление операции */
+var OrderDirection = /* @__PURE__ */ function(OrderDirection) {
+	/** Значение не указано */
+	OrderDirection[OrderDirection["ORDER_DIRECTION_UNSPECIFIED"] = 0] = "ORDER_DIRECTION_UNSPECIFIED";
+	/** Покупка */
+	OrderDirection[OrderDirection["ORDER_DIRECTION_BUY"] = 1] = "ORDER_DIRECTION_BUY";
+	/** Продажа */
+	OrderDirection[OrderDirection["ORDER_DIRECTION_SELL"] = 2] = "ORDER_DIRECTION_SELL";
+	return OrderDirection;
+}({});
+/** Тип заявки */
+var OrderType = /* @__PURE__ */ function(OrderType) {
+	/** Значение не указано */
+	OrderType[OrderType["ORDER_TYPE_UNSPECIFIED"] = 0] = "ORDER_TYPE_UNSPECIFIED";
+	/** Лимитная */
+	OrderType[OrderType["ORDER_TYPE_LIMIT"] = 1] = "ORDER_TYPE_LIMIT";
+	/** Рыночная */
+	OrderType[OrderType["ORDER_TYPE_MARKET"] = 2] = "ORDER_TYPE_MARKET";
+	/** Лучшая цена */
+	OrderType[OrderType["ORDER_TYPE_BESTPRICE"] = 3] = "ORDER_TYPE_BESTPRICE";
+	return OrderType;
+}({});
+//#endregion
 //#region src/main/ipcHandlers/tradingAssistantHandlers.ts
 var orderManagerInstance = null;
 var setOrderManagerInstance = (manager) => {
@@ -3195,8 +3229,8 @@ var registerTradingAssistantHandlers = () => {
 				success: true,
 				orderId: (await sandboxGrpc.postSandboxOrder({
 					instrumentId: instrumentUid,
-					direction: "ORDER_DIRECTION_SELL",
-					orderType: "ORDER_TYPE_MARKET",
+					direction: OrderDirection.ORDER_DIRECTION_SELL,
+					orderType: OrderType.ORDER_TYPE_MARKET,
 					quantity,
 					accountId
 				}, token)).orderId
@@ -3739,40 +3773,6 @@ function registerTasksHandlers() {
 		createTasksWindow();
 	});
 }
-//#endregion
-//#region src/api/tbank/ordersTypes.ts
-/** Тип идентификатора заявки */
-var OrderIdType = /* @__PURE__ */ function(OrderIdType) {
-	/** Тип идентификатора не указан */
-	OrderIdType[OrderIdType["ORDER_ID_TYPE_UNSPECIFIED"] = 0] = "ORDER_ID_TYPE_UNSPECIFIED";
-	/** Биржевой идентификатор */
-	OrderIdType[OrderIdType["ORDER_ID_TYPE_EXCHANGE"] = 1] = "ORDER_ID_TYPE_EXCHANGE";
-	/** Ключ идемпотентности, переданный клиентом */
-	OrderIdType[OrderIdType["ORDER_ID_TYPE_REQUEST"] = 2] = "ORDER_ID_TYPE_REQUEST";
-	return OrderIdType;
-}({});
-/** Направление операции */
-var OrderDirection = /* @__PURE__ */ function(OrderDirection) {
-	/** Значение не указано */
-	OrderDirection[OrderDirection["ORDER_DIRECTION_UNSPECIFIED"] = 0] = "ORDER_DIRECTION_UNSPECIFIED";
-	/** Покупка */
-	OrderDirection[OrderDirection["ORDER_DIRECTION_BUY"] = 1] = "ORDER_DIRECTION_BUY";
-	/** Продажа */
-	OrderDirection[OrderDirection["ORDER_DIRECTION_SELL"] = 2] = "ORDER_DIRECTION_SELL";
-	return OrderDirection;
-}({});
-/** Тип заявки */
-var OrderType = /* @__PURE__ */ function(OrderType) {
-	/** Значение не указано */
-	OrderType[OrderType["ORDER_TYPE_UNSPECIFIED"] = 0] = "ORDER_TYPE_UNSPECIFIED";
-	/** Лимитная */
-	OrderType[OrderType["ORDER_TYPE_LIMIT"] = 1] = "ORDER_TYPE_LIMIT";
-	/** Рыночная */
-	OrderType[OrderType["ORDER_TYPE_MARKET"] = 2] = "ORDER_TYPE_MARKET";
-	/** Лучшая цена */
-	OrderType[OrderType["ORDER_TYPE_BESTPRICE"] = 3] = "ORDER_TYPE_BESTPRICE";
-	return OrderType;
-}({});
 //#endregion
 //#region src/main/services/orderManager.ts
 var OrderManager = class {

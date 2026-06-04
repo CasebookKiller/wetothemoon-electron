@@ -49,6 +49,7 @@ export const PositionsOrdersTab: React.FC<Props> = ({ accountId }) => {
   const closePosition = async (instrumentUid: string, quantity: number) => {
     const api = (window as any).electronAPI;
     if (api?.closePosition) {
+      console.log('Closing position:', { instrumentUid, accountId, quantity });
       const result = await api.closePosition(instrumentUid, accountId, quantity);
       if (result.success) {
         console.log('Позиция закрыта, ордер:', result.orderId);
@@ -96,16 +97,18 @@ export const PositionsOrdersTab: React.FC<Props> = ({ accountId }) => {
           <Column header="Quantity" body={quantityTemplate} />
           <Column header="Avg Price" body={priceTemplate} />
           <Column header="Current P/L" body={() => '—'} />
-          <Column body={row => (
-            row.instrumentUid && row.instrumentUid !== 'RUB' ? (
+          <Column body={row => {
+            const qty = row.quantity || row.balance || 0;
+            if (!row.instrumentUid || row.instrumentUid === 'RUB' || qty <= 0) return null;
+            return (
               <Button
                 icon="pi pi-times"
                 className="p-button-sm p-button-danger"
-                onClick={() => closePosition(row.instrumentUid, row.quantity || row.balance || 0)}
+                onClick={() => closePosition(row.instrumentUid, qty)}
                 tooltip="Close position"
               />
-            ) : null
-          )} />
+            );
+          }} />
         </DataTable>
 
         <h4 className="p-mb-2 p-mt-3">Active Orders</h4>

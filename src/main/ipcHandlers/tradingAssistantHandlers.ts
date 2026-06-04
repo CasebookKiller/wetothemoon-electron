@@ -18,6 +18,7 @@ import { instrumentsGrpc } from '@/main/services/tbank/InstrumentsGrpcService';
 import { BatchBacktestRunner } from '@/main/services/backtest/batchBacktestRunner';
 import { DailyVAReversalStrategy } from '../services/backtest/strategies/DailyVAReversalStrategy';
 import { FVGVolumeStrategy } from '../services/backtest/strategies/FVGVolumeStrategy';
+import { OrderDirection, OrderType } from '@/api/tbank/ordersTypes';
 
 let orderManagerInstance: OrderManager | null = null;
 
@@ -673,8 +674,8 @@ export const registerTradingAssistantHandlers = () => {
       // В реальности нужно смотреть тип позиции, но пока так
       const order = await sandboxGrpc.postSandboxOrder({
         instrumentId: instrumentUid,
-        direction: 'ORDER_DIRECTION_SELL',  // или BUY для шорта
-        orderType: 'ORDER_TYPE_MARKET',
+        direction: OrderDirection.ORDER_DIRECTION_SELL,  // или BUY для шорта
+        orderType: OrderType.ORDER_TYPE_MARKET,
         quantity,
         accountId,
       }, token);
