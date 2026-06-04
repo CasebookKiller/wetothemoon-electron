@@ -23,11 +23,12 @@ export interface BatchResultItem {
   params: BatchParams;
   stats: any;
   signals: number;
+  partial?: boolean; // true, если это промежуточный результат
 }
 
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
 export class BatchBacktestRunner {
+  private cancelled = false;
+
   async run(
     instrumentUids: string[],
     dateFrom: string,
@@ -41,9 +42,15 @@ export class BatchBacktestRunner {
     onProgress: (item: BatchResultItem) => void
   ): Promise<void> {
     const loader = new HistoricalDataLoader();
+    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
     for (const uid of instrumentUids) {
+      if (this.cancelled) break;
+
       for (const params of paramSets) {
+        if (this.cancelled) break;
+
+        // Общий портфель на все дни для данной комбинации параметров
         const portfolio = new VirtualPortfolio({
           initialCapital: 100000,
           stopLossPercent: params.stopLossPercent,
@@ -54,35 +61,27 @@ export class BatchBacktestRunner {
           riskPercent: params.riskPercent,
         });
 
-        const strategyOptions = {
-          volumeFilterEnabled: params.volumeFilterEnabled,
-          volumeFilterPeriod: params.volumeFilterPeriod,
-        };
-
-        const strategy = strategyType === 'trend'
-          ? new TrendStrategy(uid, null as any, strategyOptions)
-          : new VolumeAccumulationStrategy(uid, null as any, strategyOptions);
-
         let totalSignals = 0;
-        let lastClose = 0;                     // ← новая переменная
+        let lastClose = 0;
         let currentDate = new Date(dateFrom + 'T00:00:00Z');
         const endDate = new Date(dateTo + 'T00:00:00Z');
 
         while (currentDate <= endDate) {
+          if (this.cancelled) break;
+
           const dayOfWeek = currentDate.getDay();
           if (dayOfWeek !== 0 && dayOfWeek !== 6) {
             const dateStr = currentDate.toISOString().split('T')[0];
             const dayFrom = new Date(dateStr + 'T07:00:00Z');
             const dayTo = new Date(dateStr + 'T16:00:00Z');
 
-            // Повторные попытки для каждого дня
+            // Загружаем свечи дня с повторными попытками
             let candles: any[] = [];
             let retries = 3;
-            while (retries > 0) {
+            while (retries > 0 && candles.length === 0) {
               try {
                 await delay(1000);
                 candles = await loader.loadIntradayCandles(uid, dayFrom, dayTo, token, interval);
-                break;
               } catch (e: any) {
                 retries--;
                 console.warn(`[Batch] Ошибка загрузки за ${dateStr}, осталось попыток: ${retries}`, e.message);
@@ -91,12 +90,20 @@ export class BatchBacktestRunner {
             }
 
             if (candles.length > 0) {
+              // Строим профиль дня
               const engine = new VolumeProfileEngine({ profileResolution, valueAreaPercent });
               candles.forEach(c => (engine as any).onCandle?.(c));
               const profile = engine.getProfile(uid);
 
               if (profile) {
-                strategy.updateProfile(profile);
+                // СОЗДАЁМ НОВУЮ стратегию для этого дня (как в одиночном бэктесте)
+                const strategyOptions = {
+                  volumeFilterEnabled: params.volumeFilterEnabled,
+                  volumeFilterPeriod: params.volumeFilterPeriod,
+                };
+                const strategy = strategyType === 'trend'
+                  ? new TrendStrategy(uid, profile, strategyOptions)
+                  : new VolumeAccumulationStrategy(uid, profile, strategyOptions);
 
                 for (const candle of candles) {
                   strategy.onCandle(candle);
@@ -111,7 +118,7 @@ export class BatchBacktestRunner {
                   const high = quotationToNumber(candle.high);
                   const low = quotationToNumber(candle.low);
                   const close = quotationToNumber(candle.close);
-                  lastClose = close;          // ← запоминаем последнюю цену
+                  lastClose = close;
                   portfolio.checkStopTake(high, low, close, candle.time || '');
                 }
               }
@@ -120,7 +127,6 @@ export class BatchBacktestRunner {
           currentDate.setDate(currentDate.getDate() + 1);
         }
 
-        // Закрываем позицию по реальной последней цене, а не по 0
         portfolio.finalizeWithLastPrice(lastClose, '');
 
         const resultItem: BatchResultItem = {
@@ -132,5 +138,13 @@ export class BatchBacktestRunner {
         onProgress(resultItem);
       }
     }
+  }
+
+  cancel(): void {
+    this.cancelled = true;
+  }
+
+  public isCancelled(): boolean {
+    return this.cancelled;
   }
 }

@@ -191,44 +191,42 @@ export class OrderManager {
     try {
       const lastPrice = await this.getLastPrice(this.trailingInstrumentUid);
       if (!lastPrice) return;
-      const isBuy = true; // для лонга; при необходимости адаптируйте
+
+      const isBuy = true; // Для лонгов; для шортов условие обратное
       const newStopPrice = isBuy
         ? lastPrice * (1 - this.trailingPercent / 100)
         : lastPrice * (1 + this.trailingPercent / 100);
+
       if ((isBuy && newStopPrice > this.trailingEntryPrice) || (!isBuy && newStopPrice < this.trailingEntryPrice)) {
-        await sandboxGrpc.replaceSandboxOrder({
-          accountId: this.config.accountId,
-          orderId: this.trailingStopOrderId,
-          price: { units: Math.floor(newStopPrice), nano: Math.round((newStopPrice % 1) * 1e9) },
-          quantity: this.config.lotQuantity,
-          //direction: isBuy ? OrderDirection.ORDER_DIRECTION_SELL : OrderDirection.ORDER_DIRECTION_BUY,
-        }, this.config.token);
+        await sandboxGrpc.replaceSandboxOrder(
+          {
+            accountId: this.config.accountId,
+            orderId: this.trailingStopOrderId,
+            price: { units: Math.floor(newStopPrice), nano: Math.round((newStopPrice % 1) * 1e9) },
+            quantity: this.config.lotQuantity,
+          },
+          this.config.token
+        );
         this.trailingEntryPrice = newStopPrice;
         console.log(`[OrderManager] Трейлинг‑стоп обновлён до ${newStopPrice}`);
       }
-    } catch (e) { console.error('[OrderManager] Ошибка трейлинга:', e); }
+    } catch (e) {
+      console.error('[OrderManager] Ошибка трейлинга:', e);
+    }
   }
 
   private async getLastPrice(instrumentUid: string): Promise<number | null> {
-    if (!this.config.marketDataToken) {
-      console.warn('[OrderManager] Не задан marketDataToken');
-      return null;
-    }
+    if (!this.config.marketDataToken) return null;
     try {
-      const response = await marketDataGrpc.getLastPrices(
-        {
-          instrumentId: [instrumentUid],
-          lastPriceType: 1, // LAST_PRICE_EXCHANGE
-        },
-        this.config.marketDataToken   // передаём read-only токен
+      const resp = await marketDataGrpc.getLastPrices(
+        { instrumentId: [instrumentUid], lastPriceType: 1 },
+        this.config.marketDataToken
       );
-      const price = response.lastPrices?.[0]?.price;
-      if (price) {
-        return Number(price.units) + Number(price.nano) / 1e9;
-      }
+      const p = resp.lastPrices?.[0]?.price;
+      return p ? Number(p.units) + Number(p.nano) / 1e9 : null;
     } catch (e) {
       console.error('[OrderManager] Не удалось получить lastPrice:', e);
+      return null;
     }
-    return null;
   }
 }

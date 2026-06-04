@@ -4,6 +4,8 @@ import { VolumeProfileEngine, volumeProfileEngine } from '@/main/services/volume
 import { CandleInterval } from '@/api/tbank/marketdataTypes';
 import { BacktestEngine, IBacktestStrategy } from '@/main/services/backtest/backtestEngine';
 import { VolumeAccumulationStrategy } from '@/main/services/backtest/strategies/VolumeAccumulationStrategy';
+import { TrendStrategy } from '@/main/services/backtest/strategies/TrendStrategy';
+import { POCPullbackStrategy } from '../services/backtest/strategies/POCPullbackStrategy';
 import { HistoricalDataLoader } from '@/main/services/historicalDataLoader';
 import { StreamCandle } from '@/api/tbank/marketdataStreamTypes';
 import { VirtualPortfolio } from '@/main/services/backtest/virtualPortfolio';
@@ -12,15 +14,133 @@ import { OrderManager } from '@/main/services/orderManager';
 import { sandboxGrpc } from '@/main/services/tbank/SandboxGrpcService';
 import { marketDataBus } from '@/main/services/marketDataBus';
 import { getTradingAssistantWindow } from '@/main/windows/tradingAssistantWindow';
-import { TrendStrategy } from '@/main/services/backtest/strategies/TrendStrategy';
 import { instrumentsGrpc } from '@/main/services/tbank/InstrumentsGrpcService';
 import { BatchBacktestRunner } from '@/main/services/backtest/batchBacktestRunner';
+import { DailyVAReversalStrategy } from '../services/backtest/strategies/DailyVAReversalStrategy';
+import { FVGVolumeStrategy } from '../services/backtest/strategies/FVGVolumeStrategy';
 
 let orderManagerInstance: OrderManager | null = null;
 
 export const setOrderManagerInstance = (manager: OrderManager) => {
   orderManagerInstance = manager;
 };
+
+async function runBacktestInternal(
+  instrumentUid: string,
+  dateFrom: string,
+  dateTo: string,
+  intervalStr: string,
+  token: string,
+  params: any
+): Promise<any> {
+  const loader = new HistoricalDataLoader();
+  const intervalMap: Record<string, CandleInterval> = {
+    '1min': CandleInterval.CANDLE_INTERVAL_1_MIN,
+    '5min': CandleInterval.CANDLE_INTERVAL_5_MIN,
+    '15min': CandleInterval.CANDLE_INTERVAL_15_MIN,
+    '1hour': CandleInterval.CANDLE_INTERVAL_HOUR,
+  };
+  const interval = intervalMap[intervalStr] || CandleInterval.CANDLE_INTERVAL_1_MIN;
+
+  const allCandles: any[] = [];
+  const allSignals: BacktestSignal[] = [];
+
+  const portfolio = new VirtualPortfolio({
+    initialCapital: 100000,
+    stopLossPercent: params.stopLossPercent || 0,
+    takeProfitPercent: params.takeProfitPercent || 0,
+    trailingDistancePercent: params.trailingDistancePercent || 0,
+    lotQuantity: params.lots || 1,
+    positionSizing: params.positionSizing || 'fixed',
+    riskPercent: params.riskPercent || 1,
+  });
+
+  const strategyType = params.strategyType || 'volume_accumulation';
+
+  try {
+    let currentDate = new Date(dateFrom + 'T00:00:00Z');
+    const endDate = new Date(dateTo + 'T00:00:00Z');
+
+    while (currentDate <= endDate) {
+      const dateStr = currentDate.toISOString().split('T')[0];
+      const dayFrom = new Date(dateStr + 'T07:00:00Z');
+      const dayTo = new Date(dateStr + 'T16:00:00Z');
+
+      const candles = await loader.loadIntradayCandles(instrumentUid, dayFrom, dayTo, token, interval);
+
+      if (candles.length > 0) {
+        const engine = new VolumeProfileEngine({
+          profileResolution: params.profileResolution || 50,
+          valueAreaPercent: params.valueAreaPercent || 70,
+        });
+        candles.forEach(c => (engine as any).onCandle?.(c));
+        const profile = engine.getProfile(instrumentUid);
+
+        let strategy: IBacktestStrategy;
+        if (strategyType === 'trend') {
+          strategy = new TrendStrategy(instrumentUid, profile);
+        } else if (strategyType === 'poc_pullback') {
+          strategy = new POCPullbackStrategy(instrumentUid, profile);
+        } else if (strategyType === 'daily_va_return') {
+          strategy = new DailyVAReversalStrategy(instrumentUid, profile);
+        } else if (strategyType === 'fvg_volume') {
+          strategy = new FVGVolumeStrategy(instrumentUid, profile);
+        } else {
+          strategy = new VolumeAccumulationStrategy(instrumentUid, profile, {
+            volumeFilterEnabled: params.volumeFilterEnabled,
+            volumeFilterPeriod: params.volumeFilterPeriod,
+          });
+        }
+
+        for (const candle of candles) {
+          strategy.onCandle(candle);
+          const newSignals = strategy.getSignals();
+          for (const signal of newSignals) {
+            portfolio.processSignal(signal);
+            allSignals.push(signal);
+          }
+          strategy.clearSignals();
+
+          const high = quotationToNumber(candle.high);
+          const low = quotationToNumber(candle.low);
+          const close = quotationToNumber(candle.close);
+          portfolio.checkStopTake(high, low, close, candle.time || '');
+        }
+
+        allCandles.push(...candles);
+      }
+
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    if (allCandles.length > 0) {
+      const lastCandle = allCandles[allCandles.length - 1];
+      const lastPrice = quotationToNumber(lastCandle.close);
+      portfolio.finalizeWithLastPrice(lastPrice, lastCandle.time || '');
+    } else {
+      portfolio.finalizeWithLastPrice(0, '');
+    }
+
+    const stats = portfolio.getStats();
+    const backtestStats = {
+      totalSignals: allSignals.length,
+      buySignals: allSignals.filter(s => s.type === 'BUY').length,
+      sellSignals: allSignals.filter(s => s.type === 'SELL').length,
+      portfolio: stats,
+    };
+    const trades = portfolio.getTrades();
+
+    return {
+      stats: backtestStats,
+      signals: allSignals,
+      candles: allCandles,
+      trades,
+    };
+  } catch (error) {
+    console.error('Backtest error:', error);
+    return null;
+  }
+}
 
 export const registerTradingAssistantHandlers = () => {
   // Получить текущий профиль по инструменту (по запросу)
@@ -65,47 +185,6 @@ export const registerTradingAssistantHandlers = () => {
   });
 
   // Запуск бэктеста
-  /*
-  ipcMain.handle('trading-assistant:run-backtest', async (_, instrumentUid: string, date: string, token: string) => {
-    const loader = new HistoricalDataLoader();
-    const from = new Date(date + 'T00:00:00Z');
-    const to = new Date(date + 'T23:59:59Z');
-    
-    try {
-      // 1. Загружаем минутные свечи за торговый день
-      const candles = await loader.loadIntradayCandles(
-        instrumentUid,
-        new Date(date + 'T07:00:00Z'),
-        new Date(date + 'T16:00:00Z'),
-        token,
-        CandleInterval.CANDLE_INTERVAL_1_MIN
-      );
-
-      if (!candles || candles.length === 0) {
-        return { profile: null, stats: null, signals: [], candles: [] };
-      }
-
-      // 2. Создаём временный движок и прогоняем через него все минутные свечи
-      const profileEngine = new VolumeProfileEngine({ profileResolution: 50 });
-      candles.forEach((candle: StreamCandle) => {
-        (profileEngine as any).onCandle?.(candle);
-      });
-      const profile = profileEngine.getProfile(instrumentUid);
-
-      // 3. Стратегия и бэктест (используем уже готовые свечи)
-      const strategy = new VolumeAccumulationStrategy(instrumentUid, profile);
-      const engine = new BacktestEngine();
-      const stats = engine.run(strategy, candles);
-      const signals = strategy.getSignals();
-
-      return { profile, stats, signals, candles };
-    } catch (error) {
-      console.error('Backtest error:', error);
-      return null;
-    }
-  });
-  */
-
   ipcMain.handle('trading-assistant:run-backtest', async (_, instrumentUid: string, dateFrom: string, dateTo: string, intervalStr: string, token: string, params: any) => {
     const loader = new HistoricalDataLoader();
     const intervalMap: Record<string, CandleInterval> = {
@@ -157,6 +236,8 @@ export const registerTradingAssistantHandlers = () => {
           let strategy: IBacktestStrategy;
           if (strategyType === 'trend') {
             strategy = new TrendStrategy(instrumentUid, profile);
+          } else if (strategyType === 'poc_pullback') {
+            strategy = new POCPullbackStrategy(instrumentUid, profile);
           } else {
             strategy = new VolumeAccumulationStrategy(instrumentUid, profile, {
               volumeFilterEnabled: params.volumeFilterEnabled,
@@ -250,6 +331,7 @@ export const registerTradingAssistantHandlers = () => {
     let completed = 0;
 
     // Передаём колбэк, который отправляет прогресс через event.sender
+    currentBatchRunner = runner;
     await runner.run(
       instrumentUids, dateFrom, dateTo, interval, token, paramSets,
       strategyType, profileResolution, valueAreaPercent,
@@ -262,8 +344,70 @@ export const registerTradingAssistantHandlers = () => {
         });
       }
     );
+    currentBatchRunner = null;
+
+    event.sender.send('trading-assistant:batch-complete', { total: completed });
 
     return { completed }; // финальный ответ (опционально)
+  });
+
+  ipcMain.handle('trading-assistant:batch-v2', async (event, instrumentUids: string[], dateFrom: string, dateTo: string, intervalStr: string, token: string, paramSets: any[], strategyType: string, profileResolution: number, valueAreaPercent: number) => {
+    const total = instrumentUids.length * paramSets.length;
+    let completed = 0;
+
+    // Локальный объект для поддержки остановки
+    const runner = { cancelled: false, cancel: () => { runner.cancelled = true; } };
+    (currentBatchRunner as any) = runner;
+
+    for (const uid of instrumentUids) {
+      if (runner.cancelled) break;
+
+      for (const params of paramSets) {
+        if (runner.cancelled) break;
+
+        const result = await runBacktestInternal(uid, dateFrom, dateTo, intervalStr, token, {
+          ...params,
+          strategyType,
+          profileResolution,
+          valueAreaPercent,
+        });
+
+        completed++;
+        if (result) {
+          event.sender.send('trading-assistant:batch-progress', {
+            item: {
+              instrumentUid: uid,
+              params,
+              stats: result.stats.portfolio,   // <-- исправлено: передаём напрямую PortfolioStats
+              signals: result.signals?.length || 0,
+            },
+            completed,
+            total,
+          });
+        } else {
+          event.sender.send('trading-assistant:batch-progress', {
+            item: null,
+            completed,
+            total,
+          });
+        }
+      }
+    }
+
+    currentBatchRunner = null;
+    event.sender.send('trading-assistant:batch-complete', { total: completed });
+    return { completed };
+  });
+
+  let currentBatchRunner: BatchBacktestRunner | null = null;
+
+  // Внутри registerTradingAssistantHandlers():
+  ipcMain.handle('trading-assistant:batch-stop', async () => {
+    if (currentBatchRunner) {
+      currentBatchRunner.cancel();
+      return true;
+    }
+    return false;
   });
 
   ipcMain.handle('trading-assistant:send-backtest-signals', async (_, signals: BacktestSignal[]) => {
@@ -487,6 +631,33 @@ export const registerTradingAssistantHandlers = () => {
     const win = getTradingAssistantWindow();
     if (win && !win.isDestroyed()) {
       win.webContents.send('last-price-data', data);
+    }
+  });
+
+  ipcMain.handle('trading-assistant:get-positions', async (_, accountId: string) => {
+    const token = process.env.VITE_TSandBox || '';
+    if (!token || !accountId) return { money: [], securities: [] };
+    try {
+      const response = await sandboxGrpc.getSandboxPositions({ accountId }, token);
+      return {
+        money: response.money || [],
+        securities: response.securities || [],
+      };
+    } catch (e: any) {
+      console.error('[GetPositions]', e);
+      return { money: [], securities: [] };
+    }
+  });
+
+  ipcMain.handle('trading-assistant:get-orders', async (_, accountId: string) => {
+    const token = process.env.VITE_TSandBox || '';
+    if (!token || !accountId) return [];
+    try {
+      const response = await sandboxGrpc.getSandboxOrders({ accountId }, token);
+      return response.orders || [];
+    } catch (e: any) {
+      console.error('[GetOrders]', e);
+      return [];
     }
   });
 };

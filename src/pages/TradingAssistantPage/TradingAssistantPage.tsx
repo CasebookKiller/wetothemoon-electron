@@ -22,6 +22,8 @@ import { Dialog } from 'primereact/dialog';
 import { ProgressBar } from 'primereact/progressbar';
 import { Signal } from '@/api/tbank/signalTypes';
 import { VolumeProfileLevels } from '@/main/services/volumeProfileEngine';
+import { VolumeProfileOverlay } from '@/components/TRADING_ASSISTANT/VolumeProfileOverlay/VolumeProfileOverlay';
+import { PositionsOrdersTab } from '@/components/TRADING_ASSISTANT/PositionsOrdersTab/PositionsOrdersTab';
 
 function quotationToNumber(q: any): number {
   if (!q) return 0;
@@ -84,6 +86,8 @@ export const TradingAssistantPage: React.FC = () => {
     creatingAccount: false,
     stopLossPercent: 0.5,
     takeProfitPercent: 1.0,
+    trailingEnabled: false,
+    trailingPercent: 0.5,
   });
 
   // Стрим
@@ -152,7 +156,9 @@ export const TradingAssistantPage: React.FC = () => {
   const [batchInstruments, setBatchInstruments] = useState<string[]>([]);
   const [batchResults, setBatchResults] = useState<any[]>([]);
   const [batchRunning, setBatchRunning] = useState(false);
+  const [batchStopping, setBatchStopping] = useState(false);
   const [batchProgress, setBatchProgress] = useState<{ completed: number; total: number } | null>(null);
+  const [batchVersion, setBatchVersion] = useState<'v1' | 'v2'>('v2');
 
   // Профиль и сигналы (пустые, будут наполняться позже)
   const [profile, setProfile] = useState<any>(null);
@@ -292,6 +298,8 @@ export const TradingAssistantPage: React.FC = () => {
       lotQuantity: sandbox.lotQty,
       stopLossPercent: sandbox.stopLossPercent,
       takeProfitPercent: sandbox.takeProfitPercent,
+      trailingEnabled: sandbox.trailingEnabled,
+      trailingPercent: sandbox.trailingPercent,
     });
     alert('Config applied');
   };
@@ -492,18 +500,22 @@ export const TradingAssistantPage: React.FC = () => {
 
   const runBatch = () => {
     const api = (window as any).electronAPI;
-    if (!api?.batchBacktest) return;
+    if (!api?.batchBacktest || !api?.batchV2) return;
 
+    setBatchRunning(true);
     setBatchResults([]);
     setBatchProgress({ completed: 0, total: 0 });
 
     api.removeBatchListeners();
     api.onBatchProgress((data: any) => {
-      setBatchResults(prev => [...prev, data.item]);
+      if (data.item) {
+        setBatchResults(prev => [...prev, data.item]);
+      }
       setBatchProgress({ completed: data.completed, total: data.total });
     });
     api.onBatchComplete(() => {
       setBatchProgress(null);
+      setBatchRunning(false);
     });
 
     const paramSets = generateParamSets();
@@ -520,7 +532,10 @@ export const TradingAssistantPage: React.FC = () => {
       )
     );
 
-    api.batchBacktest(
+    // Выбор версии API
+    const batchMethod = batchVersion === 'v1' ? api.batchBacktest : api.batchV2;
+
+    batchMethod(
       batchInstruments,
       backtest.dateFrom,
       backtest.dateTo,
@@ -531,6 +546,16 @@ export const TradingAssistantPage: React.FC = () => {
       backtest.profileResolution,
       backtest.valueAreaPercent
     );
+  };
+
+  const stopBatch = async () => {
+    setBatchStopping(true);
+    const api = (window as any).electronAPI;
+    await api.stopBatch();
+    api.removeBatchListeners();        // ← убираем старые подписки
+    setBatchRunning(false);
+    setBatchProgress(null);            // ← скрываем прогресс-бар
+    setBatchStopping(false);
   };
 
   const exportCSV = () => {
@@ -846,6 +871,18 @@ export const TradingAssistantPage: React.FC = () => {
                   size={2}
                   className='mr-2'
                 />
+                <Checkbox checked={sandbox.trailingEnabled} onChange={e => updateSandbox({ trailingEnabled: e.checked })} />
+                <label className="ml-1 mr-1 mb-0">Trailing</label>
+                {sandbox.trailingEnabled && (
+                  <InputNumber
+                    value={sandbox.trailingPercent}
+                    onValueChange={e => updateSandbox({ trailingPercent: e.value ?? 0.5 })}
+                    step={0.1}
+                    min={0}
+                    size={2}
+                    className='mr-1'
+                  />
+                )}
                 <label className="mr-1">Pay (RUB)</label>
                 <InputNumber
                   value={sandbox.payAmount}
@@ -968,7 +1005,7 @@ export const TradingAssistantPage: React.FC = () => {
                 <label className="mr-1 mb-0">Strat</label>
                 <Dropdown
                   value={backtest.strategyType}
-                  options={['volume_accumulation','trend']}
+                  options={['volume_accumulation', 'trend', 'poc_pullback', 'daily_va_return', 'fvg_volume']}
                   onChange={e => updateBacktest({ strategyType: e.value })}
                   className="p-inputtext-sm mr-2"
                   style={{ width: '120px' }}
@@ -1017,7 +1054,7 @@ export const TradingAssistantPage: React.FC = () => {
         <TabPanel header="Batch">
           <Card className="surface-ground p-0">
             <div className="p-2">
-              {/* Выбор инструментов, Position Sizing, Volume Filter, Strategy, Buttons */}
+              {/* Выбор инструментов, Position Sizing, Volume Filter, Strategy */}
               <div className="p-col-12 p-md-6">
                 <div className="flex align-items-center mt-1 gap-2">
                   <div className="p-inputgroup align-items-center mr-1">
@@ -1041,7 +1078,7 @@ export const TradingAssistantPage: React.FC = () => {
                     <label className="mr-1">Strategy:</label>
                     <Dropdown
                       value={batchParams.strategyType}
-                      options={['volume_accumulation','trend']}
+                      options={['volume_accumulation', 'trend', 'poc_pullback', 'daily_va_return', 'fvg_volume']}
                       onChange={e => setBatchParams({ ...batchParams, strategyType: e.value })}
                       className="p-inputtext-sm w-full"
                     />
@@ -1084,10 +1121,7 @@ export const TradingAssistantPage: React.FC = () => {
                       />
                     )}
                   </div>
-                  <div className="flex flex-grow-1 align-items-center mt-1 gap-2">
-                    <Button label="Run Batch" onClick={runBatch} disabled={batchRunning} className="flex-grow-1 p-button-sm border-round-sm p-1 px-3 mr-1" />
-                    <Button label="Export CSV" onClick={exportCSV} disabled={batchResults.length === 0} className="flex-grow-1 p-button-sm p-button-secondary border-round-sm p-1 px-3" />
-                  </div>
+                  
                 </div>
               </div>
 
@@ -1262,10 +1296,44 @@ export const TradingAssistantPage: React.FC = () => {
                   )}
                 </div>
               </div>
-
-              {/* Position Sizing, Volume Filter, Strategy, Buttons */}
-              <div className="p-col-12 p-md-6">
-                
+              
+              {/* Buttons */}
+              <div className="p-col-12 p-md-6">      
+                <div className="p-inputgroup align-items-center mt-1">
+                <div className="flex align-items-center mr-2">
+                    <label className="mr-1">Ver.:</label>
+                    <Dropdown
+                      value={batchVersion}
+                      options={['v1', 'v2']}
+                      onChange={e => setBatchVersion(e.value)}
+                      className="p-inputtext-sm"
+                      style={{ width: '80px' }}
+                    />
+                  </div>
+                  <div className="flex align-items-center">
+                    <Button
+                      label={batchRunning ? '...' : 'Run'}
+                      onClick={runBatch}
+                      disabled={batchRunning || batchStopping}
+                      className="p-button-sm border-round-sm w-full p-1 px-3 mr-1"
+                      icon={batchRunning ? 'pi pi-spin pi-spinner' : ''}
+                    />
+                    {batchRunning && (
+                      <Button
+                        label="Stop"
+                        onClick={stopBatch}
+                        disabled={batchStopping}
+                        className="p-button-sm p-button-danger w-full border-round-sm p-1 px-3"
+                      />
+                    )}
+                    <Button
+                      label="Export CSV"
+                      onClick={exportCSV}
+                      disabled={batchResults.length === 0 || batchRunning}
+                      className="p-button-sm p-button-secondary w-full border-round-sm p-1 px-3 ml-1"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -1442,6 +1510,11 @@ export const TradingAssistantPage: React.FC = () => {
             )}
           </Card>
         </TabPanel>
+
+        {/* ========== POS/ORDERS ======== */}
+        <TabPanel header="Pos/Orders">
+          <PositionsOrdersTab accountId={sandbox.accountId} />
+        </TabPanel>
       </TabView>
       <div className="chart-row">
         {profile?.volumeByPrice && priceRange.max > 0 && (
@@ -1457,6 +1530,13 @@ export const TradingAssistantPage: React.FC = () => {
               val={profile.valueAreaLow}
             />
           </div>
+        )}
+        {profile?.volumeByPrice && (
+          <VolumeProfileOverlay
+            chart={chartRef.current}
+            volumeByPrice={profile.volumeByPrice}
+            maxVolume={Math.max(...profile.volumeByPrice.map((v: any) => v.volume))}
+          />
         )}
         <div className="chart-container" ref={chartContainerRef} />
       </div>

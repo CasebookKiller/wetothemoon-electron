@@ -177,6 +177,8 @@ try {
 		loadHistoricalProfile: (instrumentUid, candles) => electron.ipcRenderer.invoke("trading-assistant:load-historical-profile", instrumentUid, candles),
 		getAllInstruments: (token) => electron.ipcRenderer.invoke("trading-assistant:get-all-instruments", token),
 		batchBacktest: (instrumentUids, dateFrom, dateTo, interval, token, paramSets, strategyType, profileResolution, valueAreaPercent) => electron.ipcRenderer.invoke("trading-assistant:batch-backtest", instrumentUids, dateFrom, dateTo, interval, token, paramSets, strategyType, profileResolution, valueAreaPercent),
+		batchV2: (instrumentUids, dateFrom, dateTo, interval, token, paramSets, strategyType, profileResolution, valueAreaPercent) => electron.ipcRenderer.invoke("trading-assistant:batch-v2", instrumentUids, dateFrom, dateTo, interval, token, paramSets, strategyType, profileResolution, valueAreaPercent),
+		stopBatch: () => electron.ipcRenderer.invoke("trading-assistant:batch-stop"),
 		onBatchProgress: (callback) => {
 			electron.ipcRenderer.on("trading-assistant:batch-progress", (_, data) => callback(data));
 		},
@@ -186,7 +188,10 @@ try {
 		removeBatchListeners: () => {
 			electron.ipcRenderer.removeAllListeners("trading-assistant:batch-progress");
 			electron.ipcRenderer.removeAllListeners("trading-assistant:batch-complete");
-		}
+		},
+		getPositions: (accountId) => electron.ipcRenderer.invoke("trading-assistant:get-positions", accountId),
+		getOrders: (accountId) => electron.ipcRenderer.invoke("trading-assistant:get-orders", accountId),
+		cancelOrder: (orderId, accountId) => electron.ipcRenderer.invoke("trading-assistant:cancel-order", orderId, accountId)
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {
