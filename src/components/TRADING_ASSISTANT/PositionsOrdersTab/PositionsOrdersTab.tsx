@@ -98,13 +98,14 @@ export const PositionsOrdersTab: React.FC<Props> = ({ accountId }) => {
           <Column header="Avg Price" body={priceTemplate} />
           <Column header="Current P/L" body={() => '—'} />
           <Column body={row => {
-            const qty = row.quantity || row.balance || 0;
-            if (!row.instrumentUid || row.instrumentUid === 'RUB' || qty <= 0) return null;
+            const qty = row.quantity ?? row.balance ?? 0;
+            const absQty = Math.abs(Number(qty));
+            if (!row.instrumentUid || row.instrumentUid === 'RUB' || absQty === 0) return null;
             return (
               <Button
                 icon="pi pi-times"
                 className="p-button-sm p-button-danger"
-                onClick={() => closePosition(row.instrumentUid, qty)}
+                onClick={() => closePosition(row.instrumentUid, absQty)}
                 tooltip="Close position"
               />
             );
