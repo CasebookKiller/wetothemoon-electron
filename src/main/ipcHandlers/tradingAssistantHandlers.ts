@@ -660,4 +660,28 @@ export const registerTradingAssistantHandlers = () => {
       return [];
     }
   });
+
+  ipcMain.handle('trading-assistant:close-position', async (_, instrumentUid: string, accountId: string, quantity: number) => {
+    const token = process.env.VITE_TSandBox || '';
+    if (!token || !accountId || !instrumentUid || quantity <= 0) {
+      return { success: false, error: 'Неверные параметры' };
+    }
+
+    try {
+      // Определяем направление: если у нас длинная позиция — продаём, короткая — покупаем
+      // Для простоты всегда отправляем SELL, если quantity > 0 (закрываем лонг)
+      // В реальности нужно смотреть тип позиции, но пока так
+      const order = await sandboxGrpc.postSandboxOrder({
+        instrumentId: instrumentUid,
+        direction: 'ORDER_DIRECTION_SELL',  // или BUY для шорта
+        orderType: 'ORDER_TYPE_MARKET',
+        quantity,
+        accountId,
+      }, token);
+      return { success: true, orderId: order.orderId };
+    } catch (error: any) {
+      console.error('[ClosePosition]', error);
+      return { success: false, error: error.message };
+    }
+  });
 };

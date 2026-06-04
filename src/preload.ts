@@ -258,7 +258,8 @@ try {
     getPositions: (accountId: string) => ipcRenderer.invoke('trading-assistant:get-positions', accountId),
     getOrders: (accountId: string) => ipcRenderer.invoke('trading-assistant:get-orders', accountId),
     cancelOrder: (orderId: string, accountId: string) => ipcRenderer.invoke('trading-assistant:cancel-order', orderId, accountId),
-
+    closePosition: (instrumentUid: string, accountId: string, quantity: number) =>
+      ipcRenderer.invoke('trading-assistant:close-position', instrumentUid, accountId, quantity),
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

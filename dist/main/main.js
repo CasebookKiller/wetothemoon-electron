@@ -3184,6 +3184,31 @@ var registerTradingAssistantHandlers = () => {
 			return [];
 		}
 	});
+	electron.ipcMain.handle("trading-assistant:close-position", async (_, instrumentUid, accountId, quantity) => {
+		const token = process.env.VITE_TSandBox || "";
+		if (!token || !accountId || !instrumentUid || quantity <= 0) return {
+			success: false,
+			error: "Неверные параметры"
+		};
+		try {
+			return {
+				success: true,
+				orderId: (await sandboxGrpc.postSandboxOrder({
+					instrumentId: instrumentUid,
+					direction: "ORDER_DIRECTION_SELL",
+					orderType: "ORDER_TYPE_MARKET",
+					quantity,
+					accountId
+				}, token)).orderId
+			};
+		} catch (error) {
+			console.error("[ClosePosition]", error);
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
 };
 //#endregion
 //#region src/shared/types/promptgenerator.ts

@@ -46,9 +46,17 @@ export const PositionsOrdersTab: React.FC<Props> = ({ accountId }) => {
     }
   };
 
-  const closePosition = (instrumentUid: string) => {
-    // TODO: реализовать закрытие через рыночную заявку
-    console.log('Close position', instrumentUid);
+  const closePosition = async (instrumentUid: string, quantity: number) => {
+    const api = (window as any).electronAPI;
+    if (api?.closePosition) {
+      const result = await api.closePosition(instrumentUid, accountId, quantity);
+      if (result.success) {
+        console.log('Позиция закрыта, ордер:', result.orderId);
+        fetchData(); // обновляем данные
+      } else {
+        alert('Ошибка закрытия: ' + result.error);
+      }
+    }
   };
 
   const quantityTemplate = (row: any) => {
@@ -93,7 +101,7 @@ export const PositionsOrdersTab: React.FC<Props> = ({ accountId }) => {
               <Button
                 icon="pi pi-times"
                 className="p-button-sm p-button-danger"
-                onClick={() => closePosition(row.instrumentUid)}
+                onClick={() => closePosition(row.instrumentUid, row.quantity || row.balance || 0)}
                 tooltip="Close position"
               />
             ) : null
