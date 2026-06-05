@@ -95,6 +95,7 @@ export const TradingAssistantPage: React.FC = () => {
     maxSignalsPerDay: 0,
     minIntervalMinutes: 15,
   });
+  const [showSandboxSettings, setShowSandboxSettings] = useState(false);
 
   // Стрим
   const [stream, setStream] = useState({
@@ -893,35 +894,9 @@ export const TradingAssistantPage: React.FC = () => {
         {/* ========== SANDBOX ========== */}
         <TabPanel header="Sandbox">
           <Card className="surface-ground p-0">
-            {/* Первая строка: токен, кнопки счетов, выбор счёта */}
             <div className="p-2">
-              <div className="p-col-12 flex align-items-center">
-                <label className="p-mr-2 p-mb-0">Token</label>
-                <InputText
-                  value={sandbox.token}
-                  onChange={e => updateSandbox({ token: e.target.value })}
-                  className="p-inputtext-sm p-1 px-2 mr-2"
-                  placeholder="Sandbox token"
-                  style={{ flex: 1 }}
-                />
-                <Button
-                  label="Load"
-                  onClick={loadAccounts}
-                  disabled={!sandbox.token || sandbox.loadingAccounts}
-                  className="p-button-sm p-button-secondary border-round-sm p-1 px-3 mr-1"
-                />
-                <Button
-                  label="Create"
-                  onClick={handleCreateAccount}
-                  disabled={sandbox.creatingAccount}
-                  className="p-button-sm p-button-success border-round-sm p-1 px-3 mr-1"
-                />
-                <Button
-                  label="Delete"
-                  onClick={handleCloseAccount}
-                  disabled={!sandbox.accountId}
-                  className="p-button-sm p-button-danger border-round-sm p-1 px-3 mr-2"
-                />
+              {/* Основная строка управления */}
+              <div className="flex align-items-center flex-wrap gap-2">
                 <Dropdown
                   value={sandbox.accountId}
                   options={sandbox.accounts.map((a: any) => ({ label: a.name || a.id, value: a.id }))}
@@ -930,22 +905,16 @@ export const TradingAssistantPage: React.FC = () => {
                   className="p-inputtext-sm"
                   style={{ minWidth: '180px' }}
                 />
-              </div>
-            </div>
-
-            {/* Вторая строка: торговля, параметры, пополнение */}
-            <div className="flex align-items-center flex-wrap mt-1">
-              <div className="flex align-items-center flex-wrap">
                 <Checkbox checked={sandbox.demoMode} onChange={e => updateSandbox({ demoMode: e.checked })} />
-                <label className="p-1 mr-1 border-round-sm">Demo</label>
+                <label className="mr-2 mb-0">Demo</label>
                 <Button
                   label={autoTrading ? 'Stop' : 'Start'}
                   onClick={toggleTrading}
-                  className={`p-button-sm ${autoTrading ? 'p-button-danger' : 'p-button-success'} border-round-sm p-1 px-2 mr-1`}
+                  className={`p-button-sm ${autoTrading ? 'p-button-danger' : 'p-button-success'} border-round-sm p-1 px-2`}
                 />
-                <Button label="Apply" onClick={applyConfig} className="p-button-sm p-button-secondary border-round-sm p-1 px-2 mr-1" />
-              
-                <label className="mx-1">Lots</label>
+                <Button label="Apply" onClick={applyConfig} className="p-button-sm p-button-secondary border-round-sm p-1 px-2" />
+
+                <label className="mr-1 mb-0">Lots</label>
                 <InputNumber
                   id="lotQty"
                   value={sandbox.lotQty}
@@ -959,81 +928,101 @@ export const TradingAssistantPage: React.FC = () => {
                   size={1}
                   className='mr-2'
                 />
-                <label className="mr-1">SL%</label>
+
+                <label className="mr-1 mb-0">SL%</label>
                 <InputNumber
                   value={sandbox.stopLossPercent}
                   onValueChange={e => updateSandbox({ stopLossPercent: e.value ?? 0 })}
-                  step={0.1}
-                  min={0}
-                  size={2}
-                  className='mr-1'
+                  step={0.1} min={0} size={2} className="p-inputtext-sm"
                 />
-                <label className="mr-1">TP%</label>
+
+                <label className="mr-1 mb-0">TP%</label>
                 <InputNumber
                   value={sandbox.takeProfitPercent}
                   onValueChange={e => updateSandbox({ takeProfitPercent: e.value ?? 0 })}
-                  step={0.1}
-                  min={0}
-                  size={2}
-                  className='mr-2'
+                  step={0.1} min={0} size={2} className="p-inputtext-sm"
                 />
+
                 <Checkbox checked={sandbox.trailingEnabled} onChange={e => updateSandbox({ trailingEnabled: e.checked })} />
-                <label className="ml-1 mr-1 mb-0">Trailing</label>
+                <label className="mr-1 mb-0">Trail</label>
                 {sandbox.trailingEnabled && (
                   <InputNumber
                     value={sandbox.trailingPercent}
                     onValueChange={e => updateSandbox({ trailingPercent: e.value ?? 0.5 })}
-                    step={0.1}
-                    min={0}
-                    size={2}
-                    className='mr-1'
+                    step={0.1} min={0} size={2} className="p-inputtext-sm"
                   />
                 )}
-                <label className="mr-1">Max Signals/Day</label>
-                <InputNumber
-                  value={sandbox.maxSignalsPerDay}
-                  onValueChange={e => updateSandbox({ maxSignalsPerDay: e.value ?? 0 })}
-                  min={0}
-                  step={1}
-                  size={2}
-                  className="mr-2"
+
+                <Button
+                  icon="pi pi-cog"
+                  onClick={() => setShowSandboxSettings(true)}
+                  className="p-button-sm p-button-secondary p-1 px-2"
+                  tooltip="Settings"
                 />
-                <label className="mr-1">Min Interval (min)</label>
-                <InputNumber
-                  value={sandbox.minIntervalMinutes}
-                  onValueChange={e => updateSandbox({ minIntervalMinutes: e.value ?? 15 })}
-                  min={1}
-                  step={5}
-                  size={2}
-                />
-                <Checkbox checked={sandbox.dailyLossEnabled} onChange={e => updateSandbox({ dailyLossEnabled: e.checked })} />
-                <label className="ml-1 mr-1 mb-0">Daily Loss Limit</label>
-                {sandbox.dailyLossEnabled && (
-                  <InputNumber
-                    value={sandbox.dailyLossLimit}
-                    onValueChange={e => updateSandbox({ dailyLossLimit: e.value ?? 0 })}
-                    min={0}
-                    step={100}
-                    size={3}
-                    className="mr-1"
-                  />
-                )}
-                <label className="mr-1">Pay (RUB)</label>
-                <InputNumber
-                  value={sandbox.payAmount}
-                  onValueChange={e => updateSandbox({ payAmount: e.value ?? 1000 })}
-                  min={1000}
-                  step={1000}
-                  size={4}
-                  className='mr-1'
-                />
-                <Button label="Deposit" onClick={handlePayIn} className="p-button-sm border-round-sm p-1 px-3 mr-1" />
-                <Button label="Balance" onClick={refreshBalance} className="p-button-sm border-round-sm p-button-info p-1 px-3 mr-1" />
-                {sandbox.balance && <span className="p-text-nowrap p-ml-1">{sandbox.balance}</span>}
-                {sandbox.payMessage && <span className="p-ml-1" style={{ color: '#4caf50' }}>{sandbox.payMessage}</span>}
+
+                <span className="ml-auto">
+                  {sandbox.balance && <span className="mr-2">{sandbox.balance}</span>}
+                  {sandbox.payMessage && <span style={{ color: '#4caf50' }}>{sandbox.payMessage}</span>}
+                </span>
               </div>
             </div>
           </Card>
+
+          {/* Диалог настроек песочницы */}
+          <Dialog
+            header="Sandbox Settings"
+            visible={showSandboxSettings}
+            style={{ width: '500px' }}
+            onHide={() => setShowSandboxSettings(false)}
+          >
+            <div className="p-fluid">
+              <div className="p-field mb-3">
+                <label>Token</label>
+                <InputText
+                  value={sandbox.token}
+                  onChange={e => updateSandbox({ token: e.target.value })}
+                  className="p-inputtext-sm"
+                  placeholder="Sandbox token"
+                />
+              </div>
+              <div className="p-field mb-3">
+                <div className="flex gap-2">
+                  <Button
+                    label="Load"
+                    onClick={loadAccounts}
+                    disabled={!sandbox.token || sandbox.loadingAccounts}
+                    className="p-button-sm p-button-secondary"
+                  />
+                  <Button
+                    label="Create"
+                    onClick={handleCreateAccount}
+                    disabled={sandbox.creatingAccount}
+                    className="p-button-sm p-button-success"
+                  />
+                  <Button
+                    label="Delete"
+                    onClick={handleCloseAccount}
+                    disabled={!sandbox.accountId}
+                    className="p-button-sm p-button-danger"
+                  />
+                </div>
+              </div>
+              <div className="p-field mb-3">
+                <label>Pay In (RUB)</label>
+                <div className="p-inputgroup">
+                  <InputNumber
+                    value={sandbox.payAmount}
+                    onValueChange={e => updateSandbox({ payAmount: e.value ?? 1000 })}
+                    min={1000} step={1000} className="p-inputtext-sm"
+                  />
+                  <Button label="Deposit" onClick={handlePayIn} className="p-button-sm" />
+                </div>
+              </div>
+              <div className="p-field mb-3">
+                <Button label="Refresh Balance" onClick={refreshBalance} className="p-button-sm p-button-info" />
+              </div>
+            </div>
+          </Dialog>
         </TabPanel>
 
         {/* ========== BACKTEST ========== */}
