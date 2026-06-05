@@ -8,6 +8,7 @@ import {
   UTCTimestamp,
   SeriesMarker,
   createSeriesMarkers,
+  ISeriesApi,
 } from 'lightweight-charts';
 import VolumeProfileBars from '@/components/TRADING_ASSISTANT/VolumeProfileBars/VolumeProfileBars';
 import './TradingAssistantPage.css';
@@ -185,6 +186,8 @@ export const TradingAssistantPage: React.FC = () => {
   const [instrumentFilter, setInstrumentFilter] = useState('');
   const [tempSelectedInstruments, setTempSelectedInstruments] = useState<string[]>([]);
 
+  const [positionMarkers, setPositionMarkers] = useState<any[]>([]);
+  
   // ========== REFS ДЛЯ ГРАФИКА ==========
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<any>(null);
@@ -192,6 +195,7 @@ export const TradingAssistantPage: React.FC = () => {
   const signalSeriesRef = useRef<any>(null);
   const candleSeriesRef = useRef<any>(null);
   const exitMarkersRef = useRef<any[]>([]);
+  const positionMarkersRef = useRef<ISeriesApi<'Line'> | null>(null);
 
   // ========== ФУНКЦИИ ==========
 
@@ -469,6 +473,60 @@ export const TradingAssistantPage: React.FC = () => {
     return () => { api.removeCandleListener(); };
   }, []);
 
+  // Запрос позиций каждые 15 секунд (только в live-режиме)
+  useEffect(() => {
+    if (viewMode !== 'live' || !sandbox.accountId) return;
+
+    const api = (window as any).electronAPI;
+    if (!api?.getPositions) return;
+
+    const fetchPositions = async () => {
+      const data = await api.getPositions(sandbox.accountId);
+      const markers: SeriesMarker<Time>[] = [];
+      const now = Math.floor(Date.now() / 1000) as Time;
+
+      // Добавляем маркеры для ценных бумаг
+      (data?.securities || []).forEach((pos: any) => {
+        if (pos.instrumentUid && pos.averagePositionPrice) {
+          const entryPrice = Number(pos.averagePositionPrice.units) + Number(pos.averagePositionPrice.nano) / 1e9;
+          const isLong = (pos.quantity?.units || '0') >= '0'; // примерное определение
+          markers.push({
+            time: now,
+            position: isLong ? 'belowBar' : 'aboveBar',
+            color: isLong ? '#4caf50' : '#f44336',
+            shape: isLong ? 'arrowUp' : 'arrowDown',
+            text: `${isLong ? 'LONG' : 'SHORT'} @ ${entryPrice.toFixed(2)}`,
+          });
+        }
+      });
+
+      setPositionMarkers(markers);
+    };
+
+    fetchPositions();
+    const interval = setInterval(fetchPositions, 15_000);
+    return () => clearInterval(interval);
+  }, [viewMode, sandbox.accountId]);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+
+    if (positionMarkersRef.current) {
+      chart.removeSeries(positionMarkersRef.current);
+    }
+
+    if (!positionMarkers.length) return;
+
+    const series = chart.addSeries(LineSeries, {
+      lineVisible: false,
+      lastValueVisible: false,
+    });
+
+    createSeriesMarkers(series, positionMarkers);
+    positionMarkersRef.current = series;
+  }, [positionMarkers]);
+  
   // ========== BATCH FUNCTIONS ==========
   function generateValuesFromRange(min: number, max: number, step: number): number[] {
     const values: number[] = [];
@@ -917,45 +975,6 @@ export const TradingAssistantPage: React.FC = () => {
                 <Button label="Balance" onClick={refreshBalance} className="p-button-sm border-round-sm p-button-info p-1 px-3 mr-1" />
                 {sandbox.balance && <span className="p-text-nowrap p-ml-1">{sandbox.balance}</span>}
                 {sandbox.payMessage && <span className="p-ml-1" style={{ color: '#4caf50' }}>{sandbox.payMessage}</span>}
-              </div>
-            </div>
-          </Card>
-        </TabPanel>
-
-        {/* ========== STREAM ========== */}
-        <TabPanel header="Stream">
-          <Card className="surface-ground p-0">
-            <div className="p-2">
-              <div className="flex align-items-center flex-wrap">
-                <label className="mr-2 mb-0">Token</label>
-                <InputText
-                  value={stream.token}
-                  onChange={e => updateStream({ token: e.target.value })}
-                  className="p-inputtext-sm flex-1 mr-2"
-                  placeholder="Read-only token"
-                />
-                <label className="mr-2 mb-0">TF</label>
-                <Dropdown
-                  value={stream.displayTimeframe}
-                  options={[{label:'1m',value:1},{label:'5m',value:5},{label:'15m',value:15},{label:'1h',value:60}]}
-                  onChange={e => updateStream({ displayTimeframe: e.value })}
-                  className="p-inputtext-sm mr-2"
-                />
-                <Button
-                  label="Start"
-                  onClick={startStream}
-                  disabled={stream.active}
-                  className="p-button-sm border-round-sm p-1 px-3 mr-1"
-                />
-                <Button
-                  label="Stop"
-                  onClick={stopStream}
-                  disabled={!stream.active}
-                  className="p-button-sm p-button-danger border-round-sm p-1 px-3 mr-1"
-                />
-                <span className="ml-2" style={{ color: stream.active ? '#4caf50' : '#d32f2f' }}>
-                  {stream.active ? '● Live' : '○ Stopped'}
-                </span>
               </div>
             </div>
           </Card>
@@ -1537,17 +1556,53 @@ export const TradingAssistantPage: React.FC = () => {
           <PositionsOrdersTab accountId={sandbox.accountId} />
         </TabPanel>
       </TabView>
-      <div className="flex align-items-center p-mb-2">
-        <span className="mr-2">Mode:</span>
+      <div className="flex align-items-center flex-wrap mt-2 mb-2 gap-2 w-full">
+        {/* Управление стримом */}
+        <label className="mr-1 mb-0">Token</label>
+        <InputText
+          value={stream.token}
+          onChange={e => updateStream({ token: e.target.value })}
+          className="p-inputtext-sm"
+          placeholder="Read-only token"
+        />
+        <label className="mr-1 mb-0">TF</label>
+        <Dropdown
+          value={stream.displayTimeframe}
+          options={[{label:'1m',value:1},{label:'5m',value:5},{label:'15m',value:15},{label:'1h',value:60}]}
+          onChange={e => updateStream({ displayTimeframe: e.value })}
+          className="p-inputtext-sm"
+          style={{ width: '110px' }}
+        />
+        <Button
+          label="Start"
+          onClick={startStream}
+          disabled={stream.active}
+          className="p-button-sm border-round-sm p-1 px-2"
+        />
+        <Button
+          label="Stop"
+          onClick={stopStream}
+          disabled={!stream.active}
+          className="p-button-sm p-button-danger border-round-sm p-1 px-2"
+        />
+        <span style={{ color: stream.active ? '#4caf50' : '#d32f2f', minWidth: '80px' }}>
+          {stream.active ? '● Live' : '○ Stopped'}
+        </span>
+
+        {/* Разделитель */}
+        <div style={{ borderLeft: '1px solid #555', height: '24px', margin: '0 8px' }} />
+
+        {/* Переключатель режимов графика */}
+        <span className="mr-1">Mode:</span>
         <Button
           label="Live"
           onClick={() => setViewMode('live')}
-          className={`p-button-sm ${viewMode === 'live' ? 'p-button-primary' : 'p-button-secondary'} mr-1`}
+          className={`p-button-sm p-1 px-3 mr-1 ${viewMode === 'live' ? 'p-button-primary' : 'p-button-secondary'}`}
         />
         <Button
           label="Backtest"
           onClick={() => setViewMode('backtest')}
-          className={`p-button-sm ${viewMode === 'backtest' ? 'p-button-primary' : 'p-button-secondary'}`}
+          className={`p-button-sm p-1 px-3 ${viewMode === 'backtest' ? 'p-button-primary' : 'p-button-secondary'}`}
           disabled={!backtestCandlesData.length}
         />
       </div>
