@@ -1494,11 +1494,17 @@ var VolumeAccumulationStrategy = class {
 	volumeFilterPeriod;
 	volumeHistory = [];
 	lastSignalDirection = null;
+	maxSignalsPerDay = 0;
+	minIntervalMs = 0;
+	signalsToday = 0;
+	lastSignalTime = 0;
 	constructor(instrumentUid, dailyProfile, options) {
 		this.instrumentUid = instrumentUid;
 		this.dailyProfile = dailyProfile;
 		this.volumeFilterEnabled = options?.volumeFilterEnabled ?? false;
 		this.volumeFilterPeriod = options?.volumeFilterPeriod ?? 20;
+		this.maxSignalsPerDay = options?.maxSignalsPerDay ?? 0;
+		this.minIntervalMs = (options?.minIntervalMinutes ?? 15) * 60 * 1e3;
 	}
 	reset() {
 		this.signals = [];
@@ -1528,6 +1534,9 @@ var VolumeAccumulationStrategy = class {
 			this.hasBrokenLow = true;
 			this.hasBrokenHigh = false;
 		}
+		if (this.maxSignalsPerDay > 0 && this.signalsToday >= this.maxSignalsPerDay) return;
+		const now = Date.now();
+		if (this.minIntervalMs > 0 && now - this.lastSignalTime < this.minIntervalMs) return;
 		if (this.hasBrokenHigh && close < this.dailyProfile.valueAreaHigh) {
 			this.signals.push({
 				type: "SELL",
@@ -1538,6 +1547,8 @@ var VolumeAccumulationStrategy = class {
 			});
 			this.hasBrokenHigh = false;
 			this.hasPosition = true;
+			this.signalsToday++;
+			this.lastSignalTime = now;
 		}
 		if (this.hasBrokenLow && close > this.dailyProfile.valueAreaLow) {
 			this.signals.push({
@@ -1563,6 +1574,8 @@ var VolumeAccumulationStrategy = class {
 		this.hasBrokenHigh = false;
 		this.hasBrokenLow = false;
 		this.volumeHistory = [];
+		this.signalsToday = 0;
+		this.lastSignalTime = 0;
 	}
 };
 function quotationToNumber$2(q) {
@@ -3843,6 +3856,8 @@ var OrderManager = class {
 			trailingPercent: 1,
 			marketDataToken: "",
 			dailyLossLimit: 0,
+			maxSignalsPerDay: 0,
+			minIntervalMinutes: 15,
 			...config
 		};
 	}
@@ -4028,6 +4043,9 @@ var OrderManager = class {
 			}
 		}
 	}
+	getConfig() {
+		return this.config;
+	}
 };
 //#endregion
 //#region src/main/services/tradingConnector.ts
@@ -4042,7 +4060,9 @@ function connectOrderManager(manager) {
 function connectLiveStrategy(instrumentUid, manager) {
 	const strategy = new VolumeAccumulationStrategy(instrumentUid, null, {
 		volumeFilterEnabled: false,
-		volumeFilterPeriod: 20
+		volumeFilterPeriod: 20,
+		maxSignalsPerDay: manager.getConfig().maxSignalsPerDay,
+		minIntervalMinutes: manager.getConfig().minIntervalMinutes
 	});
 	volumeProfileEngine.on("profileUpdate", (profile) => {
 		if (profile.instrumentUid === instrumentUid) strategy.updateProfile(profile);

@@ -124,6 +124,10 @@ export const TradingAssistantPage: React.FC = () => {
     volumeFilterEnabled: false,
     volumeFilterPeriod: 20,
   });
+  const [backtestCandlesData, setBacktestCandlesData] = useState<any[]>([]);
+  const [backtestProfile, setBacktestProfile] = useState<any>(null);
+
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   // Batch (пока упрощённо)
   const [batchParams, setBatchParams] = useState({
@@ -165,9 +169,7 @@ export const TradingAssistantPage: React.FC = () => {
   const [batchStopping, setBatchStopping] = useState(false);
   const [batchProgress, setBatchProgress] = useState<{ completed: number; total: number } | null>(null);
   const [batchVersion, setBatchVersion] = useState<'v1' | 'v2'>('v2');
-  const [backtestCandlesData, setBacktestCandlesData] = useState<any[]>([]);
-  const [backtestProfile, setBacktestProfile] = useState<any>(null);
-
+  const [showBatchDialog, setShowBatchDialog] = useState(false);
   const [viewMode, setViewMode] = useState<'live' | 'backtest'>('live');
 
 
@@ -191,6 +193,7 @@ export const TradingAssistantPage: React.FC = () => {
 
   const [positionMarkers, setPositionMarkers] = useState<any[]>([]);
   
+
   // ========== REFS ДЛЯ ГРАФИКА ==========
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<any>(null);
@@ -854,6 +857,36 @@ export const TradingAssistantPage: React.FC = () => {
 
   return (
     <div className="trading-assistant" style={{ padding: '5px', color: '#fff', background: '#1e1e1e' }}>
+      {/* ========== TOP PANEL ========== */}
+      <div className="flex align-items-center flex-wrap p-2 gap-2" style={{ background: '#1e1e1e', borderBottom: '1px solid #333' }}>
+        <label className="mr-1 mb-0">Period:</label>
+        <InputText
+          type="date"
+          value={backtest.dateFrom}
+          onChange={e => updateBacktest({ dateFrom: e.target.value })}
+          className="p-inputtext-sm"
+          style={{ width: '130px' }}
+        />
+        <InputText
+          type="date"
+          value={backtest.dateTo}
+          onChange={e => updateBacktest({ dateTo: e.target.value })}
+          className="p-inputtext-sm"
+          style={{ width: '130px' }}
+        />
+        <label className="ml-2 mr-1 mb-0">Max Signals/Day</label>
+        <InputNumber
+          value={sandbox.maxSignalsPerDay}
+          onValueChange={e => updateSandbox({ maxSignalsPerDay: e.value ?? 0 })}
+          min={0} step={1} size={2} className="p-inputtext-sm"
+        />
+        <label className="ml-2 mr-1 mb-0">Min Interval (min)</label>
+        <InputNumber
+          value={sandbox.minIntervalMinutes}
+          onValueChange={e => updateSandbox({ minIntervalMinutes: e.value ?? 15 })}
+          min={1} step={5} size={2} className="p-inputtext-sm"
+        />
+      </div>
 
       <TabView>
         {/* ========== SANDBOX ========== */}
@@ -1062,6 +1095,31 @@ export const TradingAssistantPage: React.FC = () => {
                   size={2}
                   className="mr-2"
                 />
+                <Button
+                  label={showAdvanced ? 'Hide Advanced' : 'Advanced'}
+                  onClick={() => setShowAdvanced(!showAdvanced)}
+                  className="p-button-sm p-button-secondary p-1 px-2 mr-2"
+                />
+                {showAdvanced && (
+                  <>
+                    <label className="mr-1 mb-0">SL%</label>
+                    <InputNumber value={backtest.stopLossPercent} onValueChange={e => updateBacktest({ stopLossPercent: e.value ?? 0 })} step={0.1} min={0} size={2} className="mr-2" />
+                    <label className="mr-1 mb-0">TP%</label>
+                    <InputNumber value={backtest.takeProfitPercent} onValueChange={e => updateBacktest({ takeProfitPercent: e.value ?? 0 })} step={0.1} min={0} size={2} className="mr-2" />
+                    <label className="mr-1 mb-0">Trail%</label>
+                    <InputNumber value={backtest.trailingDistancePercent} onValueChange={e => updateBacktest({ trailingDistancePercent: e.value ?? 0 })} step={0.1} min={0} size={2} className="mr-2" />
+                    <label className="mr-1 mb-0">Lots</label>
+                    <InputNumber value={backtest.lots} onValueChange={e => updateBacktest({ lots: e.value ?? 1 })} min={1} step={1} size={2} className="mr-2" />
+                    <label className="mr-1 mb-0">Size</label>
+                    <Dropdown value={backtest.positionSizing} options={['fixed','dynamic']} onChange={e => updateBacktest({ positionSizing: e.value })} className="p-inputtext-sm mr-2" style={{ width: '100px' }} />
+                    {backtest.positionSizing === 'dynamic' && (
+                      <>
+                        <label className="mr-1 mb-0">Risk%</label>
+                        <InputNumber value={backtest.riskPercent} onValueChange={e => updateBacktest({ riskPercent: e.value ?? 1 })} step={0.1} min={0} size={2} className="mr-2" />
+                      </>
+                    )}
+                  </>
+                )}
               </div>
               <div className="flex align-items-center flex-wrap mt-2">
                 <label className="mr-1 mb-0">Strat</label>
@@ -1116,333 +1174,227 @@ export const TradingAssistantPage: React.FC = () => {
         <TabPanel header="Batch">
           <Card className="surface-ground p-0">
             <div className="p-2">
-              {/* Выбор инструментов, Position Sizing, Volume Filter, Strategy */}
-              <div className="p-col-12 p-md-6">
-                <div className="flex align-items-center mt-1 gap-2">
-                  <div className="p-inputgroup align-items-center mr-1">
-                    <label>Instruments: </label>
-                    <InputText value={`${batchInstruments.length} selected`} readOnly className="p-inputtext-sm mr-1" />
-                    <Button icon="pi pi-search" onClick={() => {
-                      setTempSelectedInstruments([...batchInstruments]);
-                      setShowInstrumentDialog(true);
-                    }} className="p-button-secondary p-button-sm border-round-sm p-1 px-3" />
-                    {batchInstruments.length > 0 && (
-                    <small className="p-mt-1" style={{ color: '#888' }}>
-                      {batchInstruments.map(uid => {
-                        const inst = availableInstruments.find(i => i.uid === uid);
-                        return inst ? inst.ticker || inst.name : uid;
-                      }).join(', ')}
-                    </small>
-                  )}
-                  </div>
-                  {/* Strategy */}
-                  <div className="flex align-items-center flex-1">
-                    <label className="mr-1">Strategy:</label>
-                    <Dropdown
-                      value={batchParams.strategyType}
-                      options={['volume_accumulation', 'trend', 'poc_pullback', 'daily_va_return', 'fvg_volume']}
-                      onChange={e => setBatchParams({ ...batchParams, strategyType: e.value })}
-                      className="p-inputtext-sm w-full"
-                    />
-                  </div>
-                  {/* Size & Risk */}
-                  <div className="flex align-items-center flex-1">
-                    <label className="mr-1">Size:</label>
-                    <Dropdown
-                      value={batchParams.positionSizing}
-                      options={['fixed','dynamic']}
-                      onChange={e => setBatchParams({ ...batchParams, positionSizing: e.value })}
-                      className="p-inputtext-sm w-full"
-                    />
-                    {batchParams.positionSizing === 'dynamic' && (
-                      <>
-                        <label className="ml-1 mr-1">Risk%:</label>
-                        <InputText
-                          value={batchParams.riskPercent.toString()}
-                          onChange={e => setBatchParams({ ...batchParams, riskPercent: Number(e.target.value) })}
-                          className="p-inputtext-sm w-full"
-                          style={{ minWidth: '70px' }}
-                        />
-                      </>
-                    )}
-                  </div>
-                  {/* Vol Filter */}
-                  <div className="flex align-items-center flex-1">
-                    <Checkbox
-                      checked={batchParams.volumeFilterEnabled}
-                      onChange={e => setBatchParams({ ...batchParams, volumeFilterEnabled: e.checked ?? false })}
-                    />
-                    <label className="ml-1 mr-1" style={{minWidth: '70px'}}>Vol Filter</label>
-                    {batchParams.volumeFilterEnabled && (
-                      <InputText
-                        value={batchParams.volumeFilterPeriod.toString()}
-                        onChange={e => setBatchParams({ ...batchParams, volumeFilterPeriod: Number(e.target.value) })}
-                        placeholder="Period"
-                        className="p-inputtext-sm flex-1"
-                        style={{ minWidth: '80px' }}
-                      />
-                    )}
-                  </div>
-                  
-                </div>
+              {/* Компактная строка управления */}
+              <div className="flex align-items-center flex-wrap gap-2 mb-2">
+                <Button
+                  label="Configure"
+                  icon="pi pi-cog"
+                  onClick={() => setShowBatchDialog(true)}
+                  className="p-button-sm p-button-secondary"
+                />
+                <Button
+                  label={batchRunning ? 'Running...' : 'Run'}
+                  onClick={runBatch}
+                  disabled={batchRunning || batchStopping}
+                  className="p-button-sm"
+                  icon={batchRunning ? 'pi pi-spin pi-spinner' : ''}
+                />
+                {batchRunning && (
+                  <Button
+                    label="Stop"
+                    onClick={stopBatch}
+                    disabled={batchStopping}
+                    className="p-button-sm p-button-danger"
+                  />
+                )}
+                <Button
+                  label="Export CSV"
+                  onClick={exportCSV}
+                  disabled={batchResults.length === 0 || batchRunning}
+                  className="p-button-sm p-button-secondary"
+                />
+                <span className="ml-2 text-sm">{batchInstruments.length} instrument(s) selected</span>
               </div>
 
-              {/* SL, TP, Trail, Lots */}
-              <div className="p-col-12 p-md-6">      
-                <div className="p-inputgroup align-items-center mt-1">
-                  <div className='p-inputgroup align-items-center mr-2'>
-                    <label className='mr-1'>SL %:</label>
-                    <Dropdown
-                      value={batchParams.slMode}
-                      options={['manual', 'range']}
-                      onChange={e => setBatchParams({ ...batchParams, slMode: e.value })}
-                      className="p-inputtext-sm"
-                      style={{ maxWidth: '110px' }}
-                    />
-                    {batchParams.slMode === 'manual' ? (
-                      <InputText
-                        value={batchParams.slValues}
-                        onChange={e => setBatchParams({ ...batchParams, slValues: e.target.value })}
-                        className="p-inputtext-sm"
-                        placeholder="1,1.5,2"
-                      />
-                    ) : (
-                      <>
-                        <InputText
-                          value={batchParams.slMin.toString()}
-                          onChange={e => setBatchParams({ ...batchParams, slMin: Number(e.target.value) })}
-                          placeholder="Мин"
-                          style={{ maxWidth: '70px' }}
-                          className="p-inputtext-sm"
-                        />
-                        <InputText
-                          value={batchParams.slMax.toString()}
-                          onChange={e => setBatchParams({ ...batchParams, slMax: Number(e.target.value) })}
-                          placeholder="Макс"
-                          style={{ maxWidth: '70px' }}
-                          className="p-inputtext-sm"
-                        />
-                        <InputText
-                          value={batchParams.slStep.toString()}
-                          onChange={e => setBatchParams({ ...batchParams, slStep: Number(e.target.value) })}
-                          placeholder="Шаг"
-                          style={{ maxWidth: '70px' }}
-                          className="p-inputtext-sm"
-                        />
-                      </>
-                    )}
-                  </div>
-                  <div className='p-inputgroup align-items-center mr-2'>
-                    <label className='mr-1'>TP %:</label>
-                    <Dropdown
-                      value={batchParams.tpMode}
-                      options={['manual', 'range']}
-                      onChange={e => setBatchParams({ ...batchParams, tpMode: e.value })}
-                      className="p-inputtext-sm"
-                      style={{ maxWidth: '110px' }}
-                    />
-                    {batchParams.tpMode === 'manual' ? (
-                      <InputText
-                        value={batchParams.tpValues}
-                        onChange={e => setBatchParams({ ...batchParams, tpValues: e.target.value })}
-                        className="p-inputtext-sm"
-                        placeholder="2,3,4"
-                      />
-                    ) : (
-                      <>
-                        <InputText
-                          value={batchParams.tpMin.toString()}
-                          onChange={e => setBatchParams({ ...batchParams, tpMin: Number(e.target.value) })}
-                          placeholder="Мин"
-                          style={{ maxWidth: '70px' }}
-                          className="p-inputtext-sm"
-                        />
-                        <InputText
-                          value={batchParams.tpMax.toString()}
-                          onChange={e => setBatchParams({ ...batchParams, tpMax: Number(e.target.value) })}
-                          placeholder="Макс"
-                          style={{ maxWidth: '70px' }}
-                          className="p-inputtext-sm"
-                        />
-                        <InputText
-                          value={batchParams.tpStep.toString()}
-                          onChange={e => setBatchParams({ ...batchParams, tpStep: Number(e.target.value) })}
-                          placeholder="Шаг"
-                          style={{ maxWidth: '70px' }}
-                          className="p-inputtext-sm"
-                        />
-                      </>
-                    )}
-                  </div>
-                  <div className='p-inputgroup align-items-center mr-2'>
-                    <label className='mr-1'>Trail %</label>
-                    <Dropdown
-                      value={batchParams.trailMode}
-                      options={['manual', 'range']}
-                      onChange={e => setBatchParams({ ...batchParams, trailMode: e.value })}
-                      className="p-inputtext-sm"
-                      style={{ maxWidth: '110px' }}
-                    />
-                    {batchParams.trailMode === 'manual' ? (
-                      <InputText
-                        value={batchParams.trailValues}
-                        onChange={e => setBatchParams({ ...batchParams, trailValues: e.target.value })}
-                        className="p-inputtext-sm"
-                        placeholder="0.5,1"
-                      />
-                    ) : (
-                      <>
-                        <InputText
-                          value={batchParams.trailMin.toString()}
-                          onChange={e => setBatchParams({ ...batchParams, trailMin: Number(e.target.value) })}
-                          placeholder="Мин"
-                          style={{ maxWidth: '70px' }}
-                          className="p-inputtext-sm"
-                        />
-                        <InputText
-                          value={batchParams.trailMax.toString()}
-                          onChange={e => setBatchParams({ ...batchParams, trailMax: Number(e.target.value) })}
-                          placeholder="Макс"
-                          style={{ maxWidth: '70px' }}
-                          className="p-inputtext-sm"
-                        />
-                        <InputText
-                          value={batchParams.trailStep.toString()}
-                          onChange={e => setBatchParams({ ...batchParams, trailStep: Number(e.target.value) })}
-                          placeholder="Шаг"
-                          style={{ maxWidth: '70px' }}
-                          className="p-inputtext-sm"
-                        />
-                      </>
-                    )}
-                  </div>
-                  <label className='mr-1'>Lots:</label>
+              {/* Прогресс */}
+              {batchProgress && (
+                <div className="mb-2">
+                  <ProgressBar value={Math.round(batchProgress.total > 0 ? (batchProgress.completed / batchProgress.total) * 100 : 0)} />
+                  <span className="ml-2">{batchProgress.completed} / {batchProgress.total}</span>
+                </div>
+              )}
+
+              {/* Таблица результатов */}
+              {batchResults.length > 0 && (
+                <div style={{ maxHeight: '400px', overflowY: 'auto', color: '#d1d4dc' }}>
+                  <table className="p-datatable-table" style={{ width: '100%', fontSize: '0.85rem' }}>
+                    <thead>
+                      <tr>
+                        <th>Instrument</th><th>SL%</th><th>TP%</th><th>Trail%</th><th>Lots</th>
+                        <th>Sizing</th><th>Risk%</th><th>VolFilt</th><th>Period</th>
+                        <th>Signals</th><th>Trades</th><th>WinRate</th><th>Profit</th><th>MaxDD</th><th>Capital</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {batchResults.map((r, idx) => (
+                        <tr key={idx}>
+                          <td>{r.instrumentUid.slice(0,8)}</td>
+                          <td>{r.params.stopLossPercent}</td>
+                          <td>{r.params.takeProfitPercent}</td>
+                          <td>{r.params.trailingDistancePercent}</td>
+                          <td>{r.params.lots}</td>
+                          <td>{r.params.positionSizing}</td>
+                          <td>{r.params.riskPercent}</td>
+                          <td>{r.params.volumeFilterEnabled ? 'Y' : 'N'}</td>
+                          <td>{r.params.volumeFilterPeriod}</td>
+                          <td>{r.signals}</td>
+                          <td>{r.stats.totalTrades}</td>
+                          <td>{r.stats.winRate?.toFixed(1)}%</td>
+                          <td>{r.stats.totalProfit?.toFixed(2)}</td>
+                          <td>{r.stats.maxDrawdown?.toFixed(2)}</td>
+                          <td>{r.stats.initialCapital}→{r.stats.finalCapital?.toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </Card>
+
+          {/* Диалог конфигурации Batch */}
+          <Dialog
+            header="Batch Configuration"
+            visible={showBatchDialog}
+            style={{ width: '750px', maxHeight: '90vh' }}
+            onHide={() => setShowBatchDialog(false)}
+          >
+            <div className="p-fluid">
+              {/* Выбор инструментов */}
+              <div className="p-field mb-3">
+                <label>Instruments</label>
+                <div className="p-inputgroup">
+                  <InputText value={`${batchInstruments.length} selected`} readOnly className="p-inputtext-sm" />
+                  <Button icon="pi pi-search" onClick={() => setShowInstrumentDialog(true)} className="p-button-secondary p-button-sm" />
+                </div>
+                {batchInstruments.length > 0 && (
+                  <small className="mt-1" style={{ color: '#888' }}>
+                    {batchInstruments.map(uid => {
+                      const inst = availableInstruments.find(i => i.uid === uid);
+                      return inst ? inst.ticker || inst.name : uid;
+                    }).join(', ')}
+                  </small>
+                )}
+              </div>
+
+              {/* Версия */}
+              <div className="p-field mb-3">
+                <label>Batch Version</label>
+                <Dropdown
+                  value={batchVersion}
+                  options={['v1', 'v2']}
+                  onChange={e => setBatchVersion(e.value)}
+                  className="p-inputtext-sm"
+                />
+              </div>
+
+              {/* Strategy */}
+              <div className="p-field mb-3">
+                <label>Strategy</label>
+                <Dropdown
+                  value={batchParams.strategyType}
+                  options={['volume_accumulation', 'trend', 'poc_pullback', 'daily_va_return', 'fvg_volume']}
+                  onChange={e => setBatchParams({ ...batchParams, strategyType: e.value })}
+                  className="p-inputtext-sm"
+                />
+              </div>
+
+              {/* Size & Risk */}
+              <div className="p-field mb-3">
+                <label>Position Sizing</label>
+                <div className="flex align-items-center gap-2">
                   <Dropdown
-                    value={batchParams.lotsMode}
-                    options={['manual', 'range']}
-                    onChange={e => setBatchParams({ ...batchParams, lotsMode: e.value })}
+                    value={batchParams.positionSizing}
+                    options={['fixed', 'dynamic']}
+                    onChange={e => setBatchParams({ ...batchParams, positionSizing: e.value })}
                     className="p-inputtext-sm"
-                    style={{ width: '110px' }}
+                    style={{ width: '120px' }}
                   />
-                  {batchParams.lotsMode === 'manual' ? (
-                    <InputText
-                      value={batchParams.lotsValues}
-                      onChange={e => setBatchParams({ ...batchParams, lotsValues: e.target.value })}
-                      className="p-inputtext-sm"
-                      placeholder="10"
-                    />
-                  ) : (
+                  {batchParams.positionSizing === 'dynamic' && (
                     <>
+                      <label className="ml-2">Risk%:</label>
                       <InputText
-                        value={batchParams.lotsMin.toString()}
-                        onChange={e => setBatchParams({ ...batchParams, lotsMin: Number(e.target.value) })}
-                        placeholder="Мин"
-                        style={{ width: '70px' }}
+                        value={batchParams.riskPercent.toString()}
+                        onChange={e => setBatchParams({ ...batchParams, riskPercent: Number(e.target.value) })}
                         className="p-inputtext-sm"
-                      />
-                      <InputText
-                        value={batchParams.lotsMax.toString()}
-                        onChange={e => setBatchParams({ ...batchParams, lotsMax: Number(e.target.value) })}
-                        placeholder="Макс"
-                        style={{ width: '70px' }}
-                        className="p-inputtext-sm"
-                      />
-                      <InputText
-                        value={batchParams.lotsStep.toString()}
-                        onChange={e => setBatchParams({ ...batchParams, lotsStep: Number(e.target.value) })}
-                        placeholder="Шаг"
-                        style={{ width: '70px' }}
-                        className="p-inputtext-sm"
+                        style={{ width: '100px' }}
                       />
                     </>
                   )}
                 </div>
               </div>
-              
-              {/* Buttons */}
-              <div className="p-col-12 p-md-6">      
-                <div className="p-inputgroup align-items-center mt-1">
-                <div className="flex align-items-center mr-2">
-                    <label className="mr-1">Ver.:</label>
-                    <Dropdown
-                      value={batchVersion}
-                      options={['v1', 'v2']}
-                      onChange={e => setBatchVersion(e.value)}
+
+              {/* Vol Filter */}
+              <div className="p-field mb-3">
+                <div className="flex align-items-center gap-2">
+                  <Checkbox
+                    checked={batchParams.volumeFilterEnabled}
+                    onChange={e => setBatchParams({ ...batchParams, volumeFilterEnabled: e.checked ?? false })}
+                  />
+                  <label>Volume Filter</label>
+                  {batchParams.volumeFilterEnabled && (
+                    <InputText
+                      value={batchParams.volumeFilterPeriod.toString()}
+                      onChange={e => setBatchParams({ ...batchParams, volumeFilterPeriod: Number(e.target.value) })}
+                      placeholder="Period"
                       className="p-inputtext-sm"
-                      style={{ width: '80px' }}
+                      style={{ width: '100px' }}
                     />
-                  </div>
-                  <div className="flex align-items-center">
-                    <Button
-                      label={batchRunning ? '...' : 'Run'}
-                      onClick={runBatch}
-                      disabled={batchRunning || batchStopping}
-                      className="p-button-sm border-round-sm w-full p-1 px-3 mr-1"
-                      icon={batchRunning ? 'pi pi-spin pi-spinner' : ''}
-                    />
-                    {batchRunning && (
-                      <Button
-                        label="Stop"
-                        onClick={stopBatch}
-                        disabled={batchStopping}
-                        className="p-button-sm p-button-danger w-full border-round-sm p-1 px-3"
-                      />
-                    )}
-                    <Button
-                      label="Export CSV"
-                      onClick={exportCSV}
-                      disabled={batchResults.length === 0 || batchRunning}
-                      className="p-button-sm p-button-secondary w-full border-round-sm p-1 px-3 ml-1"
-                    />
-                  </div>
+                  )}
                 </div>
               </div>
+
+              {/* SL, TP, Trail, Lots (как в старой форме) */}
+              {['sl', 'tp', 'trail', 'lots'].map((type) => (
+                <div className="p-field mb-3" key={type}>
+                  <label>{type.toUpperCase()} % (Lots for Lots)</label>
+                  <div className="p-inputgroup">
+                    <Dropdown
+                      value={(batchParams as any)[`${type}Mode`]}
+                      options={['manual', 'range']}
+                      onChange={e => setBatchParams({ ...batchParams, [`${type}Mode`]: e.value })}
+                      className="p-inputtext-sm"
+                      style={{ width: '110px' }}
+                    />
+                    {(batchParams as any)[`${type}Mode`] === 'manual' ? (
+                      <InputText
+                        value={(batchParams as any)[`${type}Values`]}
+                        onChange={e => setBatchParams({ ...batchParams, [`${type}Values`]: e.target.value })}
+                        className="p-inputtext-sm"
+                        placeholder={type === 'lots' ? '10' : '1,1.5,2'}
+                      />
+                    ) : (
+                      <>
+                        <InputText
+                          value={(batchParams as any)[`${type}Min`].toString()}
+                          onChange={e => setBatchParams({ ...batchParams, [`${type}Min`]: Number(e.target.value) })}
+                          placeholder="Min"
+                          style={{ width: '70px' }}
+                          className="p-inputtext-sm"
+                        />
+                        <InputText
+                          value={(batchParams as any)[`${type}Max`].toString()}
+                          onChange={e => setBatchParams({ ...batchParams, [`${type}Max`]: Number(e.target.value) })}
+                          placeholder="Max"
+                          style={{ width: '70px' }}
+                          className="p-inputtext-sm"
+                        />
+                        <InputText
+                          value={(batchParams as any)[`${type}Step`].toString()}
+                          onChange={e => setBatchParams({ ...batchParams, [`${type}Step`]: Number(e.target.value) })}
+                          placeholder="Step"
+                          style={{ width: '70px' }}
+                          className="p-inputtext-sm"
+                        />
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
+          </Dialog>
 
-            {/* Progress & Results */}
-            {batchProgress && (
-              <div className="p-mt-2">
-                <ProgressBar value={Math.round(batchProgress.total > 0 ? (batchProgress.completed / batchProgress.total) * 100 : 0)} />
-                <span className="p-ml-2">{batchProgress.completed} / {batchProgress.total}</span>
-              </div>
-            )}
-            {batchResults.length > 0 && (
-              <div className="p-mt-2" style={{ maxHeight: '400px', overflowY: 'auto', color: '#d1d4dc' }}>
-                <table className="p-datatable-table" style={{ width: '100%', fontSize: '0.85rem' }}>
-                  <thead>
-                    <tr>
-                      <th>Instrument</th><th>SL%</th><th>TP%</th><th>Trail%</th><th>Lots</th>
-                      <th>Sizing</th><th>Risk%</th><th>VolFilt</th><th>Period</th>
-                      <th>Signals</th><th>Trades</th><th>WinRate</th><th>Profit</th><th>MaxDD</th><th>Capital</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {batchResults.map((r, idx) => (
-                      <tr key={idx}>
-                        <td>{r.instrumentUid.slice(0,8)}</td>
-                        <td>{r.params.stopLossPercent}</td>
-                        <td>{r.params.takeProfitPercent}</td>
-                        <td>{r.params.trailingDistancePercent}</td>
-                        <td>{r.params.lots}</td>
-                        <td>{r.params.positionSizing}</td>
-                        <td>{r.params.riskPercent}</td>
-                        <td>{r.params.volumeFilterEnabled ? 'Y' : 'N'}</td>
-                        <td>{r.params.volumeFilterPeriod}</td>
-                        <td>{r.signals}</td>
-                        <td>{r.stats.totalTrades}</td>
-                        <td>{r.stats.winRate?.toFixed(1)}%</td>
-                        <td>{r.stats.totalProfit?.toFixed(2)}</td>
-                        <td>{r.stats.maxDrawdown?.toFixed(2)}</td>
-                        <td>{r.stats.initialCapital}→{r.stats.finalCapital?.toFixed(2)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </Card>
-
-          {/* Диалог выбора инструментов */}
+          {/* Диалог выбора инструментов (без изменений) */}
           <Dialog
             header="Выбор инструментов для Batch"
             visible={showInstrumentDialog}
