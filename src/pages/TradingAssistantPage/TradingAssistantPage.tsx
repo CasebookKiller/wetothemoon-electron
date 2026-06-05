@@ -88,6 +88,8 @@ export const TradingAssistantPage: React.FC = () => {
     takeProfitPercent: 1.0,
     trailingEnabled: false,
     trailingPercent: 0.5,
+    dailyLossEnabled: false,
+    dailyLossLimit: 0,
   });
 
   // Стрим
@@ -888,6 +890,18 @@ export const TradingAssistantPage: React.FC = () => {
                     min={0}
                     size={2}
                     className='mr-1'
+                  />
+                )}
+                <Checkbox checked={sandbox.dailyLossEnabled} onChange={e => updateSandbox({ dailyLossEnabled: e.checked })} />
+                <label className="ml-1 mr-1 mb-0">Daily Loss Limit</label>
+                {sandbox.dailyLossEnabled && (
+                  <InputNumber
+                    value={sandbox.dailyLossLimit}
+                    onValueChange={e => updateSandbox({ dailyLossLimit: e.value ?? 0 })}
+                    min={0}
+                    step={100}
+                    size={3}
+                    className="mr-1"
                   />
                 )}
                 <label className="mr-1">Pay (RUB)</label>

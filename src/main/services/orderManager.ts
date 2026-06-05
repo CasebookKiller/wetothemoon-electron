@@ -14,6 +14,7 @@ export interface OrderManagerConfig {
   trailingEnabled?: boolean;
   trailingPercent?: number;
   marketDataToken?: string;  // токен для рыночных данных (read-only)
+  dailyLossLimit?: number;   // максимальный дневной убыток в рублях (0 = выключен)
 }
 
 export class OrderManager {
@@ -28,6 +29,9 @@ export class OrderManager {
   private trailingEntryPrice: number | null = null;
   private trailingStopOrderId: string | null = null;
   private trailingInterval: NodeJS.Timeout | null = null;
+  private dailyLossCurrent: number = 0;
+  private lastLossResetDate: string = '';
+  private lastEntryPrice: number = 0;
 
   constructor(config: Partial<OrderManagerConfig> = {}) {
     this.config = {
@@ -41,12 +45,15 @@ export class OrderManager {
       trailingEnabled: false,
       trailingPercent: 1,
       marketDataToken: '',
+      dailyLossLimit: 0,   // ← добавить
       ...config,
     };
   }
 
   updateConfig(patch: Partial<OrderManagerConfig>): void {
     this.config = { ...this.config, ...patch };
+    this.dailyLossCurrent = 0;
+    this.lastLossResetDate = new Date().toISOString().split('T')[0];
   }
 
   setRunning(state: boolean): void {
@@ -72,6 +79,15 @@ export class OrderManager {
     const quantity = this.config.lotQuantity;
     const price = signal.price;
 
+    // Оцениваем результат предыдущей сделки (если была позиция)
+    if (this.lastEntryPrice > 0) {
+      const prevProfit = signal.type === 'BUY'
+        ? signal.price - this.lastEntryPrice   // если был BUY, то сейчас продаём
+        : this.lastEntryPrice - signal.price;  // если был SELL, то сейчас покупаем
+      this.updateDailyLoss(prevProfit);
+    }
+    this.lastEntryPrice = signal.price; // запоминаем новую цену входа
+
     try {
       // Отправляем основной ордер
       const order = await sandboxGrpc.postSandboxOrder(
@@ -88,6 +104,8 @@ export class OrderManager {
       this.activeOrderId = order.orderId ?? null;
       this.lastOrderTime = now;
       console.log(`[OrderManager] Ордер отправлен: ${this.activeOrderId}`);
+
+      this.lastEntryPrice = signal.price;
 
       // Устанавливаем стоп-лосс и тейк-профит, если заданы проценты
       await this.placeStopOrders(signal);
@@ -227,6 +245,22 @@ export class OrderManager {
     } catch (e) {
       console.error('[OrderManager] Не удалось получить lastPrice:', e);
       return null;
+    }
+  }
+
+  private updateDailyLoss(profit: number): void {
+    const today = new Date().toISOString().split('T')[0];
+    if (today !== this.lastLossResetDate) {
+      this.dailyLossCurrent = 0;
+      this.lastLossResetDate = today;
+    }
+    if (profit < 0) {
+      this.dailyLossCurrent += Math.abs(profit);
+      console.log(`[OrderManager] Текущий дневной убыток: ${this.dailyLossCurrent.toFixed(2)} / лимит: ${this.config.dailyLossLimit}`);
+      if (this.config.dailyLossLimit > 0 && this.dailyLossCurrent >= this.config.dailyLossLimit) {
+        console.log('[OrderManager] Достигнут дневной лимит убытка, автоторговля остановлена');
+        this.setRunning(false);
+      }
     }
   }
 }

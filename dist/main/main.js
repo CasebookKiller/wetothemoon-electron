@@ -3791,6 +3791,9 @@ var OrderManager = class {
 	trailingEntryPrice = null;
 	trailingStopOrderId = null;
 	trailingInterval = null;
+	dailyLossCurrent = 0;
+	lastLossResetDate = "";
+	lastEntryPrice = 0;
 	constructor(config = {}) {
 		this.config = {
 			lotQuantity: 1,
@@ -3803,6 +3806,7 @@ var OrderManager = class {
 			trailingEnabled: false,
 			trailingPercent: 1,
 			marketDataToken: "",
+			dailyLossLimit: 0,
 			...config
 		};
 	}
@@ -3811,6 +3815,8 @@ var OrderManager = class {
 			...this.config,
 			...patch
 		};
+		this.dailyLossCurrent = 0;
+		this.lastLossResetDate = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
 	}
 	setRunning(state) {
 		this.isRunning = state;
@@ -3831,6 +3837,11 @@ var OrderManager = class {
 		const direction = signal.type === "BUY" ? OrderDirection.ORDER_DIRECTION_BUY : OrderDirection.ORDER_DIRECTION_SELL;
 		const quantity = this.config.lotQuantity;
 		const price = signal.price;
+		if (this.lastEntryPrice > 0) {
+			const prevProfit = signal.type === "BUY" ? signal.price - this.lastEntryPrice : this.lastEntryPrice - signal.price;
+			this.updateDailyLoss(prevProfit);
+		}
+		this.lastEntryPrice = signal.price;
 		try {
 			const order = await sandboxGrpc.postSandboxOrder({
 				instrumentId: signal.instrumentUid,
@@ -3846,6 +3857,7 @@ var OrderManager = class {
 			this.activeOrderId = order.orderId ?? null;
 			this.lastOrderTime = now;
 			console.log(`[OrderManager] Ордер отправлен: ${this.activeOrderId}`);
+			this.lastEntryPrice = signal.price;
 			await this.placeStopOrders(signal);
 			if (this.config.trailingEnabled && this.activeStopOrderId) this.startTrailing(signal.instrumentUid, signal.price, this.activeStopOrderId, this.config.trailingPercent);
 		} catch (error) {
@@ -3963,6 +3975,21 @@ var OrderManager = class {
 		} catch (e) {
 			console.error("[OrderManager] Не удалось получить lastPrice:", e);
 			return null;
+		}
+	}
+	updateDailyLoss(profit) {
+		const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+		if (today !== this.lastLossResetDate) {
+			this.dailyLossCurrent = 0;
+			this.lastLossResetDate = today;
+		}
+		if (profit < 0) {
+			this.dailyLossCurrent += Math.abs(profit);
+			console.log(`[OrderManager] Текущий дневной убыток: ${this.dailyLossCurrent.toFixed(2)} / лимит: ${this.config.dailyLossLimit}`);
+			if (this.config.dailyLossLimit > 0 && this.dailyLossCurrent >= this.config.dailyLossLimit) {
+				console.log("[OrderManager] Достигнут дневной лимит убытка, автоторговля остановлена");
+				this.setRunning(false);
+			}
 		}
 	}
 };
