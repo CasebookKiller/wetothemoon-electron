@@ -92,6 +92,8 @@ export const TradingAssistantPage: React.FC = () => {
     trailingPercent: 0.5,
     dailyLossEnabled: false,
     dailyLossLimit: 0,
+    maxSignalsPerDay: 0,
+    minIntervalMinutes: 15,
   });
 
   // Стрим
@@ -312,6 +314,8 @@ export const TradingAssistantPage: React.FC = () => {
       takeProfitPercent: sandbox.takeProfitPercent,
       trailingEnabled: sandbox.trailingEnabled,
       trailingPercent: sandbox.trailingPercent,
+      maxSignalsPerDay: sandbox.maxSignalsPerDay,
+      minIntervalMinutes: sandbox.minIntervalMinutes,
     });
     alert('Config applied');
   };
@@ -951,6 +955,23 @@ export const TradingAssistantPage: React.FC = () => {
                     className='mr-1'
                   />
                 )}
+                <label className="mr-1">Max Signals/Day</label>
+                <InputNumber
+                  value={sandbox.maxSignalsPerDay}
+                  onValueChange={e => updateSandbox({ maxSignalsPerDay: e.value ?? 0 })}
+                  min={0}
+                  step={1}
+                  size={2}
+                  className="mr-2"
+                />
+                <label className="mr-1">Min Interval (min)</label>
+                <InputNumber
+                  value={sandbox.minIntervalMinutes}
+                  onValueChange={e => updateSandbox({ minIntervalMinutes: e.value ?? 15 })}
+                  min={1}
+                  step={5}
+                  size={2}
+                />
                 <Checkbox checked={sandbox.dailyLossEnabled} onChange={e => updateSandbox({ dailyLossEnabled: e.checked })} />
                 <label className="ml-1 mr-1 mb-0">Daily Loss Limit</label>
                 {sandbox.dailyLossEnabled && (

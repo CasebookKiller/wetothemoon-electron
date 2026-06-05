@@ -65,6 +65,17 @@ export const LogTab: React.FC<Props> = ({ accountId }) => {
     return String(value);
   };
 
+  // Вспомогательная функция для преобразования даты
+  const formatDate = (dateValue: any): string => {
+    if (!dateValue) return '—';
+    // Если объект Timestamp { seconds, nanos }
+    if (typeof dateValue === 'object' && dateValue.seconds !== undefined) {
+      return new Date(Number(dateValue.seconds) * 1000).toLocaleString();
+    }
+    // Если строка ISO
+    return new Date(dateValue).toLocaleString();
+  };
+
   const dateBody = (row: Operation) => {
     if (!row.date) return '—';
     return new Date(row.date).toLocaleString();
@@ -117,7 +128,7 @@ export const LogTab: React.FC<Props> = ({ accountId }) => {
           paginator
           rows={10}
         >
-          <Column header="Date" body={dateBody} sortable sortField="date" />
+          <Column header="Date" body={(row: Operation) => formatDate(row.date)} sortable sortField="date" />
           <Column header="Type" body={typeBody} sortable sortField="type" />
           <Column header="Ticker" body={row => row.ticker || row.figi || '—'} />
           <Column header="Quantity" body={row => row.quantity || '—'} />

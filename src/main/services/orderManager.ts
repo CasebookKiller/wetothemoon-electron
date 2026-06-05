@@ -15,6 +15,8 @@ export interface OrderManagerConfig {
   trailingPercent?: number;
   marketDataToken?: string;  // токен для рыночных данных (read-only)
   dailyLossLimit?: number;   // максимальный дневной убыток в рублях (0 = выключен)
+  maxSignalsPerDay?: number;   // 0 = без ограничений
+  minIntervalMinutes?: number; // минимальный интервал между сигналами (по умолчанию 15)
 }
 
 export class OrderManager {
@@ -46,6 +48,8 @@ export class OrderManager {
       trailingPercent: 1,
       marketDataToken: '',
       dailyLossLimit: 0,   // ← добавить
+      maxSignalsPerDay: 0,
+      minIntervalMinutes: 15,
       ...config,
     };
   }

@@ -14,16 +14,28 @@ export class VolumeAccumulationStrategy implements IBacktestStrategy {
   private volumeFilterPeriod: number;
   private volumeHistory: number[] = [];
   private lastSignalDirection: string | null = null;
+  private maxSignalsPerDay: number = 0;
+  private minIntervalMs: number = 0;
+  private signalsToday: number = 0;
+  private lastSignalTime: number = 0;
+
 
   constructor(
     instrumentUid: string,
     dailyProfile: VolumeProfileLevels | null,   // ← добавлено | null
-    options?: { volumeFilterEnabled?: boolean; volumeFilterPeriod?: number }
+    options?: { 
+      volumeFilterEnabled?: boolean;
+      volumeFilterPeriod?: number;
+      maxSignalsPerDay?: number;
+      minIntervalMinutes?: number;
+    }
   ) {
     this.instrumentUid = instrumentUid;
     this.dailyProfile = dailyProfile;
     this.volumeFilterEnabled = options?.volumeFilterEnabled ?? false;
     this.volumeFilterPeriod = options?.volumeFilterPeriod ?? 20;
+    this.maxSignalsPerDay = options?.maxSignalsPerDay ?? 0;
+    this.minIntervalMs = (options?.minIntervalMinutes ?? 15) * 60 * 1000;
   }
 
   reset(): void {
@@ -65,10 +77,19 @@ export class VolumeAccumulationStrategy implements IBacktestStrategy {
       this.hasBrokenHigh = true;
       this.hasBrokenLow = false;
     }
+
     // Отслеживаем выход ниже Value Area Low
     if (low < this.dailyProfile.valueAreaLow) {
       this.hasBrokenLow = true;
       this.hasBrokenHigh = false;
+    }
+
+    if (this.maxSignalsPerDay > 0 && this.signalsToday >= this.maxSignalsPerDay) {
+      return; // Достигнут дневной лимит
+    }
+    const now = Date.now();
+    if (this.minIntervalMs > 0 && (now - this.lastSignalTime) < this.minIntervalMs) {
+      return; // Не прошёл минимальный интервал
     }
 
     // Возврат внутрь VA после пробоя High → сигнал SELL
@@ -82,6 +103,8 @@ export class VolumeAccumulationStrategy implements IBacktestStrategy {
       });
       this.hasBrokenHigh = false;
       this.hasPosition = true;   // ← позиция открыта
+      this.signalsToday++;
+      this.lastSignalTime = now;
     }
 
     // Возврат внутрь VA после пробоя Low → сигнал BUY
@@ -112,6 +135,8 @@ export class VolumeAccumulationStrategy implements IBacktestStrategy {
     this.hasBrokenHigh = false;   // ← сброс
     this.hasBrokenLow = false;    // ← сброс
     this.volumeHistory = [];      // ← очистка истории объёмов
+    this.signalsToday = 0;
+    this.lastSignalTime = 0;
   }
 }
 

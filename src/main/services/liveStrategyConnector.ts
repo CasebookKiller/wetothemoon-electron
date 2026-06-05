@@ -10,6 +10,8 @@ export function connectLiveStrategy(instrumentUid: string, manager: OrderManager
   const strategy = new VolumeAccumulationStrategy(instrumentUid, null, {
     volumeFilterEnabled: false,
     volumeFilterPeriod: 20,
+    maxSignalsPerDay: manager.getConfig().maxSignalsPerDay,
+    minIntervalMinutes: manager.getConfig().minIntervalMinutes,
   });
 
   // Подписываемся на обновления профиля от движка
