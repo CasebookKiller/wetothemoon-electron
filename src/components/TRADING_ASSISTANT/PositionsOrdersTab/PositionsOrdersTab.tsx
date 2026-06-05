@@ -50,6 +50,7 @@ export const PositionsOrdersTab: React.FC<Props> = ({ accountId }) => {
     const api = (window as any).electronAPI;
     if (api?.closePosition) {
       const direction = isLong ? 'long' : 'short';
+      // Передаём 4 аргумента, как ожидает обработчик
       const result = await api.closePosition(instrumentUid, accountId, quantity, direction);
       if (result.success) {
         console.log('Позиция закрыта, ордер:', result.orderId);
@@ -100,12 +101,13 @@ export const PositionsOrdersTab: React.FC<Props> = ({ accountId }) => {
           <Column body={row => {
             const qty = row.quantity ?? row.balance ?? 0;
             const absQty = Math.abs(Number(qty));
+            const isLong = Number(qty) > 0;
             if (!row.instrumentUid || row.instrumentUid === 'RUB' || absQty === 0) return null;
             return (
               <Button
                 icon="pi pi-times"
                 className="p-button-sm p-button-danger"
-                onClick={() => closePosition(row.instrumentUid, absQty)}
+                onClick={() => closePosition(row.instrumentUid, absQty, isLong)}
                 tooltip="Close position"
               />
             );

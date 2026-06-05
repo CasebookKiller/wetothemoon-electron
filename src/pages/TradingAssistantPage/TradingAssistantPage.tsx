@@ -159,6 +159,11 @@ export const TradingAssistantPage: React.FC = () => {
   const [batchStopping, setBatchStopping] = useState(false);
   const [batchProgress, setBatchProgress] = useState<{ completed: number; total: number } | null>(null);
   const [batchVersion, setBatchVersion] = useState<'v1' | 'v2'>('v2');
+  const [backtestCandlesData, setBacktestCandlesData] = useState<any[]>([]);
+  const [backtestProfile, setBacktestProfile] = useState<any>(null);
+
+  const [viewMode, setViewMode] = useState<'live' | 'backtest'>('live');
+
 
   // Профиль и сигналы (пустые, будут наполняться позже)
   const [profile, setProfile] = useState<any>(null);
@@ -400,10 +405,12 @@ export const TradingAssistantPage: React.FC = () => {
           low: quotationToNumber(c.low),
           close: quotationToNumber(c.close),
         }));
-        setCandlesData(formatted);
+        setBacktestCandlesData(formatted);   // ← бэктест-свечи
       }
-      setProfile(result.profile);
+      setBacktestProfile(result.profile);    // ← бэктест-профиль
       updateBacktest({ signals: result.signals, result, trades: result.trades || [] });
+      // Автоматически переключаемся в режим Backtest после прогона
+      setViewMode('backtest');
     }
     updateBacktest({ loading: false });
   };
@@ -574,6 +581,11 @@ export const TradingAssistantPage: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
+  const currentCandles = viewMode === 'live' ? candlesData : backtestCandlesData;
+  const currentProfile = viewMode === 'live' ? profile : backtestProfile;
+  const currentSignals = viewMode === 'live' ? liveSignals : backtest.signals;
+  const currentTrades = viewMode === 'live' ? [] : backtest.trades;
+
   // ========== ЭФФЕКТЫ ГРАФИКА ==========
   useEffect(() => {
     if (!chartContainerRef.current) return;
@@ -624,13 +636,13 @@ export const TradingAssistantPage: React.FC = () => {
   // Отображение свечей
   useEffect(() => {
     const chart = chartRef.current;
-    if (!chart || !candlesData.length) return;
+    if (!chart || !currentCandles.length) return;
 
     if (candleSeriesRef.current) {
       chart.removeSeries(candleSeriesRef.current);
     }
 
-    const aggregated = aggregateCandles(candlesData, stream.displayTimeframe);
+    const aggregated = aggregateCandles(currentCandles, stream.displayTimeframe);
 
     const candleSeries = chart.addSeries(CandlestickSeries, {
       upColor: '#26a69a',
@@ -644,26 +656,21 @@ export const TradingAssistantPage: React.FC = () => {
     });
     candleSeries.setData(aggregated);
     chart.timeScale().fitContent();
-    // Принудительно обновляем priceRange, чтобы гистограмма синхронизировалась
-    //setTimeout(() => {
-    //  const range = chart.priceScale('right').getVisibleRange();
-    //  if (range) setPriceRange({ min: range.from, max: range.to });
-    //}, 0);
     candleSeriesRef.current = candleSeries;
-  }, [candlesData, stream.displayTimeframe]);
+  }, [currentCandles, stream.displayTimeframe]);
 
   // Обновление уровней
   useEffect(() => {
     const chart = chartRef.current;
-    if (!chart || !profile || !candlesData.length || candlesData.length < 2) return;
+    if (!chart || !currentProfile || !currentCandles.length || currentCandles.length < 2) return;
 
     [...levelSeriesRef.current, ...exitMarkersRef.current].forEach(series => {
       try { chart.removeSeries(series); } catch {}
     });
     levelSeriesRef.current = [];
 
-    const firstTime = candlesData[0].time as UTCTimestamp;
-    const lastTime = candlesData[candlesData.length - 1].time as UTCTimestamp;
+    const firstTime = currentCandles[0].time as UTCTimestamp;
+    const lastTime = currentCandles[currentCandles.length - 1].time as UTCTimestamp;
     if (typeof firstTime !== 'number' || typeof lastTime !== 'number') return;
 
     const addHorizontalLine = (price: number, color: string, title: string, lineWidth = 2) => {
@@ -678,15 +685,15 @@ export const TradingAssistantPage: React.FC = () => {
       levelSeriesRef.current.push(series);
     };
 
-    addHorizontalLine(profile.poc, 'red', 'POC', 3);
-    addHorizontalLine(profile.valueAreaHigh, 'green', 'VA High', 2);
-    addHorizontalLine(profile.valueAreaLow, 'green', 'VA Low', 2);
-  }, [profile, candlesData]);
+    addHorizontalLine(currentProfile.poc, 'red', 'POC', 3);
+    addHorizontalLine(currentProfile.valueAreaHigh, 'green', 'VA High', 2);
+    addHorizontalLine(currentProfile.valueAreaLow, 'green', 'VA Low', 2);
+  }, [currentProfile, currentCandles]);
 
   // Маркеры сигналов
   useEffect(() => {
     const chart = chartRef.current;
-    if (!chart || !backtest.signals.length) return;
+    if (!chart || !currentSignals.length) return;
 
     if (signalSeriesRef.current) {
       chart.removeSeries(signalSeriesRef.current);
@@ -697,7 +704,7 @@ export const TradingAssistantPage: React.FC = () => {
       lastValueVisible: false,
     });
 
-    const markers: SeriesMarker<Time>[] = backtest.signals.map(sig => ({
+    const markers: SeriesMarker<Time>[] = currentSignals.map(sig => ({
       time: (Math.floor(new Date(sig.time).getTime() / 1000)) as Time,
       position: sig.type === 'BUY' ? 'belowBar' : 'aboveBar',
       color: sig.type === 'BUY' ? 'green' : 'red',
@@ -707,12 +714,12 @@ export const TradingAssistantPage: React.FC = () => {
 
     createSeriesMarkers(signalSeries, markers);
     signalSeriesRef.current = signalSeries;
-  }, [backtest.signals]);
+  }, [currentSignals]);
 
   // Маркеры выходов
   useEffect(() => {
     const chart = chartRef.current;
-    if (!chart || !backtest.trades.length) return;
+    if (!chart || !currentTrades.length) return;
 
     exitMarkersRef.current.forEach(series => {
       try { chart.removeSeries(series); } catch {}
@@ -728,7 +735,7 @@ export const TradingAssistantPage: React.FC = () => {
     ];
 
     reasons.forEach(({ key, color }) => {
-      const tradesOfReason = backtest.trades.filter((t: any) => t.exitReason === key);
+      const tradesOfReason = currentTrades.filter((t: any) => t.exitReason === key);
       if (tradesOfReason.length === 0) return;
 
       const series = chart.addSeries(LineSeries, {
@@ -749,7 +756,7 @@ export const TradingAssistantPage: React.FC = () => {
     });
 
     chart.timeScale().fitContent();
-  }, [backtest.trades]);
+  }, [currentTrades]);
 
   // ProfileUpdate
   useEffect(() => {
@@ -1432,10 +1439,10 @@ export const TradingAssistantPage: React.FC = () => {
         {/* ========== SIGNALS =========== */}
         <TabPanel header="Signals">
           <Card className="surface-ground p-2">
-            <h4 className="p-mb-2">Live Signals</h4>
-            {liveSignals.length > 0 ? (
+            <h4 className="p-mb-2">Signals</h4>
+            {currentSignals.length > 0 ? (
               <ul className="p-pl-3" style={{ color: '#d1d4dc', maxHeight: '200px', overflowY: 'auto' }}>
-                {liveSignals.map((sig, idx) => (
+                {currentSignals.map((sig, idx) => (
                   <li key={idx}><strong>{sig.type}</strong>: {sig.message} @ {sig.price}</li>
                 ))}
               </ul>
@@ -1449,18 +1456,18 @@ export const TradingAssistantPage: React.FC = () => {
         <TabPanel header="Profile">
           <Card className="surface-ground p-2">
             <h4 className="p-mb-2">Volume Profile Data</h4>
-            {profile ? (
+            {currentProfile ? (
               <>
                 <div className="p-mb-2" style={{ color: '#d1d4dc' }}>
-                  <p>POC: {profile.poc.toFixed(2)}</p>
-                  <p>Value Area: {profile.valueAreaLow.toFixed(2)} – {profile.valueAreaHigh.toFixed(2)}</p>
-                  <p>Total Volume: {profile.totalVolume}</p>
+                  <p>POC: {currentProfile.poc.toFixed(2)}</p>
+                  <p>Value Area: {currentProfile.valueAreaLow.toFixed(2)} – {currentProfile.valueAreaHigh.toFixed(2)}</p>
+                  <p>Total Volume: {currentProfile.totalVolume}</p>
                 </div>
-                {profile.volumeByPrice?.length > 0 && (
+                {currentProfile.volumeByPrice?.length > 0 && (
                   <>
                     <h5>Top 10 Levels</h5>
                     <ul className="p-pl-3" style={{ color: '#d1d4dc', maxHeight: '200px', overflowY: 'auto' }}>
-                      {profile.volumeByPrice
+                      {currentProfile.volumeByPrice
                         .sort((a: any, b: any) => b.volume - a.volume)
                         .slice(0, 10)
                         .map(({ price, volume }: any) => (
@@ -1480,7 +1487,7 @@ export const TradingAssistantPage: React.FC = () => {
         <TabPanel header="Trades">
           <Card className="surface-ground p-2">
             <h4 className="p-mb-2">Trade History</h4>
-            {backtest.trades.length > 0 ? (
+            {currentTrades.length > 0 ? (
               <div style={{ maxHeight: '400px', overflowY: 'auto', color: '#d1d4dc' }}>
                 <table className="p-datatable-table" style={{ width: '100%', fontSize: '0.85rem' }}>
                   <thead>
@@ -1491,7 +1498,7 @@ export const TradingAssistantPage: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {backtest.trades.map((t: any, idx: number) => (
+                    {currentTrades.map((t: any, idx: number) => (
                       <tr key={idx} style={{ borderBottom: '1px solid #444' }}>
                         <td style={{ color: t.type === 'BUY' ? '#4caf50' : '#f44336' }}>{t.type}</td>
                         <td>{new Date(t.entryTime).toLocaleString()}</td>
@@ -1516,27 +1523,34 @@ export const TradingAssistantPage: React.FC = () => {
           <PositionsOrdersTab accountId={sandbox.accountId} />
         </TabPanel>
       </TabView>
+      <div className="flex align-items-center p-mb-2">
+        <span className="mr-2">Mode:</span>
+        <Button
+          label="Live"
+          onClick={() => setViewMode('live')}
+          className={`p-button-sm ${viewMode === 'live' ? 'p-button-primary' : 'p-button-secondary'} mr-1`}
+        />
+        <Button
+          label="Backtest"
+          onClick={() => setViewMode('backtest')}
+          className={`p-button-sm ${viewMode === 'backtest' ? 'p-button-primary' : 'p-button-secondary'}`}
+          disabled={!backtestCandlesData.length}
+        />
+      </div>
       <div className="chart-row">
-        {profile?.volumeByPrice && priceRange.max > 0 && (
+        {currentProfile?.volumeByPrice && priceRange.max > 0 && (
           <div className="volume-profile-container">
             <VolumeProfileBars
-              data={profile.volumeByPrice}
-              maxVolume={Math.max(...profile.volumeByPrice.map((v: any) => v.volume))}
+              data={currentProfile.volumeByPrice}
+              maxVolume={Math.max(...currentProfile.volumeByPrice.map((v: any) => v.volume))}
               minPrice={priceRange.min}
               maxPrice={priceRange.max}
               height={400}
-              poc={profile.poc}
-              vah={profile.valueAreaHigh}
-              val={profile.valueAreaLow}
+              poc={currentProfile.poc}
+              vah={currentProfile.valueAreaHigh}
+              val={currentProfile.valueAreaLow}
             />
           </div>
-        )}
-        {profile?.volumeByPrice && (
-          <VolumeProfileOverlay
-            chart={chartRef.current}
-            volumeByPrice={profile.volumeByPrice}
-            maxVolume={Math.max(...profile.volumeByPrice.map((v: any) => v.volume))}
-          />
         )}
         <div className="chart-container" ref={chartContainerRef} />
       </div>
