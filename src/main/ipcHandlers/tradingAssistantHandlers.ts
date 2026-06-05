@@ -690,4 +690,28 @@ export const registerTradingAssistantHandlers = () => {
       return { success: false, error: error.message || 'Неизвестная ошибка' };
     }
   });
+
+  ipcMain.handle('trading-assistant:get-operations', async (_, accountId: string, from: string, to: string, cursor: string = '') => {
+    const token = process.env.VITE_TSandBox || '';
+    if (!token || !accountId) return { operations: [], hasMore: false, nextCursor: '' };
+
+    try {
+      const response = await sandboxGrpc.getSandboxOperationsByCursor({
+        accountId,
+        from: from ? new Date(from + 'T00:00:00Z').toISOString() : undefined,
+        to: to ? new Date(to + 'T23:59:59Z').toISOString() : undefined,
+        cursor: cursor || undefined,
+        limit: 50,
+      }, token);
+
+      return {
+        operations: response.items || [],
+        hasMore: response.hasMore || false,
+        nextCursor: response.nextCursor || '',
+      };
+    } catch (e: any) {
+      console.error('[GetOperations]', e);
+      return { operations: [], hasMore: false, nextCursor: '' };
+    }
+  });
 };

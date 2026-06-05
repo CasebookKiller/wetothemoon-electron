@@ -3247,6 +3247,35 @@ var registerTradingAssistantHandlers = () => {
 			};
 		}
 	});
+	electron.ipcMain.handle("trading-assistant:get-operations", async (_, accountId, from, to, cursor = "") => {
+		const token = process.env.VITE_TSandBox || "";
+		if (!token || !accountId) return {
+			operations: [],
+			hasMore: false,
+			nextCursor: ""
+		};
+		try {
+			const response = await sandboxGrpc.getSandboxOperationsByCursor({
+				accountId,
+				from: from ? (/* @__PURE__ */ new Date(from + "T00:00:00Z")).toISOString() : void 0,
+				to: to ? (/* @__PURE__ */ new Date(to + "T23:59:59Z")).toISOString() : void 0,
+				cursor: cursor || void 0,
+				limit: 50
+			}, token);
+			return {
+				operations: response.items || [],
+				hasMore: response.hasMore || false,
+				nextCursor: response.nextCursor || ""
+			};
+		} catch (e) {
+			console.error("[GetOperations]", e);
+			return {
+				operations: [],
+				hasMore: false,
+				nextCursor: ""
+			};
+		}
+	});
 };
 //#endregion
 //#region src/shared/types/promptgenerator.ts

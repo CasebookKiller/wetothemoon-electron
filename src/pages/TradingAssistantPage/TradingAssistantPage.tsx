@@ -25,6 +25,7 @@ import { Signal } from '@/api/tbank/signalTypes';
 import { VolumeProfileLevels } from '@/main/services/volumeProfileEngine';
 import { VolumeProfileOverlay } from '@/components/TRADING_ASSISTANT/VolumeProfileOverlay/VolumeProfileOverlay';
 import { PositionsOrdersTab } from '@/components/TRADING_ASSISTANT/PositionsOrdersTab/PositionsOrdersTab';
+import { LogTab } from '@/components/TRADING_ASSISTANT/LogTab/LogTab';
 
 function quotationToNumber(q: any): number {
   if (!q) return 0;
@@ -1554,6 +1555,11 @@ export const TradingAssistantPage: React.FC = () => {
         {/* ========== POS/ORDERS ======== */}
         <TabPanel header="Pos/Orders">
           <PositionsOrdersTab accountId={sandbox.accountId} />
+        </TabPanel>
+        
+        {/* ========== POS/ORDERS ======== */}
+        <TabPanel header="Log">
+          <LogTab accountId={sandbox.accountId} />
         </TabPanel>
       </TabView>
       <div className="flex align-items-center flex-wrap mt-2 mb-2 gap-2 w-full">
