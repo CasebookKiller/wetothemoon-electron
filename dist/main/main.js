@@ -3264,7 +3264,7 @@ var registerTradingAssistantHandlers = () => {
 			}, token);
 			return {
 				operations: response.items || [],
-				hasMore: response.hasMore || false,
+				hasMore: response.hasNext || false,
 				nextCursor: response.nextCursor || ""
 			};
 		} catch (e) {

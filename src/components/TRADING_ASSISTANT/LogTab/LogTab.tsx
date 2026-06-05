@@ -48,7 +48,7 @@ export const LogTab: React.FC<Props> = ({ accountId }) => {
     } else {
       setOperations(prev => [...prev, ...(result.operations || [])]);
     }
-    setHasMore(result.hasMore);
+    setHasMore(result.hasNext || false);
     setCursor(result.nextCursor || '');
     setLoading(false);
   };

@@ -706,7 +706,7 @@ export const registerTradingAssistantHandlers = () => {
 
       return {
         operations: response.items || [],
-        hasMore: response.hasMore || false,
+        hasMore: response.hasNext || false,
         nextCursor: response.nextCursor || '',
       };
     } catch (e: any) {
