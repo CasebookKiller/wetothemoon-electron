@@ -46,14 +46,14 @@ export const PositionsOrdersTab: React.FC<Props> = ({ accountId }) => {
     }
   };
 
-  const closePosition = async (instrumentUid: string, quantity: number) => {
+  const closePosition = async (instrumentUid: string, quantity: number, isLong: boolean) => {
     const api = (window as any).electronAPI;
     if (api?.closePosition) {
-      console.log('Closing position:', { instrumentUid, accountId, quantity });
-      const result = await api.closePosition(instrumentUid, accountId, quantity);
+      const direction = isLong ? 'long' : 'short';
+      const result = await api.closePosition(instrumentUid, accountId, quantity, direction);
       if (result.success) {
         console.log('Позиция закрыта, ордер:', result.orderId);
-        fetchData(); // обновляем данные
+        fetchData();
       } else {
         alert('Ошибка закрытия: ' + result.error);
       }

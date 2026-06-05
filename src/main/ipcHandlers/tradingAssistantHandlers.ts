@@ -19,6 +19,7 @@ import { BatchBacktestRunner } from '@/main/services/backtest/batchBacktestRunne
 import { DailyVAReversalStrategy } from '../services/backtest/strategies/DailyVAReversalStrategy';
 import { FVGVolumeStrategy } from '../services/backtest/strategies/FVGVolumeStrategy';
 import { OrderDirection, OrderType } from '@/api/tbank/ordersTypes';
+import { OptionDirection } from '@/api/tbank/instrumentsTypes';
 
 let orderManagerInstance: OrderManager | null = null;
 
@@ -662,27 +663,31 @@ export const registerTradingAssistantHandlers = () => {
     }
   });
 
-  ipcMain.handle('trading-assistant:close-position', async (_, instrumentUid: string, accountId: string, quantity: number) => {
+  ipcMain.handle('trading-assistant:close-position', async (_, instrumentUid: string, accountId: string, quantity: number, direction: string) => {
     const token = process.env.VITE_TSandBox || '';
     if (!token || !accountId || !instrumentUid || quantity <= 0) {
       return { success: false, error: 'Неверные параметры' };
     }
 
     try {
-      // Определяем направление: если у нас длинная позиция — продаём, короткая — покупаем
-      // Для простоты всегда отправляем SELL, если quantity > 0 (закрываем лонг)
-      // В реальности нужно смотреть тип позиции, но пока так
+      // Определяем направление для закрытия: SELL для лонга, BUY для шорта
+      const orderDirection = direction === 'long' ? OrderDirection.ORDER_DIRECTION_SELL : OrderDirection.ORDER_DIRECTION_BUY;
+
+      console.log(`[ClosePosition] Закрываем ${quantity} ${instrumentUid} по рынку, направление: ${orderDirection}`);
+
       const order = await sandboxGrpc.postSandboxOrder({
         instrumentId: instrumentUid,
-        direction: OrderDirection.ORDER_DIRECTION_SELL,  // или BUY для шорта
+        direction: orderDirection,
         orderType: OrderType.ORDER_TYPE_MARKET,
         quantity,
         accountId,
       }, token);
+
+      console.log(`[ClosePosition] Ордер отправлен: ${order.orderId}`);
       return { success: true, orderId: order.orderId };
     } catch (error: any) {
-      console.error('[ClosePosition]', error);
-      return { success: false, error: error.message };
+      console.error('[ClosePosition] Ошибка:', error);
+      return { success: false, error: error.message || 'Неизвестная ошибка' };
     }
   });
 };

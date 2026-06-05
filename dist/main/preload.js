@@ -192,7 +192,7 @@ try {
 		getPositions: (accountId) => electron.ipcRenderer.invoke("trading-assistant:get-positions", accountId),
 		getOrders: (accountId) => electron.ipcRenderer.invoke("trading-assistant:get-orders", accountId),
 		cancelOrder: (orderId, accountId) => electron.ipcRenderer.invoke("trading-assistant:cancel-order", orderId, accountId),
-		closePosition: (instrumentUid, accountId, quantity) => electron.ipcRenderer.invoke("trading-assistant:close-position", instrumentUid, accountId, quantity)
+		closePosition: (instrumentUid, accountId, quantity, direction) => electron.ipcRenderer.invoke("trading-assistant:close-position", instrumentUid, accountId, quantity, direction)
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {

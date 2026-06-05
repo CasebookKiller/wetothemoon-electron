@@ -3218,28 +3218,32 @@ var registerTradingAssistantHandlers = () => {
 			return [];
 		}
 	});
-	electron.ipcMain.handle("trading-assistant:close-position", async (_, instrumentUid, accountId, quantity) => {
+	electron.ipcMain.handle("trading-assistant:close-position", async (_, instrumentUid, accountId, quantity, direction) => {
 		const token = process.env.VITE_TSandBox || "";
 		if (!token || !accountId || !instrumentUid || quantity <= 0) return {
 			success: false,
 			error: "Неверные параметры"
 		};
 		try {
+			const orderDirection = direction === "long" ? OrderDirection.ORDER_DIRECTION_SELL : OrderDirection.ORDER_DIRECTION_BUY;
+			console.log(`[ClosePosition] Закрываем ${quantity} ${instrumentUid} по рынку, направление: ${orderDirection}`);
+			const order = await sandboxGrpc.postSandboxOrder({
+				instrumentId: instrumentUid,
+				direction: orderDirection,
+				orderType: OrderType.ORDER_TYPE_MARKET,
+				quantity,
+				accountId
+			}, token);
+			console.log(`[ClosePosition] Ордер отправлен: ${order.orderId}`);
 			return {
 				success: true,
-				orderId: (await sandboxGrpc.postSandboxOrder({
-					instrumentId: instrumentUid,
-					direction: OrderDirection.ORDER_DIRECTION_SELL,
-					orderType: OrderType.ORDER_TYPE_MARKET,
-					quantity,
-					accountId
-				}, token)).orderId
+				orderId: order.orderId
 			};
 		} catch (error) {
-			console.error("[ClosePosition]", error);
+			console.error("[ClosePosition] Ошибка:", error);
 			return {
 				success: false,
-				error: error.message
+				error: error.message || "Неизвестная ошибка"
 			};
 		}
 	});
