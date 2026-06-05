@@ -3255,13 +3255,20 @@ var registerTradingAssistantHandlers = () => {
 			nextCursor: ""
 		};
 		try {
-			const response = await sandboxGrpc.getSandboxOperationsByCursor({
+			const request = {
 				accountId,
-				from: from ? (/* @__PURE__ */ new Date(from + "T00:00:00Z")).toISOString() : void 0,
-				to: to ? (/* @__PURE__ */ new Date(to + "T23:59:59Z")).toISOString() : void 0,
-				cursor: cursor || void 0,
 				limit: 50
-			}, token);
+			};
+			if (from) request.from = {
+				seconds: Math.floor((/* @__PURE__ */ new Date(from + "T00:00:00Z")).getTime() / 1e3),
+				nanos: 0
+			};
+			if (to) request.to = {
+				seconds: Math.floor((/* @__PURE__ */ new Date(to + "T23:59:59Z")).getTime() / 1e3),
+				nanos: 0
+			};
+			if (cursor) request.cursor = cursor;
+			const response = await sandboxGrpc.getSandboxOperationsByCursor(request, token);
 			return {
 				operations: response.items || [],
 				hasMore: response.hasNext || false,
@@ -4031,6 +4038,23 @@ function connectOrderManager(manager) {
 	});
 }
 //#endregion
+//#region src/main/services/liveStrategyConnector.ts
+function connectLiveStrategy(instrumentUid, manager) {
+	const strategy = new VolumeAccumulationStrategy(instrumentUid, null, {
+		volumeFilterEnabled: false,
+		volumeFilterPeriod: 20
+	});
+	volumeProfileEngine.on("profileUpdate", (profile) => {
+		if (profile.instrumentUid === instrumentUid) strategy.updateProfile(profile);
+	});
+	marketDataBus.on("candle", (candle) => {
+		strategy.onCandle(candle);
+		const signals = strategy.getSignals();
+		for (const signal of signals) manager.processSignal(signal);
+		strategy.clearSignals();
+	});
+}
+//#endregion
 //#region src/main/main.ts
 var scriptsDir = path.default.join(electron.app.getPath("userData"), "scripts");
 if (!(0, fs.existsSync)(scriptsDir)) {
@@ -4115,6 +4139,7 @@ electron.app.whenReady().then(() => {
 	});
 	connectOrderManager(orderManager);
 	setOrderManagerInstance(orderManager);
+	connectLiveStrategy("e6123145-9665-43e0-8413-cd61b8aa9b13", orderManager);
 });
 electron.app.on("window-all-closed", () => {
 	if (process.platform !== "darwin") electron.app.quit();

@@ -55,6 +55,8 @@ import { OrderManager } from './services/orderManager';
 
 import { connectOrderManager } from './services/tradingConnector';
 import { setOrderManagerInstance } from './ipcHandlers/tradingAssistantHandlers';
+import { connectLiveStrategy } from './services/liveStrategyConnector';
+
 
 const scriptsDir = path.join(app.getPath('userData'), 'scripts');
 if (!existsSync(scriptsDir)) {
@@ -179,6 +181,8 @@ app.whenReady().then(() => {
   });
   connectOrderManager(orderManager);
   setOrderManagerInstance(orderManager);
+  // Подключаем live-стратегию для выбранного инструмента (пока захардкожен)
+  connectLiveStrategy('e6123145-9665-43e0-8413-cd61b8aa9b13', orderManager);
   // -------------------------------------------------
 });
 

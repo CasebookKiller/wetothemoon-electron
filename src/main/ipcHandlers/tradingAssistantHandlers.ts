@@ -696,13 +696,15 @@ export const registerTradingAssistantHandlers = () => {
     if (!token || !accountId) return { operations: [], hasMore: false, nextCursor: '' };
 
     try {
-      const response = await sandboxGrpc.getSandboxOperationsByCursor({
+      const request: any = {
         accountId,
-        from: from ? new Date(from + 'T00:00:00Z').toISOString() : undefined,
-        to: to ? new Date(to + 'T23:59:59Z').toISOString() : undefined,
-        cursor: cursor || undefined,
         limit: 50,
-      }, token);
+      };
+      if (from) request.from = { seconds: Math.floor(new Date(from + 'T00:00:00Z').getTime() / 1000), nanos: 0 };
+      if (to) request.to = { seconds: Math.floor(new Date(to + 'T23:59:59Z').getTime() / 1000), nanos: 0 };
+      if (cursor) request.cursor = cursor;
+
+      const response = await sandboxGrpc.getSandboxOperationsByCursor(request, token);
 
       return {
         operations: response.items || [],
@@ -714,4 +716,5 @@ export const registerTradingAssistantHandlers = () => {
       return { operations: [], hasMore: false, nextCursor: '' };
     }
   });
+
 };
