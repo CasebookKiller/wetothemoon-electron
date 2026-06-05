@@ -267,4 +267,8 @@ export class OrderManager {
       }
     }
   }
+
+  public getConfig(): Readonly<OrderManagerConfig> {
+    return this.config;
+  }
 }
