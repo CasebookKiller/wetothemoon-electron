@@ -126,6 +126,7 @@ export const TradingAssistantPage: React.FC = () => {
   });
   const [backtestCandlesData, setBacktestCandlesData] = useState<any[]>([]);
   const [backtestProfile, setBacktestProfile] = useState<any>(null);
+  const [showBacktestAdvanced, setShowBacktestAdvanced] = useState(false);
 
   const [showAdvanced, setShowAdvanced] = useState(false);
 
@@ -1039,8 +1040,9 @@ export const TradingAssistantPage: React.FC = () => {
         <TabPanel header="Backtest">
           <Card className="surface-ground p-0">
             <div className="p-2">
-              <div className="flex align-items-center flex-wrap">
-                <label className="mr-2 mb-0">Instr</label>
+              {/* Основная строка: инструмент, кнопка Run, результат */}
+              <div className="flex align-items-center flex-wrap gap-2">
+                <label className="mr-1 mb-0">Instr</label>
                 <Dropdown
                   value={selectedInstrument}
                   options={availableInstruments.map(i => ({ label: `${i.name} (${i.ticker})`, value: i.uid }))}
@@ -1048,6 +1050,7 @@ export const TradingAssistantPage: React.FC = () => {
                   placeholder="Select"
                   filter
                   className="p-inputtext-sm flex-1 mr-2"
+                  style={{ minWidth: '200px' }}
                 />
                 <Button
                   icon="pi pi-refresh"
@@ -1055,97 +1058,6 @@ export const TradingAssistantPage: React.FC = () => {
                   disabled={instrumentsLoading}
                   className="p-button-sm p-button-secondary p-1 px-3 mr-2"
                 />
-                <label className="mr-1 mb-0">From</label>
-                <InputText
-                  type="date"
-                  value={backtest.dateFrom}
-                  onChange={e => updateBacktest({ dateFrom: e.target.value })}
-                  className="p-inputtext-sm mr-2"
-                  style={{ width: '130px' }}
-                />
-                <label className="mr-1 mb-0">To</label>
-                <InputText
-                  type="date"
-                  value={backtest.dateTo}
-                  onChange={e => updateBacktest({ dateTo: e.target.value })}
-                  className="p-inputtext-sm mr-2"
-                  style={{ width: '130px' }}
-                />
-                <label className="mr-1 mb-0">Int</label>
-                <Dropdown
-                  value={backtest.interval}
-                  options={['1min','5min','15min','1hour']}
-                  onChange={e => updateBacktest({ interval: e.value })}
-                  className="p-inputtext-sm mr-2"
-                  style={{ width: '80px' }}
-                />
-                <label className="mr-1 mb-0">VA%</label>
-                <InputNumber
-                  value={backtest.valueAreaPercent}
-                  onValueChange={e => updateBacktest({ valueAreaPercent: e.value ?? 70 })}
-                  min={50} max={90} step={5}
-                  size={2}
-                  className="mr-2"
-                />
-                <label className="mr-1 mb-0">Res</label>
-                <InputNumber
-                  value={backtest.profileResolution}
-                  onValueChange={e => updateBacktest({ profileResolution: e.value ?? 50 })}
-                  min={10} max={200} step={10}
-                  size={2}
-                  className="mr-2"
-                />
-                <Button
-                  label={showAdvanced ? 'Hide Advanced' : 'Advanced'}
-                  onClick={() => setShowAdvanced(!showAdvanced)}
-                  className="p-button-sm p-button-secondary p-1 px-2 mr-2"
-                />
-                {showAdvanced && (
-                  <>
-                    <label className="mr-1 mb-0">SL%</label>
-                    <InputNumber value={backtest.stopLossPercent} onValueChange={e => updateBacktest({ stopLossPercent: e.value ?? 0 })} step={0.1} min={0} size={2} className="mr-2" />
-                    <label className="mr-1 mb-0">TP%</label>
-                    <InputNumber value={backtest.takeProfitPercent} onValueChange={e => updateBacktest({ takeProfitPercent: e.value ?? 0 })} step={0.1} min={0} size={2} className="mr-2" />
-                    <label className="mr-1 mb-0">Trail%</label>
-                    <InputNumber value={backtest.trailingDistancePercent} onValueChange={e => updateBacktest({ trailingDistancePercent: e.value ?? 0 })} step={0.1} min={0} size={2} className="mr-2" />
-                    <label className="mr-1 mb-0">Lots</label>
-                    <InputNumber value={backtest.lots} onValueChange={e => updateBacktest({ lots: e.value ?? 1 })} min={1} step={1} size={2} className="mr-2" />
-                    <label className="mr-1 mb-0">Size</label>
-                    <Dropdown value={backtest.positionSizing} options={['fixed','dynamic']} onChange={e => updateBacktest({ positionSizing: e.value })} className="p-inputtext-sm mr-2" style={{ width: '100px' }} />
-                    {backtest.positionSizing === 'dynamic' && (
-                      <>
-                        <label className="mr-1 mb-0">Risk%</label>
-                        <InputNumber value={backtest.riskPercent} onValueChange={e => updateBacktest({ riskPercent: e.value ?? 1 })} step={0.1} min={0} size={2} className="mr-2" />
-                      </>
-                    )}
-                  </>
-                )}
-              </div>
-              <div className="flex align-items-center flex-wrap mt-2">
-                <label className="mr-1 mb-0">Strat</label>
-                <Dropdown
-                  value={backtest.strategyType}
-                  options={['volume_accumulation', 'trend', 'poc_pullback', 'daily_va_return', 'fvg_volume']}
-                  onChange={e => updateBacktest({ strategyType: e.value })}
-                  className="p-inputtext-sm mr-2"
-                  style={{ width: '120px' }}
-                />
-                <label className="mr-1 mb-0">SL%</label>
-                <InputNumber value={backtest.stopLossPercent} onValueChange={e => updateBacktest({ stopLossPercent: e.value ?? 0 })} step={0.1} min={0} size={2} className="mr-2" />
-                <label className="mr-1 mb-0">TP%</label>
-                <InputNumber value={backtest.takeProfitPercent} onValueChange={e => updateBacktest({ takeProfitPercent: e.value ?? 0 })} step={0.1} min={0} size={2} className="mr-2" />
-                <label className="mr-1 mb-0">Trail%</label>
-                <InputNumber value={backtest.trailingDistancePercent} onValueChange={e => updateBacktest({ trailingDistancePercent: e.value ?? 0 })} step={0.1} min={0} size={2} className="mr-2" />
-                <label className="mr-1 mb-0">Lots</label>
-                <InputNumber value={backtest.lots} onValueChange={e => updateBacktest({ lots: e.value ?? 1 })} min={1} step={1} size={2} className="mr-2" />
-                <label className="mr-1 mb-0">Size</label>
-                <Dropdown value={backtest.positionSizing} options={['fixed','dynamic']} onChange={e => updateBacktest({ positionSizing: e.value })} className="p-inputtext-sm mr-2" style={{ width: '100px' }} />
-                {backtest.positionSizing === 'dynamic' && (
-                  <>
-                    <label className="mr-1 mb-0">Risk%</label>
-                    <InputNumber value={backtest.riskPercent} onValueChange={e => updateBacktest({ riskPercent: e.value ?? 1 })} step={0.1} min={0} size={2} className="mr-2" />
-                  </>
-                )}
                 <Button
                   label="Run"
                   onClick={runBacktest}
@@ -1156,9 +1068,68 @@ export const TradingAssistantPage: React.FC = () => {
                   label="Send to Sandbox"
                   onClick={sendBacktestToSandbox}
                   disabled={!backtest.signals.length}
-                  className="p-button-sm p-button-warning border-round-sm p-1 px-3"
+                  className="p-button-sm p-button-warning border-round-sm p-1 px-3 mr-2"
+                />
+                <Button
+                  label={showBacktestAdvanced ? 'Hide Advanced' : 'Advanced'}
+                  onClick={() => setShowBacktestAdvanced(!showBacktestAdvanced)}
+                  className="p-button-sm p-button-secondary p-1 px-2"
                 />
               </div>
+
+              {/* Расширенные параметры (скрыты по умолчанию) */}
+              {showBacktestAdvanced && (
+                <div className="flex align-items-center flex-wrap gap-2 mt-2">
+                  <label className="mr-1 mb-0">Int</label>
+                  <Dropdown
+                    value={backtest.interval}
+                    options={['1min','5min','15min','1hour']}
+                    onChange={e => updateBacktest({ interval: e.value })}
+                    className="p-inputtext-sm mr-2"
+                    style={{ width: '80px' }}
+                  />
+                  <label className="mr-1 mb-0">VA%</label>
+                  <InputNumber value={backtest.valueAreaPercent} onValueChange={e => updateBacktest({ valueAreaPercent: e.value ?? 70 })} min={50} max={90} step={5} size={2} className="mr-2" />
+                  <label className="mr-1 mb-0">Res</label>
+                  <InputNumber value={backtest.profileResolution} onValueChange={e => updateBacktest({ profileResolution: e.value ?? 50 })} min={10} max={200} step={10} size={2} className="mr-2" />
+                  <label className="mr-1 mb-0">Strat</label>
+                  <Dropdown
+                    value={backtest.strategyType}
+                    options={['volume_accumulation','trend','poc_pullback','daily_va_return','fvg_volume']}
+                    onChange={e => updateBacktest({ strategyType: e.value })}
+                    className="p-inputtext-sm mr-2"
+                    style={{ width: '120px' }}
+                  />
+                  <label className="mr-1 mb-0">SL%</label>
+                  <InputNumber value={backtest.stopLossPercent} onValueChange={e => updateBacktest({ stopLossPercent: e.value ?? 0 })} step={0.1} min={0} size={2} className="mr-2" />
+                  <label className="mr-1 mb-0">TP%</label>
+                  <InputNumber value={backtest.takeProfitPercent} onValueChange={e => updateBacktest({ takeProfitPercent: e.value ?? 0 })} step={0.1} min={0} size={2} className="mr-2" />
+                  <label className="mr-1 mb-0">Trail%</label>
+                  <InputNumber value={backtest.trailingDistancePercent} onValueChange={e => updateBacktest({ trailingDistancePercent: e.value ?? 0 })} step={0.1} min={0} size={2} className="mr-2" />
+                  <label className="mr-1 mb-0">Lots</label>
+                  <InputNumber value={backtest.lots} onValueChange={e => updateBacktest({ lots: e.value ?? 1 })} min={1} step={1} size={2} className="mr-2" />
+                  <label className="mr-1 mb-0">Size</label>
+                  <Dropdown value={backtest.positionSizing} options={['fixed','dynamic']} onChange={e => updateBacktest({ positionSizing: e.value })} className="p-inputtext-sm mr-2" style={{ width: '100px' }} />
+                  {backtest.positionSizing === 'dynamic' && (
+                    <>
+                      <label className="mr-1 mb-0">Risk%</label>
+                      <InputNumber value={backtest.riskPercent} onValueChange={e => updateBacktest({ riskPercent: e.value ?? 1 })} step={0.1} min={0} size={2} className="mr-2" />
+                    </>
+                  )}
+                  <div className="flex align-items-center">
+                    <Checkbox checked={backtest.volumeFilterEnabled} onChange={e => updateBacktest({ volumeFilterEnabled: e.checked })} />
+                    <label className="ml-1 mr-2 mb-0">VolFilt</label>
+                    {backtest.volumeFilterEnabled && (
+                      <>
+                        <label className="mr-1 mb-0">Per</label>
+                        <InputNumber value={backtest.volumeFilterPeriod} onValueChange={e => updateBacktest({ volumeFilterPeriod: e.value ?? 20 })} min={5} max={100} step={5} size={2} className="mr-2" />
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Результат бэктеста */}
               {backtest.result?.stats && (
                 <div className="mt-2">
                   <p className="text-sm" style={{ wordBreak: 'break-all' }}>
@@ -1180,13 +1151,13 @@ export const TradingAssistantPage: React.FC = () => {
                   label="Configure"
                   icon="pi pi-cog"
                   onClick={() => setShowBatchDialog(true)}
-                  className="p-button-sm p-button-secondary"
+                  className="p-button-sm p-button-secondary p-1 px-3"
                 />
                 <Button
                   label={batchRunning ? 'Running...' : 'Run'}
                   onClick={runBatch}
                   disabled={batchRunning || batchStopping}
-                  className="p-button-sm"
+                  className="p-button-sm p-1 px-3"
                   icon={batchRunning ? 'pi pi-spin pi-spinner' : ''}
                 />
                 {batchRunning && (
@@ -1194,14 +1165,14 @@ export const TradingAssistantPage: React.FC = () => {
                     label="Stop"
                     onClick={stopBatch}
                     disabled={batchStopping}
-                    className="p-button-sm p-button-danger"
+                    className="p-button-sm p-button-danger p-1 px-3"
                   />
                 )}
                 <Button
                   label="Export CSV"
                   onClick={exportCSV}
                   disabled={batchResults.length === 0 || batchRunning}
-                  className="p-button-sm p-button-secondary"
+                  className="p-button-sm p-button-secondary p-1 px-3"
                 />
                 <span className="ml-2 text-sm">{batchInstruments.length} instrument(s) selected</span>
               </div>
