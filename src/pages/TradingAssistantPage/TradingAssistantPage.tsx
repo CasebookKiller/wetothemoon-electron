@@ -10,6 +10,7 @@ import {
   createSeriesMarkers,
   ISeriesApi,
 } from 'lightweight-charts';
+
 import VolumeProfileBars from '@/components/TRADING_ASSISTANT/VolumeProfileBars/VolumeProfileBars';
 import './TradingAssistantPage.css';
 import { Button } from 'primereact/button';
@@ -26,6 +27,7 @@ import { VolumeProfileLevels } from '@/main/services/volumeProfileEngine';
 import { VolumeProfileOverlay } from '@/components/TRADING_ASSISTANT/VolumeProfileOverlay/VolumeProfileOverlay';
 import { PositionsOrdersTab } from '@/components/TRADING_ASSISTANT/PositionsOrdersTab/PositionsOrdersTab';
 import { LogTab } from '@/components/TRADING_ASSISTANT/LogTab/LogTab';
+import { CandlestickChart } from '@/components/TRADING_ASSISTANT/CandlestickChart/CandlestickChart';
 
 function quotationToNumber(q: any): number {
   if (!q) return 0;
@@ -195,6 +197,7 @@ export const TradingAssistantPage: React.FC = () => {
 
   const [positionMarkers, setPositionMarkers] = useState<any[]>([]);
   
+  const [chartLibrary, setChartLibrary] = useState<'lightweight' | 'chartjs'>('lightweight');
 
   // ========== REFS ДЛЯ ГРАФИКА ==========
   const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -1556,36 +1559,60 @@ export const TradingAssistantPage: React.FC = () => {
           className="p-inputtext-sm"
           style={{ width: '80px' }}
         />
+        <span className="mr-1">Chart:</span>
+        <Dropdown
+          value={chartLibrary}
+          options={['lightweight', 'chartjs']}
+          onChange={e => setChartLibrary(e.value)}
+          className="p-inputtext-sm"
+          style={{ width: '100px' }}
+        />
       </div>
+
       <div className="chart-row">
-        {/* Старый боковой профиль (по умолчанию) */}
-        {profileType === 'side' && currentProfile?.volumeByPrice && priceRange.max > 0 && (
-          <div className="volume-profile-container">
-            <VolumeProfileBars
-              data={currentProfile.volumeByPrice}
-              maxVolume={Math.max(...currentProfile.volumeByPrice.map((v: any) => v.volume))}
-              minPrice={priceRange.min}
-              maxPrice={priceRange.max}
-              height={400}
-              poc={currentProfile.poc}
-              vah={currentProfile.valueAreaHigh}
-              val={currentProfile.valueAreaLow}
-            />
-          </div>
+        {/* Старый график lightweight-charts */}
+        {chartLibrary === 'lightweight' && (
+          <>
+            {profileType === 'side' && currentProfile?.volumeByPrice && priceRange.max > 0 && (
+              <div className="volume-profile-container">
+                <VolumeProfileBars
+                  data={currentProfile.volumeByPrice}
+                  maxVolume={Math.max(...currentProfile.volumeByPrice.map((v: any) => v.volume))}
+                  minPrice={priceRange.min}
+                  maxPrice={priceRange.max}
+                  height={400}
+                  poc={currentProfile.poc}
+                  vah={currentProfile.valueAreaHigh}
+                  val={currentProfile.valueAreaLow}
+                />
+              </div>
+            )}
+            {profileType === 'overlay' && (
+              <VolumeProfileOverlay
+                volumeByPrice={currentProfile?.volumeByPrice}
+                poc={currentProfile?.poc}
+                vah={currentProfile?.valueAreaHigh}
+                val={currentProfile?.valueAreaLow}
+                visible={!!currentProfile?.volumeByPrice}
+              />
+            )}
+            <div className="chart-container" ref={chartContainerRef} />
+          </>
         )}
 
-        {/* Новый chart.js оверлей */}
-        {profileType === 'overlay' && (
-          <VolumeProfileOverlay
+        {/* Новый график Chart.js */}
+        {chartLibrary === 'chartjs' && (
+          <CandlestickChart
+            candlesData={currentCandles}
             volumeByPrice={currentProfile?.volumeByPrice}
             poc={currentProfile?.poc}
             vah={currentProfile?.valueAreaHigh}
             val={currentProfile?.valueAreaLow}
-            visible={!!currentProfile?.volumeByPrice}
+            signals={currentSignals}
+            trades={currentTrades}
+            positions={[]} // позже добавим позиции
           />
         )}
-
-        <div className="chart-container" ref={chartContainerRef} />
       </div>
     </div>
   );
