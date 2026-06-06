@@ -2725,6 +2725,154 @@ var OrderType = /* @__PURE__ */ function(OrderType) {
 	return OrderType;
 }({});
 //#endregion
+//#region src/main/services/backtest/strategies/TrendStrategyPro.ts
+var TrendStrategyPro = class {
+	signals = [];
+	dailyProfile = null;
+	instrumentUid;
+	prevCandle = null;
+	fvgList = [];
+	hasPosition = false;
+	constructor(instrumentUid, dailyProfile) {
+		this.instrumentUid = instrumentUid;
+		this.dailyProfile = dailyProfile;
+	}
+	reset() {
+		this.signals = [];
+		this.prevCandle = null;
+		this.fvgList = [];
+		this.hasPosition = false;
+	}
+	onCandle(candle) {
+		if (!this.dailyProfile || this.hasPosition) return;
+		const close = quotationToNumber$1(candle.close);
+		const time = candle.time || (/* @__PURE__ */ new Date()).toISOString();
+		const vah = this.dailyProfile.valueAreaHigh;
+		const val = this.dailyProfile.valueAreaLow;
+		const hvnLevels = this.dailyProfile.hvn || [];
+		if (this.prevCandle) {
+			const prevHigh = quotationToNumber$1(this.prevCandle.high);
+			const prevLow = quotationToNumber$1(this.prevCandle.low);
+			const curLow = quotationToNumber$1(candle.low);
+			const curHigh = quotationToNumber$1(candle.high);
+			if (curLow > prevHigh) this.fvgList.push({
+				type: "bullish",
+				top: curLow,
+				bottom: prevHigh,
+				time
+			});
+			else if (curHigh < prevLow) this.fvgList.push({
+				type: "bearish",
+				top: prevLow,
+				bottom: curHigh,
+				time
+			});
+		}
+		this.prevCandle = candle;
+		for (const fvg of this.fvgList) {
+			if (!hvnLevels.some((level) => level >= fvg.bottom && level <= fvg.top)) continue;
+			if (close > vah && fvg.type === "bullish") {
+				this.signals.push({
+					type: "BUY",
+					price: close,
+					time,
+					instrumentUid: this.instrumentUid,
+					reason: `Trend Pro: Bullish FVG + HVN above VAH`
+				});
+				this.hasPosition = true;
+				this.fvgList = [];
+				return;
+			}
+			if (close < val && fvg.type === "bearish") {
+				this.signals.push({
+					type: "SELL",
+					price: close,
+					time,
+					instrumentUid: this.instrumentUid,
+					reason: `Trend Pro: Bearish FVG + HVN below VAL`
+				});
+				this.hasPosition = true;
+				this.fvgList = [];
+				return;
+			}
+		}
+	}
+	getSignals() {
+		return this.signals;
+	}
+	clearSignals() {
+		this.signals = [];
+	}
+	updateProfile(profile) {
+		this.dailyProfile = profile;
+		this.fvgList = [];
+		this.prevCandle = null;
+		this.hasPosition = false;
+	}
+};
+//#endregion
+//#region src/main/services/backtest/strategies/RejectionStrategy.ts
+var RejectionStrategy = class {
+	signals = [];
+	dailyProfile = null;
+	instrumentUid;
+	hasPosition = false;
+	constructor(instrumentUid, dailyProfile) {
+		this.instrumentUid = instrumentUid;
+		this.dailyProfile = dailyProfile;
+	}
+	reset() {
+		this.signals = [];
+		this.hasPosition = false;
+	}
+	onCandle(candle) {
+		if (!this.dailyProfile || this.hasPosition) return;
+		const open = quotationToNumber$1(candle.open);
+		const high = quotationToNumber$1(candle.high);
+		const low = quotationToNumber$1(candle.low);
+		const close = quotationToNumber$1(candle.close);
+		const time = candle.time || (/* @__PURE__ */ new Date()).toISOString();
+		const body = Math.abs(close - open);
+		const upperWick = high - Math.max(open, close);
+		const lowerWick = Math.min(open, close) - low;
+		const totalRange = high - low;
+		if (totalRange === 0) return;
+		const isRejectionUp = lowerWick > totalRange * .6 && body < totalRange * .3;
+		const isRejectionDown = upperWick > totalRange * .6 && body < totalRange * .3;
+		if (!isRejectionUp && !isRejectionDown) return;
+		if (!(this.dailyProfile.hvn || []).some((level) => Math.abs(close - level) < 1)) return;
+		if (isRejectionDown) {
+			this.signals.push({
+				type: "SELL",
+				price: close,
+				time,
+				instrumentUid: this.instrumentUid,
+				reason: `Rejection down from HVN`
+			});
+			this.hasPosition = true;
+		} else if (isRejectionUp) {
+			this.signals.push({
+				type: "BUY",
+				price: close,
+				time,
+				instrumentUid: this.instrumentUid,
+				reason: `Rejection up from HVN`
+			});
+			this.hasPosition = true;
+		}
+	}
+	getSignals() {
+		return this.signals;
+	}
+	clearSignals() {
+		this.signals = [];
+	}
+	updateProfile(profile) {
+		this.dailyProfile = profile;
+		this.hasPosition = false;
+	}
+};
+//#endregion
 //#region src/main/ipcHandlers/tradingAssistantHandlers.ts
 var orderManagerInstance = null;
 var setOrderManagerInstance = (manager) => {
@@ -2770,6 +2918,8 @@ async function runBacktestInternal(instrumentUid, dateFrom, dateTo, intervalStr,
 				else if (strategyType === "poc_pullback") strategy = new POCPullbackStrategy(instrumentUid, profile);
 				else if (strategyType === "daily_va_return") strategy = new DailyVAReversalStrategy(instrumentUid, profile);
 				else if (strategyType === "fvg_volume") strategy = new FVGVolumeStrategy(instrumentUid, profile);
+				else if (strategyType === "trend_pro") strategy = new TrendStrategyPro(instrumentUid, profile);
+				else if (strategyType === "rejection") strategy = new RejectionStrategy(instrumentUid, profile);
 				else strategy = new VolumeAccumulationStrategy(instrumentUid, profile, {
 					volumeFilterEnabled: params.volumeFilterEnabled,
 					volumeFilterPeriod: params.volumeFilterPeriod
@@ -2873,6 +3023,10 @@ var registerTradingAssistantHandlers = () => {
 					let strategy;
 					if (strategyType === "trend") strategy = new TrendStrategy(instrumentUid, profile);
 					else if (strategyType === "poc_pullback") strategy = new POCPullbackStrategy(instrumentUid, profile);
+					else if (strategyType === "daily_va_return") strategy = new DailyVAReversalStrategy(instrumentUid, profile);
+					else if (strategyType === "fvg_volume") strategy = new FVGVolumeStrategy(instrumentUid, profile);
+					else if (strategyType === "trend_pro") strategy = new TrendStrategyPro(instrumentUid, profile);
+					else if (strategyType === "rejection") strategy = new RejectionStrategy(instrumentUid, profile);
 					else strategy = new VolumeAccumulationStrategy(instrumentUid, profile, {
 						volumeFilterEnabled: params.volumeFilterEnabled,
 						volumeFilterPeriod: params.volumeFilterPeriod

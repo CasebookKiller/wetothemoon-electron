@@ -20,6 +20,8 @@ import { DailyVAReversalStrategy } from '../services/backtest/strategies/DailyVA
 import { FVGVolumeStrategy } from '../services/backtest/strategies/FVGVolumeStrategy';
 import { OrderDirection, OrderType } from '@/api/tbank/ordersTypes';
 import { OptionDirection } from '@/api/tbank/instrumentsTypes';
+import { TrendStrategyPro } from '../services/backtest/strategies/TrendStrategyPro';
+import { RejectionStrategy } from '../services/backtest/strategies/RejectionStrategy';
 
 let orderManagerInstance: OrderManager | null = null;
 
@@ -87,6 +89,10 @@ async function runBacktestInternal(
           strategy = new DailyVAReversalStrategy(instrumentUid, profile);
         } else if (strategyType === 'fvg_volume') {
           strategy = new FVGVolumeStrategy(instrumentUid, profile);
+        } else if (strategyType === 'trend_pro') {
+          strategy = new TrendStrategyPro(instrumentUid, profile);
+        } else if (strategyType === 'rejection') {
+          strategy = new RejectionStrategy(instrumentUid, profile);
         } else {
           strategy = new VolumeAccumulationStrategy(instrumentUid, profile, {
             volumeFilterEnabled: params.volumeFilterEnabled,
@@ -240,6 +246,14 @@ export const registerTradingAssistantHandlers = () => {
             strategy = new TrendStrategy(instrumentUid, profile);
           } else if (strategyType === 'poc_pullback') {
             strategy = new POCPullbackStrategy(instrumentUid, profile);
+          } else if (strategyType === 'daily_va_return') {
+            strategy = new DailyVAReversalStrategy(instrumentUid, profile);
+          } else if (strategyType === 'fvg_volume') {
+            strategy = new FVGVolumeStrategy(instrumentUid, profile);
+          } else if (strategyType === 'trend_pro') {
+            strategy = new TrendStrategyPro(instrumentUid, profile);
+          } else if (strategyType === 'rejection') {
+            strategy = new RejectionStrategy(instrumentUid, profile);
           } else {
             strategy = new VolumeAccumulationStrategy(instrumentUid, profile, {
               volumeFilterEnabled: params.volumeFilterEnabled,

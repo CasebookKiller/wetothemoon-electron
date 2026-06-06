@@ -1084,7 +1084,7 @@ export const TradingAssistantPage: React.FC = () => {
                   <label className="mr-1 mb-0">Strat</label>
                   <Dropdown
                     value={backtest.strategyType}
-                    options={['volume_accumulation','trend','poc_pullback','daily_va_return','fvg_volume']}
+                    options={['volume_accumulation', 'trend', 'poc_pullback', 'daily_va_return', 'fvg_volume', 'trend_pro', 'rejection']}
                     onChange={e => updateBacktest({ strategyType: e.value })}
                     className="p-inputtext-sm mr-2"
                     style={{ width: '120px' }}
@@ -1253,7 +1253,7 @@ export const TradingAssistantPage: React.FC = () => {
                 <label>Strategy</label>
                 <Dropdown
                   value={batchParams.strategyType}
-                  options={['volume_accumulation', 'trend', 'poc_pullback', 'daily_va_return', 'fvg_volume']}
+                  options={['volume_accumulation', 'trend', 'poc_pullback', 'daily_va_return', 'fvg_volume', 'trend_pro', 'rejection']}
                   onChange={e => setBatchParams({ ...batchParams, strategyType: e.value })}
                   className="p-inputtext-sm"
                 />
