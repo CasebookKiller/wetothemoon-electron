@@ -14,8 +14,9 @@ import {
 import { CandlestickController, CandlestickElement } from 'chartjs-chart-financial';
 import { Chart } from 'react-chartjs-2';
 import 'chartjs-adapter-luxon';
+import zoomPlugin from 'chartjs-plugin-zoom';
 
-// Регистрируем все компоненты
+// Регистрируем все необходимые компоненты
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -27,13 +28,27 @@ ChartJS.register(
   CandlestickElement,
   Tooltip,
   Legend,
+  Filler,
+  zoomPlugin
+);
+
+import 'chartjs-adapter-luxon';
+
+
+ChartJS.register(
+  TimeScale,
+  LinearScale,
+  LineElement,
+  PointElement,
+  CandlestickController,
+  CandlestickElement,
+  Tooltip,
+  Legend,
   Filler
 );
 
-
 interface CandlestickChartProps {
   candlesData: Array<{ time: number; open: number; high: number; low: number; close: number }>;
-  volumeByPrice?: Array<{ price: number; volume: number }>;
   poc?: number;
   vah?: number;
   val?: number;
@@ -44,7 +59,6 @@ interface CandlestickChartProps {
 
 export const CandlestickChart: React.FC<CandlestickChartProps> = ({
   candlesData,
-  volumeByPrice = [],
   poc,
   vah,
   val,
@@ -52,37 +66,38 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
   trades = [],
   positions = [],
 }) => {
-  const chartRef = useRef<ChartJS>(null);
-
-  // Преобразуем время в ISO-строки для оси X
-  const labels = candlesData.map(c => new Date(c.time * 1000).toISOString());
-
-  // Данные для свечей
+  // Данные для свечей (время в миллисекундах)
   const candlestickData = candlesData.map(c => ({
-    x: new Date(c.time * 1000).toISOString(),
+    x: c.time * 1000,
     o: c.open,
     h: c.high,
     l: c.low,
     c: c.close,
   }));
 
-  // Данные для профиля объёма (горизонтальные бары)
-  const sortedProfile = [...volumeByPrice].sort((a, b) => b.price - a.price);
-  const profileLabels = sortedProfile.map(item => item.price.toFixed(2));
-  const profileVolumes = sortedProfile.map(item => item.volume);
-  const maxVolume = Math.max(...profileVolumes);
-  const profileColors = sortedProfile.map(item => {
-    const opacity = item.volume / maxVolume;
-    return `rgba(38, 166, 154, ${opacity.toFixed(2)})`;
-  });
+  // Готовим датасеты
+  const datasets: any[] = [
+    {
+      label: 'Candles',
+      type: 'candlestick',
+      data: candlestickData,
+      yAxisID: 'y',
+    },
+  ];
 
-  // Линии POC, VAH, VAL
-  const lineDatasets: any[] = [];
+  // Горизонтальные линии POC, VAH, VAL
+  const timeRange = candlesData.length > 0
+    ? [candlesData[0].time * 1000, candlesData[candlesData.length - 1].time * 1000]
+    : [0, 0];
+
   if (poc !== undefined) {
-    lineDatasets.push({
+    datasets.push({
       label: 'POC',
-      type: 'line' as const,
-      data: labels.map(() => poc),
+      type: 'line',
+      data: [
+        { x: timeRange[0], y: poc },
+        { x: timeRange[1], y: poc },
+      ],
       borderColor: 'red',
       borderWidth: 2,
       pointRadius: 0,
@@ -90,11 +105,15 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
       yAxisID: 'y',
     });
   }
+
   if (vah !== undefined) {
-    lineDatasets.push({
+    datasets.push({
       label: 'VAH',
-      type: 'line' as const,
-      data: labels.map(() => vah),
+      type: 'line',
+      data: [
+        { x: timeRange[0], y: vah },
+        { x: timeRange[1], y: vah },
+      ],
       borderColor: 'green',
       borderWidth: 1,
       borderDash: [4, 4],
@@ -103,11 +122,15 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
       yAxisID: 'y',
     });
   }
+
   if (val !== undefined) {
-    lineDatasets.push({
+    datasets.push({
       label: 'VAL',
-      type: 'line' as const,
-      data: labels.map(() => val),
+      type: 'line',
+      data: [
+        { x: timeRange[0], y: val },
+        { x: timeRange[1], y: val },
+      ],
       borderColor: 'green',
       borderWidth: 1,
       borderDash: [4, 4],
@@ -118,94 +141,54 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
   }
 
   // Маркеры сигналов
-  const signalScatters = signals.map((sig, idx) => ({
-    label: idx === 0 ? 'Signals' : '',
-    type: 'scatter' as const,
-    data: signals.map(s => ({
-      x: new Date(s.time).toISOString(),
-      y: s.price,
-    })),
-    backgroundColor: signals.map(s => s.type === 'BUY' ? 'green' : 'red'),
-    borderColor: signals.map(s => s.type === 'BUY' ? 'darkgreen' : 'darkred'),
-    borderWidth: 1,
-    pointRadius: 5,
-    pointStyle: 'circle',
-    showLine: false,
-    yAxisID: 'y',
-    tooltip: {
-      callbacks: {
-        label: (context: any) => `${signals[context.dataIndex]?.type} @ ${signals[context.dataIndex]?.price}`,
-      },
-    },
-  }));
-
-  // Маркеры выходов (сделок)
-  const tradeMarkers = trades.map((t, idx) => ({
-    label: idx === 0 ? 'Exits' : '',
-    type: 'scatter' as const,
-    data: trades.map(trade => ({
-      x: new Date(trade.exitTime).toISOString(),
-      y: trade.exitPrice,
-    })),
-    backgroundColor: trades.map(trade => {
-      switch (trade.exitReason) {
-        case 'TAKE_PROFIT': return '#4caf50';
-        case 'STOP_LOSS': return '#f44336';
-        case 'TRAILING_STOP': return '#2196f3';
-        case 'END_OF_DAY': return '#ffeb3b';
-        default: return '#9e9e9e';
-      }
-    }),
-    pointRadius: 4,
-    pointStyle: 'rectRot',
-    showLine: false,
-    yAxisID: 'y',
-    tooltip: {
-      callbacks: {
-        label: (context: any) => `${trades[context.dataIndex]?.exitReason} @ ${trades[context.dataIndex]?.exitPrice}`,
-      },
-    },
-  }));
-
-  // Объединяем все датасеты
-  const datasets = [
-    // Профиль объёма (бары)
-    {
-      label: 'Volume',
-      type: 'bar' as const,
-      data: profileVolumes,
-      backgroundColor: profileColors,
-      borderColor: 'rgba(38, 166, 154, 0.5)',
-      borderWidth: 0.5,
-      barPercentage: 1.0,
-      categoryPercentage: 1.0,
+  if (signals.length > 0) {
+    datasets.push({
+      label: 'Signals',
+      type: 'scatter',
+      data: signals.map(s => ({
+        x: new Date(s.time).getTime(),
+        y: s.price,
+      })),
+      backgroundColor: signals.map(s => s.type === 'BUY' ? 'green' : 'red'),
+      borderColor: signals.map(s => s.type === 'BUY' ? 'darkgreen' : 'darkred'),
+      borderWidth: 1,
+      pointRadius: 5,
+      pointStyle: 'circle',
+      showLine: false,
       yAxisID: 'y',
-      xAxisID: 'x1',
-    },
-    // Свечи
-    {
-      label: 'Candles',
-      type: 'candlestick' as const,
-      data: candlestickData,
+    });
+  }
+
+  // Маркеры выходов
+  if (trades.length > 0) {
+    datasets.push({
+      label: 'Exits',
+      type: 'scatter',
+      data: trades.map(t => ({
+        x: new Date(t.exitTime).getTime(),
+        y: t.exitPrice,
+      })),
+      backgroundColor: trades.map(t => {
+        switch (t.exitReason) {
+          case 'TAKE_PROFIT': return '#4caf50';
+          case 'STOP_LOSS': return '#f44336';
+          case 'TRAILING_STOP': return '#2196f3';
+          case 'END_OF_DAY': return '#ffeb3b';
+          default: return '#9e9e9e';
+        }
+      }),
+      pointRadius: 4,
+      pointStyle: 'rectRot',
+      showLine: false,
       yAxisID: 'y',
-    },
-    // Линии уровней
-    ...lineDatasets,
-    // Маркеры сигналов
-    ...signalScatters,
-    // Маркеры выходов
-    ...tradeMarkers,
-  ];
+    });
+  }
 
   return (
-    <div style={{ width: '100%', height: '400px', position: 'relative' }}>
+    <div style={{ width: '100%', height: '400px' }}>
       <Chart
-        ref={chartRef}
-        type="bar" // базовый тип, но каждый датасет имеет свой type
-        data={{
-          labels: profileLabels.length > 0 ? profileLabels : labels,
-          datasets,
-        }}
+        type="candlestick"
+        data={{ datasets }}
         options={{
           responsive: true,
           maintainAspectRatio: false,
@@ -215,20 +198,26 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
               mode: 'index',
               intersect: false,
             },
+            zoom: {
+              zoom: {
+                wheel: { enabled: true },
+                pinch: { enabled: true },
+                mode: 'xy',
+              },
+              pan: {
+                enabled: true,
+                mode: 'xy',
+              },
+            },
           },
+          
           scales: {
             x: {
-              display: true,
               type: 'timeseries',
               time: {
                 unit: 'minute',
                 displayFormats: { minute: 'HH:mm' },
               },
-              grid: { display: false },
-            },
-            x1: {
-              display: false, // скрытая ось для баров профиля
-              position: 'left',
               grid: { display: false },
             },
             y: {
@@ -237,6 +226,17 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
               ticks: { color: '#d1d4dc' },
             },
           },
+          // Встроенный зум и панорамирование (без дополнительных плагинов)
+          interaction: {
+            mode: 'nearest',
+            axis: 'xy',
+            intersect: false,
+          },
+          // Разрешаем изменение масштаба колёсиком мыши
+          // Для этого нужно зарегистрировать плагин zoom (уже есть в chart.js?)
+          // Пока используем встроенные возможности: chart.js поддерживает wheel для масштабирования, если включить опцию:
+          // Но для wheel нужно использовать chartjs-plugin-zoom. Установим позже.
+          // Пока график будет просто растягиваться.
         }}
       />
     </div>
