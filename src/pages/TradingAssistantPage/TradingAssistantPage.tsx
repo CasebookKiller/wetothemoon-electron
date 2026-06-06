@@ -174,9 +174,9 @@ export const TradingAssistantPage: React.FC = () => {
   const [showBatchDialog, setShowBatchDialog] = useState(false);
   const [viewMode, setViewMode] = useState<'live' | 'backtest'>('live');
 
-
   // Профиль и сигналы (пустые, будут наполняться позже)
   const [profile, setProfile] = useState<any>(null);
+  const [profileType, setProfileType] = useState<'side' | 'overlay'>('side');
   const [liveSignals, setLiveSignals] = useState<any[]>([]);
   const [autoTrading, setAutoTrading] = useState(false);
   const [selectedInstrument, setSelectedInstrument] = useState('e6123145-9665-43e0-8413-cd61b8aa9b13');
@@ -1544,9 +1544,22 @@ export const TradingAssistantPage: React.FC = () => {
           className={`p-button-sm p-1 px-3 ${viewMode === 'backtest' ? 'p-button-primary' : 'p-button-secondary'}`}
           disabled={!backtestCandlesData.length}
         />
+
+        {/* Разделитель */}
+        <div style={{ borderLeft: '1px solid #555', height: '24px', margin: '0 8px' }} />
+
+        <span className="mr-1">Profile:</span>
+        <Dropdown
+          value={profileType}
+          options={['side', 'overlay']}
+          onChange={e => setProfileType(e.value)}
+          className="p-inputtext-sm"
+          style={{ width: '80px' }}
+        />
       </div>
       <div className="chart-row">
-        {currentProfile?.volumeByPrice && priceRange.max > 0 && (
+        {/* Старый боковой профиль (по умолчанию) */}
+        {profileType === 'side' && currentProfile?.volumeByPrice && priceRange.max > 0 && (
           <div className="volume-profile-container">
             <VolumeProfileBars
               data={currentProfile.volumeByPrice}
@@ -1560,6 +1573,18 @@ export const TradingAssistantPage: React.FC = () => {
             />
           </div>
         )}
+
+        {/* Новый chart.js оверлей */}
+        {profileType === 'overlay' && (
+          <VolumeProfileOverlay
+            volumeByPrice={currentProfile?.volumeByPrice}
+            poc={currentProfile?.poc}
+            vah={currentProfile?.valueAreaHigh}
+            val={currentProfile?.valueAreaLow}
+            visible={!!currentProfile?.volumeByPrice}
+          />
+        )}
+
         <div className="chart-container" ref={chartContainerRef} />
       </div>
     </div>
