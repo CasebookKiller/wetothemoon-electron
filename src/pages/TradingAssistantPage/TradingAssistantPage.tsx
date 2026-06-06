@@ -1572,7 +1572,7 @@ export const TradingAssistantPage: React.FC = () => {
     
       {/* Старый график lightweight-charts */}
       {chartLibrary === 'lightweight' && (
-        <>
+        <div className="chart-row">
           {profileType === 'side' && currentProfile?.volumeByPrice && priceRange.max > 0 && (
             <div className="volume-profile-container">
               <VolumeProfileBars
@@ -1597,9 +1597,8 @@ export const TradingAssistantPage: React.FC = () => {
             />
           )}
           <div className="chart-container" ref={chartContainerRef} />
-        </>
+        </div>
       )}
-
       {/* Новый график Chart.js */}
       {chartLibrary === 'chartjs' && (
         <div className="chart-row">
@@ -1629,47 +1628,6 @@ export const TradingAssistantPage: React.FC = () => {
           
           {/* Основной график */}
           <div className="chart-container" style={{ flex: 1, minWidth: 0, height: 400 }}>
-            <CandlestickChart
-              candlesData={aggregateCandles(currentCandles, stream.displayTimeframe)}
-              poc={currentProfile?.poc}
-              vah={currentProfile?.valueAreaHigh}
-              val={currentProfile?.valueAreaLow}
-              signals={currentSignals}
-              trades={currentTrades}
-              positions={[]}
-            />
-          </div>
-        </div>
-      )}
-      {chartLibrary === 'chartjs' && (
-        <div style={{ display: 'flex' }}>
-          {/* Боковой профиль (старый или новый) */}
-          {profileType === 'side' && currentProfile?.volumeByPrice && priceRange.max > 0 && (
-            <div className="volume-profile-container">
-              <VolumeProfileBars
-                data={currentProfile.volumeByPrice}
-                maxVolume={Math.max(...currentProfile.volumeByPrice.map((v: any) => v.volume))}
-                minPrice={priceRange.min}
-                maxPrice={priceRange.max}
-                height={400}
-                poc={currentProfile.poc}
-                vah={currentProfile.valueAreaHigh}
-                val={currentProfile.valueAreaLow}
-              />
-            </div>
-          )}
-          {profileType === 'overlay' && (
-            <VolumeProfileOverlay
-              volumeByPrice={currentProfile?.volumeByPrice}
-              poc={currentProfile?.poc}
-              vah={currentProfile?.valueAreaHigh}
-              val={currentProfile?.valueAreaLow}
-              visible={!!currentProfile?.volumeByPrice}
-            />
-          )}
-
-          {/* Основной график */}
-          <div style={{ flex: 1, minWidth: 0 }}>
             <CandlestickChart
               candlesData={aggregateCandles(currentCandles, stream.displayTimeframe)}
               poc={currentProfile?.poc}

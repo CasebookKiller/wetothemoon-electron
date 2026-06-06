@@ -1,10 +1,8 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import {
   Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
   TimeScale,
-  BarElement,
+  LinearScale,
   LineElement,
   PointElement,
   Tooltip,
@@ -14,26 +12,6 @@ import {
 import { CandlestickController, CandlestickElement } from 'chartjs-chart-financial';
 import { Chart } from 'react-chartjs-2';
 import 'chartjs-adapter-luxon';
-import zoomPlugin from 'chartjs-plugin-zoom';
-
-// Регистрируем все необходимые компоненты
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  TimeScale,
-  BarElement,
-  LineElement,
-  PointElement,
-  CandlestickController,
-  CandlestickElement,
-  Tooltip,
-  Legend,
-  Filler,
-  zoomPlugin
-);
-
-import 'chartjs-adapter-luxon';
-
 
 ChartJS.register(
   TimeScale,
@@ -55,6 +33,7 @@ interface CandlestickChartProps {
   signals?: Array<{ time: string; type: string; price: number; reason: string }>;
   trades?: Array<{ entryTime: string; exitTime: string; entryPrice: number; exitPrice: number; type: string; exitReason: string }>;
   positions?: Array<{ instrumentUid: string; averagePositionPrice: any; quantity: any; ticker?: string }>;
+  onVisiblePriceRangeChange?: (min: number, max: number) => void;
 }
 
 export const CandlestickChart: React.FC<CandlestickChartProps> = ({
@@ -65,8 +44,8 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
   signals = [],
   trades = [],
   positions = [],
+  onVisiblePriceRangeChange,
 }) => {
-  // Данные для свечей (время в миллисекундах)
   const candlestickData = candlesData.map(c => ({
     x: c.time * 1000,
     o: c.open,
@@ -75,7 +54,10 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
     c: c.close,
   }));
 
-  // Готовим датасеты
+  const timeRange = candlesData.length > 0
+    ? [candlesData[0].time * 1000, candlesData[candlesData.length - 1].time * 1000]
+    : [0, 0];
+
   const datasets: any[] = [
     {
       label: 'Candles',
@@ -85,11 +67,7 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
     },
   ];
 
-  // Горизонтальные линии POC, VAH, VAL
-  const timeRange = candlesData.length > 0
-    ? [candlesData[0].time * 1000, candlesData[candlesData.length - 1].time * 1000]
-    : [0, 0];
-
+  // Линии уровней
   if (poc !== undefined) {
     datasets.push({
       label: 'POC',
@@ -105,7 +83,6 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
       yAxisID: 'y',
     });
   }
-
   if (vah !== undefined) {
     datasets.push({
       label: 'VAH',
@@ -122,7 +99,6 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
       yAxisID: 'y',
     });
   }
-
   if (val !== undefined) {
     datasets.push({
       label: 'VAL',
@@ -140,7 +116,7 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
     });
   }
 
-  // Маркеры сигналов
+  // Маркеры сигналов и выходов
   if (signals.length > 0) {
     datasets.push({
       label: 'Signals',
@@ -158,8 +134,6 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
       yAxisID: 'y',
     });
   }
-
-  // Маркеры выходов
   if (trades.length > 0) {
     datasets.push({
       label: 'Exits',
@@ -194,23 +168,8 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
           maintainAspectRatio: false,
           plugins: {
             legend: { display: false },
-            tooltip: {
-              mode: 'index',
-              intersect: false,
-            },
-            zoom: {
-              zoom: {
-                wheel: { enabled: true },
-                pinch: { enabled: true },
-                mode: 'xy',
-              },
-              pan: {
-                enabled: true,
-                mode: 'xy',
-              },
-            },
+            tooltip: { mode: 'index', intersect: false },
           },
-          
           scales: {
             x: {
               type: 'timeseries',
@@ -226,17 +185,6 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
               ticks: { color: '#d1d4dc' },
             },
           },
-          // Встроенный зум и панорамирование (без дополнительных плагинов)
-          interaction: {
-            mode: 'nearest',
-            axis: 'xy',
-            intersect: false,
-          },
-          // Разрешаем изменение масштаба колёсиком мыши
-          // Для этого нужно зарегистрировать плагин zoom (уже есть в chart.js?)
-          // Пока используем встроенные возможности: chart.js поддерживает wheel для масштабирования, если включить опцию:
-          // Но для wheel нужно использовать chartjs-plugin-zoom. Установим позже.
-          // Пока график будет просто растягиваться.
         }}
       />
     </div>
