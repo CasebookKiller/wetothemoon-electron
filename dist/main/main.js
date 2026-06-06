@@ -3021,7 +3021,10 @@ var registerTradingAssistantHandlers = () => {
 					candles.forEach((c) => engine.onCandle?.(c));
 					const profile = engine.getProfile(instrumentUid);
 					let strategy;
-					if (strategyType === "trend") strategy = new TrendStrategy(instrumentUid, profile);
+					if (strategyType === "trend") strategy = new TrendStrategy(instrumentUid, profile, {
+						volumeFilterEnabled: params.volumeFilterEnabled,
+						volumeFilterPeriod: params.volumeFilterPeriod
+					});
 					else if (strategyType === "poc_pullback") strategy = new POCPullbackStrategy(instrumentUid, profile);
 					else if (strategyType === "daily_va_return") strategy = new DailyVAReversalStrategy(instrumentUid, profile);
 					else if (strategyType === "fvg_volume") strategy = new FVGVolumeStrategy(instrumentUid, profile);

@@ -243,7 +243,10 @@ export const registerTradingAssistantHandlers = () => {
           // Создаём стратегию в зависимости от выбора
           let strategy: IBacktestStrategy;
           if (strategyType === 'trend') {
-            strategy = new TrendStrategy(instrumentUid, profile);
+            strategy = new TrendStrategy(instrumentUid, profile, {
+              volumeFilterEnabled: params.volumeFilterEnabled,
+              volumeFilterPeriod: params.volumeFilterPeriod,
+            });
           } else if (strategyType === 'poc_pullback') {
             strategy = new POCPullbackStrategy(instrumentUid, profile);
           } else if (strategyType === 'daily_va_return') {
@@ -255,6 +258,7 @@ export const registerTradingAssistantHandlers = () => {
           } else if (strategyType === 'rejection') {
             strategy = new RejectionStrategy(instrumentUid, profile);
           } else {
+            // volume_accumulation (по умолчанию)
             strategy = new VolumeAccumulationStrategy(instrumentUid, profile, {
               volumeFilterEnabled: params.volumeFilterEnabled,
               volumeFilterPeriod: params.volumeFilterPeriod,
