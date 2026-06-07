@@ -266,6 +266,10 @@ try {
 
     saveJson: (data: any, defaultName: string) => ipcRenderer.invoke('trading-assistant:save-json', data, defaultName),
 
+    // Скринер
+    screenerRun: (filters: any, token: string) =>
+      ipcRenderer.invoke('trading-assistant:screener-run', filters, token),
+
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

@@ -1,4 +1,4 @@
-// src/main/services/tbank/InstrumentsService.ts
+// src/main/services/tbank/InstrumentsGrpcService.ts
 import { createGrpcClient, createMetadata } from '@/main/utils/grpcHelper';
 import type {
   InstrumentRequest,

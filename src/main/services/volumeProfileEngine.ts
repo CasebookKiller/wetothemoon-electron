@@ -39,6 +39,7 @@ export interface VolumeProfileConfig {
   lvnMultiplier: number;      // множитель для определения LVN (по умолчанию 0.5)
   minVolumeThreshold: number; // минимальный объём для учёта уровня
   profileResolution: number;   // <-- новое поле (по умолчанию 50)
+  skipAutoSubscribe?: boolean;
 }
 
 const DEFAULT_CONFIG: VolumeProfileConfig = {
@@ -70,8 +71,10 @@ export class VolumeProfileEngine extends EventEmitter {
     this.config = { ...DEFAULT_CONFIG, ...config };
 
     // Подписываемся на события шины
-    marketDataBus.onCandle(this.onCandle.bind(this));
-    marketDataBus.onTrade(this.onTrade.bind(this));
+    if (!this.config.skipAutoSubscribe) {
+      marketDataBus.onCandle(this.onCandle.bind(this));
+      marketDataBus.onTrade(this.onTrade.bind(this));
+    }
   }
 
   /*
@@ -445,6 +448,13 @@ export class VolumeProfileEngine extends EventEmitter {
   // Замена метода recalculateProfile на новый (можно просто переименовать)
   private onCandleWithCache(candle: StreamCandle): void {
     // ... (копия onCandle, но вместо recalculateProfile вызываем recalculateProfileWithCache)
+  }
+
+  // Позволяет подать свечу вручную (для построения профиля без стрима).
+  // Используется скринером и бэктестером.
+  public feedCandle(candle: StreamCandle): void {
+    // вызываем существующую приватную логику
+    this.onCandle(candle);
   }
 }
 // Экспортируем singleton (создаётся один экземпляр при импорте)

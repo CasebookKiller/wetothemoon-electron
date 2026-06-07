@@ -31,6 +31,7 @@ import { CandlestickChart } from '@/components/TRADING_ASSISTANT/CandlestickChar
 import { AmChartsStockChart } from '@/components/TRADING_ASSISTANT/AmChartsStockChart/AmChartsStockChart';
 import { EquityChart } from '@/components/TRADING_ASSISTANT/EquityChart/EquityChart';
 import { TradesTab } from '@/components/TRADING_ASSISTANT/TradesTab/TradesTab';
+import { ScreenerTab } from '@/components/TRADING_ASSISTANT/ScreenerTab/ScreenerTab';
 
 function quotationToNumber(q: any): number {
   if (!q) return 0;
@@ -1505,6 +1506,11 @@ export const TradingAssistantPage: React.FC = () => {
         {/* ========== POS/ORDERS ======== */}
         <TabPanel header="Log">
           <LogTab accountId={sandbox.accountId} />
+        </TabPanel>
+
+        {/* ========== SCREENER ========== */}
+        <TabPanel header="Screener">
+          <ScreenerTab token={stream.token} />
         </TabPanel>
       </TabView>
       <div className="flex align-items-center flex-wrap mt-2 mb-2 gap-2 w-full">

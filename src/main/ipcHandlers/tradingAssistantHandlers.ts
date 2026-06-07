@@ -24,6 +24,7 @@ import { TrendStrategyPro } from '../services/backtest/strategies/TrendStrategyP
 import { RejectionStrategy } from '../services/backtest/strategies/RejectionStrategy';
 
 import * as fs from 'fs';
+import { ScreenerService } from '../services/screenerService';
 
 let orderManagerInstance: OrderManager | null = null;
 
@@ -751,4 +752,14 @@ export const registerTradingAssistantHandlers = () => {
     }
   });
 
+  // -- Скринер инструментов --
+  ipcMain.handle('trading-assistant:screener-run', async (_event, filters: any, token: string) => {
+    if (!token) {
+      console.warn('screener:run token is empty');
+      return [];
+    }
+    const loader = new HistoricalDataLoader();
+    const screener = new ScreenerService(loader, () => token); // ← убрали третий аргумент
+    return await screener.screen(filters);
+  });
 };
