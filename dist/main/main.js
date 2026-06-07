@@ -3453,6 +3453,31 @@ var registerTradingAssistantHandlers = () => {
 			};
 		}
 	});
+	electron.ipcMain.handle("trading-assistant:save-json", async (_, data, defaultName) => {
+		const { filePath } = await electron.dialog.showSaveDialog({
+			defaultPath: defaultName,
+			filters: [{
+				name: "JSON Files",
+				extensions: ["json"]
+			}]
+		});
+		if (!filePath) return {
+			success: false,
+			error: "Отменено пользователем"
+		};
+		try {
+			fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
+			return {
+				success: true,
+				filePath
+			};
+		} catch (e) {
+			return {
+				success: false,
+				error: e.message
+			};
+		}
+	});
 };
 //#endregion
 //#region src/shared/types/promptgenerator.ts

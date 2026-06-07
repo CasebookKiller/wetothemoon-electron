@@ -263,6 +263,9 @@ try {
 
     getOperations: (accountId: string, from: string, to: string, cursor: string) =>
       ipcRenderer.invoke('trading-assistant:get-operations', accountId, from, to, cursor),
+
+    saveJson: (data: any, defaultName: string) => ipcRenderer.invoke('trading-assistant:save-json', data, defaultName),
+
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

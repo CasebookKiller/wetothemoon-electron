@@ -29,6 +29,8 @@ import { PositionsOrdersTab } from '@/components/TRADING_ASSISTANT/PositionsOrde
 import { LogTab } from '@/components/TRADING_ASSISTANT/LogTab/LogTab';
 import { CandlestickChart } from '@/components/TRADING_ASSISTANT/CandlestickChart/CandlestickChart';
 import { AmChartsStockChart } from '@/components/TRADING_ASSISTANT/AmChartsStockChart/AmChartsStockChart';
+import { EquityChart } from '@/components/TRADING_ASSISTANT/EquityChart/EquityChart';
+import { TradesTab } from '@/components/TRADING_ASSISTANT/TradesTab/TradesTab';
 
 function quotationToNumber(q: any): number {
   if (!q) return 0;
@@ -1125,11 +1127,37 @@ export const TradingAssistantPage: React.FC = () => {
               {/* Результат бэктеста */}
               {backtest.result?.stats && (
                 <div className="mt-2">
-                  <p className="text-sm" style={{ wordBreak: 'break-all' }}>
+                  <div className="text-sm align-items-center" style={{ wordBreak: 'break-all' }}>
                     Strategy: {backtest.strategyType} | Period: {backtest.dateFrom} – {backtest.dateTo} | Signals: {backtest.result.stats.totalSignals} | Trades: {backtest.result.stats.portfolio.totalTrades} (W: {backtest.result.stats.portfolio.winningTrades} / L: {backtest.result.stats.portfolio.losingTrades}) | WinRate: {backtest.result.stats.portfolio.winRate?.toFixed(1)}% | Profit: {backtest.result.stats.portfolio.totalProfit?.toFixed(2)} ({backtest.result.stats.portfolio.totalProfitPercent?.toFixed(2)}%) | MaxDD: {backtest.result.stats.portfolio.maxDrawdown?.toFixed(2)} ({backtest.result.stats.portfolio.maxDrawdownPercent?.toFixed(2)}%)
-                  </p>
+                    <Button
+                      label="JSON"
+                      className="p-button-sm p-button-secondary ml-2 p-1 px-3"
+                      onClick={async () => {
+                        if (!backtest.result) return;
+                        const api = (window as any).electronAPI;
+                        const data = {
+                          strategy: backtest.strategyType,
+                          period: `${backtest.dateFrom} – ${backtest.dateTo}`,
+                          instrument: selectedInstrument,
+                          params: {
+                            sl: backtest.stopLossPercent,
+                            tp: backtest.takeProfitPercent,
+                            trail: backtest.trailingDistancePercent,
+                            lots: backtest.lots,
+                            sizing: backtest.positionSizing,
+                            risk: backtest.riskPercent,
+                          },
+                          stats: backtest.result.stats,
+                          trades: backtest.trades,
+                        };
+                        await api.saveJson(data, `backtest_${backtest.strategyType}_${backtest.dateFrom}.json`);
+                      }}
+                    />
+
+                  </div>
                 </div>
               )}
+
             </div>
           </Card>
         </TabPanel>
@@ -1167,6 +1195,16 @@ export const TradingAssistantPage: React.FC = () => {
                   disabled={batchResults.length === 0 || batchRunning}
                   className="p-button-sm p-button-secondary p-1 px-3"
                 />
+                <Button
+                  label="JSON"
+                  className="p-button-sm p-button-secondary p-1 px-3"
+                  disabled={batchResults.length === 0}
+                  onClick={async () => {
+                    const api = (window as any).electronAPI;
+                    await api.saveJson(batchResults, `batch_results_${new Date().toISOString().slice(0,10)}.json`);
+                  }}
+                />
+
                 <span className="ml-2 text-sm">{batchInstruments.length} instrument(s) selected</span>
               </div>
 
@@ -1456,37 +1494,7 @@ export const TradingAssistantPage: React.FC = () => {
 
         {/* ========== TRADES ============ */}
         <TabPanel header="Trades">
-          <Card className="surface-ground p-2">
-            <h4 className="p-mb-2">Trade History</h4>
-            {currentTrades.length > 0 ? (
-              <div style={{ maxHeight: '400px', overflowY: 'auto', color: '#d1d4dc' }}>
-                <table className="p-datatable-table" style={{ width: '100%', fontSize: '0.85rem' }}>
-                  <thead>
-                    <tr>
-                      <th>Type</th><th>Entry Time</th><th>Exit Time</th>
-                      <th>Entry Price</th><th>Exit Price</th><th>Profit</th>
-                      <th>Exit Reason</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {currentTrades.map((t: any, idx: number) => (
-                      <tr key={idx} style={{ borderBottom: '1px solid #444' }}>
-                        <td style={{ color: t.type === 'BUY' ? '#4caf50' : '#f44336' }}>{t.type}</td>
-                        <td>{new Date(t.entryTime).toLocaleString()}</td>
-                        <td>{new Date(t.exitTime).toLocaleString()}</td>
-                        <td>{t.entryPrice.toFixed(2)}</td>
-                        <td>{t.exitPrice.toFixed(2)}</td>
-                        <td className={t.profit >= 0 ? 'text-green-500' : 'text-red-500'}>{t.profit.toFixed(2)}</td>
-                        <td>{t.exitReason}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <p className="text-center text-500">No trades yet</p>
-            )}
-          </Card>
+          <TradesTab currentTrades={currentTrades} trades={backtest.trades} />
         </TabPanel>
 
         {/* ========== POS/ORDERS ======== */}

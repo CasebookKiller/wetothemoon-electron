@@ -1,5 +1,5 @@
 // src/main/ipcHandlers/tradingAssistantHandlers.ts
-import { ipcMain, BrowserWindow } from 'electron';
+import { ipcMain, BrowserWindow, dialog } from 'electron';
 import { VolumeProfileEngine, volumeProfileEngine } from '@/main/services/volumeProfileEngine';
 import { CandleInterval } from '@/api/tbank/marketdataTypes';
 import { BacktestEngine, IBacktestStrategy } from '@/main/services/backtest/backtestEngine';
@@ -22,6 +22,8 @@ import { OrderDirection, OrderType } from '@/api/tbank/ordersTypes';
 import { OptionDirection } from '@/api/tbank/instrumentsTypes';
 import { TrendStrategyPro } from '../services/backtest/strategies/TrendStrategyPro';
 import { RejectionStrategy } from '../services/backtest/strategies/RejectionStrategy';
+
+import * as fs from 'fs';
 
 let orderManagerInstance: OrderManager | null = null;
 
@@ -732,6 +734,20 @@ export const registerTradingAssistantHandlers = () => {
     } catch (e: any) {
       console.error('[GetOperations]', e);
       return { operations: [], hasMore: false, nextCursor: '' };
+    }
+  });
+
+  ipcMain.handle('trading-assistant:save-json', async (_, data: any, defaultName: string) => {
+    const { filePath } = await dialog.showSaveDialog({
+      defaultPath: defaultName,
+      filters: [{ name: 'JSON Files', extensions: ['json'] }],
+    });
+    if (!filePath) return { success: false, error: 'Отменено пользователем' };
+    try {
+      fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+      return { success: true, filePath };
+    } catch (e: any) {
+      return { success: false, error: e.message };
     }
   });
 
