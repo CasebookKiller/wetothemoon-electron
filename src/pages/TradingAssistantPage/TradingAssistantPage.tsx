@@ -203,6 +203,8 @@ export const TradingAssistantPage: React.FC = () => {
   
   const [chartLibrary, setChartLibrary] = useState<'lightweight' | 'chartjs' | 'amcharts'>('lightweight');
 
+  const [compactMode, setCompactMode] = useState(false);
+
   // ========== REFS ДЛЯ ГРАФИКА ==========
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<any>(null);
@@ -667,9 +669,10 @@ export const TradingAssistantPage: React.FC = () => {
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
+    const containerHeight = compactMode ? window.innerHeight - 60 : 400; // 60px – высота верхней панели
     const chart = createChart(chartContainerRef.current, {
       width: chartContainerRef.current.clientWidth,
-      height: 400,
+      height: containerHeight,
       layout: {
         background: { type: ColorType.Solid, color: '#1e1e1e' },
         textColor: '#d1d4dc',
@@ -866,670 +869,43 @@ export const TradingAssistantPage: React.FC = () => {
 
   return (
     <div className="trading-assistant" style={{ padding: '5px', color: '#fff', background: '#1e1e1e' }}>
-      {/* ========== TOP PANEL ========== */}
+      {/* ВЕРХНЯЯ ПАНЕЛЬ (компактная) */}
       <div className="flex align-items-center flex-wrap p-2 gap-2" style={{ background: '#1e1e1e', borderBottom: '1px solid #333' }}>
-        <label className="mr-1 mb-0">Period:</label>
-        <InputText
-          type="date"
-          value={backtest.dateFrom}
-          onChange={e => updateBacktest({ dateFrom: e.target.value })}
-          className="p-inputtext-sm"
-          style={{ width: '130px' }}
+        {/* Инструмент */}
+        <label className="mr-1 mb-0">Instr</label>
+        <Dropdown
+          value={selectedInstrument}
+          options={availableInstruments.map(i => ({ label: `${i.name} (${i.ticker})`, value: i.uid }))}
+          onChange={e => setSelectedInstrument(e.value)}
+          placeholder="Select"
+          filter
+          className="p-inputtext-sm flex-1"
+          style={{ minWidth: '180px', maxWidth: '250px' }}
         />
-        <InputText
-          type="date"
-          value={backtest.dateTo}
-          onChange={e => updateBacktest({ dateTo: e.target.value })}
-          className="p-inputtext-sm"
-          style={{ width: '130px' }}
+        <Button
+          icon="pi pi-refresh"
+          onClick={loadAllInstruments}
+          disabled={instrumentsLoading}
+          className="p-button-sm p-button-secondary p-1 px-2"
         />
-        <label className="ml-2 mr-1 mb-0">Max Signals/Day</label>
-        <InputNumber
-          value={sandbox.maxSignalsPerDay}
-          onValueChange={e => updateSandbox({ maxSignalsPerDay: e.value ?? 0 })}
-          min={0} step={1} size={2} className="p-inputtext-sm"
-        />
-        <label className="ml-2 mr-1 mb-0">Min Interval (min)</label>
-        <InputNumber
-          value={sandbox.minIntervalMinutes}
-          onValueChange={e => updateSandbox({ minIntervalMinutes: e.value ?? 15 })}
-          min={1} step={5} size={2} className="p-inputtext-sm"
-        />
-      </div>
 
-      <TabView>
-        {/* ========== SANDBOX ========== */}
-        <TabPanel header="Sandbox">
-          <Card className="surface-ground p-0">
-            <div className="p-2">
-              {/* Основная строка управления */}
-              <div className="flex align-items-center flex-wrap gap-2">
-                <Dropdown
-                  value={sandbox.accountId}
-                  options={sandbox.accounts.map((a: any) => ({ label: a.name || a.id, value: a.id }))}
-                  onChange={e => updateSandbox({ accountId: e.value })}
-                  placeholder="Account"
-                  className="p-inputtext-sm"
-                  style={{ minWidth: '180px' }}
-                />
-                <Checkbox checked={sandbox.demoMode} onChange={e => updateSandbox({ demoMode: e.checked })} />
-                <label className="mr-2 mb-0">Demo</label>
-                <Button
-                  label={autoTrading ? 'Stop' : 'Start'}
-                  onClick={toggleTrading}
-                  className={`p-button-sm ${autoTrading ? 'p-button-danger' : 'p-button-success'} border-round-sm p-1 px-2`}
-                />
-                <Button label="Apply" onClick={applyConfig} className="p-button-sm p-button-secondary border-round-sm p-1 px-2" />
-
-                <label className="mr-1 mb-0">Lots</label>
-                <InputNumber
-                  id="lotQty"
-                  value={sandbox.lotQty}
-                  onValueChange={e => updateSandbox({ lotQty: e.value ?? 1 })}
-                  min={1}
-                  showButtons
-                  mode='decimal'
-                  buttonLayout='horizontal'
-                  decrementButtonClassName='lotQtyDec'
-                  incrementButtonClassName='lotQtyInc'
-                  size={1}
-                  className='mr-2'
-                />
-
-                <label className="mr-1 mb-0">SL%</label>
-                <InputNumber
-                  value={sandbox.stopLossPercent}
-                  onValueChange={e => updateSandbox({ stopLossPercent: e.value ?? 0 })}
-                  step={0.1} min={0} size={2} className="p-inputtext-sm"
-                />
-
-                <label className="mr-1 mb-0">TP%</label>
-                <InputNumber
-                  value={sandbox.takeProfitPercent}
-                  onValueChange={e => updateSandbox({ takeProfitPercent: e.value ?? 0 })}
-                  step={0.1} min={0} size={2} className="p-inputtext-sm"
-                />
-
-                <Checkbox checked={sandbox.trailingEnabled} onChange={e => updateSandbox({ trailingEnabled: e.checked })} />
-                <label className="mr-1 mb-0">Trail</label>
-                {sandbox.trailingEnabled && (
-                  <InputNumber
-                    value={sandbox.trailingPercent}
-                    onValueChange={e => updateSandbox({ trailingPercent: e.value ?? 0.5 })}
-                    step={0.1} min={0} size={2} className="p-inputtext-sm"
-                  />
-                )}
-
-                <Button
-                  icon="pi pi-cog"
-                  onClick={() => setShowSandboxSettings(true)}
-                  className="p-button-sm p-button-secondary p-1 px-2"
-                  tooltip="Settings"
-                />
-
-                <span className="ml-auto">
-                  {sandbox.balance && <span className="mr-2">{sandbox.balance}</span>}
-                  {sandbox.payMessage && <span style={{ color: '#4caf50' }}>{sandbox.payMessage}</span>}
-                </span>
-              </div>
-            </div>
-          </Card>
-
-          {/* Диалог настроек песочницы */}
-          <Dialog
-            header="Sandbox Settings"
-            visible={showSandboxSettings}
-            style={{ width: '500px' }}
-            onHide={() => setShowSandboxSettings(false)}
-          >
-            <div className="p-fluid">
-              <div className="p-field mb-3">
-                <label>Token</label>
-                <InputText
-                  value={sandbox.token}
-                  onChange={e => updateSandbox({ token: e.target.value })}
-                  className="p-inputtext-sm"
-                  placeholder="Sandbox token"
-                />
-              </div>
-              <div className="p-field mb-3">
-                <div className="flex gap-2">
-                  <Button
-                    label="Load"
-                    onClick={loadAccounts}
-                    disabled={!sandbox.token || sandbox.loadingAccounts}
-                    className="p-button-sm p-button-secondary"
-                  />
-                  <Button
-                    label="Create"
-                    onClick={handleCreateAccount}
-                    disabled={sandbox.creatingAccount}
-                    className="p-button-sm p-button-success"
-                  />
-                  <Button
-                    label="Delete"
-                    onClick={handleCloseAccount}
-                    disabled={!sandbox.accountId}
-                    className="p-button-sm p-button-danger"
-                  />
-                </div>
-              </div>
-              <div className="p-field mb-3">
-                <label>Pay In (RUB)</label>
-                <div className="p-inputgroup">
-                  <InputNumber
-                    value={sandbox.payAmount}
-                    onValueChange={e => updateSandbox({ payAmount: e.value ?? 1000 })}
-                    min={1000} step={1000} className="p-inputtext-sm"
-                  />
-                  <Button label="Deposit" onClick={handlePayIn} className="p-button-sm" />
-                </div>
-              </div>
-              <div className="p-field mb-3">
-                <Button label="Refresh Balance" onClick={refreshBalance} className="p-button-sm p-button-info" />
-              </div>
-            </div>
-          </Dialog>
-        </TabPanel>
-
-        {/* ========== BACKTEST ========== */}
-        <TabPanel header="Backtest">
-          <Card className="surface-ground p-0">
-            <div className="p-2">
-              {/* Основная строка: инструмент, кнопка Run, результат */}
-              <div className="flex align-items-center flex-wrap gap-2">
-                <label className="mr-1 mb-0">Instr</label>
-                <Dropdown
-                  value={selectedInstrument}
-                  options={availableInstruments.map(i => ({ label: `${i.name} (${i.ticker})`, value: i.uid }))}
-                  onChange={e => setSelectedInstrument(e.value)}
-                  placeholder="Select"
-                  filter
-                  className="p-inputtext-sm flex-1 mr-2"
-                  style={{ minWidth: '200px' }}
-                />
-                <Button
-                  icon="pi pi-refresh"
-                  onClick={loadAllInstruments}
-                  disabled={instrumentsLoading}
-                  className="p-button-sm p-button-secondary p-1 px-3 mr-2"
-                />
-                <Button
-                  label="Run"
-                  onClick={runBacktest}
-                  disabled={backtest.loading}
-                  className="p-button-sm border-round-sm p-1 px-3 mr-2"
-                />
-                <Button
-                  label="Send to Sandbox"
-                  onClick={sendBacktestToSandbox}
-                  disabled={!backtest.signals.length}
-                  className="p-button-sm p-button-warning border-round-sm p-1 px-3 mr-2"
-                />
-                <Button
-                  label={showBacktestAdvanced ? 'Hide Advanced' : 'Advanced'}
-                  onClick={() => setShowBacktestAdvanced(!showBacktestAdvanced)}
-                  className="p-button-sm p-button-secondary p-1 px-2"
-                />
-              </div>
-
-              {/* Расширенные параметры (скрыты по умолчанию) */}
-              {showBacktestAdvanced && (
-                <div className="flex align-items-center flex-wrap gap-2 mt-2">
-                  <label className="mr-1 mb-0">Int</label>
-                  <Dropdown
-                    value={backtest.interval}
-                    options={['1min','5min','15min','1hour']}
-                    onChange={e => updateBacktest({ interval: e.value })}
-                    className="p-inputtext-sm mr-2"
-                    style={{ width: '80px' }}
-                  />
-                  <label className="mr-1 mb-0">VA%</label>
-                  <InputNumber value={backtest.valueAreaPercent} onValueChange={e => updateBacktest({ valueAreaPercent: e.value ?? 70 })} min={50} max={90} step={5} size={2} className="mr-2" />
-                  <label className="mr-1 mb-0">Res</label>
-                  <InputNumber value={backtest.profileResolution} onValueChange={e => updateBacktest({ profileResolution: e.value ?? 50 })} min={10} max={200} step={10} size={2} className="mr-2" />
-                  <label className="mr-1 mb-0">Strat</label>
-                  <Dropdown
-                    value={backtest.strategyType}
-                    options={['volume_accumulation', 'trend', 'poc_pullback', 'daily_va_return', 'fvg_volume', 'trend_pro', 'rejection']}
-                    onChange={e => updateBacktest({ strategyType: e.value })}
-                    className="p-inputtext-sm mr-2"
-                    style={{ width: '120px' }}
-                  />
-                  <label className="mr-1 mb-0">SL%</label>
-                  <InputNumber value={backtest.stopLossPercent} onValueChange={e => updateBacktest({ stopLossPercent: e.value ?? 0 })} step={0.1} min={0} size={2} className="mr-2" />
-                  <label className="mr-1 mb-0">TP%</label>
-                  <InputNumber value={backtest.takeProfitPercent} onValueChange={e => updateBacktest({ takeProfitPercent: e.value ?? 0 })} step={0.1} min={0} size={2} className="mr-2" />
-                  <label className="mr-1 mb-0">Trail%</label>
-                  <InputNumber value={backtest.trailingDistancePercent} onValueChange={e => updateBacktest({ trailingDistancePercent: e.value ?? 0 })} step={0.1} min={0} size={2} className="mr-2" />
-                  <label className="mr-1 mb-0">Lots</label>
-                  <InputNumber value={backtest.lots} onValueChange={e => updateBacktest({ lots: e.value ?? 1 })} min={1} step={1} size={2} className="mr-2" />
-                  <label className="mr-1 mb-0">Size</label>
-                  <Dropdown value={backtest.positionSizing} options={['fixed','dynamic']} onChange={e => updateBacktest({ positionSizing: e.value })} className="p-inputtext-sm mr-2" style={{ width: '100px' }} />
-                  {backtest.positionSizing === 'dynamic' && (
-                    <>
-                      <label className="mr-1 mb-0">Risk%</label>
-                      <InputNumber value={backtest.riskPercent} onValueChange={e => updateBacktest({ riskPercent: e.value ?? 1 })} step={0.1} min={0} size={2} className="mr-2" />
-                    </>
-                  )}
-                  <div className="flex align-items-center">
-                    <Checkbox checked={backtest.volumeFilterEnabled} onChange={e => updateBacktest({ volumeFilterEnabled: e.checked })} />
-                    <label className="ml-1 mr-2 mb-0">VolFilt</label>
-                    {backtest.volumeFilterEnabled && (
-                      <>
-                        <label className="mr-1 mb-0">Per</label>
-                        <InputNumber value={backtest.volumeFilterPeriod} onValueChange={e => updateBacktest({ volumeFilterPeriod: e.value ?? 20 })} min={5} max={100} step={5} size={2} className="mr-2" />
-                      </>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Результат бэктеста */}
-              {backtest.result?.stats && (
-                <div className="mt-2">
-                  <div className="text-sm align-items-center" style={{ wordBreak: 'break-all' }}>
-                    Strategy: {backtest.strategyType} | Period: {backtest.dateFrom} – {backtest.dateTo} | Signals: {backtest.result.stats.totalSignals} | Trades: {backtest.result.stats.portfolio.totalTrades} (W: {backtest.result.stats.portfolio.winningTrades} / L: {backtest.result.stats.portfolio.losingTrades}) | WinRate: {backtest.result.stats.portfolio.winRate?.toFixed(1)}% | Profit: {backtest.result.stats.portfolio.totalProfit?.toFixed(2)} ({backtest.result.stats.portfolio.totalProfitPercent?.toFixed(2)}%) | MaxDD: {backtest.result.stats.portfolio.maxDrawdown?.toFixed(2)} ({backtest.result.stats.portfolio.maxDrawdownPercent?.toFixed(2)}%)
-                    <Button
-                      label="JSON"
-                      className="p-button-sm p-button-secondary ml-2 p-1 px-3"
-                      onClick={async () => {
-                        if (!backtest.result) return;
-                        const api = (window as any).electronAPI;
-                        const data = {
-                          strategy: backtest.strategyType,
-                          period: `${backtest.dateFrom} – ${backtest.dateTo}`,
-                          instrument: selectedInstrument,
-                          params: {
-                            sl: backtest.stopLossPercent,
-                            tp: backtest.takeProfitPercent,
-                            trail: backtest.trailingDistancePercent,
-                            lots: backtest.lots,
-                            sizing: backtest.positionSizing,
-                            risk: backtest.riskPercent,
-                          },
-                          stats: backtest.result.stats,
-                          trades: backtest.trades,
-                        };
-                        await api.saveJson(data, `backtest_${backtest.strategyType}_${backtest.dateFrom}.json`);
-                      }}
-                    />
-
-                  </div>
-                </div>
-              )}
-
-            </div>
-          </Card>
-        </TabPanel>
-
-        {/* ========== BATCH ============= */}
-        <TabPanel header="Batch">
-          <Card className="surface-ground p-0">
-            <div className="p-2">
-              {/* Компактная строка управления */}
-              <div className="flex align-items-center flex-wrap gap-2 mb-2">
-                <Button
-                  label="Configure"
-                  icon="pi pi-cog"
-                  onClick={() => setShowBatchDialog(true)}
-                  className="p-button-sm p-button-secondary p-1 px-3"
-                />
-                <Button
-                  label={batchRunning ? 'Running...' : 'Run'}
-                  onClick={runBatch}
-                  disabled={batchRunning || batchStopping}
-                  className="p-button-sm p-1 px-3"
-                  icon={batchRunning ? 'pi pi-spin pi-spinner' : ''}
-                />
-                {batchRunning && (
-                  <Button
-                    label="Stop"
-                    onClick={stopBatch}
-                    disabled={batchStopping}
-                    className="p-button-sm p-button-danger p-1 px-3"
-                  />
-                )}
-                <Button
-                  label="Export CSV"
-                  onClick={exportCSV}
-                  disabled={batchResults.length === 0 || batchRunning}
-                  className="p-button-sm p-button-secondary p-1 px-3"
-                />
-                <Button
-                  label="JSON"
-                  className="p-button-sm p-button-secondary p-1 px-3"
-                  disabled={batchResults.length === 0}
-                  onClick={async () => {
-                    const api = (window as any).electronAPI;
-                    await api.saveJson(batchResults, `batch_results_${new Date().toISOString().slice(0,10)}.json`);
-                  }}
-                />
-
-                <span className="ml-2 text-sm">{batchInstruments.length} instrument(s) selected</span>
-              </div>
-
-              {/* Прогресс */}
-              {batchProgress && (
-                <div className="mb-2">
-                  <ProgressBar value={Math.round(batchProgress.total > 0 ? (batchProgress.completed / batchProgress.total) * 100 : 0)} />
-                  <span className="ml-2">{batchProgress.completed} / {batchProgress.total}</span>
-                </div>
-              )}
-
-              {/* Таблица результатов */}
-              {batchResults.length > 0 && (
-                <div style={{ maxHeight: '400px', overflowY: 'auto', color: '#d1d4dc' }}>
-                  <table className="p-datatable-table" style={{ width: '100%', fontSize: '0.85rem' }}>
-                    <thead>
-                      <tr>
-                        <th>Instrument</th><th>SL%</th><th>TP%</th><th>Trail%</th><th>Lots</th>
-                        <th>Sizing</th><th>Risk%</th><th>VolFilt</th><th>Period</th>
-                        <th>Signals</th><th>Trades</th><th>WinRate</th><th>Profit</th><th>MaxDD</th><th>Capital</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {batchResults.map((r, idx) => (
-                        <tr key={idx}>
-                          <td>{r.instrumentUid.slice(0,8)}</td>
-                          <td>{r.params.stopLossPercent}</td>
-                          <td>{r.params.takeProfitPercent}</td>
-                          <td>{r.params.trailingDistancePercent}</td>
-                          <td>{r.params.lots}</td>
-                          <td>{r.params.positionSizing}</td>
-                          <td>{r.params.riskPercent}</td>
-                          <td>{r.params.volumeFilterEnabled ? 'Y' : 'N'}</td>
-                          <td>{r.params.volumeFilterPeriod}</td>
-                          <td>{r.signals}</td>
-                          <td>{r.stats.totalTrades}</td>
-                          <td>{r.stats.winRate?.toFixed(1)}%</td>
-                          <td>{r.stats.totalProfit?.toFixed(2)}</td>
-                          <td>{r.stats.maxDrawdown?.toFixed(2)}</td>
-                          <td>{r.stats.initialCapital}→{r.stats.finalCapital?.toFixed(2)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </Card>
-
-          {/* Диалог конфигурации Batch */}
-          <Dialog
-            header="Batch Configuration"
-            visible={showBatchDialog}
-            style={{ width: '750px', maxHeight: '90vh' }}
-            onHide={() => setShowBatchDialog(false)}
-          >
-            <div className="p-fluid">
-              {/* Выбор инструментов */}
-              <div className="p-field mb-3">
-                <label>Instruments</label>
-                <div className="p-inputgroup">
-                  <InputText value={`${batchInstruments.length} selected`} readOnly className="p-inputtext-sm" />
-                  <Button icon="pi pi-search" onClick={() => setShowInstrumentDialog(true)} className="p-button-secondary p-button-sm" />
-                </div>
-                {batchInstruments.length > 0 && (
-                  <small className="mt-1" style={{ color: '#888' }}>
-                    {batchInstruments.map(uid => {
-                      const inst = availableInstruments.find(i => i.uid === uid);
-                      return inst ? inst.ticker || inst.name : uid;
-                    }).join(', ')}
-                  </small>
-                )}
-              </div>
-
-              {/* Версия */}
-              <div className="p-field mb-3">
-                <label>Batch Version</label>
-                <Dropdown
-                  value={batchVersion}
-                  options={['v1', 'v2']}
-                  onChange={e => setBatchVersion(e.value)}
-                  className="p-inputtext-sm"
-                />
-              </div>
-
-              {/* Strategy */}
-              <div className="p-field mb-3">
-                <label>Strategy</label>
-                <Dropdown
-                  value={batchParams.strategyType}
-                  options={['volume_accumulation', 'trend', 'poc_pullback', 'daily_va_return', 'fvg_volume', 'trend_pro', 'rejection']}
-                  onChange={e => setBatchParams({ ...batchParams, strategyType: e.value })}
-                  className="p-inputtext-sm"
-                />
-              </div>
-
-              {/* Size & Risk */}
-              <div className="p-field mb-3">
-                <label>Position Sizing</label>
-                <div className="flex align-items-center gap-2">
-                  <Dropdown
-                    value={batchParams.positionSizing}
-                    options={['fixed', 'dynamic']}
-                    onChange={e => setBatchParams({ ...batchParams, positionSizing: e.value })}
-                    className="p-inputtext-sm"
-                    style={{ width: '120px' }}
-                  />
-                  {batchParams.positionSizing === 'dynamic' && (
-                    <>
-                      <label className="ml-2">Risk%:</label>
-                      <InputText
-                        value={batchParams.riskPercent.toString()}
-                        onChange={e => setBatchParams({ ...batchParams, riskPercent: Number(e.target.value) })}
-                        className="p-inputtext-sm"
-                        style={{ width: '100px' }}
-                      />
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Vol Filter */}
-              <div className="p-field mb-3">
-                <div className="flex align-items-center gap-2">
-                  <Checkbox
-                    checked={batchParams.volumeFilterEnabled}
-                    onChange={e => setBatchParams({ ...batchParams, volumeFilterEnabled: e.checked ?? false })}
-                  />
-                  <label>Volume Filter</label>
-                  {batchParams.volumeFilterEnabled && (
-                    <InputText
-                      value={batchParams.volumeFilterPeriod.toString()}
-                      onChange={e => setBatchParams({ ...batchParams, volumeFilterPeriod: Number(e.target.value) })}
-                      placeholder="Period"
-                      className="p-inputtext-sm"
-                      style={{ width: '100px' }}
-                    />
-                  )}
-                </div>
-              </div>
-
-              {/* SL, TP, Trail, Lots (как в старой форме) */}
-              {['sl', 'tp', 'trail', 'lots'].map((type) => (
-                <div className="p-field mb-3" key={type}>
-                  <label>{type.toUpperCase()} % (Lots for Lots)</label>
-                  <div className="p-inputgroup">
-                    <Dropdown
-                      value={(batchParams as any)[`${type}Mode`]}
-                      options={['manual', 'range']}
-                      onChange={e => setBatchParams({ ...batchParams, [`${type}Mode`]: e.value })}
-                      className="p-inputtext-sm"
-                      style={{ width: '110px' }}
-                    />
-                    {(batchParams as any)[`${type}Mode`] === 'manual' ? (
-                      <InputText
-                        value={(batchParams as any)[`${type}Values`]}
-                        onChange={e => setBatchParams({ ...batchParams, [`${type}Values`]: e.target.value })}
-                        className="p-inputtext-sm"
-                        placeholder={type === 'lots' ? '10' : '1,1.5,2'}
-                      />
-                    ) : (
-                      <>
-                        <InputText
-                          value={(batchParams as any)[`${type}Min`].toString()}
-                          onChange={e => setBatchParams({ ...batchParams, [`${type}Min`]: Number(e.target.value) })}
-                          placeholder="Min"
-                          style={{ width: '70px' }}
-                          className="p-inputtext-sm"
-                        />
-                        <InputText
-                          value={(batchParams as any)[`${type}Max`].toString()}
-                          onChange={e => setBatchParams({ ...batchParams, [`${type}Max`]: Number(e.target.value) })}
-                          placeholder="Max"
-                          style={{ width: '70px' }}
-                          className="p-inputtext-sm"
-                        />
-                        <InputText
-                          value={(batchParams as any)[`${type}Step`].toString()}
-                          onChange={e => setBatchParams({ ...batchParams, [`${type}Step`]: Number(e.target.value) })}
-                          placeholder="Step"
-                          style={{ width: '70px' }}
-                          className="p-inputtext-sm"
-                        />
-                      </>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Dialog>
-
-          {/* Диалог выбора инструментов (без изменений) */}
-          <Dialog
-            header="Выбор инструментов для Batch"
-            visible={showInstrumentDialog}
-            style={{ width: '450px', maxHeight: '600px' }}
-            onHide={() => setShowInstrumentDialog(false)}
-            footer={
-              <div className="p-d-flex p-jc-end p-gap-2">
-                <Button label="Отмена" onClick={() => setShowInstrumentDialog(false)} className="p-button-sm p-button-secondary" />
-                <Button label="Применить" onClick={() => {
-                  setBatchInstruments(tempSelectedInstruments);
-                  setShowInstrumentDialog(false);
-                }} className="p-button-sm" />
-              </div>
-            }
-          >
-            <div className="p-mb-2">
-              <InputText
-                placeholder="Поиск инструмента..."
-                value={instrumentFilter}
-                onChange={e => setInstrumentFilter(e.target.value)}
-                className="p-inputtext-sm"
-                style={{ width: '100%' }}
-              />
-            </div>
-            <div style={{ maxHeight: '350px', overflowY: 'auto', color: '#d1d4dc' }}>
-              {availableInstruments
-                .filter(inst => inst.name.toLowerCase().includes(instrumentFilter.toLowerCase()) || inst.ticker?.toLowerCase().includes(instrumentFilter.toLowerCase()))
-                .map(inst => (
-                  <div key={inst.uid} className="p-field-checkbox p-mb-1">
-                    <Checkbox
-                      inputId={`inst-${inst.uid}`}
-                      checked={tempSelectedInstruments.includes(inst.uid)}
-                      onChange={(e) => {
-                        if (e.checked) {
-                          setTempSelectedInstruments(prev => [...prev, inst.uid]);
-                        } else {
-                          setTempSelectedInstruments(prev => prev.filter(id => id !== inst.uid));
-                        }
-                      }}
-                      className='mr-1'
-                    />
-                    <label htmlFor={`inst-${inst.uid}`}>{inst.name} ({inst.ticker})</label>
-                  </div>
-                ))}
-            </div>
-          </Dialog>
-        </TabPanel>
-
-        {/* ========== SIGNALS =========== */}
-        <TabPanel header="Signals">
-          <Card className="surface-ground p-2">
-            <h4 className="p-mb-2">Signals</h4>
-            {currentSignals.length > 0 ? (
-              <ul className="p-pl-3" style={{ color: '#d1d4dc', maxHeight: '200px', overflowY: 'auto' }}>
-                {currentSignals.map((sig, idx) => (
-                  <li key={idx}><strong>{sig.type}</strong>: {sig.message} @ {sig.price}</li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-center text-500">Ожидание сигналов...</p>
-            )}
-          </Card>
-        </TabPanel>
-
-        {/* ========== PROFILE =========== */}
-        <TabPanel header="Profile">
-          <Card className="surface-ground p-2">
-            <h4 className="p-mb-2">Volume Profile Data</h4>
-            {currentProfile ? (
-              <>
-                <div className="p-mb-2" style={{ color: '#d1d4dc' }}>
-                  <p>POC: {currentProfile.poc.toFixed(2)}</p>
-                  <p>Value Area: {currentProfile.valueAreaLow.toFixed(2)} – {currentProfile.valueAreaHigh.toFixed(2)}</p>
-                  <p>Total Volume: {currentProfile.totalVolume}</p>
-                </div>
-                {currentProfile.volumeByPrice?.length > 0 && (
-                  <>
-                    <h5>Top 10 Levels</h5>
-                    <ul className="p-pl-3" style={{ color: '#d1d4dc', maxHeight: '200px', overflowY: 'auto' }}>
-                      {currentProfile.volumeByPrice
-                        .sort((a: any, b: any) => b.volume - a.volume)
-                        .slice(0, 10)
-                        .map(({ price, volume }: any) => (
-                          <li key={price}>{price.toFixed(2)} – {volume.toFixed(0)}</li>
-                        ))}
-                    </ul>
-                  </>
-                )}
-              </>
-            ) : (
-              <p className="text-center text-500">Нет данных профиля</p>
-            )}
-          </Card>
-        </TabPanel>
-
-        {/* ========== TRADES ============ */}
-        <TabPanel header="Trades">
-          <TradesTab currentTrades={currentTrades} trades={backtest.trades} />
-        </TabPanel>
-
-        {/* ========== POS/ORDERS ======== */}
-        <TabPanel header="Pos/Orders">
-          <PositionsOrdersTab accountId={sandbox.accountId} />
-        </TabPanel>
-        
-        {/* ========== POS/ORDERS ======== */}
-        <TabPanel header="Log">
-          <LogTab accountId={sandbox.accountId} />
-        </TabPanel>
-
-        {/* ========== SCREENER ========== */}
-        <TabPanel header="Screener">
-          <ScreenerTab token={stream.token} />
-        </TabPanel>
-      </TabView>
-      <div className="flex align-items-center flex-wrap mt-2 mb-2 gap-2 w-full">
-        {/* Управление стримом */}
-        <label className="mr-1 mb-0">Token</label>
+        {/* Токен (компактный) */}
         <InputText
           value={stream.token}
           onChange={e => updateStream({ token: e.target.value })}
           className="p-inputtext-sm"
-          placeholder="Read-only token"
+          placeholder="Token"
+          style={{ width: '120px' }}
         />
-        <label className="mr-1 mb-0">TF</label>
+        {/* TF */}
         <Dropdown
           value={stream.displayTimeframe}
           options={[{label:'1m',value:1},{label:'5m',value:5},{label:'15m',value:15},{label:'1h',value:60}]}
           onChange={e => updateStream({ displayTimeframe: e.value })}
           className="p-inputtext-sm"
-          style={{ width: '110px' }}
+          style={{ width: '80px' }}
         />
+        {/* Start/Stop */}
         <Button
           label="Start"
           onClick={startStream}
@@ -1542,49 +918,694 @@ export const TradingAssistantPage: React.FC = () => {
           disabled={!stream.active}
           className="p-button-sm p-button-danger border-round-sm p-1 px-2"
         />
-        <span style={{ color: stream.active ? '#4caf50' : '#d32f2f', minWidth: '80px' }}>
+        <span style={{ color: stream.active ? '#4caf50' : '#d32f2f', minWidth: '60px', fontSize: '0.85rem' }}>
           {stream.active ? '● Live' : '○ Stopped'}
         </span>
 
         {/* Разделитель */}
         <div style={{ borderLeft: '1px solid #555', height: '24px', margin: '0 8px' }} />
 
-        {/* Переключатель режимов графика */}
-        <span className="mr-1">Mode:</span>
+        {/* Режим отображения (Live/Backtest) */}
         <Button
           label="Live"
           onClick={() => setViewMode('live')}
-          className={`p-button-sm p-1 px-3 mr-1 ${viewMode === 'live' ? 'p-button-primary' : 'p-button-secondary'}`}
+          className={`p-button-sm p-1 px-2 ${viewMode === 'live' ? 'p-button-primary' : 'p-button-secondary'}`}
         />
         <Button
           label="Backtest"
           onClick={() => setViewMode('backtest')}
-          className={`p-button-sm p-1 px-3 ${viewMode === 'backtest' ? 'p-button-primary' : 'p-button-secondary'}`}
+          className={`p-button-sm p-1 px-2 ${viewMode === 'backtest' ? 'p-button-primary' : 'p-button-secondary'}`}
           disabled={!backtestCandlesData.length}
         />
 
         {/* Разделитель */}
         <div style={{ borderLeft: '1px solid #555', height: '24px', margin: '0 8px' }} />
 
-        <span className="mr-1">Profile:</span>
-        <Dropdown
-          value={profileType}
-          options={['side', 'overlay']}
-          onChange={e => setProfileType(e.value)}
-          className="p-inputtext-sm"
-          style={{ width: '80px' }}
+        {/* Кнопка компактного режима */}
+        <Button
+          icon={compactMode ? 'pi pi-expand' : 'pi pi-compress'}
+          onClick={() => setCompactMode(!compactMode)}
+          className="p-button-sm p-button-secondary p-1 px-2"
+          tooltip={compactMode ? 'Развернуть панели' : 'Компактный режим'}
         />
-        <span className="mr-1">Chart:</span>
-        <Dropdown
-          value={chartLibrary}
-          options={['lightweight', 'chartjs', 'amcharts']}
-          onChange={e => setChartLibrary(e.value)}
-          className="p-inputtext-sm"
-          style={{ width: '100px' }}
-        />
+
+        {/* Доп. кнопки – можно добавить выпадающее меню для дат и параметров бэктеста */}
+        {!compactMode && (
+          <>
+            <div style={{ borderLeft: '1px solid #555', height: '24px', margin: '0 8px' }} />
+            <label className="mr-1 mb-0">Period:</label>
+            <InputText type="date" value={backtest.dateFrom} onChange={e => updateBacktest({ dateFrom: e.target.value })} className="p-inputtext-sm" style={{ width: '130px' }} />
+            <InputText type="date" value={backtest.dateTo} onChange={e => updateBacktest({ dateTo: e.target.value })} className="p-inputtext-sm" style={{ width: '130px' }} />
+            <label className="ml-2 mr-1 mb-0">Max Signals/Day</label>
+            <InputNumber value={sandbox.maxSignalsPerDay} onValueChange={e => updateSandbox({ maxSignalsPerDay: e.value ?? 0 })} min={0} step={1} size={2} className="p-inputtext-sm" />
+            <label className="ml-2 mr-1 mb-0">Min Interval (min)</label>
+            <InputNumber value={sandbox.minIntervalMinutes} onValueChange={e => updateSandbox({ minIntervalMinutes: e.value ?? 15 })} min={1} step={5} size={2} className="p-inputtext-sm" />
+          </>
+        )}
       </div>
 
-    
+      {/* TABVIEW (скрыт в компактном режиме) */}
+      {!compactMode && (
+        <TabView>
+          {/* ========== SANDBOX ========== */}
+          <TabPanel header="Sandbox">
+            <Card className="surface-ground p-0">
+              <div className="p-2">
+                {/* Основная строка управления */}
+                <div className="flex align-items-center flex-wrap gap-2">
+                  <Dropdown
+                    value={sandbox.accountId}
+                    options={sandbox.accounts.map((a: any) => ({ label: a.name || a.id, value: a.id }))}
+                    onChange={e => updateSandbox({ accountId: e.value })}
+                    placeholder="Account"
+                    className="p-inputtext-sm"
+                    style={{ minWidth: '180px' }}
+                  />
+                  <Checkbox checked={sandbox.demoMode} onChange={e => updateSandbox({ demoMode: e.checked })} />
+                  <label className="mr-2 mb-0">Demo</label>
+                  <Button
+                    label={autoTrading ? 'Stop' : 'Start'}
+                    onClick={toggleTrading}
+                    className={`p-button-sm ${autoTrading ? 'p-button-danger' : 'p-button-success'} border-round-sm p-1 px-2`}
+                  />
+                  <Button label="Apply" onClick={applyConfig} className="p-button-sm p-button-secondary border-round-sm p-1 px-2" />
+
+                  <label className="mr-1 mb-0">Lots</label>
+                  <InputNumber
+                    id="lotQty"
+                    value={sandbox.lotQty}
+                    onValueChange={e => updateSandbox({ lotQty: e.value ?? 1 })}
+                    min={1}
+                    showButtons
+                    mode='decimal'
+                    buttonLayout='horizontal'
+                    decrementButtonClassName='lotQtyDec'
+                    incrementButtonClassName='lotQtyInc'
+                    size={1}
+                    className='mr-2'
+                  />
+
+                  <label className="mr-1 mb-0">SL%</label>
+                  <InputNumber
+                    value={sandbox.stopLossPercent}
+                    onValueChange={e => updateSandbox({ stopLossPercent: e.value ?? 0 })}
+                    step={0.1} min={0} size={2} className="p-inputtext-sm"
+                  />
+
+                  <label className="mr-1 mb-0">TP%</label>
+                  <InputNumber
+                    value={sandbox.takeProfitPercent}
+                    onValueChange={e => updateSandbox({ takeProfitPercent: e.value ?? 0 })}
+                    step={0.1} min={0} size={2} className="p-inputtext-sm"
+                  />
+
+                  <Checkbox checked={sandbox.trailingEnabled} onChange={e => updateSandbox({ trailingEnabled: e.checked })} />
+                  <label className="mr-1 mb-0">Trail</label>
+                  {sandbox.trailingEnabled && (
+                    <InputNumber
+                      value={sandbox.trailingPercent}
+                      onValueChange={e => updateSandbox({ trailingPercent: e.value ?? 0.5 })}
+                      step={0.1} min={0} size={2} className="p-inputtext-sm"
+                    />
+                  )}
+
+                  <Button
+                    icon="pi pi-cog"
+                    onClick={() => setShowSandboxSettings(true)}
+                    className="p-button-sm p-button-secondary p-1 px-2"
+                    tooltip="Settings"
+                  />
+
+                  <span className="ml-auto">
+                    {sandbox.balance && <span className="mr-2">{sandbox.balance}</span>}
+                    {sandbox.payMessage && <span style={{ color: '#4caf50' }}>{sandbox.payMessage}</span>}
+                  </span>
+                </div>
+              </div>
+            </Card>
+
+            {/* Диалог настроек песочницы */}
+            <Dialog
+              header="Sandbox Settings"
+              visible={showSandboxSettings}
+              style={{ width: '500px' }}
+              onHide={() => setShowSandboxSettings(false)}
+            >
+              <div className="p-fluid">
+                <div className="p-field mb-3">
+                  <label>Token</label>
+                  <InputText
+                    value={sandbox.token}
+                    onChange={e => updateSandbox({ token: e.target.value })}
+                    className="p-inputtext-sm"
+                    placeholder="Sandbox token"
+                  />
+                </div>
+                <div className="p-field mb-3">
+                  <div className="flex gap-2">
+                    <Button
+                      label="Load"
+                      onClick={loadAccounts}
+                      disabled={!sandbox.token || sandbox.loadingAccounts}
+                      className="p-button-sm p-button-secondary"
+                    />
+                    <Button
+                      label="Create"
+                      onClick={handleCreateAccount}
+                      disabled={sandbox.creatingAccount}
+                      className="p-button-sm p-button-success"
+                    />
+                    <Button
+                      label="Delete"
+                      onClick={handleCloseAccount}
+                      disabled={!sandbox.accountId}
+                      className="p-button-sm p-button-danger"
+                    />
+                  </div>
+                </div>
+                <div className="p-field mb-3">
+                  <label>Pay In (RUB)</label>
+                  <div className="p-inputgroup">
+                    <InputNumber
+                      value={sandbox.payAmount}
+                      onValueChange={e => updateSandbox({ payAmount: e.value ?? 1000 })}
+                      min={1000} step={1000} className="p-inputtext-sm"
+                    />
+                    <Button label="Deposit" onClick={handlePayIn} className="p-button-sm" />
+                  </div>
+                </div>
+                <div className="p-field mb-3">
+                  <Button label="Refresh Balance" onClick={refreshBalance} className="p-button-sm p-button-info" />
+                </div>
+              </div>
+            </Dialog>
+          </TabPanel>
+
+          {/* ========== BACKTEST ========== */}
+          <TabPanel header="Backtest">
+            <Card className="surface-ground p-0">
+              <div className="p-2">
+                {/* Основная строка: инструмент, кнопка Run, результат */}
+                <div className="flex align-items-center flex-wrap gap-2">
+                  <label className="mr-1 mb-0">Instr</label>
+                  <Dropdown
+                    value={selectedInstrument}
+                    options={availableInstruments.map(i => ({ label: `${i.name} (${i.ticker})`, value: i.uid }))}
+                    onChange={e => setSelectedInstrument(e.value)}
+                    placeholder="Select"
+                    filter
+                    className="p-inputtext-sm flex-1 mr-2"
+                    style={{ minWidth: '200px' }}
+                  />
+                  <Button
+                    icon="pi pi-refresh"
+                    onClick={loadAllInstruments}
+                    disabled={instrumentsLoading}
+                    className="p-button-sm p-button-secondary p-1 px-3 mr-2"
+                  />
+                  <Button
+                    label="Run"
+                    onClick={runBacktest}
+                    disabled={backtest.loading}
+                    className="p-button-sm border-round-sm p-1 px-3 mr-2"
+                  />
+                  <Button
+                    label="Send to Sandbox"
+                    onClick={sendBacktestToSandbox}
+                    disabled={!backtest.signals.length}
+                    className="p-button-sm p-button-warning border-round-sm p-1 px-3 mr-2"
+                  />
+                  <Button
+                    label={showBacktestAdvanced ? 'Hide Advanced' : 'Advanced'}
+                    onClick={() => setShowBacktestAdvanced(!showBacktestAdvanced)}
+                    className="p-button-sm p-button-secondary p-1 px-2"
+                  />
+                </div>
+
+                {/* Расширенные параметры (скрыты по умолчанию) */}
+                {showBacktestAdvanced && (
+                  <div className="flex align-items-center flex-wrap gap-2 mt-2">
+                    <label className="mr-1 mb-0">Int</label>
+                    <Dropdown
+                      value={backtest.interval}
+                      options={['1min','5min','15min','1hour']}
+                      onChange={e => updateBacktest({ interval: e.value })}
+                      className="p-inputtext-sm mr-2"
+                      style={{ width: '80px' }}
+                    />
+                    <label className="mr-1 mb-0">VA%</label>
+                    <InputNumber value={backtest.valueAreaPercent} onValueChange={e => updateBacktest({ valueAreaPercent: e.value ?? 70 })} min={50} max={90} step={5} size={2} className="mr-2" />
+                    <label className="mr-1 mb-0">Res</label>
+                    <InputNumber value={backtest.profileResolution} onValueChange={e => updateBacktest({ profileResolution: e.value ?? 50 })} min={10} max={200} step={10} size={2} className="mr-2" />
+                    <label className="mr-1 mb-0">Strat</label>
+                    <Dropdown
+                      value={backtest.strategyType}
+                      options={['volume_accumulation', 'trend', 'poc_pullback', 'daily_va_return', 'fvg_volume', 'trend_pro', 'rejection']}
+                      onChange={e => updateBacktest({ strategyType: e.value })}
+                      className="p-inputtext-sm mr-2"
+                      style={{ width: '120px' }}
+                    />
+                    <label className="mr-1 mb-0">SL%</label>
+                    <InputNumber value={backtest.stopLossPercent} onValueChange={e => updateBacktest({ stopLossPercent: e.value ?? 0 })} step={0.1} min={0} size={2} className="mr-2" />
+                    <label className="mr-1 mb-0">TP%</label>
+                    <InputNumber value={backtest.takeProfitPercent} onValueChange={e => updateBacktest({ takeProfitPercent: e.value ?? 0 })} step={0.1} min={0} size={2} className="mr-2" />
+                    <label className="mr-1 mb-0">Trail%</label>
+                    <InputNumber value={backtest.trailingDistancePercent} onValueChange={e => updateBacktest({ trailingDistancePercent: e.value ?? 0 })} step={0.1} min={0} size={2} className="mr-2" />
+                    <label className="mr-1 mb-0">Lots</label>
+                    <InputNumber value={backtest.lots} onValueChange={e => updateBacktest({ lots: e.value ?? 1 })} min={1} step={1} size={2} className="mr-2" />
+                    <label className="mr-1 mb-0">Size</label>
+                    <Dropdown value={backtest.positionSizing} options={['fixed','dynamic']} onChange={e => updateBacktest({ positionSizing: e.value })} className="p-inputtext-sm mr-2" style={{ width: '100px' }} />
+                    {backtest.positionSizing === 'dynamic' && (
+                      <>
+                        <label className="mr-1 mb-0">Risk%</label>
+                        <InputNumber value={backtest.riskPercent} onValueChange={e => updateBacktest({ riskPercent: e.value ?? 1 })} step={0.1} min={0} size={2} className="mr-2" />
+                      </>
+                    )}
+                    <div className="flex align-items-center">
+                      <Checkbox checked={backtest.volumeFilterEnabled} onChange={e => updateBacktest({ volumeFilterEnabled: e.checked })} />
+                      <label className="ml-1 mr-2 mb-0">VolFilt</label>
+                      {backtest.volumeFilterEnabled && (
+                        <>
+                          <label className="mr-1 mb-0">Per</label>
+                          <InputNumber value={backtest.volumeFilterPeriod} onValueChange={e => updateBacktest({ volumeFilterPeriod: e.value ?? 20 })} min={5} max={100} step={5} size={2} className="mr-2" />
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Результат бэктеста */}
+                {backtest.result?.stats && (
+                  <div className="mt-2">
+                    <div className="text-sm align-items-center" style={{ wordBreak: 'break-all' }}>
+                      Strategy: {backtest.strategyType} | Period: {backtest.dateFrom} – {backtest.dateTo} | Signals: {backtest.result.stats.totalSignals} | Trades: {backtest.result.stats.portfolio.totalTrades} (W: {backtest.result.stats.portfolio.winningTrades} / L: {backtest.result.stats.portfolio.losingTrades}) | WinRate: {backtest.result.stats.portfolio.winRate?.toFixed(1)}% | Profit: {backtest.result.stats.portfolio.totalProfit?.toFixed(2)} ({backtest.result.stats.portfolio.totalProfitPercent?.toFixed(2)}%) | MaxDD: {backtest.result.stats.portfolio.maxDrawdown?.toFixed(2)} ({backtest.result.stats.portfolio.maxDrawdownPercent?.toFixed(2)}%)
+                      <Button
+                        label="JSON"
+                        className="p-button-sm p-button-secondary ml-2 p-1 px-3"
+                        onClick={async () => {
+                          if (!backtest.result) return;
+                          const api = (window as any).electronAPI;
+                          const data = {
+                            strategy: backtest.strategyType,
+                            period: `${backtest.dateFrom} – ${backtest.dateTo}`,
+                            instrument: selectedInstrument,
+                            params: {
+                              sl: backtest.stopLossPercent,
+                              tp: backtest.takeProfitPercent,
+                              trail: backtest.trailingDistancePercent,
+                              lots: backtest.lots,
+                              sizing: backtest.positionSizing,
+                              risk: backtest.riskPercent,
+                            },
+                            stats: backtest.result.stats,
+                            trades: backtest.trades,
+                          };
+                          await api.saveJson(data, `backtest_${backtest.strategyType}_${backtest.dateFrom}.json`);
+                        }}
+                      />
+
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            </Card>
+          </TabPanel>
+
+          {/* ========== BATCH ============= */}
+          <TabPanel header="Batch">
+            <Card className="surface-ground p-0">
+              <div className="p-2">
+                {/* Компактная строка управления */}
+                <div className="flex align-items-center flex-wrap gap-2 mb-2">
+                  <Button
+                    label="Configure"
+                    icon="pi pi-cog"
+                    onClick={() => setShowBatchDialog(true)}
+                    className="p-button-sm p-button-secondary p-1 px-3"
+                  />
+                  <Button
+                    label={batchRunning ? 'Running...' : 'Run'}
+                    onClick={runBatch}
+                    disabled={batchRunning || batchStopping}
+                    className="p-button-sm p-1 px-3"
+                    icon={batchRunning ? 'pi pi-spin pi-spinner' : ''}
+                  />
+                  {batchRunning && (
+                    <Button
+                      label="Stop"
+                      onClick={stopBatch}
+                      disabled={batchStopping}
+                      className="p-button-sm p-button-danger p-1 px-3"
+                    />
+                  )}
+                  <Button
+                    label="Export CSV"
+                    onClick={exportCSV}
+                    disabled={batchResults.length === 0 || batchRunning}
+                    className="p-button-sm p-button-secondary p-1 px-3"
+                  />
+                  <Button
+                    label="JSON"
+                    className="p-button-sm p-button-secondary p-1 px-3"
+                    disabled={batchResults.length === 0}
+                    onClick={async () => {
+                      const api = (window as any).electronAPI;
+                      await api.saveJson(batchResults, `batch_results_${new Date().toISOString().slice(0,10)}.json`);
+                    }}
+                  />
+
+                  <span className="ml-2 text-sm">{batchInstruments.length} instrument(s) selected</span>
+                </div>
+
+                {/* Прогресс */}
+                {batchProgress && (
+                  <div className="mb-2">
+                    <ProgressBar value={Math.round(batchProgress.total > 0 ? (batchProgress.completed / batchProgress.total) * 100 : 0)} />
+                    <span className="ml-2">{batchProgress.completed} / {batchProgress.total}</span>
+                  </div>
+                )}
+
+                {/* Таблица результатов */}
+                {batchResults.length > 0 && (
+                  <div style={{ maxHeight: '400px', overflowY: 'auto', color: '#d1d4dc' }}>
+                    <table className="p-datatable-table" style={{ width: '100%', fontSize: '0.85rem' }}>
+                      <thead>
+                        <tr>
+                          <th>Instrument</th><th>SL%</th><th>TP%</th><th>Trail%</th><th>Lots</th>
+                          <th>Sizing</th><th>Risk%</th><th>VolFilt</th><th>Period</th>
+                          <th>Signals</th><th>Trades</th><th>WinRate</th><th>Profit</th><th>MaxDD</th><th>Capital</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {batchResults.map((r, idx) => (
+                          <tr key={idx}>
+                            <td>{r.instrumentUid.slice(0,8)}</td>
+                            <td>{r.params.stopLossPercent}</td>
+                            <td>{r.params.takeProfitPercent}</td>
+                            <td>{r.params.trailingDistancePercent}</td>
+                            <td>{r.params.lots}</td>
+                            <td>{r.params.positionSizing}</td>
+                            <td>{r.params.riskPercent}</td>
+                            <td>{r.params.volumeFilterEnabled ? 'Y' : 'N'}</td>
+                            <td>{r.params.volumeFilterPeriod}</td>
+                            <td>{r.signals}</td>
+                            <td>{r.stats.totalTrades}</td>
+                            <td>{r.stats.winRate?.toFixed(1)}%</td>
+                            <td>{r.stats.totalProfit?.toFixed(2)}</td>
+                            <td>{r.stats.maxDrawdown?.toFixed(2)}</td>
+                            <td>{r.stats.initialCapital}→{r.stats.finalCapital?.toFixed(2)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </Card>
+
+            {/* Диалог конфигурации Batch */}
+            <Dialog
+              header="Batch Configuration"
+              visible={showBatchDialog}
+              style={{ width: '750px', maxHeight: '90vh' }}
+              onHide={() => setShowBatchDialog(false)}
+            >
+              <div className="p-fluid">
+                {/* Выбор инструментов */}
+                <div className="p-field mb-3">
+                  <label>Instruments</label>
+                  <div className="p-inputgroup">
+                    <InputText value={`${batchInstruments.length} selected`} readOnly className="p-inputtext-sm" />
+                    <Button icon="pi pi-search" onClick={() => setShowInstrumentDialog(true)} className="p-button-secondary p-button-sm" />
+                  </div>
+                  {batchInstruments.length > 0 && (
+                    <small className="mt-1" style={{ color: '#888' }}>
+                      {batchInstruments.map(uid => {
+                        const inst = availableInstruments.find(i => i.uid === uid);
+                        return inst ? inst.ticker || inst.name : uid;
+                      }).join(', ')}
+                    </small>
+                  )}
+                </div>
+
+                {/* Версия */}
+                <div className="p-field mb-3">
+                  <label>Batch Version</label>
+                  <Dropdown
+                    value={batchVersion}
+                    options={['v1', 'v2']}
+                    onChange={e => setBatchVersion(e.value)}
+                    className="p-inputtext-sm"
+                  />
+                </div>
+
+                {/* Strategy */}
+                <div className="p-field mb-3">
+                  <label>Strategy</label>
+                  <Dropdown
+                    value={batchParams.strategyType}
+                    options={['volume_accumulation', 'trend', 'poc_pullback', 'daily_va_return', 'fvg_volume', 'trend_pro', 'rejection']}
+                    onChange={e => setBatchParams({ ...batchParams, strategyType: e.value })}
+                    className="p-inputtext-sm"
+                  />
+                </div>
+
+                {/* Size & Risk */}
+                <div className="p-field mb-3">
+                  <label>Position Sizing</label>
+                  <div className="flex align-items-center gap-2">
+                    <Dropdown
+                      value={batchParams.positionSizing}
+                      options={['fixed', 'dynamic']}
+                      onChange={e => setBatchParams({ ...batchParams, positionSizing: e.value })}
+                      className="p-inputtext-sm"
+                      style={{ width: '120px' }}
+                    />
+                    {batchParams.positionSizing === 'dynamic' && (
+                      <>
+                        <label className="ml-2">Risk%:</label>
+                        <InputText
+                          value={batchParams.riskPercent.toString()}
+                          onChange={e => setBatchParams({ ...batchParams, riskPercent: Number(e.target.value) })}
+                          className="p-inputtext-sm"
+                          style={{ width: '100px' }}
+                        />
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Vol Filter */}
+                <div className="p-field mb-3">
+                  <div className="flex align-items-center gap-2">
+                    <Checkbox
+                      checked={batchParams.volumeFilterEnabled}
+                      onChange={e => setBatchParams({ ...batchParams, volumeFilterEnabled: e.checked ?? false })}
+                    />
+                    <label>Volume Filter</label>
+                    {batchParams.volumeFilterEnabled && (
+                      <InputText
+                        value={batchParams.volumeFilterPeriod.toString()}
+                        onChange={e => setBatchParams({ ...batchParams, volumeFilterPeriod: Number(e.target.value) })}
+                        placeholder="Period"
+                        className="p-inputtext-sm"
+                        style={{ width: '100px' }}
+                      />
+                    )}
+                  </div>
+                </div>
+
+                {/* SL, TP, Trail, Lots (как в старой форме) */}
+                {['sl', 'tp', 'trail', 'lots'].map((type) => (
+                  <div className="p-field mb-3" key={type}>
+                    <label>{type.toUpperCase()} % (Lots for Lots)</label>
+                    <div className="p-inputgroup">
+                      <Dropdown
+                        value={(batchParams as any)[`${type}Mode`]}
+                        options={['manual', 'range']}
+                        onChange={e => setBatchParams({ ...batchParams, [`${type}Mode`]: e.value })}
+                        className="p-inputtext-sm"
+                        style={{ width: '110px' }}
+                      />
+                      {(batchParams as any)[`${type}Mode`] === 'manual' ? (
+                        <InputText
+                          value={(batchParams as any)[`${type}Values`]}
+                          onChange={e => setBatchParams({ ...batchParams, [`${type}Values`]: e.target.value })}
+                          className="p-inputtext-sm"
+                          placeholder={type === 'lots' ? '10' : '1,1.5,2'}
+                        />
+                      ) : (
+                        <>
+                          <InputText
+                            value={(batchParams as any)[`${type}Min`].toString()}
+                            onChange={e => setBatchParams({ ...batchParams, [`${type}Min`]: Number(e.target.value) })}
+                            placeholder="Min"
+                            style={{ width: '70px' }}
+                            className="p-inputtext-sm"
+                          />
+                          <InputText
+                            value={(batchParams as any)[`${type}Max`].toString()}
+                            onChange={e => setBatchParams({ ...batchParams, [`${type}Max`]: Number(e.target.value) })}
+                            placeholder="Max"
+                            style={{ width: '70px' }}
+                            className="p-inputtext-sm"
+                          />
+                          <InputText
+                            value={(batchParams as any)[`${type}Step`].toString()}
+                            onChange={e => setBatchParams({ ...batchParams, [`${type}Step`]: Number(e.target.value) })}
+                            placeholder="Step"
+                            style={{ width: '70px' }}
+                            className="p-inputtext-sm"
+                          />
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Dialog>
+
+            {/* Диалог выбора инструментов (без изменений) */}
+            <Dialog
+              header="Выбор инструментов для Batch"
+              visible={showInstrumentDialog}
+              style={{ width: '450px', maxHeight: '600px' }}
+              onHide={() => setShowInstrumentDialog(false)}
+              footer={
+                <div className="p-d-flex p-jc-end p-gap-2">
+                  <Button label="Отмена" onClick={() => setShowInstrumentDialog(false)} className="p-button-sm p-button-secondary" />
+                  <Button label="Применить" onClick={() => {
+                    setBatchInstruments(tempSelectedInstruments);
+                    setShowInstrumentDialog(false);
+                  }} className="p-button-sm" />
+                </div>
+              }
+            >
+              <div className="p-mb-2">
+                <InputText
+                  placeholder="Поиск инструмента..."
+                  value={instrumentFilter}
+                  onChange={e => setInstrumentFilter(e.target.value)}
+                  className="p-inputtext-sm"
+                  style={{ width: '100%' }}
+                />
+              </div>
+              <div style={{ maxHeight: '350px', overflowY: 'auto', color: '#d1d4dc' }}>
+                {availableInstruments
+                  .filter(inst => inst.name.toLowerCase().includes(instrumentFilter.toLowerCase()) || inst.ticker?.toLowerCase().includes(instrumentFilter.toLowerCase()))
+                  .map(inst => (
+                    <div key={inst.uid} className="p-field-checkbox p-mb-1">
+                      <Checkbox
+                        inputId={`inst-${inst.uid}`}
+                        checked={tempSelectedInstruments.includes(inst.uid)}
+                        onChange={(e) => {
+                          if (e.checked) {
+                            setTempSelectedInstruments(prev => [...prev, inst.uid]);
+                          } else {
+                            setTempSelectedInstruments(prev => prev.filter(id => id !== inst.uid));
+                          }
+                        }}
+                        className='mr-1'
+                      />
+                      <label htmlFor={`inst-${inst.uid}`}>{inst.name} ({inst.ticker})</label>
+                    </div>
+                  ))}
+              </div>
+            </Dialog>
+          </TabPanel>
+
+          {/* ========== SIGNALS =========== */}
+          <TabPanel header="Signals">
+            <Card className="surface-ground p-2">
+              <h4 className="p-mb-2">Signals</h4>
+              {currentSignals.length > 0 ? (
+                <ul className="p-pl-3" style={{ color: '#d1d4dc', maxHeight: '200px', overflowY: 'auto' }}>
+                  {currentSignals.map((sig, idx) => (
+                    <li key={idx}><strong>{sig.type}</strong>: {sig.message} @ {sig.price}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-center text-500">Ожидание сигналов...</p>
+              )}
+            </Card>
+          </TabPanel>
+
+          {/* ========== PROFILE =========== */}
+          <TabPanel header="Profile">
+            <Card className="surface-ground p-2">
+              <h4 className="p-mb-2">Volume Profile Data</h4>
+              {currentProfile ? (
+                <>
+                  <div className="p-mb-2" style={{ color: '#d1d4dc' }}>
+                    <p>POC: {currentProfile.poc.toFixed(2)}</p>
+                    <p>Value Area: {currentProfile.valueAreaLow.toFixed(2)} – {currentProfile.valueAreaHigh.toFixed(2)}</p>
+                    <p>Total Volume: {currentProfile.totalVolume}</p>
+                  </div>
+                  {currentProfile.volumeByPrice?.length > 0 && (
+                    <>
+                      <h5>Top 10 Levels</h5>
+                      <ul className="p-pl-3" style={{ color: '#d1d4dc', maxHeight: '200px', overflowY: 'auto' }}>
+                        {currentProfile.volumeByPrice
+                          .sort((a: any, b: any) => b.volume - a.volume)
+                          .slice(0, 10)
+                          .map(({ price, volume }: any) => (
+                            <li key={price}>{price.toFixed(2)} – {volume.toFixed(0)}</li>
+                          ))}
+                      </ul>
+                    </>
+                  )}
+                </>
+              ) : (
+                <p className="text-center text-500">Нет данных профиля</p>
+              )}
+            </Card>
+          </TabPanel>
+
+          {/* ========== TRADES ============ */}
+          <TabPanel header="Trades">
+            <TradesTab currentTrades={currentTrades} trades={backtest.trades} />
+          </TabPanel>
+
+          {/* ========== POS/ORDERS ======== */}
+          <TabPanel header="Pos/Orders">
+            <PositionsOrdersTab accountId={sandbox.accountId} />
+          </TabPanel>
+          
+          {/* ========== POS/ORDERS ======== */}
+          <TabPanel header="Log">
+            <LogTab accountId={sandbox.accountId} />
+          </TabPanel>
+
+          {/* ========== SCREENER ========== */}
+          <TabPanel header="Screener">
+            <ScreenerTab token={stream.token} />
+          </TabPanel>
+        </TabView>
+      )}
+      {/* Выбор типа профиля и графика – только когда не compact или всегда видно? */}
+      {!compactMode && (
+        <>
+          <div style={{ borderLeft: '1px solid #555', height: '8px', margin: '0 8px' }} />
+          <span className="mr-1">Profile:</span>
+          <Dropdown
+            value={profileType}
+            options={['side', 'overlay']}
+            onChange={e => setProfileType(e.value)}
+            className="p-inputtext-sm"
+            style={{ width: '80px' }}
+          />
+          <span className="mr-1">Chart:</span>
+          <Dropdown
+            value={chartLibrary}
+            options={['lightweight', 'chartjs', 'amcharts']}
+            onChange={e => setChartLibrary(e.value)}
+            className="p-inputtext-sm"
+            style={{ width: '100px' }}
+          />
+        </>
+      )}
+   
       {/* Старый график lightweight-charts */}
       {chartLibrary === 'lightweight' && (
         <div className="chart-row">
