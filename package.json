@@ -63,6 +63,7 @@
   },
   "license": "MIT",
   "dependencies": {
+    "@amcharts/amcharts5": "^5.18.0",
     "@grpc/grpc-js": "^1.14.3",
     "@grpc/proto-loader": "^0.8.1",
     "@supabase/supabase-js": "^2.103.0",

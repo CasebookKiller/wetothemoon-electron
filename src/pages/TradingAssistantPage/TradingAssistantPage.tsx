@@ -28,6 +28,7 @@ import { VolumeProfileOverlay } from '@/components/TRADING_ASSISTANT/VolumeProfi
 import { PositionsOrdersTab } from '@/components/TRADING_ASSISTANT/PositionsOrdersTab/PositionsOrdersTab';
 import { LogTab } from '@/components/TRADING_ASSISTANT/LogTab/LogTab';
 import { CandlestickChart } from '@/components/TRADING_ASSISTANT/CandlestickChart/CandlestickChart';
+import { AmChartsStockChart } from '@/components/TRADING_ASSISTANT/AmChartsStockChart/AmChartsStockChart';
 
 function quotationToNumber(q: any): number {
   if (!q) return 0;
@@ -197,7 +198,7 @@ export const TradingAssistantPage: React.FC = () => {
 
   const [positionMarkers, setPositionMarkers] = useState<any[]>([]);
   
-  const [chartLibrary, setChartLibrary] = useState<'lightweight' | 'chartjs'>('lightweight');
+  const [chartLibrary, setChartLibrary] = useState<'lightweight' | 'chartjs' | 'amcharts'>('lightweight');
 
   // ========== REFS ДЛЯ ГРАФИКА ==========
   const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -1562,7 +1563,7 @@ export const TradingAssistantPage: React.FC = () => {
         <span className="mr-1">Chart:</span>
         <Dropdown
           value={chartLibrary}
-          options={['lightweight', 'chartjs']}
+          options={['lightweight', 'chartjs', 'amcharts']}
           onChange={e => setChartLibrary(e.value)}
           className="p-inputtext-sm"
           style={{ width: '100px' }}
@@ -1639,6 +1640,16 @@ export const TradingAssistantPage: React.FC = () => {
             />
           </div>
         </div>
+      )}
+      {/* Новый график amcharts */}
+      {chartLibrary === 'amcharts' && (
+        <AmChartsStockChart
+          candlesData={currentCandles}
+          volumeByPrice={currentProfile?.volumeByPrice}
+          poc={currentProfile?.poc}
+          vah={currentProfile?.valueAreaHigh}
+          val={currentProfile?.valueAreaLow}
+        />
       )}
     
     </div>

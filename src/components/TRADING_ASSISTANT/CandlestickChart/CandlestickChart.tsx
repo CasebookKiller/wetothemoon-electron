@@ -46,7 +46,10 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
   positions = [],
   onVisiblePriceRangeChange,
 }) => {
-  const candlestickData = candlesData.map(c => ({
+  // Фильтруем свечи: time > 0
+  const validCandles = candlesData.filter(c => c.time > 0);
+
+  const candlestickData = validCandles.map(c => ({
     x: c.time * 1000,
     o: c.open,
     h: c.high,
@@ -54,9 +57,9 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
     c: c.close,
   }));
 
-  const timeRange = candlesData.length > 0
-    ? [candlesData[0].time * 1000, candlesData[candlesData.length - 1].time * 1000]
-    : [0, 0];
+  const timeRange = validCandles.length > 0
+    ? [validCandles[0].time * 1000, validCandles[validCandles.length - 1].time * 1000]
+    : null;
 
   const datasets: any[] = [
     {
@@ -67,56 +70,60 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
     },
   ];
 
-  // Линии уровней
-  if (poc !== undefined) {
-    datasets.push({
-      label: 'POC',
-      type: 'line',
-      data: [
-        { x: timeRange[0], y: poc },
-        { x: timeRange[1], y: poc },
-      ],
-      borderColor: 'red',
-      borderWidth: 2,
-      pointRadius: 0,
-      fill: false,
-      yAxisID: 'y',
-    });
-  }
-  if (vah !== undefined) {
-    datasets.push({
-      label: 'VAH',
-      type: 'line',
-      data: [
-        { x: timeRange[0], y: vah },
-        { x: timeRange[1], y: vah },
-      ],
-      borderColor: 'green',
-      borderWidth: 1,
-      borderDash: [4, 4],
-      pointRadius: 0,
-      fill: false,
-      yAxisID: 'y',
-    });
-  }
-  if (val !== undefined) {
-    datasets.push({
-      label: 'VAL',
-      type: 'line',
-      data: [
-        { x: timeRange[0], y: val },
-        { x: timeRange[1], y: val },
-      ],
-      borderColor: 'green',
-      borderWidth: 1,
-      borderDash: [4, 4],
-      pointRadius: 0,
-      fill: false,
-      yAxisID: 'y',
-    });
+  // Линии уровней строим только если есть временной диапазон
+  if (timeRange) {
+    if (poc !== undefined) {
+      datasets.push({
+        label: 'POC',
+        type: 'line',
+        data: [
+          { x: timeRange[0], y: poc },
+          { x: timeRange[1], y: poc },
+        ],
+        borderColor: 'red',
+        borderWidth: 2,
+        pointRadius: 0,
+        fill: false,
+        yAxisID: 'y',
+      });
+    }
+
+    if (vah !== undefined) {
+      datasets.push({
+        label: 'VAH',
+        type: 'line',
+        data: [
+          { x: timeRange[0], y: vah },
+          { x: timeRange[1], y: vah },
+        ],
+        borderColor: 'green',
+        borderWidth: 1,
+        borderDash: [4, 4],
+        pointRadius: 0,
+        fill: false,
+        yAxisID: 'y',
+      });
+    }
+
+    if (val !== undefined) {
+      datasets.push({
+        label: 'VAL',
+        type: 'line',
+        data: [
+          { x: timeRange[0], y: val },
+          { x: timeRange[1], y: val },
+        ],
+        borderColor: 'green',
+        borderWidth: 1,
+        borderDash: [4, 4],
+        pointRadius: 0,
+        fill: false,
+        yAxisID: 'y',
+      });
+    }
   }
 
-  // Маркеры сигналов и выходов
+  // Маркеры сигналов и выходов (без изменений)
   if (signals.length > 0) {
     datasets.push({
       label: 'Signals',
@@ -134,6 +141,7 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
       yAxisID: 'y',
     });
   }
+
   if (trades.length > 0) {
     datasets.push({
       label: 'Exits',
@@ -172,12 +180,15 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
           },
           scales: {
             x: {
-              type: 'timeseries',
+              type: 'time',
               time: {
                 unit: 'minute',
                 displayFormats: { minute: 'HH:mm' },
               },
               grid: { display: false },
+              // Явно задаём min/max, чтобы избежать ошибок с нулевыми метками
+              min: timeRange ? timeRange[0] : undefined,
+              max: timeRange ? timeRange[1] : undefined,
             },
             y: {
               position: 'right',
