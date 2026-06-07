@@ -872,43 +872,13 @@ function getProtoPath(protoFileName) {
 	if (electron.app.isPackaged) return path.default.join(process.resourcesPath, "proto", protoFileName);
 	return path.default.join(__dirname, "../../proto", protoFileName);
 }
-var marketDataBus = class MarketDataBus extends events.EventEmitter {
-	static instance;
-	constructor() {
-		super();
-		this.setMaxListeners(50);
-	}
-	static getInstance() {
-		if (!MarketDataBus.instance) MarketDataBus.instance = new MarketDataBus();
-		return MarketDataBus.instance;
-	}
-	onCandle(handler) {
-		this.on("candle", handler);
-		return this;
-	}
-	onTrade(handler) {
-		this.on("trade", handler);
-		return this;
-	}
-	onOrderBook(handler) {
-		this.on("orderbook", handler);
-		return this;
-	}
-	onLastPrice(handler) {
-		this.on("lastPrice", handler);
-		return this;
-	}
-	offCandle(handler) {
-		this.off("candle", handler);
-		return this;
-	}
-	offTrade(handler) {
-		this.off("trade", handler);
-		return this;
-	}
-}.getInstance();
 //#endregion
 //#region src/main/streams/marketdata.ts
+var MAX_RECONNECT_ATTEMPTS = 10;
+var BASE_DELAY_MS = 1e3;
+var retryTimeout = null;
+var retryCount = 0;
+var stopRequested = false;
 var registerMarketdataStreamHandlers = () => {
 	let currentStream = null;
 	console.log("[Main] registerMDStreamHandlers called");
@@ -927,74 +897,66 @@ var registerMarketdataStreamHandlers = () => {
 	console.log("[Main] gRPC client created");
 	electron.ipcMain.handle("md-stream-start", async (_, token, requestBody) => {
 		console.log("[Main] md-stream-start called");
-		console.log("[Main] Token:", token?.slice(0, 12) + "...");
-		console.log("[Main] Request body:", JSON.stringify(requestBody).slice(0, 400));
+		stopRequested = false;
 		if (currentStream) {
-			console.log("[Main] Stopping previous stream");
 			currentStream.cancel();
 			currentStream = null;
 		}
-		const metadata = new _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.Metadata();
-		metadata.add("Authorization", `Bearer ${token}`);
-		console.log("[Main] Calling MarketDataServerSideStream...");
-		const stream = client.MarketDataServerSideStream(requestBody, metadata);
-		currentStream = stream;
-		console.log("[Main] Stream created");
-		let buffer = "";
-		stream.on("data", (data) => {
-			if (typeof data !== "string" && typeof data !== "object") return;
-			const chunk = typeof data === "string" ? data : JSON.stringify(data);
-			buffer += chunk;
-			let begin = 0;
-			let depth = 0;
-			let inString = false;
-			let escape = false;
-			for (let i = 0; i < buffer.length; i++) {
-				const ch = buffer[i];
-				if (inString) {
-					if (escape) escape = false;
-					else if (ch === "\\") escape = true;
-					else if (ch === "\"") inString = false;
-					continue;
-				}
-				if (ch === "\"") inString = true;
-				else if (ch === "{") {
-					if (depth === 0) begin = i;
-					depth++;
-				} else if (ch === "}") {
-					depth--;
-					if (depth === 0) {
-						const jsonStr = buffer.substring(begin, i + 1);
-						try {
-							const parsed = JSON.parse(jsonStr);
-							if (parsed.candle) marketDataBus.emit("candle", parsed.candle);
-							if (parsed.trade) marketDataBus.emit("trade", parsed.trade);
-							if (parsed.orderbook) marketDataBus.emit("orderbook", parsed.orderbook);
-							if (parsed.lastPrice) marketDataBus.emit("lastPrice", parsed.lastPrice);
-							if (parsed.openInterest) marketDataBus.emit("openInterest", parsed.openInterest);
-							const win = getBondsWindow();
-							if (win && !win.isDestroyed()) win.webContents.send("md-stream-data", jsonStr);
-						} catch {
-							console.warn("[Main] Skipped invalid JSON fragment:", jsonStr.slice(0, 100));
-						}
-					}
-				}
+		if (retryTimeout) {
+			clearTimeout(retryTimeout);
+			retryTimeout = null;
+		}
+		retryCount = 0;
+		const connect = () => {
+			if (stopRequested) {
+				console.log("[Main] Reconnect stopped by user");
+				return;
 			}
-			if (depth > 0) buffer = buffer.substring(begin);
-			else buffer = "";
-		});
-		stream.on("status", (status) => {
-			const win = getBondsWindow();
-			if (win) win.webContents.send("md-stream-closed");
-		});
-		stream.on("error", (err) => {
-			const win = getBondsWindow();
-			if (win) win.webContents.send("md-stream-error", err.message);
-		});
-		console.log("[Main] Request sent");
+			console.log(`[Main] Connecting stream (attempt ${retryCount + 1})`);
+			const metadata = new _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.Metadata();
+			metadata.add("Authorization", `Bearer ${token}`);
+			const stream = client.MarketDataServerSideStream(requestBody, metadata);
+			currentStream = stream;
+			let buffer = "";
+			stream.on("data", (data) => {
+				if (typeof data !== "string" && typeof data !== "object") return;
+				const chunk = typeof data === "string" ? data : JSON.stringify(data);
+				buffer += chunk;
+			});
+			stream.on("end", () => {
+				console.log("[Main] Stream ended");
+				currentStream = null;
+				if (!stopRequested) scheduleReconnect();
+			});
+			stream.on("error", (err) => {
+				console.error("[Main] Stream error:", err.message);
+				currentStream = null;
+				if (!stopRequested) scheduleReconnect();
+			});
+			stream.on("status", (status) => {
+				console.log("[Main] Stream status:", status);
+			});
+		};
+		const scheduleReconnect = () => {
+			if (stopRequested) return;
+			if (retryCount >= MAX_RECONNECT_ATTEMPTS) {
+				console.error("[Main] Max reconnection attempts reached");
+				return;
+			}
+			const delay = BASE_DELAY_MS * Math.pow(2, retryCount);
+			retryCount++;
+			console.log(`[Main] Scheduling reconnect in ${delay}ms (attempt ${retryCount})`);
+			retryTimeout = setTimeout(connect, delay);
+		};
+		connect();
 	});
 	electron.ipcMain.handle("md-stream-stop", async () => {
 		console.log("[Main] md-stream-stop called");
+		stopRequested = true;
+		if (retryTimeout) {
+			clearTimeout(retryTimeout);
+			retryTimeout = null;
+		}
 		if (currentStream) {
 			currentStream.cancel();
 			currentStream = null;
@@ -1200,6 +1162,41 @@ var createTradingAssistantWindow = () => {
 	return tradingAssistantWindow;
 };
 var getTradingAssistantWindow = () => tradingAssistantWindow;
+var marketDataBus = class MarketDataBus extends events.EventEmitter {
+	static instance;
+	constructor() {
+		super();
+		this.setMaxListeners(50);
+	}
+	static getInstance() {
+		if (!MarketDataBus.instance) MarketDataBus.instance = new MarketDataBus();
+		return MarketDataBus.instance;
+	}
+	onCandle(handler) {
+		this.on("candle", handler);
+		return this;
+	}
+	onTrade(handler) {
+		this.on("trade", handler);
+		return this;
+	}
+	onOrderBook(handler) {
+		this.on("orderbook", handler);
+		return this;
+	}
+	onLastPrice(handler) {
+		this.on("lastPrice", handler);
+		return this;
+	}
+	offCandle(handler) {
+		this.off("candle", handler);
+		return this;
+	}
+	offTrade(handler) {
+		this.off("trade", handler);
+		return this;
+	}
+}.getInstance();
 //#endregion
 //#region src/main/services/volumeProfileEngine.ts
 function quotationToNumber$3(q) {
@@ -4991,6 +4988,14 @@ function applyMenuToWindow(win, template) {
 	const menu = electron.Menu.buildFromTemplate(template);
 	win.setMenu(menu);
 }
+setInterval(() => {
+	const mem = process.memoryUsage();
+	const win = getTradingAssistantWindow();
+	if (win && !win.isDestroyed()) win.webContents.send("system:memory", {
+		rss: (mem.rss / 1024 / 1024).toFixed(1),
+		heap: (mem.heapUsed / 1024 / 1024).toFixed(1)
+	});
+}, 3e4);
 //#endregion
 
 //# sourceMappingURL=main.js.map

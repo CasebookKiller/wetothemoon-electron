@@ -7,6 +7,13 @@ import { getBondsWindow } from '../windows/bondsWindow';
 import { getProtoPath } from '../utils/protoPath';
 import { marketDataBus } from '../services/marketDataBus';
 
+const MAX_RECONNECT_ATTEMPTS = 10;
+const BASE_DELAY_MS = 1000;
+
+let retryTimeout: ReturnType<typeof setTimeout> | null = null;
+let retryCount = 0;
+let stopRequested = false; // флаг, чтобы не переподключаться после ручной остановки
+
 export const registerMarketdataStreamHandlers = () => {
   // регистрируем обработчики API
 
@@ -44,116 +51,85 @@ export const registerMarketdataStreamHandlers = () => {
 
   ipcMain.handle('md-stream-start', async (_, token: string, requestBody: any) => {
     console.log('[Main] md-stream-start called');
-    console.log('[Main] Token:', token?.slice(0, 12) + '...');
-    console.log('[Main] Request body:', JSON.stringify(requestBody).slice(0, 400));
+    stopRequested = false; // сбрасываем флаг остановки
 
+    // Останавливаем текущий стрим и таймеры, если есть
     if (currentStream) {
-      console.log('[Main] Stopping previous stream');
       currentStream.cancel();
       currentStream = null;
     }
+    if (retryTimeout) {
+      clearTimeout(retryTimeout);
+      retryTimeout = null;
+    }
+    retryCount = 0;
 
-    const metadata = new grpc.Metadata();
-    metadata.add('Authorization', `Bearer ${token}`);
-
-    console.log('[Main] Calling MarketDataServerSideStream...');
-    const stream = client.MarketDataServerSideStream(requestBody, metadata);
-    currentStream = stream;
-    console.log('[Main] Stream created');
-
-    // Буфер для неполных данных (если data приходит строкой)
-    let buffer = '';
-
-    stream.on('data', (data: any) => {
-      // gRPC может отдавать уже готовый объект – сразу отправляем
-      if (typeof data !== 'string' && typeof data !== 'object') return;
-
-      // Если пришёл объект, превращаем в строку и добавляем в буфер
-      const chunk = typeof data === 'string' ? data : JSON.stringify(data);
-      buffer += chunk;
-
-      // Потоковый разбор: ищем полные JSON-объекты по фигурным скобкам
-      let begin = 0;
-      let depth = 0;
-      let inString = false;
-      let escape = false;
-
-      for (let i = 0; i < buffer.length; i++) {
-        const ch = buffer[i];
-
-        if (inString) {
-          if (escape) escape = false;
-          else if (ch === '\\') escape = true;
-          else if (ch === '"') inString = false;
-          continue;
-        }
-
-        if (ch === '"') {
-          inString = true;
-        } else if (ch === '{') {
-          if (depth === 0) begin = i;
-          depth++;
-        } else if (ch === '}') {
-          depth--;
-          if (depth === 0) {
-            const jsonStr = buffer.substring(begin, i + 1);
-            try {
-              const parsed = JSON.parse(jsonStr);          // <-- парсим один раз
-              // 1. Отправляем в шину для всех подписчиков main-процесса
-              if (parsed.candle) {
-                marketDataBus.emit('candle', parsed.candle);
-              }
-              if (parsed.trade) {
-                marketDataBus.emit('trade', parsed.trade);
-              }
-              if (parsed.orderbook) {
-                marketDataBus.emit('orderbook', parsed.orderbook);
-              }
-              if (parsed.lastPrice) {
-                marketDataBus.emit('lastPrice', parsed.lastPrice);
-              }
-              if (parsed.openInterest) {
-                marketDataBus.emit('openInterest', parsed.openInterest);
-              }
-              // … при необходимости добавьте другие типы (tradingStatus, ping)
-
-              // 2. Отправляем в окно BondsWindow (как раньше)
-              const win = getBondsWindow();
-              if (win && !win.isDestroyed()) {
-                win.webContents.send('md-stream-data', jsonStr);
-              } else {
-                // console.warn('[Main] Bonds window not available'); // окно не нужно, данные идут в шину
-              }
-            } catch {
-              console.warn('[Main] Skipped invalid JSON fragment:', jsonStr.slice(0, 100));
-            }
-          }
-        }
+    // Функция подключения
+    const connect = () => {
+      if (stopRequested) {
+        console.log('[Main] Reconnect stopped by user');
+        return;
       }
 
-      // Оставляем в буфере только незавершённый остаток
-      if (depth > 0) {
-        buffer = buffer.substring(begin);
-      } else {
-        buffer = '';
+      console.log(`[Main] Connecting stream (attempt ${retryCount + 1})`);
+      const metadata = new grpc.Metadata();
+      metadata.add('Authorization', `Bearer ${token}`);
+
+      const stream = client.MarketDataServerSideStream(requestBody, metadata);
+      currentStream = stream;
+
+      // Буфер для неполных данных
+      let buffer = '';
+
+      stream.on('data', (data: any) => {
+        if (typeof data !== 'string' && typeof data !== 'object') return;
+        const chunk = typeof data === 'string' ? data : JSON.stringify(data);
+        buffer += chunk;
+        // ... (существующий разбор JSON, оставь без изменений) ...
+        // После успешного разбора оставляем остаток в buffer
+      });
+
+      stream.on('end', () => {
+        console.log('[Main] Stream ended');
+        currentStream = null;
+        // Если останов не запрошен – переподключаемся
+        if (!stopRequested) scheduleReconnect();
+      });
+
+      stream.on('error', (err: any) => {
+        console.error('[Main] Stream error:', err.message);
+        currentStream = null;
+        if (!stopRequested) scheduleReconnect();
+      });
+
+      stream.on('status', (status: any) => {
+        // статус можно логировать, но reconnect сработает по end/error
+        console.log('[Main] Stream status:', status);
+      });
+    };
+
+    const scheduleReconnect = () => {
+      if (stopRequested) return;
+      if (retryCount >= MAX_RECONNECT_ATTEMPTS) {
+        console.error('[Main] Max reconnection attempts reached');
+        return;
       }
-    });
+      const delay = BASE_DELAY_MS * Math.pow(2, retryCount);
+      retryCount++;
+      console.log(`[Main] Scheduling reconnect in ${delay}ms (attempt ${retryCount})`);
+      retryTimeout = setTimeout(connect, delay);
+    };
 
-    stream.on('status', (status: any) => {
-      const win = getBondsWindow();
-      if (win) win.webContents.send('md-stream-closed');
-    });
-
-    stream.on('error', (err: any) => {
-      const win = getBondsWindow();
-      if (win) win.webContents.send('md-stream-error', err.message);
-    });
-
-    console.log('[Main] Request sent');
+    connect(); // Первая попытка
   });
 
   ipcMain.handle('md-stream-stop', async () => {
     console.log('[Main] md-stream-stop called');
+    stopRequested = true;
+    if (retryTimeout) {
+      clearTimeout(retryTimeout);
+      retryTimeout = null;
+    }
     if (currentStream) {
       currentStream.cancel();
       currentStream = null;

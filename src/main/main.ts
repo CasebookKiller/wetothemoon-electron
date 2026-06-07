@@ -686,6 +686,17 @@ function applyMenuToWindow(win: BrowserWindow, template: MenuItemConstructorOpti
   win.setMenu(menu);
 }
 
+setInterval(() => {
+  const mem = process.memoryUsage();
+  const win = getTradingAssistantWindow();
+  if (win && !win.isDestroyed()) {
+    win.webContents.send('system:memory', {
+      rss: (mem.rss / 1024 / 1024).toFixed(1),
+      heap: (mem.heapUsed / 1024 / 1024).toFixed(1),
+    });
+  }
+}, 30000);
+
 //// --- Тестовый блок: проверка VolumeProfileEngine ---
 //const engine = new VolumeProfileEngine();
 //

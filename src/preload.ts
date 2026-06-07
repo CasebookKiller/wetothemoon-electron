@@ -270,6 +270,10 @@ try {
     screenerRun: (filters: any, token: string) =>
       ipcRenderer.invoke('trading-assistant:screener-run', filters, token),
 
+    onSystemMemory: (callback: (data: any) => void) => {
+      ipcRenderer.on('system:memory', (_, data) => callback(data));
+    }
+    
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)
