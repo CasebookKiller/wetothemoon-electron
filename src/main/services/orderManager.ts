@@ -3,6 +3,7 @@ import { OrderDirection, OrderType, OrderIdType } from '@/api/tbank/ordersTypes'
 import type { BacktestSignal } from './backtest/common';
 import { marketDataGrpc } from './tbank/MarketDataGrpcService';  // <-- новый импорт (в начале файла)
 import type { OrderFlowEngine } from './orderFlowEngine';
+import { HistoricalDataLoader } from './historicalDataLoader';
 
 export interface OrderManagerConfig {
   lotQuantity: number;
@@ -18,6 +19,12 @@ export interface OrderManagerConfig {
   dailyLossLimit?: number;   // максимальный дневной убыток в рублях (0 = выключен)
   maxSignalsPerDay?: number;   // 0 = без ограничений
   minIntervalMinutes?: number; // минимальный интервал между сигналами (по умолчанию 15)
+  useDynamicSizing?: boolean;   // включить расчёт лотов по волатильности
+  atrPeriod?: number;           // период ATR (по умолчанию 14)
+  atrMultiplier?: number;       // множитель ATR для размера позиции (по умолчанию 2)
+  riskAmount?: number;          // сумма риска на сделку в рублях (если 0 – не используется)
+  trailingMode?: 'percent' | 'volatility'; // режим трейлинга
+  volatilityMultiplier?: number; // множитель для стопа по волатильности
 }
 
 export class OrderManager {
@@ -36,8 +43,9 @@ export class OrderManager {
   private lastLossResetDate: string = '';
   private lastEntryPrice: number = 0;
   private orderFlow?: OrderFlowEngine;
+  private historicalLoader?: HistoricalDataLoader;
 
-  constructor(config: Partial<OrderManagerConfig> = {}, orderFlow?: OrderFlowEngine) {
+  constructor(config: Partial<OrderManagerConfig> = {}, orderFlow?: OrderFlowEngine, historicalLoader?: HistoricalDataLoader) {
     this.config = {
       lotQuantity: 1,
       useMarketOrder: true,
@@ -52,9 +60,16 @@ export class OrderManager {
       dailyLossLimit: 0,
       maxSignalsPerDay: 0,
       minIntervalMinutes: 15,
+      useDynamicSizing: false,
+      atrPeriod: 14,
+      atrMultiplier: 2,
+      riskAmount: 1000,        // 1000 руб риска на сделку
+      trailingMode: 'percent',
+      volatilityMultiplier: 2,
       ...config,
     };
     this.orderFlow = orderFlow;   // сохраняем отдельно
+    this.historicalLoader = historicalLoader;
   }
 
   updateConfig(patch: Partial<OrderManagerConfig>): void {
@@ -83,27 +98,35 @@ export class OrderManager {
     }
 
     const direction = signal.type === 'BUY' ? OrderDirection.ORDER_DIRECTION_BUY : OrderDirection.ORDER_DIRECTION_SELL;
-    const quantity = this.config.lotQuantity;
-    const price = signal.price;
 
-    // Оцениваем результат предыдущей сделки (если была позиция)
+    // === ДИНАМИЧЕСКИЙ РАЗМЕР ПОЗИЦИИ ПО ATR ===
+    let quantity = this.config.lotQuantity;
+    if (this.config.useDynamicSizing && this.historicalLoader) {
+      const atr = await this.calculateATR(signal.instrumentUid, this.config.token);
+      if (atr && atr > 0 && this.config.riskAmount) {
+        const riskPerLot = atr * this.config.atrMultiplier!;
+        quantity = Math.floor(this.config.riskAmount / riskPerLot);
+        if (quantity < 1) quantity = 1;
+      }
+    }
+
+    // Оценка предыдущей сделки (существующая логика)
     if (this.lastEntryPrice > 0) {
       const prevProfit = signal.type === 'BUY'
-        ? signal.price - this.lastEntryPrice   // если был BUY, то сейчас продаём
-        : this.lastEntryPrice - signal.price;  // если был SELL, то сейчас покупаем
+        ? signal.price - this.lastEntryPrice
+        : this.lastEntryPrice - signal.price;
       this.updateDailyLoss(prevProfit);
     }
-    this.lastEntryPrice = signal.price; // запоминаем новую цену входа
+    this.lastEntryPrice = signal.price;
 
     try {
-      // Отправляем основной ордер
       const order = await sandboxGrpc.postSandboxOrder(
         {
           instrumentId: signal.instrumentUid,
           direction,
           orderType: this.config.useMarketOrder ? OrderType.ORDER_TYPE_MARKET : OrderType.ORDER_TYPE_LIMIT,
           quantity,
-          price: this.config.useMarketOrder ? undefined : { units: Math.floor(price), nano: Math.round((price % 1) * 1e9) },
+          price: this.config.useMarketOrder ? undefined : { units: Math.floor(signal.price), nano: Math.round((signal.price % 1) * 1e9) },
           accountId: this.config.accountId,
         },
         this.config.token
@@ -114,7 +137,6 @@ export class OrderManager {
 
       this.lastEntryPrice = signal.price;
 
-      // Устанавливаем стоп-лосс и тейк-профит, если заданы проценты
       await this.placeStopOrders(signal);
 
       if (this.config.trailingEnabled && this.activeStopOrderId) {
@@ -126,18 +148,35 @@ export class OrderManager {
   }
 
   private async placeStopOrders(signal: BacktestSignal): Promise<void> {
-    const { stopLossPercent, takeProfitPercent, lotQuantity, token, accountId } = this.config;
-    if (stopLossPercent <= 0 && takeProfitPercent <= 0) return;
+    const {
+      stopLossPercent,
+      takeProfitPercent,
+      lotQuantity,
+      token,
+      accountId,
+      trailingMode,
+      volatilityMultiplier
+    } = this.config;
+
+    if (stopLossPercent <= 0 && takeProfitPercent <= 0 && trailingMode !== 'volatility') return;
     if (!accountId || !token || !signal.instrumentUid) return;
 
     const entryPrice = signal.price;
     const isBuy = signal.type === 'BUY';
+    let slPrice: number | null = null;
 
-    // Стоп-лосс
-    if (stopLossPercent > 0) {
-      const slPrice = isBuy
+    if (trailingMode === 'volatility' && volatilityMultiplier && this.historicalLoader) {
+      const atr = await this.calculateATR(signal.instrumentUid, token);
+      if (atr && atr > 0) {
+        slPrice = isBuy ? entryPrice - atr * volatilityMultiplier : entryPrice + atr * volatilityMultiplier;
+      }
+    } else if (stopLossPercent > 0) {
+      slPrice = isBuy
         ? entryPrice * (1 - stopLossPercent / 100)
         : entryPrice * (1 + stopLossPercent / 100);
+    }
+
+    if (slPrice) {
       try {
         await sandboxGrpc.postSandboxStopOrder(
           {
@@ -156,7 +195,7 @@ export class OrderManager {
       }
     }
 
-    // Тейк-профит
+    // Тейк-профит (без изменений)
     if (takeProfitPercent > 0) {
       const tpPrice = isBuy
         ? entryPrice * (1 + takeProfitPercent / 100)
@@ -217,10 +256,20 @@ export class OrderManager {
       const lastPrice = await this.getLastPrice(this.trailingInstrumentUid);
       if (!lastPrice) return;
 
-      const isBuy = true; // Для лонгов; для шортов условие обратное
-      const newStopPrice = isBuy
-        ? lastPrice * (1 - this.trailingPercent / 100)
-        : lastPrice * (1 + this.trailingPercent / 100);
+      const isBuy = true; // или определять по текущей позиции, пока для лонгов
+      let newStopPrice: number;
+
+      if (this.config.trailingMode === 'volatility' && this.config.volatilityMultiplier && this.historicalLoader) {
+        const atr = await this.calculateATR(this.trailingInstrumentUid, this.config.token);
+        if (!atr) return;
+        newStopPrice = isBuy
+          ? lastPrice - atr * this.config.volatilityMultiplier
+          : lastPrice + atr * this.config.volatilityMultiplier;
+      } else {
+        newStopPrice = isBuy
+          ? lastPrice * (1 - this.config.trailingPercent / 100)
+          : lastPrice * (1 + this.config.trailingPercent / 100);
+      }
 
       if ((isBuy && newStopPrice > this.trailingEntryPrice) || (!isBuy && newStopPrice < this.trailingEntryPrice)) {
         await sandboxGrpc.replaceSandboxOrder(
@@ -273,5 +322,33 @@ export class OrderManager {
 
   public getConfig(): Readonly<OrderManagerConfig> {
     return this.config;
+  }
+
+  private async calculateATR(instrumentUid: string, token: string): Promise<number | null> {
+    if (!this.historicalLoader) return null;
+    try {
+      const now = new Date();
+      const from = new Date(now.getTime() - (this.config.atrPeriod! + 1) * 86400000);
+      const candles = await this.historicalLoader.loadIntradayCandles(
+        instrumentUid, from, now, token, 4 // CANDLE_INTERVAL_DAY
+      );
+      if (candles.length < this.config.atrPeriod!) return null;
+
+      let trueRanges: number[] = [];
+      for (let i = 1; i < candles.length; i++) {
+        const prev = candles[i - 1];
+        const curr = candles[i];
+        const high = Number(curr.high?.units || 0) + Number(curr.high?.nano || 0) / 1e9;
+        const low = Number(curr.low?.units || 0) + Number(curr.low?.nano || 0) / 1e9;
+        const prevClose = Number(prev.close?.units || 0) + Number(prev.close?.nano || 0) / 1e9;
+        const tr = Math.max(high - low, Math.abs(high - prevClose), Math.abs(low - prevClose));
+        trueRanges.push(tr);
+      }
+
+      const atr = trueRanges.reduce((s, v) => s + v, 0) / trueRanges.length;
+      return atr;
+    } catch {
+      return null;
+    }
   }
 }

@@ -4726,7 +4726,8 @@ var OrderManager = class {
 	lastLossResetDate = "";
 	lastEntryPrice = 0;
 	orderFlow;
-	constructor(config = {}, orderFlow) {
+	historicalLoader;
+	constructor(config = {}, orderFlow, historicalLoader) {
 		this.config = {
 			lotQuantity: 1,
 			useMarketOrder: true,
@@ -4741,9 +4742,16 @@ var OrderManager = class {
 			dailyLossLimit: 0,
 			maxSignalsPerDay: 0,
 			minIntervalMinutes: 15,
+			useDynamicSizing: false,
+			atrPeriod: 14,
+			atrMultiplier: 2,
+			riskAmount: 1e3,
+			trailingMode: "percent",
+			volatilityMultiplier: 2,
 			...config
 		};
 		this.orderFlow = orderFlow;
+		this.historicalLoader = historicalLoader;
 	}
 	updateConfig(patch) {
 		this.config = {
@@ -4770,8 +4778,15 @@ var OrderManager = class {
 			return;
 		}
 		const direction = signal.type === "BUY" ? OrderDirection.ORDER_DIRECTION_BUY : OrderDirection.ORDER_DIRECTION_SELL;
-		const quantity = this.config.lotQuantity;
-		const price = signal.price;
+		let quantity = this.config.lotQuantity;
+		if (this.config.useDynamicSizing && this.historicalLoader) {
+			const atr = await this.calculateATR(signal.instrumentUid, this.config.token);
+			if (atr && atr > 0 && this.config.riskAmount) {
+				const riskPerLot = atr * this.config.atrMultiplier;
+				quantity = Math.floor(this.config.riskAmount / riskPerLot);
+				if (quantity < 1) quantity = 1;
+			}
+		}
 		if (this.lastEntryPrice > 0) {
 			const prevProfit = signal.type === "BUY" ? signal.price - this.lastEntryPrice : this.lastEntryPrice - signal.price;
 			this.updateDailyLoss(prevProfit);
@@ -4784,8 +4799,8 @@ var OrderManager = class {
 				orderType: this.config.useMarketOrder ? OrderType.ORDER_TYPE_MARKET : OrderType.ORDER_TYPE_LIMIT,
 				quantity,
 				price: this.config.useMarketOrder ? void 0 : {
-					units: Math.floor(price),
-					nano: Math.round(price % 1 * 1e9)
+					units: Math.floor(signal.price),
+					nano: Math.round(signal.price % 1 * 1e9)
 				},
 				accountId: this.config.accountId
 			}, this.config.token);
@@ -4800,29 +4815,31 @@ var OrderManager = class {
 		}
 	}
 	async placeStopOrders(signal) {
-		const { stopLossPercent, takeProfitPercent, lotQuantity, token, accountId } = this.config;
-		if (stopLossPercent <= 0 && takeProfitPercent <= 0) return;
+		const { stopLossPercent, takeProfitPercent, lotQuantity, token, accountId, trailingMode, volatilityMultiplier } = this.config;
+		if (stopLossPercent <= 0 && takeProfitPercent <= 0 && trailingMode !== "volatility") return;
 		if (!accountId || !token || !signal.instrumentUid) return;
 		const entryPrice = signal.price;
 		const isBuy = signal.type === "BUY";
-		if (stopLossPercent > 0) {
-			const slPrice = isBuy ? entryPrice * (1 - stopLossPercent / 100) : entryPrice * (1 + stopLossPercent / 100);
-			try {
-				await sandboxGrpc.postSandboxStopOrder({
-					instrumentId: signal.instrumentUid,
-					direction: isBuy ? OrderDirection.ORDER_DIRECTION_SELL : OrderDirection.ORDER_DIRECTION_BUY,
-					stopOrderType: 1,
-					price: {
-						units: Math.floor(slPrice),
-						nano: Math.round(slPrice % 1 * 1e9)
-					},
-					quantity: lotQuantity,
-					accountId
-				}, token);
-				console.log(`[OrderManager] Стоп-лосс установлен на ${slPrice}`);
-			} catch (e) {
-				console.error("[OrderManager] Ошибка установки стоп-лосса:", e);
-			}
+		let slPrice = null;
+		if (trailingMode === "volatility" && volatilityMultiplier && this.historicalLoader) {
+			const atr = await this.calculateATR(signal.instrumentUid, token);
+			if (atr && atr > 0) slPrice = isBuy ? entryPrice - atr * volatilityMultiplier : entryPrice + atr * volatilityMultiplier;
+		} else if (stopLossPercent > 0) slPrice = isBuy ? entryPrice * (1 - stopLossPercent / 100) : entryPrice * (1 + stopLossPercent / 100);
+		if (slPrice) try {
+			await sandboxGrpc.postSandboxStopOrder({
+				instrumentId: signal.instrumentUid,
+				direction: isBuy ? OrderDirection.ORDER_DIRECTION_SELL : OrderDirection.ORDER_DIRECTION_BUY,
+				stopOrderType: 1,
+				price: {
+					units: Math.floor(slPrice),
+					nano: Math.round(slPrice % 1 * 1e9)
+				},
+				quantity: lotQuantity,
+				accountId
+			}, token);
+			console.log(`[OrderManager] Стоп-лосс установлен на ${slPrice}`);
+		} catch (e) {
+			console.error("[OrderManager] Ошибка установки стоп-лосса:", e);
 		}
 		if (takeProfitPercent > 0) {
 			const tpPrice = isBuy ? entryPrice * (1 + takeProfitPercent / 100) : entryPrice * (1 - takeProfitPercent / 100);
@@ -4881,7 +4898,12 @@ var OrderManager = class {
 		try {
 			const lastPrice = await this.getLastPrice(this.trailingInstrumentUid);
 			if (!lastPrice) return;
-			const newStopPrice = lastPrice * (1 - this.trailingPercent / 100);
+			let newStopPrice;
+			if (this.config.trailingMode === "volatility" && this.config.volatilityMultiplier && this.historicalLoader) {
+				const atr = await this.calculateATR(this.trailingInstrumentUid, this.config.token);
+				if (!atr) return;
+				newStopPrice = lastPrice - atr * this.config.volatilityMultiplier;
+			} else newStopPrice = lastPrice * (1 - this.config.trailingPercent / 100);
 			if (newStopPrice > this.trailingEntryPrice || false) {
 				await sandboxGrpc.replaceSandboxOrder({
 					accountId: this.config.accountId,
@@ -4929,6 +4951,28 @@ var OrderManager = class {
 	}
 	getConfig() {
 		return this.config;
+	}
+	async calculateATR(instrumentUid, token) {
+		if (!this.historicalLoader) return null;
+		try {
+			const now = /* @__PURE__ */ new Date();
+			const from = /* @__PURE__ */ new Date(now.getTime() - (this.config.atrPeriod + 1) * 864e5);
+			const candles = await this.historicalLoader.loadIntradayCandles(instrumentUid, from, now, token, 4);
+			if (candles.length < this.config.atrPeriod) return null;
+			let trueRanges = [];
+			for (let i = 1; i < candles.length; i++) {
+				const prev = candles[i - 1];
+				const curr = candles[i];
+				const high = Number(curr.high?.units || 0) + Number(curr.high?.nano || 0) / 1e9;
+				const low = Number(curr.low?.units || 0) + Number(curr.low?.nano || 0) / 1e9;
+				const prevClose = Number(prev.close?.units || 0) + Number(prev.close?.nano || 0) / 1e9;
+				const tr = Math.max(high - low, Math.abs(high - prevClose), Math.abs(low - prevClose));
+				trueRanges.push(tr);
+			}
+			return trueRanges.reduce((s, v) => s + v, 0) / trueRanges.length;
+		} catch {
+			return null;
+		}
 	}
 };
 //#endregion
