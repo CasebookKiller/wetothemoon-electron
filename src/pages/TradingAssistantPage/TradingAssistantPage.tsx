@@ -431,7 +431,11 @@ export const TradingAssistantPage: React.FC = () => {
           low: quotationToNumber(c.low),
           close: quotationToNumber(c.close),
         }));
-        setBacktestCandlesData(formatted);   // ← бэктест-свечи
+        // Удаляем дубликаты по времени (lightweight‑charts требует уникальное время)
+        const uniqueFormatted = formatted.filter((c: any, i: number, arr: any[]) =>
+          i === 0 || c.time !== arr[i - 1].time
+        );
+        setBacktestCandlesData(uniqueFormatted);   // ← бэктест-свечи
       }
       setBacktestProfile(result.profile);    // ← бэктест-профиль
       updateBacktest({ signals: result.signals, result, trades: result.trades || [] });
@@ -725,6 +729,11 @@ export const TradingAssistantPage: React.FC = () => {
 
     const aggregated = aggregateCandles(currentCandles, stream.displayTimeframe);
 
+    // Удаляем дубликаты по времени (lightweight‑charts требует строго возрастающее уникальное время)
+    const uniqueAggregated = aggregated.filter((c, i, arr) => i === 0 || c.time !== arr[i - 1].time);
+    // Дополнительная сортировка на всякий случай
+    uniqueAggregated.sort((a, b) => a.time - b.time);
+
     const candleSeries = chart.addSeries(CandlestickSeries, {
       upColor: '#26a69a',
       downColor: '#ef5350',
@@ -735,7 +744,7 @@ export const TradingAssistantPage: React.FC = () => {
       priceLineVisible: true,
       lastValueVisible: true,
     });
-    candleSeries.setData(aggregated);
+    candleSeries.setData(uniqueAggregated);
     chart.timeScale().fitContent();
     candleSeriesRef.current = candleSeries;
   }, [currentCandles, stream.displayTimeframe]);
@@ -753,6 +762,9 @@ export const TradingAssistantPage: React.FC = () => {
     const firstTime = currentCandles[0].time as UTCTimestamp;
     const lastTime = currentCandles[currentCandles.length - 1].time as UTCTimestamp;
     if (typeof firstTime !== 'number' || typeof lastTime !== 'number') return;
+
+      // === ВОТ ЭТУ СТРОКУ ДОБАВЬТЕ ===
+    if (firstTime === lastTime) return;
 
     const addHorizontalLine = (price: number, color: string, title: string, lineWidth = 2) => {
       const series = chart.addSeries(LineSeries, {
@@ -819,6 +831,21 @@ export const TradingAssistantPage: React.FC = () => {
       const tradesOfReason = currentTrades.filter((t: any) => t.exitReason === key);
       if (tradesOfReason.length === 0) return;
 
+      const data = tradesOfReason
+        .map((trade: any) => {
+          const timestamp = new Date(trade.exitTime).getTime();
+          if (isNaN(timestamp)) return null; // отбрасываем невалидные даты
+          return {
+            time: Math.floor(timestamp / 1000) as Time,
+            value: trade.exitPrice,
+          };
+        })
+        .filter((d): d is { time: Time; value: number } => d !== null) // удаляем null
+        .filter((d, i, arr) => i === 0 || d.time !== arr[i - 1]?.time) // удаляем дубликаты
+        .sort((a, b) => Number(a.time) - Number(b.time));
+
+      if (data.length === 0) return;
+
       const series = chart.addSeries(LineSeries, {
         lineVisible: false,
         lastValueVisible: false,
@@ -826,11 +853,6 @@ export const TradingAssistantPage: React.FC = () => {
         pointMarkersRadius: 5,
         color,
       });
-
-      const data = tradesOfReason.map((trade: any) => ({
-        time: (Math.floor(new Date(trade.exitTime).getTime() / 1000)) as Time,
-        value: trade.exitPrice,
-      }));
 
       series.setData(data);
       exitMarkersRef.current.push(series);
@@ -1161,7 +1183,21 @@ export const TradingAssistantPage: React.FC = () => {
                     <label className="mr-1 mb-0">Strat</label>
                     <Dropdown
                       value={backtest.strategyType}
-                      options={['volume_accumulation', 'trend', 'poc_pullback', 'daily_va_return', 'fvg_volume', 'trend_pro', 'rejection']}
+                      options={[
+                        'volume_accumulation',
+                        'trend',
+                        'trend_pro',
+                        'poc_pullback',
+                        'daily_va_return',
+                        'fvg_volume',
+                        'rejection',
+                        'initial_balance',
+                        'va_breakout_retest',
+                        'sfp',
+                        'anchored_vwap',
+                        'absorption',
+                        'exhaustion',
+                      ]}
                       onChange={e => updateBacktest({ strategyType: e.value })}
                       className="p-inputtext-sm mr-2"
                       style={{ width: '120px' }}
@@ -1366,7 +1402,21 @@ export const TradingAssistantPage: React.FC = () => {
                   <label>Strategy</label>
                   <Dropdown
                     value={batchParams.strategyType}
-                    options={['volume_accumulation', 'trend', 'poc_pullback', 'daily_va_return', 'fvg_volume', 'trend_pro', 'rejection']}
+                    options={[
+                      'volume_accumulation',
+                      'trend',
+                      'trend_pro',
+                      'poc_pullback',
+                      'daily_va_return',
+                      'fvg_volume',
+                      'rejection',
+                      'initial_balance',
+                      'va_breakout_retest',
+                      'sfp',
+                      'anchored_vwap',
+                      'absorption',
+                      'exhaustion',
+                    ]}
                     onChange={e => setBatchParams({ ...batchParams, strategyType: e.value })}
                     className="p-inputtext-sm"
                   />

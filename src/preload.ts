@@ -281,6 +281,10 @@ try {
     cloudGetTasks: () => ipcRenderer.invoke('cloud:getTasks'), // нужно добавить IPC и серверный endpoint
     cloudTestConnection: (url: string) => ipcRenderer.invoke('cloud:testConnection', url),
 
+    getMarketPhase: (instrumentUid: string) => ipcRenderer.invoke('trading-assistant:get-market-phase', instrumentUid),
+    getOrderFlowDelta: (instrumentUid: string) => ipcRenderer.invoke('trading-assistant:get-orderflow-delta', instrumentUid),
+    getCompositeProfile: (instrumentUid: string, days: number, token: string) => ipcRenderer.invoke('trading-assistant:composite-profile', instrumentUid, days, token),
+
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

@@ -3560,7 +3560,7 @@ async function runBacktestInternal(instrumentUid, dateFrom, dateTo, intervalStr,
 		return null;
 	}
 }
-var registerTradingAssistantHandlers = () => {
+var registerTradingAssistantHandlers = (historicalLoader, profileEngine, getToken, strategyManager, compositeProfileService, orderFlowEngine) => {
 	electron.ipcMain.handle("trading-assistant:get-profile", (_, instrumentUid) => {
 		const profile = volumeProfileEngine.getProfile(instrumentUid);
 		return profile ? { ...profile } : null;
@@ -4165,6 +4165,19 @@ var registerTradingAssistantHandlers = () => {
 		tokenExpiry = Date.now() + 20 * 3600 * 1e3;
 		return cachedToken;
 	}
+	electron.ipcMain.handle("trading-assistant:get-market-phase", async (_, instrumentUid) => {
+		return await strategyManager.getCurrentPhase(instrumentUid);
+	});
+	electron.ipcMain.handle("trading-assistant:update-phase-mapping", (_, phase, strategyNames) => {
+		strategyManager.updatePhaseMapping(phase, strategyNames);
+		return true;
+	});
+	electron.ipcMain.handle("trading-assistant:get-orderflow-delta", (_, instrumentUid) => {
+		return orderFlowEngine.getDelta(instrumentUid);
+	});
+	electron.ipcMain.handle("trading-assistant:composite-profile", async (_, instrumentUid, days, token) => {
+		return await compositeProfileService.buildComposite(instrumentUid, days, token);
+	});
 };
 //#endregion
 //#region src/shared/types/promptgenerator.ts
@@ -5266,6 +5279,7 @@ var OrderFlowEngine = class {
 		if (data) data.barDelta = 0;
 	}
 };
+new OrderFlowEngine();
 //#endregion
 //#region src/main/main.ts
 var historicalDataLoader = new HistoricalDataLoader();
@@ -5274,6 +5288,9 @@ if (!(0, fs.existsSync)(scriptsDir)) {
 	(0, fs.mkdirSync)(scriptsDir, { recursive: true });
 	console.log("[Main] Создана папка для скриптов:", scriptsDir);
 }
+var getToken = () => {
+	return process.env.VITE_TReadOnly || "";
+};
 electron.app.whenReady().then(() => {
 	electron.session.defaultSession.setCertificateVerifyProc((request, callback) => {
 		callback(0);
@@ -5344,7 +5361,7 @@ electron.app.whenReady().then(() => {
 	registerGrpcHandlers();
 	registerTasksHandlers();
 	scheduler.start();
-	registerTradingAssistantHandlers();
+	registerTradingAssistantHandlers(historicalDataLoader, volumeProfileEngine, getToken, strategyManager, compositeProfileService, orderFlowEngine);
 	const orderManager = new OrderManager({
 		demoMode: true,
 		token: "",
@@ -5815,13 +5832,6 @@ var compositeProfileService = new CompositeProfileService(new HistoricalDataLoad
 var marketPhaseDetector = new MarketPhaseDetector(historicalDataLoader, volumeProfileEngine);
 var orderFlowEngine = new OrderFlowEngine();
 var strategyManager = new StrategyManager(marketPhaseDetector, compositeProfileService, volumeProfileEngine, orderFlowEngine);
-electron.ipcMain.handle("trading-assistant:update-phase-mapping", (_, phase, strategyNames) => {
-	strategyManager.updatePhaseMapping(phase, strategyNames);
-	return true;
-});
-electron.ipcMain.handle("trading-assistant:get-market-phase", async (_, instrumentUid) => {
-	return await strategyManager.getCurrentPhase(instrumentUid);
-});
 setInterval(() => {
 	const mem = process.memoryUsage();
 	const win = getTradingAssistantWindow();

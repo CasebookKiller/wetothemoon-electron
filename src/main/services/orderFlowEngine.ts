@@ -115,3 +115,5 @@ export class OrderFlowEngine {
     if (data) data.barDelta = 0;
   }
 }
+
+export const orderFlowEngine = new OrderFlowEngine();

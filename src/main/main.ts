@@ -76,6 +76,10 @@ let currentStream: grpc.ClientReadableStream<any> | null = null;
 
 let ws: WebSocket | null = null;
 
+const getToken = () => {
+  return process.env.VITE_TReadOnly || '';
+}
+
 // Этот метод будет вызван после того, как Electron завершит 
 // инициализацию и будет готов к созданию окон браузера. 
 // Некоторые API можно использовать только после этого события.
@@ -179,7 +183,14 @@ app.whenReady().then(() => {
   registerTasksHandlers();
   scheduler.start();
 
-  registerTradingAssistantHandlers();
+  registerTradingAssistantHandlers(
+    historicalDataLoader,      // экземпляр HistoricalDataLoader
+    volumeProfileEngine,       // синглтон
+    getToken,                  // функция, возвращающая токен (например, () => process.env.VITE_TReadOnly)
+    strategyManager,           // экземпляр StrategyManager
+    compositeProfileService,   // экземпляр CompositeProfileService
+    orderFlowEngine            // синглтон OrderFlowEngine
+  );
 
   // ----------------- Order Manager -----------------
   const orderManager = new OrderManager({
@@ -705,17 +716,6 @@ const strategyManager = new StrategyManager(
   volumeProfileEngine,
   orderFlowEngine
 );
-
-// IPC: обновить маппинг фаз
-ipcMain.handle('trading-assistant:update-phase-mapping', (_, phase: MarketPhase, strategyNames: string[]) => {
-  strategyManager.updatePhaseMapping(phase, strategyNames);
-  return true;
-});
-
-// IPC: запросить текущую фазу
-ipcMain.handle('trading-assistant:get-market-phase', async (_, instrumentUid: string) => {
-  return await strategyManager.getCurrentPhase(instrumentUid);
-});
 
 setInterval(() => {
   const mem = process.memoryUsage();

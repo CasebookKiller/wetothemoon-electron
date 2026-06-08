@@ -18,7 +18,6 @@ export interface OrderManagerConfig {
   dailyLossLimit?: number;   // максимальный дневной убыток в рублях (0 = выключен)
   maxSignalsPerDay?: number;   // 0 = без ограничений
   minIntervalMinutes?: number; // минимальный интервал между сигналами (по умолчанию 15)
-  
 }
 
 export class OrderManager {

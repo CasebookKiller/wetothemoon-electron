@@ -27,6 +27,11 @@ import * as fs from 'fs';
 import { ScreenerService } from '../services/screenerService';
 import { createStrategy } from '../services/backtest/strategies/strategyFactory';
 
+import { OrderFlowEngine, orderFlowEngine } from '../services/orderFlowEngine';
+import { StrategyManager } from '../services/strategyManager';
+import { CompositeProfileService } from '../services/compositeProfile';
+import { MarketPhase } from '../services/marketPhaseDetector';
+
 let orderManagerInstance: OrderManager | null = null;
 
 export const setOrderManagerInstance = (manager: OrderManager) => {
@@ -151,7 +156,14 @@ async function runBacktestInternal(
   }
 }
 
-export const registerTradingAssistantHandlers = () => {
+export const registerTradingAssistantHandlers = (
+  historicalLoader: HistoricalDataLoader,
+  profileEngine: VolumeProfileEngine,
+  getToken: () => string,
+  strategyManager: StrategyManager,
+  compositeProfileService: CompositeProfileService,   // <-- добавить
+  orderFlowEngine: OrderFlowEngine
+) => {
   // Получить текущий профиль по инструменту (по запросу)
   ipcMain.handle('trading-assistant:get-profile', (_, instrumentUid: string) => {
     const profile = volumeProfileEngine.getProfile(instrumentUid);
@@ -839,4 +851,22 @@ export const registerTradingAssistantHandlers = () => {
     tokenExpiry = Date.now() + 20 * 3600 * 1000; // 20 часов
     return cachedToken;
   }
+
+  ipcMain.handle('trading-assistant:get-market-phase', async (_, instrumentUid: string) => {
+    return await strategyManager.getCurrentPhase(instrumentUid);
+  });
+
+  // IPC: обновить маппинг фаз
+  ipcMain.handle('trading-assistant:update-phase-mapping', (_, phase: MarketPhase, strategyNames: string[]) => {
+    strategyManager.updatePhaseMapping(phase, strategyNames);
+    return true;
+  });
+
+  ipcMain.handle('trading-assistant:get-orderflow-delta', (_, instrumentUid: string) => {
+    return orderFlowEngine.getDelta(instrumentUid);
+  });
+
+  ipcMain.handle('trading-assistant:composite-profile', async (_, instrumentUid: string, days: number, token: string) => {
+    return await compositeProfileService.buildComposite(instrumentUid, days, token);
+  });
 };

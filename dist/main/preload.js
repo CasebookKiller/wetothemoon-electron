@@ -203,7 +203,10 @@ try {
 		cloudGetTaskStatus: (taskId) => electron.ipcRenderer.invoke("cloud:getTaskStatus", taskId),
 		cloudGetTaskResult: (taskId) => electron.ipcRenderer.invoke("cloud:getTaskResult", taskId),
 		cloudGetTasks: () => electron.ipcRenderer.invoke("cloud:getTasks"),
-		cloudTestConnection: (url) => electron.ipcRenderer.invoke("cloud:testConnection", url)
+		cloudTestConnection: (url) => electron.ipcRenderer.invoke("cloud:testConnection", url),
+		getMarketPhase: (instrumentUid) => electron.ipcRenderer.invoke("trading-assistant:get-market-phase", instrumentUid),
+		getOrderFlowDelta: (instrumentUid) => electron.ipcRenderer.invoke("trading-assistant:get-orderflow-delta", instrumentUid),
+		getCompositeProfile: (instrumentUid, days, token) => electron.ipcRenderer.invoke("trading-assistant:composite-profile", instrumentUid, days, token)
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {
