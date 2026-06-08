@@ -186,7 +186,7 @@ app.whenReady().then(() => {
     demoMode: true,   // включите false, когда будете готовы к реальной песочнице
     token: '',        // можно задать позже через UI
     accountId: '',
-  });
+  }, orderFlowEngine);
   connectOrderManager(orderManager);
   setOrderManagerInstance(orderManager);
   // Подключаем live-стратегию для выбранного инструмента (пока захардкожен)

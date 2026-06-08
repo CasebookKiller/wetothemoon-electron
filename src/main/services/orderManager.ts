@@ -2,6 +2,7 @@ import { sandboxGrpc } from './tbank/SandboxGrpcService';
 import { OrderDirection, OrderType, OrderIdType } from '@/api/tbank/ordersTypes';
 import type { BacktestSignal } from './backtest/common';
 import { marketDataGrpc } from './tbank/MarketDataGrpcService';  // <-- новый импорт (в начале файла)
+import type { OrderFlowEngine } from './orderFlowEngine';
 
 export interface OrderManagerConfig {
   lotQuantity: number;
@@ -17,6 +18,7 @@ export interface OrderManagerConfig {
   dailyLossLimit?: number;   // максимальный дневной убыток в рублях (0 = выключен)
   maxSignalsPerDay?: number;   // 0 = без ограничений
   minIntervalMinutes?: number; // минимальный интервал между сигналами (по умолчанию 15)
+  
 }
 
 export class OrderManager {
@@ -34,8 +36,9 @@ export class OrderManager {
   private dailyLossCurrent: number = 0;
   private lastLossResetDate: string = '';
   private lastEntryPrice: number = 0;
+  private orderFlow?: OrderFlowEngine;
 
-  constructor(config: Partial<OrderManagerConfig> = {}) {
+  constructor(config: Partial<OrderManagerConfig> = {}, orderFlow?: OrderFlowEngine) {
     this.config = {
       lotQuantity: 1,
       useMarketOrder: true,
@@ -47,11 +50,12 @@ export class OrderManager {
       trailingEnabled: false,
       trailingPercent: 1,
       marketDataToken: '',
-      dailyLossLimit: 0,   // ← добавить
+      dailyLossLimit: 0,
       maxSignalsPerDay: 0,
       minIntervalMinutes: 15,
       ...config,
     };
+    this.orderFlow = orderFlow;   // сохраняем отдельно
   }
 
   updateConfig(patch: Partial<OrderManagerConfig>): void {

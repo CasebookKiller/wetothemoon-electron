@@ -4712,7 +4712,8 @@ var OrderManager = class {
 	dailyLossCurrent = 0;
 	lastLossResetDate = "";
 	lastEntryPrice = 0;
-	constructor(config = {}) {
+	orderFlow;
+	constructor(config = {}, orderFlow) {
 		this.config = {
 			lotQuantity: 1,
 			useMarketOrder: true,
@@ -4729,6 +4730,7 @@ var OrderManager = class {
 			minIntervalMinutes: 15,
 			...config
 		};
+		this.orderFlow = orderFlow;
 	}
 	updateConfig(patch) {
 		this.config = {
@@ -5347,7 +5349,7 @@ electron.app.whenReady().then(() => {
 		demoMode: true,
 		token: "",
 		accountId: ""
-	});
+	}, orderFlowEngine);
 	connectOrderManager(orderManager);
 	setOrderManagerInstance(orderManager);
 	connectLiveStrategy("e6123145-9665-43e0-8413-cd61b8aa9b13", orderManager);
@@ -5810,7 +5812,9 @@ function applyMenuToWindow(win, template) {
 	win.setMenu(menu);
 }
 var compositeProfileService = new CompositeProfileService(new HistoricalDataLoader(), volumeProfileEngine);
-var strategyManager = new StrategyManager(new MarketPhaseDetector(historicalDataLoader, volumeProfileEngine), compositeProfileService, volumeProfileEngine, new OrderFlowEngine());
+var marketPhaseDetector = new MarketPhaseDetector(historicalDataLoader, volumeProfileEngine);
+var orderFlowEngine = new OrderFlowEngine();
+var strategyManager = new StrategyManager(marketPhaseDetector, compositeProfileService, volumeProfileEngine, orderFlowEngine);
 electron.ipcMain.handle("trading-assistant:update-phase-mapping", (_, phase, strategyNames) => {
 	strategyManager.updatePhaseMapping(phase, strategyNames);
 	return true;
