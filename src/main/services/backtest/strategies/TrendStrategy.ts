@@ -1,6 +1,6 @@
 // src/main/services/backtest/strategies/TrendStrategy.ts
-import type { StreamCandle } from '@/api/tbank/marketdataStreamTypes';
-import type { VolumeProfileLevels } from '../../volumeProfileEngine';
+import type { StreamCandle } from '../../../generated/marketdataStreamTypes';
+import type { VolumeProfileLevels } from '../../../../volumeProfileEngine';
 import type { IBacktestStrategy } from '../backtestEngine';
 import { quotationToNumber, BacktestSignal } from '../common';
 

@@ -4178,6 +4178,28 @@ var registerTradingAssistantHandlers = (historicalLoader, profileEngine, getToke
 	electron.ipcMain.handle("trading-assistant:composite-profile", async (_, instrumentUid, days, token) => {
 		return await compositeProfileService.buildComposite(instrumentUid, days, token);
 	});
+	electron.ipcMain.handle("cloud:createBatch", async (_, batchConfig) => {
+		const url = process.env.VITE_CLOUD_API_URL;
+		const token = await getCloudToken();
+		return await (await fetch(`${url}/api/backtest/batch`, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				"Authorization": `Bearer ${token}`
+			},
+			body: JSON.stringify(batchConfig)
+		})).json();
+	});
+	electron.ipcMain.handle("cloud:getBatchStatus", async (_, batchId) => {
+		const url = process.env.VITE_CLOUD_API_URL;
+		const token = await getCloudToken();
+		return await (await fetch(`${url}/api/backtest/batch/${batchId}`, { headers: { "Authorization": `Bearer ${token}` } })).json();
+	});
+	electron.ipcMain.handle("cloud:getBatchResults", async (_, batchId) => {
+		const url = process.env.VITE_CLOUD_API_URL;
+		const token = await getCloudToken();
+		return await (await fetch(`${url}/api/backtest/batch/${batchId}/results`, { headers: { "Authorization": `Bearer ${token}` } })).json();
+	});
 };
 //#endregion
 //#region src/shared/types/promptgenerator.ts

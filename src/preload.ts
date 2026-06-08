@@ -285,6 +285,10 @@ try {
     getOrderFlowDelta: (instrumentUid: string) => ipcRenderer.invoke('trading-assistant:get-orderflow-delta', instrumentUid),
     getCompositeProfile: (instrumentUid: string, days: number, token: string) => ipcRenderer.invoke('trading-assistant:composite-profile', instrumentUid, days, token),
 
+    cloudCreateBatch: (batchConfig: any) => ipcRenderer.invoke('cloud:createBatch', batchConfig),
+    cloudGetBatchStatus: (batchId: string) => ipcRenderer.invoke('cloud:getBatchStatus', batchId),
+    cloudGetBatchResults: (batchId: string) => ipcRenderer.invoke('cloud:getBatchResults', batchId),
+
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

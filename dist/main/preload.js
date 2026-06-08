@@ -206,7 +206,10 @@ try {
 		cloudTestConnection: (url) => electron.ipcRenderer.invoke("cloud:testConnection", url),
 		getMarketPhase: (instrumentUid) => electron.ipcRenderer.invoke("trading-assistant:get-market-phase", instrumentUid),
 		getOrderFlowDelta: (instrumentUid) => electron.ipcRenderer.invoke("trading-assistant:get-orderflow-delta", instrumentUid),
-		getCompositeProfile: (instrumentUid, days, token) => electron.ipcRenderer.invoke("trading-assistant:composite-profile", instrumentUid, days, token)
+		getCompositeProfile: (instrumentUid, days, token) => electron.ipcRenderer.invoke("trading-assistant:composite-profile", instrumentUid, days, token),
+		cloudCreateBatch: (batchConfig) => electron.ipcRenderer.invoke("cloud:createBatch", batchConfig),
+		cloudGetBatchStatus: (batchId) => electron.ipcRenderer.invoke("cloud:getBatchStatus", batchId),
+		cloudGetBatchResults: (batchId) => electron.ipcRenderer.invoke("cloud:getBatchResults", batchId)
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {

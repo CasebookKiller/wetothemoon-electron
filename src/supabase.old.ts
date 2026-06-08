@@ -39,84 +39,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      backtest_batches: {
-        Row: {
-          created_at: string | null
-          id: string
-          params: Json | null
-          status: string | null
-          user_id: number | null
-        }
-        Insert: {
-          created_at?: string | null
-          id: string
-          params?: Json | null
-          status?: string | null
-          user_id?: number | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          params?: Json | null
-          status?: string | null
-          user_id?: number | null
-        }
-        Relationships: []
-      }
-      backtest_tasks: {
-        Row: {
-          batch_id: string | null
-          created_at: string | null
-          date_from: string | null
-          date_to: string | null
-          error: string | null
-          id: number
-          instrument_uid: string | null
-          interval: string | null
-          market_phase: string | null
-          params: Json | null
-          result: Json | null
-          status: string | null
-          strategy: string | null
-          task_id: string | null
-          user_id: number | null
-        }
-        Insert: {
-          batch_id?: string | null
-          created_at?: string | null
-          date_from?: string | null
-          date_to?: string | null
-          error?: string | null
-          id?: number
-          instrument_uid?: string | null
-          interval?: string | null
-          market_phase?: string | null
-          params?: Json | null
-          result?: Json | null
-          status?: string | null
-          strategy?: string | null
-          task_id?: string | null
-          user_id?: number | null
-        }
-        Update: {
-          batch_id?: string | null
-          created_at?: string | null
-          date_from?: string | null
-          date_to?: string | null
-          error?: string | null
-          id?: number
-          instrument_uid?: string | null
-          interval?: string | null
-          market_phase?: string | null
-          params?: Json | null
-          result?: Json | null
-          status?: string | null
-          strategy?: string | null
-          task_id?: string | null
-          user_id?: number | null
-        }
-        Relationships: []
-      }
       ids: {
         Row: {
           avatar: string | null
@@ -172,7 +94,7 @@ export type Database = {
           conversation_id: string
           created_at?: string
           data: string
-          id?: number
+          id?: never
           title?: string | null
           user_id?: string | null
         }
@@ -180,7 +102,7 @@ export type Database = {
           conversation_id?: string
           created_at?: string
           data?: string
-          id?: number
+          id?: never
           title?: string | null
           user_id?: string | null
         }
@@ -568,6 +490,10 @@ export type Database = {
         Args: { bucketid: string; metadata: Json; name: string; owner: string }
         Returns: undefined
       }
+      delete_leaf_prefixes: {
+        Args: { bucket_ids: string[]; names: string[] }
+        Returns: undefined
+      }
       extension: { Args: { name: string }; Returns: string }
       filename: { Args: { name: string }; Returns: string }
       foldername: { Args: { name: string }; Returns: string[] }
@@ -575,6 +501,9 @@ export type Database = {
         Args: { p_delimiter: string; p_key: string; p_prefix: string }
         Returns: string
       }
+      get_level: { Args: { name: string }; Returns: number }
+      get_prefix: { Args: { name: string }; Returns: string }
+      get_prefixes: { Args: { name: string }; Returns: string[] }
       get_size_by_bucket: {
         Args: never
         Returns: {
@@ -652,6 +581,26 @@ export type Database = {
           created_at: string
           id: string
           key: string
+          last_accessed_at: string
+          metadata: Json
+          name: string
+          updated_at: string
+        }[]
+      }
+      search_legacy_v1: {
+        Args: {
+          bucketname: string
+          levels?: number
+          limits?: number
+          offsets?: number
+          prefix: string
+          search?: string
+          sortcolumn?: string
+          sortorder?: string
+        }
+        Returns: {
+          created_at: string
+          id: string
           last_accessed_at: string
           metadata: Json
           name: string

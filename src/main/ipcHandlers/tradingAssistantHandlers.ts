@@ -869,4 +869,36 @@ export const registerTradingAssistantHandlers = (
   ipcMain.handle('trading-assistant:composite-profile', async (_, instrumentUid: string, days: number, token: string) => {
     return await compositeProfileService.buildComposite(instrumentUid, days, token);
   });
+
+  ipcMain.handle('cloud:createBatch', async (_, batchConfig: any) => {
+    const url = process.env.VITE_CLOUD_API_URL;
+    const token = await getCloudToken();
+    const res = await fetch(`${url}/api/backtest/batch`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(batchConfig),
+    });
+    return await res.json();
+  });
+
+  ipcMain.handle('cloud:getBatchStatus', async (_, batchId: string) => {
+    const url = process.env.VITE_CLOUD_API_URL;
+    const token = await getCloudToken();
+    const res = await fetch(`${url}/api/backtest/batch/${batchId}`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    return await res.json();
+  });
+
+  ipcMain.handle('cloud:getBatchResults', async (_, batchId: string) => {
+    const url = process.env.VITE_CLOUD_API_URL;
+    const token = await getCloudToken();
+    const res = await fetch(`${url}/api/backtest/batch/${batchId}/results`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    return await res.json();
+  });
 };
