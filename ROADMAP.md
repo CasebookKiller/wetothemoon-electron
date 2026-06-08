@@ -36,23 +36,32 @@
 ## 🔜 Текущая очередь
 
 ### 1. Оптимизация интерфейса (следующий приоритет)
-- [ ] Компактный режим: скрытие второстепенных панелей, уменьшение высоты верхних тулбаров
-- [ ] Перемещение управления стримом (Token, Start/Stop) в сворачиваемую строку или тулбар
-- [ ] Выделение больше пространства для графика (скрытие вкладок Signals, Profile в drawer/диалог)
-- [ ] Глобальный переключатель «Compact Mode»
+- [x] Компактный режим: скрытие второстепенных панелей, уменьшение высоты верхних тулбаров
+- [x] Перемещение управления стримом (Token, Start/Stop) в сворачиваемую строку или тулбар
+- [x] Выделение больше пространства для графика (скрытие вкладок Signals, Profile в drawer/диалог)
+- [x] Глобальный переключатель «Compact Mode»
 
-### 2. Облачный бэктест
-- [ ] Настроить Express‑сервер с эндпоинтами:
-  - `POST /backtest/run` → запуск бэктеста в фоне, возврат `taskId`
-  - `GET /backtest/status/:taskId` → прогресс и промежуточные результаты
-  - `GET /backtest/results/:taskId` → финальные статистика и сделки
-- [ ] Вынести общий код бэктестера в отдельный модуль (для переиспользования на сервере)
-- [ ] В клиенте (Electron):
-  - IPC‑канал `cloud-backtest:run`
-  - Поле для URL сервера в настройках
-  - Кнопка «Test Connection»
-  - UI‑панель «Cloud» с таблицей задач
-- [ ] Кнопка «Deploy to Cloud» в Batch‑панели
+### 2. Облачный бэктест (полноценные вычисления на сервере 24/7)
+- [x] Аудит сервера: 1 CPU, 3.8 ГБ RAM, 30 ГБ диск
+- [x] Анализ cbk-server: Express, Supabase, JWT, gRPC-зависимости
+- [x] Получены и адаптированы все модули (VirtualPortfolio, BacktestEngine, HistoricalDataLoader, VolumeProfileEngine, стратегии)
+- [x] Устранены ошибки компиляции и импортов
+- [x] Установка npm, Node.js 20, openssl, build-essential, git
+- [x] Клонирование cbk-server на облако, исправление прав
+- [x] Установка ws для Supabase Realtime
+- [x] Добавление // @ts-nocheck в index.ts и supabaseClient.ts
+- [x] Настройка .env (PORT, TReadOnly, SUPABASE_URL, SUPABASE_ANON_KEY)
+- [x] Сборка и запуск сервера (screen), копирование proto в dist
+- [x] Синхронизация изменений с GitHub (коммиты и push)
+- [x] Тестирование API облачного сервера
+  - [x] Проверка авторизации (POST /login)
+  - [x] Создание задачи (POST /api/backtest/tasks)
+  - [x] Получение статуса (GET /api/backtest/tasks/:taskId)
+  - [x] Получение результата (GET /api/backtest/results/:taskId)
+- [ ] **Интеграция клиента (Electron)**
+  - [ ] IPC-каналы cloud:createTask, cloud:uploadResult, cloud:getTasks
+  - [ ] UI-панель «Cloud» с таблицей задач и кнопкой «Deploy to Cloud»
+- [ ] **Мониторинг и стабилизация** (pm2, логирование)
 
 ### 3. Расширение методологии Trader Dale
 - [ ] **MarketPhaseDetector** — определение фаз рынка (Balance/Trend/Breakout/Chop) на основе VWAP, VA, объёмов

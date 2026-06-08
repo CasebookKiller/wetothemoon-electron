@@ -103,6 +103,8 @@ docs/
 training/
 
 clean.sh
+server_info.sh
+
 
 dist/
 src/renderer/dist/

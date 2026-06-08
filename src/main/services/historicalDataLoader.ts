@@ -1,4 +1,5 @@
 // src/main/services/historicalDataLoader.ts
+
 import { marketDataGrpc } from './tbank/MarketDataGrpcService';
 import { VolumeProfileEngine } from './volumeProfileEngine';
 import type { VolumeProfileLevels } from './volumeProfileEngine';

@@ -32,6 +32,7 @@ import { AmChartsStockChart } from '@/components/TRADING_ASSISTANT/AmChartsStock
 import { EquityChart } from '@/components/TRADING_ASSISTANT/EquityChart/EquityChart';
 import { TradesTab } from '@/components/TRADING_ASSISTANT/TradesTab/TradesTab';
 import { ScreenerTab } from '@/components/TRADING_ASSISTANT/ScreenerTab/ScreenerTab';
+import { CloudTab } from '@/components/TRADING_ASSISTANT/CloudTab/CloudTab';
 
 function quotationToNumber(q: any): number {
   if (!q) return 0;
@@ -1580,6 +1581,11 @@ export const TradingAssistantPage: React.FC = () => {
           {/* ========== SCREENER ========== */}
           <TabPanel header="Screener">
             <ScreenerTab token={stream.token} />
+          </TabPanel>
+
+          {/* ========== CLOUD ============= */}
+          <TabPanel header="Cloud">
+            <CloudTab />
           </TabPanel>
         </TabView>
       )}

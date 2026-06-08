@@ -198,7 +198,12 @@ try {
 		screenerRun: (filters, token) => electron.ipcRenderer.invoke("trading-assistant:screener-run", filters, token),
 		onSystemMemory: (callback) => {
 			electron.ipcRenderer.on("system:memory", (_, data) => callback(data));
-		}
+		},
+		cloudCreateTask: (instrumentUid, dateFrom, dateTo, interval, params) => electron.ipcRenderer.invoke("cloud:createTask", instrumentUid, dateFrom, dateTo, interval, params),
+		cloudGetTaskStatus: (taskId) => electron.ipcRenderer.invoke("cloud:getTaskStatus", taskId),
+		cloudGetTaskResult: (taskId) => electron.ipcRenderer.invoke("cloud:getTaskResult", taskId),
+		cloudGetTasks: () => electron.ipcRenderer.invoke("cloud:getTasks"),
+		cloudTestConnection: (url) => electron.ipcRenderer.invoke("cloud:testConnection", url)
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {

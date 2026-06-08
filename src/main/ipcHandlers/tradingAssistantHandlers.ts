@@ -25,6 +25,7 @@ import { RejectionStrategy } from '../services/backtest/strategies/RejectionStra
 
 import * as fs from 'fs';
 import { ScreenerService } from '../services/screenerService';
+import { net } from 'electron'; // встроенный HTTP-клиент
 
 let orderManagerInstance: OrderManager | null = null;
 
@@ -762,4 +763,90 @@ export const registerTradingAssistantHandlers = () => {
     const screener = new ScreenerService(loader, () => token); // ← убрали третий аргумент
     return await screener.screen(filters);
   });
+
+  ipcMain.handle('cloud:createTask', async (_event, instrumentUid: string, dateFrom: string, dateTo: string, interval: string, params: any) => {
+    const url = process.env.VITE_CLOUD_API_URL;
+    console.log('VITE_CLOUD_API_URL: ', process.env.VITE_CLOUD_API_URL); 
+    if (!url) return { error: 'CLOUD_API_URL not set' };
+    const email = process.env.VITE_CLOUD_EMAIL;
+    const password = process.env.VITE_CLOUD_PASSWORD;
+    if (!email || !password) return { error: 'Cloud credentials not configured' };
+
+    // Авторизуемся на сервере
+    const loginRes = await fetch(`${url}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    const loginData = await loginRes.json();
+    if (!loginData.token) return { error: 'Login failed', details: loginData };
+
+    // Создаём задачу
+    const taskRes = await fetch(`${url}/api/backtest/tasks`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${loginData.token}`,
+      },
+      body: JSON.stringify({ instrumentUid, dateFrom, dateTo, interval, params }),
+    });
+    return await taskRes.json();
+  });
+
+  ipcMain.handle('cloud:getTaskStatus', async (_event, taskId: string) => {
+    const url = process.env.VITE_CLOUD_API_URL;
+    if (!url) return { error: 'CLOUD_API_URL not set' };
+    const token = await getCloudToken(); // вспомогательная функция для получения JWT (можно кешировать)
+    const res = await fetch(`${url}/api/backtest/tasks/${taskId}`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    return await res.json();
+  });
+
+  ipcMain.handle('cloud:getTaskResult', async (_event, taskId: string) => {
+    const url = process.env.VITE_CLOUD_API_URL;
+    if (!url) return { error: 'CLOUD_API_URL not set' };
+    const token = await getCloudToken();
+    const res = await fetch(`${url}/api/backtest/results/${taskId}`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    return await res.json();
+  });
+
+  ipcMain.handle('cloud:getTasks', async () => {
+    const url = process.env.VITE_CLOUD_API_URL;
+    if (!url) return [];
+    const token = await getCloudToken();
+    const res = await fetch(`${url}/api/backtest/tasks`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    return await res.json();
+  });
+
+  ipcMain.handle('cloud:testConnection', async (_event, serverUrl: string) => {
+    try {
+      const res = await fetch(`${serverUrl}/`);
+      return { ok: res.ok, status: res.status };
+    } catch (err: any) {
+      return { ok: false, error: err.message };
+    }
+  });
+
+  // Простейший кеш токена (на 20 часов)
+  let cachedToken: string | null = null;
+  let tokenExpiry = 0;
+
+  async function getCloudToken(): Promise<string | null> {
+    if (cachedToken && Date.now() < tokenExpiry) return cachedToken;
+    const url = process.env.VITE_CLOUD_API_URL;
+    const loginRes = await fetch(`${url}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: process.env.VITE_CLOUD_EMAIL, password: process.env.VITE_CLOUD_PASSWORD }),
+    });
+    const data = await loginRes.json();
+    cachedToken = data.token;
+    tokenExpiry = Date.now() + 20 * 3600 * 1000; // 20 часов
+    return cachedToken;
+  }
 };

@@ -1,3 +1,5 @@
+// src/main/utils/protoPath.ts
+
 import path from 'path';
 import { app } from 'electron';
 

@@ -272,8 +272,15 @@ try {
 
     onSystemMemory: (callback: (data: any) => void) => {
       ipcRenderer.on('system:memory', (_, data) => callback(data));
-    }
-    
+    },
+
+    cloudCreateTask: (instrumentUid: string, dateFrom: string, dateTo: string, interval: string, params: any) =>
+      ipcRenderer.invoke('cloud:createTask', instrumentUid, dateFrom, dateTo, interval, params),
+    cloudGetTaskStatus: (taskId: string) => ipcRenderer.invoke('cloud:getTaskStatus', taskId),
+    cloudGetTaskResult: (taskId: string) => ipcRenderer.invoke('cloud:getTaskResult', taskId),
+    cloudGetTasks: () => ipcRenderer.invoke('cloud:getTasks'), // нужно добавить IPC и серверный endpoint
+    cloudTestConnection: (url: string) => ipcRenderer.invoke('cloud:testConnection', url),
+
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

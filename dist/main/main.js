@@ -3666,6 +3666,88 @@ var registerTradingAssistantHandlers = () => {
 		}
 		return await new ScreenerService(new HistoricalDataLoader(), () => token).screen(filters);
 	});
+	electron.ipcMain.handle("cloud:createTask", async (_event, instrumentUid, dateFrom, dateTo, interval, params) => {
+		const url = process.env.VITE_CLOUD_API_URL;
+		console.log("VITE_CLOUD_API_URL: ", process.env.VITE_CLOUD_API_URL);
+		if (!url) return { error: "CLOUD_API_URL not set" };
+		const email = process.env.VITE_CLOUD_EMAIL;
+		const password = process.env.VITE_CLOUD_PASSWORD;
+		if (!email || !password) return { error: "Cloud credentials not configured" };
+		const loginData = await (await fetch(`${url}/login`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				email,
+				password
+			})
+		})).json();
+		if (!loginData.token) return {
+			error: "Login failed",
+			details: loginData
+		};
+		return await (await fetch(`${url}/api/backtest/tasks`, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				"Authorization": `Bearer ${loginData.token}`
+			},
+			body: JSON.stringify({
+				instrumentUid,
+				dateFrom,
+				dateTo,
+				interval,
+				params
+			})
+		})).json();
+	});
+	electron.ipcMain.handle("cloud:getTaskStatus", async (_event, taskId) => {
+		const url = process.env.VITE_CLOUD_API_URL;
+		if (!url) return { error: "CLOUD_API_URL not set" };
+		const token = await getCloudToken();
+		return await (await fetch(`${url}/api/backtest/tasks/${taskId}`, { headers: { "Authorization": `Bearer ${token}` } })).json();
+	});
+	electron.ipcMain.handle("cloud:getTaskResult", async (_event, taskId) => {
+		const url = process.env.VITE_CLOUD_API_URL;
+		if (!url) return { error: "CLOUD_API_URL not set" };
+		const token = await getCloudToken();
+		return await (await fetch(`${url}/api/backtest/results/${taskId}`, { headers: { "Authorization": `Bearer ${token}` } })).json();
+	});
+	electron.ipcMain.handle("cloud:getTasks", async () => {
+		const url = process.env.VITE_CLOUD_API_URL;
+		if (!url) return [];
+		const token = await getCloudToken();
+		return await (await fetch(`${url}/api/backtest/tasks`, { headers: { "Authorization": `Bearer ${token}` } })).json();
+	});
+	electron.ipcMain.handle("cloud:testConnection", async (_event, serverUrl) => {
+		try {
+			const res = await fetch(`${serverUrl}/`);
+			return {
+				ok: res.ok,
+				status: res.status
+			};
+		} catch (err) {
+			return {
+				ok: false,
+				error: err.message
+			};
+		}
+	});
+	let cachedToken = null;
+	let tokenExpiry = 0;
+	async function getCloudToken() {
+		if (cachedToken && Date.now() < tokenExpiry) return cachedToken;
+		const url = process.env.VITE_CLOUD_API_URL;
+		cachedToken = (await (await fetch(`${url}/login`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				email: process.env.VITE_CLOUD_EMAIL,
+				password: process.env.VITE_CLOUD_PASSWORD
+			})
+		})).json()).token;
+		tokenExpiry = Date.now() + 20 * 3600 * 1e3;
+		return cachedToken;
+	}
 };
 //#endregion
 //#region src/shared/types/promptgenerator.ts

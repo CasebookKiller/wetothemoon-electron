@@ -1,3 +1,5 @@
+// src/main/services/tbank/MarketDataGrpcService.ts
+
 import { createGrpcClient, createMetadata } from '@/main/utils/grpcHelper';
 import type {
   GetCandlesRequest,

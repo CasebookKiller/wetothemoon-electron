@@ -1,4 +1,5 @@
 // src/main/services/backtest/backtestEngine.ts
+
 import type { StreamCandle } from '@/api/tbank/marketdataStreamTypes';
 import { VirtualPortfolio, type PortfolioStats, type PortfolioConfig } from './virtualPortfolio';
 import { quotationToNumber } from './common';
