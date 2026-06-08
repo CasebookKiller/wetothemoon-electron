@@ -4629,7 +4629,240 @@ var CompositeProfileService = class {
 	}
 };
 //#endregion
+//#region src/main/services/marketPhaseDetector.ts
+var MarketPhase = /* @__PURE__ */ function(MarketPhase) {
+	MarketPhase["BALANCE"] = "BALANCE";
+	MarketPhase["TREND_UP"] = "TREND_UP";
+	MarketPhase["TREND_DOWN"] = "TREND_DOWN";
+	MarketPhase["BREAKOUT"] = "BREAKOUT";
+	MarketPhase["CHOP"] = "CHOP";
+	return MarketPhase;
+}({});
+var MarketPhaseDetector = class {
+	historicalLoader;
+	profileEngine;
+	constructor(historicalLoader, profileEngine) {
+		this.historicalLoader = historicalLoader;
+		this.profileEngine = profileEngine;
+	}
+	async detectPhase(instrumentUid) {
+		const candles = await this.historicalLoader.loadIntradayCandles(instrumentUid, /* @__PURE__ */ new Date(Date.now() - 7200 * 1e3), /* @__PURE__ */ new Date(), process.env.VITE_TReadOnly || "", CandleInterval.CANDLE_INTERVAL_5_MIN);
+		const profile = this.profileEngine.getProfile(instrumentUid);
+		if (!profile || candles.length < 5) return "CHOP";
+		const { vwap, angle } = this.calcVWAPAngle(candles);
+		const insideVA = this.calcPercentInsideVA(candles, profile);
+		const lastCandle = candles[candles.length - 1];
+		const avgVolume = candles.reduce((s, c) => s + Number(c.volume), 0) / candles.length;
+		const volumeSpike = Number(lastCandle.volume) > avgVolume * 1.5;
+		const absAngle = Math.abs(angle);
+		if (insideVA > 70 && absAngle < .3) return "BALANCE";
+		if (absAngle > .5 && insideVA < 40) return angle > 0 ? "TREND_UP" : "TREND_DOWN";
+		if (volumeSpike && (Number(lastCandle.high) > profile.valueAreaHigh || Number(lastCandle.low) < profile.valueAreaLow)) return "BREAKOUT";
+		return "CHOP";
+	}
+	calcVWAPAngle(candles) {
+		const totalVolume = candles.reduce((s, c) => s + Number(c.volume), 0);
+		const vwap = candles.reduce((s, c) => s + (Number(c.high) + Number(c.low) + Number(c.close)) / 3 * Number(c.volume), 0) / totalVolume;
+		if (candles.length < 2) return {
+			vwap,
+			angle: 0
+		};
+		const prevVWAP = (Number(candles[candles.length - 2].high) + Number(candles[candles.length - 2].low) + Number(candles[candles.length - 2].close)) / 3;
+		const lastVWAP = (Number(candles[candles.length - 1].high) + Number(candles[candles.length - 1].low) + Number(candles[candles.length - 1].close)) / 3;
+		return {
+			vwap,
+			angle: Math.atan((lastVWAP - prevVWAP) / prevVWAP) * (180 / Math.PI)
+		};
+	}
+	calcPercentInsideVA(candles, profile) {
+		return candles.filter((c) => Number(c.close) >= profile.valueAreaLow && Number(c.close) <= profile.valueAreaHigh).length / candles.length * 100;
+	}
+};
+//#endregion
+//#region src/main/services/strategyManager.ts
+var StrategyManager = class {
+	phaseDetector;
+	compositeProfile;
+	volumeProfile;
+	orderFlow;
+	activeStrategies = [];
+	strategyRegistry = /* @__PURE__ */ new Map();
+	phaseMapping = /* @__PURE__ */ new Map();
+	constructor(phaseDetector, compositeProfile, volumeProfile, orderFlow) {
+		this.phaseDetector = phaseDetector;
+		this.compositeProfile = compositeProfile;
+		this.volumeProfile = volumeProfile;
+		this.orderFlow = orderFlow;
+		this.phaseMapping.set(MarketPhase.BALANCE, [
+			"daily_va_reversal",
+			"poc_pullback",
+			"volume_accumulation"
+		]);
+		this.phaseMapping.set(MarketPhase.TREND_UP, [
+			"trend_pro",
+			"rejection",
+			"anchored_vwap"
+		]);
+		this.phaseMapping.set(MarketPhase.TREND_DOWN, [
+			"trend_pro",
+			"rejection",
+			"anchored_vwap"
+		]);
+		this.phaseMapping.set(MarketPhase.BREAKOUT, ["initial_balance", "va_breakout_retest"]);
+		this.phaseMapping.set(MarketPhase.CHOP, []);
+	}
+	/** Зарегистрировать стратегию в реестре */
+	registerStrategy(name, factory) {
+		this.strategyRegistry.set(name, {
+			name,
+			factory
+		});
+	}
+	/** Обновить маппинг фаз → стратегии (можно вызывать из UI) */
+	updatePhaseMapping(phase, strategyNames) {
+		this.phaseMapping.set(phase, strategyNames);
+	}
+	/** Основной метод: вызывается при каждом новом баре или по таймеру */
+	async update(instrumentUid) {
+		const phase = await this.phaseDetector.detectPhase(instrumentUid);
+		const strategyNames = this.phaseMapping.get(phase) || [];
+		const profile = this.volumeProfile.getProfile(instrumentUid);
+		this.activeStrategies = [];
+		for (const name of strategyNames) {
+			const entry = this.strategyRegistry.get(name);
+			if (entry) try {
+				const strategy = entry.factory(instrumentUid, profile);
+				this.activeStrategies.push(strategy);
+			} catch (err) {
+				console.warn(`StrategyManager: failed to create strategy ${name}`, err);
+			}
+		}
+	}
+	/** Получить сигналы от всех активных стратегий для текущей свечи */
+	evaluateSignals(candle) {
+		const allSignals = [];
+		for (const strategy of this.activeStrategies) {
+			strategy.onCandle(candle);
+			const signals = strategy.getSignals();
+			allSignals.push(...signals);
+			strategy.clearSignals();
+		}
+		return allSignals;
+	}
+	/** Получить текущую фазу (кешируется в MarketPhaseDetector) */
+	getCurrentPhase(instrumentUid) {
+		return this.phaseDetector.detectPhase(instrumentUid);
+	}
+	/** Сброс активных стратегий (например, при смене дня) */
+	reset() {
+		this.activeStrategies.forEach((s) => s.reset());
+		this.activeStrategies = [];
+	}
+};
+//#endregion
+//#region src/main/services/orderFlowEngine.ts
+var OrderFlowEngine = class {
+	deltas = /* @__PURE__ */ new Map();
+	absorptionEvents = /* @__PURE__ */ new Map();
+	constructor() {
+		marketDataBus.onTrade(this.onTrade.bind(this));
+		marketDataBus.onOrderBook(this.onOrderBook.bind(this));
+	}
+	getDelta(instrumentUid) {
+		return this.deltas.get(instrumentUid)?.cumulativeDelta ?? 0;
+	}
+	detectAbsorption(uid) {
+		return this.absorptionEvents.get(uid) || null;
+	}
+	detectExhaustion(uid) {
+		const data = this.deltas.get(uid);
+		if (!data) return null;
+		if (data.lastPrice >= data.extremePrice && data.barDelta < 0) return {
+			type: "bearish",
+			extremePrice: data.extremePrice
+		};
+		if (data.lastPrice <= data.extremePrice && data.barDelta > 0) return {
+			type: "bullish",
+			extremePrice: data.extremePrice
+		};
+		return null;
+	}
+	onTrade(trade) {
+		const uid = trade.instrumentUid || trade.figi;
+		if (!uid) return;
+		const price = quotationToNumber$3(trade.price);
+		const volume = Number(trade.quantity || "0");
+		const direction = trade.direction === "TRADE_DIRECTION_BUY" ? "buy" : trade.direction === "TRADE_DIRECTION_SELL" ? "sell" : null;
+		if (!direction || volume === 0) return;
+		if (!this.deltas.has(uid)) this.deltas.set(uid, {
+			cumulativeDelta: 0,
+			barDelta: 0,
+			lastPrice: price,
+			extremePrice: price,
+			tradeSizes: [],
+			deltaHistory: []
+		});
+		const data = this.deltas.get(uid);
+		const delta = direction === "buy" ? volume : -volume;
+		data.cumulativeDelta += delta;
+		data.barDelta += delta;
+		data.lastPrice = price;
+		if (price > data.extremePrice) data.extremePrice = price;
+		if (price < data.extremePrice) data.extremePrice = price;
+		data.deltaHistory.push({
+			time: trade.time || "",
+			delta: data.barDelta,
+			price
+		});
+		if (data.deltaHistory.length > 100) data.deltaHistory.shift();
+		data.tradeSizes.push(volume);
+		if (data.tradeSizes.length > 3) data.tradeSizes.shift();
+		if (this.isIceberg(data.tradeSizes)) {}
+	}
+	onOrderBook(ob) {
+		const uid = ob.instrumentUid || ob.figi;
+		if (!uid) return;
+		const bids = (ob.bids || []).map((b) => ({
+			price: quotationToNumber$3(b.price),
+			volume: b.quantity || 0
+		}));
+		const asks = (ob.asks || []).map((a) => ({
+			price: quotationToNumber$3(a.price),
+			volume: a.quantity || 0
+		}));
+		if (!bids.length || !asks.length) return;
+		const bidsNum = bids.map((b) => ({
+			price: b.price,
+			volume: Number(b.volume)
+		}));
+		const asksNum = asks.map((a) => ({
+			price: a.price,
+			volume: Number(a.volume)
+		}));
+		const maxBid = bidsNum.reduce((max, b) => b.volume > max.volume ? b : max, bidsNum[0]);
+		const maxAsk = asksNum.reduce((max, a) => a.volume > max.volume ? a : max, asksNum[0]);
+		if (maxBid.volume > 1e3) this.absorptionEvents.set(uid, {
+			side: "bid",
+			priceLevel: maxBid.price
+		});
+		if (maxAsk.volume > 1e3) this.absorptionEvents.set(uid, {
+			side: "ask",
+			priceLevel: maxAsk.price
+		});
+	}
+	isIceberg(sizes) {
+		if (sizes.length < 3) return false;
+		const last = sizes[sizes.length - 1];
+		return last === sizes[sizes.length - 2] && last === sizes[sizes.length - 3] && last > 0;
+	}
+	resetBar(instrumentUid) {
+		const data = this.deltas.get(instrumentUid);
+		if (data) data.barDelta = 0;
+	}
+};
+//#endregion
 //#region src/main/main.ts
+var historicalDataLoader = new HistoricalDataLoader();
 var scriptsDir = path.default.join(electron.app.getPath("userData"), "scripts");
 if (!(0, fs.existsSync)(scriptsDir)) {
 	(0, fs.mkdirSync)(scriptsDir, { recursive: true });
@@ -5172,7 +5405,15 @@ function applyMenuToWindow(win, template) {
 	const menu = electron.Menu.buildFromTemplate(template);
 	win.setMenu(menu);
 }
-new CompositeProfileService(new HistoricalDataLoader(), volumeProfileEngine);
+var compositeProfileService = new CompositeProfileService(new HistoricalDataLoader(), volumeProfileEngine);
+var strategyManager = new StrategyManager(new MarketPhaseDetector(historicalDataLoader, volumeProfileEngine), compositeProfileService, volumeProfileEngine, new OrderFlowEngine());
+electron.ipcMain.handle("trading-assistant:update-phase-mapping", (_, phase, strategyNames) => {
+	strategyManager.updatePhaseMapping(phase, strategyNames);
+	return true;
+});
+electron.ipcMain.handle("trading-assistant:get-market-phase", async (_, instrumentUid) => {
+	return await strategyManager.getCurrentPhase(instrumentUid);
+});
 setInterval(() => {
 	const mem = process.memoryUsage();
 	const win = getTradingAssistantWindow();

@@ -60,6 +60,11 @@ import { connectLiveStrategy } from './services/liveStrategyConnector';
 import { CompositeProfileService } from './services/compositeProfile';
 
 import { volumeProfileEngine } from './services/volumeProfileEngine';
+import { StrategyManager } from './services/strategyManager.ts';
+import { MarketPhaseDetector, MarketPhase } from './services/marketPhaseDetector.ts';
+import { OrderFlowEngine } from './services/orderFlowEngine.ts';
+
+const historicalDataLoader = new HistoricalDataLoader();
 
 const scriptsDir = path.join(app.getPath('userData'), 'scripts');
 if (!existsSync(scriptsDir)) {
@@ -691,6 +696,26 @@ function applyMenuToWindow(win: BrowserWindow, template: MenuItemConstructorOpti
 
 const loaderInstance = new HistoricalDataLoader(); // если ещё нет переменной
 const compositeProfileService = new CompositeProfileService(loaderInstance, volumeProfileEngine);
+const marketPhaseDetector = new MarketPhaseDetector(historicalDataLoader, volumeProfileEngine);
+const orderFlowEngine = new OrderFlowEngine();
+
+const strategyManager = new StrategyManager(
+  marketPhaseDetector,
+  compositeProfileService,
+  volumeProfileEngine,
+  orderFlowEngine
+);
+
+// IPC: обновить маппинг фаз
+ipcMain.handle('trading-assistant:update-phase-mapping', (_, phase: MarketPhase, strategyNames: string[]) => {
+  strategyManager.updatePhaseMapping(phase, strategyNames);
+  return true;
+});
+
+// IPC: запросить текущую фазу
+ipcMain.handle('trading-assistant:get-market-phase', async (_, instrumentUid: string) => {
+  return await strategyManager.getCurrentPhase(instrumentUid);
+});
 
 setInterval(() => {
   const mem = process.memoryUsage();
