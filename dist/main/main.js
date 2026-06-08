@@ -1585,193 +1585,6 @@ function quotationToNumber$2(q) {
 	return Number(q.units || 0) + (q.nano || 0) / 1e9;
 }
 //#endregion
-//#region src/main/services/backtest/common.ts
-/** Преобразует Quotation в число */
-function quotationToNumber$1(q) {
-	if (!q) return 0;
-	return Number(q.units || "0") + (q.nano || 0) / 1e9;
-}
-//#endregion
-//#region src/main/services/backtest/strategies/TrendStrategy.ts
-var TrendStrategy = class {
-	signals = [];
-	dailyProfile = null;
-	instrumentUid;
-	hvnLevel = null;
-	hvnBroken = false;
-	trendDirection = null;
-	hasPosition = false;
-	lastTradeTime = 0;
-	minIntervalMs = 900 * 1e3;
-	volumeFilterEnabled;
-	volumeFilterPeriod;
-	volumeHistory = [];
-	constructor(instrumentUid, dailyProfile, options) {
-		this.instrumentUid = instrumentUid;
-		this.dailyProfile = dailyProfile;
-		this.volumeFilterEnabled = options?.volumeFilterEnabled ?? false;
-		this.volumeFilterPeriod = options?.volumeFilterPeriod ?? 20;
-	}
-	reset() {
-		this.signals = [];
-		this.hvnLevel = null;
-		this.hvnBroken = false;
-		this.trendDirection = null;
-		this.hasPosition = false;
-		this.lastTradeTime = 0;
-		this.volumeHistory = [];
-	}
-	onCandle(candle) {
-		if (!this.dailyProfile || this.hasPosition) return;
-		const high = quotationToNumber$1(candle.high);
-		const low = quotationToNumber$1(candle.low);
-		const close = quotationToNumber$1(candle.close);
-		const time = candle.time || (/* @__PURE__ */ new Date()).toISOString();
-		const volume = Number(candle.volume || "0");
-		this.volumeHistory.push(volume);
-		if (this.volumeHistory.length > this.volumeFilterPeriod) this.volumeHistory.shift();
-		if (this.volumeFilterEnabled && this.volumeHistory.length >= this.volumeFilterPeriod) {
-			if (volume < this.volumeHistory.reduce((a, b) => a + b, 0) / this.volumeHistory.length) return;
-		}
-		const now = new Date(time).getTime();
-		if (now - this.lastTradeTime < this.minIntervalMs) return;
-		if (close > this.dailyProfile.valueAreaHigh) this.trendDirection = "UP";
-		else if (close < this.dailyProfile.valueAreaLow) this.trendDirection = "DOWN";
-		else {
-			this.hvnLevel = null;
-			this.hvnBroken = false;
-			return;
-		}
-		if (this.hvnLevel === null && this.dailyProfile.hvn.length > 0) {
-			const hvnList = this.dailyProfile.hvn;
-			if (this.trendDirection === "UP") {
-				const candidates = hvnList.filter((level) => level < close);
-				if (candidates.length > 0) this.hvnLevel = Math.max(...candidates);
-			} else {
-				const candidates = hvnList.filter((level) => level > close);
-				if (candidates.length > 0) this.hvnLevel = Math.min(...candidates);
-			}
-		}
-		if (this.hvnLevel === null) return;
-		if (!this.hvnBroken) {
-			if (this.trendDirection === "UP" && high > this.hvnLevel) this.hvnBroken = true;
-			else if (this.trendDirection === "DOWN" && low < this.hvnLevel) this.hvnBroken = true;
-		}
-		if (this.hvnBroken) {
-			const tolerance = .05;
-			if (this.trendDirection === "UP" && close <= this.hvnLevel + tolerance && close >= this.hvnLevel - tolerance) {
-				this.signals.push({
-					type: "BUY",
-					price: close,
-					time,
-					instrumentUid: this.instrumentUid,
-					reason: `Тренд вверх, ретест HVN ${this.hvnLevel}`
-				});
-				this.hasPosition = true;
-				this.lastTradeTime = now;
-				this.hvnLevel = null;
-				this.hvnBroken = false;
-			} else if (this.trendDirection === "DOWN" && close >= this.hvnLevel - tolerance && close <= this.hvnLevel + tolerance) {
-				this.signals.push({
-					type: "SELL",
-					price: close,
-					time,
-					instrumentUid: this.instrumentUid,
-					reason: `Тренд вниз, ретест HVN ${this.hvnLevel}`
-				});
-				this.hasPosition = true;
-				this.lastTradeTime = now;
-				this.hvnLevel = null;
-				this.hvnBroken = false;
-			}
-		}
-	}
-	getSignals() {
-		return this.signals;
-	}
-	clearSignals() {
-		this.signals = [];
-	}
-	updateProfile(profile) {
-		this.dailyProfile = profile;
-		this.hasPosition = false;
-		this.hvnLevel = null;
-		this.hvnBroken = false;
-		this.trendDirection = null;
-		this.volumeHistory = [];
-	}
-};
-//#endregion
-//#region src/main/services/backtest/strategies/POCPullbackStrategy.ts
-var POCPullbackStrategy = class {
-	signals = [];
-	dailyProfile = null;
-	instrumentUid;
-	priceAbovePOC = false;
-	priceBelowPOC = false;
-	hasPosition = false;
-	constructor(instrumentUid, dailyProfile) {
-		this.instrumentUid = instrumentUid;
-		this.dailyProfile = dailyProfile;
-	}
-	reset() {
-		this.signals = [];
-		this.priceAbovePOC = false;
-		this.priceBelowPOC = false;
-		this.hasPosition = false;
-	}
-	onCandle(candle) {
-		if (!this.dailyProfile || this.hasPosition) return;
-		const high = quotationToNumber$1(candle.high);
-		const low = quotationToNumber$1(candle.low);
-		const close = quotationToNumber$1(candle.close);
-		const time = candle.time || (/* @__PURE__ */ new Date()).toISOString();
-		const poc = this.dailyProfile.poc;
-		if (high > poc) {
-			this.priceAbovePOC = true;
-			this.priceBelowPOC = false;
-		}
-		if (low < poc) {
-			this.priceBelowPOC = true;
-			this.priceAbovePOC = false;
-		}
-		if (this.priceAbovePOC && close <= poc) {
-			this.signals.push({
-				type: "BUY",
-				price: close,
-				time,
-				instrumentUid: this.instrumentUid,
-				reason: `POC Pullback long from above (POC=${poc})`
-			});
-			this.hasPosition = true;
-			this.priceAbovePOC = false;
-		}
-		if (this.priceBelowPOC && close >= poc) {
-			this.signals.push({
-				type: "SELL",
-				price: close,
-				time,
-				instrumentUid: this.instrumentUid,
-				reason: `POC Pullback short from below (POC=${poc})`
-			});
-			this.hasPosition = true;
-			this.priceBelowPOC = false;
-		}
-	}
-	getSignals() {
-		return this.signals;
-	}
-	clearSignals() {
-		this.signals = [];
-	}
-	updateProfile(profile) {
-		this.dailyProfile = profile;
-		this.priceAbovePOC = false;
-		this.priceBelowPOC = false;
-		this.hasPosition = false;
-	}
-};
-//#endregion
 //#region src/main/utils/grpcHelper.ts
 function createGrpcClient(packageName, serviceName) {
 	const PROTO_PATH = getProtoPath(packageName);
@@ -1851,7 +1664,7 @@ var marketDataGrpc = {
 };
 //#endregion
 //#region src/main/services/historicalDataLoader.ts
-function quotationToNumber(q) {
+function quotationToNumber$1(q) {
 	if (!q) return 0;
 	return Number(q.units || 0) + (q.nano || 0) / 1e9;
 }
@@ -1881,10 +1694,10 @@ var HistoricalDataLoader = class {
 		if (candles.length === 0) return null;
 		const engine = new VolumeProfileEngine({ profileResolution });
 		for (const candle of candles) {
-			const open = quotationToNumber(candle.open);
-			const high = quotationToNumber(candle.high);
-			const low = quotationToNumber(candle.low);
-			const close = quotationToNumber(candle.close);
+			const open = quotationToNumber$1(candle.open);
+			const high = quotationToNumber$1(candle.high);
+			const low = quotationToNumber$1(candle.low);
+			const close = quotationToNumber$1(candle.close);
 			const volume = Number(candle.volume || "0");
 			const streamCandle = {
 				instrumentUid,
@@ -2087,6 +1900,13 @@ var VirtualPortfolio = class {
 		return this.trades;
 	}
 };
+//#endregion
+//#region src/main/services/backtest/common.ts
+/** Преобразует Quotation в число */
+function quotationToNumber(q) {
+	if (!q) return 0;
+	return Number(q.units || "0") + (q.nano || 0) / 1e9;
+}
 //#endregion
 //#region src/main/services/tbank/SandboxGrpcService.ts
 var client$6 = createGrpcClient("sandbox.proto", "SandboxService");
@@ -2458,6 +2278,116 @@ var instrumentsGrpc = {
 	})
 };
 //#endregion
+//#region src/main/services/backtest/strategies/TrendStrategy.ts
+var TrendStrategy = class {
+	signals = [];
+	dailyProfile = null;
+	instrumentUid;
+	hvnLevel = null;
+	hvnBroken = false;
+	trendDirection = null;
+	hasPosition = false;
+	lastTradeTime = 0;
+	minIntervalMs = 900 * 1e3;
+	volumeFilterEnabled;
+	volumeFilterPeriod;
+	volumeHistory = [];
+	constructor(instrumentUid, dailyProfile, options) {
+		this.instrumentUid = instrumentUid;
+		this.dailyProfile = dailyProfile;
+		this.volumeFilterEnabled = options?.volumeFilterEnabled ?? false;
+		this.volumeFilterPeriod = options?.volumeFilterPeriod ?? 20;
+	}
+	reset() {
+		this.signals = [];
+		this.hvnLevel = null;
+		this.hvnBroken = false;
+		this.trendDirection = null;
+		this.hasPosition = false;
+		this.lastTradeTime = 0;
+		this.volumeHistory = [];
+	}
+	onCandle(candle) {
+		if (!this.dailyProfile || this.hasPosition) return;
+		const high = quotationToNumber(candle.high);
+		const low = quotationToNumber(candle.low);
+		const close = quotationToNumber(candle.close);
+		const time = candle.time || (/* @__PURE__ */ new Date()).toISOString();
+		const volume = Number(candle.volume || "0");
+		this.volumeHistory.push(volume);
+		if (this.volumeHistory.length > this.volumeFilterPeriod) this.volumeHistory.shift();
+		if (this.volumeFilterEnabled && this.volumeHistory.length >= this.volumeFilterPeriod) {
+			if (volume < this.volumeHistory.reduce((a, b) => a + b, 0) / this.volumeHistory.length) return;
+		}
+		const now = new Date(time).getTime();
+		if (now - this.lastTradeTime < this.minIntervalMs) return;
+		if (close > this.dailyProfile.valueAreaHigh) this.trendDirection = "UP";
+		else if (close < this.dailyProfile.valueAreaLow) this.trendDirection = "DOWN";
+		else {
+			this.hvnLevel = null;
+			this.hvnBroken = false;
+			return;
+		}
+		if (this.hvnLevel === null && this.dailyProfile.hvn.length > 0) {
+			const hvnList = this.dailyProfile.hvn;
+			if (this.trendDirection === "UP") {
+				const candidates = hvnList.filter((level) => level < close);
+				if (candidates.length > 0) this.hvnLevel = Math.max(...candidates);
+			} else {
+				const candidates = hvnList.filter((level) => level > close);
+				if (candidates.length > 0) this.hvnLevel = Math.min(...candidates);
+			}
+		}
+		if (this.hvnLevel === null) return;
+		if (!this.hvnBroken) {
+			if (this.trendDirection === "UP" && high > this.hvnLevel) this.hvnBroken = true;
+			else if (this.trendDirection === "DOWN" && low < this.hvnLevel) this.hvnBroken = true;
+		}
+		if (this.hvnBroken) {
+			const tolerance = .05;
+			if (this.trendDirection === "UP" && close <= this.hvnLevel + tolerance && close >= this.hvnLevel - tolerance) {
+				this.signals.push({
+					type: "BUY",
+					price: close,
+					time,
+					instrumentUid: this.instrumentUid,
+					reason: `Тренд вверх, ретест HVN ${this.hvnLevel}`
+				});
+				this.hasPosition = true;
+				this.lastTradeTime = now;
+				this.hvnLevel = null;
+				this.hvnBroken = false;
+			} else if (this.trendDirection === "DOWN" && close >= this.hvnLevel - tolerance && close <= this.hvnLevel + tolerance) {
+				this.signals.push({
+					type: "SELL",
+					price: close,
+					time,
+					instrumentUid: this.instrumentUid,
+					reason: `Тренд вниз, ретест HVN ${this.hvnLevel}`
+				});
+				this.hasPosition = true;
+				this.lastTradeTime = now;
+				this.hvnLevel = null;
+				this.hvnBroken = false;
+			}
+		}
+	}
+	getSignals() {
+		return this.signals;
+	}
+	clearSignals() {
+		this.signals = [];
+	}
+	updateProfile(profile) {
+		this.dailyProfile = profile;
+		this.hasPosition = false;
+		this.hvnLevel = null;
+		this.hvnBroken = false;
+		this.trendDirection = null;
+		this.volumeHistory = [];
+	}
+};
+//#endregion
 //#region src/main/services/backtest/batchBacktestRunner.ts
 var BatchBacktestRunner = class {
 	cancelled = false;
@@ -2517,9 +2447,9 @@ var BatchBacktestRunner = class {
 									totalSignals += newSignals.length;
 									for (const signal of newSignals) portfolio.processSignal(signal);
 									strategy.clearSignals();
-									const high = quotationToNumber$1(candle.high);
-									const low = quotationToNumber$1(candle.low);
-									const close = quotationToNumber$1(candle.close);
+									const high = quotationToNumber(candle.high);
+									const low = quotationToNumber(candle.low);
+									const close = quotationToNumber(candle.close);
 									lastClose = close;
 									portfolio.checkStopTake(high, low, close, candle.time || "");
 								}
@@ -2543,153 +2473,6 @@ var BatchBacktestRunner = class {
 	}
 	isCancelled() {
 		return this.cancelled;
-	}
-};
-//#endregion
-//#region src/main/services/backtest/strategies/DailyVAReversalStrategy.ts
-var DailyVAReversalStrategy = class {
-	signals = [];
-	dailyProfile = null;
-	instrumentUid;
-	aboveVA = false;
-	belowVA = false;
-	hasPosition = false;
-	constructor(instrumentUid, dailyProfile) {
-		this.instrumentUid = instrumentUid;
-		this.dailyProfile = dailyProfile;
-	}
-	reset() {
-		this.signals = [];
-		this.aboveVA = false;
-		this.belowVA = false;
-		this.hasPosition = false;
-	}
-	onCandle(candle) {
-		if (!this.dailyProfile || this.hasPosition) return;
-		const high = quotationToNumber$1(candle.high);
-		const low = quotationToNumber$1(candle.low);
-		const close = quotationToNumber$1(candle.close);
-		const time = candle.time || (/* @__PURE__ */ new Date()).toISOString();
-		const vah = this.dailyProfile.valueAreaHigh;
-		const val = this.dailyProfile.valueAreaLow;
-		if (high > vah) {
-			this.aboveVA = true;
-			this.belowVA = false;
-		}
-		if (low < val) {
-			this.belowVA = true;
-			this.aboveVA = false;
-		}
-		if (this.aboveVA && close < vah) {
-			this.signals.push({
-				type: "SELL",
-				price: close,
-				time,
-				instrumentUid: this.instrumentUid,
-				reason: `Return to VA after breaking high (VAH=${vah})`
-			});
-			this.hasPosition = true;
-			this.aboveVA = false;
-		}
-		if (this.belowVA && close > val) {
-			this.signals.push({
-				type: "BUY",
-				price: close,
-				time,
-				instrumentUid: this.instrumentUid,
-				reason: `Return to VA after breaking low (VAL=${val})`
-			});
-			this.hasPosition = true;
-			this.belowVA = false;
-		}
-	}
-	getSignals() {
-		return this.signals;
-	}
-	clearSignals() {
-		this.signals = [];
-	}
-	updateProfile(profile) {
-		this.dailyProfile = profile;
-		this.aboveVA = false;
-		this.belowVA = false;
-		this.hasPosition = false;
-	}
-};
-//#endregion
-//#region src/main/services/backtest/strategies/FVGVolumeStrategy.ts
-var FVGVolumeStrategy = class {
-	signals = [];
-	dailyProfile = null;
-	instrumentUid;
-	fvgList = [];
-	hasPosition = false;
-	prevCandle = null;
-	constructor(instrumentUid, dailyProfile) {
-		this.instrumentUid = instrumentUid;
-		this.dailyProfile = dailyProfile;
-	}
-	reset() {
-		this.signals = [];
-		this.fvgList = [];
-		this.hasPosition = false;
-		this.prevCandle = null;
-	}
-	onCandle(candle) {
-		if (!this.dailyProfile || this.hasPosition) return;
-		const close = quotationToNumber$1(candle.close);
-		const time = candle.time || (/* @__PURE__ */ new Date()).toISOString();
-		if (this.prevCandle) {
-			const prevHigh = quotationToNumber$1(this.prevCandle.high);
-			const prevLow = quotationToNumber$1(this.prevCandle.low);
-			const curLow = quotationToNumber$1(candle.low);
-			const curHigh = quotationToNumber$1(candle.high);
-			if (curLow > prevHigh) this.fvgList.push({
-				type: "bullish",
-				top: curLow,
-				bottom: prevHigh,
-				time
-			});
-			else if (curHigh < prevLow) this.fvgList.push({
-				type: "bearish",
-				top: prevLow,
-				bottom: curHigh,
-				time
-			});
-		}
-		this.prevCandle = candle;
-		const hvnLevels = this.dailyProfile.hvn || [];
-		for (const fvg of this.fvgList) if (hvnLevels.some((level) => level >= fvg.bottom && level <= fvg.top)) {
-			if (fvg.type === "bullish") this.signals.push({
-				type: "BUY",
-				price: close,
-				time,
-				instrumentUid: this.instrumentUid,
-				reason: `Bullish FVG + Volume Cluster`
-			});
-			else this.signals.push({
-				type: "SELL",
-				price: close,
-				time,
-				instrumentUid: this.instrumentUid,
-				reason: `Bearish FVG + Volume Cluster`
-			});
-			this.hasPosition = true;
-			this.fvgList = [];
-			break;
-		}
-	}
-	getSignals() {
-		return this.signals;
-	}
-	clearSignals() {
-		this.signals = [];
-	}
-	updateProfile(profile) {
-		this.dailyProfile = profile;
-		this.fvgList = [];
-		this.prevCandle = null;
-		this.hasPosition = false;
 	}
 };
 //#endregion
@@ -2726,154 +2509,6 @@ var OrderType = /* @__PURE__ */ function(OrderType) {
 	OrderType[OrderType["ORDER_TYPE_BESTPRICE"] = 3] = "ORDER_TYPE_BESTPRICE";
 	return OrderType;
 }({});
-//#endregion
-//#region src/main/services/backtest/strategies/TrendStrategyPro.ts
-var TrendStrategyPro = class {
-	signals = [];
-	dailyProfile = null;
-	instrumentUid;
-	prevCandle = null;
-	fvgList = [];
-	hasPosition = false;
-	constructor(instrumentUid, dailyProfile) {
-		this.instrumentUid = instrumentUid;
-		this.dailyProfile = dailyProfile;
-	}
-	reset() {
-		this.signals = [];
-		this.prevCandle = null;
-		this.fvgList = [];
-		this.hasPosition = false;
-	}
-	onCandle(candle) {
-		if (!this.dailyProfile || this.hasPosition) return;
-		const close = quotationToNumber$1(candle.close);
-		const time = candle.time || (/* @__PURE__ */ new Date()).toISOString();
-		const vah = this.dailyProfile.valueAreaHigh;
-		const val = this.dailyProfile.valueAreaLow;
-		const hvnLevels = this.dailyProfile.hvn || [];
-		if (this.prevCandle) {
-			const prevHigh = quotationToNumber$1(this.prevCandle.high);
-			const prevLow = quotationToNumber$1(this.prevCandle.low);
-			const curLow = quotationToNumber$1(candle.low);
-			const curHigh = quotationToNumber$1(candle.high);
-			if (curLow > prevHigh) this.fvgList.push({
-				type: "bullish",
-				top: curLow,
-				bottom: prevHigh,
-				time
-			});
-			else if (curHigh < prevLow) this.fvgList.push({
-				type: "bearish",
-				top: prevLow,
-				bottom: curHigh,
-				time
-			});
-		}
-		this.prevCandle = candle;
-		for (const fvg of this.fvgList) {
-			if (!hvnLevels.some((level) => level >= fvg.bottom && level <= fvg.top)) continue;
-			if (close > vah && fvg.type === "bullish") {
-				this.signals.push({
-					type: "BUY",
-					price: close,
-					time,
-					instrumentUid: this.instrumentUid,
-					reason: `Trend Pro: Bullish FVG + HVN above VAH`
-				});
-				this.hasPosition = true;
-				this.fvgList = [];
-				return;
-			}
-			if (close < val && fvg.type === "bearish") {
-				this.signals.push({
-					type: "SELL",
-					price: close,
-					time,
-					instrumentUid: this.instrumentUid,
-					reason: `Trend Pro: Bearish FVG + HVN below VAL`
-				});
-				this.hasPosition = true;
-				this.fvgList = [];
-				return;
-			}
-		}
-	}
-	getSignals() {
-		return this.signals;
-	}
-	clearSignals() {
-		this.signals = [];
-	}
-	updateProfile(profile) {
-		this.dailyProfile = profile;
-		this.fvgList = [];
-		this.prevCandle = null;
-		this.hasPosition = false;
-	}
-};
-//#endregion
-//#region src/main/services/backtest/strategies/RejectionStrategy.ts
-var RejectionStrategy = class {
-	signals = [];
-	dailyProfile = null;
-	instrumentUid;
-	hasPosition = false;
-	constructor(instrumentUid, dailyProfile) {
-		this.instrumentUid = instrumentUid;
-		this.dailyProfile = dailyProfile;
-	}
-	reset() {
-		this.signals = [];
-		this.hasPosition = false;
-	}
-	onCandle(candle) {
-		if (!this.dailyProfile || this.hasPosition) return;
-		const open = quotationToNumber$1(candle.open);
-		const high = quotationToNumber$1(candle.high);
-		const low = quotationToNumber$1(candle.low);
-		const close = quotationToNumber$1(candle.close);
-		const time = candle.time || (/* @__PURE__ */ new Date()).toISOString();
-		const body = Math.abs(close - open);
-		const upperWick = high - Math.max(open, close);
-		const lowerWick = Math.min(open, close) - low;
-		const totalRange = high - low;
-		if (totalRange === 0) return;
-		const isRejectionUp = lowerWick > totalRange * .6 && body < totalRange * .3;
-		const isRejectionDown = upperWick > totalRange * .6 && body < totalRange * .3;
-		if (!isRejectionUp && !isRejectionDown) return;
-		if (!(this.dailyProfile.hvn || []).some((level) => Math.abs(close - level) < 1)) return;
-		if (isRejectionDown) {
-			this.signals.push({
-				type: "SELL",
-				price: close,
-				time,
-				instrumentUid: this.instrumentUid,
-				reason: `Rejection down from HVN`
-			});
-			this.hasPosition = true;
-		} else if (isRejectionUp) {
-			this.signals.push({
-				type: "BUY",
-				price: close,
-				time,
-				instrumentUid: this.instrumentUid,
-				reason: `Rejection up from HVN`
-			});
-			this.hasPosition = true;
-		}
-	}
-	getSignals() {
-		return this.signals;
-	}
-	clearSignals() {
-		this.signals = [];
-	}
-	updateProfile(profile) {
-		this.dailyProfile = profile;
-		this.hasPosition = false;
-	}
-};
 //#endregion
 //#region src/main/services/screenerService.ts
 var ScreenerService = class {
@@ -3054,6 +2689,783 @@ var ScreenerService = class {
 	}
 };
 //#endregion
+//#region src/main/services/backtest/strategies/TrendStrategyPro.ts
+var TrendStrategyPro = class {
+	signals = [];
+	dailyProfile = null;
+	instrumentUid;
+	prevCandle = null;
+	fvgList = [];
+	hasPosition = false;
+	constructor(instrumentUid, dailyProfile) {
+		this.instrumentUid = instrumentUid;
+		this.dailyProfile = dailyProfile;
+	}
+	reset() {
+		this.signals = [];
+		this.prevCandle = null;
+		this.fvgList = [];
+		this.hasPosition = false;
+	}
+	onCandle(candle) {
+		if (!this.dailyProfile || this.hasPosition) return;
+		const close = quotationToNumber(candle.close);
+		const time = candle.time || (/* @__PURE__ */ new Date()).toISOString();
+		const vah = this.dailyProfile.valueAreaHigh;
+		const val = this.dailyProfile.valueAreaLow;
+		const hvnLevels = this.dailyProfile.hvn || [];
+		if (this.prevCandle) {
+			const prevHigh = quotationToNumber(this.prevCandle.high);
+			const prevLow = quotationToNumber(this.prevCandle.low);
+			const curLow = quotationToNumber(candle.low);
+			const curHigh = quotationToNumber(candle.high);
+			if (curLow > prevHigh) this.fvgList.push({
+				type: "bullish",
+				top: curLow,
+				bottom: prevHigh,
+				time
+			});
+			else if (curHigh < prevLow) this.fvgList.push({
+				type: "bearish",
+				top: prevLow,
+				bottom: curHigh,
+				time
+			});
+		}
+		this.prevCandle = candle;
+		for (const fvg of this.fvgList) {
+			if (!hvnLevels.some((level) => level >= fvg.bottom && level <= fvg.top)) continue;
+			if (close > vah && fvg.type === "bullish") {
+				this.signals.push({
+					type: "BUY",
+					price: close,
+					time,
+					instrumentUid: this.instrumentUid,
+					reason: `Trend Pro: Bullish FVG + HVN above VAH`
+				});
+				this.hasPosition = true;
+				this.fvgList = [];
+				return;
+			}
+			if (close < val && fvg.type === "bearish") {
+				this.signals.push({
+					type: "SELL",
+					price: close,
+					time,
+					instrumentUid: this.instrumentUid,
+					reason: `Trend Pro: Bearish FVG + HVN below VAL`
+				});
+				this.hasPosition = true;
+				this.fvgList = [];
+				return;
+			}
+		}
+	}
+	getSignals() {
+		return this.signals;
+	}
+	clearSignals() {
+		this.signals = [];
+	}
+	updateProfile(profile) {
+		this.dailyProfile = profile;
+		this.fvgList = [];
+		this.prevCandle = null;
+		this.hasPosition = false;
+	}
+};
+//#endregion
+//#region src/main/services/backtest/strategies/POCPullbackStrategy.ts
+var POCPullbackStrategy = class {
+	signals = [];
+	dailyProfile = null;
+	instrumentUid;
+	priceAbovePOC = false;
+	priceBelowPOC = false;
+	hasPosition = false;
+	constructor(instrumentUid, dailyProfile) {
+		this.instrumentUid = instrumentUid;
+		this.dailyProfile = dailyProfile;
+	}
+	reset() {
+		this.signals = [];
+		this.priceAbovePOC = false;
+		this.priceBelowPOC = false;
+		this.hasPosition = false;
+	}
+	onCandle(candle) {
+		if (!this.dailyProfile || this.hasPosition) return;
+		const high = quotationToNumber(candle.high);
+		const low = quotationToNumber(candle.low);
+		const close = quotationToNumber(candle.close);
+		const time = candle.time || (/* @__PURE__ */ new Date()).toISOString();
+		const poc = this.dailyProfile.poc;
+		if (high > poc) {
+			this.priceAbovePOC = true;
+			this.priceBelowPOC = false;
+		}
+		if (low < poc) {
+			this.priceBelowPOC = true;
+			this.priceAbovePOC = false;
+		}
+		if (this.priceAbovePOC && close <= poc) {
+			this.signals.push({
+				type: "BUY",
+				price: close,
+				time,
+				instrumentUid: this.instrumentUid,
+				reason: `POC Pullback long from above (POC=${poc})`
+			});
+			this.hasPosition = true;
+			this.priceAbovePOC = false;
+		}
+		if (this.priceBelowPOC && close >= poc) {
+			this.signals.push({
+				type: "SELL",
+				price: close,
+				time,
+				instrumentUid: this.instrumentUid,
+				reason: `POC Pullback short from below (POC=${poc})`
+			});
+			this.hasPosition = true;
+			this.priceBelowPOC = false;
+		}
+	}
+	getSignals() {
+		return this.signals;
+	}
+	clearSignals() {
+		this.signals = [];
+	}
+	updateProfile(profile) {
+		this.dailyProfile = profile;
+		this.priceAbovePOC = false;
+		this.priceBelowPOC = false;
+		this.hasPosition = false;
+	}
+};
+//#endregion
+//#region src/main/services/backtest/strategies/DailyVAReversalStrategy.ts
+var DailyVAReversalStrategy = class {
+	signals = [];
+	dailyProfile = null;
+	instrumentUid;
+	aboveVA = false;
+	belowVA = false;
+	hasPosition = false;
+	constructor(instrumentUid, dailyProfile) {
+		this.instrumentUid = instrumentUid;
+		this.dailyProfile = dailyProfile;
+	}
+	reset() {
+		this.signals = [];
+		this.aboveVA = false;
+		this.belowVA = false;
+		this.hasPosition = false;
+	}
+	onCandle(candle) {
+		if (!this.dailyProfile || this.hasPosition) return;
+		const high = quotationToNumber(candle.high);
+		const low = quotationToNumber(candle.low);
+		const close = quotationToNumber(candle.close);
+		const time = candle.time || (/* @__PURE__ */ new Date()).toISOString();
+		const vah = this.dailyProfile.valueAreaHigh;
+		const val = this.dailyProfile.valueAreaLow;
+		if (high > vah) {
+			this.aboveVA = true;
+			this.belowVA = false;
+		}
+		if (low < val) {
+			this.belowVA = true;
+			this.aboveVA = false;
+		}
+		if (this.aboveVA && close < vah) {
+			this.signals.push({
+				type: "SELL",
+				price: close,
+				time,
+				instrumentUid: this.instrumentUid,
+				reason: `Return to VA after breaking high (VAH=${vah})`
+			});
+			this.hasPosition = true;
+			this.aboveVA = false;
+		}
+		if (this.belowVA && close > val) {
+			this.signals.push({
+				type: "BUY",
+				price: close,
+				time,
+				instrumentUid: this.instrumentUid,
+				reason: `Return to VA after breaking low (VAL=${val})`
+			});
+			this.hasPosition = true;
+			this.belowVA = false;
+		}
+	}
+	getSignals() {
+		return this.signals;
+	}
+	clearSignals() {
+		this.signals = [];
+	}
+	updateProfile(profile) {
+		this.dailyProfile = profile;
+		this.aboveVA = false;
+		this.belowVA = false;
+		this.hasPosition = false;
+	}
+};
+//#endregion
+//#region src/main/services/backtest/strategies/FVGVolumeStrategy.ts
+var FVGVolumeStrategy = class {
+	signals = [];
+	dailyProfile = null;
+	instrumentUid;
+	fvgList = [];
+	hasPosition = false;
+	prevCandle = null;
+	constructor(instrumentUid, dailyProfile) {
+		this.instrumentUid = instrumentUid;
+		this.dailyProfile = dailyProfile;
+	}
+	reset() {
+		this.signals = [];
+		this.fvgList = [];
+		this.hasPosition = false;
+		this.prevCandle = null;
+	}
+	onCandle(candle) {
+		if (!this.dailyProfile || this.hasPosition) return;
+		const close = quotationToNumber(candle.close);
+		const time = candle.time || (/* @__PURE__ */ new Date()).toISOString();
+		if (this.prevCandle) {
+			const prevHigh = quotationToNumber(this.prevCandle.high);
+			const prevLow = quotationToNumber(this.prevCandle.low);
+			const curLow = quotationToNumber(candle.low);
+			const curHigh = quotationToNumber(candle.high);
+			if (curLow > prevHigh) this.fvgList.push({
+				type: "bullish",
+				top: curLow,
+				bottom: prevHigh,
+				time
+			});
+			else if (curHigh < prevLow) this.fvgList.push({
+				type: "bearish",
+				top: prevLow,
+				bottom: curHigh,
+				time
+			});
+		}
+		this.prevCandle = candle;
+		const hvnLevels = this.dailyProfile.hvn || [];
+		for (const fvg of this.fvgList) if (hvnLevels.some((level) => level >= fvg.bottom && level <= fvg.top)) {
+			if (fvg.type === "bullish") this.signals.push({
+				type: "BUY",
+				price: close,
+				time,
+				instrumentUid: this.instrumentUid,
+				reason: `Bullish FVG + Volume Cluster`
+			});
+			else this.signals.push({
+				type: "SELL",
+				price: close,
+				time,
+				instrumentUid: this.instrumentUid,
+				reason: `Bearish FVG + Volume Cluster`
+			});
+			this.hasPosition = true;
+			this.fvgList = [];
+			break;
+		}
+	}
+	getSignals() {
+		return this.signals;
+	}
+	clearSignals() {
+		this.signals = [];
+	}
+	updateProfile(profile) {
+		this.dailyProfile = profile;
+		this.fvgList = [];
+		this.prevCandle = null;
+		this.hasPosition = false;
+	}
+};
+//#endregion
+//#region src/main/services/backtest/strategies/RejectionStrategy.ts
+var RejectionStrategy = class {
+	signals = [];
+	dailyProfile = null;
+	instrumentUid;
+	hasPosition = false;
+	constructor(instrumentUid, dailyProfile) {
+		this.instrumentUid = instrumentUid;
+		this.dailyProfile = dailyProfile;
+	}
+	reset() {
+		this.signals = [];
+		this.hasPosition = false;
+	}
+	onCandle(candle) {
+		if (!this.dailyProfile || this.hasPosition) return;
+		const open = quotationToNumber(candle.open);
+		const high = quotationToNumber(candle.high);
+		const low = quotationToNumber(candle.low);
+		const close = quotationToNumber(candle.close);
+		const time = candle.time || (/* @__PURE__ */ new Date()).toISOString();
+		const body = Math.abs(close - open);
+		const upperWick = high - Math.max(open, close);
+		const lowerWick = Math.min(open, close) - low;
+		const totalRange = high - low;
+		if (totalRange === 0) return;
+		const isRejectionUp = lowerWick > totalRange * .6 && body < totalRange * .3;
+		const isRejectionDown = upperWick > totalRange * .6 && body < totalRange * .3;
+		if (!isRejectionUp && !isRejectionDown) return;
+		if (!(this.dailyProfile.hvn || []).some((level) => Math.abs(close - level) < 1)) return;
+		if (isRejectionDown) {
+			this.signals.push({
+				type: "SELL",
+				price: close,
+				time,
+				instrumentUid: this.instrumentUid,
+				reason: `Rejection down from HVN`
+			});
+			this.hasPosition = true;
+		} else if (isRejectionUp) {
+			this.signals.push({
+				type: "BUY",
+				price: close,
+				time,
+				instrumentUid: this.instrumentUid,
+				reason: `Rejection up from HVN`
+			});
+			this.hasPosition = true;
+		}
+	}
+	getSignals() {
+		return this.signals;
+	}
+	clearSignals() {
+		this.signals = [];
+	}
+	updateProfile(profile) {
+		this.dailyProfile = profile;
+		this.hasPosition = false;
+	}
+};
+//#endregion
+//#region src/main/services/backtest/strategies/InitialBalanceStrategy.ts
+var InitialBalanceStrategy = class {
+	signals = [];
+	ibHigh = 0;
+	ibLow = 0;
+	ibPeriodMinutes;
+	instrumentUid;
+	profile;
+	candlesInPeriod = [];
+	periodExpired = false;
+	constructor(instrumentUid, profile, ibMinutes = 60) {
+		this.instrumentUid = instrumentUid;
+		this.profile = profile;
+		this.ibPeriodMinutes = ibMinutes;
+	}
+	onCandle(candle) {
+		if (this.periodExpired) return;
+		const time = candle.time || (/* @__PURE__ */ new Date()).toISOString();
+		const high = quotationToNumber(candle.high);
+		const low = quotationToNumber(candle.low);
+		const close = quotationToNumber(candle.close);
+		const volume = Number(candle.volume || "0");
+		this.candlesInPeriod.push({
+			time,
+			high,
+			low,
+			close,
+			volume
+		});
+		if ((new Date(time).getTime() - new Date(this.candlesInPeriod[0].time).getTime()) / 6e4 >= this.ibPeriodMinutes) {
+			this.ibHigh = Math.max(...this.candlesInPeriod.map((c) => c.high));
+			this.ibLow = Math.min(...this.candlesInPeriod.map((c) => c.low));
+			this.periodExpired = true;
+		} else return;
+		if (close > this.ibHigh && volume > this.averageVolume() * 1.5) this.signals.push({
+			type: "BUY",
+			price: close,
+			time,
+			instrumentUid: this.instrumentUid,
+			reason: `IB breakout up (high=${this.ibHigh})`
+		});
+		else if (close < this.ibLow && volume > this.averageVolume() * 1.5) this.signals.push({
+			type: "SELL",
+			price: close,
+			time,
+			instrumentUid: this.instrumentUid,
+			reason: `IB breakout down (low=${this.ibLow})`
+		});
+	}
+	averageVolume() {
+		if (this.candlesInPeriod.length === 0) return 0;
+		return this.candlesInPeriod.reduce((s, c) => s + c.volume, 0) / this.candlesInPeriod.length;
+	}
+	getSignals() {
+		return this.signals;
+	}
+	clearSignals() {
+		this.signals = [];
+	}
+	reset() {
+		this.signals = [];
+		this.periodExpired = false;
+		this.candlesInPeriod = [];
+		this.ibHigh = 0;
+		this.ibLow = 0;
+	}
+	updateProfile(profile) {
+		this.profile = profile;
+		this.reset();
+	}
+};
+//#endregion
+//#region src/main/services/backtest/strategies/VABreakoutRetestStrategy.ts
+var VABreakoutRetestStrategy = class {
+	signals = [];
+	instrumentUid;
+	profile;
+	brokenHigh = false;
+	brokenLow = false;
+	retestHigh = false;
+	retestLow = false;
+	constructor(instrumentUid, profile) {
+		this.instrumentUid = instrumentUid;
+		this.profile = profile;
+	}
+	onCandle(candle) {
+		if (!this.profile) return;
+		const high = quotationToNumber(candle.high);
+		const low = quotationToNumber(candle.low);
+		const close = quotationToNumber(candle.close);
+		const volume = Number(candle.volume || "0");
+		const time = candle.time || (/* @__PURE__ */ new Date()).toISOString();
+		const avgVolume = 5e4;
+		if (high > this.profile.valueAreaHigh && volume > avgVolume * 1.2) {
+			this.brokenHigh = true;
+			this.brokenLow = false;
+		}
+		if (low < this.profile.valueAreaLow && volume > avgVolume * 1.2) {
+			this.brokenLow = true;
+			this.brokenHigh = false;
+		}
+		if (this.brokenHigh && !this.retestHigh) {
+			if (low <= this.profile.valueAreaHigh && close > this.profile.valueAreaHigh) {
+				this.signals.push({
+					type: "BUY",
+					price: close,
+					time,
+					instrumentUid: this.instrumentUid,
+					reason: `Return to VAH after breakout (VAH=${this.profile.valueAreaHigh})`
+				});
+				this.retestHigh = true;
+				this.brokenHigh = false;
+			}
+		}
+		if (this.brokenLow && !this.retestLow) {
+			if (high >= this.profile.valueAreaLow && close < this.profile.valueAreaLow) {
+				this.signals.push({
+					type: "SELL",
+					price: close,
+					time,
+					instrumentUid: this.instrumentUid,
+					reason: `Return to VAL after breakout (VAL=${this.profile.valueAreaLow})`
+				});
+				this.retestLow = true;
+				this.brokenLow = false;
+			}
+		}
+	}
+	getSignals() {
+		return this.signals;
+	}
+	clearSignals() {
+		this.signals = [];
+	}
+	reset() {
+		this.signals = [];
+		this.brokenHigh = false;
+		this.brokenLow = false;
+		this.retestHigh = false;
+		this.retestLow = false;
+	}
+	updateProfile(profile) {
+		this.profile = profile;
+		this.reset();
+	}
+};
+//#endregion
+//#region src/main/services/backtest/strategies/SFPStrategy.ts
+var SFPStrategy = class {
+	signals = [];
+	instrumentUid;
+	profile;
+	previousHigh = 0;
+	previousLow = Infinity;
+	windowCandles = [];
+	constructor(instrumentUid, profile) {
+		this.instrumentUid = instrumentUid;
+		this.profile = profile;
+	}
+	onCandle(candle) {
+		const high = quotationToNumber(candle.high);
+		const low = quotationToNumber(candle.low);
+		const close = quotationToNumber(candle.close);
+		const volume = Number(candle.volume || "0");
+		const time = candle.time || (/* @__PURE__ */ new Date()).toISOString();
+		this.windowCandles.push(candle);
+		if (this.windowCandles.length > 10) this.windowCandles.shift();
+		if (this.windowCandles.length >= 3) {
+			const prevCandles = this.windowCandles.slice(0, -1);
+			this.previousHigh = Math.max(...prevCandles.map((c) => quotationToNumber(c.high)));
+			this.previousLow = Math.min(...prevCandles.map((c) => quotationToNumber(c.low)));
+		}
+		if (high > this.previousHigh && close < this.previousHigh && volume > this.averageVolume() * 1.3) this.signals.push({
+			type: "SELL",
+			price: close,
+			time,
+			instrumentUid: this.instrumentUid,
+			reason: `Swing failure – false breakout above ${this.previousHigh}`
+		});
+		if (low < this.previousLow && close > this.previousLow && volume > this.averageVolume() * 1.3) this.signals.push({
+			type: "BUY",
+			price: close,
+			time,
+			instrumentUid: this.instrumentUid,
+			reason: `Swing failure – false breakdown below ${this.previousLow}`
+		});
+	}
+	averageVolume() {
+		if (this.windowCandles.length === 0) return 0;
+		return this.windowCandles.reduce((s, c) => s + Number(c.volume || "0"), 0) / this.windowCandles.length;
+	}
+	getSignals() {
+		return this.signals;
+	}
+	clearSignals() {
+		this.signals = [];
+	}
+	reset() {
+		this.signals = [];
+		this.windowCandles = [];
+		this.previousHigh = 0;
+		this.previousLow = Infinity;
+	}
+	updateProfile(profile) {
+		this.profile = profile;
+		this.reset();
+	}
+};
+//#endregion
+//#region src/main/services/backtest/strategies/AnchoredVWAPStrategy.ts
+var AnchoredVWAPStrategy = class {
+	signals = [];
+	instrumentUid;
+	profile;
+	anchorTime;
+	vwapNumerator = 0;
+	vwapDenominator = 0;
+	avwapValues = [];
+	currentAVWAP = 0;
+	trendDirection = null;
+	trendConfirmed = false;
+	constructor(instrumentUid, profile, anchorTime) {
+		this.instrumentUid = instrumentUid;
+		this.profile = profile;
+		this.anchorTime = anchorTime ? anchorTime.getTime() : Date.now() - 36e5;
+	}
+	onCandle(candle) {
+		if (new Date(candle.time || Date.now()).getTime() < this.anchorTime) return;
+		const high = quotationToNumber(candle.high);
+		const low = quotationToNumber(candle.low);
+		const close = quotationToNumber(candle.close);
+		const volume = Number(candle.volume || "0");
+		const typicalPrice = (high + low + close) / 3;
+		this.vwapNumerator += typicalPrice * volume;
+		this.vwapDenominator += volume;
+		this.currentAVWAP = this.vwapDenominator > 0 ? this.vwapNumerator / this.vwapDenominator : close;
+		this.avwapValues.push(this.currentAVWAP);
+		if (this.avwapValues.length > 20) this.avwapValues.shift();
+		if (this.avwapValues.length >= 5) {
+			const first = this.avwapValues[this.avwapValues.length - 5];
+			const change = (this.avwapValues[this.avwapValues.length - 1] - first) / first;
+			if (change > .001) {
+				this.trendDirection = "up";
+				this.trendConfirmed = true;
+			} else if (change < -.001) {
+				this.trendDirection = "down";
+				this.trendConfirmed = true;
+			} else this.trendConfirmed = false;
+		}
+		if (!this.trendConfirmed) return;
+		if (this.trendDirection === "up" && low <= this.currentAVWAP && close > this.currentAVWAP) this.signals.push({
+			type: "BUY",
+			price: close,
+			time: candle.time || (/* @__PURE__ */ new Date()).toISOString(),
+			instrumentUid: this.instrumentUid,
+			reason: `Bounce off AVWAP in uptrend (AVWAP=${this.currentAVWAP.toFixed(2)})`
+		});
+		else if (this.trendDirection === "down" && high >= this.currentAVWAP && close < this.currentAVWAP) this.signals.push({
+			type: "SELL",
+			price: close,
+			time: candle.time || (/* @__PURE__ */ new Date()).toISOString(),
+			instrumentUid: this.instrumentUid,
+			reason: `Bounce off AVWAP in downtrend (AVWAP=${this.currentAVWAP.toFixed(2)})`
+		});
+	}
+	getSignals() {
+		return this.signals;
+	}
+	clearSignals() {
+		this.signals = [];
+	}
+	reset() {
+		this.signals = [];
+		this.vwapNumerator = 0;
+		this.vwapDenominator = 0;
+		this.avwapValues = [];
+		this.currentAVWAP = 0;
+		this.trendConfirmed = false;
+		this.trendDirection = null;
+	}
+	updateProfile(profile) {
+		this.profile = profile;
+	}
+};
+//#endregion
+//#region src/main/services/backtest/strategies/AbsorptionStrategy.ts
+var AbsorptionStrategy = class {
+	signals = [];
+	instrumentUid;
+	profile;
+	orderFlow;
+	constructor(instrumentUid, profile, orderFlow) {
+		this.instrumentUid = instrumentUid;
+		this.profile = profile;
+		this.orderFlow = orderFlow;
+	}
+	onCandle(candle) {
+		const absorption = this.orderFlow.detectAbsorption(this.instrumentUid);
+		if (!absorption) return;
+		const close = quotationToNumber(candle.close);
+		const time = candle.time || (/* @__PURE__ */ new Date()).toISOString();
+		if (absorption.side === "ask") this.signals.push({
+			type: "BUY",
+			price: close,
+			time,
+			instrumentUid: this.instrumentUid,
+			reason: `Absorption of ask wall at ${absorption.priceLevel}`
+		});
+		else if (absorption.side === "bid") this.signals.push({
+			type: "SELL",
+			price: close,
+			time,
+			instrumentUid: this.instrumentUid,
+			reason: `Absorption of bid wall at ${absorption.priceLevel}`
+		});
+	}
+	getSignals() {
+		return this.signals;
+	}
+	clearSignals() {
+		this.signals = [];
+	}
+	reset() {
+		this.signals = [];
+	}
+	updateProfile(profile) {
+		this.profile = profile;
+	}
+};
+//#endregion
+//#region src/main/services/backtest/strategies/ExhaustionStrategy.ts
+var ExhaustionStrategy = class {
+	signals = [];
+	instrumentUid;
+	profile;
+	orderFlow;
+	constructor(instrumentUid, profile, orderFlow) {
+		this.instrumentUid = instrumentUid;
+		this.profile = profile;
+		this.orderFlow = orderFlow;
+	}
+	onCandle(candle) {
+		const exhaustion = this.orderFlow.detectExhaustion(this.instrumentUid);
+		if (!exhaustion) return;
+		const close = quotationToNumber(candle.close);
+		const time = candle.time || (/* @__PURE__ */ new Date()).toISOString();
+		if (exhaustion.type === "bearish") this.signals.push({
+			type: "SELL",
+			price: close,
+			time,
+			instrumentUid: this.instrumentUid,
+			reason: `Bearish exhaustion (price high, delta negative)`
+		});
+		else if (exhaustion.type === "bullish") this.signals.push({
+			type: "BUY",
+			price: close,
+			time,
+			instrumentUid: this.instrumentUid,
+			reason: `Bullish exhaustion (price low, delta positive)`
+		});
+	}
+	getSignals() {
+		return this.signals;
+	}
+	clearSignals() {
+		this.signals = [];
+	}
+	reset() {
+		this.signals = [];
+	}
+	updateProfile(profile) {
+		this.profile = profile;
+	}
+};
+//#endregion
+//#region src/main/services/backtest/strategies/strategyFactory.ts
+function createStrategy(name, instrumentUid, profile, orderFlow, options) {
+	switch (name) {
+		case "volume_accumulation": return new VolumeAccumulationStrategy(instrumentUid, profile, options);
+		case "trend": return new TrendStrategy(instrumentUid, profile, options);
+		case "trend_pro": return new TrendStrategyPro(instrumentUid, profile);
+		case "poc_pullback": return new POCPullbackStrategy(instrumentUid, profile);
+		case "daily_va_return": return new DailyVAReversalStrategy(instrumentUid, profile);
+		case "fvg_volume": return new FVGVolumeStrategy(instrumentUid, profile);
+		case "rejection": return new RejectionStrategy(instrumentUid, profile);
+		case "initial_balance": return new InitialBalanceStrategy(instrumentUid, profile, options?.ibMinutes || 60);
+		case "va_breakout_retest": return new VABreakoutRetestStrategy(instrumentUid, profile);
+		case "sfp": return new SFPStrategy(instrumentUid, profile);
+		case "anchored_vwap": return new AnchoredVWAPStrategy(instrumentUid, profile, options?.anchorTime ? new Date(options.anchorTime) : void 0);
+		case "absorption": return new AbsorptionStrategy(instrumentUid, profile, orderFlow);
+		case "exhaustion": return new ExhaustionStrategy(instrumentUid, profile, orderFlow);
+		default: throw new Error(`Unknown strategy: ${name}`);
+	}
+}
+function getAvailableStrategies() {
+	return [
+		"volume_accumulation",
+		"trend",
+		"trend_pro",
+		"poc_pullback",
+		"daily_va_return",
+		"fvg_volume",
+		"rejection",
+		"initial_balance",
+		"va_breakout_retest",
+		"sfp",
+		"anchored_vwap",
+		"absorption",
+		"exhaustion"
+	];
+}
+//#endregion
 //#region src/main/ipcHandlers/tradingAssistantHandlers.ts
 var orderManagerInstance = null;
 var setOrderManagerInstance = (manager) => {
@@ -3095,16 +3507,20 @@ async function runBacktestInternal(instrumentUid, dateFrom, dateTo, intervalStr,
 				candles.forEach((c) => engine.onCandle?.(c));
 				const profile = engine.getProfile(instrumentUid);
 				let strategy;
-				if (strategyType === "trend") strategy = new TrendStrategy(instrumentUid, profile);
-				else if (strategyType === "poc_pullback") strategy = new POCPullbackStrategy(instrumentUid, profile);
-				else if (strategyType === "daily_va_return") strategy = new DailyVAReversalStrategy(instrumentUid, profile);
-				else if (strategyType === "fvg_volume") strategy = new FVGVolumeStrategy(instrumentUid, profile);
-				else if (strategyType === "trend_pro") strategy = new TrendStrategyPro(instrumentUid, profile);
-				else if (strategyType === "rejection") strategy = new RejectionStrategy(instrumentUid, profile);
-				else strategy = new VolumeAccumulationStrategy(instrumentUid, profile, {
-					volumeFilterEnabled: params.volumeFilterEnabled,
-					volumeFilterPeriod: params.volumeFilterPeriod
-				});
+				try {
+					strategy = createStrategy(strategyType, instrumentUid, profile, void 0, {
+						volumeFilterEnabled: params.volumeFilterEnabled,
+						volumeFilterPeriod: params.volumeFilterPeriod,
+						ibMinutes: params.ibMinutes || 60,
+						anchorTime: params.anchorTime
+					});
+				} catch (e) {
+					console.error("Failed to create strategy:", e);
+					strategy = new VolumeAccumulationStrategy(instrumentUid, profile, {
+						volumeFilterEnabled: params.volumeFilterEnabled,
+						volumeFilterPeriod: params.volumeFilterPeriod
+					});
+				}
 				for (const candle of candles) {
 					strategy.onCandle(candle);
 					const newSignals = strategy.getSignals();
@@ -3113,9 +3529,9 @@ async function runBacktestInternal(instrumentUid, dateFrom, dateTo, intervalStr,
 						allSignals.push(signal);
 					}
 					strategy.clearSignals();
-					const high = quotationToNumber$1(candle.high);
-					const low = quotationToNumber$1(candle.low);
-					const close = quotationToNumber$1(candle.close);
+					const high = quotationToNumber(candle.high);
+					const low = quotationToNumber(candle.low);
+					const close = quotationToNumber(candle.close);
 					portfolio.checkStopTake(high, low, close, candle.time || "");
 				}
 				allCandles.push(...candles);
@@ -3124,7 +3540,7 @@ async function runBacktestInternal(instrumentUid, dateFrom, dateTo, intervalStr,
 		}
 		if (allCandles.length > 0) {
 			const lastCandle = allCandles[allCandles.length - 1];
-			const lastPrice = quotationToNumber$1(lastCandle.close);
+			const lastPrice = quotationToNumber(lastCandle.close);
 			portfolio.finalizeWithLastPrice(lastPrice, lastCandle.time || "");
 		} else portfolio.finalizeWithLastPrice(0, "");
 		const stats = portfolio.getStats();
@@ -3202,19 +3618,20 @@ var registerTradingAssistantHandlers = () => {
 					candles.forEach((c) => engine.onCandle?.(c));
 					const profile = engine.getProfile(instrumentUid);
 					let strategy;
-					if (strategyType === "trend") strategy = new TrendStrategy(instrumentUid, profile, {
-						volumeFilterEnabled: params.volumeFilterEnabled,
-						volumeFilterPeriod: params.volumeFilterPeriod
-					});
-					else if (strategyType === "poc_pullback") strategy = new POCPullbackStrategy(instrumentUid, profile);
-					else if (strategyType === "daily_va_return") strategy = new DailyVAReversalStrategy(instrumentUid, profile);
-					else if (strategyType === "fvg_volume") strategy = new FVGVolumeStrategy(instrumentUid, profile);
-					else if (strategyType === "trend_pro") strategy = new TrendStrategyPro(instrumentUid, profile);
-					else if (strategyType === "rejection") strategy = new RejectionStrategy(instrumentUid, profile);
-					else strategy = new VolumeAccumulationStrategy(instrumentUid, profile, {
-						volumeFilterEnabled: params.volumeFilterEnabled,
-						volumeFilterPeriod: params.volumeFilterPeriod
-					});
+					try {
+						strategy = createStrategy(strategyType, instrumentUid, profile, void 0, {
+							volumeFilterEnabled: params.volumeFilterEnabled,
+							volumeFilterPeriod: params.volumeFilterPeriod,
+							ibMinutes: params.ibMinutes || 60,
+							anchorTime: params.anchorTime
+						});
+					} catch (e) {
+						console.error("Failed to create strategy:", e);
+						strategy = new VolumeAccumulationStrategy(instrumentUid, profile, {
+							volumeFilterEnabled: params.volumeFilterEnabled,
+							volumeFilterPeriod: params.volumeFilterPeriod
+						});
+					}
 					for (const candle of candles) {
 						strategy.onCandle(candle);
 						const newSignals = strategy.getSignals();
@@ -3223,9 +3640,9 @@ var registerTradingAssistantHandlers = () => {
 							allSignals.push(signal);
 						}
 						strategy.clearSignals();
-						const high = quotationToNumber$1(candle.high);
-						const low = quotationToNumber$1(candle.low);
-						const close = quotationToNumber$1(candle.close);
+						const high = quotationToNumber(candle.high);
+						const low = quotationToNumber(candle.low);
+						const close = quotationToNumber(candle.close);
 						portfolio.checkStopTake(high, low, close, candle.time || "");
 					}
 					allCandles.push(...candles);
@@ -3234,7 +3651,7 @@ var registerTradingAssistantHandlers = () => {
 			}
 			if (allCandles.length > 0) {
 				const lastCandle = allCandles[allCandles.length - 1];
-				const lastPrice = quotationToNumber$1(lastCandle.close);
+				const lastPrice = quotationToNumber(lastCandle.close);
 				portfolio.finalizeWithLastPrice(lastPrice, lastCandle.time || "");
 			} else portfolio.finalizeWithLastPrice(0, "");
 			const stats = portfolio.getStats();
@@ -4686,7 +5103,6 @@ var StrategyManager = class {
 	volumeProfile;
 	orderFlow;
 	activeStrategies = [];
-	strategyRegistry = /* @__PURE__ */ new Map();
 	phaseMapping = /* @__PURE__ */ new Map();
 	constructor(phaseDetector, compositeProfile, volumeProfile, orderFlow) {
 		this.phaseDetector = phaseDetector;
@@ -4694,7 +5110,7 @@ var StrategyManager = class {
 		this.volumeProfile = volumeProfile;
 		this.orderFlow = orderFlow;
 		this.phaseMapping.set(MarketPhase.BALANCE, [
-			"daily_va_reversal",
+			"daily_va_return",
 			"poc_pullback",
 			"volume_accumulation"
 		]);
@@ -4711,34 +5127,21 @@ var StrategyManager = class {
 		this.phaseMapping.set(MarketPhase.BREAKOUT, ["initial_balance", "va_breakout_retest"]);
 		this.phaseMapping.set(MarketPhase.CHOP, []);
 	}
-	/** Зарегистрировать стратегию в реестре */
-	registerStrategy(name, factory) {
-		this.strategyRegistry.set(name, {
-			name,
-			factory
-		});
-	}
-	/** Обновить маппинг фаз → стратегии (можно вызывать из UI) */
 	updatePhaseMapping(phase, strategyNames) {
 		this.phaseMapping.set(phase, strategyNames);
 	}
-	/** Основной метод: вызывается при каждом новом баре или по таймеру */
 	async update(instrumentUid) {
 		const phase = await this.phaseDetector.detectPhase(instrumentUid);
 		const strategyNames = this.phaseMapping.get(phase) || [];
 		const profile = this.volumeProfile.getProfile(instrumentUid);
 		this.activeStrategies = [];
-		for (const name of strategyNames) {
-			const entry = this.strategyRegistry.get(name);
-			if (entry) try {
-				const strategy = entry.factory(instrumentUid, profile);
-				this.activeStrategies.push(strategy);
-			} catch (err) {
-				console.warn(`StrategyManager: failed to create strategy ${name}`, err);
-			}
+		for (const name of strategyNames) try {
+			const strategy = createStrategy(name, instrumentUid, profile, this.orderFlow);
+			this.activeStrategies.push(strategy);
+		} catch (err) {
+			console.warn(`StrategyManager: failed to create strategy ${name}`, err);
 		}
 	}
-	/** Получить сигналы от всех активных стратегий для текущей свечи */
 	evaluateSignals(candle) {
 		const allSignals = [];
 		for (const strategy of this.activeStrategies) {
@@ -4749,11 +5152,12 @@ var StrategyManager = class {
 		}
 		return allSignals;
 	}
-	/** Получить текущую фазу (кешируется в MarketPhaseDetector) */
 	getCurrentPhase(instrumentUid) {
 		return this.phaseDetector.detectPhase(instrumentUid);
 	}
-	/** Сброс активных стратегий (например, при смене дня) */
+	getAvailableStrategies() {
+		return getAvailableStrategies();
+	}
 	reset() {
 		this.activeStrategies.forEach((s) => s.reset());
 		this.activeStrategies = [];

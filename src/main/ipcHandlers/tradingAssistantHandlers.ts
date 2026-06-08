@@ -25,7 +25,7 @@ import { RejectionStrategy } from '../services/backtest/strategies/RejectionStra
 
 import * as fs from 'fs';
 import { ScreenerService } from '../services/screenerService';
-import { net } from 'electron'; // встроенный HTTP-клиент
+import { createStrategy } from '../services/backtest/strategies/strategyFactory';
 
 let orderManagerInstance: OrderManager | null = null;
 
@@ -85,19 +85,16 @@ async function runBacktestInternal(
         const profile = engine.getProfile(instrumentUid);
 
         let strategy: IBacktestStrategy;
-        if (strategyType === 'trend') {
-          strategy = new TrendStrategy(instrumentUid, profile);
-        } else if (strategyType === 'poc_pullback') {
-          strategy = new POCPullbackStrategy(instrumentUid, profile);
-        } else if (strategyType === 'daily_va_return') {
-          strategy = new DailyVAReversalStrategy(instrumentUid, profile);
-        } else if (strategyType === 'fvg_volume') {
-          strategy = new FVGVolumeStrategy(instrumentUid, profile);
-        } else if (strategyType === 'trend_pro') {
-          strategy = new TrendStrategyPro(instrumentUid, profile);
-        } else if (strategyType === 'rejection') {
-          strategy = new RejectionStrategy(instrumentUid, profile);
-        } else {
+        try {
+          strategy = createStrategy(strategyType, instrumentUid, profile, undefined, {
+            volumeFilterEnabled: params.volumeFilterEnabled,
+            volumeFilterPeriod: params.volumeFilterPeriod,
+            ibMinutes: params.ibMinutes || 60,
+            anchorTime: params.anchorTime,
+          });
+        } catch (e) {
+          console.error('Failed to create strategy:', e);
+          // fallback к самой первой стратегии, чтобы не падать
           strategy = new VolumeAccumulationStrategy(instrumentUid, profile, {
             volumeFilterEnabled: params.volumeFilterEnabled,
             volumeFilterPeriod: params.volumeFilterPeriod,
@@ -246,23 +243,16 @@ export const registerTradingAssistantHandlers = () => {
 
           // Создаём стратегию в зависимости от выбора
           let strategy: IBacktestStrategy;
-          if (strategyType === 'trend') {
-            strategy = new TrendStrategy(instrumentUid, profile, {
+          try {
+            strategy = createStrategy(strategyType, instrumentUid, profile, undefined, {
               volumeFilterEnabled: params.volumeFilterEnabled,
               volumeFilterPeriod: params.volumeFilterPeriod,
+              ibMinutes: params.ibMinutes || 60,
+              anchorTime: params.anchorTime,
             });
-          } else if (strategyType === 'poc_pullback') {
-            strategy = new POCPullbackStrategy(instrumentUid, profile);
-          } else if (strategyType === 'daily_va_return') {
-            strategy = new DailyVAReversalStrategy(instrumentUid, profile);
-          } else if (strategyType === 'fvg_volume') {
-            strategy = new FVGVolumeStrategy(instrumentUid, profile);
-          } else if (strategyType === 'trend_pro') {
-            strategy = new TrendStrategyPro(instrumentUid, profile);
-          } else if (strategyType === 'rejection') {
-            strategy = new RejectionStrategy(instrumentUid, profile);
-          } else {
-            // volume_accumulation (по умолчанию)
+          } catch (e) {
+            console.error('Failed to create strategy:', e);
+            // fallback к самой первой стратегии, чтобы не падать
             strategy = new VolumeAccumulationStrategy(instrumentUid, profile, {
               volumeFilterEnabled: params.volumeFilterEnabled,
               volumeFilterPeriod: params.volumeFilterPeriod,
