@@ -4,7 +4,7 @@ import { marketDataBus } from './marketDataBus';
 import type { StreamCandle, StreamTrade, Quotation } from '@/api/tbank/marketdataStreamTypes';
 
 // Вспомогательная функция: Quotation → число
-function quotationToNumber(q?: Quotation): number {
+export function quotationToNumber(q?: Quotation): number {
   if (!q) return 0;
   const units = Number(q.units || '0');
   const nano = q.nano || 0;

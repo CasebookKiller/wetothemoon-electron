@@ -4527,6 +4527,108 @@ function connectLiveStrategy(instrumentUid, manager) {
 	});
 }
 //#endregion
+//#region src/main/services/compositeProfile.ts
+var CompositeProfileService = class {
+	historicalLoader;
+	profileEngine;
+	defaultDays;
+	cache = /* @__PURE__ */ new Map();
+	constructor(historicalLoader, profileEngine, defaultDays = 10) {
+		this.historicalLoader = historicalLoader;
+		this.profileEngine = profileEngine;
+		this.defaultDays = defaultDays;
+	}
+	/**
+	* Строит композитный профиль за N дней.
+	* Использует уже загруженные дневные профили через VolumeProfileEngine,
+	* но для истории создаёт временные экземпляры движка.
+	*/
+	async buildComposite(instrumentUid, days = this.defaultDays, token) {
+		const cacheKey = `${instrumentUid}_${days}`;
+		if (this.cache.has(cacheKey)) return this.cache.get(cacheKey);
+		const profiles = [];
+		const now = /* @__PURE__ */ new Date();
+		for (let d = 0; d < days; d++) {
+			const date = /* @__PURE__ */ new Date(now.getTime() - d * 864e5);
+			const from = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 7, 0, 0);
+			const to = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 16, 0, 0);
+			try {
+				const candles = await this.historicalLoader.loadIntradayCandles(instrumentUid, from, to, token, 4);
+				if (!candles || candles.length === 0) continue;
+				const engine = new VolumeProfileEngine({
+					profileResolution: 50,
+					valueAreaPercent: 70,
+					skipAutoSubscribe: true
+				});
+				candles.forEach((c) => engine.feedCandle(c));
+				const profile = engine.getProfile(instrumentUid);
+				if (profile) profiles.push(profile);
+			} catch (err) {
+				console.warn(`CompositeProfile: error loading day ${date.toISOString().slice(0, 10)}`, err);
+			}
+		}
+		if (profiles.length === 0) return null;
+		const pocFrequency = /* @__PURE__ */ new Map();
+		let totalVAHigh = 0;
+		let totalVALow = 0;
+		const allHVN = [];
+		const allLVN = [];
+		for (const p of profiles) {
+			const poc = p.poc;
+			pocFrequency.set(poc, (pocFrequency.get(poc) || 0) + 1);
+			totalVAHigh += p.valueAreaHigh;
+			totalVALow += p.valueAreaLow;
+			allHVN.push(...p.hvn);
+			allLVN.push(...p.lvn);
+		}
+		let mainPoc = profiles[0].poc;
+		let maxCount = 0;
+		pocFrequency.forEach((count, price) => {
+			if (count > maxCount) {
+				maxCount = count;
+				mainPoc = price;
+			}
+		});
+		const swingHighs = this.clusterLevels(allHVN, .5);
+		const swingLows = this.clusterLevels(allLVN, .5);
+		const result = {
+			instrumentUid,
+			poc: mainPoc,
+			recurringPocs: pocFrequency,
+			swingHighs,
+			swingLows,
+			avgVAHigh: totalVAHigh / profiles.length,
+			avgVALow: totalVALow / profiles.length,
+			daysUsed: profiles.length
+		};
+		this.cache.set(cacheKey, result);
+		return result;
+	}
+	/** Простая кластеризация уровней: группирует близкие цены (±percent) */
+	clusterLevels(levels, percent) {
+		if (levels.length === 0) return [];
+		const sorted = [...levels].sort((a, b) => a - b);
+		const clusters = [];
+		let currentCluster = [sorted[0]];
+		for (let i = 1; i < sorted.length; i++) {
+			const prev = currentCluster[currentCluster.length - 1];
+			if ((sorted[i] - prev) / prev <= percent / 100) currentCluster.push(sorted[i]);
+			else {
+				clusters.push(currentCluster.reduce((s, v) => s + v, 0) / currentCluster.length);
+				currentCluster = [sorted[i]];
+			}
+		}
+		clusters.push(currentCluster.reduce((s, v) => s + v, 0) / currentCluster.length);
+		return clusters;
+	}
+	/** Очистка кэша для инструмента */
+	invalidateCache(instrumentUid) {
+		if (instrumentUid) {
+			for (const key of this.cache.keys()) if (key.startsWith(instrumentUid)) this.cache.delete(key);
+		} else this.cache.clear();
+	}
+};
+//#endregion
 //#region src/main/main.ts
 var scriptsDir = path.default.join(electron.app.getPath("userData"), "scripts");
 if (!(0, fs.existsSync)(scriptsDir)) {
@@ -5070,6 +5172,7 @@ function applyMenuToWindow(win, template) {
 	const menu = electron.Menu.buildFromTemplate(template);
 	win.setMenu(menu);
 }
+new CompositeProfileService(new HistoricalDataLoader(), volumeProfileEngine);
 setInterval(() => {
 	const mem = process.memoryUsage();
 	const win = getTradingAssistantWindow();

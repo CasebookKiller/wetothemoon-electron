@@ -57,6 +57,9 @@ import { connectOrderManager } from './services/tradingConnector';
 import { setOrderManagerInstance } from './ipcHandlers/tradingAssistantHandlers';
 import { connectLiveStrategy } from './services/liveStrategyConnector';
 
+import { CompositeProfileService } from './services/compositeProfile';
+
+import { volumeProfileEngine } from './services/volumeProfileEngine';
 
 const scriptsDir = path.join(app.getPath('userData'), 'scripts');
 if (!existsSync(scriptsDir)) {
@@ -685,6 +688,9 @@ function applyMenuToWindow(win: BrowserWindow, template: MenuItemConstructorOpti
   const menu = Menu.buildFromTemplate(template);
   win.setMenu(menu);
 }
+
+const loaderInstance = new HistoricalDataLoader(); // если ещё нет переменной
+const compositeProfileService = new CompositeProfileService(loaderInstance, volumeProfileEngine);
 
 setInterval(() => {
   const mem = process.memoryUsage();
