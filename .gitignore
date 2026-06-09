@@ -102,8 +102,10 @@ docs/
 # Training
 training/
 
+# Scripts
 clean.sh
 server_info.sh
+cloud_check_task.sh
 
 
 dist/
