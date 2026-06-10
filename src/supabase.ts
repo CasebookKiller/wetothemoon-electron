@@ -78,7 +78,7 @@ export type Database = {
           result: Json | null
           status: string | null
           strategy: string | null
-          task_id: string | null
+          task_id: string
           user_id: number | null
         }
         Insert: {
@@ -95,7 +95,7 @@ export type Database = {
           result?: Json | null
           status?: string | null
           strategy?: string | null
-          task_id?: string | null
+          task_id: string
           user_id?: number | null
         }
         Update: {
@@ -112,7 +112,7 @@ export type Database = {
           result?: Json | null
           status?: string | null
           strategy?: string | null
-          task_id?: string | null
+          task_id?: string
           user_id?: number | null
         }
         Relationships: []
