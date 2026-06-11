@@ -81,7 +81,18 @@ export const CloudTab: React.FC = () => {
         stopLossPercent: stopLoss,
         takeProfitPercent: takeProfit,
       };
-      const result = await api.cloudCreateTask(instrumentUid, dateFrom, dateTo, intervalValue, params);
+      const result = await api.cloudCreateTask(
+        serverUrl,
+        instrumentUid,
+        dateFrom,
+        dateTo,
+        intervalValue,
+        strategy,           // ← передаём strategy отдельно
+        {
+          stopLossPercent: stopLoss,
+          takeProfitPercent: takeProfit,
+        }
+      );
       if (result.taskId) {
         // Добавляем новую задачу в локальный список
         setTasks(prev => [

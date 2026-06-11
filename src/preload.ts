@@ -274,8 +274,8 @@ try {
       ipcRenderer.on('system:memory', (_, data) => callback(data));
     },
 
-    cloudCreateTask: (instrumentUid: string, dateFrom: string, dateTo: string, interval: string, params: any) =>
-      ipcRenderer.invoke('cloud:createTask', instrumentUid, dateFrom, dateTo, interval, params),
+    cloudCreateTask: (serverUrl: string, instrumentUid: string, dateFrom: string, dateTo: string, interval: string, strategy: string, params: any) =>
+      ipcRenderer.invoke('cloud:createTask', serverUrl, instrumentUid, dateFrom, dateTo, interval, strategy, params),
     cloudGetTaskStatus: (taskId: string) => ipcRenderer.invoke('cloud:getTaskStatus', taskId),
     cloudGetTaskResult: (taskId: string) => ipcRenderer.invoke('cloud:getTaskResult', taskId),
     cloudGetTasks: () => ipcRenderer.invoke('cloud:getTasks'), // нужно добавить IPC и серверный endpoint
@@ -286,8 +286,9 @@ try {
     getCompositeProfile: (instrumentUid: string, days: number, token: string) => ipcRenderer.invoke('trading-assistant:composite-profile', instrumentUid, days, token),
 
     cloudCreateBatch: (batchConfig: any) => ipcRenderer.invoke('cloud:createBatch', batchConfig),
-    cloudGetBatchStatus: (batchId: string) => ipcRenderer.invoke('cloud:getBatchStatus', batchId),
-    cloudGetBatchResults: (batchId: string) => ipcRenderer.invoke('cloud:getBatchResults', batchId),
+    cloudGetBatchStatus: (serverUrl: string, batchId: string) => ipcRenderer.invoke('cloud:getBatchStatus', serverUrl, batchId),
+    cloudGetBatchResults: (serverUrl: string, batchId: string) => ipcRenderer.invoke('cloud:getBatchResults', serverUrl, batchId),
+    cloudGetInstruments: (serverUrl: string) => ipcRenderer.invoke('cloud:getInstruments', serverUrl),
 
   });
 

@@ -199,7 +199,7 @@ try {
 		onSystemMemory: (callback) => {
 			electron.ipcRenderer.on("system:memory", (_, data) => callback(data));
 		},
-		cloudCreateTask: (instrumentUid, dateFrom, dateTo, interval, params) => electron.ipcRenderer.invoke("cloud:createTask", instrumentUid, dateFrom, dateTo, interval, params),
+		cloudCreateTask: (serverUrl, instrumentUid, dateFrom, dateTo, interval, strategy, params) => electron.ipcRenderer.invoke("cloud:createTask", serverUrl, instrumentUid, dateFrom, dateTo, interval, strategy, params),
 		cloudGetTaskStatus: (taskId) => electron.ipcRenderer.invoke("cloud:getTaskStatus", taskId),
 		cloudGetTaskResult: (taskId) => electron.ipcRenderer.invoke("cloud:getTaskResult", taskId),
 		cloudGetTasks: () => electron.ipcRenderer.invoke("cloud:getTasks"),
@@ -208,8 +208,9 @@ try {
 		getOrderFlowDelta: (instrumentUid) => electron.ipcRenderer.invoke("trading-assistant:get-orderflow-delta", instrumentUid),
 		getCompositeProfile: (instrumentUid, days, token) => electron.ipcRenderer.invoke("trading-assistant:composite-profile", instrumentUid, days, token),
 		cloudCreateBatch: (batchConfig) => electron.ipcRenderer.invoke("cloud:createBatch", batchConfig),
-		cloudGetBatchStatus: (batchId) => electron.ipcRenderer.invoke("cloud:getBatchStatus", batchId),
-		cloudGetBatchResults: (batchId) => electron.ipcRenderer.invoke("cloud:getBatchResults", batchId)
+		cloudGetBatchStatus: (serverUrl, batchId) => electron.ipcRenderer.invoke("cloud:getBatchStatus", serverUrl, batchId),
+		cloudGetBatchResults: (serverUrl, batchId) => electron.ipcRenderer.invoke("cloud:getBatchResults", serverUrl, batchId),
+		cloudGetInstruments: (serverUrl) => electron.ipcRenderer.invoke("cloud:getInstruments", serverUrl)
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {

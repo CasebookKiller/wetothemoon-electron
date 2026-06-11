@@ -766,39 +766,34 @@ export const registerTradingAssistantHandlers = (
     return await screener.screen(filters);
   });
 
-  ipcMain.handle('cloud:createTask', async (_event, instrumentUid: string, dateFrom: string, dateTo: string, interval: string, params: any) => {
-    const url = process.env.VITE_CLOUD_API_URL;
-    console.log('VITE_CLOUD_API_URL: ', process.env.VITE_CLOUD_API_URL); 
-    if (!url) return { error: 'CLOUD_API_URL not set' };
-    const email = process.env.VITE_CLOUD_EMAIL;
-    const password = process.env.VITE_CLOUD_PASSWORD;
-    if (!email || !password) return { error: 'Cloud credentials not configured' };
-
-    // Авторизуемся на сервере
-    const loginRes = await fetch(`${url}/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    });
-    const loginData = await loginRes.json();
-    if (!loginData.token) return { error: 'Login failed', details: loginData };
-
-    // Создаём задачу
-    const taskRes = await fetch(`${url}/api/backtest/tasks`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${loginData.token}`,
-      },
-      body: JSON.stringify({ instrumentUid, dateFrom, dateTo, interval, params }),
-    });
-    return await taskRes.json();
+  ipcMain.handle('cloud:createTask', async (_event, serverUrl: string, instrumentUid: string, dateFrom: string, dateTo: string, interval: string, strategy: string, params: any) => {
+    try {
+      const token = await getCloudToken(serverUrl);
+      const res = await fetch(`${serverUrl}/api/backtest/tasks`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          instrumentUid,
+          dateFrom,
+          dateTo,
+          interval,
+          strategy,           // ← теперь передаём отдельно
+          params,
+        }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { error: err.message };
+    }
   });
 
   ipcMain.handle('cloud:getTaskStatus', async (_event, taskId: string) => {
     const url = process.env.VITE_CLOUD_API_URL;
     if (!url) return { error: 'CLOUD_API_URL not set' };
-    const token = await getCloudToken(); // вспомогательная функция для получения JWT (можно кешировать)
+    const token = await getCloudToken(url); // вспомогательная функция для получения JWT (можно кешировать)
     const res = await fetch(`${url}/api/backtest/tasks/${taskId}`, {
       headers: { 'Authorization': `Bearer ${token}` },
     });
@@ -808,7 +803,7 @@ export const registerTradingAssistantHandlers = (
   ipcMain.handle('cloud:getTaskResult', async (_event, taskId: string) => {
     const url = process.env.VITE_CLOUD_API_URL;
     if (!url) return { error: 'CLOUD_API_URL not set' };
-    const token = await getCloudToken();
+    const token = await getCloudToken(url);
     const res = await fetch(`${url}/api/backtest/results/${taskId}`, {
       headers: { 'Authorization': `Bearer ${token}` },
     });
@@ -818,7 +813,7 @@ export const registerTradingAssistantHandlers = (
   ipcMain.handle('cloud:getTasks', async () => {
     const url = process.env.VITE_CLOUD_API_URL;
     if (!url) return [];
-    const token = await getCloudToken();
+    const token = await getCloudToken(url);
     const res = await fetch(`${url}/api/backtest/tasks`, {
       headers: { 'Authorization': `Bearer ${token}` },
     });
@@ -838,15 +833,19 @@ export const registerTradingAssistantHandlers = (
   let cachedToken: string | null = null;
   let tokenExpiry = 0;
 
-  async function getCloudToken(): Promise<string | null> {
-    if (cachedToken && Date.now() < tokenExpiry) return cachedToken;
-    const url = process.env.VITE_CLOUD_API_URL;
-    const loginRes = await fetch(`${url}/login`, {
+async function getCloudToken(serverUrl: string): Promise<string | null> {
+  // простейший кеш на 20 часов
+  if (cachedToken && Date.now() < tokenExpiry) return cachedToken;
+    const loginRes = await fetch(`${serverUrl}/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: process.env.VITE_CLOUD_EMAIL, password: process.env.VITE_CLOUD_PASSWORD }),
+      body: JSON.stringify({
+        email: process.env.CLOUD_EMAIL || 'll@me.com',
+        password: process.env.CLOUD_PASSWORD || '7777',
+      }),
     });
     const data = await loginRes.json();
+    if (!data.token) throw new Error('Login failed: ' + JSON.stringify(data));
     cachedToken = data.token;
     tokenExpiry = Date.now() + 20 * 3600 * 1000; // 20 часов
     return cachedToken;
@@ -870,6 +869,7 @@ export const registerTradingAssistantHandlers = (
     return await compositeProfileService.buildComposite(instrumentUid, days, token);
   });
 
+  /*
   ipcMain.handle('cloud:createBatch', async (_, batchConfig: any) => {
     const url = process.env.VITE_CLOUD_API_URL;
     const token = await getCloudToken();
@@ -883,7 +883,9 @@ export const registerTradingAssistantHandlers = (
     });
     return await res.json();
   });
+  */
 
+  /*
   ipcMain.handle('cloud:getBatchStatus', async (_, batchId: string) => {
     const url = process.env.VITE_CLOUD_API_URL;
     const token = await getCloudToken();
@@ -892,7 +894,9 @@ export const registerTradingAssistantHandlers = (
     });
     return await res.json();
   });
+  */
 
+  /*
   ipcMain.handle('cloud:getBatchResults', async (_, batchId: string) => {
     const url = process.env.VITE_CLOUD_API_URL;
     const token = await getCloudToken();
@@ -900,5 +904,73 @@ export const registerTradingAssistantHandlers = (
       headers: { 'Authorization': `Bearer ${token}` },
     });
     return await res.json();
+  });
+  */
+
+  // 1. Создание batch-прогона
+  ipcMain.handle('cloud:createBatch', async (_event, batchConfig: {
+    serverUrl: string;
+    instruments: string[];
+    dateFrom: string;
+    dateTo: string;
+    interval: string;
+    strategy: string;
+    params: any;
+  }) => {
+    const { serverUrl, ...batch } = batchConfig;
+    
+    try {
+      const token = await getCloudToken(serverUrl);
+      const res = await fetch(`${serverUrl}/api/backtest/batch`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(batch),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { error: err.message };
+    }
+  });
+
+  // 2. Получение статуса batch'а
+  ipcMain.handle('cloud:getBatchStatus', async (_event, serverUrl: string, batchId: string) => {
+    try {
+      const token = await getCloudToken(serverUrl);
+      const res = await fetch(`${serverUrl}/api/backtest/batch/${batchId}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { error: err.message };
+    }
+  });
+
+  // 3. Получение результатов batch'а
+  ipcMain.handle('cloud:getBatchResults', async (_event, serverUrl: string, batchId: string) => {
+    try {
+      const token = await getCloudToken(serverUrl);
+      const res = await fetch(`${serverUrl}/api/backtest/batch/${batchId}/results`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { error: err.message };
+    }
+  });
+
+  // 4. Получение списка инструментов с сервера (опционально, если есть скринер)
+  ipcMain.handle('cloud:getInstruments', async (_event, serverUrl: string) => {
+    try {
+      const token = await getCloudToken(serverUrl);
+      const res = await fetch(`${serverUrl}/api/screener`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { error: err.message };
+    }
   });
 };
