@@ -283,8 +283,8 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches }) 
           <DataTable value={selectedBatch.results} className="p-datatable-sm" stripedRows responsiveLayout="scroll" style={{ fontSize: '0.85rem' }}>
             <Column field="instrumentUid" header="Инструмент" body={(row) => row.instrumentUid?.slice(0,12)} />
             <Column field="status" header="Статус" body={(row) => <Tag severity={row.status === 'completed' ? 'success' : 'warning'} value={row.status} />} />
-            <Column field="portfolio.totalProfit" header="Прибыль" body={(row) => row.portfolio?.totalProfit?.toFixed(2)} />
-            <Column field="portfolio.winRate" header="WinRate" body={(row) => row.portfolio?.winRate?.toFixed(1) + '%'} />
+            <Column field="totalProfit" header="Прибыль" body={(row) => row.totalProfit != null ? row.totalProfit.toFixed(2) : '-'} />
+            <Column field="winRate" header="WinRate" body={(row) => row.winRate != null ? row.winRate.toFixed(1) + '%' : '-'} />
           </DataTable>
         ) : <p>Нет данных</p>}
       </Dialog>
