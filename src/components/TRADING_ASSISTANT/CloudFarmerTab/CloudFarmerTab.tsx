@@ -86,16 +86,20 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches }) 
 
     const intervalId = window.setInterval(async () => {
       const api = (window as any).electronAPI;
-      for (const batch of batches) {
-        if (batch.status === 'running' || batch.status === 'pending') {
-          try {
-            const updated = await api.cloudGetBatchStatus(serverUrl, batch.batchId);
-            setBatches(prev => prev.map(b => b.batchId === batch.batchId ? { ...b, ...updated.batch, results: updated.tasks } : b));
-          } catch (err) {
-            console.error('Polling error:', err);
-          }
-        }
-      }
+      const updatedBatches = await Promise.all(
+        batches.map(async (batch) => {
+          if (batch.status === 'completed' || batch.status === 'failed') return batch;
+          const data = await api.cloudGetBatchStatus(serverUrl, batch.batchId);
+          const tasks = data?.tasks || [];
+          const completed = tasks.filter((t: any) => t.status === 'completed').length;
+          const failed = tasks.filter((t: any) => t.status === 'failed').length;
+          const newStatus = (data?.batch?.status === 'completed' || data?.batch?.status === 'failed')
+            ? data.batch.status
+            : batch.status;
+          return { ...batch, status: newStatus, total: tasks.length, completed, failed };
+        })
+      );
+      setBatches(updatedBatches);
     }, 10000);
 
     return () => window.clearInterval(intervalId);
