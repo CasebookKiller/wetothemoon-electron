@@ -289,7 +289,7 @@ try {
     cloudGetBatchStatus: (serverUrl: string, batchId: string) => ipcRenderer.invoke('cloud:getBatchStatus', serverUrl, batchId),
     cloudGetBatchResults: (serverUrl: string, batchId: string) => ipcRenderer.invoke('cloud:getBatchResults', serverUrl, batchId),
     cloudGetInstruments: (serverUrl: string) => ipcRenderer.invoke('cloud:getInstruments', serverUrl),
-
+    cloudGetBatches: (serverUrl: string) => ipcRenderer.invoke('cloud:getBatches', serverUrl),
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

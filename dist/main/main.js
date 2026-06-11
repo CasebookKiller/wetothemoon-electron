@@ -4207,6 +4207,10 @@ var registerTradingAssistantHandlers = (historicalLoader, profileEngine, getToke
 			return { error: err.message };
 		}
 	});
+	electron.ipcMain.handle("cloud:getBatches", async (_event, serverUrl) => {
+		const token = await getCloudToken(serverUrl);
+		return await (await fetch(`${serverUrl}/api/backtest/batches`, { headers: { "Authorization": `Bearer ${token}` } })).json();
+	});
 };
 //#endregion
 //#region src/shared/types/promptgenerator.ts

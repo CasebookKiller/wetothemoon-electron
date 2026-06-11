@@ -210,7 +210,8 @@ try {
 		cloudCreateBatch: (batchConfig) => electron.ipcRenderer.invoke("cloud:createBatch", batchConfig),
 		cloudGetBatchStatus: (serverUrl, batchId) => electron.ipcRenderer.invoke("cloud:getBatchStatus", serverUrl, batchId),
 		cloudGetBatchResults: (serverUrl, batchId) => electron.ipcRenderer.invoke("cloud:getBatchResults", serverUrl, batchId),
-		cloudGetInstruments: (serverUrl) => electron.ipcRenderer.invoke("cloud:getInstruments", serverUrl)
+		cloudGetInstruments: (serverUrl) => electron.ipcRenderer.invoke("cloud:getInstruments", serverUrl),
+		cloudGetBatches: (serverUrl) => electron.ipcRenderer.invoke("cloud:getBatches", serverUrl)
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {

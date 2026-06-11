@@ -973,4 +973,12 @@ async function getCloudToken(serverUrl: string): Promise<string | null> {
       return { error: err.message };
     }
   });
+
+  ipcMain.handle('cloud:getBatches', async (_event, serverUrl: string) => {
+    const token = await getCloudToken(serverUrl);
+    const res = await fetch(`${serverUrl}/api/backtest/batches`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    return await res.json();
+  });
 };

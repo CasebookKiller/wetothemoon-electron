@@ -35,6 +35,16 @@ import { ScreenerTab } from '@/components/TRADING_ASSISTANT/ScreenerTab/Screener
 import { CloudTab } from '@/components/TRADING_ASSISTANT/CloudTab/CloudTab';
 import { CloudFarmerTab } from '@/components/TRADING_ASSISTANT/CloudFarmerTab/CloudFarmerTab';
 
+interface BatchResult {
+  batchId: string;
+  status: string;
+  total: number;
+  completed: number;
+  failed: number;
+  results?: any[];
+}
+
+
 function quotationToNumber(q: any): number {
   if (!q) return 0;
   const units = Number(q.units || 0);
@@ -206,6 +216,8 @@ export const TradingAssistantPage: React.FC = () => {
   const [chartLibrary, setChartLibrary] = useState<'lightweight' | 'chartjs' | 'amcharts'>('lightweight');
 
   const [compactMode, setCompactMode] = useState(false);
+
+  const [farmerBatches, setFarmerBatches] = useState<BatchResult[]>([]);
 
   // ========== REFS ДЛЯ ГРАФИКА ==========
   const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -1641,7 +1653,11 @@ export const TradingAssistantPage: React.FC = () => {
 
           {/* ========== FARMER ============ */}
           <TabPanel header="Farmer">
-            <CloudFarmerTab token={stream.token} />
+            <CloudFarmerTab
+              token={stream.token}
+              batches={farmerBatches}
+              setBatches={setFarmerBatches}
+            />
           </TabPanel>
         </TabView>
       )}

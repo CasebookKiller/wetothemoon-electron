@@ -20,10 +20,12 @@ interface BatchResult {
 }
 
 interface Props {
-  token: string; // read-only токен для загрузки инструментов
+  token: string;
+  batches: BatchResult[];
+  setBatches: React.Dispatch<React.SetStateAction<BatchResult[]>>;
 }
 
-export const CloudFarmerTab: React.FC<Props> = ({ token }) => {
+export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches }) => {
   const [serverUrl, setServerUrl] = useState('http://192.144.14.181:8000');
   const [instruments, setInstruments] = useState<string[]>([]);
   const [availableInstruments, setAvailableInstruments] = useState<Array<{ uid: string; name: string; ticker?: string }>>([]);
@@ -33,7 +35,7 @@ export const CloudFarmerTab: React.FC<Props> = ({ token }) => {
 
   const [dateFrom, setDateFrom] = useState(new Date().toISOString().split('T')[0]);
   const [dateTo, setDateTo] = useState(new Date().toISOString().split('T')[0]);
-  const [interval, setInterval] = useState('CANDLE_INTERVAL_1_MIN');
+  const [intervalValue, setIntervalValue] = useState('CANDLE_INTERVAL_1_MIN'); // переименовали
   const [strategy, setStrategy] = useState('volume_accumulation');
   const [stopLoss, setStopLoss] = useState(0.5);
   const [takeProfit, setTakeProfit] = useState(1.0);
@@ -42,13 +44,12 @@ export const CloudFarmerTab: React.FC<Props> = ({ token }) => {
   const [dynamicSizing, setDynamicSizing] = useState(false);
   const [riskAmount, setRiskAmount] = useState(1000);
 
-  const [batches, setBatches] = useState<BatchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedBatch, setSelectedBatch] = useState<BatchResult | null>(null);
   const [showResults, setShowResults] = useState(false);
   const [resultsLoading, setResultsLoading] = useState(false);
 
-  // Загрузка списка инструментов (как в TradingAssistantPage)
+  // Загрузка списка инструментов
   const loadInstruments = async () => {
     const api = (window as any).electronAPI;
     if (!api?.getAllInstruments) return;
@@ -60,17 +61,24 @@ export const CloudFarmerTab: React.FC<Props> = ({ token }) => {
     if (token) loadInstruments();
   }, [token]);
 
-  // Открыть диалог выбора инструментов
-  const openInstrumentDialog = () => {
-    setTempSelected([...instruments]);
-    setShowInstrumentDialog(true);
-  };
-
-  // Применить выбор
-  const applyInstrumentSelection = () => {
-    setInstruments(tempSelected);
-    setShowInstrumentDialog(false);
-  };
+  // Загрузка batch'ей с сервера при монтировании
+  useEffect(() => {
+    const loadBatches = async () => {
+      const api = (window as any).electronAPI;
+      if (!api?.cloudGetBatches) return;
+      const data = await api.cloudGetBatches(serverUrl);
+      if (Array.isArray(data)) {
+        setBatches(data.map((b: any) => ({
+          batchId: b.id,
+          status: b.status,
+          total: 0, // будет обновлено позже
+          completed: 0,
+          failed: 0,
+        })));
+      }
+    };
+    if (serverUrl) loadBatches();
+  }, [serverUrl, setBatches]);
 
   // Автоматический опрос статуса активных batch'ей
   useEffect(() => {
@@ -91,7 +99,17 @@ export const CloudFarmerTab: React.FC<Props> = ({ token }) => {
     }, 10000);
 
     return () => window.clearInterval(intervalId);
-  }, [serverUrl, batches.length]);
+  }, [serverUrl, batches, setBatches]);
+
+  const openInstrumentDialog = () => {
+    setTempSelected([...instruments]);
+    setShowInstrumentDialog(true);
+  };
+
+  const applyInstrumentSelection = () => {
+    setInstruments(tempSelected);
+    setShowInstrumentDialog(false);
+  };
 
   const handleStartBatch = async () => {
     if (instruments.length === 0) return;
@@ -112,7 +130,7 @@ export const CloudFarmerTab: React.FC<Props> = ({ token }) => {
         instruments,
         dateFrom,
         dateTo,
-        interval,
+        interval: intervalValue,
         strategy,
         params,
       });
@@ -166,7 +184,7 @@ export const CloudFarmerTab: React.FC<Props> = ({ token }) => {
         </div>
         <div className="flex align-items-center flex-wrap gap-2 mb-2">
           <label className="mr-1 mb-0">Interval</label>
-          <Dropdown value={interval} options={['CANDLE_INTERVAL_1_MIN','CANDLE_INTERVAL_5_MIN','CANDLE_INTERVAL_HOUR']} onChange={e => setInterval(e.value)} className="p-inputtext-sm" style={{ width: '160px' }} />
+          <Dropdown value={intervalValue} options={['CANDLE_INTERVAL_1_MIN','CANDLE_INTERVAL_5_MIN','CANDLE_INTERVAL_HOUR']} onChange={e => setIntervalValue(e.value)} className="p-inputtext-sm" style={{ width: '160px' }} />
           <label className="mr-1 mb-0">Strategy</label>
           <Dropdown value={strategy} options={['volume_accumulation','trend','poc_pullback','daily_va_return','sfp','initial_balance','anchored_vwap']} onChange={e => setStrategy(e.value)} className="p-inputtext-sm" style={{ width: '150px' }} />
           <label className="mr-1 mb-0">SL%</label>
