@@ -32,6 +32,8 @@ _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node
 let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_proto_loader_build_src_index_js = require("/home/ll/Документы/GitHub/wetothemoon-project/wetothemoon-electron/node_modules/@grpc/proto-loader/build/src/index.js");
 _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_proto_loader_build_src_index_js = __toESM(_home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_proto_loader_build_src_index_js);
 let events = require("events");
+let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_fs_extra_lib_index_js = require("/home/ll/Документы/GitHub/wetothemoon-project/wetothemoon-electron/node_modules/fs-extra/lib/index.js");
+_home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_fs_extra_lib_index_js = __toESM(_home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_fs_extra_lib_index_js);
 let fs = require("fs");
 fs = __toESM(fs);
 let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_uuid_dist_node_index_js = require("/home/ll/Документы/GitHub/wetothemoon-project/wetothemoon-electron/node_modules/uuid/dist-node/index.js");
@@ -1199,7 +1201,7 @@ var marketDataBus = class MarketDataBus extends events.EventEmitter {
 }.getInstance();
 //#endregion
 //#region src/main/services/volumeProfileEngine.ts
-function quotationToNumber$3(q) {
+function quotationToNumber$2(q) {
 	if (!q) return 0;
 	return Number(q.units || "0") + (q.nano || 0) / 1e9;
 }
@@ -1236,9 +1238,9 @@ var VolumeProfileEngine = class extends events.EventEmitter {
 		if (!uid) return;
 		const volume = Number(candle.volume || "0");
 		if (volume <= this.config.minVolumeThreshold) return;
-		const high = quotationToNumber$3(candle.high);
-		const low = quotationToNumber$3(candle.low);
-		const close = quotationToNumber$3(candle.close);
+		const high = quotationToNumber$2(candle.high);
+		const low = quotationToNumber$2(candle.low);
+		const close = quotationToNumber$2(candle.close);
 		const time = candle.time || (/* @__PURE__ */ new Date()).toISOString();
 		this.lastPrice.set(uid, close);
 		const typicalPrice = (high + low + close) / 3;
@@ -1268,7 +1270,7 @@ var VolumeProfileEngine = class extends events.EventEmitter {
 	onTrade(trade) {
 		const uid = trade.instrumentUid || trade.figi;
 		if (!uid) return;
-		const price = quotationToNumber$3(trade.price);
+		const price = quotationToNumber$2(trade.price);
 		this.lastPrice.set(uid, price);
 	}
 	addVolume(uid, price, volume) {
@@ -1518,9 +1520,9 @@ var VolumeAccumulationStrategy = class {
 	hasPosition = false;
 	onCandle(candle) {
 		if (!this.dailyProfile || this.hasPosition) return;
-		const high = quotationToNumber$2(candle.high);
-		const low = quotationToNumber$2(candle.low);
-		const close = quotationToNumber$2(candle.close);
+		const high = quotationToNumber$1(candle.high);
+		const low = quotationToNumber$1(candle.low);
+		const close = quotationToNumber$1(candle.close);
 		const time = candle.time || (/* @__PURE__ */ new Date()).toISOString();
 		const volume = Number(candle.volume || "0");
 		this.volumeHistory.push(volume);
@@ -1580,7 +1582,7 @@ var VolumeAccumulationStrategy = class {
 		this.lastSignalTime = 0;
 	}
 };
-function quotationToNumber$2(q) {
+function quotationToNumber$1(q) {
 	if (!q) return 0;
 	return Number(q.units || 0) + (q.nano || 0) / 1e9;
 }
@@ -1664,11 +1666,6 @@ var marketDataGrpc = {
 };
 //#endregion
 //#region src/main/services/historicalDataLoader.ts
-function quotationToNumber$1(q) {
-	if (!q) return 0;
-	return Number(q.units || 0) + (q.nano || 0) / 1e9;
-}
-/** Преобразует Timestamp (строка ISO или объект {seconds,nanos}) в ISO-строку */
 function timestampToISO(ts) {
 	if (!ts) return (/* @__PURE__ */ new Date()).toISOString();
 	if (typeof ts === "object" && ts.seconds !== void 0) return (/* @__PURE__ */ new Date(ts.seconds * 1e3)).toISOString();
@@ -1676,77 +1673,118 @@ function timestampToISO(ts) {
 	return (/* @__PURE__ */ new Date()).toISOString();
 }
 var HistoricalDataLoader = class {
-	async loadDailyProfile(instrumentUid, from, to, token, profileResolution = 50) {
-		const request = {
-			instrumentId: instrumentUid,
-			interval: CandleInterval.CANDLE_INTERVAL_DAY,
-			from: {
-				seconds: Math.floor(from.getTime() / 1e3),
-				nanos: 0
-			},
-			to: {
-				seconds: Math.floor(to.getTime() / 1e3),
-				nanos: 0
-			},
-			candleSourceType: CandleSourceRequest.CANDLE_SOURCE_EXCHANGE
+	cacheDir = path.default.join(electron.app.getPath("userData"), "candles_cache");
+	compactCandle(c) {
+		return {
+			o: c.open,
+			h: c.high,
+			l: c.low,
+			c: c.close,
+			v: c.volume,
+			t: c.time
 		};
-		const candles = (await marketDataGrpc.getCandles(request, token)).candles || [];
-		if (candles.length === 0) return null;
-		const engine = new VolumeProfileEngine({ profileResolution });
-		for (const candle of candles) {
-			const open = quotationToNumber$1(candle.open);
-			const high = quotationToNumber$1(candle.high);
-			const low = quotationToNumber$1(candle.low);
-			const close = quotationToNumber$1(candle.close);
-			const volume = Number(candle.volume || "0");
-			const streamCandle = {
-				instrumentUid,
-				open: {
-					units: open.toString(),
-					nano: 0
-				},
-				high: {
-					units: high.toString(),
-					nano: 0
-				},
-				low: {
-					units: low.toString(),
-					nano: 0
-				},
-				close: {
-					units: close.toString(),
-					nano: 0
-				},
-				volume: volume.toString(),
-				time: timestampToISO(candle.time)
-			};
-			engine.onCandle?.(streamCandle);
+	}
+	expandCandle(c, instrumentUid) {
+		return {
+			instrumentUid,
+			open: c.o,
+			high: c.h,
+			low: c.l,
+			close: c.c,
+			volume: c.v,
+			time: c.t
+		};
+	}
+	/** Атомарная запись: сначала пишем во временный файл, потом переименовываем */
+	async atomicWriteJson(filePath, data) {
+		const tmpPath = filePath + ".tmp";
+		try {
+			const json = JSON.stringify(data);
+			_home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_fs_extra_lib_index_js.default.writeFileSync(tmpPath, json, "utf-8");
+			_home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_fs_extra_lib_index_js.default.renameSync(tmpPath, filePath);
+			console.log(`[Cache] Saved: ${filePath}`);
+		} catch (e) {
+			console.error("Failed to write cache file", filePath, e);
+			try {
+				_home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_fs_extra_lib_index_js.default.unlinkSync(tmpPath);
+			} catch {}
 		}
-		return engine.getProfile(instrumentUid);
 	}
 	async loadIntradayCandles(instrumentUid, from, to, token, interval = CandleInterval.CANDLE_INTERVAL_1_MIN) {
-		const request = {
-			instrumentId: instrumentUid,
-			interval,
-			from: {
-				seconds: Math.floor(from.getTime() / 1e3),
-				nanos: 0
-			},
-			to: {
-				seconds: Math.floor(to.getTime() / 1e3),
-				nanos: 0
-			},
-			candleSourceType: CandleSourceRequest.CANDLE_SOURCE_EXCHANGE
-		};
-		return ((await marketDataGrpc.getCandles(request, token)).candles || []).map((candle) => ({
-			instrumentUid,
-			open: candle.open,
-			high: candle.high,
-			low: candle.low,
-			close: candle.close,
-			volume: String(candle.volume || "0"),
-			time: timestampToISO(candle.time)
-		}));
+		try {
+			await _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_fs_extra_lib_index_js.default.ensureDir(this.cacheDir);
+		} catch (e) {
+			console.error("Failed to create cache dir:", e);
+		}
+		const allCandles = [];
+		let currentDate = new Date(from);
+		currentDate.setHours(7, 0, 0, 0);
+		while (currentDate <= to) {
+			let dateStr = "";
+			try {
+				dateStr = currentDate.toISOString().split("T")[0];
+				const cacheFile = path.default.join(this.cacheDir, `${instrumentUid}_${interval}_${dateStr}.json`);
+				let dayCandles = null;
+				try {
+					if (await _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_fs_extra_lib_index_js.default.pathExists(cacheFile)) {
+						const stat = await _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_fs_extra_lib_index_js.default.stat(cacheFile);
+						if ((Date.now() - stat.mtimeMs) / 36e5 < 24) {
+							const raw = await _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_fs_extra_lib_index_js.default.readFile(cacheFile, "utf-8");
+							dayCandles = JSON.parse(raw).map((c) => this.expandCandle(c, instrumentUid));
+							console.log(`[Cache] Loaded from cache: ${cacheFile}`);
+						}
+					}
+				} catch (e) {
+					console.error("Cache read error for", dateStr, e);
+				}
+				if (!dayCandles) {
+					const dayFrom = new Date(currentDate);
+					const dayTo = new Date(currentDate);
+					dayTo.setHours(16, 0, 0, 0);
+					if (dayTo > to) dayTo.setTime(to.getTime());
+					const request = {
+						instrumentId: instrumentUid,
+						interval,
+						from: {
+							seconds: Math.floor(dayFrom.getTime() / 1e3),
+							nanos: 0
+						},
+						to: {
+							seconds: Math.floor(dayTo.getTime() / 1e3),
+							nanos: 0
+						},
+						candleSourceType: CandleSourceRequest.CANDLE_SOURCE_EXCHANGE
+					};
+					dayCandles = ((await marketDataGrpc.getCandles(request, token)).candles || []).map((candle) => ({
+						instrumentUid,
+						open: candle.open,
+						high: candle.high,
+						low: candle.low,
+						close: candle.close,
+						volume: String(candle.volume || "0"),
+						time: timestampToISO(candle.time)
+					}));
+					const compactData = dayCandles.map((c) => this.compactCandle(c));
+					this.atomicWriteJson(cacheFile, compactData).then(() => console.log(`[Cache] Saved: ${cacheFile}`)).catch((e) => console.error("Cache write error for", dateStr, e));
+				}
+				allCandles.push(...dayCandles);
+			} catch (e) {
+				console.error("Error loading day", dateStr, e);
+			}
+			currentDate.setDate(currentDate.getDate() + 1);
+		}
+		this.cleanOldCache().catch((e) => console.warn("Cache cleanup error:", e));
+		return allCandles;
+	}
+	async cleanOldCache(maxAgeDays = 30) {
+		const files = await _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_fs_extra_lib_index_js.default.readdir(this.cacheDir);
+		const now = Date.now();
+		for (const file of files) {
+			const filePath = path.default.join(this.cacheDir, file);
+			try {
+				if ((now - (await _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_fs_extra_lib_index_js.default.stat(filePath)).mtimeMs) / 864e5 > maxAgeDays) await _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_fs_extra_lib_index_js.default.unlink(filePath);
+			} catch (e) {}
+		}
 	}
 };
 //#endregion
@@ -5286,7 +5324,7 @@ var OrderFlowEngine = class {
 	onTrade(trade) {
 		const uid = trade.instrumentUid || trade.figi;
 		if (!uid) return;
-		const price = quotationToNumber$3(trade.price);
+		const price = quotationToNumber$2(trade.price);
 		const volume = Number(trade.quantity || "0");
 		const direction = trade.direction === "TRADE_DIRECTION_BUY" ? "buy" : trade.direction === "TRADE_DIRECTION_SELL" ? "sell" : null;
 		if (!direction || volume === 0) return;
@@ -5319,11 +5357,11 @@ var OrderFlowEngine = class {
 		const uid = ob.instrumentUid || ob.figi;
 		if (!uid) return;
 		const bids = (ob.bids || []).map((b) => ({
-			price: quotationToNumber$3(b.price),
+			price: quotationToNumber$2(b.price),
 			volume: b.quantity || 0
 		}));
 		const asks = (ob.asks || []).map((a) => ({
-			price: quotationToNumber$3(a.price),
+			price: quotationToNumber$2(a.price),
 			volume: a.quantity || 0
 		}));
 		if (!bids.length || !asks.length) return;
@@ -5359,6 +5397,12 @@ var OrderFlowEngine = class {
 new OrderFlowEngine();
 //#endregion
 //#region src/main/main.ts
+process.on("uncaughtException", (err) => {
+	console.error("Uncaught exception:", err);
+});
+process.on("unhandledRejection", (reason, promise) => {
+	console.error("Unhandled rejection at:", promise, "reason:", reason);
+});
 var historicalDataLoader = new HistoricalDataLoader();
 var scriptsDir = path.default.join(electron.app.getPath("userData"), "scripts");
 if (!(0, fs.existsSync)(scriptsDir)) {

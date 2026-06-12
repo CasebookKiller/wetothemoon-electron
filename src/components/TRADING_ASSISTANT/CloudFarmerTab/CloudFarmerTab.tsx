@@ -17,6 +17,12 @@ interface BatchResult {
   completed: number;
   failed: number;
   results?: any[];
+  dateFrom?: string;
+  dateTo?: string;
+  strategy?: string;
+  params?: any;
+  interval?: string;
+  error?: string;
 }
 
 interface Props {
@@ -36,6 +42,13 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches }) 
   const [dateFrom, setDateFrom] = useState(new Date().toISOString().split('T')[0]);
   const [dateTo, setDateTo] = useState(new Date().toISOString().split('T')[0]);
   const [intervalValue, setIntervalValue] = useState('CANDLE_INTERVAL_1_MIN'); // переименовали
+  // Если выбрано больше 5 дней, автоматически переключаемся на 5-минутные свечи
+  useEffect(() => {
+    const daysDiff = Math.ceil((new Date(dateTo).getTime() - new Date(dateFrom).getTime()) / 86400000);
+    if (daysDiff > 5 && intervalValue === 'CANDLE_INTERVAL_1_MIN') {
+      setIntervalValue('CANDLE_INTERVAL_5_MIN');
+    }
+  }, [dateFrom, dateTo, intervalValue]);
   const [strategy, setStrategy] = useState('volume_accumulation');
   const [stopLoss, setStopLoss] = useState(0.5);
   const [takeProfit, setTakeProfit] = useState(1.0);
@@ -71,9 +84,12 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches }) 
         setBatches(data.map((b: any) => ({
           batchId: b.id,
           status: b.status,
-          total: 0, // будет обновлено позже
-          completed: 0,
-          failed: 0,
+          total: 0, completed: 0, failed: 0,
+          dateFrom: b.params?.dateFrom,
+          dateTo: b.params?.dateTo,
+          strategy: b.params?.strategy,
+          params: b.params?.params || b.params,
+          interval: b.params?.interval,
         })));
       }
     };
@@ -89,14 +105,36 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches }) 
       const updatedBatches = await Promise.all(
         batches.map(async (batch) => {
           if (batch.status === 'completed' || batch.status === 'failed') return batch;
-          const data = await api.cloudGetBatchStatus(serverUrl, batch.batchId);
-          const tasks = data?.tasks || [];
-          const completed = tasks.filter((t: any) => t.status === 'completed').length;
-          const failed = tasks.filter((t: any) => t.status === 'failed').length;
-          const newStatus = (data?.batch?.status === 'completed' || data?.batch?.status === 'failed')
-            ? data.batch.status
-            : batch.status;
-          return { ...batch, status: newStatus, total: tasks.length, completed, failed };
+          try {
+            const data = await api.cloudGetBatchStatus(serverUrl, batch.batchId);
+            const tasks = data?.tasks || [];
+            const completed = tasks.filter((t: any) => t.status === 'completed').length;
+            const failed = tasks.filter((t: any) => t.status === 'failed').length;
+            const batchParams = data?.batch?.params || {};
+            // Извлекаем параметры из объекта params (сервер кладёт их в batch.params)
+            const rawParams = batchParams.params || batchParams;
+            const params = {
+              ...rawParams,
+              trailingEnabled: rawParams.trailingDistancePercent > 0,
+              trailingPercent: rawParams.trailingDistancePercent,
+              useDynamicSizing: rawParams.positionSizing === 'dynamic',
+              riskAmount: rawParams.riskAmount || 1000,
+            };
+            return {
+              ...batch,
+              status: data?.batch?.status || batch.status,
+              total: tasks.length,
+              completed,
+              failed,
+              dateFrom: batchParams.dateFrom || batch.dateFrom,
+              dateTo: batchParams.dateTo || batch.dateTo,
+              strategy: batchParams.strategy || batch.strategy,
+              params: params,
+              interval: batchParams.interval || batch.interval,
+            };
+          } catch {
+            return batch;
+          }
         })
       );
       setBatches(updatedBatches);
@@ -121,6 +159,13 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches }) 
     try {
       const api = (window as any).electronAPI;
       const params: any = {
+        stopLossPercent: stopLoss,
+        takeProfitPercent: takeProfit,
+        trailingDistancePercent: trailing ? trailingPercent : 0,
+        positionSizing: dynamicSizing ? 'dynamic' : 'fixed',
+        riskPercent: dynamicSizing ? (riskAmount / 100000) * 100 : 1,
+      };
+      /*const params: any = {
         strategyType: strategy,
         stopLossPercent: stopLoss,
         takeProfitPercent: takeProfit,
@@ -128,7 +173,7 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches }) 
         trailingPercent: trailing ? trailingPercent : 0,
         useDynamicSizing: dynamicSizing,
         riskAmount: dynamicSizing ? riskAmount : 0,
-      };
+      };*/
       const result = await api.cloudCreateBatch({
         serverUrl,
         instruments,
@@ -139,7 +184,18 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches }) 
         params,
       });
       if (result.batchId) {
-        setBatches(prev => [...prev, { batchId: result.batchId, status: 'running', total: instruments.length, completed: 0, failed: 0 }]);
+        setBatches(prev => [...prev, {
+          batchId: result.batchId,
+          status: 'running',
+          total: instruments.length,
+          completed: 0,
+          failed: 0,
+          dateFrom,
+          dateTo,
+          strategy,
+          params,
+          interval: intervalValue,
+        }]);
       } else {
         alert('Ошибка: ' + JSON.stringify(result));
       }
@@ -266,14 +322,28 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches }) 
       {batches.length > 0 && (
         <Card className="surface-ground p-2">
           <h5 className="p-mb-2">Прогоны ({batches.length})</h5>
-          <DataTable value={batches} className="p-datatable-sm" stripedRows responsiveLayout="scroll" style={{ fontSize: '0.85rem' }}>
+          <DataTable value={batches} className="p-datatable-sm" stripedRows responsiveLayout="scroll" style={{ fontSize: '0.8rem' }}>
             <Column field="batchId" header="ID" body={(row) => row.batchId.slice(-8)} />
             <Column field="status" header="Статус" body={statusBody} />
+            <Column header="Период" body={(row) => `${row.dateFrom || '?'} – ${row.dateTo || '?'}`} />
+            <Column header="Стратегия" body={(row) => row.strategy || '—'} />
+            <Column header="SL%" body={(row) => row.params?.stopLossPercent ?? '—'} />
+            <Column header="TP%" body={(row) => row.params?.takeProfitPercent ?? '—'} />
+            <Column header="Trail%" body={(row) => 
+              row.params?.trailingDistancePercent > 0 ? row.params.trailingDistancePercent + '%' : '—'
+            } />
+            <Column header="Dyn.Lots" body={(row) => 
+              row.params?.positionSizing === 'dynamic' ? 'Да' : 'Нет'
+            } />
+            <Column header="Интервал" body={(row) => row.interval || '—'} />
             <Column field="total" header="Всего" />
             <Column field="completed" header="Готово" />
+            <Column header="Ошибка" body={(row: BatchResult) => 
+              row.status === 'failed' && row.error ? <Tag severity="danger" value={row.error} /> : null
+            } />
             <Column body={(row: BatchResult) => (
               <Button icon="pi pi-eye" className="p-button-sm p-button-info p-1" onClick={() => viewResults(row)} disabled={row.status !== 'completed'} />
-            )} header="Результат" />
+            )} header="Рез." />
           </DataTable>
         </Card>
       )}

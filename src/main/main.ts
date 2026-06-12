@@ -1,5 +1,13 @@
 // src/main/main.ts
 
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception:', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled rejection at:', promise, 'reason:', reason);
+});
+
 import 'dotenv/config';
 import { app, BrowserWindow, dialog, ipcMain, Menu, MenuItemConstructorOptions, session } from 'electron';
 import { createMainWindow } from './windows/mainWindow.ts';

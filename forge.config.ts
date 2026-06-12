@@ -68,7 +68,7 @@ const config: ForgeConfig = {
     }),
     // Fuses are used to enable/disable various Electron functionality
     // at package time, before code signing the application
-    new FusesPlugin({
+    /*new FusesPlugin({
       version: 1,
       runasnode: false,
       cookieencryption: true,
@@ -83,7 +83,7 @@ const config: ForgeConfig = {
       //[FuseV1Options.EnableNodeCliInspectArguments]: false,
       //[FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
       //[FuseV1Options.OnlyLoadAppFromAsar]: true,
-    }),
+    }),*/
   ],
 };
 
