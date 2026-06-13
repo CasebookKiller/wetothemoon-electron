@@ -201,6 +201,8 @@ export const TradingAssistantPage: React.FC = () => {
   const [availableInstruments, setAvailableInstruments] = useState<Array<{ uid: string; name: string; ticker?: string }>>([]);
   const [instrumentsLoading, setInstrumentsLoading] = useState(false);
 
+  const [farmerInstruments, setFarmerInstruments] = useState<string[]>([]);
+
   // Активная вкладка
   const [activeTab, setActiveTab] = useState('sandbox');
   
@@ -218,6 +220,8 @@ export const TradingAssistantPage: React.FC = () => {
   const [compactMode, setCompactMode] = useState(false);
 
   const [farmerBatches, setFarmerBatches] = useState<BatchResult[]>([]);
+
+  const [screenerResults, setScreenerResults] = useState<any[]>([]);
 
   // ========== REFS ДЛЯ ГРАФИКА ==========
   const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -1658,7 +1662,12 @@ export const TradingAssistantPage: React.FC = () => {
 
           {/* ========== SCREENER ========== */}
           <TabPanel header="Screener">
-            <ScreenerTab token={stream.token} />
+            <ScreenerTab
+              token={stream.token}
+              results={screenerResults}
+              setResults={setScreenerResults}
+              onSendToFarmer={setFarmerInstruments}
+            />
           </TabPanel>
 
           {/* ========== CLOUD ============= */}
@@ -1672,10 +1681,13 @@ export const TradingAssistantPage: React.FC = () => {
               token={stream.token}
               batches={farmerBatches}
               setBatches={setFarmerBatches}
+              farmerInstruments={farmerInstruments}
+              setFarmerInstruments={setFarmerInstruments}
             />
           </TabPanel>
         </TabView>
       )}
+
       {/* Выбор типа профиля и графика – только когда не compact или всегда видно? */}
       {!compactMode && (
         <>

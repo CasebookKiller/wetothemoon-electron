@@ -15,6 +15,7 @@ export interface ScreenerResult {
   figi: string;
   ticker: string;
   name: string;
+  uid: string;                  // ← обязательно для отправки в фермер
   lastPrice: number;
   avgVolumePerCandle: number;   // средний объём за часовую свечу
   vaWidthPercent: number;
@@ -62,16 +63,41 @@ export class ScreenerService {
       const name = instr.name as string;
 
       try {
-        const candles = await this.historicalLoader.loadIntradayCandles(
-          uid,
-          twoDaysAgo,
-          now,
-          token,
-          CandleInterval.CANDLE_INTERVAL_HOUR
-        );
+        // Задержка между инструментами, чтобы не превысить лимит API
+        await new Promise(resolve => setTimeout(resolve, 150));
+
+        let candles: StreamCandle[] | null = null;
+        let attempts = 0;
+
+        // Две попытки с паузой при rate limit
+        while (attempts < 2) {
+          try {
+            candles = await this.historicalLoader.loadIntradayCandles(
+              uid,
+              twoDaysAgo,
+              now,
+              token,
+              CandleInterval.CANDLE_INTERVAL_HOUR
+            );
+            break; // успешно загрузили – выходим из цикла
+          } catch (err: any) {
+            if (err.code === 8) { // RESOURCE_EXHAUSTED
+              console.warn(`Rate limit hit for ${ticker}, waiting 3s...`);
+              await new Promise(resolve => setTimeout(resolve, 3000));
+              attempts++;
+            } else {
+              throw err; // другая ошибка – пробрасываем выше
+            }
+          }
+        }
 
         if (!candles || candles.length < 5) {
-          results.push({ figi, ticker, name, lastPrice: 0, avgVolumePerCandle: 0, vaWidthPercent: 0, pocStrength: 0, poc: 0, vah: 0, val: 0, error: 'Not enough candles' });
+          results.push({
+            figi, ticker, name, uid,
+            lastPrice: 0, avgVolumePerCandle: 0, vaWidthPercent: 0,
+            pocStrength: 0, poc: 0, vah: 0, val: 0,
+            error: 'Not enough candles'
+          });
           continue;
         }
 
@@ -84,13 +110,23 @@ export class ScreenerService {
         });
 
         if (validCandles.length < 3) {
-          results.push({ figi, ticker, name, lastPrice: 0, avgVolumePerCandle: 0, vaWidthPercent: 0, pocStrength: 0, poc: 0, vah: 0, val: 0, error: 'Invalid candles' });
+          results.push({
+            figi, ticker, name, uid,
+            lastPrice: 0, avgVolumePerCandle: 0, vaWidthPercent: 0,
+            pocStrength: 0, poc: 0, vah: 0, val: 0,
+            error: 'Invalid candles'
+          });
           continue;
         }
 
         const avgVolumePerCandle = validCandles.reduce((s, c) => s + Number(c.volume || '0'), 0) / validCandles.length;
         if (filters.minAvgVolume && avgVolumePerCandle < filters.minAvgVolume) {
-          results.push({ figi, ticker, name, lastPrice: 0, avgVolumePerCandle, vaWidthPercent: 0, pocStrength: 0, poc: 0, vah: 0, val: 0, error: 'Volume too low' });
+          results.push({
+            figi, ticker, name, uid,
+            lastPrice: 0, avgVolumePerCandle, vaWidthPercent: 0,
+            pocStrength: 0, poc: 0, vah: 0, val: 0,
+            error: 'Volume too low'
+          });
           continue;
         }
 
@@ -103,14 +139,24 @@ export class ScreenerService {
         validCandles.forEach(c => engine.feedCandle(c));
         const profile: VolumeProfileLevels | null = engine.getProfile(uid);
         if (!profile || profile.totalVolume === 0) {
-          results.push({ figi, ticker, name, lastPrice: 0, avgVolumePerCandle, vaWidthPercent: 0, pocStrength: 0, poc: 0, vah: 0, val: 0, error: 'No profile' });
+          results.push({
+            figi, ticker, name, uid,
+            lastPrice: 0, avgVolumePerCandle, vaWidthPercent: 0,
+            pocStrength: 0, poc: 0, vah: 0, val: 0,
+            error: 'No profile'
+          });
           continue;
         }
 
         const vaWidth = profile.valueAreaHigh - profile.valueAreaLow;
         const vaWidthPercent = (vaWidth / profile.poc) * 100;
         if (filters.maxVaWidthPercent && vaWidthPercent > filters.maxVaWidthPercent) {
-          results.push({ figi, ticker, name, lastPrice: profile.poc, avgVolumePerCandle, vaWidthPercent, pocStrength: 0, poc: profile.poc, vah: profile.valueAreaHigh, val: profile.valueAreaLow, error: 'VA too wide' });
+          results.push({
+            figi, ticker, name, uid,
+            lastPrice: profile.poc, avgVolumePerCandle, vaWidthPercent,
+            pocStrength: 0, poc: profile.poc, vah: profile.valueAreaHigh, val: profile.valueAreaLow,
+            error: 'VA too wide'
+          });
           continue;
         }
 
@@ -127,7 +173,12 @@ export class ScreenerService {
         }
         const pocStrength = vaVolume > 0 ? pocVolumeInVA / vaVolume : 0;
         if (filters.minPocStrength && pocStrength < filters.minPocStrength) {
-          results.push({ figi, ticker, name, lastPrice: profile.poc, avgVolumePerCandle, vaWidthPercent, pocStrength, poc: profile.poc, vah: profile.valueAreaHigh, val: profile.valueAreaLow, error: 'POC too weak' });
+          results.push({
+            figi, ticker, name, uid,
+            lastPrice: profile.poc, avgVolumePerCandle, vaWidthPercent,
+            pocStrength, poc: profile.poc, vah: profile.valueAreaHigh, val: profile.valueAreaLow,
+            error: 'POC too weak'
+          });
           continue;
         }
 
@@ -135,6 +186,7 @@ export class ScreenerService {
           figi,
           ticker,
           name,
+          uid,
           lastPrice: profile.poc,
           avgVolumePerCandle: Math.round(avgVolumePerCandle),
           vaWidthPercent: Math.round(vaWidthPercent * 100) / 100,
@@ -144,8 +196,14 @@ export class ScreenerService {
           val: profile.valueAreaLow,
         });
         engine.reset(uid);
+        
       } catch (err: any) {
-        results.push({ figi, ticker, name, lastPrice: 0, avgVolumePerCandle: 0, vaWidthPercent: 0, pocStrength: 0, poc: 0, vah: 0, val: 0, error: err.message });
+        results.push({
+          figi, ticker, name, uid,
+          lastPrice: 0, avgVolumePerCandle: 0, vaWidthPercent: 0,
+          pocStrength: 0, poc: 0, vah: 0, val: 0,
+          error: err.message
+        });
       }
     }
 

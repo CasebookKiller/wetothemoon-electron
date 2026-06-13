@@ -29,9 +29,11 @@ interface Props {
   token: string;
   batches: BatchResult[];
   setBatches: React.Dispatch<React.SetStateAction<BatchResult[]>>;
+  farmerInstruments?: string[];
+  setFarmerInstruments?: React.Dispatch<React.SetStateAction<string[]>>;
 }
 
-export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches }) => {
+export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, farmerInstruments, setFarmerInstruments }) => {
   const [serverUrl, setServerUrl] = useState('http://192.144.14.181:8000');
   const [instruments, setInstruments] = useState<string[]>([]);
   const [availableInstruments, setAvailableInstruments] = useState<Array<{ uid: string; name: string; ticker?: string }>>([]);
@@ -74,6 +76,13 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches }) 
   };
 
   useEffect(() => {
+    if (farmerInstruments && farmerInstruments.length > 0) {
+      setInstruments(farmerInstruments);
+      setFarmerInstruments?.([]); // сбросить, чтобы повторно не устанавливались
+    }
+  }, [farmerInstruments]);
+
+  useEffect(() => {
     if (token) loadInstruments();
   }, [token]);
 
@@ -83,19 +92,41 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches }) 
       const api = (window as any).electronAPI;
       if (!api?.cloudGetBatches) return;
       const data = await api.cloudGetBatches(serverUrl);
-      if (Array.isArray(data)) {
-        setBatches(data.map((b: any) => ({
-          batchId: b.id,
-          status: b.status,
-          total: 0, completed: 0, failed: 0,
-          dateFrom: b.params?.dateFrom,
-          dateTo: b.params?.dateTo,
-          strategy: b.params?.strategy,
-          params: b.params?.params || b.params,
-          interval: b.params?.interval,
-        })));
-      }
+      if (!Array.isArray(data)) return;
+
+      // Для каждого batch'а получаем подробный статус (особенно для failed)
+      const detailed = await Promise.all(
+        data.map(async (b: any) => {
+          const base = {
+            batchId: b.id,
+            status: b.status,
+            total: 0, completed: 0, failed: 0,
+            dateFrom: b.params?.dateFrom,
+            dateTo: b.params?.dateTo,
+            strategy: b.params?.strategy,
+            params: b.params?.params || b.params,
+            interval: b.params?.interval,
+            error: undefined,
+          };
+
+          if (b.status === 'failed' || b.status === 'completed') {
+            try {
+              const statusData = await api.cloudGetBatchStatus(serverUrl, b.id);
+              const tasks = statusData?.tasks || [];
+              const failedTask = tasks.find((t: any) => t.status === 'failed');
+              base.error = failedTask?.error || null;
+              base.completed = tasks.filter((t: any) => t.status === 'completed').length;
+              base.failed = tasks.filter((t: any) => t.status === 'failed').length;
+              base.total = tasks.length;
+            } catch (e) { /* оставляем как есть */ }
+          }
+          return base;
+        })
+      );
+
+      setBatches(detailed);
     };
+
     if (serverUrl) loadBatches();
   }, [serverUrl, setBatches]);
 
@@ -113,6 +144,8 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches }) 
             const tasks = data?.tasks || [];
             const completed = tasks.filter((t: any) => t.status === 'completed').length;
             const failed = tasks.filter((t: any) => t.status === 'failed').length;
+            const failedTask = tasks.find((t: any) => t.status === 'failed');
+            const errorMessage = failedTask?.error || null;
             const batchParams = data?.batch?.params || {};
             // Извлекаем параметры из объекта params (сервер кладёт их в batch.params)
             const rawParams = batchParams.params || batchParams;
@@ -134,6 +167,7 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches }) 
               strategy: batchParams.strategy || batch.strategy,
               params: params,
               interval: batchParams.interval || batch.interval,
+              error: errorMessage,
             };
           } catch {
             return batch;
@@ -199,6 +233,7 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches }) 
           strategy,
           params,
           interval: intervalValue,
+          error: undefined
         }]);
       } else {
         alert('Ошибка: ' + JSON.stringify(result));
@@ -217,7 +252,15 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches }) 
     try {
       const api = (window as any).electronAPI;
       const fullResults = await api.cloudGetBatchResults(serverUrl, batch.batchId);
-      setSelectedBatch(prev => prev ? { ...prev, results: fullResults.results } : prev);
+      const enriched = (fullResults.results || []).map((r: any) => {
+        const inst = availableInstruments.find(i => i.uid === r.instrumentUid);
+        return {
+          ...r,
+          name: inst?.name || '',
+          ticker: inst?.ticker || inst?.name || '',
+        };
+      });
+      setSelectedBatch(prev => prev ? { ...prev, results: enriched } : prev);
     } catch (err) {
       console.error(err);
     } finally {
@@ -229,23 +272,30 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches }) 
     const api = (window as any).electronAPI;
     const fullResults = await api.cloudGetBatchResults(serverUrl, batch.batchId);
     if (!fullResults?.results) return;
+    const enriched = (fullResults.results || []).map((r: any) => {
+      const inst = availableInstruments.find(i => i.uid === r.instrumentUid);
+      return { ...r, ticker: inst?.ticker || inst?.name || r.instrumentUid?.slice(0,12) };
+    });
 
-    const rows = fullResults.results.map((r: any) => ({
-      instrument: r.instrumentUid,
-      status: r.status,
-      profit: r.totalProfit,
-      winRate: r.winRate,
-      error: r.error,
-    }));
-
-    // CSV заголовки и строки
-    const header = 'Instrument,Status,Profit,WinRate,Error';
-    const csvRows = rows.map((r: any) =>
-      `${r.instrument},${r.status},${r.profit ?? ''},${r.winRate ?? ''},${r.error ?? ''}`
+    const header = 'Instrument,Status,Period,SL%,TP%,Trail%,Lots,Dyn,Profit,Trades,WinRate';
+    const rows = fullResults.results.map((r: any) =>
+      [
+        r.instrumentUid,
+        enriched,
+        r.status,
+        `${r.dateFrom || ''}–${r.dateTo || ''}`,
+        r.stopLoss ?? '',
+        r.takeProfit ?? '',
+        r.trailing ?? '',
+        r.lots ?? '',
+        r.positionSizing === 'dynamic' ? 'Yes' : 'No',
+        r.totalProfit ?? '',
+        r.totalTrades ?? '',
+        r.winRate ?? ''
+      ].join(',')
     ).join('\n');
-    const csv = header + '\n' + csvRows;
 
-    // Скачивание через Blob
+    const csv = header + '\n' + rows;
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -299,7 +349,13 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches }) 
           <InputNumber value={lots} onValueChange={e => setLots(e.value ?? 1)} min={1} step={1} size={3} className="p-inputtext-sm" />
         </div>
         <div className="flex align-items-center gap-2 mb-2">
-          <Button label="Выбрать инструменты" icon="pi pi-list" onClick={openInstrumentDialog} className="p-button-sm p-button-secondary p-1 px-3" />
+          <Button
+            label="Выбрать инструменты"
+            icon="pi pi-list"
+            onClick={openInstrumentDialog}
+            className="p-button-sm p-button-secondary p-1 px-3"
+            style={{minWidth: '200px'}}
+          />
           <span className="text-sm text-500">{instruments.length} выбрано</span>
           {instruments.length > 0 && (
             <span className="text-sm text-500">
@@ -374,9 +430,15 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches }) 
             <Column header="Интервал" body={(row) => row.interval || '—'} />
             <Column field="total" header="Всего" />
             <Column field="completed" header="Готово" />
-            <Column header="Ошибка" body={(row: BatchResult) => 
-              row.status === 'failed' && row.error ? <Tag severity="danger" value={row.error} /> : null
-            } />
+            <Column
+              header="Ошибка"
+              body={(row: BatchResult) => {
+                console.log('Row error:', row.status, row.error);
+                return row.status === 'failed' && row.error ? (
+                  <Tag severity="danger" value={row.error} />
+                ) : null;
+              }}
+            />
             <Column body={(row: BatchResult) => (
               <div className="flex gap-1">
                 <Button icon="pi pi-eye" className="p-button-sm p-button-info p-1" onClick={() => viewResults(row)} disabled={row.status !== 'completed'} />
@@ -388,12 +450,26 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches }) 
         </Card>
       )}
 
-      <Dialog header={`Результаты прогона ${selectedBatch?.batchId?.slice(-8)}`} visible={showResults} style={{ width: '700px' }} onHide={() => setShowResults(false)}>
+      <Dialog header={`Результаты прогона ${selectedBatch?.batchId?.slice(-8)}`} visible={showResults} style={{ width: '900px' }} onHide={() => setShowResults(false)}>
         {resultsLoading ? <p>Загрузка...</p> : selectedBatch?.results ? (
-          <DataTable value={selectedBatch.results} className="p-datatable-sm" stripedRows responsiveLayout="scroll" style={{ fontSize: '0.85rem' }}>
-            <Column field="instrumentUid" header="Инструмент" body={(row) => row.instrumentUid?.slice(0,12)} />
+          <DataTable value={selectedBatch.results} className="p-datatable-sm" stripedRows responsiveLayout="scroll" style={{ fontSize: '0.8rem' }}>
+            <Column
+              header="Инструмент"
+              body={(row) => {
+                const ticker = row.ticker || row.name || '';
+                const uid = row.instrumentUid || '';
+                return ticker ? `${ticker} (${uid.slice(0,12)})` : uid.slice(0,12);
+              }}
+            />
             <Column field="status" header="Статус" body={(row) => <Tag severity={row.status === 'completed' ? 'success' : 'warning'} value={row.status} />} />
+            <Column header="Период" body={(row) => `${row.dateFrom || '?'} – ${row.dateTo || '?'}`} />
+            <Column header="SL%" body={(row) => row.stopLoss != null ? row.stopLoss : '-'} />
+            <Column header="TP%" body={(row) => row.takeProfit != null ? row.takeProfit : '-'} />
+            <Column header="Trail%" body={(row) => row.trailing > 0 ? row.trailing + '%' : '-'} />
+            <Column header="Lots" body={(row) => row.lots ?? '-'} />
+            <Column header="Dyn" body={(row) => row.positionSizing === 'dynamic' ? 'Да' : 'Нет'} />
             <Column field="totalProfit" header="Прибыль" body={(row) => row.totalProfit != null ? row.totalProfit.toFixed(2) : '-'} />
+            <Column field="totalTrades" header="Сделок" body={(row) => row.totalTrades ?? '-'} />
             <Column field="winRate" header="WinRate" body={(row) => row.winRate != null ? row.winRate.toFixed(1) + '%' : '-'} />
           </DataTable>
         ) : <p>Нет данных</p>}

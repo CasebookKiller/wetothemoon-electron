@@ -2570,12 +2570,25 @@ var ScreenerService = class {
 			const ticker = instr.ticker;
 			const name = instr.name;
 			try {
-				const candles = await this.historicalLoader.loadIntradayCandles(uid, twoDaysAgo, now, token, CandleInterval.CANDLE_INTERVAL_HOUR);
+				await new Promise((resolve) => setTimeout(resolve, 150));
+				let candles = null;
+				let attempts = 0;
+				while (attempts < 2) try {
+					candles = await this.historicalLoader.loadIntradayCandles(uid, twoDaysAgo, now, token, CandleInterval.CANDLE_INTERVAL_HOUR);
+					break;
+				} catch (err) {
+					if (err.code === 8) {
+						console.warn(`Rate limit hit for ${ticker}, waiting 3s...`);
+						await new Promise((resolve) => setTimeout(resolve, 3e3));
+						attempts++;
+					} else throw err;
+				}
 				if (!candles || candles.length < 5) {
 					results.push({
 						figi,
 						ticker,
 						name,
+						uid,
 						lastPrice: 0,
 						avgVolumePerCandle: 0,
 						vaWidthPercent: 0,
@@ -2598,6 +2611,7 @@ var ScreenerService = class {
 						figi,
 						ticker,
 						name,
+						uid,
 						lastPrice: 0,
 						avgVolumePerCandle: 0,
 						vaWidthPercent: 0,
@@ -2615,6 +2629,7 @@ var ScreenerService = class {
 						figi,
 						ticker,
 						name,
+						uid,
 						lastPrice: 0,
 						avgVolumePerCandle,
 						vaWidthPercent: 0,
@@ -2638,6 +2653,7 @@ var ScreenerService = class {
 						figi,
 						ticker,
 						name,
+						uid,
 						lastPrice: 0,
 						avgVolumePerCandle,
 						vaWidthPercent: 0,
@@ -2655,6 +2671,7 @@ var ScreenerService = class {
 						figi,
 						ticker,
 						name,
+						uid,
 						lastPrice: profile.poc,
 						avgVolumePerCandle,
 						vaWidthPercent,
@@ -2678,6 +2695,7 @@ var ScreenerService = class {
 						figi,
 						ticker,
 						name,
+						uid,
 						lastPrice: profile.poc,
 						avgVolumePerCandle,
 						vaWidthPercent,
@@ -2693,6 +2711,7 @@ var ScreenerService = class {
 					figi,
 					ticker,
 					name,
+					uid,
 					lastPrice: profile.poc,
 					avgVolumePerCandle: Math.round(avgVolumePerCandle),
 					vaWidthPercent: Math.round(vaWidthPercent * 100) / 100,
@@ -2707,6 +2726,7 @@ var ScreenerService = class {
 					figi,
 					ticker,
 					name,
+					uid,
 					lastPrice: 0,
 					avgVolumePerCandle: 0,
 					vaWidthPercent: 0,
