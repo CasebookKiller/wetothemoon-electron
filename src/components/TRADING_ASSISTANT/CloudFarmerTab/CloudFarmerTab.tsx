@@ -42,11 +42,14 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches }) 
   const [dateFrom, setDateFrom] = useState(new Date().toISOString().split('T')[0]);
   const [dateTo, setDateTo] = useState(new Date().toISOString().split('T')[0]);
   const [intervalValue, setIntervalValue] = useState('CANDLE_INTERVAL_1_MIN'); // переименовали
+
+  const [lots, setLots] = useState(1);
+  
   // Если выбрано больше 5 дней, автоматически переключаемся на 5-минутные свечи
   useEffect(() => {
     const daysDiff = Math.ceil((new Date(dateTo).getTime() - new Date(dateFrom).getTime()) / 86400000);
     if (daysDiff > 5 && intervalValue === 'CANDLE_INTERVAL_1_MIN') {
-      setIntervalValue('CANDLE_INTERVAL_5_MIN');
+      //setIntervalValue('CANDLE_INTERVAL_5_MIN');
     }
   }, [dateFrom, dateTo, intervalValue]);
   const [strategy, setStrategy] = useState('volume_accumulation');
@@ -164,6 +167,7 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches }) 
         trailingDistancePercent: trailing ? trailingPercent : 0,
         positionSizing: dynamicSizing ? 'dynamic' : 'fixed',
         riskPercent: dynamicSizing ? (riskAmount / 100000) * 100 : 1,
+        lots: lots,   // <-- количество лотов
       };
       /*const params: any = {
         strategyType: strategy,
@@ -221,6 +225,36 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches }) 
     }
   };
 
+  const exportBatchToCSV = async (batch: BatchResult) => {
+    const api = (window as any).electronAPI;
+    const fullResults = await api.cloudGetBatchResults(serverUrl, batch.batchId);
+    if (!fullResults?.results) return;
+
+    const rows = fullResults.results.map((r: any) => ({
+      instrument: r.instrumentUid,
+      status: r.status,
+      profit: r.totalProfit,
+      winRate: r.winRate,
+      error: r.error,
+    }));
+
+    // CSV заголовки и строки
+    const header = 'Instrument,Status,Profit,WinRate,Error';
+    const csvRows = rows.map((r: any) =>
+      `${r.instrument},${r.status},${r.profit ?? ''},${r.winRate ?? ''},${r.error ?? ''}`
+    ).join('\n');
+    const csv = header + '\n' + csvRows;
+
+    // Скачивание через Blob
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `batch_${batch.batchId.slice(-8)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const statusBody = (row: BatchResult) => {
     const severityMap: Record<string, 'success' | 'warning' | 'danger' | 'info'> = {
       completed: 'success',
@@ -261,6 +295,8 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches }) 
             <label className="ml-1 mr-2 mb-0">Dynamic Lots</label>
             {dynamicSizing && <InputNumber value={riskAmount} onValueChange={e => setRiskAmount(e.value ?? 0)} step={100} min={0} size={3} className="p-inputtext-sm" placeholder="Risk RUB" />}
           </div>
+          <label className="mr-1 mb-0">Lots</label>
+          <InputNumber value={lots} onValueChange={e => setLots(e.value ?? 1)} min={1} step={1} size={3} className="p-inputtext-sm" />
         </div>
         <div className="flex align-items-center gap-2 mb-2">
           <Button label="Выбрать инструменты" icon="pi pi-list" onClick={openInstrumentDialog} className="p-button-sm p-button-secondary p-1 px-3" />
@@ -342,8 +378,12 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches }) 
               row.status === 'failed' && row.error ? <Tag severity="danger" value={row.error} /> : null
             } />
             <Column body={(row: BatchResult) => (
-              <Button icon="pi pi-eye" className="p-button-sm p-button-info p-1" onClick={() => viewResults(row)} disabled={row.status !== 'completed'} />
+              <div className="flex gap-1">
+                <Button icon="pi pi-eye" className="p-button-sm p-button-info p-1" onClick={() => viewResults(row)} disabled={row.status !== 'completed'} />
+                <Button icon="pi pi-download" className="p-button-sm p-button-success p-1" onClick={() => exportBatchToCSV(row)} disabled={row.status !== 'completed'} />
+              </div>
             )} header="Рез." />
+            
           </DataTable>
         </Card>
       )}

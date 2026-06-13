@@ -181,7 +181,7 @@ export const TradingAssistantPage: React.FC = () => {
     loading: false,
     result: null as any,
     trades: [] as any[],
-    
+    interval: 'CANDLE_INTERVAL_1_MIN', // новое поле    
   });
   const [batchInstruments, setBatchInstruments] = useState<string[]>([]);
   const [batchResults, setBatchResults] = useState<any[]>([]);
@@ -643,7 +643,7 @@ export const TradingAssistantPage: React.FC = () => {
       batchInstruments,
       backtest.dateFrom,
       backtest.dateTo,
-      backtest.interval,
+      batchParams.interval,
       stream.token,
       uniqueParamSets,
       batchParams.strategyType,
@@ -1431,6 +1431,21 @@ export const TradingAssistantPage: React.FC = () => {
                       'exhaustion',
                     ]}
                     onChange={e => setBatchParams({ ...batchParams, strategyType: e.value })}
+                    className="p-inputtext-sm"
+                  />
+                </div>
+
+                {/* Strategy */}
+                <div className="p-field mb-3">
+                  <label>Interval</label>
+                  <Dropdown
+                    value={batchParams.interval}
+                    options={[
+                      { label: '1 min', value: 'CANDLE_INTERVAL_1_MIN' },
+                      { label: '5 min', value: 'CANDLE_INTERVAL_5_MIN' },
+                      { label: '1 hour', value: 'CANDLE_INTERVAL_HOUR' },
+                    ]}
+                    onChange={e => setBatchParams({ ...batchParams, interval: e.value })}
                     className="p-inputtext-sm"
                   />
                 </div>

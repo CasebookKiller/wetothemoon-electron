@@ -58,6 +58,16 @@ async function runBacktestInternal(
   const allCandles: any[] = [];
   const allSignals: BacktestSignal[] = [];
 
+  console.log(`[LOCAL] Portfolio config:`, {
+    initialCapital: 100000,
+    stopLossPercent: params.stopLossPercent,
+    takeProfitPercent: params.takeProfitPercent,
+    trailingDistancePercent: params.trailingDistancePercent,
+    lotQuantity: params.lots,
+    positionSizing: params.positionSizing,
+    riskPercent: params.riskPercent,
+  });
+
   const portfolio = new VirtualPortfolio({
     initialCapital: 100000,
     stopLossPercent: params.stopLossPercent || 0,

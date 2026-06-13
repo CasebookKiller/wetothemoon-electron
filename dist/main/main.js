@@ -3519,6 +3519,15 @@ async function runBacktestInternal(instrumentUid, dateFrom, dateTo, intervalStr,
 	}[intervalStr] || CandleInterval.CANDLE_INTERVAL_1_MIN;
 	const allCandles = [];
 	const allSignals = [];
+	console.log(`[LOCAL] Portfolio config:`, {
+		initialCapital: 1e5,
+		stopLossPercent: params.stopLossPercent,
+		takeProfitPercent: params.takeProfitPercent,
+		trailingDistancePercent: params.trailingDistancePercent,
+		lotQuantity: params.lots,
+		positionSizing: params.positionSizing,
+		riskPercent: params.riskPercent
+	});
 	const portfolio = new VirtualPortfolio({
 		initialCapital: 1e5,
 		stopLossPercent: params.stopLossPercent || 0,
