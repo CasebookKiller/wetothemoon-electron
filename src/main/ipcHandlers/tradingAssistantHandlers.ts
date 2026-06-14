@@ -926,9 +926,15 @@ async function getCloudToken(serverUrl: string): Promise<string | null> {
     interval: string;
     strategy: string;
     params: any;
+    // поля сетки
+    slMin?: number; slMax?: number; slStep?: number;
+    tpMin?: number; tpMax?: number; tpStep?: number;
+    trailMin?: number; trailMax?: number; trailStep?: number;
+    lotsMin?: number; lotsMax?: number; lotsStep?: number;
+    riskMin?: number; riskMax?: number; riskStep?: number;
   }) => {
     const { serverUrl, ...batch } = batchConfig;
-    
+
     try {
       const token = await getCloudToken(serverUrl);
       const res = await fetch(`${serverUrl}/api/backtest/batch`, {
@@ -937,7 +943,7 @@ async function getCloudToken(serverUrl: string): Promise<string | null> {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify(batch),
+        body: JSON.stringify(batch), // batch уже содержит все нужные поля
       });
       return await res.json();
     } catch (err: any) {

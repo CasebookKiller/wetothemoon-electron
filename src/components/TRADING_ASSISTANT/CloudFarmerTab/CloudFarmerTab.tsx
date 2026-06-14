@@ -67,6 +67,29 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
   const [showResults, setShowResults] = useState(false);
   const [resultsLoading, setResultsLoading] = useState(false);
 
+  const [slMin, setSlMin] = useState(1);
+  const [slMax, setSlMax] = useState(2);
+  const [slStep, setSlStep] = useState(0.5);
+  const [tpMin, setTpMin] = useState(2);
+  const [tpMax, setTpMax] = useState(4);
+  const [tpStep, setTpStep] = useState(1);
+  const [trailMin, setTrailMin] = useState(0.5);
+  const [trailMax, setTrailMax] = useState(1);
+  const [trailStep, setTrailStep] = useState(0.5);
+  const [lotsMin, setLotsMin] = useState(10);
+  const [lotsMax, setLotsMax] = useState(20);
+  const [lotsStep, setLotsStep] = useState(10);
+  const [riskMin, setRiskMin] = useState(1);
+  const [riskMax, setRiskMax] = useState(2);
+  const [riskStep, setRiskStep] = useState(0.5);
+  const [useGrid, setUseGrid] = useState(false);
+
+  const [useVolumeFilter, setUseVolumeFilter] = useState(false);
+  const [volPeriod, setVolPeriod] = useState(20);           // фиксированное значение, если сетка не используется
+  const [volPeriodMin, setVolPeriodMin] = useState(5);
+  const [volPeriodMax, setVolPeriodMax] = useState(50);
+  const [volPeriodStep, setVolPeriodStep] = useState(5);
+
   // Загрузка списка инструментов
   const loadInstruments = async () => {
     const api = (window as any).electronAPI;
@@ -212,7 +235,7 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
         useDynamicSizing: dynamicSizing,
         riskAmount: dynamicSizing ? riskAmount : 0,
       };*/
-      const result = await api.cloudCreateBatch({
+      const batchConfig: any = {
         serverUrl,
         instruments,
         dateFrom,
@@ -220,7 +243,41 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
         interval: intervalValue,
         strategy,
         params,
-      });
+      };
+      if (useGrid) {
+        batchConfig.slMin = slMin;
+        batchConfig.slMax = slMax;
+        batchConfig.slStep = slStep;
+        batchConfig.tpMin = tpMin;
+        batchConfig.tpMax = tpMax;
+        batchConfig.tpStep = tpStep;
+        batchConfig.trailMin = trailMin;
+        batchConfig.trailMax = trailMax;
+        batchConfig.trailStep = trailStep;
+        batchConfig.lotsMin = lotsMin;
+        batchConfig.lotsMax = lotsMax;
+        batchConfig.lotsStep = lotsStep;
+        batchConfig.riskMin = riskMin;
+        batchConfig.riskMax = riskMax;
+        batchConfig.riskStep = riskStep;
+      }
+      // Параметры объёмного фильтра
+      if (useVolumeFilter) {
+        params.volumeFilterEnabled = true;
+        if (useGrid) {
+          // для сетки передаём диапазон
+          batchConfig.volPeriodMin = volPeriodMin;
+          batchConfig.volPeriodMax = volPeriodMax;
+          batchConfig.volPeriodStep = volPeriodStep;
+        } else {
+          // фиксированное значение
+          params.volumeFilterPeriod = volPeriod;
+        }
+      } else {
+        params.volumeFilterEnabled = false;
+      }
+
+      const result = await api.cloudCreateBatch(batchConfig);
       if (result.batchId) {
         setBatches(prev => [...prev, {
           batchId: result.batchId,
@@ -347,6 +404,77 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
           </div>
           <label className="mr-1 mb-0">Lots</label>
           <InputNumber value={lots} onValueChange={e => setLots(e.value ?? 1)} min={1} step={1} size={3} className="p-inputtext-sm" />
+          <div className="flex align-items-center">
+            <Checkbox checked={useGrid} onChange={e => setUseGrid(e.checked || false)} />
+            <label className="ml-1 mr-2 mb-0">Grid search</label>
+          </div>
+
+          {useGrid && (
+            <div className="flex flex-wrap gap-2 mt-2">
+              {/* SL */}
+              <div className="flex align-items-center">
+                <label className="mr-1">SL</label>
+                <InputNumber value={slMin} onValueChange={e => setSlMin(e.value ?? 1)} min={0.1} step={0.1} size={2} className="p-inputtext-sm" />
+                <span className="mx-1">–</span>
+                <InputNumber value={slMax} onValueChange={e => setSlMax(e.value ?? 2)} min={0.1} step={0.1} size={2} className="p-inputtext-sm" />
+                <span className="mx-1">/</span>
+                <InputNumber value={slStep} onValueChange={e => setSlStep(e.value ?? 0.5)} min={0.1} step={0.1} size={2} className="p-inputtext-sm" />
+              </div>
+              {/* TP */}
+              <div className="flex align-items-center">
+                <label className="mr-1">TP</label>
+                <InputNumber value={tpMin} onValueChange={e => setTpMin(e.value ?? 2)} min={0.1} step={1} size={2} className="p-inputtext-sm" />
+                <span className="mx-1">–</span>
+                <InputNumber value={tpMax} onValueChange={e => setTpMax(e.value ?? 4)} min={0.1} step={1} size={2} className="p-inputtext-sm" />
+                <span className="mx-1">/</span>
+                <InputNumber value={tpStep} onValueChange={e => setTpStep(e.value ?? 1)} min={0.1} step={0.1} size={2} className="p-inputtext-sm" />
+              </div>
+              {/* Trail */}
+              <div className="flex align-items-center">
+                <label className="mr-1">Trail</label>
+                <InputNumber value={trailMin} onValueChange={e => setTrailMin(e.value ?? 0.5)} min={0.1} step={0.1} size={2} className="p-inputtext-sm" />
+                <span className="mx-1">–</span>
+                <InputNumber value={trailMax} onValueChange={e => setTrailMax(e.value ?? 1)} min={0.1} step={0.1} size={2} className="p-inputtext-sm" />
+                <span className="mx-1">/</span>
+                <InputNumber value={trailStep} onValueChange={e => setTrailStep(e.value ?? 0.5)} min={0.1} step={0.1} size={2} className="p-inputtext-sm" />
+              </div>
+              {/* Lots */}
+              <div className="flex align-items-center">
+                <label className="mr-1">Lots</label>
+                <InputNumber value={lotsMin} onValueChange={e => setLotsMin(e.value ?? 10)} min={1} step={10} size={2} className="p-inputtext-sm" />
+                <span className="mx-1">–</span>
+                <InputNumber value={lotsMax} onValueChange={e => setLotsMax(e.value ?? 20)} min={1} step={10} size={2} className="p-inputtext-sm" />
+                <span className="mx-1">/</span>
+                <InputNumber value={lotsStep} onValueChange={e => setLotsStep(e.value ?? 10)} min={1} step={1} size={2} className="p-inputtext-sm" />
+              </div>
+              {/* Risk */}
+              <div className="flex align-items-center">
+                <label className="mr-1">Risk%</label>
+                <InputNumber value={riskMin} onValueChange={e => setRiskMin(e.value ?? 1)} min={0.1} step={0.5} size={2} className="p-inputtext-sm" />
+                <span className="mx-1">–</span>
+                <InputNumber value={riskMax} onValueChange={e => setRiskMax(e.value ?? 2)} min={0.1} step={0.5} size={2} className="p-inputtext-sm" />
+                <span className="mx-1">/</span>
+                <InputNumber value={riskStep} onValueChange={e => setRiskStep(e.value ?? 0.5)} min={0.1} step={0.1} size={2} className="p-inputtext-sm" />
+              </div>
+              {/* Volume Filter */}
+              <div className="flex align-items-center">
+                <Checkbox checked={useVolumeFilter} onChange={e => setUseVolumeFilter(e.checked || false)} />
+                <label className="ml-1 mr-2 mb-0">Vol Filt</label>
+                {useVolumeFilter && useGrid && (
+                  <>
+                    <InputNumber value={volPeriodMin} onValueChange={e => setVolPeriodMin(e.value ?? 5)} min={1} step={5} size={2} className="p-inputtext-sm" />
+                    <span className="mx-1">–</span>
+                    <InputNumber value={volPeriodMax} onValueChange={e => setVolPeriodMax(e.value ?? 50)} min={1} step={5} size={2} className="p-inputtext-sm" />
+                    <span className="mx-1">/</span>
+                    <InputNumber value={volPeriodStep} onValueChange={e => setVolPeriodStep(e.value ?? 5)} min={1} step={1} size={2} className="p-inputtext-sm" />
+                  </>
+                )}
+                {useVolumeFilter && !useGrid && (
+                  <InputNumber value={volPeriod} onValueChange={e => setVolPeriod(e.value ?? 20)} min={1} step={5} size={2} className="p-inputtext-sm" placeholder="Period" />
+                )}
+              </div>
+            </div>
+          )}
         </div>
         <div className="flex align-items-center gap-2 mb-2">
           <Button
