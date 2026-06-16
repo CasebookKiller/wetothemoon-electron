@@ -362,6 +362,27 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
     URL.revokeObjectURL(url);
   };
 
+  const getPhaseSummary = (results: any[]) => {
+    const map: Record<string, { count: number; totalProfit: number; totalWinRate: number }> = {};
+
+    results.forEach(r => {
+      const dist = r.phaseDistribution || {};
+      Object.entries(dist).forEach(([phase, days]) => {
+        if (!map[phase]) map[phase] = { count: 0, totalProfit: 0, totalWinRate: 0 };
+        map[phase].count += 1;
+        map[phase].totalProfit += r.totalProfit || 0;
+        map[phase].totalWinRate += r.winRate || 0;
+      });
+    });
+
+    return Object.entries(map).map(([phase, data]) => ({
+      phase,
+      count: data.count,
+      avgProfit: data.count > 0 ? data.totalProfit / data.count : 0,
+      avgWinRate: data.count > 0 ? data.totalWinRate / data.count : 0,
+    }));
+  };
+
   const statusBody = (row: BatchResult) => {
     const severityMap: Record<string, 'success' | 'warning' | 'danger' | 'info'> = {
       completed: 'success',
@@ -539,6 +560,7 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
         </div>
       </Dialog>
 
+
       {batches.length > 0 && (
         <Card className="surface-ground p-2">
           <h5 className="p-mb-2">Прогоны ({batches.length})</h5>
@@ -580,26 +602,43 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
 
       <Dialog header={`Результаты прогона ${selectedBatch?.batchId?.slice(-8)}`} visible={showResults} style={{ width: '900px' }} onHide={() => setShowResults(false)}>
         {resultsLoading ? <p>Загрузка...</p> : selectedBatch?.results ? (
-          <DataTable value={selectedBatch.results} className="p-datatable-sm" stripedRows responsiveLayout="scroll" style={{ fontSize: '0.8rem' }}>
-            <Column
-              header="Инструмент"
-              body={(row) => {
-                const ticker = row.ticker || row.name || '';
-                const uid = row.instrumentUid || '';
-                return ticker ? `${ticker} (${uid.slice(0,12)})` : uid.slice(0,12);
-              }}
-            />
-            <Column field="status" header="Статус" body={(row) => <Tag severity={row.status === 'completed' ? 'success' : 'warning'} value={row.status} />} />
-            <Column header="Период" body={(row) => `${row.dateFrom || '?'} – ${row.dateTo || '?'}`} />
-            <Column header="SL%" body={(row) => row.stopLoss != null ? row.stopLoss : '-'} />
-            <Column header="TP%" body={(row) => row.takeProfit != null ? row.takeProfit : '-'} />
-            <Column header="Trail%" body={(row) => row.trailing > 0 ? row.trailing + '%' : '-'} />
-            <Column header="Lots" body={(row) => row.lots ?? '-'} />
-            <Column header="Dyn" body={(row) => row.positionSizing === 'dynamic' ? 'Да' : 'Нет'} />
-            <Column field="totalProfit" header="Прибыль" body={(row) => row.totalProfit != null ? row.totalProfit.toFixed(2) : '-'} />
-            <Column field="totalTrades" header="Сделок" body={(row) => row.totalTrades ?? '-'} />
-            <Column field="winRate" header="WinRate" body={(row) => row.winRate != null ? row.winRate.toFixed(1) + '%' : '-'} />
-          </DataTable>
+          <>
+            {/* Сводная таблица по фазам */}
+            {selectedBatch.results.length > 0 && (
+              <div className="mb-3">
+                <h5>Распределение по фазам рынка</h5>
+                <DataTable value={getPhaseSummary(selectedBatch.results)} className="p-datatable-sm" stripedRows responsiveLayout="scroll" style={{ fontSize: '0.8rem' }}>
+                  <Column field="phase" header="Фаза" />
+                  <Column field="count" header="Количество задач" />
+                  <Column field="avgProfit" header="Средняя прибыль" body={(row) => row.avgProfit.toFixed(2)} />
+                  <Column field="avgWinRate" header="Средний WinRate" body={(row) => row.avgWinRate.toFixed(1) + '%'} />
+                </DataTable>
+              </div>
+            )}
+
+            {/* Основная таблица с задачами */}
+            <DataTable value={selectedBatch.results} className="p-datatable-sm" stripedRows responsiveLayout="scroll" style={{ fontSize: '0.8rem' }}>
+              <Column
+                header="Инструмент"
+                body={(row) => {
+                  const ticker = row.ticker || row.name || '';
+                  const uid = row.instrumentUid || '';
+                  return ticker ? `${ticker} (${uid.slice(0,12)})` : uid.slice(0,12);
+                }}
+              />
+              <Column field="status" header="Статус" body={(row) => <Tag severity={row.status === 'completed' ? 'success' : 'warning'} value={row.status} />} />
+              <Column header="Период" body={(row) => `${row.dateFrom || '?'} – ${row.dateTo || '?'}`} />
+              <Column header="SL%" body={(row) => row.stopLoss != null ? row.stopLoss : '-'} />
+              <Column header="TP%" body={(row) => row.takeProfit != null ? row.takeProfit : '-'} />
+              <Column header="Trail%" body={(row) => row.trailing > 0 ? row.trailing + '%' : '-'} />
+              <Column header="Lots" body={(row) => row.lots ?? '-'} />
+              <Column header="Dyn" body={(row) => row.positionSizing === 'dynamic' ? 'Да' : 'Нет'} />
+              <Column field="totalProfit" header="Прибыль" body={(row) => row.totalProfit != null ? row.totalProfit.toFixed(2) : '-'} />
+              <Column field="totalTrades" header="Сделок" body={(row) => row.totalTrades ?? '-'} />
+              <Column field="winRate" header="WinRate" body={(row) => row.winRate != null ? row.winRate.toFixed(1) + '%' : '-'} />
+              <Column header="Фаза" body={(row) => row.marketPhase || '—'} />
+            </DataTable>
+          </>
         ) : <p>Нет данных</p>}
       </Dialog>
     </div>
