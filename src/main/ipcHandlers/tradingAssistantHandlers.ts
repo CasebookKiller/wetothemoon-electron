@@ -934,9 +934,11 @@ async function getCloudToken(serverUrl: string): Promise<string | null> {
     riskMin?: number; riskMax?: number; riskStep?: number;
   }) => {
     const { serverUrl, ...batch } = batchConfig;
-
+    console.log('\x1b[1;33m[IPC] Sending batch to:\x1b[0m', `${serverUrl}/api/backtest/batch`, 'with body:', JSON.stringify(batch));
     try {
       const token = await getCloudToken(serverUrl);
+      console.log('\x1b[1;33m[IPC] cloud:createBatch called with serverUrl:\x1b[0m', batchConfig.serverUrl);
+      console.log('\x1b[1;33m[IPC] batch body:\x1b[0m', JSON.stringify(batch));
       const res = await fetch(`${serverUrl}/api/backtest/batch`, {
         method: 'POST',
         headers: {
@@ -945,7 +947,9 @@ async function getCloudToken(serverUrl: string): Promise<string | null> {
         },
         body: JSON.stringify(batch), // batch уже содержит все нужные поля
       });
-      return await res.json();
+      const resjson = await res.json();
+      console.log('\x1b[1;33m[IPC] batch response:\x1b[0m', JSON.stringify(resjson));
+      return resjson;
     } catch (err: any) {
       return { error: err.message };
     }

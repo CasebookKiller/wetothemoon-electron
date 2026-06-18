@@ -277,6 +277,9 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
         params.volumeFilterEnabled = false;
       }
 
+      console.log('[FARMER] batchConfig.serverUrl:', batchConfig.serverUrl);
+      console.log('[FARMER] Sending batch config:', JSON.stringify(batchConfig));
+      
       const result = await api.cloudCreateBatch(batchConfig);
       if (result.batchId) {
         setBatches(prev => [...prev, {
@@ -329,16 +332,22 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
     const api = (window as any).electronAPI;
     const fullResults = await api.cloudGetBatchResults(serverUrl, batch.batchId);
     if (!fullResults?.results) return;
-    const enriched = (fullResults.results || []).map((r: any) => {
-      const inst = availableInstruments.find(i => i.uid === r.instrumentUid);
-      return { ...r, ticker: inst?.ticker || inst?.name || r.instrumentUid?.slice(0,12) };
-    });
 
-    const header = 'Instrument,Status,Period,SL%,TP%,Trail%,Lots,Dyn,Profit,Trades,WinRate';
-    const rows = fullResults.results.map((r: any) =>
-      [
+    const header = 'Instrument,Status,Period,SL%,TP%,Trail%,Lots,Dyn,Profit,Trades,WinRate,Phase';
+    const rows = fullResults.results.map((r: any) => {
+      // Вычисляем доминирующую фазу
+      const dist = r.phaseDistribution || {};
+      let dominant = '';
+      let max = 0;
+      for (const [phase, count] of Object.entries(dist)) {
+        if ((count as number) > max) {
+          max = count as number;
+          dominant = phase;
+        }
+      }
+
+      return [
         r.instrumentUid,
-        enriched,
         r.status,
         `${r.dateFrom || ''}–${r.dateTo || ''}`,
         r.stopLoss ?? '',
@@ -348,9 +357,10 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
         r.positionSizing === 'dynamic' ? 'Yes' : 'No',
         r.totalProfit ?? '',
         r.totalTrades ?? '',
-        r.winRate ?? ''
-      ].join(',')
-    ).join('\n');
+        r.winRate ?? '',
+        dominant,
+      ].join(',');
+    }).join('\n');
 
     const csv = header + '\n' + rows;
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -636,7 +646,18 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
               <Column field="totalProfit" header="Прибыль" body={(row) => row.totalProfit != null ? row.totalProfit.toFixed(2) : '-'} />
               <Column field="totalTrades" header="Сделок" body={(row) => row.totalTrades ?? '-'} />
               <Column field="winRate" header="WinRate" body={(row) => row.winRate != null ? row.winRate.toFixed(1) + '%' : '-'} />
-              <Column header="Фаза" body={(row) => row.marketPhase || '—'} />
+              <Column header="Phase" body={(row) => {
+                const dist = row.phaseDistribution || {};
+                let dominant = '';
+                let max = 0;
+                for (const [phase, count] of Object.entries(dist)) {
+                  if ((count as number) > max) {
+                    max = count as number;
+                    dominant = phase;
+                  }
+                }
+                return dominant || '—';
+              }} />
             </DataTable>
           </>
         ) : <p>Нет данных</p>}

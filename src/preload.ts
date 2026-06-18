@@ -286,6 +286,7 @@ try {
     getCompositeProfile: (instrumentUid: string, days: number, token: string) => ipcRenderer.invoke('trading-assistant:composite-profile', instrumentUid, days, token),
 
     cloudCreateBatch: (batchConfig: any) => ipcRenderer.invoke('cloud:createBatch', batchConfig),
+    
     cloudGetBatchStatus: (serverUrl: string, batchId: string) => ipcRenderer.invoke('cloud:getBatchStatus', serverUrl, batchId),
     cloudGetBatchResults: (serverUrl: string, batchId: string) => ipcRenderer.invoke('cloud:getBatchResults', serverUrl, batchId),
     cloudGetInstruments: (serverUrl: string) => ipcRenderer.invoke('cloud:getInstruments', serverUrl),

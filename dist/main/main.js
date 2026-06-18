@@ -4236,9 +4236,12 @@ var registerTradingAssistantHandlers = (historicalLoader, profileEngine, getToke
 	});
 	electron.ipcMain.handle("cloud:createBatch", async (_event, batchConfig) => {
 		const { serverUrl, ...batch } = batchConfig;
+		console.log("\x1B[1;33m[IPC] Sending batch to:\x1B[0m", `${serverUrl}/api/backtest/batch`, "with body:", JSON.stringify(batch));
 		try {
 			const token = await getCloudToken(serverUrl);
-			return await (await fetch(`${serverUrl}/api/backtest/batch`, {
+			console.log("\x1B[1;33m[IPC] cloud:createBatch called with serverUrl:\x1B[0m", batchConfig.serverUrl);
+			console.log("\x1B[1;33m[IPC] batch body:\x1B[0m", JSON.stringify(batch));
+			const resjson = await (await fetch(`${serverUrl}/api/backtest/batch`, {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
@@ -4246,6 +4249,8 @@ var registerTradingAssistantHandlers = (historicalLoader, profileEngine, getToke
 				},
 				body: JSON.stringify(batch)
 			})).json();
+			console.log("\x1B[1;33m[IPC] batch response:\x1B[0m", JSON.stringify(resjson));
+			return resjson;
 		} catch (err) {
 			return { error: err.message };
 		}
