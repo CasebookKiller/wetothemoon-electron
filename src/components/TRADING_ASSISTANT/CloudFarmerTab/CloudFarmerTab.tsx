@@ -43,17 +43,10 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
 
   const [dateFrom, setDateFrom] = useState(new Date().toISOString().split('T')[0]);
   const [dateTo, setDateTo] = useState(new Date().toISOString().split('T')[0]);
-  const [intervalValue, setIntervalValue] = useState('CANDLE_INTERVAL_1_MIN'); // переименовали
+  const [intervalValue, setIntervalValue] = useState('CANDLE_INTERVAL_1_MIN');
 
   const [lots, setLots] = useState(1);
   
-  // Если выбрано больше 5 дней, автоматически переключаемся на 5-минутные свечи
-  useEffect(() => {
-    const daysDiff = Math.ceil((new Date(dateTo).getTime() - new Date(dateFrom).getTime()) / 86400000);
-    if (daysDiff > 5 && intervalValue === 'CANDLE_INTERVAL_1_MIN') {
-      //setIntervalValue('CANDLE_INTERVAL_5_MIN');
-    }
-  }, [dateFrom, dateTo, intervalValue]);
   const [strategy, setStrategy] = useState('volume_accumulation');
   const [stopLoss, setStopLoss] = useState(0.5);
   const [takeProfit, setTakeProfit] = useState(1.0);
@@ -85,7 +78,7 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
   const [useGrid, setUseGrid] = useState(false);
 
   const [useVolumeFilter, setUseVolumeFilter] = useState(false);
-  const [volPeriod, setVolPeriod] = useState(20);           // фиксированное значение, если сетка не используется
+  const [volPeriod, setVolPeriod] = useState(20);
   const [volPeriodMin, setVolPeriodMin] = useState(5);
   const [volPeriodMax, setVolPeriodMax] = useState(50);
   const [volPeriodStep, setVolPeriodStep] = useState(5);
@@ -101,7 +94,7 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
   useEffect(() => {
     if (farmerInstruments && farmerInstruments.length > 0) {
       setInstruments(farmerInstruments);
-      setFarmerInstruments?.([]); // сбросить, чтобы повторно не устанавливались
+      setFarmerInstruments?.([]);
     }
   }, [farmerInstruments]);
 
@@ -117,7 +110,6 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
       const data = await api.cloudGetBatches(serverUrl);
       if (!Array.isArray(data)) return;
 
-      // Для каждого batch'а получаем подробный статус (особенно для failed)
       const detailed = await Promise.all(
         data.map(async (b: any) => {
           const base = {
@@ -170,7 +162,6 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
             const failedTask = tasks.find((t: any) => t.status === 'failed');
             const errorMessage = failedTask?.error || null;
             const batchParams = data?.batch?.params || {};
-            // Извлекаем параметры из объекта params (сервер кладёт их в batch.params)
             const rawParams = batchParams.params || batchParams;
             const params = {
               ...rawParams,
@@ -224,17 +215,8 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
         trailingDistancePercent: trailing ? trailingPercent : 0,
         positionSizing: dynamicSizing ? 'dynamic' : 'fixed',
         riskPercent: dynamicSizing ? (riskAmount / 100000) * 100 : 1,
-        lots: lots,   // <-- количество лотов
+        lots: lots,
       };
-      /*const params: any = {
-        strategyType: strategy,
-        stopLossPercent: stopLoss,
-        takeProfitPercent: takeProfit,
-        trailingEnabled: trailing,
-        trailingPercent: trailing ? trailingPercent : 0,
-        useDynamicSizing: dynamicSizing,
-        riskAmount: dynamicSizing ? riskAmount : 0,
-      };*/
       const batchConfig: any = {
         serverUrl,
         instruments,
@@ -261,25 +243,19 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
         batchConfig.riskMax = riskMax;
         batchConfig.riskStep = riskStep;
       }
-      // Параметры объёмного фильтра
       if (useVolumeFilter) {
         params.volumeFilterEnabled = true;
         if (useGrid) {
-          // для сетки передаём диапазон
           batchConfig.volPeriodMin = volPeriodMin;
           batchConfig.volPeriodMax = volPeriodMax;
           batchConfig.volPeriodStep = volPeriodStep;
         } else {
-          // фиксированное значение
           params.volumeFilterPeriod = volPeriod;
         }
       } else {
         params.volumeFilterEnabled = false;
       }
 
-      console.log('[FARMER] batchConfig.serverUrl:', batchConfig.serverUrl);
-      console.log('[FARMER] Sending batch config:', JSON.stringify(batchConfig));
-      
       const result = await api.cloudCreateBatch(batchConfig);
       if (result.batchId) {
         setBatches(prev => [...prev, {
@@ -306,21 +282,49 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
   };
 
   const viewResults = async (batch: BatchResult) => {
-    setSelectedBatch(batch);
+    setSelectedBatch(null);  // ← добавить эту строку
+    //setSelectedBatch(batch);
     setShowResults(true);
     setResultsLoading(true);
     try {
       const api = (window as any).electronAPI;
       const fullResults = await api.cloudGetBatchResults(serverUrl, batch.batchId);
+      console.log('=== RAW SERVER RESPONSE ===');
+      console.log(JSON.stringify(fullResults, null, 2));
       const enriched = (fullResults.results || []).map((r: any) => {
         const inst = availableInstruments.find(i => i.uid === r.instrumentUid);
         return {
-          ...r,
+          taskId: r.taskId,
+          instrumentUid: r.instrumentUid,
+          status: r.status,
+          totalProfit: r.totalProfit,
+          totalTrades: r.totalTrades,
+          winRate: r.winRate,
+          maxDrawdown: r.maxDrawdown,
+          error: r.error,
+          marketPhases: r.marketPhases,
+          phaseDistribution: r.phaseDistribution,
+          dateFrom: r.dateFrom,
+          dateTo: r.dateTo,
+          strategy: r.strategy,
+          stopLoss: r.stopLoss,
+          takeProfit: r.takeProfit,
+          trailing: r.trailing,
+          positionSizing: r.positionSizing,
+          lots: r.lots,
+          riskPercent: r.riskPercent,
           name: inst?.name || '',
           ticker: inst?.ticker || inst?.name || '',
         };
       });
-      setSelectedBatch(prev => prev ? { ...prev, results: enriched } : prev);
+      console.log('=== ENRICHED RESULTS (first item) ===');
+      console.log(JSON.stringify(enriched[0], null, 2));
+      // Принудительно создаём новый массив, чтобы React увидел изменение
+      setSelectedBatch(prev => prev ? { ...prev, results: [...enriched] } : { ...batch, results: enriched });
+      setTimeout(() => {
+        console.log('=== CURRENT selectedBatch.results (first item) ===');
+        console.log(JSON.stringify(selectedBatch?.results?.[0], null, 2));
+      }, 100);
     } catch (err) {
       console.error(err);
     } finally {
@@ -335,7 +339,6 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
 
     const header = 'Instrument,Status,Period,SL%,TP%,Trail%,Lots,Dyn,Profit,Trades,WinRate,Phase';
     const rows = fullResults.results.map((r: any) => {
-      // Вычисляем доминирующую фазу
       const dist = r.phaseDistribution || {};
       let dominant = '';
       let max = 0;
@@ -376,13 +379,12 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
     const map: Record<string, { count: number; totalProfit: number; totalWinRate: number }> = {};
 
     results.forEach(r => {
-      const dist = r.phaseDistribution || {};
-      Object.entries(dist).forEach(([phase, days]) => {
-        if (!map[phase]) map[phase] = { count: 0, totalProfit: 0, totalWinRate: 0 };
-        map[phase].count += 1;
-        map[phase].totalProfit += r.totalProfit || 0;
-        map[phase].totalWinRate += r.winRate || 0;
-      });
+      const phases = r.marketPhases;
+      const phase = Array.isArray(phases) ? phases[0] : (phases || 'Unknown');
+      if (!map[phase]) map[phase] = { count: 0, totalProfit: 0, totalWinRate: 0 };
+      map[phase].count += 1;
+      map[phase].totalProfit += r.totalProfit || 0;
+      map[phase].totalWinRate += r.winRate || 0;
     });
 
     return Object.entries(map).map(([phase, data]) => ({
@@ -442,7 +444,6 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
 
           {useGrid && (
             <div className="flex flex-wrap gap-2 mt-2">
-              {/* SL */}
               <div className="flex align-items-center">
                 <label className="mr-1">SL</label>
                 <InputNumber value={slMin} onValueChange={e => setSlMin(e.value ?? 1)} min={0.1} step={0.1} size={2} className="p-inputtext-sm" />
@@ -451,7 +452,6 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
                 <span className="mx-1">/</span>
                 <InputNumber value={slStep} onValueChange={e => setSlStep(e.value ?? 0.5)} min={0.1} step={0.1} size={2} className="p-inputtext-sm" />
               </div>
-              {/* TP */}
               <div className="flex align-items-center">
                 <label className="mr-1">TP</label>
                 <InputNumber value={tpMin} onValueChange={e => setTpMin(e.value ?? 2)} min={0.1} step={1} size={2} className="p-inputtext-sm" />
@@ -460,7 +460,6 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
                 <span className="mx-1">/</span>
                 <InputNumber value={tpStep} onValueChange={e => setTpStep(e.value ?? 1)} min={0.1} step={0.1} size={2} className="p-inputtext-sm" />
               </div>
-              {/* Trail */}
               <div className="flex align-items-center">
                 <label className="mr-1">Trail</label>
                 <InputNumber value={trailMin} onValueChange={e => setTrailMin(e.value ?? 0.5)} min={0.1} step={0.1} size={2} className="p-inputtext-sm" />
@@ -469,7 +468,6 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
                 <span className="mx-1">/</span>
                 <InputNumber value={trailStep} onValueChange={e => setTrailStep(e.value ?? 0.5)} min={0.1} step={0.1} size={2} className="p-inputtext-sm" />
               </div>
-              {/* Lots */}
               <div className="flex align-items-center">
                 <label className="mr-1">Lots</label>
                 <InputNumber value={lotsMin} onValueChange={e => setLotsMin(e.value ?? 10)} min={1} step={10} size={2} className="p-inputtext-sm" />
@@ -478,7 +476,6 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
                 <span className="mx-1">/</span>
                 <InputNumber value={lotsStep} onValueChange={e => setLotsStep(e.value ?? 10)} min={1} step={1} size={2} className="p-inputtext-sm" />
               </div>
-              {/* Risk */}
               <div className="flex align-items-center">
                 <label className="mr-1">Risk%</label>
                 <InputNumber value={riskMin} onValueChange={e => setRiskMin(e.value ?? 1)} min={0.1} step={0.5} size={2} className="p-inputtext-sm" />
@@ -487,7 +484,6 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
                 <span className="mx-1">/</span>
                 <InputNumber value={riskStep} onValueChange={e => setRiskStep(e.value ?? 0.5)} min={0.1} step={0.1} size={2} className="p-inputtext-sm" />
               </div>
-              {/* Volume Filter */}
               <div className="flex align-items-center">
                 <Checkbox checked={useVolumeFilter} onChange={e => setUseVolumeFilter(e.checked || false)} />
                 <label className="ml-1 mr-2 mb-0">Vol Filt</label>
@@ -525,7 +521,6 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
         <Button label="Запустить прогон" icon="pi pi-play" onClick={handleStartBatch} disabled={loading || instruments.length === 0} className="p-button-sm p-1 px-3" />
       </Card>
 
-      {/* Диалог выбора инструментов */}
       <Dialog
         header="Выбор инструментов"
         visible={showInstrumentDialog}
@@ -570,7 +565,6 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
         </div>
       </Dialog>
 
-
       {batches.length > 0 && (
         <Card className="surface-ground p-2">
           <h5 className="p-mb-2">Прогоны ({batches.length})</h5>
@@ -605,7 +599,6 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
                 <Button icon="pi pi-download" className="p-button-sm p-button-success p-1" onClick={() => exportBatchToCSV(row)} disabled={row.status !== 'completed'} />
               </div>
             )} header="Рез." />
-            
           </DataTable>
         </Card>
       )}
@@ -613,7 +606,6 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
       <Dialog header={`Результаты прогона ${selectedBatch?.batchId?.slice(-8)}`} visible={showResults} style={{ width: '900px' }} onHide={() => setShowResults(false)}>
         {resultsLoading ? <p>Загрузка...</p> : selectedBatch?.results ? (
           <>
-            {/* Сводная таблица по фазам */}
             {selectedBatch.results.length > 0 && (
               <div className="mb-3">
                 <h5>Распределение по фазам рынка</h5>
@@ -626,8 +618,7 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
               </div>
             )}
 
-            {/* Основная таблица с задачами */}
-            <DataTable value={selectedBatch.results} className="p-datatable-sm" stripedRows responsiveLayout="scroll" style={{ fontSize: '0.8rem' }}>
+            <DataTable value={selectedBatch.results} key={JSON.stringify(selectedBatch.results)} className="p-datatable-sm" stripedRows responsiveLayout="scroll" style={{ fontSize: '0.8rem' }}>
               <Column
                 header="Инструмент"
                 body={(row) => {
@@ -646,17 +637,12 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
               <Column field="totalProfit" header="Прибыль" body={(row) => row.totalProfit != null ? row.totalProfit.toFixed(2) : '-'} />
               <Column field="totalTrades" header="Сделок" body={(row) => row.totalTrades ?? '-'} />
               <Column field="winRate" header="WinRate" body={(row) => row.winRate != null ? row.winRate.toFixed(1) + '%' : '-'} />
-              <Column header="Phase" body={(row) => {
-                const dist = row.phaseDistribution || {};
-                let dominant = '';
-                let max = 0;
-                for (const [phase, count] of Object.entries(dist)) {
-                  if ((count as number) > max) {
-                    max = count as number;
-                    dominant = phase;
-                  }
-                }
-                return dominant || '—';
+              <Column header="Фаза" body={(row) => {
+                // Берём первый элемент массива, если он есть
+                const phases = row.marketPhases;
+                if (Array.isArray(phases) && phases.length > 0) return phases[0];
+                // Если массив пуст или отсутствует, показываем прочерк
+                return '—';
               }} />
             </DataTable>
           </>
