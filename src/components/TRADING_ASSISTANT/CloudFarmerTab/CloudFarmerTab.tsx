@@ -302,6 +302,7 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
           winRate: r.winRate,
           maxDrawdown: r.maxDrawdown,
           error: r.error,
+          phaseDetails: r.phaseDetails || [],
           marketPhases: r.marketPhases,
           phaseDistribution: r.phaseDistribution,
           dateFrom: r.dateFrom,
@@ -615,6 +616,23 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
                   <Column field="avgProfit" header="Средняя прибыль" body={(row) => row.avgProfit.toFixed(2)} />
                   <Column field="avgWinRate" header="Средний WinRate" body={(row) => row.avgWinRate.toFixed(1) + '%'} />
                 </DataTable>
+              </div>
+            )}
+
+            {selectedBatch?.results?.length > 0 && (
+              <div className="mb-3">
+                <h5>Фазы по дням</h5>
+                {selectedBatch.results.map((task: any) => (
+                  <div key={task.taskId} className="mb-2">
+                    <strong>{task.instrumentUid?.slice(0,12)}</strong>
+                    <DataTable value={task.phaseDetails || []} className="p-datatable-sm" stripedRows responsiveLayout="scroll" style={{ fontSize: '0.75rem' }}>
+                      <Column field="date" header="Дата" />
+                      <Column field="phase" header="Фаза" body={(row: any) => (
+                        <Tag severity={row.phase === 'CHOP' ? 'warning' : row.phase === 'BALANCE' ? 'info' : row.phase === 'TREND_UP' ? 'success' : row.phase === 'TREND_DOWN' ? 'danger' : 'secondary'} value={row.phase} />
+                      )} />
+                    </DataTable>
+                  </div>
+                ))}
               </div>
             )}
 
