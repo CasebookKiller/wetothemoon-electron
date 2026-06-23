@@ -291,6 +291,8 @@ try {
     cloudGetBatchResults: (serverUrl: string, batchId: string) => ipcRenderer.invoke('cloud:getBatchResults', serverUrl, batchId),
     cloudGetInstruments: (serverUrl: string) => ipcRenderer.invoke('cloud:getInstruments', serverUrl),
     cloudGetBatches: (serverUrl: string) => ipcRenderer.invoke('cloud:getBatches', serverUrl),
+
+    cloudDeleteBatch: (serverUrl: string, batchId: string) => ipcRenderer.invoke('cloud:deleteBatch', serverUrl, batchId),
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

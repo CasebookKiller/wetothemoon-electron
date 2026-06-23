@@ -604,6 +604,17 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
               <div className="flex gap-1">
                 <Button icon="pi pi-eye" className="p-button-sm p-button-info p-1" onClick={() => viewResults(row)} disabled={row.status !== 'completed'} />
                 <Button icon="pi pi-download" className="p-button-sm p-button-success p-1" onClick={() => exportBatchToCSV(row)} disabled={row.status !== 'completed'} />
+                <Button
+                  icon="pi pi-trash"
+                  className="p-button-sm p-button-danger p-1"
+                  tooltip="Удалить прогон"
+                  onClick={async () => {
+                    if (!confirm('Удалить этот прогон и все его задачи?')) return;
+                    const api = (window as any).electronAPI;
+                    await api.cloudDeleteBatch(serverUrl, row.batchId);
+                    setBatches(prev => prev.filter(b => b.batchId !== row.batchId));
+                  }}
+                />
               </div>
             )} header="Рез." />
           </DataTable>

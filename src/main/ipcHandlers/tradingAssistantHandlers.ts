@@ -1001,4 +1001,13 @@ async function getCloudToken(serverUrl: string): Promise<string | null> {
     });
     return await res.json();
   });
+
+  ipcMain.handle('cloud:deleteBatch', async (_event, serverUrl: string, batchId: string) => {
+    const token = await getCloudToken(serverUrl);
+    const res = await fetch(`${serverUrl}/api/backtest/batch/${batchId}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    return await res.json();
+  });
 };

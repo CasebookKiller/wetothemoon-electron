@@ -4283,6 +4283,13 @@ var registerTradingAssistantHandlers = (historicalLoader, profileEngine, getToke
 		const token = await getCloudToken(serverUrl);
 		return await (await fetch(`${serverUrl}/api/backtest/batches`, { headers: { "Authorization": `Bearer ${token}` } })).json();
 	});
+	electron.ipcMain.handle("cloud:deleteBatch", async (_event, serverUrl, batchId) => {
+		const token = await getCloudToken(serverUrl);
+		return await (await fetch(`${serverUrl}/api/backtest/batch/${batchId}`, {
+			method: "DELETE",
+			headers: { "Authorization": `Bearer ${token}` }
+		})).json();
+	});
 };
 //#endregion
 //#region src/shared/types/promptgenerator.ts
