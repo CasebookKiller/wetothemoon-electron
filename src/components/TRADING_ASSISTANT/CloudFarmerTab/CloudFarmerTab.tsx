@@ -377,22 +377,28 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
   };
 
   const getPhaseSummary = (results: any[]) => {
-    const map: Record<string, { count: number; totalProfit: number; totalWinRate: number }> = {};
+    const dateMap = new Map<string, string>(); // дата -> фаза
 
     results.forEach(r => {
-      const phases = r.marketPhases;
-      const phase = Array.isArray(phases) ? phases[0] : (phases || 'Unknown');
-      if (!map[phase]) map[phase] = { count: 0, totalProfit: 0, totalWinRate: 0 };
-      map[phase].count += 1;
-      map[phase].totalProfit += r.totalProfit || 0;
-      map[phase].totalWinRate += r.winRate || 0;
+      const details = r.phaseDetails; // массив {date, phase}
+      if (Array.isArray(details)) {
+        details.forEach((d: any) => {
+          // Если дата ещё не встречалась, запоминаем фазу
+          if (!dateMap.has(d.date)) {
+            dateMap.set(d.date, d.phase);
+          }
+        });
+      }
     });
 
-    return Object.entries(map).map(([phase, data]) => ({
+    const phaseCount = new Map<string, number>();
+    dateMap.forEach(phase => {
+      phaseCount.set(phase, (phaseCount.get(phase) || 0) + 1);
+    });
+
+    return Array.from(phaseCount.entries()).map(([phase, days]) => ({
       phase,
-      count: data.count,
-      avgProfit: data.count > 0 ? data.totalProfit / data.count : 0,
-      avgWinRate: data.count > 0 ? data.totalWinRate / data.count : 0,
+      days,
     }));
   };
 
@@ -612,9 +618,7 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
                 <h5>Распределение по фазам рынка</h5>
                 <DataTable value={getPhaseSummary(selectedBatch.results)} className="p-datatable-sm" stripedRows responsiveLayout="scroll" style={{ fontSize: '0.8rem' }}>
                   <Column field="phase" header="Фаза" />
-                  <Column field="count" header="Количество задач" />
-                  <Column field="avgProfit" header="Средняя прибыль" body={(row) => row.avgProfit.toFixed(2)} />
-                  <Column field="avgWinRate" header="Средний WinRate" body={(row) => row.avgWinRate.toFixed(1) + '%'} />
+                  <Column field="days" header="Количество дней" />
                 </DataTable>
               </div>
             )}
