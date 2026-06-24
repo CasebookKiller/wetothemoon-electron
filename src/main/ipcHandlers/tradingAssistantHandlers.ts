@@ -1010,4 +1010,34 @@ async function getCloudToken(serverUrl: string): Promise<string | null> {
     });
     return await res.json();
   });
+
+  ipcMain.handle('cloud:getSchedulerTasks', async (_event, serverUrl: string) => {
+    const token = await getCloudToken(serverUrl);
+    const res = await fetch(`${serverUrl}/api/scheduler`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    return await res.json();
+  });
+
+  ipcMain.handle('cloud:addSchedulerTask', async (_event, serverUrl: string, task: any) => {
+    const token = await getCloudToken(serverUrl);
+    const res = await fetch(`${serverUrl}/api/scheduler`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(task),
+    });
+    return await res.json();
+  });
+
+  ipcMain.handle('cloud:deleteSchedulerTask', async (_event, serverUrl: string, id: string) => {
+    const token = await getCloudToken(serverUrl);
+    const res = await fetch(`${serverUrl}/api/scheduler/${id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    return await res.json();
+  });
 };

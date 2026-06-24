@@ -212,7 +212,10 @@ try {
 		cloudGetBatchResults: (serverUrl, batchId) => electron.ipcRenderer.invoke("cloud:getBatchResults", serverUrl, batchId),
 		cloudGetInstruments: (serverUrl) => electron.ipcRenderer.invoke("cloud:getInstruments", serverUrl),
 		cloudGetBatches: (serverUrl) => electron.ipcRenderer.invoke("cloud:getBatches", serverUrl),
-		cloudDeleteBatch: (serverUrl, batchId) => electron.ipcRenderer.invoke("cloud:deleteBatch", serverUrl, batchId)
+		cloudDeleteBatch: (serverUrl, batchId) => electron.ipcRenderer.invoke("cloud:deleteBatch", serverUrl, batchId),
+		cloudGetSchedulerTasks: (serverUrl) => electron.ipcRenderer.invoke("cloud:getSchedulerTasks", serverUrl),
+		cloudAddSchedulerTask: (serverUrl, task) => electron.ipcRenderer.invoke("cloud:addSchedulerTask", serverUrl, task),
+		cloudDeleteSchedulerTask: (serverUrl, id) => electron.ipcRenderer.invoke("cloud:deleteSchedulerTask", serverUrl, id)
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {

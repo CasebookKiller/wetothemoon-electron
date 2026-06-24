@@ -293,6 +293,10 @@ try {
     cloudGetBatches: (serverUrl: string) => ipcRenderer.invoke('cloud:getBatches', serverUrl),
 
     cloudDeleteBatch: (serverUrl: string, batchId: string) => ipcRenderer.invoke('cloud:deleteBatch', serverUrl, batchId),
+
+    cloudGetSchedulerTasks: (serverUrl: string) => ipcRenderer.invoke('cloud:getSchedulerTasks', serverUrl),
+    cloudAddSchedulerTask: (serverUrl: string, task: any) => ipcRenderer.invoke('cloud:addSchedulerTask', serverUrl, task),
+    cloudDeleteSchedulerTask: (serverUrl: string, id: string) => ipcRenderer.invoke('cloud:deleteSchedulerTask', serverUrl, id),
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

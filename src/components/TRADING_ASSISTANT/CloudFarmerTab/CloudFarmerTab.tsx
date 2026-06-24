@@ -83,6 +83,68 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
   const [volPeriodMax, setVolPeriodMax] = useState(50);
   const [volPeriodStep, setVolPeriodStep] = useState(5);
 
+  const [schedulerTasks, setSchedulerTasks] = useState<any[]>([]);
+  const [schedTime, setSchedTime] = useState('09:00');
+  const [schedInstruments, setSchedInstruments] = useState<string[]>([]);
+  const [schedDateFrom, setSchedDateFrom] = useState(new Date().toISOString().split('T')[0]);
+  const [schedDateTo, setSchedDateTo] = useState(new Date().toISOString().split('T')[0]);
+  const [schedInterval, setSchedInterval] = useState('CANDLE_INTERVAL_1_MIN');
+  const [schedStrategy, setSchedStrategy] = useState('volume_accumulation');
+  const [schedStopLoss, setSchedStopLoss] = useState(1);
+  const [schedTakeProfit, setSchedTakeProfit] = useState(2);
+  const [schedTrailing, setSchedTrailing] = useState(false);
+  const [schedTrailingPercent, setSchedTrailingPercent] = useState(1.0);
+  const [schedDynamicSizing, setSchedDynamicSizing] = useState(false);
+  const [schedRiskAmount, setSchedRiskAmount] = useState(1000);
+  const [schedLots, setSchedLots] = useState(10);
+  const [schedLoading, setSchedLoading] = useState(false);
+
+  const loadSchedulerTasks = async () => {
+    const api = (window as any).electronAPI;
+    if (!api?.cloudGetSchedulerTasks) return;
+    const data = await api.cloudGetSchedulerTasks(serverUrl);
+    if (Array.isArray(data)) setSchedulerTasks(data);
+  };
+
+  const handleAddSchedulerTask = async () => {
+    setSchedLoading(true);
+    try {
+      const api = (window as any).electronAPI;
+      const params: any = {
+        stopLossPercent: schedStopLoss,
+        takeProfitPercent: schedTakeProfit,
+        trailingDistancePercent: schedTrailing ? schedTrailingPercent : 0,
+        positionSizing: schedDynamicSizing ? 'dynamic' : 'fixed',
+        riskPercent: schedDynamicSizing ? (schedRiskAmount / 100000) * 100 : 1,
+        lots: schedLots,
+      };
+      const result = await api.cloudAddSchedulerTask(serverUrl, {
+        time: schedTime,
+        instruments: schedInstruments,
+        dateFrom: schedDateFrom,
+        dateTo: schedDateTo,
+        interval: schedInterval,
+        strategy: schedStrategy,
+        params,
+      });
+      if (result.success) {
+        await loadSchedulerTasks();
+      } else {
+        alert('Ошибка: ' + JSON.stringify(result));
+      }
+    } catch (err: any) {
+      alert('Ошибка: ' + err.message);
+    } finally {
+      setSchedLoading(false);
+    }
+  };
+
+  const handleDeleteSchedulerTask = async (id: string) => {
+    const api = (window as any).electronAPI;
+    await api.cloudDeleteSchedulerTask(serverUrl, id);
+    await loadSchedulerTasks();
+  };
+
   // Загрузка списка инструментов
   const loadInstruments = async () => {
     const api = (window as any).electronAPI;
@@ -681,6 +743,31 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
           </>
         ) : <p>Нет данных</p>}
       </Dialog>
+
+      <Card className="surface-ground p-2 mb-3">
+        <h5 className="p-mb-2">Планировщик ежедневных прогонов</h5>
+        <div className="flex align-items-center flex-wrap gap-2 mb-2">
+          <label className="mr-1 mb-0">Время (UTC)</label>
+          <InputText value={schedTime} onChange={e => setSchedTime(e.target.value)} className="p-inputtext-sm" style={{ width: '80px' }} />
+          <label className="mr-1 mb-0">Инструменты</label>
+          <InputText value={schedInstruments.join(',')} onChange={e => setSchedInstruments(e.target.value.split(',').map(s => s.trim()))} className="p-inputtext-sm" style={{ width: '200px' }} placeholder="uid1,uid2" />
+          <label className="mr-1 mb-0">Период</label>
+          <InputText type="date" value={schedDateFrom} onChange={e => setSchedDateFrom(e.target.value)} className="p-inputtext-sm" style={{ width: '130px' }} />
+          <InputText type="date" value={schedDateTo} onChange={e => setSchedDateTo(e.target.value)} className="p-inputtext-sm" style={{ width: '130px' }} />
+          <Button label="Добавить задание" icon="pi pi-plus" onClick={handleAddSchedulerTask} disabled={schedLoading} className="p-button-sm p-1 px-3" />
+        </div>
+        {schedulerTasks.length > 0 && (
+          <DataTable value={schedulerTasks} className="p-datatable-sm" stripedRows responsiveLayout="scroll" style={{ fontSize: '0.8rem' }}>
+            <Column field="id" header="ID" body={(row) => row.id.slice(-8)} />
+            <Column field="time" header="Время" />
+            <Column field="strategy" header="Стратегия" />
+            <Column field="nextRun" header="След. запуск" />
+            <Column body={(row: any) => (
+              <Button icon="pi pi-trash" className="p-button-sm p-button-danger p-1" onClick={() => handleDeleteSchedulerTask(row.id)} />
+            )} header="Действия" />
+          </DataTable>
+        )}
+      </Card>
     </div>
   );
 };

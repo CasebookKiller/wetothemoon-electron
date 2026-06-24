@@ -4290,6 +4290,28 @@ var registerTradingAssistantHandlers = (historicalLoader, profileEngine, getToke
 			headers: { "Authorization": `Bearer ${token}` }
 		})).json();
 	});
+	electron.ipcMain.handle("cloud:getSchedulerTasks", async (_event, serverUrl) => {
+		const token = await getCloudToken(serverUrl);
+		return await (await fetch(`${serverUrl}/api/scheduler`, { headers: { "Authorization": `Bearer ${token}` } })).json();
+	});
+	electron.ipcMain.handle("cloud:addSchedulerTask", async (_event, serverUrl, task) => {
+		const token = await getCloudToken(serverUrl);
+		return await (await fetch(`${serverUrl}/api/scheduler`, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				"Authorization": `Bearer ${token}`
+			},
+			body: JSON.stringify(task)
+		})).json();
+	});
+	electron.ipcMain.handle("cloud:deleteSchedulerTask", async (_event, serverUrl, id) => {
+		const token = await getCloudToken(serverUrl);
+		return await (await fetch(`${serverUrl}/api/scheduler/${id}`, {
+			method: "DELETE",
+			headers: { "Authorization": `Bearer ${token}` }
+		})).json();
+	});
 };
 //#endregion
 //#region src/shared/types/promptgenerator.ts
