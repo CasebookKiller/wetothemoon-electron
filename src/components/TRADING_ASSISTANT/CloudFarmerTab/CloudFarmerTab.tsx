@@ -101,6 +101,8 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
 
   const [phaseFilter, setPhaseFilter] = useState<string>('Все');
 
+  const [useServerGrid, setUseServerGrid] = useState(false);
+
   const loadSchedulerTasks = async () => {
     const api = (window as any).electronAPI;
     if (!api?.cloudGetSchedulerTasks) return;
@@ -281,6 +283,7 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
         riskPercent: dynamicSizing ? (riskAmount / 100000) * 100 : 1,
         lots: lots,
       };
+
       const batchConfig: any = {
         serverUrl,
         instruments,
@@ -290,7 +293,9 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
         strategy,
         params,
       };
-      if (useGrid) {
+
+      // Передаём параметры сетки (используются и для ручного Grid, и для Server Grid)
+      if (useGrid || useServerGrid) {
         batchConfig.slMin = slMin;
         batchConfig.slMax = slMax;
         batchConfig.slStep = slStep;
@@ -307,9 +312,16 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
         batchConfig.riskMax = riskMax;
         batchConfig.riskStep = riskStep;
       }
+
+      // Флаг для серверного перебора
+      if (useServerGrid) {
+        batchConfig.useServerGrid = true;
+      }
+
+      // Параметры объёмного фильтра
       if (useVolumeFilter) {
         params.volumeFilterEnabled = true;
-        if (useGrid) {
+        if (useGrid || useServerGrid) {
           batchConfig.volPeriodMin = volPeriodMin;
           batchConfig.volPeriodMax = volPeriodMax;
           batchConfig.volPeriodStep = volPeriodStep;
@@ -511,6 +523,10 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
           <div className="flex align-items-center">
             <Checkbox checked={useGrid} onChange={e => setUseGrid(e.checked || false)} />
             <label className="ml-1 mr-2 mb-0">Grid search</label>
+          </div>
+          <div className="flex align-items-center">
+            <Checkbox checked={useServerGrid} onChange={e => setUseServerGrid(e.checked || false)} />
+            <label className="ml-1 mr-2 mb-0">Server Grid</label>
           </div>
 
           {useGrid && (
