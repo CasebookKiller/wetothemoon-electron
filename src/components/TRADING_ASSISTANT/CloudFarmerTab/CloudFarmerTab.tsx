@@ -99,6 +99,8 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
   const [schedLots, setSchedLots] = useState(10);
   const [schedLoading, setSchedLoading] = useState(false);
 
+  const [phaseFilter, setPhaseFilter] = useState<string>('Все');
+
   const loadSchedulerTasks = async () => {
     const api = (window as any).electronAPI;
     if (!api?.cloudGetSchedulerTasks) return;
@@ -713,7 +715,29 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
               </div>
             )}
 
-            <DataTable value={selectedBatch.results} key={JSON.stringify(selectedBatch.results)} className="p-datatable-sm" stripedRows responsiveLayout="scroll" style={{ fontSize: '0.8rem' }}>
+            <div className="flex align-items-center gap-2 mb-2">
+              <span>Фильтр по фазе:</span>
+              <Dropdown
+                value={phaseFilter}
+                options={['Все', 'BALANCE', 'TREND_UP', 'TREND_DOWN', 'BREAKOUT', 'CHOP']}
+                onChange={e => setPhaseFilter(e.value)}
+                className="p-inputtext-sm"
+                style={{ width: '140px' }}
+              />
+            </div>
+
+            <DataTable
+              value={selectedBatch.results.filter((r: any) => {
+                if (phaseFilter === 'Все') return true;
+                const phases = r.marketPhases;
+                return Array.isArray(phases) && phases.includes(phaseFilter);
+              })}
+              key={JSON.stringify(selectedBatch.results)}
+              className="p-datatable-sm"
+              stripedRows
+              responsiveLayout="scroll"
+              style={{ fontSize: '0.8rem' }}
+            >
               <Column
                 header="Инструмент"
                 body={(row) => {
