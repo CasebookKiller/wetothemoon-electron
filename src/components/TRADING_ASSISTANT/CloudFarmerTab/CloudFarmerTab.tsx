@@ -336,7 +336,7 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
       if (result.batchId) {
         setBatches(prev => [...prev, {
           batchId: result.batchId,
-          status: 'running',
+          status: result.status || 'pending',
           total: instruments.length,
           completed: 0,
           failed: 0,
@@ -453,28 +453,49 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
   };
 
   const getPhaseSummary = (results: any[]) => {
-    const dateMap = new Map<string, string>(); // дата -> фаза
+    // Собираем по датам словарь { фаза: количество инструментов }
+    const dayMap = new Map<string, Map<string, number>>();
 
     results.forEach(r => {
-      const details = r.phaseDetails; // массив {date, phase}
+      const details = r.phaseDetails;
       if (Array.isArray(details)) {
         details.forEach((d: any) => {
-          // Если дата ещё не встречалась, запоминаем фазу
-          if (!dateMap.has(d.date)) {
-            dateMap.set(d.date, d.phase);
+          if (!d.date || !d.phase) return;
+          if (!dayMap.has(d.date)) {
+            dayMap.set(d.date, new Map());
           }
+          const phaseCount = dayMap.get(d.date)!;
+          phaseCount.set(d.phase, (phaseCount.get(d.phase) || 0) + 1);
         });
       }
     });
 
-    const phaseCount = new Map<string, number>();
-    dateMap.forEach(phase => {
-      phaseCount.set(phase, (phaseCount.get(phase) || 0) + 1);
+    // Определяем доминирующую фазу для каждого дня
+    const dominantByDate = new Map<string, string>();
+    dayMap.forEach((phaseCounts, date) => {
+      let maxCount = 0;
+      let dominant = 'CHOP'; // значение по умолчанию
+      phaseCounts.forEach((count, phase) => {
+        if (count > maxCount) {
+          maxCount = count;
+          dominant = phase;
+        }
+      });
+      dominantByDate.set(date, dominant);
     });
 
-    return Array.from(phaseCount.entries()).map(([phase, days]) => ({
+    // Суммируем дни по доминирующим фазам
+    const phaseDays = new Map<string, number>();
+    dominantByDate.forEach(phase => {
+      phaseDays.set(phase, (phaseDays.get(phase) || 0) + 1);
+    });
+
+    const totalDays = dominantByDate.size;
+
+    return Array.from(phaseDays.entries()).map(([phase, days]) => ({
       phase,
       days,
+      percent: totalDays > 0 ? ((days / totalDays) * 100).toFixed(1) : '0.0',
     }));
   };
 
@@ -709,7 +730,8 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
                 <h5>Распределение по фазам рынка</h5>
                 <DataTable value={getPhaseSummary(selectedBatch.results)} className="p-datatable-sm" stripedRows responsiveLayout="scroll" style={{ fontSize: '0.8rem' }}>
                   <Column field="phase" header="Фаза" />
-                  <Column field="days" header="Количество дней" />
+                  <Column field="days" header="Дней" />
+                  <Column field="percent" header="%" body={(row) => `${row.percent}%`} />
                 </DataTable>
               </div>
             )}
@@ -717,17 +739,50 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
             {selectedBatch?.results?.length > 0 && (
               <div className="mb-3">
                 <h5>Фазы по дням</h5>
-                {selectedBatch.results.map((task: any) => (
-                  <div key={task.taskId} className="mb-2">
-                    <strong>{task.instrumentUid?.slice(0,12)}</strong>
-                    <DataTable value={task.phaseDetails || []} className="p-datatable-sm" stripedRows responsiveLayout="scroll" style={{ fontSize: '0.75rem' }}>
-                      <Column field="date" header="Дата" />
-                      <Column field="phase" header="Фаза" body={(row: any) => (
-                        <Tag severity={row.phase === 'CHOP' ? 'warning' : row.phase === 'BALANCE' ? 'info' : row.phase === 'TREND_UP' ? 'success' : row.phase === 'TREND_DOWN' ? 'danger' : 'secondary'} value={row.phase} />
-                      )} />
-                    </DataTable>
-                  </div>
-                ))}
+                {(() => {
+                  // Группируем задачи по instrumentUid
+                  const groupMap = new Map<string, any[]>();
+                  selectedBatch.results.forEach((task: any) => {
+                    const uid = task.instrumentUid;
+                    if (!groupMap.has(uid)) groupMap.set(uid, []);
+                    groupMap.get(uid)!.push(task);
+                  });
+
+                  return Array.from(groupMap.entries()).map(([uid, tasks]) => {
+                    // Берём фазы из первой задачи (они одинаковы для всех задач с тем же uid и периодом)
+                    const representative = tasks[0];
+                    const details = representative.phaseDetails || [];
+                    const ticker = representative.ticker || representative.name || uid.slice(0,12);
+                    return (
+                      <div key={uid} className="mb-2">
+                        <strong>{ticker}</strong>
+                        <DataTable
+                          value={details}
+                          className="p-datatable-sm"
+                          stripedRows
+                          style={{ fontSize: '0.75rem' }}
+                        >
+                          <Column field="date" header="Дата" />
+                          <Column
+                            field="phase"
+                            header="Фаза"
+                            body={(row: any) => (
+                              <Tag
+                                severity={
+                                  row.phase === 'CHOP' ? 'warning' :
+                                  row.phase === 'BALANCE' ? 'info' :
+                                  row.phase === 'TREND_UP' ? 'success' :
+                                  row.phase === 'TREND_DOWN' ? 'danger' : 'secondary'
+                                }
+                                value={row.phase}
+                              />
+                            )}
+                          />
+                        </DataTable>
+                      </div>
+                    );
+                  });
+                })()}
               </div>
             )}
 
@@ -773,11 +828,13 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
               <Column field="totalTrades" header="Сделок" body={(row) => row.totalTrades ?? '-'} />
               <Column field="winRate" header="WinRate" body={(row) => row.winRate != null ? row.winRate.toFixed(1) + '%' : '-'} />
               <Column header="Фаза" body={(row) => {
-                // Берём первый элемент массива, если он есть
                 const phases = row.marketPhases;
-                if (Array.isArray(phases) && phases.length > 0) return phases[0];
-                // Если массив пуст или отсутствует, показываем прочерк
-                return '—';
+                if (!Array.isArray(phases) || phases.length === 0) return '—';
+                // подсчёт самой частой фазы
+                const freq: Record<string, number> = {};
+                phases.forEach(p => { freq[p] = (freq[p] || 0) + 1; });
+                const dominant = Object.entries(freq).sort((a,b) => b[1]-a[1])[0][0];
+                return dominant;
               }} />
             </DataTable>
           </>
