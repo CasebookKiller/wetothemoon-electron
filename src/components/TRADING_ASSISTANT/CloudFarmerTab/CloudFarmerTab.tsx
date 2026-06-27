@@ -111,6 +111,8 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
 
   const [instrumentDialogTarget, setInstrumentDialogTarget] = useState<'farmer' | 'scheduler'>('farmer');
 
+  const [schedulerBatchStatuses, setSchedulerBatchStatuses] = useState<Map<string, string>>(new Map());
+
   // Функция сохранения в планировщик
   const handleSaveToScheduler = async () => {
     const api = (window as any).electronAPI;
@@ -210,11 +212,28 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
       setUseVolumeFilter(false);
     }
   };
+
   const loadSchedulerTasks = async () => {
     const api = (window as any).electronAPI;
     if (!api?.cloudGetSchedulerTasks) return;
     const data = await api.cloudGetSchedulerTasks(serverUrl);
-    if (Array.isArray(data)) setSchedulerTasks(data);
+    if (Array.isArray(data)) {
+      setSchedulerTasks(data);
+      // Запрашиваем статусы для заданий с lastBatchId
+      const statusMap = new Map<string, string>();
+      await Promise.all(data
+        .filter((t: any) => t.lastBatchId)
+        .map(async (t: any) => {
+          try {
+            const statusData = await api.cloudGetBatchStatus(serverUrl, t.lastBatchId);
+            statusMap.set(t.id, statusData?.batch?.status || 'unknown');
+          } catch {
+            statusMap.set(t.id, 'unknown');
+          }
+        })
+      );
+      setSchedulerBatchStatuses(statusMap);
+    }
   };
 
   const handleAddSchedulerTask = async () => {
@@ -366,6 +385,12 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
 
     return () => window.clearInterval(intervalId);
   }, [serverUrl, batches, setBatches]);
+
+  useEffect(() => {
+    if (serverUrl) {
+      loadSchedulerTasks();
+    }
+  }, [serverUrl]); // или можно [] чтобы загрузить один раз
 
   const openInstrumentDialog = () => {
     setTempSelected([...instruments]);
@@ -522,6 +547,55 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
       }, 100);
     } catch (err) {
       console.error(err);
+    } finally {
+      setResultsLoading(false);
+    }
+  };
+
+  const viewBatchResults = async (batchId: string) => {
+    setResultsLoading(true);
+    try {
+      const api = (window as any).electronAPI;
+      const fullResults = await api.cloudGetBatchResults(serverUrl, batchId);
+      const enriched = (fullResults.results || []).map((r: any) => {
+        const inst = availableInstruments.find(i => i.uid === r.instrumentUid);
+        return {
+          taskId: r.taskId,
+          instrumentUid: r.instrumentUid,
+          status: r.status,
+          totalProfit: r.totalProfit,
+          totalTrades: r.totalTrades,
+          winRate: r.winRate,
+          maxDrawdown: r.maxDrawdown,
+          error: r.error,
+          phaseDetails: r.phaseDetails || [],
+          marketPhases: r.marketPhases,
+          dateFrom: r.dateFrom,
+          dateTo: r.dateTo,
+          strategy: r.strategy,
+          stopLoss: r.stopLoss,
+          takeProfit: r.takeProfit,
+          trailing: r.trailing,
+          positionSizing: r.positionSizing,
+          lots: r.lots,
+          riskPercent: r.riskPercent,
+          name: inst?.name || '',
+          ticker: inst?.ticker || inst?.name || '',
+        };
+      });
+      // Создаём временный объект BatchResult, чтобы использовать существующий диалог отображения
+      const fakeBatch: BatchResult = {
+        batchId: batchId,
+        status: 'completed', // не важно, диалог просто показывает результаты
+        total: enriched.length,
+        completed: enriched.length,
+        failed: 0,
+        results: enriched,
+      };
+      setSelectedBatch(fakeBatch);
+      setShowResults(true);
+    } catch (err) {
+      console.error('Failed to load scheduler batch results', err);
     } finally {
       setResultsLoading(false);
     }
@@ -1034,18 +1108,50 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
                 return mskDate;
               }} 
             />
+            <Column
+              header="Последний запуск"
+              body={(row: any) => {
+                if (!row.lastRun) return '—';
+                const mskDate = new Date(row.lastRun).toLocaleString('ru-RU', {
+                  timeZone: 'Europe/Moscow',
+                  year: 'numeric', month: '2-digit', day: '2-digit',
+                  hour: '2-digit', minute: '2-digit'
+                });
+                const status = schedulerBatchStatuses.get(row.id);
+                let severity: 'success' | 'warning' | 'danger' | 'info' = 'info';
+                if (status === 'completed') severity = 'success';
+                else if (status === 'running') severity = 'warning';
+                else if (status === 'failed') severity = 'danger';
+                return (
+                  <div>
+                    <div style={{ fontSize: '0.7rem' }}>{mskDate}</div>
+                    {status && (
+                      <Tag severity={severity} value={status} style={{ fontSize: '0.65rem' }} />
+                    )}
+                  </div>
+                );
+              }}
+            />
             <Column body={(row: any) => (
               <div className="flex gap-1">
-                <Button 
-                  icon="pi pi-download" 
-                  className="p-button-sm p-button-info p-1" 
-                  tooltip="Загрузить в фермер" 
-                  onClick={() => loadTaskToFarmer(row)} 
+                <Button
+                  icon="pi pi-download"
+                  className="p-button-sm p-button-info p-1"
+                  tooltip="Загрузить в фермер"
+                  onClick={() => loadTaskToFarmer(row)}
                 />
-                <Button 
-                  icon="pi pi-trash" 
-                  className="p-button-sm p-button-danger p-1" 
-                  onClick={() => handleDeleteSchedulerTask(row.id)} 
+                {row.lastBatchId && (
+                  <Button
+                    icon="pi pi-eye"
+                    className="p-button-sm p-button-success p-1"
+                    tooltip="Результаты"
+                    onClick={() => viewBatchResults(row.lastBatchId)}
+                  />
+                )}
+                <Button
+                  icon="pi pi-trash"
+                  className="p-button-sm p-button-danger p-1"
+                  onClick={() => handleDeleteSchedulerTask(row.id)}
                 />
               </div>
             )} header="Действия" />
