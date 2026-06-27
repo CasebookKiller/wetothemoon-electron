@@ -215,11 +215,16 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
 
   const loadSchedulerTasks = async () => {
     const api = (window as any).electronAPI;
-    if (!api?.cloudGetSchedulerTasks) return;
+    if (!api?.cloudGetSchedulerTasks) {
+      console.warn('[UI] cloudGetSchedulerTasks API not available');
+      return;
+    }
+    console.log('[UI] Loading scheduler tasks from', serverUrl);
     const data = await api.cloudGetSchedulerTasks(serverUrl);
+    console.log('[UI] Received scheduler tasks:', data);
     if (Array.isArray(data)) {
       setSchedulerTasks(data);
-      // Запрашиваем статусы для заданий с lastBatchId
+      // запрос статусов (уже есть в вашей реализации)
       const statusMap = new Map<string, string>();
       await Promise.all(data
         .filter((t: any) => t.lastBatchId)
@@ -233,6 +238,8 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
         })
       );
       setSchedulerBatchStatuses(statusMap);
+    } else {
+      console.warn('[UI] Scheduler tasks data is not an array:', data);
     }
   };
 
@@ -1096,6 +1103,26 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
             <Column field="id" header="ID" body={(row) => row.id.slice(-8)} />
             <Column field="time" header="Время" />
             <Column field="strategy" header="Стратегия" />
+            <Column
+              header="Параметры"
+              body={(row: any) => {
+                const p = row.params || {};
+                const parts: string[] = [];
+                if (p.stopLossPercent != null) parts.push(`SL:${p.stopLossPercent}%`);
+                if (p.takeProfitPercent != null) parts.push(`TP:${p.takeProfitPercent}%`);
+                if (p.trailingDistancePercent > 0) parts.push(`Trail:${p.trailingDistancePercent}%`);
+                if (p.lots != null) parts.push(`Lots:${p.lots}`);
+                if (p.positionSizing === 'dynamic') parts.push('Dyn');
+                if (row.useGrid) parts.push('Grid');
+                if (row.useVolumeFilter) parts.push('VolFilt');
+                const text = parts.length > 0 ? parts.join(', ') : '—';
+                return (
+                  <span style={{ fontSize: '0.75rem' }} title={JSON.stringify(row.params)}>
+                    {text}
+                  </span>
+                );
+              }}
+            />
             <Column 
               header="След. запуск" 
               body={(row: any) => {
