@@ -74,7 +74,9 @@ export type Database = {
           instrument_uid: string | null
           interval: string | null
           market_phase: string | null
+          market_phases: string[] | null
           params: Json | null
+          phase_status: string | null
           result: Json | null
           status: string | null
           strategy: string | null
@@ -91,7 +93,9 @@ export type Database = {
           instrument_uid?: string | null
           interval?: string | null
           market_phase?: string | null
+          market_phases?: string[] | null
           params?: Json | null
+          phase_status?: string | null
           result?: Json | null
           status?: string | null
           strategy?: string | null
@@ -108,7 +112,9 @@ export type Database = {
           instrument_uid?: string | null
           interval?: string | null
           market_phase?: string | null
+          market_phases?: string[] | null
           params?: Json | null
+          phase_status?: string | null
           result?: Json | null
           status?: string | null
           strategy?: string | null
@@ -186,6 +192,66 @@ export type Database = {
         }
         Relationships: []
       }
+      scheduler_tasks: {
+        Row: {
+          created_at: string | null
+          date_from: string | null
+          date_to: string | null
+          enabled: boolean | null
+          grid_config: Json | null
+          id: string
+          instruments: string[]
+          interval: string | null
+          last_run: string | null
+          next_run: string | null
+          params: Json
+          strategy: string
+          time: string
+          use_grid: boolean | null
+          use_volume_filter: boolean | null
+          user_id: number | null
+          volume_filter_config: Json | null
+        }
+        Insert: {
+          created_at?: string | null
+          date_from?: string | null
+          date_to?: string | null
+          enabled?: boolean | null
+          grid_config?: Json | null
+          id: string
+          instruments: string[]
+          interval?: string | null
+          last_run?: string | null
+          next_run?: string | null
+          params?: Json
+          strategy?: string
+          time: string
+          use_grid?: boolean | null
+          use_volume_filter?: boolean | null
+          user_id?: number | null
+          volume_filter_config?: Json | null
+        }
+        Update: {
+          created_at?: string | null
+          date_from?: string | null
+          date_to?: string | null
+          enabled?: boolean | null
+          grid_config?: Json | null
+          id?: string
+          instruments?: string[]
+          interval?: string | null
+          last_run?: string | null
+          next_run?: string | null
+          params?: Json
+          strategy?: string
+          time?: string
+          use_grid?: boolean | null
+          use_volume_filter?: boolean | null
+          user_id?: number | null
+          volume_filter_config?: Json | null
+        }
+        Relationships: []
+      }
       tusers: {
         Row: {
           created_at: string
@@ -229,6 +295,7 @@ export type Database = {
         Args: { bucket: string; object: string }
         Returns: Record<string, unknown>
       }
+      jsonb_to_text_array: { Args: { data: Json }; Returns: string[] }
     }
     Enums: {
       [_ in never]: never
