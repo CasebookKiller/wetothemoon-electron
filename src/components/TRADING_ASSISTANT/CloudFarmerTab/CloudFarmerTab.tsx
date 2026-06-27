@@ -109,6 +109,8 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
   const [schedulerDateFrom, setSchedulerDateFrom] = useState(new Date().toISOString().split('T')[0]);
   const [schedulerDateTo, setSchedulerDateTo] = useState(new Date().toISOString().split('T')[0]);
 
+  const [instrumentDialogTarget, setInstrumentDialogTarget] = useState<'farmer' | 'scheduler'>('farmer');
+
   // Функция сохранения в планировщик
   const handleSaveToScheduler = async () => {
     const api = (window as any).electronAPI;
@@ -367,11 +369,22 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
 
   const openInstrumentDialog = () => {
     setTempSelected([...instruments]);
+    setInstrumentDialogTarget('farmer');
+    setShowInstrumentDialog(true);
+  };
+
+  const openSchedulerInstrumentDialog = () => {
+    setTempSelected([...schedInstruments]); // копируем текущие выбранные uid
+    setInstrumentDialogTarget('scheduler');
     setShowInstrumentDialog(true);
   };
 
   const applyInstrumentSelection = () => {
-    setInstruments(tempSelected);
+    if (instrumentDialogTarget === 'scheduler') {
+      setSchedInstruments(tempSelected);
+    } else {
+      setInstruments(tempSelected);
+    }
     setShowInstrumentDialog(false);
   };
 
@@ -992,7 +1005,13 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
           <label className="mr-1 mb-0">Время (UTC)</label>
           <InputText value={schedTime} onChange={e => setSchedTime(e.target.value)} className="p-inputtext-sm" style={{ width: '80px' }} />
           <label className="mr-1 mb-0">Инструменты</label>
-          <InputText value={schedInstruments.join(',')} onChange={e => setSchedInstruments(e.target.value.split(',').map(s => s.trim()))} className="p-inputtext-sm" style={{ width: '200px' }} placeholder="uid1,uid2" />
+          <Button 
+            label="Выбрать инструменты" 
+            icon="pi pi-list" 
+            onClick={openSchedulerInstrumentDialog} 
+            className="p-button-sm p-button-secondary p-1 px-2" 
+          />
+          <span className="text-sm text-500">{schedInstruments.length} выбрано</span>
           <label className="mr-1 mb-0">Период</label>
           <InputText type="date" value={schedDateFrom} onChange={e => setSchedDateFrom(e.target.value)} className="p-inputtext-sm" style={{ width: '130px' }} />
           <InputText type="date" value={schedDateTo} onChange={e => setSchedDateTo(e.target.value)} className="p-inputtext-sm" style={{ width: '130px' }} />
