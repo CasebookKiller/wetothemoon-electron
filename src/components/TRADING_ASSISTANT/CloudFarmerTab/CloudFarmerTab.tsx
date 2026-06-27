@@ -1002,7 +1002,7 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
       <Card className="surface-ground p-2 mb-3">
         <h5 className="p-mb-2">Планировщик ежедневных прогонов</h5>
         <div className="flex align-items-center flex-wrap gap-2 mb-2">
-          <label className="mr-1 mb-0">Время (UTC)</label>
+          <label className="mb-1">Время (МСК)</label>
           <InputText value={schedTime} onChange={e => setSchedTime(e.target.value)} className="p-inputtext-sm" style={{ width: '80px' }} />
           <label className="mr-1 mb-0">Инструменты</label>
           <Button 
@@ -1022,7 +1022,18 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
             <Column field="id" header="ID" body={(row) => row.id.slice(-8)} />
             <Column field="time" header="Время" />
             <Column field="strategy" header="Стратегия" />
-            <Column field="nextRun" header="След. запуск" />
+            <Column 
+              header="След. запуск" 
+              body={(row: any) => {
+                if (!row.nextRun) return '—';
+                const mskDate = new Date(row.nextRun).toLocaleString('ru-RU', { 
+                  timeZone: 'Europe/Moscow',
+                  year: 'numeric', month: '2-digit', day: '2-digit',
+                  hour: '2-digit', minute: '2-digit'
+                });
+                return mskDate;
+              }} 
+            />
             <Column body={(row: any) => (
               <div className="flex gap-1">
                 <Button 
