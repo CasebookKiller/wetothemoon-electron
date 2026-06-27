@@ -103,6 +103,111 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
 
   const [useServerGrid, setUseServerGrid] = useState(false);
 
+  // Внутри компонента CloudFarmerTab, добавим новые состояния:
+  const [showSchedulerDialog, setShowSchedulerDialog] = useState(false);
+  const [schedulerTime, setSchedulerTime] = useState('09:00');
+  const [schedulerDateFrom, setSchedulerDateFrom] = useState(new Date().toISOString().split('T')[0]);
+  const [schedulerDateTo, setSchedulerDateTo] = useState(new Date().toISOString().split('T')[0]);
+
+  // Функция сохранения в планировщик
+  const handleSaveToScheduler = async () => {
+    const api = (window as any).electronAPI;
+    if (!api?.cloudAddSchedulerTask) return;
+
+    const params: any = {
+      stopLossPercent: stopLoss,
+      takeProfitPercent: takeProfit,
+      trailingDistancePercent: trailing ? trailingPercent : 0,
+      positionSizing: dynamicSizing ? 'dynamic' : 'fixed',
+      riskPercent: dynamicSizing ? (riskAmount / 100000) * 100 : 1,
+      lots: lots,
+    };
+
+    const gridConfig = (useGrid || useServerGrid) ? {
+      slMin, slMax, slStep,
+      tpMin, tpMax, tpStep,
+      trailMin, trailMax, trailStep,
+      lotsMin, lotsMax, lotsStep,
+      riskMin, riskMax, riskStep,
+    } : null;
+
+    const volumeFilterConfig = useVolumeFilter ? {
+      min: volPeriodMin,
+      max: volPeriodMax,
+      step: volPeriodStep,
+      period: volPeriod,
+    } : null;
+
+    try {
+      const result = await api.cloudAddSchedulerTask(serverUrl, {
+        time: schedulerTime,
+        instruments,
+        dateFrom: schedulerDateFrom,
+        dateTo: schedulerDateTo,
+        interval: intervalValue,
+        strategy,
+        params,
+        useGrid: useGrid || useServerGrid,
+        gridConfig,
+        useVolumeFilter,
+        volumeFilterConfig,
+      });
+      if (result.success) {
+        await loadSchedulerTasks();
+        setShowSchedulerDialog(false);
+      } else {
+        alert('Ошибка: ' + JSON.stringify(result));
+      }
+    } catch (err: any) {
+      alert('Ошибка: ' + err.message);
+    }
+  };
+
+  // Функция загрузки задания в основной интерфейс
+  const loadTaskToFarmer = (task: any) => {
+    if (!task) return;
+    setInstruments(task.instruments || []);
+    setDateFrom(task.dateFrom || '');
+    setDateTo(task.dateTo || '');
+    setIntervalValue(task.interval || 'CANDLE_INTERVAL_1_MIN');
+    setStrategy(task.strategy || 'volume_accumulation');
+
+    const p = task.params || {};
+    setStopLoss(p.stopLossPercent ?? 0.5);
+    setTakeProfit(p.takeProfitPercent ?? 1);
+    setTrailing(p.trailingDistancePercent > 0);
+    setTrailingPercent(p.trailingDistancePercent > 0 ? p.trailingDistancePercent : 1);
+    setDynamicSizing(p.positionSizing === 'dynamic');
+    if (p.positionSizing === 'dynamic' && p.riskPercent) {
+      setRiskAmount((p.riskPercent / 100) * 100000);
+    }
+    setLots(p.lots ?? 1);
+
+    if (task.useGrid && task.gridConfig) {
+      setUseGrid(true);
+      setUseServerGrid(false);
+      const gc = task.gridConfig;
+      setSlMin(gc.slMin); setSlMax(gc.slMax); setSlStep(gc.slStep);
+      setTpMin(gc.tpMin); setTpMax(gc.tpMax); setTpStep(gc.tpStep);
+      setTrailMin(gc.trailMin); setTrailMax(gc.trailMax); setTrailStep(gc.trailStep);
+      setLotsMin(gc.lotsMin); setLotsMax(gc.lotsMax); setLotsStep(gc.lotsStep);
+      setRiskMin(gc.riskMin); setRiskMax(gc.riskMax); setRiskStep(gc.riskStep);
+    } else {
+      setUseGrid(false);
+      setUseServerGrid(false);
+    }
+
+    if (task.useVolumeFilter && task.volumeFilterConfig) {
+      setUseVolumeFilter(true);
+      const vc = task.volumeFilterConfig;
+      setVolPeriod(vc.period || 20);
+      setVolPeriodMin(vc.min || 5);
+      setVolPeriodMax(vc.max || 50);
+      setVolPeriodStep(vc.step || 5);
+    } else {
+      setUseVolumeFilter(false);
+    }
+  };
   const loadSchedulerTasks = async () => {
     const api = (window as any).electronAPI;
     if (!api?.cloudGetSchedulerTasks) return;
@@ -627,6 +732,18 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
           )}
         </div>
         <Button label="Запустить прогон" icon="pi pi-play" onClick={handleStartBatch} disabled={loading || instruments.length === 0} className="p-button-sm p-1 px-3" />
+        <Button 
+          label="Сохранить в планировщик" 
+          icon="pi pi-calendar-plus" 
+          onClick={() => {
+            setSchedulerTime('09:00');
+            setSchedulerDateFrom(dateFrom);
+            setSchedulerDateTo(dateTo);
+            setShowSchedulerDialog(true);
+          }}
+          disabled={instruments.length === 0} 
+          className="p-button-sm p-button-secondary p-1 px-3 ml-2" 
+        />
       </Card>
 
       <Dialog
@@ -841,6 +958,34 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
         ) : <p>Нет данных</p>}
       </Dialog>
 
+      <Dialog 
+        header="Сохранить в планировщик" 
+        visible={showSchedulerDialog} 
+        style={{ width: '350px' }} 
+        onHide={() => setShowSchedulerDialog(false)}
+        footer={
+          <div className="flex justify-content-end gap-2">
+            <Button label="Отмена" onClick={() => setShowSchedulerDialog(false)} className="p-button-sm p-button-secondary" />
+            <Button label="Сохранить" onClick={handleSaveToScheduler} className="p-button-sm" />
+          </div>
+        }
+      >
+        <div className="p-fluid">
+          <div className="p-field mb-2">
+            <label className="mb-1">Время (UTC)</label>
+            <InputText value={schedulerTime} onChange={e => setSchedulerTime(e.target.value)} className="p-inputtext-sm" />
+          </div>
+          <div className="p-field mb-2">
+            <label className="mb-1">Период с</label>
+            <InputText type="date" value={schedulerDateFrom} onChange={e => setSchedulerDateFrom(e.target.value)} className="p-inputtext-sm" />
+          </div>
+          <div className="p-field mb-2">
+            <label className="mb-1">Период по</label>
+            <InputText type="date" value={schedulerDateTo} onChange={e => setSchedulerDateTo(e.target.value)} className="p-inputtext-sm" />
+          </div>
+        </div>
+      </Dialog>
+
       <Card className="surface-ground p-2 mb-3">
         <h5 className="p-mb-2">Планировщик ежедневных прогонов</h5>
         <div className="flex align-items-center flex-wrap gap-2 mb-2">
@@ -860,7 +1005,19 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
             <Column field="strategy" header="Стратегия" />
             <Column field="nextRun" header="След. запуск" />
             <Column body={(row: any) => (
-              <Button icon="pi pi-trash" className="p-button-sm p-button-danger p-1" onClick={() => handleDeleteSchedulerTask(row.id)} />
+              <div className="flex gap-1">
+                <Button 
+                  icon="pi pi-download" 
+                  className="p-button-sm p-button-info p-1" 
+                  tooltip="Загрузить в фермер" 
+                  onClick={() => loadTaskToFarmer(row)} 
+                />
+                <Button 
+                  icon="pi pi-trash" 
+                  className="p-button-sm p-button-danger p-1" 
+                  onClick={() => handleDeleteSchedulerTask(row.id)} 
+                />
+              </div>
             )} header="Действия" />
           </DataTable>
         )}
