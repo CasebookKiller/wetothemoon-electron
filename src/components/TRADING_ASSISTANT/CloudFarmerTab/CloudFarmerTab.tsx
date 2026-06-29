@@ -212,32 +212,34 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
   };
 
   const loadSchedulerTasks = async () => {
-    const api = (window as any).electronAPI;
-    if (!api?.cloudGetSchedulerTasks) {
-      console.warn('[UI] cloudGetSchedulerTasks API not available');
-      return;
-    }
-    console.log('[UI] Loading scheduler tasks from', serverUrl);
-    const data = await api.cloudGetSchedulerTasks(serverUrl);
-    console.log('[UI] Received scheduler tasks:', data);
-    if (Array.isArray(data)) {
-      setSchedulerTasks(data);
-      // запрос статусов (уже есть в вашей реализации)
-      const statusMap = new Map<string, string>();
-      await Promise.all(data
-        .filter((t: any) => t.lastBatchId)
-        .map(async (t: any) => {
-          try {
-            const statusData = await api.cloudGetBatchStatus(serverUrl, t.lastBatchId);
-            statusMap.set(t.id, statusData?.batch?.status || 'unknown');
-          } catch {
-            statusMap.set(t.id, 'unknown');
-          }
-        })
-      );
-      setSchedulerBatchStatuses(statusMap);
-    } else {
-      console.warn('[UI] Scheduler tasks data is not an array:', data);
+    try {
+      const api = (window as any).electronAPI;
+      if (!api?.cloudGetSchedulerTasks) return;
+      console.log('[UI] Loading scheduler tasks from', serverUrl);
+      const data = await api.cloudGetSchedulerTasks(serverUrl);
+      console.log('[UI] Received scheduler tasks:', data);
+      if (Array.isArray(data)) {
+        setSchedulerTasks(data);
+        // запрос статусов
+        const statusMap = new Map<string, string>();
+        await Promise.all(data
+          .filter((t: any) => t.lastBatchId)
+          .map(async (t: any) => {
+            try {
+              const statusData = await api.cloudGetBatchStatus(serverUrl, t.lastBatchId);
+              statusMap.set(t.id, statusData?.batch?.status || 'unknown');
+            } catch {
+              statusMap.set(t.id, 'unknown');
+            }
+          })
+        );
+        setSchedulerBatchStatuses(statusMap);
+      } else {
+        console.warn('[UI] Scheduler tasks data is not an array:', data);
+        setSchedulerTasks([]);
+      }
+    } catch (err) {
+      console.error('[UI] loadSchedulerTasks error:', err);
     }
   };
 
