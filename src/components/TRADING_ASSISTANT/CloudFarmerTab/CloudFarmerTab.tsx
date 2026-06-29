@@ -104,10 +104,9 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
   const [useServerGrid, setUseServerGrid] = useState(false);
 
   // Внутри компонента CloudFarmerTab, добавим новые состояния:
-  const [showSchedulerDialog, setShowSchedulerDialog] = useState(false);
   const [schedulerTime, setSchedulerTime] = useState('09:00');
-  const [schedulerDateFrom, setSchedulerDateFrom] = useState(new Date().toISOString().split('T')[0]);
-  const [schedulerDateTo, setSchedulerDateTo] = useState(new Date().toISOString().split('T')[0]);
+  //const [schedulerDateFrom, setSchedulerDateFrom] = useState(new Date().toISOString().split('T')[0]);
+  //const [schedulerDateTo, setSchedulerDateTo] = useState(new Date().toISOString().split('T')[0]);
 
   const [instrumentDialogTarget, setInstrumentDialogTarget] = useState<'farmer' | 'scheduler'>('farmer');
 
@@ -146,8 +145,8 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
       const result = await api.cloudAddSchedulerTask(serverUrl, {
         time: schedulerTime,
         instruments,
-        dateFrom: schedulerDateFrom,
-        dateTo: schedulerDateTo,
+        dateFrom: dateFrom,
+        dateTo: dateTo,
         interval: intervalValue,
         strategy,
         params,
@@ -828,12 +827,7 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
         <Button 
           label="Сохранить в планировщик" 
           icon="pi pi-calendar-plus" 
-          onClick={() => {
-            setSchedulerTime('09:00');
-            setSchedulerDateFrom(dateFrom);
-            setSchedulerDateTo(dateTo);
-            setShowSchedulerDialog(true);
-          }}
+          onClick={handleSaveToScheduler}
           disabled={instruments.length === 0} 
           className="p-button-sm p-button-secondary p-1 px-3 ml-2" 
         />
@@ -845,22 +839,6 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
           className="p-inputtext-sm"
           style={{ width: '70px' }}
           placeholder="09:00"
-        />
-        <label className="mr-1 mb-0">Период с</label>
-        <InputText
-          type="date"
-          value={schedulerDateFrom}
-          onChange={e => setSchedulerDateFrom(e.target.value)}
-          className="p-inputtext-sm"
-          style={{ width: '130px' }}
-        />
-        <label className="mr-1 mb-0">по</label>
-        <InputText
-          type="date"
-          value={schedulerDateTo}
-          onChange={e => setSchedulerDateTo(e.target.value)}
-          className="p-inputtext-sm"
-          style={{ width: '130px' }}
         />
       </Card>
 
@@ -1074,34 +1052,6 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
             </DataTable>
           </>
         ) : <p>Нет данных</p>}
-      </Dialog>
-
-      <Dialog 
-        header="Сохранить в планировщик" 
-        visible={showSchedulerDialog} 
-        style={{ width: '350px' }} 
-        onHide={() => setShowSchedulerDialog(false)}
-        footer={
-          <div className="flex justify-content-end gap-2">
-            <Button label="Отмена" onClick={() => setShowSchedulerDialog(false)} className="p-button-sm p-button-secondary" />
-            <Button label="Сохранить" onClick={handleSaveToScheduler} className="p-button-sm" />
-          </div>
-        }
-      >
-        <div className="p-fluid">
-          <div className="p-field mb-2">
-            <label className="mb-1">Время (UTC)</label>
-            <InputText value={schedulerTime} onChange={e => setSchedulerTime(e.target.value)} className="p-inputtext-sm" />
-          </div>
-          <div className="p-field mb-2">
-            <label className="mb-1">Период с</label>
-            <InputText type="date" value={schedulerDateFrom} onChange={e => setSchedulerDateFrom(e.target.value)} className="p-inputtext-sm" />
-          </div>
-          <div className="p-field mb-2">
-            <label className="mb-1">Период по</label>
-            <InputText type="date" value={schedulerDateTo} onChange={e => setSchedulerDateTo(e.target.value)} className="p-inputtext-sm" />
-          </div>
-        </div>
       </Dialog>
 
       <Card className="surface-ground p-2 my-3">
