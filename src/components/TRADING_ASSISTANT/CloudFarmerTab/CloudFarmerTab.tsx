@@ -158,7 +158,6 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
       });
       if (result.success) {
         await loadSchedulerTasks();
-        setShowSchedulerDialog(false);
       } else {
         alert('Ошибка: ' + JSON.stringify(result));
       }
@@ -838,6 +837,31 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
           disabled={instruments.length === 0} 
           className="p-button-sm p-button-secondary p-1 px-3 ml-2" 
         />
+        {/* Поля для планировщика */}
+        <label className="ml-2 mr-1 mb-0">Время (МСК)</label>
+        <InputText
+          value={schedulerTime}
+          onChange={e => setSchedulerTime(e.target.value)}
+          className="p-inputtext-sm"
+          style={{ width: '70px' }}
+          placeholder="09:00"
+        />
+        <label className="mr-1 mb-0">Период с</label>
+        <InputText
+          type="date"
+          value={schedulerDateFrom}
+          onChange={e => setSchedulerDateFrom(e.target.value)}
+          className="p-inputtext-sm"
+          style={{ width: '130px' }}
+        />
+        <label className="mr-1 mb-0">по</label>
+        <InputText
+          type="date"
+          value={schedulerDateTo}
+          onChange={e => setSchedulerDateTo(e.target.value)}
+          className="p-inputtext-sm"
+          style={{ width: '130px' }}
+        />
       </Card>
 
       <Dialog
@@ -1080,24 +1104,7 @@ export const CloudFarmerTab: React.FC<Props> = ({ token, batches, setBatches, fa
         </div>
       </Dialog>
 
-      <Card className="surface-ground p-2 mb-3">
-        <h5 className="p-mb-2">Планировщик ежедневных прогонов</h5>
-        <div className="flex align-items-center flex-wrap gap-2 mb-2">
-          <label className="mb-1">Время (МСК)</label>
-          <InputText value={schedTime} onChange={e => setSchedTime(e.target.value)} className="p-inputtext-sm" style={{ width: '80px' }} />
-          <label className="mr-1 mb-0">Инструменты</label>
-          <Button 
-            label="Выбрать инструменты" 
-            icon="pi pi-list" 
-            onClick={openSchedulerInstrumentDialog} 
-            className="p-button-sm p-button-secondary p-1 px-2" 
-          />
-          <span className="text-sm text-500">{schedInstruments.length} выбрано</span>
-          <label className="mr-1 mb-0">Период</label>
-          <InputText type="date" value={schedDateFrom} onChange={e => setSchedDateFrom(e.target.value)} className="p-inputtext-sm" style={{ width: '130px' }} />
-          <InputText type="date" value={schedDateTo} onChange={e => setSchedDateTo(e.target.value)} className="p-inputtext-sm" style={{ width: '130px' }} />
-          <Button label="Добавить задание" icon="pi pi-plus" onClick={handleAddSchedulerTask} disabled={schedLoading} className="p-button-sm p-1 px-3" />
-        </div>
+      <Card className="surface-ground p-2 my-3">
         {schedulerTasks.length > 0 && (
           <DataTable value={schedulerTasks} className="p-datatable-sm" stripedRows responsiveLayout="scroll" style={{ fontSize: '0.8rem' }}>
             <Column field="id" header="ID" body={(row) => row.id.slice(-8)} />
