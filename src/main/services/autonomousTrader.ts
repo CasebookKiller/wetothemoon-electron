@@ -23,7 +23,9 @@ export class AutonomousTrader extends EventEmitter {
     private orderManager: OrderManager,
     private strategyManager: StrategyManager,
     private compositeProfile: CompositeProfileService
-  ) {}
+  ) {
+    super(); // ← обязательно
+  }
 
   /**
    * Запустить автоматическую торговлю для указанного инструмента.
@@ -59,7 +61,7 @@ export class AutonomousTrader extends EventEmitter {
           try {
             await this.orderManager.processSignal(signal);
             this.emit('order-sent', { instrumentUid, signal, status: 'sent' });
-          } catch (e) {
+          } catch (e: any) {
             this.emit('order-error', { instrumentUid, signal, error: e.message });
           }
         }

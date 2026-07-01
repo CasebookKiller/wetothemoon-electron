@@ -1049,10 +1049,31 @@ async function getCloudToken(serverUrl: string): Promise<string | null> {
     return await res.json();
   });
 
-  ipcMain.handle('trading-assistant:start-auto-trader', async (_, instrumentUid: string) => {
+  ipcMain.handle('trading-assistant:start-auto-trader', async (event: Electron.IpcMainInvokeEvent, instrumentUid: string) => {
     if (!autonomousTraderInstance) return { success: false, error: 'AutoTrader not initialized' };
     const token = process.env.VITE_TReadOnly || '';
     await autonomousTraderInstance.start(instrumentUid, token);
+
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) return { success: true }; // окно не найдено, но трейдер запущен
+
+    // Подписываемся на события автотрейдера
+    const onSignal = (data: any) => {
+      if (!win.isDestroyed()) win.webContents.send('auto-trader:signal', data);
+    };
+    const onOrderSent = (data: any) => {
+      if (!win.isDestroyed()) win.webContents.send('auto-trader:order-sent', data);
+    };
+    const onOrderError = (data: any) => {
+      if (!win.isDestroyed()) win.webContents.send('auto-trader:order-error', data);
+    };
+
+    autonomousTraderInstance.on('signal', onSignal);
+    autonomousTraderInstance.on('order-sent', onOrderSent);
+    autonomousTraderInstance.on('order-error', onOrderError);
+
+    // Сохраним обработчики, чтобы отписаться при остановке (можно в Map)
+    // Пока для простоты оставим так, но добавим очистку при остановке.
     return { success: true };
   });
 

@@ -4316,13 +4316,27 @@ var registerTradingAssistantHandlers = (historicalLoader, profileEngine, getToke
 			headers: { "Authorization": `Bearer ${token}` }
 		})).json();
 	});
-	electron.ipcMain.handle("trading-assistant:start-auto-trader", async (_, instrumentUid) => {
+	electron.ipcMain.handle("trading-assistant:start-auto-trader", async (event, instrumentUid) => {
 		if (!autonomousTraderInstance) return {
 			success: false,
 			error: "AutoTrader not initialized"
 		};
 		const token = process.env.VITE_TReadOnly || "";
 		await autonomousTraderInstance.start(instrumentUid, token);
+		const win = electron.BrowserWindow.fromWebContents(event.sender);
+		if (!win) return { success: true };
+		const onSignal = (data) => {
+			if (!win.isDestroyed()) win.webContents.send("auto-trader:signal", data);
+		};
+		const onOrderSent = (data) => {
+			if (!win.isDestroyed()) win.webContents.send("auto-trader:order-sent", data);
+		};
+		const onOrderError = (data) => {
+			if (!win.isDestroyed()) win.webContents.send("auto-trader:order-error", data);
+		};
+		autonomousTraderInstance.on("signal", onSignal);
+		autonomousTraderInstance.on("order-sent", onOrderSent);
+		autonomousTraderInstance.on("order-error", onOrderError);
 		return { success: true };
 	});
 	electron.ipcMain.handle("trading-assistant:stop-auto-trader", async (_, instrumentUid) => {
@@ -5497,6 +5511,7 @@ var AutonomousTrader = class extends events.EventEmitter {
 	compositeProfile;
 	active = /* @__PURE__ */ new Map();
 	constructor(orderManager, strategyManager, compositeProfile) {
+		super();
 		this.orderManager = orderManager;
 		this.strategyManager = strategyManager;
 		this.compositeProfile = compositeProfile;
