@@ -223,6 +223,41 @@ export const TradingAssistantPage: React.FC = () => {
 
   const [screenerResults, setScreenerResults] = useState<any[]>([]);
 
+  const [activeAutoTraders, setActiveAutoTraders] = useState<string[]>([]);
+
+  const [autoTraderLog, setAutoTraderLog] = useState<Array<{ time: string; text: string; type: 'signal' | 'order' | 'error' }>>([]);
+
+  useEffect(() => {
+    const api = (window as any).electronAPI;
+    if (!api) return;
+
+    api.onAutoTraderSignal((data: any) => {
+      setAutoTraderLog(prev => [...prev.slice(-19), {
+        time: new Date().toLocaleTimeString(),
+        text: `${data.instrumentUid.slice(0,8)}: ${data.signal.type} @ ${data.signal.price?.toFixed(2)} - ${data.signal.message || ''}`,
+        type: 'signal'
+      }]);
+    });
+    api.onAutoTraderOrderSent((data: any) => {
+      setAutoTraderLog(prev => [...prev.slice(-19), {
+        time: new Date().toLocaleTimeString(),
+        text: `Order sent: ${data.signal.type} ${data.signal.price}`,
+        type: 'order'
+      }]);
+    });
+    api.onAutoTraderOrderError((data: any) => {
+      setAutoTraderLog(prev => [...prev.slice(-19), {
+        time: new Date().toLocaleTimeString(),
+        text: `Order error: ${data.error}`,
+        type: 'error'
+      }]);
+    });
+
+    return () => {
+      api.removeAutoTraderListeners();
+    };
+  }, []);
+
   // ========== REFS ДЛЯ ГРАФИКА ==========
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<any>(null);
@@ -360,7 +395,35 @@ export const TradingAssistantPage: React.FC = () => {
     setAutoTrading(newState);
   };
 
+  const startAutoTraderHandler = async () => {
+    const api = (window as any).electronAPI;
+    if (!api?.startAutoTrader) return;
+    await api.startAutoTrader(selectedInstrument);
+    // Обновляем список активных
+    const active = await api.getActiveAutoTraders();
+    setActiveAutoTraders(active);
+  };
+
+  const stopAutoTraderHandler = async () => {
+    const api = (window as any).electronAPI;
+    if (!api?.stopAutoTrader) return;
+    await api.stopAutoTrader(selectedInstrument);
+    const active = await api.getActiveAutoTraders();
+    setActiveAutoTraders(active);
+  };
+
   // --- Stream ---
+  useEffect(() => {
+    const fetchActive = async () => {
+      const api = (window as any).electronAPI;
+      if (api?.getActiveAutoTraders) {
+        const active = await api.getActiveAutoTraders();
+        setActiveAutoTraders(active);
+      }
+    };
+    fetchActive();
+  }, []);
+
   const startStream = async () => {
     const api = (window as any).electronAPI;
     if (!api?.startMarketStream || !api?.getTodayCandles || !api?.loadHistoricalProfile) return;
@@ -1030,31 +1093,6 @@ export const TradingAssistantPage: React.FC = () => {
                   />
                   <Button label="Apply" onClick={applyConfig} className="p-button-sm p-button-secondary border-round-sm p-1 px-2" />
 
-                  <div className="flex align-items-center flex-wrap gap-2 mt-3">
-                    <label className="mr-1 mb-0">Auto (Phase-based)</label>
-                    <Button
-                      label="Start Auto Trader"
-                      onClick={async () => {
-                        const api = (window as any).electronAPI;
-                        if (api?.startAutoTrader) {
-                          await api.startAutoTrader(selectedInstrument);
-                          // обновите список активных, если нужно
-                        }
-                      }}
-                      disabled={!sandbox.accountId || stream.active === false}
-                      className="p-button-sm p-button-warning p-1 px-2"
-                    />
-                    <Button
-                      label="Stop Auto Trader"
-                      onClick={async () => {
-                        const api = (window as any).electronAPI;
-                        if (api?.stopAutoTrader) {
-                          await api.stopAutoTrader(selectedInstrument);
-                        }
-                      }}
-                      className="p-button-sm p-button-danger p-1 px-2"
-                    />
-                  </div>
                   <label className="mr-1 mb-0">Lots</label>
                   <InputNumber
                     id="lotQty"
@@ -1100,6 +1138,44 @@ export const TradingAssistantPage: React.FC = () => {
                     className="p-button-sm p-button-secondary p-1 px-2"
                     tooltip="Settings"
                   />
+
+
+                  <div className="flex align-items-center flex-wrap gap-2 mt-3">
+                    <label className="mr-1 mb-0">Auto (Phase-based)</label>
+                    <Button
+                      label={activeAutoTraders.includes(selectedInstrument) ? 'Running...' : 'Start Auto Trader'}
+                      onClick={startAutoTraderHandler}
+                      disabled={!sandbox.accountId || stream.active === false}
+                      className={`p-button-sm p-1 px-2 ${activeAutoTraders.includes(selectedInstrument) ? 'p-button-warning' : ''}`}
+                      icon={activeAutoTraders.includes(selectedInstrument) ? 'pi pi-spin pi-spinner' : ''}
+                    />
+                    <Button
+                      label="Stop Auto Trader"
+                      onClick={stopAutoTraderHandler}
+                      disabled={!activeAutoTraders.includes(selectedInstrument)}
+                      className="p-button-sm p-button-danger p-1 px-2"
+                    />
+                    {activeAutoTraders.length > 0 && (
+                      <span className="text-sm ml-2">
+                        Active: {activeAutoTraders.map(uid => availableInstruments.find(i => i.uid === uid)?.ticker || uid.slice(0,8)).join(', ')}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="mt-2">
+                    <h5>Лог автотрейдера</h5>
+                    <div style={{ maxHeight: '200px', overflowY: 'auto', background: '#111', color: '#ccc', padding: '8px', borderRadius: '4px' }}>
+                      {autoTraderLog.length === 0 && <span>Ожидание сигналов...</span>}
+                      {autoTraderLog.map((entry, i) => (
+                        <div key={i} style={{ fontSize: '0.8rem', borderBottom: '1px solid #333', padding: '2px 0' }}>
+                          <span style={{ color: '#888' }}>{entry.time}</span>{' '}
+                          <span style={{ color: entry.type === 'error' ? 'red' : entry.type === 'order' ? '#4caf50' : '#fff' }}>
+                            {entry.text}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
 
                   <span className="ml-auto">
                     {sandbox.balance && <span className="mr-2">{sandbox.balance}</span>}

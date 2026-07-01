@@ -6,6 +6,8 @@ import { StrategyManager } from './strategyManager';
 import { CompositeProfileService } from './compositeProfile';
 import type { StreamCandle } from '@/api/tbank/marketdataStreamTypes';
 
+import { EventEmitter } from 'events';
+
 /**
  * Автономный трейдер, который динамически выбирает стратегии
  * в зависимости от текущей фазы рынка и автоматически отправляет
@@ -13,7 +15,7 @@ import type { StreamCandle } from '@/api/tbank/marketdataStreamTypes';
  *
  * Не зависит от Electron и может быть использован в облачном процессе.
  */
-export class AutonomousTrader {
+export class AutonomousTrader extends EventEmitter {
   // active хранит обработчики свечей для каждого запущенного инструмента
   private active = new Map<string, { handler: (candle: StreamCandle) => void }>();
 
@@ -53,7 +55,13 @@ export class AutonomousTrader {
         const signals = this.strategyManager.evaluateSignals(candle);
         // 3. Отправляем сигналы в OrderManager (с учётом риск‑менеджмента)
         for (const signal of signals) {
-          await this.orderManager.processSignal(signal);
+          this.emit('signal', { instrumentUid, signal, timestamp: new Date().toISOString() });
+          try {
+            await this.orderManager.processSignal(signal);
+            this.emit('order-sent', { instrumentUid, signal, status: 'sent' });
+          } catch (e) {
+            this.emit('order-error', { instrumentUid, signal, error: e.message });
+          }
         }
       } catch (e) {
         console.error(`[AutonomousTrader] Ошибка обработки ${instrumentUid}:`, e);

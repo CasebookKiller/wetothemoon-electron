@@ -5491,7 +5491,7 @@ new OrderFlowEngine();
 *
 * Не зависит от Electron и может быть использован в облачном процессе.
 */
-var AutonomousTrader = class {
+var AutonomousTrader = class extends events.EventEmitter {
 	orderManager;
 	strategyManager;
 	compositeProfile;
@@ -5521,7 +5521,27 @@ var AutonomousTrader = class {
 			try {
 				await this.strategyManager.update(instrumentUid);
 				const signals = this.strategyManager.evaluateSignals(candle);
-				for (const signal of signals) await this.orderManager.processSignal(signal);
+				for (const signal of signals) {
+					this.emit("signal", {
+						instrumentUid,
+						signal,
+						timestamp: (/* @__PURE__ */ new Date()).toISOString()
+					});
+					try {
+						await this.orderManager.processSignal(signal);
+						this.emit("order-sent", {
+							instrumentUid,
+							signal,
+							status: "sent"
+						});
+					} catch (e) {
+						this.emit("order-error", {
+							instrumentUid,
+							signal,
+							error: e.message
+						});
+					}
+				}
 			} catch (e) {
 				console.error(`[AutonomousTrader] Ошибка обработки ${instrumentUid}:`, e);
 			}

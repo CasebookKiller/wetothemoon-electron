@@ -218,7 +218,21 @@ try {
 		cloudDeleteSchedulerTask: (serverUrl, id) => electron.ipcRenderer.invoke("cloud:deleteSchedulerTask", serverUrl, id),
 		startAutoTrader: (instrumentUid) => electron.ipcRenderer.invoke("trading-assistant:start-auto-trader", instrumentUid),
 		stopAutoTrader: (instrumentUid) => electron.ipcRenderer.invoke("trading-assistant:stop-auto-trader", instrumentUid),
-		getActiveAutoTraders: () => electron.ipcRenderer.invoke("trading-assistant:get-active-auto-traders")
+		getActiveAutoTraders: () => electron.ipcRenderer.invoke("trading-assistant:get-active-auto-traders"),
+		onAutoTraderSignal: (callback) => {
+			electron.ipcRenderer.on("auto-trader:signal", (_, data) => callback(data));
+		},
+		onAutoTraderOrderSent: (callback) => {
+			electron.ipcRenderer.on("auto-trader:order-sent", (_, data) => callback(data));
+		},
+		onAutoTraderOrderError: (callback) => {
+			electron.ipcRenderer.on("auto-trader:order-error", (_, data) => callback(data));
+		},
+		removeAutoTraderListeners: () => {
+			electron.ipcRenderer.removeAllListeners("auto-trader:signal");
+			electron.ipcRenderer.removeAllListeners("auto-trader:order-sent");
+			electron.ipcRenderer.removeAllListeners("auto-trader:order-error");
+		}
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {

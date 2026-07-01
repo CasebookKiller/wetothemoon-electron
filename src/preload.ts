@@ -304,6 +304,21 @@ try {
       ipcRenderer.invoke('trading-assistant:stop-auto-trader', instrumentUid),
     getActiveAutoTraders: () =>
       ipcRenderer.invoke('trading-assistant:get-active-auto-traders'),
+
+    onAutoTraderSignal: (callback: (data: any) => void) => {
+      ipcRenderer.on('auto-trader:signal', (_, data) => callback(data));
+    },
+    onAutoTraderOrderSent: (callback: (data: any) => void) => {
+      ipcRenderer.on('auto-trader:order-sent', (_, data) => callback(data));
+    },
+    onAutoTraderOrderError: (callback: (data: any) => void) => {
+      ipcRenderer.on('auto-trader:order-error', (_, data) => callback(data));
+    },
+    removeAutoTraderListeners: () => {
+      ipcRenderer.removeAllListeners('auto-trader:signal');
+      ipcRenderer.removeAllListeners('auto-trader:order-sent');
+      ipcRenderer.removeAllListeners('auto-trader:order-error');
+    }
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)
