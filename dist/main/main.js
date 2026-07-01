@@ -5389,6 +5389,9 @@ var StrategyManager = class {
 	getAvailableStrategies() {
 		return getAvailableStrategies();
 	}
+	getActiveStrategies() {
+		return this.activeStrategies.map((s) => s.constructor.name);
+	}
 	reset() {
 		this.activeStrategies.forEach((s) => s.reset());
 		this.activeStrategies = [];
@@ -5534,25 +5537,39 @@ var AutonomousTrader = class extends events.EventEmitter {
 		const handler = async (candle) => {
 			if (candle.instrumentUid !== instrumentUid && candle.figi !== instrumentUid) return;
 			try {
+				console.log(`[AutonomousTrader] Свеча для ${instrumentUid.slice(0, 12)}: время=${candle.time}, цена закрытия=${candle.close}`);
 				await this.strategyManager.update(instrumentUid);
+				const activeStrats = this.strategyManager.getActiveStrategies();
+				console.log(`[AutonomousTrader] Фаза обновлена, активные стратегии: ${activeStrats?.join(", ") || "нет"}`);
 				const signals = this.strategyManager.evaluateSignals(candle);
-				for (const signal of signals) {
+				console.log(`[AutonomousTrader] Получено сигналов: ${signals.length}`);
+				for (const sig of signals) {
+					console.log(`[AutonomousTrader] Сигнал: ${sig.type} по цене ${sig.price} (${sig.reason || ""})`);
 					this.emit("signal", {
 						instrumentUid,
-						signal,
+						signal: {
+							type: sig.type,
+							price: sig.price,
+							reason: sig.reason
+						},
+						timestamp: (/* @__PURE__ */ new Date()).toISOString()
+					});
+					this.emit("signal", {
+						instrumentUid,
+						signal: sig,
 						timestamp: (/* @__PURE__ */ new Date()).toISOString()
 					});
 					try {
-						await this.orderManager.processSignal(signal);
+						await this.orderManager.processSignal(sig);
 						this.emit("order-sent", {
 							instrumentUid,
-							signal,
+							signal: sig,
 							status: "sent"
 						});
 					} catch (e) {
 						this.emit("order-error", {
 							instrumentUid,
-							signal,
+							signal: sig,
 							error: e.message
 						});
 					}

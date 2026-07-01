@@ -48,21 +48,28 @@ export class AutonomousTrader extends EventEmitter {
 
     // Обработчик свечи
     const handler = async (candle: StreamCandle) => {
-      // Проверяем, относится ли свеча к нашему инструменту (обычно по instrumentUid)
       if (candle.instrumentUid !== instrumentUid && (candle as any).figi !== instrumentUid) return;
       try {
-        // 1. Определяем фазу рынка и обновляем список активных стратегий
+        // 1. Проверим свечу
+        console.log(`[AutonomousTrader] Свеча для ${instrumentUid.slice(0,12)}: время=${candle.time}, цена закрытия=${candle.close}`);
+
+        // 2. Обновим фазу и стратегии
         await this.strategyManager.update(instrumentUid);
-        // 2. Получаем сигналы от всех активных стратегий
+        const activeStrats = this.strategyManager.getActiveStrategies(); // если такого метода нет, добавим
+        console.log(`[AutonomousTrader] Фаза обновлена, активные стратегии: ${activeStrats?.join(', ') || 'нет'}`);
+
+        // 3. Получим сигналы
         const signals = this.strategyManager.evaluateSignals(candle);
-        // 3. Отправляем сигналы в OrderManager (с учётом риск‑менеджмента)
-        for (const signal of signals) {
-          this.emit('signal', { instrumentUid, signal, timestamp: new Date().toISOString() });
+        console.log(`[AutonomousTrader] Получено сигналов: ${signals.length}`);
+        for (const sig of signals) {
+          console.log(`[AutonomousTrader] Сигнал: ${sig.type} по цене ${sig.price} (${sig.reason || ''})`);
+this.emit('signal', { instrumentUid, signal: { type: sig.type, price: sig.price, reason: sig.reason }, timestamp: new Date().toISOString() });
+          this.emit('signal', { instrumentUid, signal: sig, timestamp: new Date().toISOString() });
           try {
-            await this.orderManager.processSignal(signal);
-            this.emit('order-sent', { instrumentUid, signal, status: 'sent' });
+            await this.orderManager.processSignal(sig);
+            this.emit('order-sent', { instrumentUid, signal: sig, status: 'sent' });
           } catch (e: any) {
-            this.emit('order-error', { instrumentUid, signal, error: e.message });
+            this.emit('order-error', { instrumentUid, signal: sig, error: e.message });
           }
         }
       } catch (e) {

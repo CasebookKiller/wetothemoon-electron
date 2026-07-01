@@ -65,6 +65,10 @@ export class StrategyManager {
     return getAvailableStrategies();
   }
 
+  public getActiveStrategies(): string[] {
+    return this.activeStrategies.map(s => s.constructor.name);
+  }
+
   reset(): void {
     this.activeStrategies.forEach(s => s.reset());
     this.activeStrategies = [];
