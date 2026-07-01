@@ -1,3 +1,5 @@
+// src/components/TRADING_ASSISTANT/TradesTab/TradesTab.tsx
+
 import React from 'react';
 import { Card } from 'primereact/card';
 import { EquityChart } from '../EquityChart/EquityChart';

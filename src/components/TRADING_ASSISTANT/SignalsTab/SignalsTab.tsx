@@ -1,3 +1,5 @@
+// src/components/TRADING_ASSISTANT/SignalsTab/SignalsTab.tsx
+
 import React from 'react';
 import { Card } from 'primereact/card';
 

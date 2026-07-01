@@ -297,6 +297,13 @@ try {
     cloudGetSchedulerTasks: (serverUrl: string) => ipcRenderer.invoke('cloud:getSchedulerTasks', serverUrl),
     cloudAddSchedulerTask: (serverUrl: string, task: any) => ipcRenderer.invoke('cloud:addSchedulerTask', serverUrl, task),
     cloudDeleteSchedulerTask: (serverUrl: string, id: string) => ipcRenderer.invoke('cloud:deleteSchedulerTask', serverUrl, id),
+
+    startAutoTrader: (instrumentUid: string) =>
+      ipcRenderer.invoke('trading-assistant:start-auto-trader', instrumentUid),
+    stopAutoTrader: (instrumentUid: string) =>
+      ipcRenderer.invoke('trading-assistant:stop-auto-trader', instrumentUid),
+    getActiveAutoTraders: () =>
+      ipcRenderer.invoke('trading-assistant:get-active-auto-traders'),
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

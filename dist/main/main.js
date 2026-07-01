@@ -3627,6 +3627,10 @@ async function runBacktestInternal(instrumentUid, dateFrom, dateTo, intervalStr,
 		return null;
 	}
 }
+var autonomousTraderInstance = null;
+var setAutonomousTraderInstance = (instance) => {
+	autonomousTraderInstance = instance;
+};
 var registerTradingAssistantHandlers = (historicalLoader, profileEngine, getToken, strategyManager, compositeProfileService, orderFlowEngine) => {
 	electron.ipcMain.handle("trading-assistant:get-profile", (_, instrumentUid) => {
 		const profile = volumeProfileEngine.getProfile(instrumentUid);
@@ -4311,6 +4315,26 @@ var registerTradingAssistantHandlers = (historicalLoader, profileEngine, getToke
 			method: "DELETE",
 			headers: { "Authorization": `Bearer ${token}` }
 		})).json();
+	});
+	electron.ipcMain.handle("trading-assistant:start-auto-trader", async (_, instrumentUid) => {
+		if (!autonomousTraderInstance) return {
+			success: false,
+			error: "AutoTrader not initialized"
+		};
+		const token = process.env.VITE_TReadOnly || "";
+		await autonomousTraderInstance.start(instrumentUid, token);
+		return { success: true };
+	});
+	electron.ipcMain.handle("trading-assistant:stop-auto-trader", async (_, instrumentUid) => {
+		if (!autonomousTraderInstance) return {
+			success: false,
+			error: "AutoTrader not initialized"
+		};
+		autonomousTraderInstance.stop(instrumentUid);
+		return { success: true };
+	});
+	electron.ipcMain.handle("trading-assistant:get-active-auto-traders", async () => {
+		return autonomousTraderInstance ? autonomousTraderInstance.getActiveInstruments() : [];
 	});
 };
 //#endregion
@@ -5459,6 +5483,78 @@ var OrderFlowEngine = class {
 };
 new OrderFlowEngine();
 //#endregion
+//#region src/main/services/autonomousTrader.ts
+/**
+* Автономный трейдер, который динамически выбирает стратегии
+* в зависимости от текущей фазы рынка и автоматически отправляет
+* сигналы в OrderManager.
+*
+* Не зависит от Electron и может быть использован в облачном процессе.
+*/
+var AutonomousTrader = class {
+	orderManager;
+	strategyManager;
+	compositeProfile;
+	active = /* @__PURE__ */ new Map();
+	constructor(orderManager, strategyManager, compositeProfile) {
+		this.orderManager = orderManager;
+		this.strategyManager = strategyManager;
+		this.compositeProfile = compositeProfile;
+	}
+	/**
+	* Запустить автоматическую торговлю для указанного инструмента.
+	* @param instrumentUid - идентификатор инструмента
+	* @param token - токен для загрузки исторических данных (обычно read‑only)
+	*/
+	async start(instrumentUid, token) {
+		if (this.active.has(instrumentUid)) {
+			console.warn(`[AutonomousTrader] ${instrumentUid} уже запущен`);
+			return;
+		}
+		try {
+			await this.compositeProfile.buildComposite(instrumentUid, 10, token);
+		} catch (e) {
+			console.warn(`[AutonomousTrader] Не удалось построить композитный профиль для ${instrumentUid}`, e);
+		}
+		const handler = async (candle) => {
+			if (candle.instrumentUid !== instrumentUid && candle.figi !== instrumentUid) return;
+			try {
+				await this.strategyManager.update(instrumentUid);
+				const signals = this.strategyManager.evaluateSignals(candle);
+				for (const signal of signals) await this.orderManager.processSignal(signal);
+			} catch (e) {
+				console.error(`[AutonomousTrader] Ошибка обработки ${instrumentUid}:`, e);
+			}
+		};
+		marketDataBus.on("candle", handler);
+		this.active.set(instrumentUid, { handler });
+		console.log(`[AutonomousTrader] Запущен для ${instrumentUid}`);
+	}
+	/**
+	* Остановить автоматическую торговлю для инструмента.
+	*/
+	stop(instrumentUid) {
+		const entry = this.active.get(instrumentUid);
+		if (!entry) return;
+		marketDataBus.off("candle", entry.handler);
+		this.active.delete(instrumentUid);
+		this.strategyManager.reset();
+		console.log(`[AutonomousTrader] Остановлен для ${instrumentUid}`);
+	}
+	/**
+	* Остановить все активные трейдеры.
+	*/
+	stopAll() {
+		for (const uid of this.active.keys()) this.stop(uid);
+	}
+	/**
+	* Получить список идентификаторов инструментов, для которых активна торговля.
+	*/
+	getActiveInstruments() {
+		return Array.from(this.active.keys());
+	}
+};
+//#endregion
 //#region src/main/main.ts
 process.on("uncaughtException", (err) => {
 	console.error("Uncaught exception:", err);
@@ -5554,6 +5650,7 @@ electron.app.whenReady().then(() => {
 	connectOrderManager(orderManager);
 	setOrderManagerInstance(orderManager);
 	connectLiveStrategy("e6123145-9665-43e0-8413-cd61b8aa9b13", orderManager);
+	setAutonomousTraderInstance(new AutonomousTrader(orderManager, strategyManager, compositeProfileService));
 });
 electron.app.on("window-all-closed", () => {
 	if (process.platform !== "darwin") electron.app.quit();

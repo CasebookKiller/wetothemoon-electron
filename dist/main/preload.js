@@ -215,7 +215,10 @@ try {
 		cloudDeleteBatch: (serverUrl, batchId) => electron.ipcRenderer.invoke("cloud:deleteBatch", serverUrl, batchId),
 		cloudGetSchedulerTasks: (serverUrl) => electron.ipcRenderer.invoke("cloud:getSchedulerTasks", serverUrl),
 		cloudAddSchedulerTask: (serverUrl, task) => electron.ipcRenderer.invoke("cloud:addSchedulerTask", serverUrl, task),
-		cloudDeleteSchedulerTask: (serverUrl, id) => electron.ipcRenderer.invoke("cloud:deleteSchedulerTask", serverUrl, id)
+		cloudDeleteSchedulerTask: (serverUrl, id) => electron.ipcRenderer.invoke("cloud:deleteSchedulerTask", serverUrl, id),
+		startAutoTrader: (instrumentUid) => electron.ipcRenderer.invoke("trading-assistant:start-auto-trader", instrumentUid),
+		stopAutoTrader: (instrumentUid) => electron.ipcRenderer.invoke("trading-assistant:stop-auto-trader", instrumentUid),
+		getActiveAutoTraders: () => electron.ipcRenderer.invoke("trading-assistant:get-active-auto-traders")
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {

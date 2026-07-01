@@ -31,6 +31,7 @@ import { OrderFlowEngine, orderFlowEngine } from '../services/orderFlowEngine';
 import { StrategyManager } from '../services/strategyManager';
 import { CompositeProfileService } from '../services/compositeProfile';
 import { MarketPhase } from '../services/marketPhaseDetector';
+import { AutonomousTrader } from '../services/autonomousTrader';
 
 let orderManagerInstance: OrderManager | null = null;
 
@@ -165,6 +166,13 @@ async function runBacktestInternal(
     return null;
   }
 }
+
+
+let autonomousTraderInstance: AutonomousTrader | null = null;
+
+export const setAutonomousTraderInstance = (instance: AutonomousTrader) => {
+  autonomousTraderInstance = instance;
+};
 
 export const registerTradingAssistantHandlers = (
   historicalLoader: HistoricalDataLoader,
@@ -1039,5 +1047,22 @@ async function getCloudToken(serverUrl: string): Promise<string | null> {
       headers: { 'Authorization': `Bearer ${token}` },
     });
     return await res.json();
+  });
+
+  ipcMain.handle('trading-assistant:start-auto-trader', async (_, instrumentUid: string) => {
+    if (!autonomousTraderInstance) return { success: false, error: 'AutoTrader not initialized' };
+    const token = process.env.VITE_TReadOnly || '';
+    await autonomousTraderInstance.start(instrumentUid, token);
+    return { success: true };
+  });
+
+  ipcMain.handle('trading-assistant:stop-auto-trader', async (_, instrumentUid: string) => {
+    if (!autonomousTraderInstance) return { success: false, error: 'AutoTrader not initialized' };
+    autonomousTraderInstance.stop(instrumentUid);
+    return { success: true };
+  });
+
+  ipcMain.handle('trading-assistant:get-active-auto-traders', async () => {
+    return autonomousTraderInstance ? autonomousTraderInstance.getActiveInstruments() : [];
   });
 };

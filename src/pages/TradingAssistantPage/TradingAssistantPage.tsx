@@ -1030,6 +1030,31 @@ export const TradingAssistantPage: React.FC = () => {
                   />
                   <Button label="Apply" onClick={applyConfig} className="p-button-sm p-button-secondary border-round-sm p-1 px-2" />
 
+                  <div className="flex align-items-center flex-wrap gap-2 mt-3">
+                    <label className="mr-1 mb-0">Auto (Phase-based)</label>
+                    <Button
+                      label="Start Auto Trader"
+                      onClick={async () => {
+                        const api = (window as any).electronAPI;
+                        if (api?.startAutoTrader) {
+                          await api.startAutoTrader(selectedInstrument);
+                          // обновите список активных, если нужно
+                        }
+                      }}
+                      disabled={!sandbox.accountId || stream.active === false}
+                      className="p-button-sm p-button-warning p-1 px-2"
+                    />
+                    <Button
+                      label="Stop Auto Trader"
+                      onClick={async () => {
+                        const api = (window as any).electronAPI;
+                        if (api?.stopAutoTrader) {
+                          await api.stopAutoTrader(selectedInstrument);
+                        }
+                      }}
+                      className="p-button-sm p-button-danger p-1 px-2"
+                    />
+                  </div>
                   <label className="mr-1 mb-0">Lots</label>
                   <InputNumber
                     id="lotQty"

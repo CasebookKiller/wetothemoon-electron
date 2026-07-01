@@ -71,6 +71,8 @@ import { volumeProfileEngine } from './services/volumeProfileEngine';
 import { StrategyManager } from './services/strategyManager.ts';
 import { MarketPhaseDetector, MarketPhase } from './services/marketPhaseDetector.ts';
 import { OrderFlowEngine } from './services/orderFlowEngine.ts';
+import { AutonomousTrader } from './services/autonomousTrader.ts';
+import { setAutonomousTraderInstance } from './ipcHandlers/tradingAssistantHandlers';
 
 const historicalDataLoader = new HistoricalDataLoader();
 
@@ -211,6 +213,15 @@ app.whenReady().then(() => {
   // Подключаем live-стратегию для выбранного инструмента (пока захардкожен)
   connectLiveStrategy('e6123145-9665-43e0-8413-cd61b8aa9b13', orderManager);
   // -------------------------------------------------
+  // ---------- Автономный трейдер ----------
+  const autoTrader = new AutonomousTrader(
+    orderManager,
+    strategyManager,
+    compositeProfileService
+  );
+  setAutonomousTraderInstance(autoTrader);
+  // (опционально) при необходимости сразу запустить для выбранного инструмента
+  // autoTrader.start('e6123145-9665-43e0-8413-cd61b8aa9b13', getToken());
 });
 
 // Завершать работу, когда закрыты все окна, за исключением macOS. Там это обычное дело

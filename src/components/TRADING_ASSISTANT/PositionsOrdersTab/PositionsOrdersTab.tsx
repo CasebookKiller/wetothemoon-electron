@@ -1,3 +1,5 @@
+// src/components/TRADING_ASSISTANT/PositionsOrdersTab/PositionsOrdersTab.tsx
+
 import React, { useEffect, useState } from 'react';
 import { Card } from 'primereact/card';
 import { Button } from 'primereact/button';

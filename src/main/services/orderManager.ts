@@ -1,3 +1,5 @@
+// src/main/services/orderManager.ts
+
 import { sandboxGrpc } from './tbank/SandboxGrpcService';
 import { OrderDirection, OrderType, OrderIdType } from '@/api/tbank/ordersTypes';
 import type { BacktestSignal } from './backtest/common';

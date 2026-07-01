@@ -1,3 +1,5 @@
+// src/components/TRADING_ASSISTANT/StreamTab/StreamTab.tsx
+
 import React from 'react';
 import { Card } from 'primereact/card';
 import { Button } from 'primereact/button';

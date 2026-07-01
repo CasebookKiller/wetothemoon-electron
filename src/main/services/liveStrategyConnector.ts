@@ -1,3 +1,5 @@
+// src/main/services/liveStrategyConnector.ts
+
 import { marketDataBus } from './marketDataBus';
 import { volumeProfileEngine } from './volumeProfileEngine';
 import { VolumeAccumulationStrategy } from './backtest/strategies/VolumeAccumulationStrategy';
