@@ -4,11 +4,19 @@ import type { StreamCandle, StreamTrade, StreamOrderBook, StreamLastPrice } from
 
 class MarketDataBus extends EventEmitter {
   private static instance: MarketDataBus;
+  private static counter = 0;
+  private id: number;
 
   private constructor() {
     super();
-    // Увеличим лимит слушателей, т.к. в будущем может быть много стратегий
+    MarketDataBus.counter++;
+    this.id = MarketDataBus.counter;
+    console.log(`[MarketDataBus] Создан экземпляр #${this.id}`);
     this.setMaxListeners(50);
+  }
+
+  public getInstanceId(): number {
+    return this.id;
   }
 
   public static getInstance(): MarketDataBus {

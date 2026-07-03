@@ -874,6 +874,49 @@ function getProtoPath(protoFileName) {
 	if (electron.app.isPackaged) return path.default.join(process.resourcesPath, "proto", protoFileName);
 	return path.default.join(__dirname, "../../proto", protoFileName);
 }
+var marketDataBus = class MarketDataBus extends events.EventEmitter {
+	static instance;
+	static counter = 0;
+	id;
+	constructor() {
+		super();
+		MarketDataBus.counter++;
+		this.id = MarketDataBus.counter;
+		console.log(`[MarketDataBus] Создан экземпляр #${this.id}`);
+		this.setMaxListeners(50);
+	}
+	getInstanceId() {
+		return this.id;
+	}
+	static getInstance() {
+		if (!MarketDataBus.instance) MarketDataBus.instance = new MarketDataBus();
+		return MarketDataBus.instance;
+	}
+	onCandle(handler) {
+		this.on("candle", handler);
+		return this;
+	}
+	onTrade(handler) {
+		this.on("trade", handler);
+		return this;
+	}
+	onOrderBook(handler) {
+		this.on("orderbook", handler);
+		return this;
+	}
+	onLastPrice(handler) {
+		this.on("lastPrice", handler);
+		return this;
+	}
+	offCandle(handler) {
+		this.off("candle", handler);
+		return this;
+	}
+	offTrade(handler) {
+		this.off("trade", handler);
+		return this;
+	}
+}.getInstance();
 //#endregion
 //#region src/main/streams/marketdata.ts
 var MAX_RECONNECT_ATTEMPTS = 10;
@@ -924,6 +967,43 @@ var registerMarketdataStreamHandlers = () => {
 				if (typeof data !== "string" && typeof data !== "object") return;
 				const chunk = typeof data === "string" ? data : JSON.stringify(data);
 				buffer += chunk;
+				while (buffer.length > 0) {
+					let jsonEnd = -1;
+					let depth = 0;
+					for (let i = 0; i < buffer.length; i++) if (buffer[i] === "{") depth++;
+					else if (buffer[i] === "}") {
+						depth--;
+						if (depth === 0) {
+							jsonEnd = i + 1;
+							break;
+						}
+					}
+					if (jsonEnd === -1) break;
+					const jsonStr = buffer.substring(0, jsonEnd);
+					buffer = buffer.substring(jsonEnd);
+					let parsed;
+					try {
+						parsed = JSON.parse(jsonStr);
+					} catch (e) {
+						console.warn("[Stream] Failed to parse chunk:", jsonStr.slice(0, 100));
+						continue;
+					}
+					if (parsed.candle) {
+						const rawCandle = parsed.candle;
+						const candle = {
+							instrumentUid: rawCandle.instrumentUid || rawCandle.figi,
+							figi: rawCandle.figi,
+							open: rawCandle.open,
+							high: rawCandle.high,
+							low: rawCandle.low,
+							close: rawCandle.close,
+							volume: rawCandle.volume,
+							time: rawCandle.time
+						};
+						console.log("[Stream] Эмитируем свечу для", candle.instrumentUid, candle.time);
+						marketDataBus.emit("candle", candle);
+					}
+				}
 			});
 			stream.on("end", () => {
 				console.log("[Main] Stream ended");
@@ -1164,41 +1244,6 @@ var createTradingAssistantWindow = () => {
 	return tradingAssistantWindow;
 };
 var getTradingAssistantWindow = () => tradingAssistantWindow;
-var marketDataBus = class MarketDataBus extends events.EventEmitter {
-	static instance;
-	constructor() {
-		super();
-		this.setMaxListeners(50);
-	}
-	static getInstance() {
-		if (!MarketDataBus.instance) MarketDataBus.instance = new MarketDataBus();
-		return MarketDataBus.instance;
-	}
-	onCandle(handler) {
-		this.on("candle", handler);
-		return this;
-	}
-	onTrade(handler) {
-		this.on("trade", handler);
-		return this;
-	}
-	onOrderBook(handler) {
-		this.on("orderbook", handler);
-		return this;
-	}
-	onLastPrice(handler) {
-		this.on("lastPrice", handler);
-		return this;
-	}
-	offCandle(handler) {
-		this.off("candle", handler);
-		return this;
-	}
-	offTrade(handler) {
-		this.off("trade", handler);
-		return this;
-	}
-}.getInstance();
 //#endregion
 //#region src/main/services/volumeProfileEngine.ts
 function quotationToNumber$2(q) {
@@ -4326,7 +4371,11 @@ var registerTradingAssistantHandlers = (historicalLoader, profileEngine, getToke
 		const win = electron.BrowserWindow.fromWebContents(event.sender);
 		if (!win) return { success: true };
 		const onSignal = (data) => {
-			if (!win.isDestroyed()) win.webContents.send("auto-trader:signal", data);
+			console.log("[IPC] Получен signal от автотрейдера");
+			if (!win.isDestroyed()) {
+				win.webContents.send("auto-trader:signal", data);
+				console.log("[IPC] signal отправлен в рендерер");
+			} else console.log("[IPC] Окно уничтожено, signal не отправлен");
 		};
 		const onOrderSent = (data) => {
 			if (!win.isDestroyed()) win.webContents.send("auto-trader:order-sent", data);
@@ -4964,6 +5013,13 @@ var OrderManager = class {
 			this.updateDailyLoss(prevProfit);
 		}
 		this.lastEntryPrice = signal.price;
+		console.log("[OrderManager] Отправляю ордер:", {
+			instrumentId: signal.instrumentUid,
+			direction,
+			orderType: this.config.useMarketOrder ? "MARKET" : "LIMIT",
+			quantity,
+			accountId: this.config.accountId
+		});
 		try {
 			const order = await sandboxGrpc.postSandboxOrder({
 				instrumentId: signal.instrumentUid,
@@ -5501,6 +5557,7 @@ var OrderFlowEngine = class {
 new OrderFlowEngine();
 //#endregion
 //#region src/main/services/autonomousTrader.ts
+console.log("[autonomousTrader] marketDataBus instance id:", marketDataBus.getInstanceId());
 /**
 * Автономный трейдер, который динамически выбирает стратегии
 * в зависимости от текущей фазы рынка и автоматически отправляет
@@ -5529,56 +5586,21 @@ var AutonomousTrader = class extends events.EventEmitter {
 			console.warn(`[AutonomousTrader] ${instrumentUid} уже запущен`);
 			return;
 		}
-		try {
-			await this.compositeProfile.buildComposite(instrumentUid, 10, token);
-		} catch (e) {
-			console.warn(`[AutonomousTrader] Не удалось построить композитный профиль для ${instrumentUid}`, e);
-		}
-		const handler = async (candle) => {
-			if (candle.instrumentUid !== instrumentUid && candle.figi !== instrumentUid) return;
-			try {
-				console.log(`[AutonomousTrader] Свеча для ${instrumentUid.slice(0, 12)}: время=${candle.time}, цена закрытия=${candle.close}`);
-				await this.strategyManager.update(instrumentUid);
-				const activeStrats = this.strategyManager.getActiveStrategies();
-				console.log(`[AutonomousTrader] Фаза обновлена, активные стратегии: ${activeStrats?.join(", ") || "нет"}`);
-				const signals = this.strategyManager.evaluateSignals(candle);
-				console.log(`[AutonomousTrader] Получено сигналов: ${signals.length}`);
-				for (const sig of signals) {
-					console.log(`[AutonomousTrader] Сигнал: ${sig.type} по цене ${sig.price} (${sig.reason || ""})`);
-					this.emit("signal", {
-						instrumentUid,
-						signal: {
-							type: sig.type,
-							price: sig.price,
-							reason: sig.reason
-						},
-						timestamp: (/* @__PURE__ */ new Date()).toISOString()
-					});
-					this.emit("signal", {
-						instrumentUid,
-						signal: sig,
-						timestamp: (/* @__PURE__ */ new Date()).toISOString()
-					});
-					try {
-						await this.orderManager.processSignal(sig);
-						this.emit("order-sent", {
-							instrumentUid,
-							signal: sig,
-							status: "sent"
-						});
-					} catch (e) {
-						this.emit("order-error", {
-							instrumentUid,
-							signal: sig,
-							error: e.message
-						});
-					}
-				}
-			} catch (e) {
-				console.error(`[AutonomousTrader] Ошибка обработки ${instrumentUid}:`, e);
-			}
+		const handler = (signal) => {
+			console.log("[AutonomousTrader] signal handler called", signal.instrumentUid, signal.type);
+			this.emit("signal", {
+				instrumentUid: signal.instrumentUid,
+				signal: {
+					type: signal.type,
+					price: signal.price,
+					reason: signal.message
+				},
+				timestamp: (/* @__PURE__ */ new Date()).toISOString()
+			});
 		};
-		marketDataBus.on("candle", handler);
+		console.log("[AutonomousTrader] Подписываемся на signal...");
+		volumeProfileEngine.on("signal", handler);
+		console.log("[AutonomousTrader] Подписка выполнена");
 		this.active.set(instrumentUid, { handler });
 		console.log(`[AutonomousTrader] Запущен для ${instrumentUid}`);
 	}
@@ -5614,6 +5636,7 @@ process.on("uncaughtException", (err) => {
 process.on("unhandledRejection", (reason, promise) => {
 	console.error("Unhandled rejection at:", promise, "reason:", reason);
 });
+console.log("[main] marketDataBus instance id:", marketDataBus.getInstanceId());
 var historicalDataLoader = new HistoricalDataLoader();
 var scriptsDir = path.default.join(electron.app.getPath("userData"), "scripts");
 if (!(0, fs.existsSync)(scriptsDir)) {
@@ -5702,7 +5725,14 @@ electron.app.whenReady().then(() => {
 	connectOrderManager(orderManager);
 	setOrderManagerInstance(orderManager);
 	connectLiveStrategy("e6123145-9665-43e0-8413-cd61b8aa9b13", orderManager);
-	setAutonomousTraderInstance(new AutonomousTrader(orderManager, strategyManager, compositeProfileService));
+	const autoTrader = new AutonomousTrader(orderManager, strategyManager, compositeProfileService);
+	volumeProfileEngine.on("signal", (s) => console.log("[main test] signal", s.type));
+	marketDataBus.on("candle", (c) => {
+		console.log("[DEBUG candle] uid:", c.instrumentUid, "time:", c.time);
+	});
+	console.log("[main] Добавили отладочного слушателя candle, всего слушателей:", marketDataBus.listenerCount("candle"));
+	setAutonomousTraderInstance(autoTrader);
+	console.log("[main] Candle listeners:", marketDataBus.listenerCount("candle"));
 });
 electron.app.on("window-all-closed", () => {
 	if (process.platform !== "darwin") electron.app.quit();

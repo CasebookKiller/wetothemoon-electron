@@ -1,3 +1,5 @@
+// src/main/ipcHandlers/mdHandlers.ts
+
 import { BrowserWindow, ipcMain } from 'electron';
 import { createMDWindow, getMDWindow } from '../windows/mdWindow';
 

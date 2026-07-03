@@ -92,7 +92,7 @@ export class OrderManager {
       return;
     }
     if (!this.config.token || !this.config.accountId) return;
-
+    
     const now = Date.now();
     if (now - this.lastOrderTime < 5 * 60 * 1000) {
       console.log('[OrderManager] Кулдаун, пропускаем сигнал');
@@ -120,6 +120,14 @@ export class OrderManager {
       this.updateDailyLoss(prevProfit);
     }
     this.lastEntryPrice = signal.price;
+
+    console.log('[OrderManager] Отправляю ордер:', {
+      instrumentId: signal.instrumentUid,
+      direction,
+      orderType: this.config.useMarketOrder ? 'MARKET' : 'LIMIT',
+      quantity,
+      accountId: this.config.accountId,
+    });
 
     try {
       const order = await sandboxGrpc.postSandboxOrder(

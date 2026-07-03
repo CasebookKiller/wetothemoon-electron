@@ -232,6 +232,7 @@ export const TradingAssistantPage: React.FC = () => {
     if (!api) return;
 
     api.onAutoTraderSignal((data: any) => {
+      console.log('[UI] Получен signal в рендерере:', data);
       setAutoTraderLog(prev => [...prev.slice(-19), {
         time: new Date().toLocaleTimeString(),
         text: `${data.instrumentUid.slice(0,8)}: ${data.signal.type} @ ${data.signal.price?.toFixed(2)} - ${data.signal.message || ''}`,

@@ -1,3 +1,5 @@
+// src/main/ipcHandlers/grpcHandlers.ts
+
 import { ipcMain } from 'electron';
 import { usersGrpc } from '@/main/services/tbank/UsersGrpcService';
 import { instrumentsGrpc } from '@/main/services/tbank/InstrumentsGrpcService';

@@ -74,6 +74,9 @@ import { OrderFlowEngine } from './services/orderFlowEngine.ts';
 import { AutonomousTrader } from './services/autonomousTrader.ts';
 import { setAutonomousTraderInstance } from './ipcHandlers/tradingAssistantHandlers';
 
+import { marketDataBus } from './services/marketDataBus';
+console.log('[main] marketDataBus instance id:', marketDataBus.getInstanceId());
+
 const historicalDataLoader = new HistoricalDataLoader();
 
 const scriptsDir = path.join(app.getPath('userData'), 'scripts');
@@ -219,7 +222,13 @@ app.whenReady().then(() => {
     strategyManager,
     compositeProfileService
   );
+  volumeProfileEngine.on('signal', (s) => console.log('[main test] signal', s.type));
+  marketDataBus.on('candle', (c) => {
+    console.log('[DEBUG candle] uid:', c.instrumentUid, 'time:', c.time);
+  });
+  console.log('[main] Добавили отладочного слушателя candle, всего слушателей:', marketDataBus.listenerCount('candle'));
   setAutonomousTraderInstance(autoTrader);
+  console.log('[main] Candle listeners:', marketDataBus.listenerCount('candle'));
   // (опционально) при необходимости сразу запустить для выбранного инструмента
   // autoTrader.start('e6123145-9665-43e0-8413-cd61b8aa9b13', getToken());
 });
@@ -740,10 +749,12 @@ setInterval(() => {
   const mem = process.memoryUsage();
   const win = getTradingAssistantWindow();
   if (win && !win.isDestroyed()) {
-    win.webContents.send('system:memory', {
-      rss: (mem.rss / 1024 / 1024).toFixed(1),
-      heap: (mem.heapUsed / 1024 / 1024).toFixed(1),
-    });
+    try {
+      win.webContents.send('system:memory', {
+        rss: (mem.rss / 1024 / 1024).toFixed(1),
+        heap: (mem.heapUsed / 1024 / 1024).toFixed(1),
+      });
+    } catch {}
   }
 }, 30000);
 

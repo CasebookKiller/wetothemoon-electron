@@ -7,6 +7,9 @@ import { CompositeProfileService } from './compositeProfile';
 import type { StreamCandle } from '@/api/tbank/marketdataStreamTypes';
 
 import { EventEmitter } from 'events';
+import { volumeProfileEngine } from './volumeProfileEngine';
+
+console.log('[autonomousTrader] marketDataBus instance id:', marketDataBus.getInstanceId());
 
 /**
  * Автономный трейдер, который динамически выбирает стратегии
@@ -38,47 +41,19 @@ export class AutonomousTrader extends EventEmitter {
       return;
     }
 
-    // Построить композитный профиль за последние 10 дней для контекста стратегий
-    try {
-      await this.compositeProfile.buildComposite(instrumentUid, 10, token);
-    } catch (e) {
-      console.warn(`[AutonomousTrader] Не удалось построить композитный профиль для ${instrumentUid}`, e);
-      // продолжаем без композита, стратегии могут использовать только текущий профиль
-    }
-
-    // Обработчик свечи
-    const handler = async (candle: StreamCandle) => {
-      if (candle.instrumentUid !== instrumentUid && (candle as any).figi !== instrumentUid) return;
-      try {
-        // 1. Проверим свечу
-        console.log(`[AutonomousTrader] Свеча для ${instrumentUid.slice(0,12)}: время=${candle.time}, цена закрытия=${candle.close}`);
-
-        // 2. Обновим фазу и стратегии
-        await this.strategyManager.update(instrumentUid);
-        const activeStrats = this.strategyManager.getActiveStrategies(); // если такого метода нет, добавим
-        console.log(`[AutonomousTrader] Фаза обновлена, активные стратегии: ${activeStrats?.join(', ') || 'нет'}`);
-
-        // 3. Получим сигналы
-        const signals = this.strategyManager.evaluateSignals(candle);
-        console.log(`[AutonomousTrader] Получено сигналов: ${signals.length}`);
-        for (const sig of signals) {
-          console.log(`[AutonomousTrader] Сигнал: ${sig.type} по цене ${sig.price} (${sig.reason || ''})`);
-this.emit('signal', { instrumentUid, signal: { type: sig.type, price: sig.price, reason: sig.reason }, timestamp: new Date().toISOString() });
-          this.emit('signal', { instrumentUid, signal: sig, timestamp: new Date().toISOString() });
-          try {
-            await this.orderManager.processSignal(sig);
-            this.emit('order-sent', { instrumentUid, signal: sig, status: 'sent' });
-          } catch (e: any) {
-            this.emit('order-error', { instrumentUid, signal: sig, error: e.message });
-          }
-        }
-      } catch (e) {
-        console.error(`[AutonomousTrader] Ошибка обработки ${instrumentUid}:`, e);
-      }
+    // Подписываемся на сигналы от VolumeProfileEngine (вместо marketDataBus)
+    const handler = (signal: any) => {
+      console.log('[AutonomousTrader] signal handler called', signal.instrumentUid, signal.type);
+      // Временно без фильтра – принимаем все сигналы
+      this.emit('signal', {
+        instrumentUid: signal.instrumentUid,
+        signal: { type: signal.type, price: signal.price, reason: signal.message },
+        timestamp: new Date().toISOString()
+      });
     };
-
-    // Подписываемся на свечи
-    marketDataBus.on('candle', handler);
+    console.log('[AutonomousTrader] Подписываемся на signal...');
+    volumeProfileEngine.on('signal', handler);
+    console.log('[AutonomousTrader] Подписка выполнена');
     this.active.set(instrumentUid, { handler });
     console.log(`[AutonomousTrader] Запущен для ${instrumentUid}`);
   }

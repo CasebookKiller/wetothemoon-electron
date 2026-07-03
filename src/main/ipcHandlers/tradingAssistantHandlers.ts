@@ -195,15 +195,15 @@ export const registerTradingAssistantHandlers = (
 
     // Обработчик обновления профиля
     const onProfileUpdate = (profile: any) => {
-      if (!win.isDestroyed()) {
-        win.webContents.send('trading-assistant:profile-update', profile);
+      if (win && !win.isDestroyed()) {
+        try { win.webContents.send('trading-assistant:profile-update', profile); } catch {}
       }
     };
 
     // Обработчик сигналов
     const onSignal = (signal: any) => {
-      if (!win.isDestroyed()) {
-        win.webContents.send('trading-assistant:signal', signal);
+      if (win && !win.isDestroyed()) {
+        try { win.webContents.send('trading-assistant:signal', signal); } catch {}
       }
     };
 
@@ -667,14 +667,14 @@ export const registerTradingAssistantHandlers = (
   marketDataBus.on('candle', (candle: any) => {
     const win = getTradingAssistantWindow();
     if (win && !win.isDestroyed()) {
-      win.webContents.send('candle-data', candle);
+      try { win.webContents.send('candle-data', candle); } catch {}
     }
   });
 
   marketDataBus.on('lastPrice', (data: any) => {
     const win = getTradingAssistantWindow();
     if (win && !win.isDestroyed()) {
-      win.webContents.send('last-price-data', data);
+      try { win.webContents.send('last-price-data', data); } catch {}
     }
   });
 
@@ -1059,7 +1059,13 @@ async function getCloudToken(serverUrl: string): Promise<string | null> {
 
     // Подписываемся на события автотрейдера
     const onSignal = (data: any) => {
-      if (!win.isDestroyed()) win.webContents.send('auto-trader:signal', data);
+      console.log('[IPC] Получен signal от автотрейдера');
+      if (!win.isDestroyed()) {
+        win.webContents.send('auto-trader:signal', data);
+        console.log('[IPC] signal отправлен в рендерер');
+      } else {
+        console.log('[IPC] Окно уничтожено, signal не отправлен');
+      }
     };
     const onOrderSent = (data: any) => {
       if (!win.isDestroyed()) win.webContents.send('auto-trader:order-sent', data);

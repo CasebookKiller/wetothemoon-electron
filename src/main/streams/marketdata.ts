@@ -87,6 +87,52 @@ export const registerMarketdataStreamHandlers = () => {
         buffer += chunk;
         // ... (существующий разбор JSON, оставь без изменений) ...
         // После успешного разбора оставляем остаток в buffer
+        // Пытаемся разобрать JSON-объекты из буфера
+        while (buffer.length > 0) {
+          let jsonEnd = -1;
+          let depth = 0;
+          for (let i = 0; i < buffer.length; i++) {
+            if (buffer[i] === '{') depth++;
+            else if (buffer[i] === '}') {
+              depth--;
+              if (depth === 0) {
+                jsonEnd = i + 1;
+                break;
+              }
+            }
+          }
+          if (jsonEnd === -1) break; // нет полного JSON-объекта
+
+          const jsonStr = buffer.substring(0, jsonEnd);
+          buffer = buffer.substring(jsonEnd);
+
+          let parsed: any;
+          try {
+            parsed = JSON.parse(jsonStr);
+          } catch (e) {
+            console.warn('[Stream] Failed to parse chunk:', jsonStr.slice(0, 100));
+            continue;
+          }
+
+          // --- НОВЫЙ КОД ---
+          // Обрабатываем MarketDataResponse
+          if (parsed.candle) {
+            const rawCandle = parsed.candle;
+            const candle = {
+              instrumentUid: rawCandle.instrumentUid || rawCandle.figi,
+              figi: rawCandle.figi,
+              open: rawCandle.open,
+              high: rawCandle.high,
+              low: rawCandle.low,
+              close: rawCandle.close,
+              volume: rawCandle.volume,
+              time: rawCandle.time,
+            };
+            console.log('[Stream] Эмитируем свечу для', candle.instrumentUid, candle.time);
+            marketDataBus.emit('candle', candle);
+          }
+          // Если нужно, обрабатываем другие типы данных (lastPrice, trades и т.д.)
+          }
       });
 
       stream.on('end', () => {
