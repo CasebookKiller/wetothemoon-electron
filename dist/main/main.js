@@ -3685,10 +3685,14 @@ var registerTradingAssistantHandlers = (historicalLoader, profileEngine, getToke
 		const win = electron.BrowserWindow.fromWebContents(event.sender);
 		if (!win) return;
 		const onProfileUpdate = (profile) => {
-			if (!win.isDestroyed()) win.webContents.send("trading-assistant:profile-update", profile);
+			if (win && !win.isDestroyed()) try {
+				win.webContents.send("trading-assistant:profile-update", profile);
+			} catch {}
 		};
 		const onSignal = (signal) => {
-			if (!win.isDestroyed()) win.webContents.send("trading-assistant:signal", signal);
+			if (win && !win.isDestroyed()) try {
+				win.webContents.send("trading-assistant:signal", signal);
+			} catch {}
 		};
 		volumeProfileEngine.on("profileUpdate", onProfileUpdate);
 		volumeProfileEngine.on("signal", onSignal);
@@ -4066,11 +4070,15 @@ var registerTradingAssistantHandlers = (historicalLoader, profileEngine, getToke
 	});
 	marketDataBus.on("candle", (candle) => {
 		const win = getTradingAssistantWindow();
-		if (win && !win.isDestroyed()) win.webContents.send("candle-data", candle);
+		if (win && !win.isDestroyed()) try {
+			win.webContents.send("candle-data", candle);
+		} catch {}
 	});
 	marketDataBus.on("lastPrice", (data) => {
 		const win = getTradingAssistantWindow();
-		if (win && !win.isDestroyed()) win.webContents.send("last-price-data", data);
+		if (win && !win.isDestroyed()) try {
+			win.webContents.send("last-price-data", data);
+		} catch {}
 	});
 	electron.ipcMain.handle("trading-assistant:get-positions", async (_, accountId) => {
 		const token = process.env.VITE_TSandBox || "";
@@ -6198,10 +6206,12 @@ var strategyManager = new StrategyManager(marketPhaseDetector, compositeProfileS
 setInterval(() => {
 	const mem = process.memoryUsage();
 	const win = getTradingAssistantWindow();
-	if (win && !win.isDestroyed()) win.webContents.send("system:memory", {
-		rss: (mem.rss / 1024 / 1024).toFixed(1),
-		heap: (mem.heapUsed / 1024 / 1024).toFixed(1)
-	});
+	if (win && !win.isDestroyed()) try {
+		win.webContents.send("system:memory", {
+			rss: (mem.rss / 1024 / 1024).toFixed(1),
+			heap: (mem.heapUsed / 1024 / 1024).toFixed(1)
+		});
+	} catch {}
 }, 3e4);
 //#endregion
 

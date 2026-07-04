@@ -227,6 +227,8 @@ export const TradingAssistantPage: React.FC = () => {
 
   const [autoTraderLog, setAutoTraderLog] = useState<Array<{ time: string; text: string; type: 'signal' | 'order' | 'error' }>>([]);
 
+  const [isWeekendMode, setIsWeekendMode] = useState(false);
+
   useEffect(() => {
     const api = (window as any).electronAPI;
     if (!api) return;
@@ -458,7 +460,9 @@ export const TradingAssistantPage: React.FC = () => {
           subscriptionAction: 'SUBSCRIPTION_ACTION_SUBSCRIBE',
           instruments: [{
             instrumentId: selectedInstrument,
-            interval: 'SUBSCRIPTION_INTERVAL_ONE_MINUTE'
+            interval: isWeekendMode
+              ? 'SUBSCRIPTION_INTERVAL_WEEKEND_ONE_MINUTE'
+              : 'SUBSCRIPTION_INTERVAL_ONE_MINUTE'
           }]
         }
       });
@@ -1025,7 +1029,10 @@ export const TradingAssistantPage: React.FC = () => {
         <span style={{ color: stream.active ? '#4caf50' : '#d32f2f', minWidth: '60px', fontSize: '0.85rem' }}>
           {stream.active ? '● Live' : '○ Stopped'}
         </span>
-
+        
+        <Checkbox checked={isWeekendMode} onChange={e => setIsWeekendMode(e.checked as boolean)} />
+        <label className="ml-1 mb-0" style={{ fontSize: '0.8rem' }}>Weekend</label>
+        
         {/* Разделитель */}
         <div style={{ borderLeft: '1px solid #555', height: '24px', margin: '0 8px' }} />
 
