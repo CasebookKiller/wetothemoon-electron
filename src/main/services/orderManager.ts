@@ -135,7 +135,7 @@ export class OrderManager {
         {
           instrumentId: instrumentId,
           direction: direction as any,
-          orderType: this.config.useMarketOrder ? OrderType.ORDER_TYPE_MARKET : OrderType.ORDER_TYPE_LIMIT,
+          orderType: (this.config.useMarketOrder ? 'ORDER_TYPE_MARKET' : 'ORDER_TYPE_LIMIT') as any,
           quantity,
           price: this.config.useMarketOrder ? undefined : { units: Math.floor(signal.price), nano: Math.round((signal.price % 1) * 1e9) },
           accountId: this.config.accountId,
@@ -202,7 +202,7 @@ export class OrderManager {
           token
         );
         console.log('[OrderManager] Ответ на стоп-ордер:', JSON.stringify(resp));
-        const stopOrderId = resp.stopOrderId || resp.orderId || null;
+        stopOrderId = resp.stopOrderId || resp.orderId || null;
         if (stopOrderId) {
           console.log(`[OrderManager] Стоп-лосс установлен на ${slPrice}, stopOrderId=${stopOrderId}`);
           this.activeStopOrderId = stopOrderId;
