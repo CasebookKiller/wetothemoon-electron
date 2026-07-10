@@ -5061,6 +5061,7 @@ var OrderManager = class {
 		});
 		const instrumentId = signal.figi || signal.instrumentUid;
 		try {
+			const orderId = `ord_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
 			const order = await sandboxGrpc.postSandboxOrder({
 				instrumentId,
 				direction,
@@ -5070,7 +5071,8 @@ var OrderManager = class {
 					units: Math.floor(signal.price),
 					nano: Math.round(signal.price % 1 * 1e9)
 				},
-				accountId: this.config.accountId
+				accountId: this.config.accountId,
+				orderId
 			}, this.config.token);
 			this.activeOrderId = order.orderId ?? null;
 			this.lastOrderTime = now;

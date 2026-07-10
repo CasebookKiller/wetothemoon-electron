@@ -131,6 +131,7 @@ export class OrderManager {
     });
     const instrumentId = (signal as any).figi || signal.instrumentUid;
     try {
+      const orderId = `ord_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
       const order = await sandboxGrpc.postSandboxOrder(
         {
           instrumentId: instrumentId,
@@ -139,6 +140,7 @@ export class OrderManager {
           quantity,
           price: this.config.useMarketOrder ? undefined : { units: Math.floor(signal.price), nano: Math.round((signal.price % 1) * 1e9) },
           accountId: this.config.accountId,
+          orderId: orderId,
         },
         this.config.token
       );
