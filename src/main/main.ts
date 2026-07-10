@@ -224,7 +224,8 @@ app.whenReady().then(() => {
   );
   volumeProfileEngine.on('signal', (s) => console.log('[main test] signal', s.type));
   marketDataBus.on('candle', (c) => {
-    console.log('[DEBUG candle] uid:', c.instrumentUid, 'time:', c.time);
+    //убираем вывод в дог
+    //console.log('[DEBUG candle] uid:', c.instrumentUid, 'time:', c.time);
   });
   console.log('[main] Добавили отладочного слушателя candle, всего слушателей:', marketDataBus.listenerCount('candle'));
   setAutonomousTraderInstance(autoTrader);

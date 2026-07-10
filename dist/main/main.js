@@ -5619,11 +5619,7 @@ var AutonomousTrader = class extends events.EventEmitter {
 				},
 				timestamp: (/* @__PURE__ */ new Date()).toISOString()
 			});
-			if (this.orderManager) {
-				const signalForOrder = { ...signal };
-				if (this.figiMap.has(signal.instrumentUid)) signalForOrder.instrumentUid = this.figiMap.get(signal.instrumentUid);
-				await this.orderManager.processSignal(signalForOrder);
-			}
+			if (this.orderManager) await this.orderManager.processSignal(signal);
 		};
 		this.orderManager.setRunning(true);
 		console.log("[AutonomousTrader] Подписываемся на signal...");
@@ -5753,9 +5749,7 @@ electron.app.whenReady().then(() => {
 	setOrderManagerInstance(orderManager);
 	const autoTrader = new AutonomousTrader(orderManager, strategyManager, compositeProfileService);
 	volumeProfileEngine.on("signal", (s) => console.log("[main test] signal", s.type));
-	marketDataBus.on("candle", (c) => {
-		console.log("[DEBUG candle] uid:", c.instrumentUid, "time:", c.time);
-	});
+	marketDataBus.on("candle", (c) => {});
 	console.log("[main] Добавили отладочного слушателя candle, всего слушателей:", marketDataBus.listenerCount("candle"));
 	setAutonomousTraderInstance(autoTrader);
 	console.log("[main] Candle listeners:", marketDataBus.listenerCount("candle"));

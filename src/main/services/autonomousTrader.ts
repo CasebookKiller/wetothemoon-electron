@@ -57,11 +57,16 @@ export class AutonomousTrader extends EventEmitter {
       });
       // Отправка сигнала в OrderManager
       if (this.orderManager) {
-        const signalForOrder = { ...signal };
-        if (this.figiMap.has(signal.instrumentUid)) {
-          signalForOrder.instrumentUid = this.figiMap.get(signal.instrumentUid);
-        }
-        await this.orderManager.processSignal(signalForOrder);
+        // Старый код (неправильный):
+        // const signalForOrder = { ...signal };
+        // if (this.figiMap.has(signal.instrumentUid)) {
+        //   signalForOrder.instrumentUid = this.figiMap.get(signal.instrumentUid);
+        // }
+        // await this.orderManager.processSignal(signalForOrder);
+
+        // Новый код:
+        await this.orderManager.processSignal(signal);
+        
       }
     };
 
