@@ -4954,15 +4954,6 @@ function registerTasksHandlers() {
 	});
 }
 //#endregion
-//#region src/api/tbank/stopordersTypes.ts
-var StopOrderType = /* @__PURE__ */ function(StopOrderType) {
-	StopOrderType[StopOrderType["STOP_ORDER_TYPE_UNSPECIFIED"] = 0] = "STOP_ORDER_TYPE_UNSPECIFIED";
-	StopOrderType[StopOrderType["STOP_ORDER_TYPE_TAKE_PROFIT"] = 1] = "STOP_ORDER_TYPE_TAKE_PROFIT";
-	StopOrderType[StopOrderType["STOP_ORDER_TYPE_STOP_LOSS"] = 2] = "STOP_ORDER_TYPE_STOP_LOSS";
-	StopOrderType[StopOrderType["STOP_ORDER_TYPE_STOP_LIMIT"] = 3] = "STOP_ORDER_TYPE_STOP_LIMIT";
-	return StopOrderType;
-}({});
-//#endregion
 //#region src/main/services/orderManager.ts
 var OrderManager = class {
 	config;
@@ -5031,7 +5022,7 @@ var OrderManager = class {
 			console.log("[OrderManager] Кулдаун, пропускаем сигнал");
 			return;
 		}
-		const direction = signal.type === "BUY" ? OrderDirection.ORDER_DIRECTION_BUY : OrderDirection.ORDER_DIRECTION_SELL;
+		const direction = signal.type === "BUY" ? "ORDER_DIRECTION_BUY" : "ORDER_DIRECTION_SELL";
 		let quantity = this.config.lotQuantity;
 		if (this.config.useDynamicSizing && this.historicalLoader) {
 			const atr = await this.calculateATR(signal.instrumentUid, this.config.token);
@@ -5091,8 +5082,8 @@ var OrderManager = class {
 		if (slPrice) try {
 			const resp = await sandboxGrpc.postSandboxStopOrder({
 				instrumentId: signal.instrumentUid,
-				direction: isBuy ? OrderDirection.ORDER_DIRECTION_SELL : OrderDirection.ORDER_DIRECTION_BUY,
-				stopOrderType: StopOrderType.STOP_ORDER_TYPE_STOP_LOSS,
+				direction: isBuy ? "ORDER_DIRECTION_SELL" : "ORDER_DIRECTION_BUY",
+				stopOrderType: "STOP_ORDER_TYPE_STOP_LOSS",
 				price: {
 					units: Math.floor(slPrice),
 					nano: Math.round(slPrice % 1 * 1e9)
@@ -5114,8 +5105,8 @@ var OrderManager = class {
 			try {
 				await sandboxGrpc.postSandboxStopOrder({
 					instrumentId: signal.instrumentUid,
-					direction: isBuy ? OrderDirection.ORDER_DIRECTION_SELL : OrderDirection.ORDER_DIRECTION_BUY,
-					stopOrderType: StopOrderType.STOP_ORDER_TYPE_TAKE_PROFIT,
+					direction: isBuy ? "ORDER_DIRECTION_SELL" : "ORDER_DIRECTION_BUY",
+					stopOrderType: "STOP_ORDER_TYPE_TAKE_PROFIT",
 					price: {
 						units: Math.floor(tpPrice),
 						nano: Math.round(tpPrice % 1 * 1e9)

@@ -100,7 +100,7 @@ export class OrderManager {
       return;
     }
 
-    const direction = signal.type === 'BUY' ? OrderDirection.ORDER_DIRECTION_BUY : OrderDirection.ORDER_DIRECTION_SELL;
+    const direction = signal.type === 'BUY' ? 'ORDER_DIRECTION_BUY' : 'ORDER_DIRECTION_SELL';
 
     // === ДИНАМИЧЕСКИЙ РАЗМЕР ПОЗИЦИИ ПО ATR ===
     let quantity = this.config.lotQuantity;
@@ -134,7 +134,7 @@ export class OrderManager {
       const order = await sandboxGrpc.postSandboxOrder(
         {
           instrumentId: instrumentId,
-          direction,
+          direction: direction as any,
           orderType: this.config.useMarketOrder ? OrderType.ORDER_TYPE_MARKET : OrderType.ORDER_TYPE_LIMIT,
           quantity,
           price: this.config.useMarketOrder ? undefined : { units: Math.floor(signal.price), nano: Math.round((signal.price % 1) * 1e9) },
@@ -193,8 +193,8 @@ export class OrderManager {
         const resp: any = await sandboxGrpc.postSandboxStopOrder(
           {
             instrumentId: signal.instrumentUid,
-            direction: (isBuy ? OrderDirection.ORDER_DIRECTION_SELL : OrderDirection.ORDER_DIRECTION_BUY) as any,
-            stopOrderType: StopOrderType.STOP_ORDER_TYPE_STOP_LOSS, // вместо 1
+            direction: (isBuy ? 'ORDER_DIRECTION_SELL' : 'ORDER_DIRECTION_BUY') as any,
+            stopOrderType: 'STOP_ORDER_TYPE_STOP_LOSS' as any,
             price: { units: Math.floor(slPrice), nano: Math.round((slPrice % 1) * 1e9) },
             quantity: lotQuantity,
             accountId,
@@ -223,8 +223,8 @@ export class OrderManager {
         await sandboxGrpc.postSandboxStopOrder(
           {
             instrumentId: signal.instrumentUid,
-            direction: (isBuy ? OrderDirection.ORDER_DIRECTION_SELL : OrderDirection.ORDER_DIRECTION_BUY) as any,
-            stopOrderType: StopOrderType.STOP_ORDER_TYPE_TAKE_PROFIT, // вместо 2
+            direction: (isBuy ? 'ORDER_DIRECTION_SELL' : 'ORDER_DIRECTION_BUY') as any,
+            stopOrderType: 'STOP_ORDER_TYPE_TAKE_PROFIT' as any,
             price: { units: Math.floor(tpPrice), nano: Math.round((tpPrice % 1) * 1e9) },
             quantity: lotQuantity,
             accountId,
