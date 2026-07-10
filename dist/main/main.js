@@ -4954,6 +4954,21 @@ function registerTasksHandlers() {
 	});
 }
 //#endregion
+//#region src/api/tbank/stopordersTypes.ts
+var StopOrderDirection = /* @__PURE__ */ function(StopOrderDirection) {
+	StopOrderDirection[StopOrderDirection["STOP_ORDER_DIRECTION_UNSPECIFIED"] = 0] = "STOP_ORDER_DIRECTION_UNSPECIFIED";
+	StopOrderDirection[StopOrderDirection["STOP_ORDER_DIRECTION_BUY"] = 1] = "STOP_ORDER_DIRECTION_BUY";
+	StopOrderDirection[StopOrderDirection["STOP_ORDER_DIRECTION_SELL"] = 2] = "STOP_ORDER_DIRECTION_SELL";
+	return StopOrderDirection;
+}({});
+var StopOrderType = /* @__PURE__ */ function(StopOrderType) {
+	StopOrderType[StopOrderType["STOP_ORDER_TYPE_UNSPECIFIED"] = 0] = "STOP_ORDER_TYPE_UNSPECIFIED";
+	StopOrderType[StopOrderType["STOP_ORDER_TYPE_TAKE_PROFIT"] = 1] = "STOP_ORDER_TYPE_TAKE_PROFIT";
+	StopOrderType[StopOrderType["STOP_ORDER_TYPE_STOP_LOSS"] = 2] = "STOP_ORDER_TYPE_STOP_LOSS";
+	StopOrderType[StopOrderType["STOP_ORDER_TYPE_STOP_LIMIT"] = 3] = "STOP_ORDER_TYPE_STOP_LIMIT";
+	return StopOrderType;
+}({});
+//#endregion
 //#region src/main/services/orderManager.ts
 var OrderManager = class {
 	config;
@@ -5022,7 +5037,7 @@ var OrderManager = class {
 			console.log("[OrderManager] Кулдаун, пропускаем сигнал");
 			return;
 		}
-		const direction = signal.type === "BUY" ? "ORDER_DIRECTION_BUY" : "ORDER_DIRECTION_SELL";
+		const direction = signal.type === "BUY" ? OrderDirection.ORDER_DIRECTION_BUY : OrderDirection.ORDER_DIRECTION_SELL;
 		let quantity = this.config.lotQuantity;
 		if (this.config.useDynamicSizing && this.historicalLoader) {
 			const atr = await this.calculateATR(signal.instrumentUid, this.config.token);
@@ -5040,25 +5055,22 @@ var OrderManager = class {
 		console.log("[OrderManager] Отправляю ордер:", {
 			instrumentId: signal.instrumentUid,
 			direction,
-			orderType: this.config.useMarketOrder ? "ORDER_TYPE_MARKET" : "ORDER_TYPE_LIMIT",
+			orderType: this.config.useMarketOrder ? OrderType.ORDER_TYPE_MARKET : OrderType.ORDER_TYPE_LIMIT,
 			quantity,
 			accountId: this.config.accountId
 		});
 		signal.figi || signal.instrumentUid;
 		try {
-			const orderId = `ord_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
-			console.log("[OrderManager] Сгенерирован orderId:", orderId);
 			const order = await sandboxGrpc.postSandboxOrder({
 				instrumentId: signal.instrumentUid,
 				direction,
-				orderType: this.config.useMarketOrder ? "ORDER_TYPE_MARKET" : "ORDER_TYPE_LIMIT",
+				orderType: this.config.useMarketOrder ? OrderType.ORDER_TYPE_MARKET : OrderType.ORDER_TYPE_LIMIT,
 				quantity,
 				price: this.config.useMarketOrder ? void 0 : {
 					units: Math.floor(signal.price),
 					nano: Math.round(signal.price % 1 * 1e9)
 				},
-				accountId: this.config.accountId,
-				orderId
+				accountId: this.config.accountId
 			}, this.config.token);
 			this.activeOrderId = order.orderId ?? null;
 			this.lastOrderTime = now;
@@ -5085,9 +5097,13 @@ var OrderManager = class {
 		if (slPrice) try {
 			const resp = await sandboxGrpc.postSandboxStopOrder({
 				instrumentId: signal.instrumentUid,
-				direction: isBuy ? "STOP_ORDER_DIRECTION_SELL" : "STOP_ORDER_DIRECTION_BUY",
-				stopOrderType: "STOP_ORDER_TYPE_STOP_LOSS",
+				direction: isBuy ? StopOrderDirection.STOP_ORDER_DIRECTION_SELL : StopOrderDirection.STOP_ORDER_DIRECTION_BUY,
+				stopOrderType: StopOrderType.STOP_ORDER_TYPE_STOP_LOSS,
 				price: {
+					units: Math.floor(slPrice),
+					nano: Math.round(slPrice % 1 * 1e9)
+				},
+				stopPrice: {
 					units: Math.floor(slPrice),
 					nano: Math.round(slPrice % 1 * 1e9)
 				},
@@ -5108,9 +5124,13 @@ var OrderManager = class {
 			try {
 				await sandboxGrpc.postSandboxStopOrder({
 					instrumentId: signal.instrumentUid,
-					direction: isBuy ? "STOP_ORDER_DIRECTION_SELL" : "STOP_ORDER_DIRECTION_BUY",
-					stopOrderType: "STOP_ORDER_TYPE_TAKE_PROFIT",
+					direction: isBuy ? StopOrderDirection.STOP_ORDER_DIRECTION_SELL : StopOrderDirection.STOP_ORDER_DIRECTION_BUY,
+					stopOrderType: StopOrderType.STOP_ORDER_TYPE_TAKE_PROFIT,
 					price: {
+						units: Math.floor(tpPrice),
+						nano: Math.round(tpPrice % 1 * 1e9)
+					},
+					stopPrice: {
 						units: Math.floor(tpPrice),
 						nano: Math.round(tpPrice % 1 * 1e9)
 					},
