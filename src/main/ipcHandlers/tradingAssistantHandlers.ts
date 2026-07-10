@@ -1057,8 +1057,8 @@ async function getCloudToken(serverUrl: string): Promise<string | null> {
   ipcMain.handle('trading-assistant:start-auto-trader', async (event: Electron.IpcMainInvokeEvent, instrumentUid: string) => {
     if (!autonomousTraderInstance) return { success: false, error: 'AutoTrader not initialized' };
     const token = process.env.VITE_TReadOnly || '';
-    await autonomousTraderInstance.start(instrumentUid, token, instrumentFigiMap);
-    //await autonomousTraderInstance.start(instrumentUid, token);
+    //await autonomousTraderInstance.start(instrumentUid, token, instrumentFigiMap);
+    await autonomousTraderInstance.start(instrumentUid, token);
 
     const win = BrowserWindow.fromWebContents(event.sender);
     if (!win) return { success: true }; // окно не найдено, но трейдер запущен

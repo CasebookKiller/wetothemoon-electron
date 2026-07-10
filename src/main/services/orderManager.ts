@@ -100,7 +100,8 @@ export class OrderManager {
       return;
     }
 
-    const direction = signal.type === 'BUY' ? OrderDirection.ORDER_DIRECTION_BUY : OrderDirection.ORDER_DIRECTION_SELL;
+    //const direction = signal.type === 'BUY' ? OrderDirection.ORDER_DIRECTION_BUY : OrderDirection.ORDER_DIRECTION_SELL;
+    const direction = signal.type === 'BUY' ? 'ORDER_DIRECTION_BUY' : 'ORDER_DIRECTION_SELL';
 
     // === ДИНАМИЧЕСКИЙ РАЗМЕР ПОЗИЦИИ ПО ATR ===
     let quantity = this.config.lotQuantity;
@@ -125,22 +126,26 @@ export class OrderManager {
     console.log('[OrderManager] Отправляю ордер:', {
       instrumentId: signal.instrumentUid,
       direction,
-      orderType: this.config.useMarketOrder ? OrderType.ORDER_TYPE_MARKET : OrderType.ORDER_TYPE_LIMIT,
+      //orderType: this.config.useMarketOrder ? OrderType.ORDER_TYPE_MARKET : OrderType.ORDER_TYPE_LIMIT,
+      orderType: this.config.useMarketOrder ? 'ORDER_TYPE_MARKET' : 'ORDER_TYPE_LIMIT',
       quantity,
       accountId: this.config.accountId,
     });
     const instrumentId = (signal as any).figi || signal.instrumentUid;
     try {
       const orderId = `ord_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
+      console.log('[OrderManager] Сгенерирован orderId:', orderId);
+
       const order = await sandboxGrpc.postSandboxOrder(
         {
-          instrumentId: instrumentId,
+          instrumentId: signal.instrumentUid,
           direction: direction as any,
-          orderType: this.config.useMarketOrder ? OrderType.ORDER_TYPE_MARKET : OrderType.ORDER_TYPE_LIMIT,
+          //orderType: this.config.useMarketOrder ? OrderType.ORDER_TYPE_MARKET : OrderType.ORDER_TYPE_LIMIT,
+          orderType: (this.config.useMarketOrder ? 'ORDER_TYPE_MARKET' : 'ORDER_TYPE_LIMIT') as any,
           quantity,
           price: this.config.useMarketOrder ? undefined : { units: Math.floor(signal.price), nano: Math.round((signal.price % 1) * 1e9) },
           accountId: this.config.accountId,
-          orderId: orderId,
+          orderId: orderId,   // ← обязательно
         },
         this.config.token
       );
@@ -195,8 +200,10 @@ export class OrderManager {
         const resp: any = await sandboxGrpc.postSandboxStopOrder(
           {
             instrumentId: signal.instrumentUid,
-            direction: (isBuy ? StopOrderDirection.STOP_ORDER_DIRECTION_SELL : StopOrderDirection.STOP_ORDER_DIRECTION_BUY) as any,
-            stopOrderType: StopOrderType.STOP_ORDER_TYPE_STOP_LOSS as any,
+            //direction: (isBuy ? StopOrderDirection.STOP_ORDER_DIRECTION_SELL : StopOrderDirection.STOP_ORDER_DIRECTION_BUY) as any,
+            //stopOrderType: StopOrderType.STOP_ORDER_TYPE_STOP_LOSS as any,
+            direction: (isBuy ? 'STOP_ORDER_DIRECTION_SELL' : 'STOP_ORDER_DIRECTION_BUY') as any,
+            stopOrderType: 'STOP_ORDER_TYPE_STOP_LOSS' as any,
             price: { units: Math.floor(slPrice), nano: Math.round((slPrice % 1) * 1e9) },
             quantity: lotQuantity,
             accountId,
@@ -225,8 +232,10 @@ export class OrderManager {
         await sandboxGrpc.postSandboxStopOrder(
           {
             instrumentId: signal.instrumentUid,
-            direction: (isBuy ? StopOrderDirection.STOP_ORDER_DIRECTION_SELL : StopOrderDirection.STOP_ORDER_DIRECTION_BUY) as any,
-            stopOrderType: StopOrderType.STOP_ORDER_TYPE_TAKE_PROFIT as any,
+            //direction: (isBuy ? StopOrderDirection.STOP_ORDER_DIRECTION_SELL : StopOrderDirection.STOP_ORDER_DIRECTION_BUY) as any,
+            //stopOrderType: StopOrderType.STOP_ORDER_TYPE_TAKE_PROFIT as any,
+            direction: (isBuy ? 'STOP_ORDER_DIRECTION_SELL' : 'STOP_ORDER_DIRECTION_BUY') as any,
+            stopOrderType: 'STOP_ORDER_TYPE_TAKE_PROFIT' as any,
             price: { units: Math.floor(tpPrice), nano: Math.round((tpPrice % 1) * 1e9) },
             quantity: lotQuantity,
             accountId,

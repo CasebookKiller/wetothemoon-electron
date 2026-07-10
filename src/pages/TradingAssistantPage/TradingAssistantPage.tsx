@@ -998,8 +998,8 @@ export const TradingAssistantPage: React.FC = () => {
     api.subscribeTradingAssistant();
 
     const onProfile = (newProfile: VolumeProfileLevels) => {
-      console.log('[Profile Update]', newProfile);                  // <-- лог
-      console.log('[Profile volumeByPrice]', newProfile.volumeByPrice?.length); // <-- лог
+      //console.log('[Profile Update]', newProfile);                  // <-- лог
+      //console.log('[Profile volumeByPrice]', newProfile.volumeByPrice?.length); // <-- лог
       if (newProfile.instrumentUid === selectedInstrument) {
         setProfile(newProfile);
       }

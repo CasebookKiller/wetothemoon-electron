@@ -1,109 +1,72 @@
 // src/main/services/autonomousTrader.ts
 
-import { marketDataBus } from './marketDataBus';
 import { OrderManager } from './orderManager';
 import { StrategyManager } from './strategyManager';
 import { CompositeProfileService } from './compositeProfile';
-import type { StreamCandle } from '@/api/tbank/marketdataStreamTypes';
-
-import { EventEmitter } from 'events';
 import { volumeProfileEngine } from './volumeProfileEngine';
+import { EventEmitter } from 'events';
 
-console.log('[autonomousTrader] marketDataBus instance id:', marketDataBus.getInstanceId());
-
-/**
- * Автономный трейдер, который динамически выбирает стратегии
- * в зависимости от текущей фазы рынка и автоматически отправляет
- * сигналы в OrderManager.
- *
- * Не зависит от Electron и может быть использован в облачном процессе.
- */
 export class AutonomousTrader extends EventEmitter {
-  // active хранит обработчики свечей для каждого запущенного инструмента
-  private active = new Map<string, { handler: (candle: StreamCandle) => void }>();
-  private figiMap = new Map<string, string>();
+  private active = new Map<string, { handler: (signal: any) => void }>();
 
   constructor(
     private orderManager: OrderManager,
     private strategyManager: StrategyManager,
     private compositeProfile: CompositeProfileService
   ) {
-    super(); // ← обязательно
+    super();
   }
 
-  /**
-   * Запустить автоматическую торговлю для указанного инструмента.
-   * @param instrumentUid - идентификатор инструмента
-   * @param token - токен для загрузки исторических данных (обычно read‑only)
-   */
-  async start(instrumentUid: string, token: string, figiMap?: Map<string, string>): Promise<void> {
-    if (figiMap) this.figiMap = figiMap;
+  async start(instrumentUid: string, token: string): Promise<void> {
+    // Если уже запущен для этого инструмента, останавливаем старый обработчик
     if (this.active.has(instrumentUid)) {
-      console.warn(`[AutonomousTrader] ${instrumentUid} уже запущен`);
-      return;
+      console.warn(`[AutonomousTrader] ${instrumentUid} уже запущен, перезапускаем`);
+      this.stop(instrumentUid);
     }
-    // Подписываемся на сигналы от VolumeProfileEngine (вместо marketDataBus)
+
     const handler = async (signal: any) => {
-      if (this.figiMap.has(signal.instrumentUid)) {
-        signal.figi = this.figiMap.get(signal.instrumentUid);
-      }
-      
       if (signal.instrumentUid !== instrumentUid) return;
+
       console.log(`[AutonomousTrader] signal handler called ${signal.instrumentUid} ${signal.type}`);
+
       this.emit('signal', {
         instrumentUid,
         signal: { type: signal.type, price: signal.price, reason: signal.message },
         timestamp: new Date().toISOString()
       });
-      // Отправка сигнала в OrderManager
-      if (this.orderManager) {
-        // Старый код (неправильный):
-        // const signalForOrder = { ...signal };
-        // if (this.figiMap.has(signal.instrumentUid)) {
-        //   signalForOrder.instrumentUid = this.figiMap.get(signal.instrumentUid);
-        // }
-        // await this.orderManager.processSignal(signalForOrder);
 
-        // Новый код:
+      if (this.orderManager) {
         await this.orderManager.processSignal(signal);
-        
       }
     };
 
-    // сразу после подписки добавить запуск OrderManager
-    this.orderManager.setRunning(true);
     console.log('[AutonomousTrader] Подписываемся на signal...');
     volumeProfileEngine.on('signal', handler);
     console.log('[AutonomousTrader] Подписка выполнена');
+
+    this.orderManager.setRunning(true);
+
     this.active.set(instrumentUid, { handler });
     console.log(`[AutonomousTrader] Запущен для ${instrumentUid}`);
   }
 
-  /**
-   * Остановить автоматическую торговлю для инструмента.
-   */
   stop(instrumentUid: string): void {
     const entry = this.active.get(instrumentUid);
     if (!entry) return;
-    marketDataBus.off('candle', entry.handler);
+
+    volumeProfileEngine.off('signal', entry.handler);
     this.active.delete(instrumentUid);
-    // Сбрасываем активные стратегии, чтобы не оставались устаревшие
+
     this.strategyManager.reset();
     console.log(`[AutonomousTrader] Остановлен для ${instrumentUid}`);
   }
 
-  /**
-   * Остановить все активные трейдеры.
-   */
   stopAll(): void {
     for (const uid of this.active.keys()) {
       this.stop(uid);
     }
   }
 
-  /**
-   * Получить список идентификаторов инструментов, для которых активна торговля.
-   */
   getActiveInstruments(): string[] {
     return Array.from(this.active.keys());
   }
