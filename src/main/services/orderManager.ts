@@ -6,7 +6,7 @@ import type { BacktestSignal } from './backtest/common';
 import { marketDataGrpc } from './tbank/MarketDataGrpcService';  // <-- новый импорт (в начале файла)
 import type { OrderFlowEngine } from './orderFlowEngine';
 import { HistoricalDataLoader } from './historicalDataLoader';
-import { StopOrderType } from '@/api/tbank/stopordersTypes';
+import { StopOrderType, StopOrderDirection } from '@/api/tbank/stopordersTypes';
 
 export interface OrderManagerConfig {
   lotQuantity: number;
@@ -100,7 +100,7 @@ export class OrderManager {
       return;
     }
 
-    const direction = signal.type === 'BUY' ? 'ORDER_DIRECTION_BUY' : 'ORDER_DIRECTION_SELL';
+    const direction = signal.type === 'BUY' ? OrderDirection.ORDER_DIRECTION_BUY : OrderDirection.ORDER_DIRECTION_SELL;
 
     // === ДИНАМИЧЕСКИЙ РАЗМЕР ПОЗИЦИИ ПО ATR ===
     let quantity = this.config.lotQuantity;
@@ -135,7 +135,7 @@ export class OrderManager {
         {
           instrumentId: instrumentId,
           direction: direction as any,
-          orderType: (this.config.useMarketOrder ? 'ORDER_TYPE_MARKET' : 'ORDER_TYPE_LIMIT') as any,
+          orderType: this.config.useMarketOrder ? OrderType.ORDER_TYPE_MARKET : OrderType.ORDER_TYPE_LIMIT,
           quantity,
           price: this.config.useMarketOrder ? undefined : { units: Math.floor(signal.price), nano: Math.round((signal.price % 1) * 1e9) },
           accountId: this.config.accountId,
@@ -193,8 +193,8 @@ export class OrderManager {
         const resp: any = await sandboxGrpc.postSandboxStopOrder(
           {
             instrumentId: signal.instrumentUid,
-            direction: (isBuy ? 'ORDER_DIRECTION_SELL' : 'ORDER_DIRECTION_BUY') as any,
-            stopOrderType: 'STOP_ORDER_TYPE_STOP_LOSS' as any,
+            direction: (isBuy ? StopOrderDirection.STOP_ORDER_DIRECTION_SELL : StopOrderDirection.STOP_ORDER_DIRECTION_BUY) as any,
+            stopOrderType: StopOrderType.STOP_ORDER_TYPE_STOP_LOSS as any,
             price: { units: Math.floor(slPrice), nano: Math.round((slPrice % 1) * 1e9) },
             quantity: lotQuantity,
             accountId,
@@ -223,8 +223,8 @@ export class OrderManager {
         await sandboxGrpc.postSandboxStopOrder(
           {
             instrumentId: signal.instrumentUid,
-            direction: (isBuy ? 'ORDER_DIRECTION_SELL' : 'ORDER_DIRECTION_BUY') as any,
-            stopOrderType: 'STOP_ORDER_TYPE_TAKE_PROFIT' as any,
+            direction: (isBuy ? StopOrderDirection.STOP_ORDER_DIRECTION_SELL : StopOrderDirection.STOP_ORDER_DIRECTION_BUY) as any,
+            stopOrderType: StopOrderType.STOP_ORDER_TYPE_TAKE_PROFIT as any,
             price: { units: Math.floor(tpPrice), nano: Math.round((tpPrice % 1) * 1e9) },
             quantity: lotQuantity,
             accountId,
