@@ -3575,6 +3575,7 @@ function getAvailableStrategies() {
 }
 //#endregion
 //#region src/main/ipcHandlers/tradingAssistantHandlers.ts
+var instrumentFigiMap = /* @__PURE__ */ new Map();
 var orderManagerInstance = null;
 var setOrderManagerInstance = (manager) => {
 	orderManagerInstance = manager;
@@ -4058,6 +4059,9 @@ var registerTradingAssistantHandlers = (historicalLoader, profileEngine, getToke
 		while (attempt < maxRetries) try {
 			console.log(`[GetAllInstruments] Попытка ${attempt + 1} из ${maxRetries}`);
 			const instruments = ((await instrumentsGrpc.shares({ instrumentStatus: 1 }, token)).instruments || []).filter((inst) => inst.apiTradeAvailableFlag === true && inst.currency?.toLowerCase() === "rub");
+			instruments.forEach((inst) => {
+				if (inst.uid && inst.figi) instrumentFigiMap.set(inst.uid, inst.figi);
+			});
 			console.log(`[GetAllInstruments] Найдено ${instruments.length} российских акций`);
 			return instruments.map((inst) => ({
 				uid: inst.uid || inst.figi,
@@ -4380,7 +4384,7 @@ var registerTradingAssistantHandlers = (historicalLoader, profileEngine, getToke
 			error: "AutoTrader not initialized"
 		};
 		const token = process.env.VITE_TReadOnly || "";
-		await autonomousTraderInstance.start(instrumentUid, token);
+		await autonomousTraderInstance.start(instrumentUid, token, instrumentFigiMap);
 		const win = electron.BrowserWindow.fromWebContents(event.sender);
 		if (!win) return { success: true };
 		const onSignal = (data) => {
@@ -5049,9 +5053,10 @@ var OrderManager = class {
 			quantity,
 			accountId: this.config.accountId
 		});
+		const instrumentId = signal.figi || signal.instrumentUid;
 		try {
 			const order = await sandboxGrpc.postSandboxOrder({
-				instrumentId: signal.instrumentUid,
+				instrumentId,
 				direction,
 				orderType: this.config.useMarketOrder ? OrderType.ORDER_TYPE_MARKET : OrderType.ORDER_TYPE_LIMIT,
 				quantity,
@@ -5583,6 +5588,7 @@ var AutonomousTrader = class extends events.EventEmitter {
 	strategyManager;
 	compositeProfile;
 	active = /* @__PURE__ */ new Map();
+	figiMap = /* @__PURE__ */ new Map();
 	constructor(orderManager, strategyManager, compositeProfile) {
 		super();
 		this.orderManager = orderManager;
@@ -5594,12 +5600,14 @@ var AutonomousTrader = class extends events.EventEmitter {
 	* @param instrumentUid - идентификатор инструмента
 	* @param token - токен для загрузки исторических данных (обычно read‑only)
 	*/
-	async start(instrumentUid, token) {
+	async start(instrumentUid, token, figiMap) {
+		if (figiMap) this.figiMap = figiMap;
 		if (this.active.has(instrumentUid)) {
 			console.warn(`[AutonomousTrader] ${instrumentUid} уже запущен`);
 			return;
 		}
 		const handler = async (signal) => {
+			if (this.figiMap.has(signal.instrumentUid)) signal.figi = this.figiMap.get(signal.instrumentUid);
 			if (signal.instrumentUid !== instrumentUid) return;
 			console.log(`[AutonomousTrader] signal handler called ${signal.instrumentUid} ${signal.type}`);
 			this.emit("signal", {
@@ -5611,7 +5619,11 @@ var AutonomousTrader = class extends events.EventEmitter {
 				},
 				timestamp: (/* @__PURE__ */ new Date()).toISOString()
 			});
-			if (this.orderManager) await this.orderManager.processSignal(signal);
+			if (this.orderManager) {
+				const signalForOrder = { ...signal };
+				if (this.figiMap.has(signal.instrumentUid)) signalForOrder.instrumentUid = this.figiMap.get(signal.instrumentUid);
+				await this.orderManager.processSignal(signalForOrder);
+			}
 		};
 		this.orderManager.setRunning(true);
 		console.log("[AutonomousTrader] Подписываемся на signal...");

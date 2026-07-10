@@ -21,6 +21,7 @@ console.log('[autonomousTrader] marketDataBus instance id:', marketDataBus.getIn
 export class AutonomousTrader extends EventEmitter {
   // active хранит обработчики свечей для каждого запущенного инструмента
   private active = new Map<string, { handler: (candle: StreamCandle) => void }>();
+  private figiMap = new Map<string, string>();
 
   constructor(
     private orderManager: OrderManager,
@@ -35,14 +36,18 @@ export class AutonomousTrader extends EventEmitter {
    * @param instrumentUid - идентификатор инструмента
    * @param token - токен для загрузки исторических данных (обычно read‑only)
    */
-  async start(instrumentUid: string, token: string): Promise<void> {
+  async start(instrumentUid: string, token: string, figiMap?: Map<string, string>): Promise<void> {
+    if (figiMap) this.figiMap = figiMap;
     if (this.active.has(instrumentUid)) {
       console.warn(`[AutonomousTrader] ${instrumentUid} уже запущен`);
       return;
     }
-
     // Подписываемся на сигналы от VolumeProfileEngine (вместо marketDataBus)
     const handler = async (signal: any) => {
+      if (this.figiMap.has(signal.instrumentUid)) {
+        signal.figi = this.figiMap.get(signal.instrumentUid);
+      }
+      
       if (signal.instrumentUid !== instrumentUid) return;
       console.log(`[AutonomousTrader] signal handler called ${signal.instrumentUid} ${signal.type}`);
       this.emit('signal', {
@@ -52,7 +57,11 @@ export class AutonomousTrader extends EventEmitter {
       });
       // Отправка сигнала в OrderManager
       if (this.orderManager) {
-        await this.orderManager.processSignal(signal);
+        const signalForOrder = { ...signal };
+        if (this.figiMap.has(signal.instrumentUid)) {
+          signalForOrder.instrumentUid = this.figiMap.get(signal.instrumentUid);
+        }
+        await this.orderManager.processSignal(signalForOrder);
       }
     };
 

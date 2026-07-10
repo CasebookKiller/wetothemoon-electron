@@ -129,11 +129,11 @@ export class OrderManager {
       quantity,
       accountId: this.config.accountId,
     });
-
+    const instrumentId = (signal as any).figi || signal.instrumentUid;
     try {
       const order = await sandboxGrpc.postSandboxOrder(
         {
-          instrumentId: signal.instrumentUid,
+          instrumentId: instrumentId,
           direction,
           orderType: this.config.useMarketOrder ? OrderType.ORDER_TYPE_MARKET : OrderType.ORDER_TYPE_LIMIT,
           quantity,

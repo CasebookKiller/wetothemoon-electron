@@ -33,6 +33,8 @@ import { CompositeProfileService } from '../services/compositeProfile';
 import { MarketPhase } from '../services/marketPhaseDetector';
 import { AutonomousTrader } from '../services/autonomousTrader';
 
+const instrumentFigiMap = new Map<string, string>();
+
 let orderManagerInstance: OrderManager | null = null;
 
 export const setOrderManagerInstance = (manager: OrderManager) => {
@@ -642,6 +644,9 @@ export const registerTradingAssistantHandlers = (
             inst.apiTradeAvailableFlag === true &&
             inst.currency?.toLowerCase() === 'rub'
         );
+        instruments.forEach((inst: any) => {
+          if (inst.uid && inst.figi) instrumentFigiMap.set(inst.uid, inst.figi);
+        });
         console.log(`[GetAllInstruments] Найдено ${instruments.length} российских акций`);
         return instruments.map((inst: any) => ({
           uid: inst.uid || inst.figi,
@@ -1052,7 +1057,8 @@ async function getCloudToken(serverUrl: string): Promise<string | null> {
   ipcMain.handle('trading-assistant:start-auto-trader', async (event: Electron.IpcMainInvokeEvent, instrumentUid: string) => {
     if (!autonomousTraderInstance) return { success: false, error: 'AutoTrader not initialized' };
     const token = process.env.VITE_TReadOnly || '';
-    await autonomousTraderInstance.start(instrumentUid, token);
+    await autonomousTraderInstance.start(instrumentUid, token, instrumentFigiMap);
+    //await autonomousTraderInstance.start(instrumentUid, token);
 
     const win = BrowserWindow.fromWebContents(event.sender);
     if (!win) return { success: true }; // окно не найдено, но трейдер запущен
