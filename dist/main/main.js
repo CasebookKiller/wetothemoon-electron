@@ -5055,7 +5055,7 @@ var OrderManager = class {
 		console.log("[OrderManager] Отправляю ордер:", {
 			instrumentId: signal.instrumentUid,
 			direction,
-			orderType: this.config.useMarketOrder ? "MARKET" : "LIMIT",
+			orderType: this.config.useMarketOrder ? OrderType.ORDER_TYPE_MARKET : OrderType.ORDER_TYPE_LIMIT,
 			quantity,
 			accountId: this.config.accountId
 		});
