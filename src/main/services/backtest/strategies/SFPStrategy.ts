@@ -1,4 +1,5 @@
 // src/main/services/backtest/strategies/SFPStrategy.ts
+
 import type { StreamCandle } from '@/api/tbank/marketdataStreamTypes';
 import type { VolumeProfileLevels } from '../../volumeProfileEngine';
 import type { IBacktestStrategy } from '../backtestEngine';

@@ -42,15 +42,22 @@ export class AutonomousTrader extends EventEmitter {
     }
 
     // Подписываемся на сигналы от VolumeProfileEngine (вместо marketDataBus)
-    const handler = (signal: any) => {
-      console.log('[AutonomousTrader] signal handler called', signal.instrumentUid, signal.type);
-      // Временно без фильтра – принимаем все сигналы
+    const handler = async (signal: any) => {
+      if (signal.instrumentUid !== instrumentUid) return;
+      console.log(`[AutonomousTrader] signal handler called ${signal.instrumentUid} ${signal.type}`);
       this.emit('signal', {
-        instrumentUid: signal.instrumentUid,
+        instrumentUid,
         signal: { type: signal.type, price: signal.price, reason: signal.message },
         timestamp: new Date().toISOString()
       });
+      // Отправка сигнала в OrderManager
+      if (this.orderManager) {
+        await this.orderManager.processSignal(signal);
+      }
     };
+
+    // сразу после подписки добавить запуск OrderManager
+    this.orderManager.setRunning(true);
     console.log('[AutonomousTrader] Подписываемся на signal...');
     volumeProfileEngine.on('signal', handler);
     console.log('[AutonomousTrader] Подписка выполнена');

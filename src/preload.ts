@@ -318,7 +318,10 @@ try {
       ipcRenderer.removeAllListeners('auto-trader:signal');
       ipcRenderer.removeAllListeners('auto-trader:order-sent');
       ipcRenderer.removeAllListeners('auto-trader:order-error');
-    }
+    },
+
+    getOrderFlowSnapshot: (instrumentUid: string) =>
+      ipcRenderer.invoke('trading-assistant:get-orderflow-snapshot', instrumentUid),
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

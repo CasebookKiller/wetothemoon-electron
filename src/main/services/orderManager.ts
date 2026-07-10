@@ -6,6 +6,7 @@ import type { BacktestSignal } from './backtest/common';
 import { marketDataGrpc } from './tbank/MarketDataGrpcService';  // <-- новый импорт (в начале файла)
 import type { OrderFlowEngine } from './orderFlowEngine';
 import { HistoricalDataLoader } from './historicalDataLoader';
+import { StopOrderType } from '@/api/tbank/stopordersTypes';
 
 export interface OrderManagerConfig {
   lotQuantity: number;
@@ -147,17 +148,17 @@ export class OrderManager {
 
       this.lastEntryPrice = signal.price;
 
-      await this.placeStopOrders(signal);
+      const stopOrderId = await this.placeStopOrders(signal);
 
-      if (this.config.trailingEnabled && this.activeStopOrderId) {
-        this.startTrailing(signal.instrumentUid, signal.price, this.activeStopOrderId, this.config.trailingPercent);
+      if (this.config.trailingEnabled && stopOrderId) {
+        this.startTrailing(signal.instrumentUid, signal.price, stopOrderId, this.config.trailingPercent);
       }
     } catch (error) {
       console.error('[OrderManager] Ошибка отправки ордера:', error);
     }
   }
 
-  private async placeStopOrders(signal: BacktestSignal): Promise<void> {
+  private async placeStopOrders(signal: BacktestSignal): Promise<string | null> {
     const {
       stopLossPercent,
       takeProfitPercent,
@@ -168,12 +169,13 @@ export class OrderManager {
       volatilityMultiplier
     } = this.config;
 
-    if (stopLossPercent <= 0 && takeProfitPercent <= 0 && trailingMode !== 'volatility') return;
-    if (!accountId || !token || !signal.instrumentUid) return;
+    if (stopLossPercent <= 0 && takeProfitPercent <= 0 && trailingMode !== 'volatility') return null;
+    if (!accountId || !token || !signal.instrumentUid) return null;
 
     const entryPrice = signal.price;
     const isBuy = signal.type === 'BUY';
     let slPrice: number | null = null;
+    let stopOrderId: string | null = null;
 
     if (trailingMode === 'volatility' && volatilityMultiplier && this.historicalLoader) {
       const atr = await this.calculateATR(signal.instrumentUid, token);
@@ -188,18 +190,25 @@ export class OrderManager {
 
     if (slPrice) {
       try {
-        await sandboxGrpc.postSandboxStopOrder(
+        const resp: any = await sandboxGrpc.postSandboxStopOrder(
           {
             instrumentId: signal.instrumentUid,
             direction: (isBuy ? OrderDirection.ORDER_DIRECTION_SELL : OrderDirection.ORDER_DIRECTION_BUY) as any,
-            stopOrderType: 1, // STOP_LOSS
+            stopOrderType: StopOrderType.STOP_ORDER_TYPE_STOP_LOSS, // вместо 1
             price: { units: Math.floor(slPrice), nano: Math.round((slPrice % 1) * 1e9) },
             quantity: lotQuantity,
             accountId,
           },
           token
         );
-        console.log(`[OrderManager] Стоп-лосс установлен на ${slPrice}`);
+        console.log('[OrderManager] Ответ на стоп-ордер:', JSON.stringify(resp));
+        const stopOrderId = resp.stopOrderId || resp.orderId || null;
+        if (stopOrderId) {
+          console.log(`[OrderManager] Стоп-лосс установлен на ${slPrice}, stopOrderId=${stopOrderId}`);
+          this.activeStopOrderId = stopOrderId;
+        } else {
+          console.warn('[OrderManager] Не удалось получить ID стоп-ордера из ответа');
+        }
       } catch (e) {
         console.error('[OrderManager] Ошибка установки стоп-лосса:', e);
       }
@@ -215,7 +224,7 @@ export class OrderManager {
           {
             instrumentId: signal.instrumentUid,
             direction: (isBuy ? OrderDirection.ORDER_DIRECTION_SELL : OrderDirection.ORDER_DIRECTION_BUY) as any,
-            stopOrderType: 2, // TAKE_PROFIT
+            stopOrderType: StopOrderType.STOP_ORDER_TYPE_TAKE_PROFIT, // вместо 2
             price: { units: Math.floor(tpPrice), nano: Math.round((tpPrice % 1) * 1e9) },
             quantity: lotQuantity,
             accountId,
@@ -227,6 +236,8 @@ export class OrderManager {
         console.error('[OrderManager] Ошибка установки тейк-профита:', e);
       }
     }
+
+    return stopOrderId;
   }
 
   async cancelActiveOrder(): Promise<void> {
@@ -244,6 +255,10 @@ export class OrderManager {
   }
 
   startTrailing(instrumentUid: string, entryPrice: number, stopOrderId: string, trailPercent: number): void {
+    if (this.trailingActive) {
+      console.log('[OrderManager] Трейлинг уже активен, перезапускаем с новым стоп‑ордером');
+      this.stopTrailing();
+    }
     this.trailingActive = true;
     this.trailingInstrumentUid = instrumentUid;
     this.trailingEntryPrice = entryPrice;

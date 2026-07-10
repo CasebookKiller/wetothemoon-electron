@@ -34,6 +34,7 @@ import { TradesTab } from '@/components/TRADING_ASSISTANT/TradesTab/TradesTab';
 import { ScreenerTab } from '@/components/TRADING_ASSISTANT/ScreenerTab/ScreenerTab';
 import { CloudTab } from '@/components/TRADING_ASSISTANT/CloudTab/CloudTab';
 import { CloudFarmerTab } from '@/components/TRADING_ASSISTANT/CloudFarmerTab/CloudFarmerTab';
+import { Tag } from 'primereact/tag';
 
 interface BatchResult {
   batchId: string;
@@ -108,10 +109,15 @@ export const TradingAssistantPage: React.FC = () => {
     takeProfitPercent: 1.0,
     trailingEnabled: false,
     trailingPercent: 0.5,
+    trailingMode: 'percent' as 'percent' | 'volatility',   // <-- добавить
     dailyLossEnabled: false,
     dailyLossLimit: 0,
     maxSignalsPerDay: 0,
     minIntervalMinutes: 15,
+    dynamicSizing: false,
+    riskAmount: 1000,
+    atrPeriod: 14,
+    atrMultiplier: 2,
   });
   const [showSandboxSettings, setShowSandboxSettings] = useState(false);
 
@@ -228,6 +234,21 @@ export const TradingAssistantPage: React.FC = () => {
   const [autoTraderLog, setAutoTraderLog] = useState<Array<{ time: string; text: string; type: 'signal' | 'order' | 'error' }>>([]);
 
   const [isWeekendMode, setIsWeekendMode] = useState(false);
+
+  const [orderFlowData, setOrderFlowData] = useState<{ delta: number; absorption: any; exhaustion: any } | null>(null);
+
+  useEffect(() => {
+    if (!selectedInstrument) return;
+    const api = (window as any).electronAPI;
+    if (!api?.getOrderFlowSnapshot) return;
+
+    const interval = setInterval(async () => {
+      const data = await api.getOrderFlowSnapshot(selectedInstrument);
+      setOrderFlowData(data);
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [selectedInstrument]);
 
   useEffect(() => {
     const api = (window as any).electronAPI;
@@ -386,6 +407,11 @@ export const TradingAssistantPage: React.FC = () => {
       trailingPercent: sandbox.trailingPercent,
       maxSignalsPerDay: sandbox.maxSignalsPerDay,
       minIntervalMinutes: sandbox.minIntervalMinutes,
+      useDynamicSizing: sandbox.dynamicSizing,
+      riskAmount: sandbox.riskAmount,
+      atrPeriod: sandbox.atrPeriod,       // если используется ATR
+      atrMultiplier: sandbox.atrMultiplier,
+      trailingMode: sandbox.trailingMode,
     });
     alert('Config applied');
   };
@@ -401,8 +427,26 @@ export const TradingAssistantPage: React.FC = () => {
   const startAutoTraderHandler = async () => {
     const api = (window as any).electronAPI;
     if (!api?.startAutoTrader) return;
+
+    // 1. Сначала применяем текущие настройки риск‑менеджмента
+    await api.updateTradingConfig({
+      token: sandbox.token,
+      accountId: sandbox.accountId,
+      demoMode: sandbox.demoMode,
+      lotQuantity: sandbox.lotQty,
+      stopLossPercent: sandbox.stopLossPercent,
+      takeProfitPercent: sandbox.takeProfitPercent,
+      trailingEnabled: sandbox.trailingEnabled,
+      trailingPercent: sandbox.trailingPercent,
+      trailingMode: sandbox.trailingMode,
+      useDynamicSizing: sandbox.dynamicSizing,
+      riskAmount: sandbox.riskAmount,
+      atrPeriod: sandbox.atrPeriod,
+      atrMultiplier: sandbox.atrMultiplier,
+    });
+
+    // 2. Запускаем автотрейдер
     await api.startAutoTrader(selectedInstrument);
-    // Обновляем список активных
     const active = await api.getActiveAutoTraders();
     setActiveAutoTraders(active);
   };
@@ -1100,7 +1144,9 @@ export const TradingAssistantPage: React.FC = () => {
                     className={`p-button-sm ${autoTrading ? 'p-button-danger' : 'p-button-success'} border-round-sm p-1 px-2`}
                   />
                   <Button label="Apply" onClick={applyConfig} className="p-button-sm p-button-secondary border-round-sm p-1 px-2" />
-
+                </div>
+                
+                <div className="flex align-items-center flex-wrap gap-2 mt-3">
                   <label className="mr-1 mb-0">Lots</label>
                   <InputNumber
                     id="lotQty"
@@ -1140,13 +1186,52 @@ export const TradingAssistantPage: React.FC = () => {
                     />
                   )}
 
+                  {/* Dynamic Lots */}
+                  <Checkbox
+                    checked={sandbox.dynamicSizing}
+                    onChange={e => updateSandbox({ dynamicSizing: e.checked })}
+                  />
+                  <label className="ml-1 mr-2 mb-0">Dyn.Lots</label>
+                  {sandbox.dynamicSizing && (
+                    <InputNumber
+                      value={sandbox.riskAmount}
+                      onValueChange={e => updateSandbox({ riskAmount: e.value ?? 1000 })}
+                      step={100}
+                      min={0}
+                      size={3}
+                      className="p-inputtext-sm"
+                      placeholder="Risk RUB"
+                    />
+                  )}
+
+                  {/* ATR Settings (показываем, только если включён Dynamic Lots или волатильный трейлинг) */}
+                  {(sandbox.dynamicSizing || sandbox.trailingMode === 'volatility') && (
+                    <label className="mr-1 mb-0">ATR Per</label>
+                  )}
+                  {(sandbox.dynamicSizing || sandbox.trailingMode === 'volatility') && (
+                    <InputNumber
+                      value={sandbox.atrPeriod}
+                      onValueChange={e => updateSandbox({ atrPeriod: e.value ?? 14 })}
+                      min={5} max={50} step={1} size={2} className="p-inputtext-sm"
+                    />
+                  )}
+                  {(sandbox.dynamicSizing || sandbox.trailingMode === 'volatility') && (
+                    <label className="ml-2 mr-1 mb-0">Mult</label>
+                  )}
+                  {(sandbox.dynamicSizing || sandbox.trailingMode === 'volatility') && (
+                    <InputNumber
+                      value={sandbox.atrMultiplier}
+                      onValueChange={e => updateSandbox({ atrMultiplier: e.value ?? 2.0 })}
+                      min={0.5} max={5} step={0.1} size={2} className="p-inputtext-sm"
+                    />
+                  )}
+
                   <Button
                     icon="pi pi-cog"
                     onClick={() => setShowSandboxSettings(true)}
                     className="p-button-sm p-button-secondary p-1 px-2"
                     tooltip="Settings"
                   />
-
 
                   <div className="flex align-items-center flex-wrap gap-2 mt-3">
                     <label className="mr-1 mb-0">Auto (Phase-based)</label>
@@ -1167,6 +1252,22 @@ export const TradingAssistantPage: React.FC = () => {
                       <span className="text-sm ml-2">
                         Active: {activeAutoTraders.map(uid => availableInstruments.find(i => i.uid === uid)?.ticker || uid.slice(0,8)).join(', ')}
                       </span>
+                    )}
+                    {orderFlowData && (
+                      <>
+                        <div className="flex align-items-center ml-2" style={{ fontSize: '0.8rem' }}>
+                          <span className="mr-1">Δ</span>
+                          <span style={{ color: orderFlowData.delta >= 0 ? '#4caf50' : '#f44336', fontWeight: 'bold' }}>
+                            {orderFlowData.delta > 0 ? '+' : ''}{orderFlowData.delta}
+                          </span>
+                        </div>
+                        {orderFlowData.absorption && (
+                          <Tag severity="info" value={`Abs: ${orderFlowData.absorption.side}`} style={{ fontSize: '0.7rem' }} />
+                        )}
+                        {orderFlowData.exhaustion && (
+                          <Tag severity="warning" value={`Exh: ${orderFlowData.exhaustion.type}`} style={{ fontSize: '0.7rem' }} />
+                        )}
+                      </>
                     )}
                   </div>
 

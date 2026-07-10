@@ -119,6 +119,48 @@ export const LogTab: React.FC<Props> = ({ accountId }) => {
             loading={loading}
             className="p-button-sm p-button-secondary"
           />
+          <Button
+            label="CSV"
+            icon="pi pi-download"
+            className="p-button-sm p-button-success p-1 px-2"
+            disabled={operations.length === 0}
+            onClick={() => {
+              const header = 'Date,Type,Ticker,Quantity,Price,Payment,Commission';
+              const rows = operations.map(op => [
+                op.date ? new Date(op.date).toLocaleString() : '',
+                op.type,
+                op.ticker || op.figi || '',
+                op.quantity || '',
+                formatCurrency(op.price),
+                formatCurrency(op.payment),
+                formatCurrency(op.commission),
+              ].join(',')).join('\n');
+              const csv = header + '\n' + rows;
+              const blob = new Blob([csv], { type: 'text/csv' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `operations_${new Date().toISOString().slice(0,10)}.csv`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+          />
+          <Button
+            label="JSON"
+            icon="pi pi-file"
+            className="p-button-sm p-button-secondary p-1 px-2"
+            disabled={operations.length === 0}
+            onClick={() => {
+              const json = JSON.stringify(operations, null, 2);
+              const blob = new Blob([json], { type: 'application/json' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `operations_${new Date().toISOString().slice(0,10)}.json`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+          />
         </div>
 
         <DataTable

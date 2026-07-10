@@ -42,8 +42,12 @@ export function createStrategy(
     case 'va_breakout_retest': return new VABreakoutRetestStrategy(instrumentUid, profile);
     case 'sfp': return new SFPStrategy(instrumentUid, profile);
     case 'anchored_vwap': return new AnchoredVWAPStrategy(instrumentUid, profile, options?.anchorTime ? new Date(options.anchorTime) : undefined);
-    case 'absorption': return new AbsorptionStrategy(instrumentUid, profile, orderFlow!);
-    case 'exhaustion': return new ExhaustionStrategy(instrumentUid, profile, orderFlow!);
+    case 'absorption':
+      if (!orderFlow) throw new Error('AbsorptionStrategy requires OrderFlowEngine');
+      return new AbsorptionStrategy(instrumentUid, profile, orderFlow);
+    case 'exhaustion':
+      if (!orderFlow) throw new Error('ExhaustionStrategy requires OrderFlowEngine');
+      return new ExhaustionStrategy(instrumentUid, profile, orderFlow);
     default: throw new Error(`Unknown strategy: ${name}`);
   }
 }

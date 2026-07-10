@@ -1092,4 +1092,11 @@ async function getCloudToken(serverUrl: string): Promise<string | null> {
   ipcMain.handle('trading-assistant:get-active-auto-traders', async () => {
     return autonomousTraderInstance ? autonomousTraderInstance.getActiveInstruments() : [];
   });
+
+  ipcMain.handle('trading-assistant:get-orderflow-snapshot', (_, instrumentUid: string) => {
+    const delta = orderFlowEngine.getDelta(instrumentUid);
+    const absorption = orderFlowEngine.detectAbsorption(instrumentUid);
+    const exhaustion = orderFlowEngine.detectExhaustion(instrumentUid);
+    return { delta, absorption, exhaustion };
+  });
 };

@@ -919,16 +919,14 @@ var marketDataBus = class MarketDataBus extends events.EventEmitter {
 }.getInstance();
 //#endregion
 //#region src/main/streams/marketdata.ts
-var MAX_RECONNECT_ATTEMPTS = 10;
-var BASE_DELAY_MS = 1e3;
+var MAX_RECONNECT_ATTEMPTS = 3;
+var BASE_DELAY_MS = 3e3;
 var retryTimeout = null;
 var retryCount = 0;
-var stopRequested = false;
-var registerMarketdataStreamHandlers = () => {
-	let currentStream = null;
-	console.log("[Main] registerMDStreamHandlers called");
+var currentStream = null;
+var client$8 = null;
+function createClient() {
 	const PROTO_PATH = getProtoPath("marketdata.proto");
-	console.log("[Main] Proto path:", PROTO_PATH);
 	const packageDefinition = _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_proto_loader_build_src_index_js.loadSync(PROTO_PATH, {
 		keepCase: false,
 		longs: String,
@@ -937,12 +935,13 @@ var registerMarketdataStreamHandlers = () => {
 		oneofs: true
 	});
 	const MarketDataStreamService = _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.loadPackageDefinition(packageDefinition).tinkoff.public.invest.api.contract.v1.MarketDataStreamService;
-	console.log("[Main] Proto loaded, service:", !!MarketDataStreamService);
-	const client = new MarketDataStreamService("invest-public-api.tbank.ru:443", _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.credentials.createSsl(null, null, null, { rejectUnauthorized: false }), { "grpc.ssl_target_name_override": "invest-public-api.tbank.ru" });
-	console.log("[Main] gRPC client created");
+	return new MarketDataStreamService("invest-public-api.tbank.ru:443", _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.credentials.createSsl(null, null, null, { rejectUnauthorized: false }), { "grpc.ssl_target_name_override": "invest-public-api.tbank.ru" });
+}
+var registerMarketdataStreamHandlers = () => {
+	console.log("[Main] registerMDStreamHandlers called");
+	client$8 = createClient();
 	electron.ipcMain.handle("md-stream-start", async (_, token, requestBody) => {
 		console.log("[Main] md-stream-start called");
-		stopRequested = false;
 		if (currentStream) {
 			currentStream.cancel();
 			currentStream = null;
@@ -952,15 +951,24 @@ var registerMarketdataStreamHandlers = () => {
 			retryTimeout = null;
 		}
 		retryCount = 0;
+		if (client$8) try {
+			client$8.close();
+		} catch (e) {}
+		client$8 = createClient();
 		const connect = () => {
-			if (stopRequested) {
-				console.log("[Main] Reconnect stopped by user");
+			if (retryCount >= MAX_RECONNECT_ATTEMPTS) {
+				console.error("[Main] Достигнуто максимальное количество попыток переподключения");
 				return;
 			}
-			console.log(`[Main] Connecting stream (attempt ${retryCount + 1})`);
+			console.log(`[Main] Подключение стрима (попытка ${retryCount + 1})`);
 			const metadata = new _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.Metadata();
 			metadata.add("Authorization", `Bearer ${token}`);
-			const stream = client.MarketDataServerSideStream(requestBody, metadata);
+			const stream = client$8.MarketDataServerSideStream(requestBody, metadata);
+			if (!stream) {
+				console.error("[Main] Не удалось создать стрим");
+				if (retryCount < MAX_RECONNECT_ATTEMPTS) scheduleReconnect();
+				return;
+			}
 			currentStream = stream;
 			let buffer = "";
 			stream.on("data", (data) => {
@@ -985,56 +993,49 @@ var registerMarketdataStreamHandlers = () => {
 					try {
 						parsed = JSON.parse(jsonStr);
 					} catch (e) {
-						console.warn("[Stream] Failed to parse chunk:", jsonStr.slice(0, 100));
+						console.warn("[Stream] Ошибка парсинга");
 						continue;
 					}
 					if (parsed.candle) {
-						const rawCandle = parsed.candle;
-						const candle = {
-							instrumentUid: rawCandle.instrumentUid || rawCandle.figi,
-							figi: rawCandle.figi,
-							open: rawCandle.open,
-							high: rawCandle.high,
-							low: rawCandle.low,
-							close: rawCandle.close,
-							volume: rawCandle.volume,
-							time: rawCandle.time
-						};
-						console.log("[Stream] Эмитируем свечу для", candle.instrumentUid, candle.time);
-						marketDataBus.emit("candle", candle);
+						const c = parsed.candle;
+						marketDataBus.emit("candle", {
+							instrumentUid: c.instrumentUid || c.figi,
+							figi: c.figi,
+							open: c.open,
+							high: c.high,
+							low: c.low,
+							close: c.close,
+							volume: c.volume,
+							time: c.time
+						});
 					}
 				}
 			});
 			stream.on("end", () => {
-				console.log("[Main] Stream ended");
+				console.log("[Main] Стрим завершён");
 				currentStream = null;
-				if (!stopRequested) scheduleReconnect();
+				if (retryCount < MAX_RECONNECT_ATTEMPTS) scheduleReconnect();
 			});
 			stream.on("error", (err) => {
-				console.error("[Main] Stream error:", err.message);
+				console.error(`[Main] Ошибка стрима: ${err.message}`);
 				currentStream = null;
-				if (!stopRequested) scheduleReconnect();
-			});
-			stream.on("status", (status) => {
-				console.log("[Main] Stream status:", status);
+				if (err.code === 8) {
+					console.error("[Main] Лимит стримов исчерпан, дальнейшие попытки остановлены");
+					return;
+				}
+				if (retryCount < MAX_RECONNECT_ATTEMPTS) scheduleReconnect();
 			});
 		};
 		const scheduleReconnect = () => {
-			if (stopRequested) return;
-			if (retryCount >= MAX_RECONNECT_ATTEMPTS) {
-				console.error("[Main] Max reconnection attempts reached");
-				return;
-			}
 			const delay = BASE_DELAY_MS * Math.pow(2, retryCount);
 			retryCount++;
-			console.log(`[Main] Scheduling reconnect in ${delay}ms (attempt ${retryCount})`);
+			console.log(`[Main] Переподключение через ${delay / 1e3}с (попытка ${retryCount})`);
 			retryTimeout = setTimeout(connect, delay);
 		};
 		connect();
 	});
 	electron.ipcMain.handle("md-stream-stop", async () => {
 		console.log("[Main] md-stream-stop called");
-		stopRequested = true;
 		if (retryTimeout) {
 			clearTimeout(retryTimeout);
 			retryTimeout = null;
@@ -3546,8 +3547,12 @@ function createStrategy(name, instrumentUid, profile, orderFlow, options) {
 		case "va_breakout_retest": return new VABreakoutRetestStrategy(instrumentUid, profile);
 		case "sfp": return new SFPStrategy(instrumentUid, profile);
 		case "anchored_vwap": return new AnchoredVWAPStrategy(instrumentUid, profile, options?.anchorTime ? new Date(options.anchorTime) : void 0);
-		case "absorption": return new AbsorptionStrategy(instrumentUid, profile, orderFlow);
-		case "exhaustion": return new ExhaustionStrategy(instrumentUid, profile, orderFlow);
+		case "absorption":
+			if (!orderFlow) throw new Error("AbsorptionStrategy requires OrderFlowEngine");
+			return new AbsorptionStrategy(instrumentUid, profile, orderFlow);
+		case "exhaustion":
+			if (!orderFlow) throw new Error("ExhaustionStrategy requires OrderFlowEngine");
+			return new ExhaustionStrategy(instrumentUid, profile, orderFlow);
 		default: throw new Error(`Unknown strategy: ${name}`);
 	}
 }
@@ -4407,6 +4412,13 @@ var registerTradingAssistantHandlers = (historicalLoader, profileEngine, getToke
 	electron.ipcMain.handle("trading-assistant:get-active-auto-traders", async () => {
 		return autonomousTraderInstance ? autonomousTraderInstance.getActiveInstruments() : [];
 	});
+	electron.ipcMain.handle("trading-assistant:get-orderflow-snapshot", (_, instrumentUid) => {
+		return {
+			delta: orderFlowEngine.getDelta(instrumentUid),
+			absorption: orderFlowEngine.detectAbsorption(instrumentUid),
+			exhaustion: orderFlowEngine.detectExhaustion(instrumentUid)
+		};
+	});
 };
 //#endregion
 //#region src/shared/types/promptgenerator.ts
@@ -4938,6 +4950,15 @@ function registerTasksHandlers() {
 	});
 }
 //#endregion
+//#region src/api/tbank/stopordersTypes.ts
+var StopOrderType = /* @__PURE__ */ function(StopOrderType) {
+	StopOrderType[StopOrderType["STOP_ORDER_TYPE_UNSPECIFIED"] = 0] = "STOP_ORDER_TYPE_UNSPECIFIED";
+	StopOrderType[StopOrderType["STOP_ORDER_TYPE_TAKE_PROFIT"] = 1] = "STOP_ORDER_TYPE_TAKE_PROFIT";
+	StopOrderType[StopOrderType["STOP_ORDER_TYPE_STOP_LOSS"] = 2] = "STOP_ORDER_TYPE_STOP_LOSS";
+	StopOrderType[StopOrderType["STOP_ORDER_TYPE_STOP_LIMIT"] = 3] = "STOP_ORDER_TYPE_STOP_LIMIT";
+	return StopOrderType;
+}({});
+//#endregion
 //#region src/main/services/orderManager.ts
 var OrderManager = class {
 	config;
@@ -5044,28 +5065,29 @@ var OrderManager = class {
 			this.lastOrderTime = now;
 			console.log(`[OrderManager] Ордер отправлен: ${this.activeOrderId}`);
 			this.lastEntryPrice = signal.price;
-			await this.placeStopOrders(signal);
-			if (this.config.trailingEnabled && this.activeStopOrderId) this.startTrailing(signal.instrumentUid, signal.price, this.activeStopOrderId, this.config.trailingPercent);
+			const stopOrderId = await this.placeStopOrders(signal);
+			if (this.config.trailingEnabled && stopOrderId) this.startTrailing(signal.instrumentUid, signal.price, stopOrderId, this.config.trailingPercent);
 		} catch (error) {
 			console.error("[OrderManager] Ошибка отправки ордера:", error);
 		}
 	}
 	async placeStopOrders(signal) {
 		const { stopLossPercent, takeProfitPercent, lotQuantity, token, accountId, trailingMode, volatilityMultiplier } = this.config;
-		if (stopLossPercent <= 0 && takeProfitPercent <= 0 && trailingMode !== "volatility") return;
-		if (!accountId || !token || !signal.instrumentUid) return;
+		if (stopLossPercent <= 0 && takeProfitPercent <= 0 && trailingMode !== "volatility") return null;
+		if (!accountId || !token || !signal.instrumentUid) return null;
 		const entryPrice = signal.price;
 		const isBuy = signal.type === "BUY";
 		let slPrice = null;
+		let stopOrderId = null;
 		if (trailingMode === "volatility" && volatilityMultiplier && this.historicalLoader) {
 			const atr = await this.calculateATR(signal.instrumentUid, token);
 			if (atr && atr > 0) slPrice = isBuy ? entryPrice - atr * volatilityMultiplier : entryPrice + atr * volatilityMultiplier;
 		} else if (stopLossPercent > 0) slPrice = isBuy ? entryPrice * (1 - stopLossPercent / 100) : entryPrice * (1 + stopLossPercent / 100);
 		if (slPrice) try {
-			await sandboxGrpc.postSandboxStopOrder({
+			const resp = await sandboxGrpc.postSandboxStopOrder({
 				instrumentId: signal.instrumentUid,
 				direction: isBuy ? OrderDirection.ORDER_DIRECTION_SELL : OrderDirection.ORDER_DIRECTION_BUY,
-				stopOrderType: 1,
+				stopOrderType: StopOrderType.STOP_ORDER_TYPE_STOP_LOSS,
 				price: {
 					units: Math.floor(slPrice),
 					nano: Math.round(slPrice % 1 * 1e9)
@@ -5073,7 +5095,12 @@ var OrderManager = class {
 				quantity: lotQuantity,
 				accountId
 			}, token);
-			console.log(`[OrderManager] Стоп-лосс установлен на ${slPrice}`);
+			console.log("[OrderManager] Ответ на стоп-ордер:", JSON.stringify(resp));
+			const stopOrderId = resp.stopOrderId || resp.orderId || null;
+			if (stopOrderId) {
+				console.log(`[OrderManager] Стоп-лосс установлен на ${slPrice}, stopOrderId=${stopOrderId}`);
+				this.activeStopOrderId = stopOrderId;
+			} else console.warn("[OrderManager] Не удалось получить ID стоп-ордера из ответа");
 		} catch (e) {
 			console.error("[OrderManager] Ошибка установки стоп-лосса:", e);
 		}
@@ -5083,7 +5110,7 @@ var OrderManager = class {
 				await sandboxGrpc.postSandboxStopOrder({
 					instrumentId: signal.instrumentUid,
 					direction: isBuy ? OrderDirection.ORDER_DIRECTION_SELL : OrderDirection.ORDER_DIRECTION_BUY,
-					stopOrderType: 2,
+					stopOrderType: StopOrderType.STOP_ORDER_TYPE_TAKE_PROFIT,
 					price: {
 						units: Math.floor(tpPrice),
 						nano: Math.round(tpPrice % 1 * 1e9)
@@ -5096,6 +5123,7 @@ var OrderManager = class {
 				console.error("[OrderManager] Ошибка установки тейк-профита:", e);
 			}
 		}
+		return stopOrderId;
 	}
 	async cancelActiveOrder() {
 		if (!this.activeOrderId || !this.config.token || !this.config.accountId) return;
@@ -5112,6 +5140,10 @@ var OrderManager = class {
 		}
 	}
 	startTrailing(instrumentUid, entryPrice, stopOrderId, trailPercent) {
+		if (this.trailingActive) {
+			console.log("[OrderManager] Трейлинг уже активен, перезапускаем с новым стоп‑ордером");
+			this.stopTrailing();
+		}
 		this.trailingActive = true;
 		this.trailingInstrumentUid = instrumentUid;
 		this.trailingEntryPrice = entryPrice;
@@ -5211,33 +5243,6 @@ var OrderManager = class {
 		}
 	}
 };
-//#endregion
-//#region src/main/services/tradingConnector.ts
-function connectOrderManager(manager) {
-	volumeProfileEngine.on("signal", (signal) => {
-		console.log("[TradingConnector] Получен сигнал:", signal);
-		manager.processSignal(signal);
-	});
-}
-//#endregion
-//#region src/main/services/liveStrategyConnector.ts
-function connectLiveStrategy(instrumentUid, manager) {
-	const strategy = new VolumeAccumulationStrategy(instrumentUid, null, {
-		volumeFilterEnabled: false,
-		volumeFilterPeriod: 20,
-		maxSignalsPerDay: manager.getConfig().maxSignalsPerDay,
-		minIntervalMinutes: manager.getConfig().minIntervalMinutes
-	});
-	volumeProfileEngine.on("profileUpdate", (profile) => {
-		if (profile.instrumentUid === instrumentUid) strategy.updateProfile(profile);
-	});
-	marketDataBus.on("candle", (candle) => {
-		strategy.onCandle(candle);
-		const signals = strategy.getSignals();
-		for (const signal of signals) manager.processSignal(signal);
-		strategy.clearSignals();
-	});
-}
 //#endregion
 //#region src/main/services/compositeProfile.ts
 var CompositeProfileService = class {
@@ -5594,10 +5599,11 @@ var AutonomousTrader = class extends events.EventEmitter {
 			console.warn(`[AutonomousTrader] ${instrumentUid} уже запущен`);
 			return;
 		}
-		const handler = (signal) => {
-			console.log("[AutonomousTrader] signal handler called", signal.instrumentUid, signal.type);
+		const handler = async (signal) => {
+			if (signal.instrumentUid !== instrumentUid) return;
+			console.log(`[AutonomousTrader] signal handler called ${signal.instrumentUid} ${signal.type}`);
 			this.emit("signal", {
-				instrumentUid: signal.instrumentUid,
+				instrumentUid,
 				signal: {
 					type: signal.type,
 					price: signal.price,
@@ -5605,7 +5611,9 @@ var AutonomousTrader = class extends events.EventEmitter {
 				},
 				timestamp: (/* @__PURE__ */ new Date()).toISOString()
 			});
+			if (this.orderManager) await this.orderManager.processSignal(signal);
 		};
+		this.orderManager.setRunning(true);
 		console.log("[AutonomousTrader] Подписываемся на signal...");
 		volumeProfileEngine.on("signal", handler);
 		console.log("[AutonomousTrader] Подписка выполнена");
@@ -5730,9 +5738,7 @@ electron.app.whenReady().then(() => {
 		token: "",
 		accountId: ""
 	}, orderFlowEngine);
-	connectOrderManager(orderManager);
 	setOrderManagerInstance(orderManager);
-	connectLiveStrategy("e6123145-9665-43e0-8413-cd61b8aa9b13", orderManager);
 	const autoTrader = new AutonomousTrader(orderManager, strategyManager, compositeProfileService);
 	volumeProfileEngine.on("signal", (s) => console.log("[main test] signal", s.type));
 	marketDataBus.on("candle", (c) => {

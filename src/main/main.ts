@@ -211,10 +211,10 @@ app.whenReady().then(() => {
     token: '',        // можно задать позже через UI
     accountId: '',
   }, orderFlowEngine);
-  connectOrderManager(orderManager);
+  // connectOrderManager(orderManager); временное отключение для проверки исправления ошибки
   setOrderManagerInstance(orderManager);
   // Подключаем live-стратегию для выбранного инструмента (пока захардкожен)
-  connectLiveStrategy('e6123145-9665-43e0-8413-cd61b8aa9b13', orderManager);
+  // connectLiveStrategy('e6123145-9665-43e0-8413-cd61b8aa9b13', orderManager);
   // -------------------------------------------------
   // ---------- Автономный трейдер ----------
   const autoTrader = new AutonomousTrader(

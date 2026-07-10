@@ -1,5 +1,7 @@
-import type { StreamCandle } from '../../../generated/marketdataStreamTypes';
-import type { VolumeProfileLevels } from '../../../../volumeProfileEngine';
+// src/main/services/backtest/strategies/POCPullbackStrategy.ts
+
+import type { StreamCandle } from '@/api/tbank/marketdataStreamTypes';
+import type { VolumeProfileLevels } from '../../volumeProfileEngine';
 import type { IBacktestStrategy } from '../backtestEngine';
 import { BacktestSignal, quotationToNumber } from '../common';
 
