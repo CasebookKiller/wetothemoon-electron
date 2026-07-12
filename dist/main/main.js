@@ -5224,7 +5224,7 @@ var OrderManager = class {
 			if (slPrice) {
 				slPrice = isBuy ? Math.max(slPrice, entryPrice * .98) : Math.min(slPrice, entryPrice * 1.02);
 				try {
-					const orderId = `sl_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
+					const orderId = this.generateUUID();
 					stopOrderId = (await sandboxGrpc.postSandboxOrder({
 						instrumentId: signal.instrumentUid,
 						direction: isBuy ? OrderDirection.ORDER_DIRECTION_SELL : OrderDirection.ORDER_DIRECTION_BUY,
@@ -5238,6 +5238,7 @@ var OrderManager = class {
 						orderId
 					}, token)).orderId || null;
 					console.log(`[OrderManager] Стоп‑лосс (лимитный) выставлен на ${slPrice}, orderId=${stopOrderId}`);
+					await new Promise((resolve) => setTimeout(resolve, 200));
 				} catch (e) {
 					console.error("[OrderManager] Ошибка выставления стоп‑лосса:", e);
 				}
@@ -5246,7 +5247,7 @@ var OrderManager = class {
 		if (takeProfitPercent > 0) {
 			const tpPrice = isBuy ? entryPrice * (1 + takeProfitPercent / 100) : entryPrice * (1 - takeProfitPercent / 100);
 			try {
-				const orderId = `tp_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
+				const orderId = this.generateUUID();
 				takeProfitOrderId = (await sandboxGrpc.postSandboxOrder({
 					instrumentId: signal.instrumentUid,
 					direction: isBuy ? OrderDirection.ORDER_DIRECTION_SELL : OrderDirection.ORDER_DIRECTION_BUY,

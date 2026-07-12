@@ -317,7 +317,8 @@ export class OrderManager {
           : Math.min(slPrice, entryPrice * (1 + MAX_SL_DEVIATION));
 
         try {
-          const orderId = `sl_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
+          //const orderId = `sl_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
+          const orderId = this.generateUUID();
           const resp: any = await sandboxGrpc.postSandboxOrder(
             {
               instrumentId: signal.instrumentUid,
@@ -332,6 +333,7 @@ export class OrderManager {
           );
           stopOrderId = resp.orderId || null;
           console.log(`[OrderManager] Стоп‑лосс (лимитный) выставлен на ${slPrice}, orderId=${stopOrderId}`);
+          await new Promise(resolve => setTimeout(resolve, 200));
         } catch (e) {
           console.error('[OrderManager] Ошибка выставления стоп‑лосса:', e);
         }
@@ -344,7 +346,8 @@ export class OrderManager {
         ? entryPrice * (1 + takeProfitPercent / 100)
         : entryPrice * (1 - takeProfitPercent / 100);
       try {
-        const orderId = `tp_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
+        //const orderId = `tp_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
+        const orderId = this.generateUUID();
         const resp: any = await sandboxGrpc.postSandboxOrder(
           {
             instrumentId: signal.instrumentUid,
