@@ -5238,7 +5238,7 @@ var OrderManager = class {
 						orderId
 					}, token)).orderId || null;
 					console.log(`[OrderManager] Стоп‑лосс (лимитный) выставлен на ${slPrice}, orderId=${stopOrderId}`);
-					await new Promise((resolve) => setTimeout(resolve, 200));
+					await new Promise((resolve) => setTimeout(resolve, 500));
 				} catch (e) {
 					console.error("[OrderManager] Ошибка выставления стоп‑лосса:", e);
 				}
@@ -5246,7 +5246,9 @@ var OrderManager = class {
 		}
 		if (takeProfitPercent > 0) {
 			const tpPrice = isBuy ? entryPrice * (1 + takeProfitPercent / 100) : entryPrice * (1 - takeProfitPercent / 100);
-			try {
+			let attempts = 0;
+			const maxAttempts = 3;
+			while (attempts < maxAttempts) try {
 				const orderId = this.generateUUID();
 				takeProfitOrderId = (await sandboxGrpc.postSandboxOrder({
 					instrumentId: signal.instrumentUid,
@@ -5261,8 +5263,16 @@ var OrderManager = class {
 					orderId
 				}, token)).orderId || null;
 				console.log(`[OrderManager] Тейк‑профит (лимитный) выставлен на ${tpPrice}, orderId=${takeProfitOrderId}`);
+				break;
 			} catch (e) {
-				console.error("[OrderManager] Ошибка выставления тейк‑профита:", e);
+				if (e?.code === 8 && attempts < maxAttempts - 1) {
+					console.warn(`[OrderManager] Превышен лимит запросов, повтор через 1с (попытка ${attempts + 1})`);
+					await new Promise((resolve) => setTimeout(resolve, 1e3));
+					attempts++;
+				} else {
+					console.error("[OrderManager] Ошибка выставления тейк‑профита:", e);
+					break;
+				}
 			}
 		}
 		return {

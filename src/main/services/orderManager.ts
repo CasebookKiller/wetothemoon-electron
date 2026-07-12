@@ -333,37 +333,50 @@ export class OrderManager {
           );
           stopOrderId = resp.orderId || null;
           console.log(`[OrderManager] Стоп‑лосс (лимитный) выставлен на ${slPrice}, orderId=${stopOrderId}`);
-          await new Promise(resolve => setTimeout(resolve, 200));
+          await new Promise(resolve => setTimeout(resolve, 500)); // 500 мс
         } catch (e) {
           console.error('[OrderManager] Ошибка выставления стоп‑лосса:', e);
         }
       }
     }
 
-    // --- Тейк‑профит (лимитный ордер) ---
+    // --- Тейк‑профит (лимитный ордер) с retry ---
     if (takeProfitPercent > 0) {
       const tpPrice = isBuy
         ? entryPrice * (1 + takeProfitPercent / 100)
         : entryPrice * (1 - takeProfitPercent / 100);
-      try {
-        //const orderId = `tp_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
-        const orderId = this.generateUUID();
-        const resp: any = await sandboxGrpc.postSandboxOrder(
-          {
-            instrumentId: signal.instrumentUid,
-            direction: isBuy ? OrderDirection.ORDER_DIRECTION_SELL : OrderDirection.ORDER_DIRECTION_BUY,
-            orderType: OrderType.ORDER_TYPE_LIMIT,
-            quantity: lotQuantity,
-            price: { units: Math.floor(tpPrice), nano: Math.round((tpPrice % 1) * 1e9) },
-            accountId,
-            orderId: orderId,
-          } as any,
-          token
-        );
-        takeProfitOrderId = resp.orderId || null;
-        console.log(`[OrderManager] Тейк‑профит (лимитный) выставлен на ${tpPrice}, orderId=${takeProfitOrderId}`);
-      } catch (e) {
-        console.error('[OrderManager] Ошибка выставления тейк‑профита:', e);
+
+      let attempts = 0;
+      const maxAttempts = 3;
+      while (attempts < maxAttempts) {
+        try {
+          const orderId = this.generateUUID();
+          const resp: any = await sandboxGrpc.postSandboxOrder(
+            {
+              instrumentId: signal.instrumentUid,
+              direction: isBuy ? OrderDirection.ORDER_DIRECTION_SELL : OrderDirection.ORDER_DIRECTION_BUY,
+              orderType: OrderType.ORDER_TYPE_LIMIT,
+              quantity: lotQuantity,
+              price: { units: Math.floor(tpPrice), nano: Math.round((tpPrice % 1) * 1e9) },
+              accountId,
+              orderId: orderId,
+            } as any,
+            token
+          );
+          takeProfitOrderId = resp.orderId || null;
+          console.log(`[OrderManager] Тейк‑профит (лимитный) выставлен на ${tpPrice}, orderId=${takeProfitOrderId}`);
+          break; // успех — выходим из цикла
+        } catch (e: any) {
+          if (e?.code === 8 && attempts < maxAttempts - 1) {
+            // RESOURCE_EXHAUSTED — ждём и повторяем
+            console.warn(`[OrderManager] Превышен лимит запросов, повтор через 1с (попытка ${attempts + 1})`);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            attempts++;
+          } else {
+            console.error('[OrderManager] Ошибка выставления тейк‑профита:', e);
+            break;
+          }
+        }
       }
     }
 
