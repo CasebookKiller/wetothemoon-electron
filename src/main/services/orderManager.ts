@@ -6,7 +6,7 @@ import type { BacktestSignal } from './backtest/common';
 import { marketDataGrpc } from './tbank/MarketDataGrpcService';  // <-- новый импорт (в начале файла)
 import type { OrderFlowEngine } from './orderFlowEngine';
 import { HistoricalDataLoader } from './historicalDataLoader';
-import { StopOrderType, StopOrderDirection } from '@/api/tbank/stopordersTypes';
+import { StopOrderType, StopOrderDirection, StopOrderExpirationType, ExchangeOrderType } from '@/api/tbank/stopordersTypes';
 
 export interface OrderManagerConfig {
   lotQuantity: number;
@@ -47,6 +47,7 @@ export class OrderManager {
   private lastEntryPrice: number = 0;
   private orderFlow?: OrderFlowEngine;
   private historicalLoader?: HistoricalDataLoader;
+  private activeTakeProfitOrderId: string | null = null;
 
   constructor(config: Partial<OrderManagerConfig> = {}, orderFlow?: OrderFlowEngine, historicalLoader?: HistoricalDataLoader) {
     this.config = {
@@ -131,7 +132,7 @@ export class OrderManager {
       quantity,
       accountId: this.config.accountId,
     });
-    const instrumentId = (signal as any).figi || signal.instrumentUid;
+    //const instrumentId = (signal as any).figi || signal.instrumentUid;
     try {
       //const orderId = `ord_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
       //console.log('[OrderManager] Сгенерирован orderId:', orderId);
@@ -155,10 +156,16 @@ export class OrderManager {
 
       this.lastEntryPrice = signal.price;
 
-      const stopOrderId = await this.placeStopOrders(signal);
+      ///const stopOrderId = await this.placeStopOrders(signal);
 
+      //if (this.config.trailingEnabled && stopOrderId) {
+      //  this.startTrailing(signal.instrumentUid, signal.price, stopOrderId, this.config.trailingPercent);
+      //}
+      // Вставьте:
+      const entryPrice = signal.price;
+      const { stopOrderId } = await this.placeProtectiveOrders(signal, entryPrice);
       if (this.config.trailingEnabled && stopOrderId) {
-        this.startTrailing(signal.instrumentUid, signal.price, stopOrderId, this.config.trailingPercent);
+        this.startTrailing(signal.instrumentUid, entryPrice, stopOrderId, this.config.trailingPercent);
       }
     } catch (error) {
       console.error('[OrderManager] Ошибка отправки ордера:', error);
@@ -197,60 +204,153 @@ export class OrderManager {
 
     if (slPrice) {
       try {
+        const orderId = `sl_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
+        const stopInstrumentId = (signal as any).figi || signal.instrumentUid;
         const resp: any = await sandboxGrpc.postSandboxStopOrder(
           {
-            instrumentId: signal.instrumentUid,
-            direction: (isBuy ? StopOrderDirection.STOP_ORDER_DIRECTION_SELL : StopOrderDirection.STOP_ORDER_DIRECTION_BUY) as any,
-            stopOrderType: StopOrderType.STOP_ORDER_TYPE_STOP_LOSS as any,
-            //direction: (isBuy ? 'STOP_ORDER_DIRECTION_SELL' : 'STOP_ORDER_DIRECTION_BUY') as any,
-            //stopOrderType: 'STOP_ORDER_TYPE_STOP_LOSS' as any,
+            //instrumentId: signal.instrumentUid,
+            instrumentId: stopInstrumentId,
+            direction: (isBuy ? 'STOP_ORDER_DIRECTION_SELL' : 'STOP_ORDER_DIRECTION_BUY') as any,
+            stopOrderType: 'STOP_ORDER_TYPE_STOP_LOSS' as any,
             price: { units: Math.floor(slPrice), nano: Math.round((slPrice % 1) * 1e9) },
-            stopPrice: { units: Math.floor(slPrice), nano: Math.round((slPrice % 1) * 1e9) },   // ← добавить
+            stopPrice: { units: Math.floor(slPrice), nano: Math.round((slPrice % 1) * 1e9) },
             quantity: lotQuantity,
             accountId,
+            expirationType: 'STOP_ORDER_EXPIRATION_TYPE_GOOD_TILL_CANCEL' as any,
+            exchangeOrderType: 'EXCHANGE_ORDER_TYPE_MARKET' as any,
+            orderId: orderId,
           },
           token
         );
-        console.log('[OrderManager] Ответ на стоп-ордер:', JSON.stringify(resp));
-        stopOrderId = resp.stopOrderId || resp.orderId || null;
+        console.log('[OrderManager] Ответ на стоп‑лосс:', JSON.stringify(resp));
+        stopOrderId = resp.stopOrderId || null;
         if (stopOrderId) {
-          console.log(`[OrderManager] Стоп-лосс установлен на ${slPrice}, stopOrderId=${stopOrderId}`);
+          console.log(`[OrderManager] Стоп‑лосс установлен на ${slPrice}, stopOrderId=${stopOrderId}`);
           this.activeStopOrderId = stopOrderId;
         } else {
-          console.warn('[OrderManager] Не удалось получить ID стоп-ордера из ответа');
+          console.warn('[OrderManager] Не удалось получить ID стоп‑ордера из ответа');
         }
       } catch (e) {
-        console.error('[OrderManager] Ошибка установки стоп-лосса:', e);
+        console.error('[OrderManager] Ошибка установки стоп‑лосса:', e);
       }
     }
 
-    // Тейк-профит (без изменений)
+    // Тейк‑профит
     if (takeProfitPercent > 0) {
       const tpPrice = isBuy
         ? entryPrice * (1 + takeProfitPercent / 100)
         : entryPrice * (1 - takeProfitPercent / 100);
       try {
-        await sandboxGrpc.postSandboxStopOrder(
+        const orderId = `tp_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
+        const resp: any = await sandboxGrpc.postSandboxStopOrder(
           {
             instrumentId: signal.instrumentUid,
-            direction: (isBuy ? StopOrderDirection.STOP_ORDER_DIRECTION_SELL : StopOrderDirection.STOP_ORDER_DIRECTION_BUY) as any,
-            stopOrderType: StopOrderType.STOP_ORDER_TYPE_TAKE_PROFIT as any,
-            //direction: (isBuy ? 'STOP_ORDER_DIRECTION_SELL' : 'STOP_ORDER_DIRECTION_BUY') as any,
-            //stopOrderType: 'STOP_ORDER_TYPE_TAKE_PROFIT' as any,
+            direction: (isBuy ? 'STOP_ORDER_DIRECTION_SELL' : 'STOP_ORDER_DIRECTION_BUY') as any,
+            stopOrderType: 'STOP_ORDER_TYPE_TAKE_PROFIT' as any,
             price: { units: Math.floor(tpPrice), nano: Math.round((tpPrice % 1) * 1e9) },
-            stopPrice: { units: Math.floor(tpPrice), nano: Math.round((tpPrice % 1) * 1e9) },   // ← добавить
+            stopPrice: { units: Math.floor(tpPrice), nano: Math.round((tpPrice % 1) * 1e9) },
             quantity: lotQuantity,
             accountId,
+            expirationType: 'STOP_ORDER_EXPIRATION_TYPE_GOOD_TILL_CANCEL' as any,
+            exchangeOrderType: 'EXCHANGE_ORDER_TYPE_MARKET' as any,
+            orderId: orderId,
           },
           token
         );
-        console.log(`[OrderManager] Тейк-профит установлен на ${tpPrice}`);
+        console.log(`[OrderManager] Тейк‑профит установлен на ${tpPrice}`);
+        // ID тейк‑профита не сохраняем, т.к. трейлинг работает только со стоп‑лоссом
       } catch (e) {
-        console.error('[OrderManager] Ошибка установки тейк-профита:', e);
+        console.error('[OrderManager] Ошибка установки тейк‑профита:', e);
       }
     }
 
     return stopOrderId;
+  }
+
+  private async placeProtectiveOrders(signal: BacktestSignal, entryPrice: number): Promise<{ stopOrderId: string | null; takeProfitOrderId: string | null }> {
+    const {
+      stopLossPercent,
+      takeProfitPercent,
+      lotQuantity,
+      token,
+      accountId,
+      trailingMode,
+      volatilityMultiplier
+    } = this.config;
+
+    if (stopLossPercent <= 0 && takeProfitPercent <= 0 && trailingMode !== 'volatility')
+      return { stopOrderId: null, takeProfitOrderId: null };
+    if (!accountId || !token || !signal.instrumentUid)
+      return { stopOrderId: null, takeProfitOrderId: null };
+
+    const isBuy = signal.type === 'BUY';
+    let stopOrderId: string | null = null;
+    let takeProfitOrderId: string | null = null;
+
+    // --- Стоп‑лосс (лимитный ордер) ---
+    if (stopLossPercent > 0 || trailingMode === 'volatility') {
+      let slPrice: number | null = null;
+      if (trailingMode === 'volatility' && volatilityMultiplier && this.historicalLoader) {
+        const atr = await this.calculateATR(signal.instrumentUid, token);
+        if (atr && atr > 0) {
+          slPrice = isBuy ? entryPrice - atr * volatilityMultiplier : entryPrice + atr * volatilityMultiplier;
+        }
+      } else if (stopLossPercent > 0) {
+        slPrice = isBuy
+          ? entryPrice * (1 - stopLossPercent / 100)
+          : entryPrice * (1 + stopLossPercent / 100);
+      }
+
+      if (slPrice) {
+        try {
+          const orderId = `sl_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
+          const resp: any = await sandboxGrpc.postSandboxOrder(
+            {
+              instrumentId: signal.instrumentUid,
+              direction: isBuy ? OrderDirection.ORDER_DIRECTION_SELL : OrderDirection.ORDER_DIRECTION_BUY,
+              orderType: OrderType.ORDER_TYPE_LIMIT,
+              quantity: lotQuantity,
+              price: { units: Math.floor(slPrice), nano: Math.round((slPrice % 1) * 1e9) },
+              accountId,
+              orderId: orderId,
+            } as any,
+            token
+          );
+          stopOrderId = resp.orderId || null;
+          console.log(`[OrderManager] Стоп‑лосс (лимитный) выставлен на ${slPrice}, orderId=${stopOrderId}`);
+        } catch (e) {
+          console.error('[OrderManager] Ошибка выставления стоп‑лосса:', e);
+        }
+      }
+    }
+
+    // --- Тейк‑профит (лимитный ордер) ---
+    if (takeProfitPercent > 0) {
+      const tpPrice = isBuy
+        ? entryPrice * (1 + takeProfitPercent / 100)
+        : entryPrice * (1 - takeProfitPercent / 100);
+      try {
+        const orderId = `tp_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
+        const resp: any = await sandboxGrpc.postSandboxOrder(
+          {
+            instrumentId: signal.instrumentUid,
+            direction: isBuy ? OrderDirection.ORDER_DIRECTION_SELL : OrderDirection.ORDER_DIRECTION_BUY,
+            orderType: OrderType.ORDER_TYPE_LIMIT,
+            quantity: lotQuantity,
+            price: { units: Math.floor(tpPrice), nano: Math.round((tpPrice % 1) * 1e9) },
+            accountId,
+            orderId: orderId,
+          } as any,
+          token
+        );
+        takeProfitOrderId = resp.orderId || null;
+        console.log(`[OrderManager] Тейк‑профит (лимитный) выставлен на ${tpPrice}, orderId=${takeProfitOrderId}`);
+      } catch (e) {
+        console.error('[OrderManager] Ошибка выставления тейк‑профита:', e);
+      }
+    }
+
+    return { stopOrderId, takeProfitOrderId };
   }
 
   async cancelActiveOrder(): Promise<void> {

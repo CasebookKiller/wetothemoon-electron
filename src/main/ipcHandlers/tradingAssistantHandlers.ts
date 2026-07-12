@@ -1105,4 +1105,16 @@ async function getCloudToken(serverUrl: string): Promise<string | null> {
     const exhaustion = orderFlowEngine.detectExhaustion(instrumentUid);
     return { delta, absorption, exhaustion };
   });
+
+  // Временный канал для тестирования стоп-заявок
+  ipcMain.handle('test-stop-order', async (_, request: any) => {
+    const token = process.env.VITE_TSandBox || '';
+    if (!token) return { success: false, error: 'Токен песочницы не задан' };
+    try {
+      const resp = await sandboxGrpc.postSandboxStopOrder(request, token);
+      return { success: true, resp };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
 };

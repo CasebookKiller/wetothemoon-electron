@@ -233,7 +233,8 @@ try {
 			electron.ipcRenderer.removeAllListeners("auto-trader:order-sent");
 			electron.ipcRenderer.removeAllListeners("auto-trader:order-error");
 		},
-		getOrderFlowSnapshot: (instrumentUid) => electron.ipcRenderer.invoke("trading-assistant:get-orderflow-snapshot", instrumentUid)
+		getOrderFlowSnapshot: (instrumentUid) => electron.ipcRenderer.invoke("trading-assistant:get-orderflow-snapshot", instrumentUid),
+		testStopOrder: (request) => electron.ipcRenderer.invoke("test-stop-order", request)
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {

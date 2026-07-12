@@ -322,6 +322,8 @@ try {
 
     getOrderFlowSnapshot: (instrumentUid: string) =>
       ipcRenderer.invoke('trading-assistant:get-orderflow-snapshot', instrumentUid),
+
+    testStopOrder: (request: any) => ipcRenderer.invoke('test-stop-order', request),
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)
