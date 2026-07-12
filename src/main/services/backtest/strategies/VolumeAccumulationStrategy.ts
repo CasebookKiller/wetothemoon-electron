@@ -101,6 +101,7 @@ export class VolumeAccumulationStrategy implements IBacktestStrategy {
         time,
         instrumentUid: this.instrumentUid,
         reason: `Return to VA after breaking high (VAH=${this.dailyProfile.valueAreaHigh})`,
+        targetPrice: this.dailyProfile.poc,   // ← добавить
       });
       this.hasBrokenHigh = false;
       this.hasPosition = true;   // ← позиция открыта
@@ -116,6 +117,7 @@ export class VolumeAccumulationStrategy implements IBacktestStrategy {
         time,
         instrumentUid: this.instrumentUid,
         reason: `Return to VA after breaking low (VAL=${this.dailyProfile.valueAreaLow})`,
+        targetPrice: this.dailyProfile.poc,   // ← добавить
       });
       this.hasBrokenLow = false;
       this.hasPosition = true;   // ← позиция открыта

@@ -119,6 +119,7 @@ export const TradingAssistantPage: React.FC = () => {
     atrPeriod: 14,
     atrMultiplier: 2,
     stopMode: 'stop_order' as 'stop_order' | 'limit_order',
+    entryMode: 'market' as 'market' | 'limit',
   });
   const [showSandboxSettings, setShowSandboxSettings] = useState(false);
 
@@ -1180,19 +1181,29 @@ export const TradingAssistantPage: React.FC = () => {
                   />
 
                   {/* Режим стоп‑заявок */}
-                  <div className="flex align-items-center ml-2">
-                    <label className="mr-1 mb-0">Stop mode</label>
-                    <Dropdown
-                      value={sandbox.stopMode}
-                      options={[
-                        { label: 'Stop Order', value: 'stop_order' },
-                        { label: 'Limit Order', value: 'limit_order' },
-                      ]}
-                      onChange={e => updateSandbox({ stopMode: e.value })}
-                      className="p-inputtext-sm"
-                      style={{ width: '130px' }}
-                    />
-                  </div>
+                  <label className="mr-1 mb-0">Stop mode</label>
+                  <Dropdown
+                    value={sandbox.stopMode}
+                    options={[
+                      { label: 'Stop Order', value: 'stop_order' },
+                      { label: 'Limit Order', value: 'limit_order' },
+                    ]}
+                    onChange={e => updateSandbox({ stopMode: e.value })}
+                    className="p-inputtext-sm"
+                    style={{ width: '130px' }}
+                  />
+
+                  <label className="mr-1 mb-0">Entry mode</label>
+                  <Dropdown
+                    value={sandbox.entryMode}
+                    options={[
+                      { label: 'Market', value: 'market' },
+                      { label: 'Limit', value: 'limit' },
+                    ]}
+                    onChange={e => updateSandbox({ entryMode: e.value })}
+                    className="p-inputtext-sm"
+                    style={{ width: '100px' }}
+                  />
 
                   <Checkbox checked={sandbox.trailingEnabled} onChange={e => updateSandbox({ trailingEnabled: e.checked })} />
                   <label className="mr-1 mb-0">Trail</label>

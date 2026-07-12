@@ -1593,7 +1593,8 @@ var VolumeAccumulationStrategy = class {
 				price: close,
 				time,
 				instrumentUid: this.instrumentUid,
-				reason: `Return to VA after breaking high (VAH=${this.dailyProfile.valueAreaHigh})`
+				reason: `Return to VA after breaking high (VAH=${this.dailyProfile.valueAreaHigh})`,
+				targetPrice: this.dailyProfile.poc
 			});
 			this.hasBrokenHigh = false;
 			this.hasPosition = true;
@@ -1606,7 +1607,8 @@ var VolumeAccumulationStrategy = class {
 				price: close,
 				time,
 				instrumentUid: this.instrumentUid,
-				reason: `Return to VA after breaking low (VAL=${this.dailyProfile.valueAreaLow})`
+				reason: `Return to VA after breaking low (VAL=${this.dailyProfile.valueAreaLow})`,
+				targetPrice: this.dailyProfile.poc
 			});
 			this.hasBrokenLow = false;
 			this.hasPosition = true;

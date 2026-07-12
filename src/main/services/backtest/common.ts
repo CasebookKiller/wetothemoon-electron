@@ -6,6 +6,7 @@ export interface BacktestSignal {
   time: string;
   instrumentUid: string;
   reason: string;
+  targetPrice?: number;   // целевая цена для лимитного входа
 }
 
 /** Преобразует Quotation в число */
