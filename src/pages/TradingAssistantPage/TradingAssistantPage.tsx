@@ -36,6 +36,8 @@ import { CloudTab } from '@/components/TRADING_ASSISTANT/CloudTab/CloudTab';
 import { CloudFarmerTab } from '@/components/TRADING_ASSISTANT/CloudFarmerTab/CloudFarmerTab';
 import { Tag } from 'primereact/tag';
 
+import { Toast } from 'primereact/toast';
+
 interface BatchResult {
   batchId: string;
   status: string;
@@ -281,6 +283,27 @@ export const TradingAssistantPage: React.FC = () => {
 
     return () => {
       api.removeAutoTraderListeners();
+    };
+  }, []);
+
+  const toast = useRef<Toast>(null);
+
+  useEffect(() => {
+    const api = (window as any).electronAPI;
+    if (!api?.onApiError) return;
+
+    const handler = (data: any) => {
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Ошибка API',
+        detail: data.message,
+        life: 5000,
+      });
+    };
+
+    api.onApiError(handler);
+    return () => {
+      api.removeApiErrorListener?.();
     };
   }, []);
 
@@ -1025,6 +1048,7 @@ export const TradingAssistantPage: React.FC = () => {
 
   return (
     <div className="trading-assistant" style={{ padding: '5px', color: '#fff', background: '#1e1e1e' }}>
+      <Toast ref={toast} />
       {/* ВЕРХНЯЯ ПАНЕЛЬ (компактная) */}
       <div className="flex align-items-center flex-wrap p-2 gap-2" style={{ background: '#1e1e1e', borderBottom: '1px solid #333' }}>
         {/* Инструмент */}

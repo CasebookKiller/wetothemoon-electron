@@ -324,6 +324,13 @@ try {
       ipcRenderer.invoke('trading-assistant:get-orderflow-snapshot', instrumentUid),
 
     testStopOrder: (request: any) => ipcRenderer.invoke('test-stop-order', request),
+
+    onApiError: (callback: (data: any) => void) => {
+      ipcRenderer.on('api-error', (_, data) => callback(data));
+    },
+    removeApiErrorListener: () => {
+      ipcRenderer.removeAllListeners('api-error');
+    },
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

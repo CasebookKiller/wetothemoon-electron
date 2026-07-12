@@ -5,6 +5,7 @@ import * as protoLoader from '@grpc/proto-loader';
 import { ipcMain } from 'electron';
 import { getProtoPath } from '../utils/protoPath';
 import { marketDataBus } from '../services/marketDataBus';
+import { handleApiError } from '../services/apiErrorHandler';
 
 const MAX_RECONNECT_ATTEMPTS = 3;
 const BASE_DELAY_MS = 3000;
@@ -127,7 +128,8 @@ export const registerMarketdataStreamHandlers = () => {
       });
 
       stream.on('error', (err: any) => {
-        console.error(`[Main] Ошибка стрима: ${err.message}`);
+        const apiError = handleApiError(err);
+        console.error(`[Main] Ошибка стрима: ${apiError.message}`)
         currentStream = null;
         if (err.code === 8) { // RESOURCE_EXHAUSTED
           console.error('[Main] Лимит стримов исчерпан, дальнейшие попытки остановлены');

@@ -110,14 +110,14 @@ _Цель: полностью автоматическая торговля по
 #### 1.2 Сервис обработки ошибок API (`ApiErrorHandler`)
 _Цель: централизованная обработка всех кодов ошибок T‑Invest API, понятные сообщения и автоматический повтор для временных сбоев._
 
-- [ ] **Создать `src/main/services/apiErrorHandler.ts`**
+- [x] **Создать `src/main/services/apiErrorHandler.ts`**
   - Полный справочник кодов ошибок (12001–90003)
   - Категоризация: `INVALID_ARGUMENT`, `PERMISSION_DENIED`, `NOT_FOUND`, `INTERNAL`, `RESOURCE_EXHAUSTED`, `FAILED_PRECONDITION`, `UNAUTHENTICATED`, `UNIMPLEMENTED`, `UNAVAILABLE`
   - Русскоязычные описания и рекомендации
-- [ ] **Функция `handleApiError(error: any)`**
+- [x] **Функция `handleApiError(error: any)`**
   - Извлекает `code`, `details`, `metadata`
   - Возвращает `{ message, category, shouldRetry, retryDelayMs? }`
-- [ ] **Интеграция в `OrderManager`, стримы, хэндлеры**
+- [x] **Интеграция в `OrderManager`, стримы, хэндлеры**
   - Замена `console.error` на `handleApiError`
   - Автоматический retry для `INTERNAL` и `RESOURCE_EXHAUSTED`
 - [ ] **IPC‑канал для UI‑уведомлений**

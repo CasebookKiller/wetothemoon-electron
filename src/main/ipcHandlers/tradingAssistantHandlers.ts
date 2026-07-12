@@ -1117,4 +1117,11 @@ async function getCloudToken(serverUrl: string): Promise<string | null> {
       return { success: false, error: error.message };
     }
   });
+
+  ipcMain.on('trading-assistant:api-error', (event, error: any) => {
+    const win = getTradingAssistantWindow();
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('api-error', error);
+    }
+  });
 };

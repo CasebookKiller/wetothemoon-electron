@@ -234,7 +234,13 @@ try {
 			electron.ipcRenderer.removeAllListeners("auto-trader:order-error");
 		},
 		getOrderFlowSnapshot: (instrumentUid) => electron.ipcRenderer.invoke("trading-assistant:get-orderflow-snapshot", instrumentUid),
-		testStopOrder: (request) => electron.ipcRenderer.invoke("test-stop-order", request)
+		testStopOrder: (request) => electron.ipcRenderer.invoke("test-stop-order", request),
+		onApiError: (callback) => {
+			electron.ipcRenderer.on("api-error", (_, data) => callback(data));
+		},
+		removeApiErrorListener: () => {
+			electron.ipcRenderer.removeAllListeners("api-error");
+		}
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {

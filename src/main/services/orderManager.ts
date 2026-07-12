@@ -7,6 +7,7 @@ import { marketDataGrpc } from './tbank/MarketDataGrpcService';  // <-- новы
 import type { OrderFlowEngine } from './orderFlowEngine';
 import { HistoricalDataLoader } from './historicalDataLoader';
 import { StopOrderType, StopOrderDirection, StopOrderExpirationType, ExchangeOrderType } from '@/api/tbank/stopordersTypes';
+import { handleApiError } from './apiErrorHandler';
 
 export interface OrderManagerConfig {
   lotQuantity: number;
@@ -192,7 +193,9 @@ export class OrderManager {
         this.startTrailing(signal.instrumentUid, entryPrice, stopOrderId, this.config.trailingPercent);
       }
     } catch (error) {
-      console.error('[OrderManager] Ошибка отправки ордера:', error);
+      const apiError = handleApiError(error);
+      console.error('[OrderManager] Ошибка отправки ордера:', apiError.message);
+      // позже можно будет отправлять apiError в UI через IPC
     }
   }
 
