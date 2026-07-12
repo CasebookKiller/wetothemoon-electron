@@ -240,7 +240,9 @@ try {
 		},
 		removeApiErrorListener: () => {
 			electron.ipcRenderer.removeAllListeners("api-error");
-		}
+		},
+		startAutoTraderMultiple: (uids) => electron.ipcRenderer.invoke("trading-assistant:start-auto-trader-multiple", uids),
+		stopAllStrategies: () => electron.ipcRenderer.invoke("trading-assistant:stop-all-strategies")
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {

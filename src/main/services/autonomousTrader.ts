@@ -50,6 +50,12 @@ export class AutonomousTrader extends EventEmitter {
     console.log(`[AutonomousTrader] Запущен для ${instrumentUid}`);
   }
 
+  async startMultiple(uids: string[], token: string): Promise<void> {
+    for (const uid of uids) {
+      await this.start(uid, token);
+    }
+  }
+
   stop(instrumentUid: string): void {
     const entry = this.active.get(instrumentUid);
     if (!entry) return;

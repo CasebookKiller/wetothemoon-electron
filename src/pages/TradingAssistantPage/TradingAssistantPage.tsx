@@ -208,6 +208,10 @@ export const TradingAssistantPage: React.FC = () => {
   const [liveSignals, setLiveSignals] = useState<any[]>([]);
   const [autoTrading, setAutoTrading] = useState(false);
   const [selectedInstrument, setSelectedInstrument] = useState('e6123145-9665-43e0-8413-cd61b8aa9b13');
+  const [selectedInstruments, setSelectedInstruments] = useState<string[]>([]);
+  const [showMultiInstrumentDialog, setShowMultiInstrumentDialog] = useState(false);
+  const [tempMultiSelected, setTempMultiSelected] = useState<string[]>([]);
+  
   const [availableInstruments, setAvailableInstruments] = useState<Array<{ uid: string; name: string; ticker?: string }>>([]);
   const [instrumentsLoading, setInstrumentsLoading] = useState(false);
 
@@ -452,9 +456,9 @@ export const TradingAssistantPage: React.FC = () => {
 
   const startAutoTraderHandler = async () => {
     const api = (window as any).electronAPI;
-    if (!api?.startAutoTrader) return;
+    if (!api?.startAutoTraderMultiple) return;
 
-    // 1. Сначала применяем текущие настройки риск‑менеджмента
+    // 1. Применить конфиг
     await api.updateTradingConfig({
       token: sandbox.token,
       accountId: sandbox.accountId,
@@ -472,18 +476,18 @@ export const TradingAssistantPage: React.FC = () => {
       stopMode: sandbox.stopMode,
     });
 
-    // 2. Запускаем автотрейдер
-    await api.startAutoTrader(selectedInstrument);
+    // 2. Выбрать инструменты: если в мультивыборе есть, то их, иначе текущий
+    const instrumentsToStart = selectedInstruments.length > 0 ? selectedInstruments : [selectedInstrument];
+    await api.startAutoTraderMultiple(instrumentsToStart);
     const active = await api.getActiveAutoTraders();
     setActiveAutoTraders(active);
   };
 
   const stopAutoTraderHandler = async () => {
     const api = (window as any).electronAPI;
-    if (!api?.stopAutoTrader) return;
-    await api.stopAutoTrader(selectedInstrument);
-    const active = await api.getActiveAutoTraders();
-    setActiveAutoTraders(active);
+    if (!api?.stopAllStrategies) return;
+    await api.stopAllStrategies();
+    setActiveAutoTraders([]);
   };
 
   // --- Stream ---
@@ -1101,6 +1105,16 @@ export const TradingAssistantPage: React.FC = () => {
         <span style={{ color: stream.active ? '#4caf50' : '#d32f2f', minWidth: '60px', fontSize: '0.85rem' }}>
           {stream.active ? '● Live' : '○ Stopped'}
         </span>
+        <Button
+          label="Выбрать инструменты"
+          icon="pi pi-list"
+          onClick={() => {
+            setTempMultiSelected([...selectedInstruments]);
+            setShowMultiInstrumentDialog(true);
+          }}
+          className="p-button-sm p-button-secondary p-1 px-2"
+        />
+        <span className="text-sm text-500">{selectedInstruments.length} выбрано</span>
         
         <Checkbox checked={isWeekendMode} onChange={e => setIsWeekendMode(e.checked as boolean)} />
         <label className="ml-1 mb-0" style={{ fontSize: '0.8rem' }}>Weekend</label>
@@ -2054,7 +2068,53 @@ export const TradingAssistantPage: React.FC = () => {
           val={currentProfile?.valueAreaLow}
         />
       )}
-    
+      
+      <Dialog
+        header="Выбор инструментов для автотрейдера"
+        visible={showMultiInstrumentDialog}
+        style={{ width: '450px', maxHeight: '600px' }}
+        onHide={() => setShowMultiInstrumentDialog(false)}
+        footer={
+          <div className="flex justify-content-end gap-2">
+            <Button label="Отмена" onClick={() => setShowMultiInstrumentDialog(false)} className="p-button-sm p-button-secondary" />
+            <Button label="Применить" onClick={() => {
+              setSelectedInstruments(tempMultiSelected);
+              setShowMultiInstrumentDialog(false);
+            }} className="p-button-sm" />
+          </div>
+        }
+      >
+        <div className="p-mb-2">
+          <InputText
+            placeholder="Поиск инструмента..."
+            value={instrumentFilter}
+            onChange={e => setInstrumentFilter(e.target.value)}
+            className="p-inputtext-sm"
+            style={{ width: '100%' }}
+          />
+        </div>
+        <div style={{ maxHeight: '350px', overflowY: 'auto', color: '#d1d4dc' }}>
+          {availableInstruments
+            .filter(inst => inst.name.toLowerCase().includes(instrumentFilter.toLowerCase()) || inst.ticker?.toLowerCase().includes(instrumentFilter.toLowerCase()))
+            .map(inst => (
+              <div key={inst.uid} className="p-field-checkbox p-mb-1">
+                <Checkbox
+                  inputId={`multi-${inst.uid}`}
+                  checked={tempMultiSelected.includes(inst.uid)}
+                  onChange={(e) => {
+                    if (e.checked) {
+                      setTempMultiSelected(prev => [...prev, inst.uid]);
+                    } else {
+                      setTempMultiSelected(prev => prev.filter(id => id !== inst.uid));
+                    }
+                  }}
+                  className='mr-1'
+                />
+                <label htmlFor={`multi-${inst.uid}`}>{inst.name} ({inst.ticker})</label>
+              </div>
+            ))}
+        </div>
+      </Dialog>  
     </div>
   );
 };

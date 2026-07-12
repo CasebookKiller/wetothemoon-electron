@@ -5205,6 +5205,22 @@ var registerTradingAssistantHandlers = (historicalLoader, profileEngine, getToke
 		const win = getTradingAssistantWindow();
 		if (win && !win.isDestroyed()) win.webContents.send("api-error", error);
 	});
+	electron.ipcMain.handle("trading-assistant:start-auto-trader-multiple", async (event, uids) => {
+		if (!autonomousTraderInstance) return {
+			success: false,
+			error: "AutoTrader not initialized"
+		};
+		const token = process.env.VITE_TReadOnly || "";
+		await autonomousTraderInstance.startMultiple(uids, token);
+		return { success: true };
+	});
+	electron.ipcMain.handle("trading-assistant:stop-all-strategies", async () => {
+		if (autonomousTraderInstance) {
+			autonomousTraderInstance.stopAll();
+			return { success: true };
+		}
+		return { success: false };
+	});
 };
 //#endregion
 //#region src/shared/types/promptgenerator.ts
@@ -6524,6 +6540,9 @@ var AutonomousTrader = class extends events.EventEmitter {
 		this.orderManager.setRunning(true);
 		this.active.set(instrumentUid, { handler });
 		console.log(`[AutonomousTrader] Запущен для ${instrumentUid}`);
+	}
+	async startMultiple(uids, token) {
+		for (const uid of uids) await this.start(uid, token);
 	}
 	stop(instrumentUid) {
 		const entry = this.active.get(instrumentUid);

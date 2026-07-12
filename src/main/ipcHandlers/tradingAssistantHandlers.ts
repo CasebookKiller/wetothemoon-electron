@@ -1124,4 +1124,19 @@ async function getCloudToken(serverUrl: string): Promise<string | null> {
       win.webContents.send('api-error', error);
     }
   });
+
+  ipcMain.handle('trading-assistant:start-auto-trader-multiple', async (event, uids: string[]) => {
+    if (!autonomousTraderInstance) return { success: false, error: 'AutoTrader not initialized' };
+    const token = process.env.VITE_TReadOnly || '';
+    await autonomousTraderInstance.startMultiple(uids, token);
+    return { success: true };
+  });
+
+  ipcMain.handle('trading-assistant:stop-all-strategies', async () => {
+    if (autonomousTraderInstance) {
+      autonomousTraderInstance.stopAll();
+      return { success: true };
+    }
+    return { success: false };
+  });
 };

@@ -331,6 +331,10 @@ try {
     removeApiErrorListener: () => {
       ipcRenderer.removeAllListeners('api-error');
     },
+
+    startAutoTraderMultiple: (uids: string[]) => ipcRenderer.invoke('trading-assistant:start-auto-trader-multiple', uids),
+    stopAllStrategies: () => ipcRenderer.invoke('trading-assistant:stop-all-strategies'),
+
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)
