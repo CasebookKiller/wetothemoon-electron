@@ -4972,6 +4972,33 @@ function registerTasksHandlers() {
 	});
 }
 //#endregion
+//#region src/api/tbank/stopordersTypes.ts
+var StopOrderDirection = /* @__PURE__ */ function(StopOrderDirection) {
+	StopOrderDirection[StopOrderDirection["STOP_ORDER_DIRECTION_UNSPECIFIED"] = 0] = "STOP_ORDER_DIRECTION_UNSPECIFIED";
+	StopOrderDirection[StopOrderDirection["STOP_ORDER_DIRECTION_BUY"] = 1] = "STOP_ORDER_DIRECTION_BUY";
+	StopOrderDirection[StopOrderDirection["STOP_ORDER_DIRECTION_SELL"] = 2] = "STOP_ORDER_DIRECTION_SELL";
+	return StopOrderDirection;
+}({});
+var StopOrderType = /* @__PURE__ */ function(StopOrderType) {
+	StopOrderType[StopOrderType["STOP_ORDER_TYPE_UNSPECIFIED"] = 0] = "STOP_ORDER_TYPE_UNSPECIFIED";
+	StopOrderType[StopOrderType["STOP_ORDER_TYPE_TAKE_PROFIT"] = 1] = "STOP_ORDER_TYPE_TAKE_PROFIT";
+	StopOrderType[StopOrderType["STOP_ORDER_TYPE_STOP_LOSS"] = 2] = "STOP_ORDER_TYPE_STOP_LOSS";
+	StopOrderType[StopOrderType["STOP_ORDER_TYPE_STOP_LIMIT"] = 3] = "STOP_ORDER_TYPE_STOP_LIMIT";
+	return StopOrderType;
+}({});
+var ExchangeOrderType = /* @__PURE__ */ function(ExchangeOrderType) {
+	ExchangeOrderType[ExchangeOrderType["EXCHANGE_ORDER_TYPE_UNSPECIFIED"] = 0] = "EXCHANGE_ORDER_TYPE_UNSPECIFIED";
+	ExchangeOrderType[ExchangeOrderType["EXCHANGE_ORDER_TYPE_MARKET"] = 1] = "EXCHANGE_ORDER_TYPE_MARKET";
+	ExchangeOrderType[ExchangeOrderType["EXCHANGE_ORDER_TYPE_LIMIT"] = 2] = "EXCHANGE_ORDER_TYPE_LIMIT";
+	return ExchangeOrderType;
+}({});
+var StopOrderExpirationType = /* @__PURE__ */ function(StopOrderExpirationType) {
+	StopOrderExpirationType[StopOrderExpirationType["STOP_ORDER_EXPIRATION_TYPE_UNSPECIFIED"] = 0] = "STOP_ORDER_EXPIRATION_TYPE_UNSPECIFIED";
+	StopOrderExpirationType[StopOrderExpirationType["STOP_ORDER_EXPIRATION_TYPE_GOOD_TILL_CANCEL"] = 1] = "STOP_ORDER_EXPIRATION_TYPE_GOOD_TILL_CANCEL";
+	StopOrderExpirationType[StopOrderExpirationType["STOP_ORDER_EXPIRATION_TYPE_GOOD_TILL_DATE"] = 2] = "STOP_ORDER_EXPIRATION_TYPE_GOOD_TILL_DATE";
+	return StopOrderExpirationType;
+}({});
+//#endregion
 //#region src/main/services/orderManager.ts
 var OrderManager = class {
 	config;
@@ -5012,10 +5039,14 @@ var OrderManager = class {
 			riskAmount: 1e3,
 			trailingMode: "percent",
 			volatilityMultiplier: 2,
+			stopMode: "stop_order",
 			...config
 		};
 		this.orderFlow = orderFlow;
 		this.historicalLoader = historicalLoader;
+	}
+	generateUUID() {
+		return crypto.randomUUID();
 	}
 	updateConfig(patch) {
 		this.config = {
@@ -5080,62 +5111,54 @@ var OrderManager = class {
 			console.log(`[OrderManager] Ордер отправлен: ${this.activeOrderId}`);
 			this.lastEntryPrice = signal.price;
 			const entryPrice = signal.price;
-			const { stopOrderId } = await this.placeProtectiveOrders(signal, entryPrice);
+			let stopOrderId = null;
+			if (this.config.stopMode === "stop_order") stopOrderId = await this.placeStopOrders(signal);
+			else stopOrderId = (await this.placeProtectiveOrders(signal, entryPrice)).stopOrderId;
 			if (this.config.trailingEnabled && stopOrderId) this.startTrailing(signal.instrumentUid, entryPrice, stopOrderId, this.config.trailingPercent);
 		} catch (error) {
 			console.error("[OrderManager] Ошибка отправки ордера:", error);
 		}
 	}
 	async placeStopOrders(signal) {
-		const { stopLossPercent, takeProfitPercent, lotQuantity, token, accountId, trailingMode, volatilityMultiplier } = this.config;
-		if (stopLossPercent <= 0 && takeProfitPercent <= 0 && trailingMode !== "volatility") return null;
+		const { stopLossPercent, takeProfitPercent, lotQuantity, token, accountId } = this.config;
+		if (stopLossPercent <= 0 && takeProfitPercent <= 0) return null;
 		if (!accountId || !token || !signal.instrumentUid) return null;
 		const entryPrice = signal.price;
 		const isBuy = signal.type === "BUY";
-		let slPrice = null;
 		let stopOrderId = null;
-		if (trailingMode === "volatility" && volatilityMultiplier && this.historicalLoader) {
-			const atr = await this.calculateATR(signal.instrumentUid, token);
-			if (atr && atr > 0) slPrice = isBuy ? entryPrice - atr * volatilityMultiplier : entryPrice + atr * volatilityMultiplier;
-		} else if (stopLossPercent > 0) slPrice = isBuy ? entryPrice * (1 - stopLossPercent / 100) : entryPrice * (1 + stopLossPercent / 100);
-		if (slPrice) try {
-			const orderId = `sl_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
-			const stopInstrumentId = signal.figi || signal.instrumentUid;
-			const resp = await sandboxGrpc.postSandboxStopOrder({
-				instrumentId: stopInstrumentId,
-				direction: isBuy ? "STOP_ORDER_DIRECTION_SELL" : "STOP_ORDER_DIRECTION_BUY",
-				stopOrderType: "STOP_ORDER_TYPE_STOP_LOSS",
-				price: {
-					units: Math.floor(slPrice),
-					nano: Math.round(slPrice % 1 * 1e9)
-				},
-				stopPrice: {
-					units: Math.floor(slPrice),
-					nano: Math.round(slPrice % 1 * 1e9)
-				},
-				quantity: lotQuantity,
-				accountId,
-				expirationType: "STOP_ORDER_EXPIRATION_TYPE_GOOD_TILL_CANCEL",
-				exchangeOrderType: "EXCHANGE_ORDER_TYPE_MARKET",
-				orderId
-			}, token);
-			console.log("[OrderManager] Ответ на стоп‑лосс:", JSON.stringify(resp));
-			stopOrderId = resp.stopOrderId || null;
-			if (stopOrderId) {
+		if (stopLossPercent > 0) {
+			const slPrice = isBuy ? entryPrice * (1 - stopLossPercent / 100) : entryPrice * (1 + stopLossPercent / 100);
+			try {
+				stopOrderId = (await sandboxGrpc.postSandboxStopOrder({
+					instrumentId: signal.instrumentUid,
+					direction: isBuy ? StopOrderDirection.STOP_ORDER_DIRECTION_SELL : StopOrderDirection.STOP_ORDER_DIRECTION_BUY,
+					stopOrderType: StopOrderType.STOP_ORDER_TYPE_STOP_LOSS,
+					price: {
+						units: Math.floor(slPrice),
+						nano: Math.round(slPrice % 1 * 1e9)
+					},
+					stopPrice: {
+						units: Math.floor(slPrice),
+						nano: Math.round(slPrice % 1 * 1e9)
+					},
+					quantity: lotQuantity,
+					accountId,
+					expirationType: StopOrderExpirationType.STOP_ORDER_EXPIRATION_TYPE_GOOD_TILL_CANCEL,
+					exchangeOrderType: ExchangeOrderType.EXCHANGE_ORDER_TYPE_MARKET,
+					orderId: this.generateUUID()
+				}, token)).stopOrderId || null;
 				console.log(`[OrderManager] Стоп‑лосс установлен на ${slPrice}, stopOrderId=${stopOrderId}`);
-				this.activeStopOrderId = stopOrderId;
-			} else console.warn("[OrderManager] Не удалось получить ID стоп‑ордера из ответа");
-		} catch (e) {
-			console.error("[OrderManager] Ошибка установки стоп‑лосса:", e);
+			} catch (e) {
+				console.error("[OrderManager] Ошибка установки стоп‑лосса:", e);
+			}
 		}
 		if (takeProfitPercent > 0) {
 			const tpPrice = isBuy ? entryPrice * (1 + takeProfitPercent / 100) : entryPrice * (1 - takeProfitPercent / 100);
 			try {
-				const orderId = `tp_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
 				await sandboxGrpc.postSandboxStopOrder({
 					instrumentId: signal.instrumentUid,
-					direction: isBuy ? "STOP_ORDER_DIRECTION_SELL" : "STOP_ORDER_DIRECTION_BUY",
-					stopOrderType: "STOP_ORDER_TYPE_TAKE_PROFIT",
+					direction: isBuy ? StopOrderDirection.STOP_ORDER_DIRECTION_SELL : StopOrderDirection.STOP_ORDER_DIRECTION_BUY,
+					stopOrderType: StopOrderType.STOP_ORDER_TYPE_TAKE_PROFIT,
 					price: {
 						units: Math.floor(tpPrice),
 						nano: Math.round(tpPrice % 1 * 1e9)
@@ -5146,9 +5169,9 @@ var OrderManager = class {
 					},
 					quantity: lotQuantity,
 					accountId,
-					expirationType: "STOP_ORDER_EXPIRATION_TYPE_GOOD_TILL_CANCEL",
-					exchangeOrderType: "EXCHANGE_ORDER_TYPE_MARKET",
-					orderId
+					expirationType: StopOrderExpirationType.STOP_ORDER_EXPIRATION_TYPE_GOOD_TILL_CANCEL,
+					exchangeOrderType: ExchangeOrderType.EXCHANGE_ORDER_TYPE_MARKET,
+					orderId: this.generateUUID()
 				}, token);
 				console.log(`[OrderManager] Тейк‑профит установлен на ${tpPrice}`);
 			} catch (e) {

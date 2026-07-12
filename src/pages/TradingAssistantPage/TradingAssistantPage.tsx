@@ -118,6 +118,7 @@ export const TradingAssistantPage: React.FC = () => {
     riskAmount: 1000,
     atrPeriod: 14,
     atrMultiplier: 2,
+    stopMode: 'stop_order' as 'stop_order' | 'limit_order',
   });
   const [showSandboxSettings, setShowSandboxSettings] = useState(false);
 
@@ -412,6 +413,7 @@ export const TradingAssistantPage: React.FC = () => {
       atrPeriod: sandbox.atrPeriod,       // если используется ATR
       atrMultiplier: sandbox.atrMultiplier,
       trailingMode: sandbox.trailingMode,
+      stopMode: sandbox.stopMode,
     });
     alert('Config applied');
   };
@@ -443,6 +445,7 @@ export const TradingAssistantPage: React.FC = () => {
       riskAmount: sandbox.riskAmount,
       atrPeriod: sandbox.atrPeriod,
       atrMultiplier: sandbox.atrMultiplier,
+      stopMode: sandbox.stopMode,
     });
 
     // 2. Запускаем автотрейдер
@@ -1175,6 +1178,21 @@ export const TradingAssistantPage: React.FC = () => {
                     onValueChange={e => updateSandbox({ takeProfitPercent: e.value ?? 0 })}
                     step={0.1} min={0} size={2} className="p-inputtext-sm"
                   />
+
+                  {/* Режим стоп‑заявок */}
+                  <div className="flex align-items-center ml-2">
+                    <label className="mr-1 mb-0">Stop mode</label>
+                    <Dropdown
+                      value={sandbox.stopMode}
+                      options={[
+                        { label: 'Stop Order', value: 'stop_order' },
+                        { label: 'Limit Order', value: 'limit_order' },
+                      ]}
+                      onChange={e => updateSandbox({ stopMode: e.value })}
+                      className="p-inputtext-sm"
+                      style={{ width: '130px' }}
+                    />
+                  </div>
 
                   <Checkbox checked={sandbox.trailingEnabled} onChange={e => updateSandbox({ trailingEnabled: e.checked })} />
                   <label className="mr-1 mb-0">Trail</label>
