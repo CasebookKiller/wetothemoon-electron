@@ -204,6 +204,7 @@ const errorMessages: Record<number, { message: string; category: ApiErrorCategor
 };
 
 export function handleApiError(error: any): ApiErrorResult {
+  
   const grpcCode = error?.code;
   const details = error?.details || '';
   // Пытаемся извлечь бизнес-код T‑Invest из details (например, "80004")
@@ -215,6 +216,22 @@ export function handleApiError(error: any): ApiErrorResult {
     message: `Неизвестная ошибка (код ${code}): ${details}`,
     category: ApiErrorCategory.INTERNAL,
   };
+
+  // Цветной вывод в консоль
+  const colorMap: Record<string, string> = {
+    [ApiErrorCategory.INTERNAL]: '\x1b[31m',   // красный
+    [ApiErrorCategory.UNAUTHENTICATED]: '\x1b[31m',
+    [ApiErrorCategory.PERMISSION_DENIED]: '\x1b[31m',
+    [ApiErrorCategory.RESOURCE_EXHAUSTED]: '\x1b[33m', // жёлтый
+    [ApiErrorCategory.FAILED_PRECONDITION]: '\x1b[33m',
+    [ApiErrorCategory.INVALID_ARGUMENT]: '\x1b[34m',   // синий
+    [ApiErrorCategory.NOT_FOUND]: '\x1b[90m',          // серый
+    [ApiErrorCategory.UNIMPLEMENTED]: '\x1b[90m',
+    [ApiErrorCategory.UNAVAILABLE]: '\x1b[90m',
+  };
+  const reset = '\x1b[0m';
+  const color = colorMap[info.category] || '\x1b[31m';
+  console.error(`${color}[ApiError] ${info.category} (код ${code}): ${info.message}${reset}`);
 
   const shouldRetry = info.category === ApiErrorCategory.INTERNAL || info.category === ApiErrorCategory.RESOURCE_EXHAUSTED;
 

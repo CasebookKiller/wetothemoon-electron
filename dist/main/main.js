@@ -1675,6 +1675,20 @@ function handleApiError(error) {
 		message: `Неизвестная ошибка (код ${code}): ${details}`,
 		category: "INTERNAL"
 	};
+	const colorMap = {
+		["INTERNAL"]: "\x1B[31m",
+		["UNAUTHENTICATED"]: "\x1B[31m",
+		["PERMISSION_DENIED"]: "\x1B[31m",
+		["RESOURCE_EXHAUSTED"]: "\x1B[33m",
+		["FAILED_PRECONDITION"]: "\x1B[33m",
+		["INVALID_ARGUMENT"]: "\x1B[34m",
+		["NOT_FOUND"]: "\x1B[90m",
+		["UNIMPLEMENTED"]: "\x1B[90m",
+		["UNAVAILABLE"]: "\x1B[90m"
+	};
+	const reset = "\x1B[0m";
+	const color = colorMap[info.category] || "\x1B[31m";
+	console.error(`${color}[ApiError] ${info.category} (код ${code}): ${info.message}${reset}`);
 	const shouldRetry = info.category === "INTERNAL" || info.category === "RESOURCE_EXHAUSTED";
 	const win = getTradingAssistantWindow();
 	if (win && !win.isDestroyed()) win.webContents.send("api-error", {
