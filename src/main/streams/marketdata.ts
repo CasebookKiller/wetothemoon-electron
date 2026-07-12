@@ -128,8 +128,7 @@ export const registerMarketdataStreamHandlers = () => {
       });
 
       stream.on('error', (err: any) => {
-        const apiError = handleApiError(err);
-        console.error(`[Main] Ошибка стрима: ${apiError.message}`)
+        handleApiError(err);  // цветной вывод уже внутри
         currentStream = null;
         if (err.code === 8) { // RESOURCE_EXHAUSTED
           console.error('[Main] Лимит стримов исчерпан, дальнейшие попытки остановлены');

@@ -1804,8 +1804,7 @@ var registerMarketdataStreamHandlers = () => {
 				if (retryCount < MAX_RECONNECT_ATTEMPTS) scheduleReconnect();
 			});
 			stream.on("error", (err) => {
-				const apiError = handleApiError(err);
-				console.error(`[Main] Ошибка стрима: ${apiError.message}`);
+				handleApiError(err);
 				currentStream = null;
 				if (err.code === 8) {
 					console.error("[Main] Лимит стримов исчерпан, дальнейшие попытки остановлены");
