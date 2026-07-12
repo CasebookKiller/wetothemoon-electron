@@ -29,6 +29,7 @@ export interface OrderManagerConfig {
   trailingMode?: 'percent' | 'volatility'; // режим трейлинга
   volatilityMultiplier?: number; // множитель для стопа по волатильности
   stopMode: 'stop_order' | 'limit_order';
+  entryMode?: 'market' | 'limit';   // ← добавить
 }
 
 export class OrderManager {
@@ -72,6 +73,7 @@ export class OrderManager {
       trailingMode: 'percent',
       volatilityMultiplier: 2,
       stopMode: 'stop_order',
+      entryMode: 'market',   // ← добавить
       ...config,
     };
     this.orderFlow = orderFlow;   // сохраняем отдельно
@@ -100,7 +102,7 @@ export class OrderManager {
       return;
     }
     if (!this.config.token || !this.config.accountId) return;
-    
+
     const now = Date.now();
     if (now - this.lastOrderTime < 5 * 60 * 1000) {
       console.log('[OrderManager] Кулдаун, пропускаем сигнал');
@@ -108,7 +110,6 @@ export class OrderManager {
     }
 
     const direction = signal.type === 'BUY' ? OrderDirection.ORDER_DIRECTION_BUY : OrderDirection.ORDER_DIRECTION_SELL;
-    //const direction = signal.type === 'BUY' ? 'ORDER_DIRECTION_BUY' : 'ORDER_DIRECTION_SELL';
 
     // === ДИНАМИЧЕСКИЙ РАЗМЕР ПОЗИЦИИ ПО ATR ===
     let quantity = this.config.lotQuantity;
@@ -128,48 +129,56 @@ export class OrderManager {
         : this.lastEntryPrice - signal.price;
       this.updateDailyLoss(prevProfit);
     }
-    this.lastEntryPrice = signal.price;
 
-    console.log('[OrderManager] Отправляю ордер:', {
-      instrumentId: signal.instrumentUid,
-      direction,
-      orderType: this.config.useMarketOrder ? OrderType.ORDER_TYPE_MARKET : OrderType.ORDER_TYPE_LIMIT,
-      //orderType: this.config.useMarketOrder ? 'ORDER_TYPE_MARKET' : 'ORDER_TYPE_LIMIT',
-      quantity,
-      accountId: this.config.accountId,
-    });
-    //const instrumentId = (signal as any).figi || signal.instrumentUid;
+    // ========== ОСНОВНОЙ ОРДЕР (рыночный или лимитный) ==========
     try {
-      //const orderId = `ord_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
-      //console.log('[OrderManager] Сгенерирован orderId:', orderId);
+      let entryOrderResult: any = null;
 
-      const order = await sandboxGrpc.postSandboxOrder(
-        {
-          instrumentId: signal.instrumentUid,
-          direction: direction as any,
-          orderType: this.config.useMarketOrder ? OrderType.ORDER_TYPE_MARKET : OrderType.ORDER_TYPE_LIMIT,
-          //orderType: (this.config.useMarketOrder ? 'ORDER_TYPE_MARKET' : 'ORDER_TYPE_LIMIT') as any,
-          quantity,
-          price: this.config.useMarketOrder ? undefined : { units: Math.floor(signal.price), nano: Math.round((signal.price % 1) * 1e9) },
-          accountId: this.config.accountId,
-          //orderId: orderId,   // ← обязательно
-        },
-        this.config.token
-      );
-      this.activeOrderId = order.orderId ?? null;
-      this.lastOrderTime = now;
-      console.log(`[OrderManager] Ордер отправлен: ${this.activeOrderId}`);
+      if (this.config.entryMode === 'limit' && signal.targetPrice) {
+        // ---- Лимитный вход ----
+        const limitPrice = signal.targetPrice;
+        const orderId = this.generateUUID();
+        console.log(`[OrderManager] Выставляю лимитный ордер на ${limitPrice}, orderId=${orderId}`);
+        entryOrderResult = await sandboxGrpc.postSandboxOrder(
+          {
+            instrumentId: signal.instrumentUid,
+            direction: direction as any,
+            orderType: OrderType.ORDER_TYPE_LIMIT,
+            quantity,
+            price: { units: Math.floor(limitPrice), nano: Math.round((limitPrice % 1) * 1e9) },
+            accountId: this.config.accountId,
+            orderId: orderId,
+          },
+          this.config.token
+        );
+        this.activeOrderId = entryOrderResult.orderId ?? null;
+        this.lastOrderTime = now;
+        this.lastEntryPrice = limitPrice;
+        console.log(`[OrderManager] Лимитный ордер отправлен: ${this.activeOrderId}`);
+      } else {
+        // ---- Рыночный вход (текущее поведение) ----
+        const orderId = this.generateUUID();
+        console.log('[OrderManager] Выставляю рыночный ордер, orderId=', orderId);
+        entryOrderResult = await sandboxGrpc.postSandboxOrder(
+          {
+            instrumentId: signal.instrumentUid,
+            direction: direction as any,
+            orderType: OrderType.ORDER_TYPE_MARKET,
+            quantity,
+            price: this.config.useMarketOrder ? undefined : { units: Math.floor(signal.price), nano: Math.round((signal.price % 1) * 1e9) },
+            accountId: this.config.accountId,
+            orderId: orderId,
+          },
+          this.config.token
+        );
+        this.activeOrderId = entryOrderResult.orderId ?? null;
+        this.lastOrderTime = now;
+        this.lastEntryPrice = signal.price;
+        console.log(`[OrderManager] Рыночный ордер отправлен: ${this.activeOrderId}`);
+      }
 
-      this.lastEntryPrice = signal.price;
-
-      ///const stopOrderId = await this.placeStopOrders(signal);
-
-      //if (this.config.trailingEnabled && stopOrderId) {
-      //  this.startTrailing(signal.instrumentUid, signal.price, stopOrderId, this.config.trailingPercent);
-      //}
-      // Вставьте:
-      // после успешного основного ордера
-      const entryPrice = signal.price;
+      // ========== ЗАЩИТНЫЕ ОРДЕРА И ТРЕЙЛИНГ ==========
+      const entryPrice = this.lastEntryPrice;
       let stopOrderId: string | null = null;
 
       if (this.config.stopMode === 'stop_order') {
