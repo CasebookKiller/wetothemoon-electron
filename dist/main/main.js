@@ -5148,7 +5148,8 @@ var OrderManager = class {
 		const isBuy = signal.type === "BUY";
 		let stopOrderId = null;
 		if (stopLossPercent > 0) {
-			const slPrice = isBuy ? entryPrice * (1 - stopLossPercent / 100) : entryPrice * (1 + stopLossPercent / 100);
+			let slPrice = isBuy ? entryPrice * (1 - stopLossPercent / 100) : entryPrice * (1 + stopLossPercent / 100);
+			slPrice = isBuy ? Math.max(slPrice, entryPrice * .98) : Math.min(slPrice, entryPrice * 1.02);
 			try {
 				stopOrderId = (await sandboxGrpc.postSandboxStopOrder({
 					instrumentId: signal.instrumentUid,
@@ -5220,23 +5221,26 @@ var OrderManager = class {
 				const atr = await this.calculateATR(signal.instrumentUid, token);
 				if (atr && atr > 0) slPrice = isBuy ? entryPrice - atr * volatilityMultiplier : entryPrice + atr * volatilityMultiplier;
 			} else if (stopLossPercent > 0) slPrice = isBuy ? entryPrice * (1 - stopLossPercent / 100) : entryPrice * (1 + stopLossPercent / 100);
-			if (slPrice) try {
-				const orderId = `sl_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
-				stopOrderId = (await sandboxGrpc.postSandboxOrder({
-					instrumentId: signal.instrumentUid,
-					direction: isBuy ? OrderDirection.ORDER_DIRECTION_SELL : OrderDirection.ORDER_DIRECTION_BUY,
-					orderType: OrderType.ORDER_TYPE_LIMIT,
-					quantity: lotQuantity,
-					price: {
-						units: Math.floor(slPrice),
-						nano: Math.round(slPrice % 1 * 1e9)
-					},
-					accountId,
-					orderId
-				}, token)).orderId || null;
-				console.log(`[OrderManager] Стоп‑лосс (лимитный) выставлен на ${slPrice}, orderId=${stopOrderId}`);
-			} catch (e) {
-				console.error("[OrderManager] Ошибка выставления стоп‑лосса:", e);
+			if (slPrice) {
+				slPrice = isBuy ? Math.max(slPrice, entryPrice * .98) : Math.min(slPrice, entryPrice * 1.02);
+				try {
+					const orderId = `sl_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
+					stopOrderId = (await sandboxGrpc.postSandboxOrder({
+						instrumentId: signal.instrumentUid,
+						direction: isBuy ? OrderDirection.ORDER_DIRECTION_SELL : OrderDirection.ORDER_DIRECTION_BUY,
+						orderType: OrderType.ORDER_TYPE_LIMIT,
+						quantity: lotQuantity,
+						price: {
+							units: Math.floor(slPrice),
+							nano: Math.round(slPrice % 1 * 1e9)
+						},
+						accountId,
+						orderId
+					}, token)).orderId || null;
+					console.log(`[OrderManager] Стоп‑лосс (лимитный) выставлен на ${slPrice}, orderId=${stopOrderId}`);
+				} catch (e) {
+					console.error("[OrderManager] Ошибка выставления стоп‑лосса:", e);
+				}
 			}
 		}
 		if (takeProfitPercent > 0) {

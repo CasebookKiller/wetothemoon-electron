@@ -213,9 +213,15 @@ export class OrderManager {
     let stopOrderId: string | null = null;
 
     if (stopLossPercent > 0) {
-      const slPrice = isBuy
+      let slPrice = isBuy
         ? entryPrice * (1 - stopLossPercent / 100)
         : entryPrice * (1 + stopLossPercent / 100);
+
+      // Ограничиваем отклонение стоп‑цены (временно 2% для ВТБ)
+      const MAX_SL_DEVIATION = 0.02; // 2%
+      slPrice = isBuy
+        ? Math.max(slPrice, entryPrice * (1 - MAX_SL_DEVIATION))
+        : Math.min(slPrice, entryPrice * (1 + MAX_SL_DEVIATION));
 
       try {
         const resp: any = await sandboxGrpc.postSandboxStopOrder(
@@ -304,6 +310,12 @@ export class OrderManager {
       }
 
       if (slPrice) {
+        // Ограничиваем отклонение стоп‑цены (временно 2% для ВТБ)
+        const MAX_SL_DEVIATION = 0.02;
+        slPrice = isBuy
+          ? Math.max(slPrice, entryPrice * (1 - MAX_SL_DEVIATION))
+          : Math.min(slPrice, entryPrice * (1 + MAX_SL_DEVIATION));
+
         try {
           const orderId = `sl_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
           const resp: any = await sandboxGrpc.postSandboxOrder(
