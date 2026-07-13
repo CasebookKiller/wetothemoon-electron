@@ -37,7 +37,8 @@ export const SandboxTab: React.FC<SandboxTabProps> = ({ availableInstruments }) 
   const [entryMode, setEntryMode] = useState<'market' | 'limit'>('market');
 
   // ---------- Ручной ордер ----------
-  const [manualUid, setManualUid] = useState('');
+  //const [manualUid, setManualUid] = useState('');
+  const [manualInstrument, setManualInstrument] = useState<string>('');
   const [manualType, setManualType] = useState<'BUY' | 'SELL'>('BUY');
   const [manualQuantity, setManualQuantity] = useState(1);
   const [manualPrice, setManualPrice] = useState(0);
@@ -114,11 +115,11 @@ export const SandboxTab: React.FC<SandboxTabProps> = ({ availableInstruments }) 
 
   // Отправить ручной ордер
   const sendManualOrder = async () => {
-    if (!selectedAccountId || !manualUid) return;
+    if (!selectedAccountId || !manualInstrument) return;
     await applyConfig(); // чтобы OrderManager получил актуальные настройки
     if (!api?.sendManualOrder) return;
     const res = await api.sendManualOrder({
-      instrumentUid: manualUid,
+      instrumentUid: manualInstrument,
       type: manualType,
       quantity: manualQuantity,
       orderType: isLimitOrder ? 'limit' : 'market',
@@ -143,14 +144,20 @@ export const SandboxTab: React.FC<SandboxTabProps> = ({ availableInstruments }) 
               className="p-inputtext-sm"
               style={{ minWidth: '200px' }}
             />
-            <Button icon="pi pi-refresh" loading={loadingAccounts} onClick={loadAccounts} className="p-button-sm p-button-secondary" tooltip="Загрузить счета" />
-            <Button icon="pi pi-plus" onClick={handleCreateAccount} className="p-button-sm p-button-success" tooltip="Создать счёт" />
-            <Button icon="pi pi-trash" onClick={handleCloseAccount} className="p-button-sm p-button-danger" tooltip="Удалить счёт" />
-            <span className="ml-auto">
-              {balance && <span className="mr-2">{balance}</span>}
-              <InputNumber value={payAmount} onValueChange={e => setPayAmount(e.value ?? 0)} min={1000} step={1000} className="p-inputtext-sm" style={{ width: '100px' }} />
-              <Button label="Пополнить" onClick={handlePayIn} className="p-button-sm p-ml-2" />
-            </span>
+            <Button icon="pi pi-refresh" loading={loadingAccounts} onClick={loadAccounts} className="p-button-sm p-button-secondary p-1 px-2" tooltip="Загрузить счета" />
+            <Button icon="pi pi-plus" onClick={handleCreateAccount} className="p-button-sm p-button-success p-1 px-2" tooltip="Создать счёт" />
+            <Button icon="pi pi-trash" onClick={handleCloseAccount} className="p-button-sm p-button-danger p-1 px-2" tooltip="Удалить счёт" />
+            {balance && <label className="mr-1 mb-0">Баланс</label>}
+            {balance && <div className="mr-1 mb-0">{balance}</div>}
+            <InputNumber
+              value={payAmount}
+              onValueChange={e => setPayAmount(e.value ?? 0)}
+              min={1000}
+              step={1000}
+              className="p-inputtext-sm mr-1"
+              //style={{width: '100px'}}
+            />
+            <Button label="Пополнить" onClick={handlePayIn} className="p-button-sm p-button-success p-1 px-2" />
           </div>
 
           {/* Настройки риск‑менеджмента */}
@@ -162,18 +169,14 @@ export const SandboxTab: React.FC<SandboxTabProps> = ({ availableInstruments }) 
             <label className="ml-2 mr-1 mb-0">TP%</label>
             <InputNumber value={takeProfitPercent} onValueChange={e => setTakeProfitPercent(e.value ?? 0)} step={0.1} min={0} size={2} className="p-inputtext-sm" />
 
-            <div className="flex align-items-center ml-2">
-              <Checkbox checked={trailingEnabled} onChange={(e:any) => setTrailingEnabled(e.checked)} />
-              <label className="ml-1 mr-1 mb-0">Trail</label>
-              {trailingEnabled && <InputNumber value={trailingPercent} onValueChange={e => setTrailingPercent(e.value ?? 0.5)} step={0.1} min={0} size={2} className="p-inputtext-sm" />}
-            </div>
-
-            <div className="flex align-items-center ml-2">
-              <Checkbox checked={dynamicSizing} onChange={(e:any) => setDynamicSizing(e.checked)} />
-              <label className="ml-1 mr-1 mb-0">Dyn.Lots</label>
-              {dynamicSizing && <InputNumber value={riskAmount} onValueChange={e => setRiskAmount(e.value ?? 1000)} step={100} min={0} size={3} className="p-inputtext-sm" placeholder="Risk RUB" />}
-            </div>
-
+            <Checkbox checked={trailingEnabled} onChange={(e:any) => setTrailingEnabled(e.checked)} />
+            <label className="ml-1 mr-1 mb-0">Trail</label>
+            {trailingEnabled && <InputNumber value={trailingPercent} onValueChange={e => setTrailingPercent(e.value ?? 0.5)} step={0.1} min={0} size={2} className="p-inputtext-sm" />}
+            
+            <Checkbox checked={dynamicSizing} onChange={(e:any) => setDynamicSizing(e.checked)} />
+            <label className="ml-1 mr-1 mb-0">Dyn.Lots</label>
+            {dynamicSizing && <InputNumber value={riskAmount} onValueChange={e => setRiskAmount(e.value ?? 1000)} step={100} min={0} size={3} className="p-inputtext-sm" placeholder="Risk RUB" />}
+            
             {(dynamicSizing || trailingEnabled) && (
               <>
                 <label className="ml-2 mr-1 mb-0">ATR Per</label>
@@ -188,29 +191,39 @@ export const SandboxTab: React.FC<SandboxTabProps> = ({ availableInstruments }) 
             <label className="ml-2 mr-1 mb-0">Stop</label>
             <Dropdown value={stopMode} options={[{ label: 'Stop Order', value: 'stop_order' }, { label: 'Limit Order', value: 'limit_order' }]} onChange={e => setStopMode(e.value)} className="p-inputtext-sm" style={{ width: '120px' }} />
 
-            <Button label="Apply" onClick={applyConfig} className="p-button-sm p-button-info" tooltip="Применить конфигурацию" />
+            <Button label="Apply" onClick={applyConfig} className="p-button-sm p-button-info p-1 px-2" tooltip="Применить конфигурацию" />
           </div>
 
-          {/* Ручной ордер */}
-          <Card className="surface-ground p-2 mt-2">
-            <h5 className="p-mb-2">Ручной ордер</h5>
-            <div className="flex align-items-center flex-wrap gap-2">
-              <label className="mr-1 mb-0">UID</label>
-              <InputText value={manualUid} onChange={e => setManualUid(e.target.value)} className="p-inputtext-sm" style={{ width: '200px' }} placeholder="e6123145-..." />
-              <label className="mr-1 mb-0">Тип</label>
-              <Dropdown value={manualType} options={[{ label: 'BUY', value: 'BUY' }, { label: 'SELL', value: 'SELL' }]} onChange={e => setManualType(e.value)} className="p-inputtext-sm" style={{ width: '80px' }} />
-              <label className="mr-1 mb-0">Кол-во</label>
-              <InputNumber value={manualQuantity} onValueChange={e => setManualQuantity(e.value ?? 1)} min={1} size={1} className="p-inputtext-sm" />
-              <div className="flex align-items-center">
-                <Checkbox checked={isLimitOrder} onChange={(e: any) => setIsLimitOrder(e.checked)} />
-                <label className="ml-1 mr-2 mb-0">Limit</label>
-                {isLimitOrder && <InputNumber value={manualPrice} onValueChange={e => setManualPrice(e.value ?? 0)} min={0} step={0.01} size={3} className="p-inputtext-sm" />}
-              </div>
-              <Button label="Отправить" icon="pi pi-send" onClick={sendManualOrder} className="p-button-sm p-button-success" />
-            </div>
-          </Card>
         </div>
       </Card>
+
+      {/* Ручной ордер */}
+      <Card className="surface-ground p-1 mt-1">
+        <h5 className="my-1 p-1">Ручной ордер</h5>
+        <div className="flex align-items-center flex-wrap gap-2">
+          <label className="mr-1 mb-0">Инструмент</label>
+          <Dropdown
+            value={manualInstrument}
+            options={availableInstruments.map(i => ({ label: `${i.name} (${i.ticker})`, value: i.uid }))}
+            onChange={e => setManualInstrument(e.value)}
+            placeholder="Выберите инструмент"
+            filter
+            className="p-inputtext-sm"
+            style={{ minWidth: '220px' }}
+          />
+          <label className="mr-1 mb-0">Тип</label>
+          <Dropdown value={manualType} options={[{ label: 'BUY', value: 'BUY' }, { label: 'SELL', value: 'SELL' }]} onChange={e => setManualType(e.value)} className="p-inputtext-sm" style={{ width: '80px' }} />
+          <label className="mr-1 mb-0">Кол-во</label>
+          <InputNumber value={manualQuantity} onValueChange={e => setManualQuantity(e.value ?? 1)} min={1} size={1} className="p-inputtext-sm" />
+          <div className="flex align-items-center">
+            <Checkbox checked={isLimitOrder} onChange={(e: any) => setIsLimitOrder(e.checked)} />
+            <label className="ml-1 mr-2 mb-0">Limit</label>
+            {isLimitOrder && <InputNumber value={manualPrice} onValueChange={e => setManualPrice(e.value ?? 0)} min={0} step={0.01} size={3} className="p-inputtext-sm" />}
+          </div>
+          <Button label="Отправить" icon="pi pi-send" onClick={sendManualOrder} className="p-button-sm p-button-success p-1 px-2" />
+        </div>
+      </Card>
+
     </div>
   );
 };
