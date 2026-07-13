@@ -38,6 +38,7 @@ import { Tag } from 'primereact/tag';
 
 import { Toast } from 'primereact/toast';
 import { AutoTraderTab } from '@/components/TRADING_ASSISTANT/AutoTraderTab/AutoTraderTab';
+import { SandboxTab } from '@/components/TRADING_ASSISTANT/SandboxTab/SandboxTab';
 
 interface BatchResult {
   batchId: string;
@@ -1172,6 +1173,11 @@ export const TradingAssistantPage: React.FC = () => {
         <TabView>
           {/* ========== SANDBOX ========== */}
           <TabPanel header="Sandbox">
+            <SandboxTab availableInstruments={availableInstruments} />
+          </TabPanel>
+          
+          {/* ========== SANDBOX (OLD) ==== */}
+          <TabPanel header="Sandbox (old)">
             <Card className="surface-ground p-0">
               <div className="p-2">
                 {/* Основная строка управления */}
