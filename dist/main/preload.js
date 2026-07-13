@@ -68,8 +68,8 @@ try {
 				callback(files);
 			});
 		},
-		startMarketStream: (token, body) => electron.ipcRenderer.invoke("md-stream-start", token, body),
-		stopMarketStream: () => electron.ipcRenderer.invoke("md-stream-stop"),
+		startMarketStream: (token, body, streamKey = "chart") => electron.ipcRenderer.invoke("md-stream-start", streamKey, token, body),
+		stopMarketStream: (streamKey = "chart") => electron.ipcRenderer.invoke("md-stream-stop", streamKey),
 		onMarketData: (callback) => {
 			electron.ipcRenderer.removeAllListeners("md-stream-data");
 			electron.ipcRenderer.on("md-stream-data", (_, data) => callback(data));
@@ -241,8 +241,7 @@ try {
 		removeApiErrorListener: () => {
 			electron.ipcRenderer.removeAllListeners("api-error");
 		},
-		startAutoTraderMultiple: (uids) => electron.ipcRenderer.invoke("trading-assistant:start-auto-trader-multiple", uids),
-		stopAllStrategies: () => electron.ipcRenderer.invoke("trading-assistant:stop-all-strategies")
+		sendManualOrder: (params) => electron.ipcRenderer.invoke("trading-assistant:send-manual-order", params)
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {

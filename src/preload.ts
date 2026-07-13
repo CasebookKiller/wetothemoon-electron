@@ -87,9 +87,10 @@ try {
 
     // ==================== Методы стримов (из preloadbonds.ts) ====================
     // MarketDataStream
-    startMarketStream: (token: string, body: any) =>
-      ipcRenderer.invoke('md-stream-start', token, body),
-    stopMarketStream: () => ipcRenderer.invoke('md-stream-stop'),
+    startMarketStream: (token: string, body: any, streamKey = 'chart') =>
+      ipcRenderer.invoke('md-stream-start', streamKey, token, body),
+    stopMarketStream: (streamKey = 'chart') =>
+      ipcRenderer.invoke('md-stream-stop', streamKey),
     onMarketData: (callback: (data: string) => void) => {
       ipcRenderer.removeAllListeners('md-stream-data');
       ipcRenderer.on('md-stream-data', (_, data: string) => callback(data));
@@ -332,9 +333,7 @@ try {
       ipcRenderer.removeAllListeners('api-error');
     },
 
-    startAutoTraderMultiple: (uids: string[]) => ipcRenderer.invoke('trading-assistant:start-auto-trader-multiple', uids),
-    stopAllStrategies: () => ipcRenderer.invoke('trading-assistant:stop-all-strategies'),
-
+    sendManualOrder: (params: any) => ipcRenderer.invoke('trading-assistant:send-manual-order', params),
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

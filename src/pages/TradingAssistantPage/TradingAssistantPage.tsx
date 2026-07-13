@@ -37,6 +37,7 @@ import { CloudFarmerTab } from '@/components/TRADING_ASSISTANT/CloudFarmerTab/Cl
 import { Tag } from 'primereact/tag';
 
 import { Toast } from 'primereact/toast';
+import { AutoTraderTab } from '@/components/TRADING_ASSISTANT/AutoTraderTab/AutoTraderTab';
 
 interface BatchResult {
   batchId: string;
@@ -208,10 +209,6 @@ export const TradingAssistantPage: React.FC = () => {
   const [liveSignals, setLiveSignals] = useState<any[]>([]);
   const [autoTrading, setAutoTrading] = useState(false);
   const [selectedInstrument, setSelectedInstrument] = useState('e6123145-9665-43e0-8413-cd61b8aa9b13');
-  const [selectedInstruments, setSelectedInstruments] = useState<string[]>([]);
-  const [showMultiInstrumentDialog, setShowMultiInstrumentDialog] = useState(false);
-  const [tempMultiSelected, setTempMultiSelected] = useState<string[]>([]);
-  
   const [availableInstruments, setAvailableInstruments] = useState<Array<{ uid: string; name: string; ticker?: string }>>([]);
   const [instrumentsLoading, setInstrumentsLoading] = useState(false);
 
@@ -244,6 +241,14 @@ export const TradingAssistantPage: React.FC = () => {
   const [isWeekendMode, setIsWeekendMode] = useState(false);
 
   const [orderFlowData, setOrderFlowData] = useState<{ delta: number; absorption: any; exhaustion: any } | null>(null);
+
+  const [manualOrder, setManualOrder] = useState({
+    instrumentUid: selectedInstrument,
+    type: 'BUY' as 'BUY' | 'SELL',
+    quantity: 1,
+    orderType: 'market' as 'market' | 'limit',
+    price: 0,
+  });
 
   useEffect(() => {
     if (!selectedInstrument) return;
@@ -456,9 +461,9 @@ export const TradingAssistantPage: React.FC = () => {
 
   const startAutoTraderHandler = async () => {
     const api = (window as any).electronAPI;
-    if (!api?.startAutoTraderMultiple) return;
+    if (!api?.startAutoTrader) return;
 
-    // 1. Применить конфиг
+    // 1. Сначала применяем текущие настройки риск‑менеджмента
     await api.updateTradingConfig({
       token: sandbox.token,
       accountId: sandbox.accountId,
@@ -476,18 +481,29 @@ export const TradingAssistantPage: React.FC = () => {
       stopMode: sandbox.stopMode,
     });
 
-    // 2. Выбрать инструменты: если в мультивыборе есть, то их, иначе текущий
-    const instrumentsToStart = selectedInstruments.length > 0 ? selectedInstruments : [selectedInstrument];
-    await api.startAutoTraderMultiple(instrumentsToStart);
+    // 2. Запускаем автотрейдер
+    await api.startAutoTrader(selectedInstrument);
     const active = await api.getActiveAutoTraders();
     setActiveAutoTraders(active);
   };
 
   const stopAutoTraderHandler = async () => {
     const api = (window as any).electronAPI;
-    if (!api?.stopAllStrategies) return;
-    await api.stopAllStrategies();
-    setActiveAutoTraders([]);
+    if (!api?.stopAutoTrader) return;
+    await api.stopAutoTrader(selectedInstrument);
+    const active = await api.getActiveAutoTraders();
+    setActiveAutoTraders(active);
+  };
+
+  const handleSendManualOrder = async () => {
+    const api = (window as any).electronAPI;
+    if (!api?.sendManualOrder) return;
+    const res = await api.sendManualOrder(manualOrder);
+    if (res.success) {
+      alert('Ордер отправлен');
+    } else {
+      alert('Ошибка: ' + res.error);
+    }
   };
 
   // --- Stream ---
@@ -540,7 +556,7 @@ export const TradingAssistantPage: React.FC = () => {
               : 'SUBSCRIPTION_INTERVAL_ONE_MINUTE'
           }]
         }
-      });
+      }, 'chart');
       updateStream({ active: true });
     } catch (err: any) {
       console.error(err);
@@ -1105,16 +1121,6 @@ export const TradingAssistantPage: React.FC = () => {
         <span style={{ color: stream.active ? '#4caf50' : '#d32f2f', minWidth: '60px', fontSize: '0.85rem' }}>
           {stream.active ? '● Live' : '○ Stopped'}
         </span>
-        <Button
-          label="Выбрать инструменты"
-          icon="pi pi-list"
-          onClick={() => {
-            setTempMultiSelected([...selectedInstruments]);
-            setShowMultiInstrumentDialog(true);
-          }}
-          className="p-button-sm p-button-secondary p-1 px-2"
-        />
-        <span className="text-sm text-500">{selectedInstruments.length} выбрано</span>
         
         <Checkbox checked={isWeekendMode} onChange={e => setIsWeekendMode(e.checked as boolean)} />
         <label className="ml-1 mb-0" style={{ fontSize: '0.8rem' }}>Weekend</label>
@@ -1300,59 +1306,6 @@ export const TradingAssistantPage: React.FC = () => {
                     tooltip="Settings"
                   />
 
-                  <div className="flex align-items-center flex-wrap gap-2 mt-3">
-                    <label className="mr-1 mb-0">Auto (Phase-based)</label>
-                    <Button
-                      label={activeAutoTraders.includes(selectedInstrument) ? 'Running...' : 'Start Auto Trader'}
-                      onClick={startAutoTraderHandler}
-                      disabled={!sandbox.accountId || stream.active === false}
-                      className={`p-button-sm p-1 px-2 ${activeAutoTraders.includes(selectedInstrument) ? 'p-button-warning' : ''}`}
-                      icon={activeAutoTraders.includes(selectedInstrument) ? 'pi pi-spin pi-spinner' : ''}
-                    />
-                    <Button
-                      label="Stop Auto Trader"
-                      onClick={stopAutoTraderHandler}
-                      disabled={!activeAutoTraders.includes(selectedInstrument)}
-                      className="p-button-sm p-button-danger p-1 px-2"
-                    />
-                    {activeAutoTraders.length > 0 && (
-                      <span className="text-sm ml-2">
-                        Active: {activeAutoTraders.map(uid => availableInstruments.find(i => i.uid === uid)?.ticker || uid.slice(0,8)).join(', ')}
-                      </span>
-                    )}
-                    {orderFlowData && (
-                      <>
-                        <div className="flex align-items-center ml-2" style={{ fontSize: '0.8rem' }}>
-                          <span className="mr-1">Δ</span>
-                          <span style={{ color: orderFlowData.delta >= 0 ? '#4caf50' : '#f44336', fontWeight: 'bold' }}>
-                            {orderFlowData.delta > 0 ? '+' : ''}{orderFlowData.delta}
-                          </span>
-                        </div>
-                        {orderFlowData.absorption && (
-                          <Tag severity="info" value={`Abs: ${orderFlowData.absorption.side}`} style={{ fontSize: '0.7rem' }} />
-                        )}
-                        {orderFlowData.exhaustion && (
-                          <Tag severity="warning" value={`Exh: ${orderFlowData.exhaustion.type}`} style={{ fontSize: '0.7rem' }} />
-                        )}
-                      </>
-                    )}
-                  </div>
-
-                  <div className="mt-2">
-                    <h5>Лог автотрейдера</h5>
-                    <div style={{ maxHeight: '200px', overflowY: 'auto', background: '#111', color: '#ccc', padding: '8px', borderRadius: '4px' }}>
-                      {autoTraderLog.length === 0 && <span>Ожидание сигналов...</span>}
-                      {autoTraderLog.map((entry, i) => (
-                        <div key={i} style={{ fontSize: '0.8rem', borderBottom: '1px solid #333', padding: '2px 0' }}>
-                          <span style={{ color: '#888' }}>{entry.time}</span>{' '}
-                          <span style={{ color: entry.type === 'error' ? 'red' : entry.type === 'order' ? '#4caf50' : '#fff' }}>
-                            {entry.text}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
                   <span className="ml-auto">
                     {sandbox.balance && <span className="mr-2">{sandbox.balance}</span>}
                     {sandbox.payMessage && <span style={{ color: '#4caf50' }}>{sandbox.payMessage}</span>}
@@ -1416,6 +1369,11 @@ export const TradingAssistantPage: React.FC = () => {
                 </div>
               </div>
             </Dialog>
+          </TabPanel>
+
+          {/* ========== AUTOTRADER ========== */}
+          <TabPanel header="Autotrader">
+            <AutoTraderTab sandbox={sandbox} availableInstruments={availableInstruments} />
           </TabPanel>
 
           {/* ========== BACKTEST ========== */}
@@ -2068,53 +2026,7 @@ export const TradingAssistantPage: React.FC = () => {
           val={currentProfile?.valueAreaLow}
         />
       )}
-      
-      <Dialog
-        header="Выбор инструментов для автотрейдера"
-        visible={showMultiInstrumentDialog}
-        style={{ width: '450px', maxHeight: '600px' }}
-        onHide={() => setShowMultiInstrumentDialog(false)}
-        footer={
-          <div className="flex justify-content-end gap-2">
-            <Button label="Отмена" onClick={() => setShowMultiInstrumentDialog(false)} className="p-button-sm p-button-secondary" />
-            <Button label="Применить" onClick={() => {
-              setSelectedInstruments(tempMultiSelected);
-              setShowMultiInstrumentDialog(false);
-            }} className="p-button-sm" />
-          </div>
-        }
-      >
-        <div className="p-mb-2">
-          <InputText
-            placeholder="Поиск инструмента..."
-            value={instrumentFilter}
-            onChange={e => setInstrumentFilter(e.target.value)}
-            className="p-inputtext-sm"
-            style={{ width: '100%' }}
-          />
-        </div>
-        <div style={{ maxHeight: '350px', overflowY: 'auto', color: '#d1d4dc' }}>
-          {availableInstruments
-            .filter(inst => inst.name.toLowerCase().includes(instrumentFilter.toLowerCase()) || inst.ticker?.toLowerCase().includes(instrumentFilter.toLowerCase()))
-            .map(inst => (
-              <div key={inst.uid} className="p-field-checkbox p-mb-1">
-                <Checkbox
-                  inputId={`multi-${inst.uid}`}
-                  checked={tempMultiSelected.includes(inst.uid)}
-                  onChange={(e) => {
-                    if (e.checked) {
-                      setTempMultiSelected(prev => [...prev, inst.uid]);
-                    } else {
-                      setTempMultiSelected(prev => prev.filter(id => id !== inst.uid));
-                    }
-                  }}
-                  className='mr-1'
-                />
-                <label htmlFor={`multi-${inst.uid}`}>{inst.name} ({inst.ticker})</label>
-              </div>
-            ))}
-        </div>
-      </Dialog>  
+    
     </div>
   );
 };

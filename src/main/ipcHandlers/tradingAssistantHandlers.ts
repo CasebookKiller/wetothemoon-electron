@@ -1125,18 +1125,13 @@ async function getCloudToken(serverUrl: string): Promise<string | null> {
     }
   });
 
-  ipcMain.handle('trading-assistant:start-auto-trader-multiple', async (event, uids: string[]) => {
-    if (!autonomousTraderInstance) return { success: false, error: 'AutoTrader not initialized' };
-    const token = process.env.VITE_TReadOnly || '';
-    await autonomousTraderInstance.startMultiple(uids, token);
-    return { success: true };
-  });
-
-  ipcMain.handle('trading-assistant:stop-all-strategies', async () => {
-    if (autonomousTraderInstance) {
-      autonomousTraderInstance.stopAll();
+  ipcMain.handle('trading-assistant:send-manual-order', async (_, params: any) => {
+    if (!orderManagerInstance) return { success: false, error: 'OrderManager не инициализирован' };
+    try {
+      await orderManagerInstance.sendManualOrder(params);
       return { success: true };
+    } catch (e: any) {
+      return { success: false, error: e.message };
     }
-    return { success: false };
   });
 };

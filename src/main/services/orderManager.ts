@@ -522,4 +522,22 @@ export class OrderManager {
       return null;
     }
   }
+
+  async sendManualOrder(params: {
+    instrumentUid: string;
+    type: 'BUY' | 'SELL';
+    quantity: number;
+    orderType: 'market' | 'limit';
+    price?: number;
+  }): Promise<void> {
+    const signal: BacktestSignal = {
+      instrumentUid: params.instrumentUid,
+      type: params.type,
+      price: params.price || 0, // для market можно 0
+      time: new Date().toISOString(),
+      reason: 'Manual order',
+      targetPrice: params.orderType === 'limit' ? params.price : undefined,
+    };
+    await this.processSignal(signal);
+  }
 }

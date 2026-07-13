@@ -918,845 +918,67 @@ var marketDataBus = class MarketDataBus extends events.EventEmitter {
 	}
 }.getInstance();
 //#endregion
-//#region src/main/windows/tradingAssistantWindow.ts
-var tradingAssistantWindow = null;
-var preloadPath$1 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
-var createTradingAssistantWindow = () => {
-	if (tradingAssistantWindow && !tradingAssistantWindow.isDestroyed()) {
-		tradingAssistantWindow.focus();
-		return tradingAssistantWindow;
-	}
-	tradingAssistantWindow = new electron.BrowserWindow({
-		width: 1200,
-		height: 800,
-		title: "Trading Assistant – Volume Profile",
-		webPreferences: {
-			preload: preloadPath$1,
-			contextIsolation: true,
-			nodeIntegration: false
-		}
-	});
-	if (process.env.NODE_ENV === "development") tradingAssistantWindow.loadURL(`${DEV_SERVER_URL}/#/trading-assistant`);
-	else tradingAssistantWindow.loadFile(getMainWindowProdPath());
-	const menu = electron.Menu.buildFromTemplate(tradingAssistantWindowMenuTemplate);
-	tradingAssistantWindow.setMenu(menu);
-	tradingAssistantWindow.on("closed", () => {
-		tradingAssistantWindow = null;
-	});
-	return tradingAssistantWindow;
-};
-var getTradingAssistantWindow = () => tradingAssistantWindow;
-//#endregion
-//#region src/main/services/apiErrorHandler.ts
-var errorMessages = {
-	12001: {
-		message: "Метод не реализован.",
-		category: "UNIMPLEMENTED"
-	},
-	12002: {
-		message: "Устаревший метод недоступен.",
-		category: "UNAVAILABLE"
-	},
-	30001: {
-		message: "Параметр from обязателен.",
-		category: "INVALID_ARGUMENT"
-	},
-	30002: {
-		message: "Запрошенный период не может превышать 14 дней.",
-		category: "INVALID_ARGUMENT"
-	},
-	30003: {
-		message: "from не может быть меньше текущей даты.",
-		category: "INVALID_ARGUMENT"
-	},
-	30004: {
-		message: "Параметр to обязателен.",
-		category: "INVALID_ARGUMENT"
-	},
-	30005: {
-		message: "Некорректный id_type.",
-		category: "INVALID_ARGUMENT"
-	},
-	30006: {
-		message: "Параметр id_type обязателен.",
-		category: "INVALID_ARGUMENT"
-	},
-	30007: {
-		message: "Параметр id обязателен.",
-		category: "INVALID_ARGUMENT"
-	},
-	30008: {
-		message: "Параметр figi обязателен.",
-		category: "INVALID_ARGUMENT"
-	},
-	30009: {
-		message: "Некорректный параметр from.",
-		category: "INVALID_ARGUMENT"
-	},
-	30010: {
-		message: "Некорректный параметр to.",
-		category: "INVALID_ARGUMENT"
-	},
-	30011: {
-		message: "Некорректный интервал.",
-		category: "INVALID_ARGUMENT"
-	},
-	30012: {
-		message: "to не может быть меньше from.",
-		category: "INVALID_ARGUMENT"
-	},
-	30013: {
-		message: "class_code обязателен при поиске по тикеру.",
-		category: "INVALID_ARGUMENT"
-	},
-	30014: {
-		message: "Превышен максимальный период запроса для данного интервала свечи.",
-		category: "INVALID_ARGUMENT"
-	},
-	30015: {
-		message: "Параметр quantity обязателен и должен быть больше 0.",
-		category: "INVALID_ARGUMENT"
-	},
-	30016: {
-		message: "Некорректный параметр quantity.",
-		category: "INVALID_ARGUMENT"
-	},
-	30017: {
-		message: "Параметр price обязателен.",
-		category: "INVALID_ARGUMENT"
-	},
-	30018: {
-		message: "Некорректный параметр price.",
-		category: "INVALID_ARGUMENT"
-	},
-	30019: {
-		message: "Параметр direction обязателен.",
-		category: "INVALID_ARGUMENT"
-	},
-	30020: {
-		message: "Некорректный direction.",
-		category: "INVALID_ARGUMENT"
-	},
-	30021: {
-		message: "Параметр account_id обязателен.",
-		category: "INVALID_ARGUMENT"
-	},
-	30022: {
-		message: "Некорректный account_id.",
-		category: "INVALID_ARGUMENT"
-	},
-	30023: {
-		message: "Некорректный параметр state.",
-		category: "INVALID_ARGUMENT"
-	},
-	30025: {
-		message: "Параметр order_type обязателен.",
-		category: "INVALID_ARGUMENT"
-	},
-	30026: {
-		message: "Некорректный order_type.",
-		category: "INVALID_ARGUMENT"
-	},
-	30027: {
-		message: "Параметр order_id обязателен.",
-		category: "INVALID_ARGUMENT"
-	},
-	30028: {
-		message: "order_id имеет неверный формат UUID.",
-		category: "INVALID_ARGUMENT"
-	},
-	30029: {
-		message: "Параметр idempotency_key обязателен.",
-		category: "INVALID_ARGUMENT"
-	},
-	30030: {
-		message: "Некорректный idempotency_key.",
-		category: "INVALID_ARGUMENT"
-	},
-	30031: {
-		message: "Параметр depth обязателен.",
-		category: "INVALID_ARGUMENT"
-	},
-	30032: {
-		message: "Некорректный параметр depth.",
-		category: "INVALID_ARGUMENT"
-	},
-	30033: {
-		message: "trade_clearing_account или class_code обязателен.",
-		category: "INVALID_ARGUMENT"
-	},
-	30034: {
-		message: "Недостаточно средств для совершения сделки.",
-		category: "INVALID_ARGUMENT"
-	},
-	30035: {
-		message: "Некорректный stop_price.",
-		category: "INVALID_ARGUMENT"
-	},
-	30036: {
-		message: "Параметр stop_price обязателен.",
-		category: "INVALID_ARGUMENT"
-	},
-	30037: {
-		message: "Параметр stop_order_type обязателен.",
-		category: "INVALID_ARGUMENT"
-	},
-	30038: {
-		message: "Некорректный stop_order_type.",
-		category: "INVALID_ARGUMENT"
-	},
-	30039: {
-		message: "Некорректный параметр trailing_data.",
-		category: "INVALID_ARGUMENT"
-	},
-	30040: {
-		message: "Некорректный expire_date.",
-		category: "INVALID_ARGUMENT"
-	},
-	30041: {
-		message: "Метод доступен только для фьючерсов.",
-		category: "INVALID_ARGUMENT"
-	},
-	30042: {
-		message: "Недостаточно активов для маржинальной сделки.",
-		category: "INVALID_ARGUMENT"
-	},
-	30043: {
-		message: "Параметр expiration_type обязателен.",
-		category: "INVALID_ARGUMENT"
-	},
-	30044: {
-		message: "Некорректный expiration_type.",
-		category: "INVALID_ARGUMENT"
-	},
-	30045: {
-		message: "Параметр ticker обязателен.",
-		category: "INVALID_ARGUMENT"
-	},
-	30047: {
-		message: "Валюта цены не совпадает с валютой расчётов по инструменту.",
-		category: "INVALID_ARGUMENT"
-	},
-	30048: {
-		message: "Метод доступен только для облигаций.",
-		category: "INVALID_ARGUMENT"
-	},
-	30049: {
-		message: "Ошибка выставления торгового поручения: %s",
-		category: "INVALID_ARGUMENT"
-	},
-	30050: {
-		message: "Некорректный instrument_status.",
-		category: "INVALID_ARGUMENT"
-	},
-	30051: {
-		message: "Маржинальная торговля недоступна.",
-		category: "INVALID_ARGUMENT"
-	},
-	30052: {
-		message: "Инструмент запрещён для торгов через API.",
-		category: "INVALID_ARGUMENT"
-	},
-	30053: {
-		message: "Ошибка выставления стоп-заявки: %s",
-		category: "INVALID_ARGUMENT"
-	},
-	30054: {
-		message: "Инструмент не является акцией или ETF.",
-		category: "INVALID_ARGUMENT"
-	},
-	30055: {
-		message: "order_id не может быть длиннее 36 символов.",
-		category: "INVALID_ARGUMENT"
-	},
-	30056: {
-		message: "Валюта стоп-заявки не поддерживается.",
-		category: "INVALID_ARGUMENT"
-	},
-	30057: {
-		message: "Заявка-дубль не найдена.",
-		category: "INVALID_ARGUMENT"
-	},
-	30058: {
-		message: "Задача ещё не завершена, попробуйте позже.",
-		category: "INVALID_ARGUMENT"
-	},
-	30059: {
-		message: "Ошибка отмены заявки: %s",
-		category: "INVALID_ARGUMENT"
-	},
-	30060: {
-		message: "Ошибка отмены стоп-заявки: %s",
-		category: "INVALID_ARGUMENT"
-	},
-	30061: {
-		message: "from вне допустимого диапазона.",
-		category: "INVALID_ARGUMENT"
-	},
-	30062: {
-		message: "to вне допустимого диапазона.",
-		category: "INVALID_ARGUMENT"
-	},
-	30063: {
-		message: "expire_date вне допустимого диапазона.",
-		category: "INVALID_ARGUMENT"
-	},
-	30064: {
-		message: "Период не может превышать 31 день.",
-		category: "INVALID_ARGUMENT"
-	},
-	30065: {
-		message: "Параметр task_id обязателен.",
-		category: "INVALID_ARGUMENT"
-	},
-	30066: {
-		message: "Параметр payload обязателен.",
-		category: "INVALID_ARGUMENT"
-	},
-	30067: {
-		message: "Некорректный action_type.",
-		category: "INVALID_ARGUMENT"
-	},
-	30068: {
-		message: "Доступны только лимитные заявки.",
-		category: "INVALID_ARGUMENT"
-	},
-	30069: {
-		message: "Параметр limit должен быть ≤ 1000.",
-		category: "INVALID_ARGUMENT"
-	},
-	30070: {
-		message: "from не может быть больше текущей даты.",
-		category: "INVALID_ARGUMENT"
-	},
-	30077: {
-		message: "Метод недоступен для внебиржевых инструментов.",
-		category: "INVALID_ARGUMENT"
-	},
-	30078: {
-		message: "Некорректный шаг цены.",
-		category: "INVALID_ARGUMENT"
-	},
-	30079: {
-		message: "Инструмент недоступен для торгов.",
-		category: "INVALID_ARGUMENT"
-	},
-	30080: {
-		message: "Количество лотов должно быть положительным.",
-		category: "INVALID_ARGUMENT"
-	},
-	30081: {
-		message: "Счёт закрыт.",
-		category: "INVALID_ARGUMENT"
-	},
-	30082: {
-		message: "Счёт заблокирован.",
-		category: "INVALID_ARGUMENT"
-	},
-	30083: {
-		message: "Некорректный тип заявки.",
-		category: "INVALID_ARGUMENT"
-	},
-	30084: {
-		message: "Превышен лимит запрашиваемого периода.",
-		category: "INVALID_ARGUMENT"
-	},
-	30085: {
-		message: "Цена в пунктах доступна только для фьючерсов и облигаций.",
-		category: "INVALID_ARGUMENT"
-	},
-	30086: {
-		message: "Некорректный год.",
-		category: "INVALID_ARGUMENT"
-	},
-	30087: {
-		message: "Параметр query обязателен.",
-		category: "INVALID_ARGUMENT"
-	},
-	30088: {
-		message: "from и to должны быть в одном году.",
-		category: "INVALID_ARGUMENT"
-	},
-	30089: {
-		message: "to не должно быть позднее %s.",
-		category: "INVALID_ARGUMENT"
-	},
-	30090: {
-		message: "Параметр siebel_id обязателен.",
-		category: "INVALID_ARGUMENT"
-	},
-	30091: {
-		message: "Количество инструментов не может превышать 100.",
-		category: "INVALID_ARGUMENT"
-	},
-	30092: {
-		message: "Торги недоступны по нерабочим дням.",
-		category: "INVALID_ARGUMENT"
-	},
-	30093: {
-		message: "figi или instrument_id обязателен.",
-		category: "INVALID_ARGUMENT"
-	},
-	30094: {
-		message: "Выставление заявок по опционам недоступно.",
-		category: "INVALID_ARGUMENT"
-	},
-	30095: {
-		message: "Заявка не исполнена биржей.",
-		category: "INVALID_ARGUMENT"
-	},
-	30096: {
-		message: "Заявка отклонена, попробуйте позже.",
-		category: "INVALID_ARGUMENT"
-	},
-	30097: {
-		message: "Несоответствующая торговая сессия.",
-		category: "INVALID_ARGUMENT"
-	},
-	30098: {
-		message: "Торги по инструменту сейчас не проводятся.",
-		category: "INVALID_ARGUMENT"
-	},
-	30099: {
-		message: "Цена вне лимитов по инструменту.",
-		category: "INVALID_ARGUMENT"
-	},
-	30100: {
-		message: "Цена должна быть положительной.",
-		category: "INVALID_ARGUMENT"
-	},
-	30101: {
-		message: "Для торговли инструментом пройдите тестирование.",
-		category: "INVALID_ARGUMENT"
-	},
-	30102: {
-		message: "Обязательные параметры указаны неправильно.",
-		category: "INVALID_ARGUMENT"
-	},
-	30103: {
-		message: "Доступна только заявка по лучшей цене.",
-		category: "INVALID_ARGUMENT"
-	},
-	30104: {
-		message: "Некорректный price_type.",
-		category: "INVALID_ARGUMENT"
-	},
-	30105: {
-		message: "Некорректный exchange_order_type.",
-		category: "INVALID_ARGUMENT"
-	},
-	30106: {
-		message: "Некорректный статус.",
-		category: "INVALID_ARGUMENT"
-	},
-	30107: {
-		message: "limit и page не могут быть отрицательными.",
-		category: "INVALID_ARGUMENT"
-	},
-	30108: {
-		message: "Количество брендов меньше запрашиваемых параметров.",
-		category: "INVALID_ARGUMENT"
-	},
-	30109: {
-		message: "Превышена максимальная сумма сделки.",
-		category: "INVALID_ARGUMENT"
-	},
-	30210: {
-		message: "Не заданы параметры trailing_data.",
-		category: "INVALID_ARGUMENT"
-	},
-	30211: {
-		message: "Не задан indent_type.",
-		category: "INVALID_ARGUMENT"
-	},
-	30212: {
-		message: "Не задан spread_type.",
-		category: "INVALID_ARGUMENT"
-	},
-	30213: {
-		message: "Некорректный indicator_type.",
-		category: "INVALID_ARGUMENT"
-	},
-	30214: {
-		message: "Некорректный type_of_price.",
-		category: "INVALID_ARGUMENT"
-	},
-	30215: {
-		message: "Некорректный length.",
-		category: "INVALID_ARGUMENT"
-	},
-	30216: {
-		message: "Некорректный deviation_data.",
-		category: "INVALID_ARGUMENT"
-	},
-	30217: {
-		message: "Некорректный smoothing_data.",
-		category: "INVALID_ARGUMENT"
-	},
-	30218: {
-		message: "Количество инструментов в списке не может превышать 3000.",
-		category: "INVALID_ARGUMENT"
-	},
-	30219: {
-		message: "Некорректный candle_source_type.",
-		category: "INVALID_ARGUMENT"
-	},
-	30220: {
-		message: "candle_type не поддерживается с limit.",
-		category: "INVALID_ARGUMENT"
-	},
-	30221: {
-		message: "order_request_id должен быть UUID.",
-		category: "INVALID_ARGUMENT"
-	},
-	30222: {
-		message: "signal_id должен быть UUID.",
-		category: "INVALID_ARGUMENT"
-	},
-	30223: {
-		message: "strategy_id должен быть UUID.",
-		category: "INVALID_ARGUMENT"
-	},
-	30224: {
-		message: "Некорректный strategy_type.",
-		category: "INVALID_ARGUMENT"
-	},
-	30225: {
-		message: "Некорректный параметр active.",
-		category: "INVALID_ARGUMENT"
-	},
-	30226: {
-		message: "Количество элементов меньше запрашиваемых параметров.",
-		category: "INVALID_ARGUMENT"
-	},
-	30227: {
-		message: "Заявка отменена.",
-		category: "INVALID_ARGUMENT"
-	},
-	30228: {
-		message: "Необходимо указать from или limit.",
-		category: "INVALID_ARGUMENT"
-	},
-	30229: {
-		message: "Конвертация цены фьючерса недоступна.",
-		category: "INVALID_ARGUMENT"
-	},
-	30230: {
-		message: "Параметр group_id обязателен.",
-		category: "INVALID_ARGUMENT"
-	},
-	30231: {
-		message: "group_name отсутствует или некорректен.",
-		category: "INVALID_ARGUMENT"
-	},
-	30232: {
-		message: "group_color отсутствует или некорректен.",
-		category: "INVALID_ARGUMENT"
-	},
-	30233: {
-		message: "Группа не может быть удалена.",
-		category: "INVALID_ARGUMENT"
-	},
-	30234: {
-		message: "Инструмент не поддерживается методом.",
-		category: "INVALID_ARGUMENT"
-	},
-	30235: {
-		message: "Для данного интервала свечи доступны данные за последние 30 дней.",
-		category: "INVALID_ARGUMENT"
-	},
-	30236: {
-		message: "Конвертация цены фьючерса недоступна.",
-		category: "INVALID_ARGUMENT"
-	},
-	30237: {
-		message: "Параметр instrument_id обязателен.",
-		category: "INVALID_ARGUMENT"
-	},
-	30238: {
-		message: "За указанный интервал операций нет.",
-		category: "INVALID_ARGUMENT"
-	},
-	30240: {
-		message: "Требуется подтверждение для непокрытой позиции.",
-		category: "INVALID_ARGUMENT"
-	},
-	30241: {
-		message: "take_profit_type не применим к данной стоп-заявке.",
-		category: "INVALID_ARGUMENT"
-	},
-	30242: {
-		message: "limit должен быть от 1 до 100.",
-		category: "INVALID_ARGUMENT"
-	},
-	30244: {
-		message: "Превышен максимальный интервал запроса.",
-		category: "INVALID_ARGUMENT"
-	},
-	30245: {
-		message: "Некорректный execution_status.",
-		category: "INVALID_ARGUMENT"
-	},
-	30246: {
-		message: "Некорректный параметр amount.",
-		category: "INVALID_ARGUMENT"
-	},
-	30247: {
-		message: "Параметр amount обязателен.",
-		category: "INVALID_ARGUMENT"
-	},
-	30248: {
-		message: "Параметр to_account_id обязателен.",
-		category: "INVALID_ARGUMENT"
-	},
-	30249: {
-		message: "Параметр from_account_id обязателен.",
-		category: "INVALID_ARGUMENT"
-	},
-	30250: {
-		message: "Некорректный to_account_id.",
-		category: "INVALID_ARGUMENT"
-	},
-	30251: {
-		message: "Ошибка выполнения транзакции.",
-		category: "INVALID_ARGUMENT"
-	},
-	30252: {
-		message: "Некорректный from_account_id.",
-		category: "INVALID_ARGUMENT"
-	},
-	30253: {
-		message: "Некорректная валюта.",
-		category: "INVALID_ARGUMENT"
-	},
-	30254: {
-		message: "Некорректный time_in_force.",
-		category: "INVALID_ARGUMENT"
-	},
-	30255: {
-		message: "Торговля по счёту запрещена.",
-		category: "INVALID_ARGUMENT"
-	},
-	30256: {
-		message: "Параметр transaction_id обязателен.",
-		category: "INVALID_ARGUMENT"
-	},
-	30257: {
-		message: "Некорректный transaction_id.",
-		category: "INVALID_ARGUMENT"
-	},
-	30258: {
-		message: "Указанная валюта недоступна для операции.",
-		category: "INVALID_ARGUMENT"
-	},
-	30260: {
-		message: "Моментальное исполнение не поддерживается этим типом стоп-заявки.",
-		category: "INVALID_ARGUMENT"
-	},
-	35001: {
-		message: "Достигнут лимит на открытие счетов в песочнице.",
-		category: "INVALID_ARGUMENT"
-	},
-	40002: {
-		message: "Недостаточно прав для операции.",
-		category: "PERMISSION_DENIED"
-	},
-	40003: {
-		message: "Токен доступа не найден или неактивен.",
-		category: "UNAUTHENTICATED"
-	},
-	40004: {
-		message: "Выставление заявок недоступно с данного аккаунта.",
-		category: "PERMISSION_DENIED"
-	},
-	40005: {
-		message: "Недостаточно прав для перевода средств.",
-		category: "PERMISSION_DENIED"
-	},
-	50001: {
-		message: "Биржа не найдена.",
-		category: "NOT_FOUND"
-	},
-	50002: {
-		message: "Инструмент не найден.",
-		category: "NOT_FOUND"
-	},
-	50004: {
-		message: "Счёт не найден.",
-		category: "NOT_FOUND"
-	},
-	50005: {
-		message: "Торговое поручение не найдено.",
-		category: "NOT_FOUND"
-	},
-	50006: {
-		message: "Стоп-заявка не найдена.",
-		category: "NOT_FOUND"
-	},
-	50007: {
-		message: "Задача не найдена.",
-		category: "NOT_FOUND"
-	},
-	50008: {
-		message: "Источник данных по стаканам отсутствует.",
-		category: "NOT_FOUND"
-	},
-	50009: {
-		message: "Актив не найден.",
-		category: "NOT_FOUND"
-	},
-	50010: {
-		message: "Бренд не найден.",
-		category: "NOT_FOUND"
-	},
-	50011: {
-		message: "Стратегия не найдена.",
-		category: "NOT_FOUND"
-	},
-	50012: {
-		message: "Сигнал не найден.",
-		category: "NOT_FOUND"
-	},
-	70001: {
-		message: "Внутренняя ошибка сервиса. Попробуйте позже.",
-		category: "INTERNAL"
-	},
-	70002: {
-		message: "Неизвестная сетевая ошибка. Попробуйте позже.",
-		category: "INTERNAL"
-	},
-	70003: {
-		message: "Внутренняя ошибка сервиса. Попробуйте позже.",
-		category: "INTERNAL"
-	},
-	80001: {
-		message: "Превышен лимит одновременных стрим-соединений.",
-		category: "RESOURCE_EXHAUSTED"
-	},
-	80002: {
-		message: "Превышен лимит запросов в минуту.",
-		category: "RESOURCE_EXHAUSTED"
-	},
-	80003: {
-		message: "Превышен лимит отправки СМС.",
-		category: "RESOURCE_EXHAUSTED"
-	},
-	80004: {
-		message: "В стриме отсутствуют активные подписки.",
-		category: "RESOURCE_EXHAUSTED"
-	},
-	80005: {
-		message: "Превышено время жизни стрима.",
-		category: "RESOURCE_EXHAUSTED"
-	},
-	80006: {
-		message: "Превышен лимит ошибок в минуту.",
-		category: "RESOURCE_EXHAUSTED"
-	},
-	90001: {
-		message: "Требуется подтверждение операции: %s",
-		category: "FAILED_PRECONDITION"
-	},
-	90002: {
-		message: "Инструмент доступен только квалифицированным инвесторам.",
-		category: "FAILED_PRECONDITION"
-	},
-	90003: {
-		message: "Цена заявки слишком высокая.",
-		category: "FAILED_PRECONDITION"
-	}
-};
-function handleApiError(error) {
-	const grpcCode = error?.code;
-	const details = error?.details || "";
-	const match = details.match(/\b(\d{5})\b/);
-	const code = (match ? parseInt(match[1], 10) : null) || grpcCode;
-	const info = errorMessages[code] || {
-		message: `Неизвестная ошибка (код ${code}): ${details}`,
-		category: "INTERNAL"
-	};
-	const colorMap = {
-		["INTERNAL"]: "\x1B[31m",
-		["UNAUTHENTICATED"]: "\x1B[31m",
-		["PERMISSION_DENIED"]: "\x1B[31m",
-		["RESOURCE_EXHAUSTED"]: "\x1B[33m",
-		["FAILED_PRECONDITION"]: "\x1B[33m",
-		["INVALID_ARGUMENT"]: "\x1B[34m",
-		["NOT_FOUND"]: "\x1B[90m",
-		["UNIMPLEMENTED"]: "\x1B[90m",
-		["UNAVAILABLE"]: "\x1B[90m"
-	};
-	const reset = "\x1B[0m";
-	const color = colorMap[info.category] || "\x1B[31m";
-	console.error(`${color}[ApiError] ${info.category} (код ${code}): ${info.message}${reset}`);
-	const shouldRetry = info.category === "INTERNAL" || info.category === "RESOURCE_EXHAUSTED";
-	const win = getTradingAssistantWindow();
-	if (win && !win.isDestroyed()) win.webContents.send("api-error", {
-		message: info.message,
-		category: info.category,
-		code,
-		timestamp: Date.now()
-	});
-	return {
-		message: info.message,
-		category: info.category,
-		shouldRetry,
-		retryDelayMs: shouldRetry ? 1e3 : void 0
-	};
-}
-//#endregion
 //#region src/main/streams/marketdata.ts
 var MAX_RECONNECT_ATTEMPTS = 3;
 var BASE_DELAY_MS = 3e3;
-var retryTimeout = null;
-var retryCount = 0;
-var currentStream = null;
-var client$8 = null;
-function createClient() {
-	const PROTO_PATH = getProtoPath("marketdata.proto");
-	const packageDefinition = _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_proto_loader_build_src_index_js.loadSync(PROTO_PATH, {
-		keepCase: false,
-		longs: String,
-		enums: String,
-		defaults: true,
-		oneofs: true
+var streams = /* @__PURE__ */ new Map();
+function getOrCreateClient(streamKey) {
+	if (!streams.has(streamKey)) streams.set(streamKey, {
+		stream: null,
+		client: null,
+		retryTimeout: null,
+		retryCount: 0
 	});
-	const MarketDataStreamService = _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.loadPackageDefinition(packageDefinition).tinkoff.public.invest.api.contract.v1.MarketDataStreamService;
-	return new MarketDataStreamService("invest-public-api.tbank.ru:443", _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.credentials.createSsl(null, null, null, { rejectUnauthorized: false }), { "grpc.ssl_target_name_override": "invest-public-api.tbank.ru" });
+	const state = streams.get(streamKey);
+	if (!state.client) {
+		const PROTO_PATH = getProtoPath("marketdata.proto");
+		const packageDefinition = _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_proto_loader_build_src_index_js.loadSync(PROTO_PATH, {
+			keepCase: false,
+			longs: String,
+			enums: String,
+			defaults: true,
+			oneofs: true
+		});
+		const MarketDataStreamService = _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.loadPackageDefinition(packageDefinition).tinkoff.public.invest.api.contract.v1.MarketDataStreamService;
+		state.client = new MarketDataStreamService("invest-public-api.tbank.ru:443", _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.credentials.createSsl(null, null, null, { rejectUnauthorized: false }), { "grpc.ssl_target_name_override": "invest-public-api.tbank.ru" });
+	}
+	return state.client;
 }
 var registerMarketdataStreamHandlers = () => {
 	console.log("[Main] registerMDStreamHandlers called");
-	client$8 = createClient();
-	electron.ipcMain.handle("md-stream-start", async (_, token, requestBody) => {
-		console.log("[Main] md-stream-start called");
-		if (currentStream) {
-			currentStream.cancel();
-			currentStream = null;
+	electron.ipcMain.handle("md-stream-start", async (_, streamKey, token, requestBody) => {
+		console.log(`[Main] md-stream-start called for ${streamKey}`);
+		const state = streams.get(streamKey) || {
+			stream: null,
+			client: null,
+			retryTimeout: null,
+			retryCount: 0
+		};
+		streams.set(streamKey, state);
+		if (state.stream) {
+			state.stream.cancel();
+			state.stream = null;
 		}
-		if (retryTimeout) {
-			clearTimeout(retryTimeout);
-			retryTimeout = null;
+		if (state.retryTimeout) {
+			clearTimeout(state.retryTimeout);
+			state.retryTimeout = null;
 		}
-		retryCount = 0;
-		if (client$8) try {
-			client$8.close();
-		} catch (e) {}
-		client$8 = createClient();
+		state.retryCount = 0;
+		const client = getOrCreateClient(streamKey);
 		const connect = () => {
-			if (retryCount >= MAX_RECONNECT_ATTEMPTS) {
-				console.error("[Main] Достигнуто максимальное количество попыток переподключения");
+			if (state.retryCount >= MAX_RECONNECT_ATTEMPTS) {
+				console.error(`[Main] Достигнуто максимальное количество попыток для ${streamKey}`);
 				return;
 			}
-			console.log(`[Main] Подключение стрима (попытка ${retryCount + 1})`);
+			console.log(`[Main] Подключение стрима ${streamKey} (попытка ${state.retryCount + 1})`);
 			const metadata = new _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__grpc_grpc_js_build_src_index_js.Metadata();
 			metadata.add("Authorization", `Bearer ${token}`);
-			const stream = client$8.MarketDataServerSideStream(requestBody, metadata);
+			const stream = client.MarketDataServerSideStream(requestBody, metadata);
 			if (!stream) {
-				console.error("[Main] Не удалось создать стрим");
-				if (retryCount < MAX_RECONNECT_ATTEMPTS) scheduleReconnect();
+				if (state.retryCount < MAX_RECONNECT_ATTEMPTS) scheduleReconnect();
 				return;
 			}
-			currentStream = stream;
+			state.stream = stream;
 			let buffer = "";
 			stream.on("data", (data) => {
 				if (typeof data !== "string" && typeof data !== "object") return;
@@ -1780,7 +1002,6 @@ var registerMarketdataStreamHandlers = () => {
 					try {
 						parsed = JSON.parse(jsonStr);
 					} catch (e) {
-						console.warn("[Stream] Ошибка парсинга");
 						continue;
 					}
 					if (parsed.candle) {
@@ -1799,37 +1020,39 @@ var registerMarketdataStreamHandlers = () => {
 				}
 			});
 			stream.on("end", () => {
-				console.log("[Main] Стрим завершён");
-				currentStream = null;
-				if (retryCount < MAX_RECONNECT_ATTEMPTS) scheduleReconnect();
+				console.log(`[Main] Стрим ${streamKey} завершён`);
+				state.stream = null;
+				if (state.retryCount < MAX_RECONNECT_ATTEMPTS) scheduleReconnect();
 			});
 			stream.on("error", (err) => {
-				handleApiError(err);
-				currentStream = null;
+				console.error(`[Main] Ошибка стрима ${streamKey}: ${err.message}`);
+				state.stream = null;
 				if (err.code === 8) {
-					console.error("[Main] Лимит стримов исчерпан, дальнейшие попытки остановлены");
+					console.error(`[Main] Лимит стримов исчерпан для ${streamKey}`);
 					return;
 				}
-				if (retryCount < MAX_RECONNECT_ATTEMPTS) scheduleReconnect();
+				if (state.retryCount < MAX_RECONNECT_ATTEMPTS) scheduleReconnect();
 			});
 		};
 		const scheduleReconnect = () => {
-			const delay = BASE_DELAY_MS * Math.pow(2, retryCount);
-			retryCount++;
-			console.log(`[Main] Переподключение через ${delay / 1e3}с (попытка ${retryCount})`);
-			retryTimeout = setTimeout(connect, delay);
+			const delay = BASE_DELAY_MS * Math.pow(2, state.retryCount);
+			state.retryCount++;
+			console.log(`[Main] Переподключение ${streamKey} через ${delay / 1e3}с (попытка ${state.retryCount})`);
+			state.retryTimeout = setTimeout(connect, delay);
 		};
 		connect();
 	});
-	electron.ipcMain.handle("md-stream-stop", async () => {
-		console.log("[Main] md-stream-stop called");
-		if (retryTimeout) {
-			clearTimeout(retryTimeout);
-			retryTimeout = null;
+	electron.ipcMain.handle("md-stream-stop", async (_, streamKey) => {
+		console.log(`[Main] md-stream-stop called for ${streamKey}`);
+		const state = streams.get(streamKey);
+		if (!state) return;
+		if (state.retryTimeout) {
+			clearTimeout(state.retryTimeout);
+			state.retryTimeout = null;
 		}
-		if (currentStream) {
-			currentStream.cancel();
-			currentStream = null;
+		if (state.stream) {
+			state.stream.cancel();
+			state.stream = null;
 		}
 	});
 };
@@ -2003,6 +1226,35 @@ var registerOrdersStreamHandlers = () => {
 		}
 	});
 };
+//#endregion
+//#region src/main/windows/tradingAssistantWindow.ts
+var tradingAssistantWindow = null;
+var preloadPath$1 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var createTradingAssistantWindow = () => {
+	if (tradingAssistantWindow && !tradingAssistantWindow.isDestroyed()) {
+		tradingAssistantWindow.focus();
+		return tradingAssistantWindow;
+	}
+	tradingAssistantWindow = new electron.BrowserWindow({
+		width: 1200,
+		height: 800,
+		title: "Trading Assistant – Volume Profile",
+		webPreferences: {
+			preload: preloadPath$1,
+			contextIsolation: true,
+			nodeIntegration: false
+		}
+	});
+	if (process.env.NODE_ENV === "development") tradingAssistantWindow.loadURL(`${DEV_SERVER_URL}/#/trading-assistant`);
+	else tradingAssistantWindow.loadFile(getMainWindowProdPath());
+	const menu = electron.Menu.buildFromTemplate(tradingAssistantWindowMenuTemplate);
+	tradingAssistantWindow.setMenu(menu);
+	tradingAssistantWindow.on("closed", () => {
+		tradingAssistantWindow = null;
+	});
+	return tradingAssistantWindow;
+};
+var getTradingAssistantWindow = () => tradingAssistantWindow;
 //#endregion
 //#region src/main/services/volumeProfileEngine.ts
 function quotationToNumber$2(q) {
@@ -5205,21 +4457,20 @@ var registerTradingAssistantHandlers = (historicalLoader, profileEngine, getToke
 		const win = getTradingAssistantWindow();
 		if (win && !win.isDestroyed()) win.webContents.send("api-error", error);
 	});
-	electron.ipcMain.handle("trading-assistant:start-auto-trader-multiple", async (event, uids) => {
-		if (!autonomousTraderInstance) return {
+	electron.ipcMain.handle("trading-assistant:send-manual-order", async (_, params) => {
+		if (!orderManagerInstance) return {
 			success: false,
-			error: "AutoTrader not initialized"
+			error: "OrderManager не инициализирован"
 		};
-		const token = process.env.VITE_TReadOnly || "";
-		await autonomousTraderInstance.startMultiple(uids, token);
-		return { success: true };
-	});
-	electron.ipcMain.handle("trading-assistant:stop-all-strategies", async () => {
-		if (autonomousTraderInstance) {
-			autonomousTraderInstance.stopAll();
+		try {
+			await orderManagerInstance.sendManualOrder(params);
 			return { success: true };
+		} catch (e) {
+			return {
+				success: false,
+				error: e.message
+			};
 		}
-		return { success: false };
 	});
 };
 //#endregion
@@ -5779,6 +5030,764 @@ var StopOrderExpirationType = /* @__PURE__ */ function(StopOrderExpirationType) 
 	return StopOrderExpirationType;
 }({});
 //#endregion
+//#region src/main/services/apiErrorHandler.ts
+var errorMessages = {
+	12001: {
+		message: "Метод не реализован.",
+		category: "UNIMPLEMENTED"
+	},
+	12002: {
+		message: "Устаревший метод недоступен.",
+		category: "UNAVAILABLE"
+	},
+	30001: {
+		message: "Параметр from обязателен.",
+		category: "INVALID_ARGUMENT"
+	},
+	30002: {
+		message: "Запрошенный период не может превышать 14 дней.",
+		category: "INVALID_ARGUMENT"
+	},
+	30003: {
+		message: "from не может быть меньше текущей даты.",
+		category: "INVALID_ARGUMENT"
+	},
+	30004: {
+		message: "Параметр to обязателен.",
+		category: "INVALID_ARGUMENT"
+	},
+	30005: {
+		message: "Некорректный id_type.",
+		category: "INVALID_ARGUMENT"
+	},
+	30006: {
+		message: "Параметр id_type обязателен.",
+		category: "INVALID_ARGUMENT"
+	},
+	30007: {
+		message: "Параметр id обязателен.",
+		category: "INVALID_ARGUMENT"
+	},
+	30008: {
+		message: "Параметр figi обязателен.",
+		category: "INVALID_ARGUMENT"
+	},
+	30009: {
+		message: "Некорректный параметр from.",
+		category: "INVALID_ARGUMENT"
+	},
+	30010: {
+		message: "Некорректный параметр to.",
+		category: "INVALID_ARGUMENT"
+	},
+	30011: {
+		message: "Некорректный интервал.",
+		category: "INVALID_ARGUMENT"
+	},
+	30012: {
+		message: "to не может быть меньше from.",
+		category: "INVALID_ARGUMENT"
+	},
+	30013: {
+		message: "class_code обязателен при поиске по тикеру.",
+		category: "INVALID_ARGUMENT"
+	},
+	30014: {
+		message: "Превышен максимальный период запроса для данного интервала свечи.",
+		category: "INVALID_ARGUMENT"
+	},
+	30015: {
+		message: "Параметр quantity обязателен и должен быть больше 0.",
+		category: "INVALID_ARGUMENT"
+	},
+	30016: {
+		message: "Некорректный параметр quantity.",
+		category: "INVALID_ARGUMENT"
+	},
+	30017: {
+		message: "Параметр price обязателен.",
+		category: "INVALID_ARGUMENT"
+	},
+	30018: {
+		message: "Некорректный параметр price.",
+		category: "INVALID_ARGUMENT"
+	},
+	30019: {
+		message: "Параметр direction обязателен.",
+		category: "INVALID_ARGUMENT"
+	},
+	30020: {
+		message: "Некорректный direction.",
+		category: "INVALID_ARGUMENT"
+	},
+	30021: {
+		message: "Параметр account_id обязателен.",
+		category: "INVALID_ARGUMENT"
+	},
+	30022: {
+		message: "Некорректный account_id.",
+		category: "INVALID_ARGUMENT"
+	},
+	30023: {
+		message: "Некорректный параметр state.",
+		category: "INVALID_ARGUMENT"
+	},
+	30025: {
+		message: "Параметр order_type обязателен.",
+		category: "INVALID_ARGUMENT"
+	},
+	30026: {
+		message: "Некорректный order_type.",
+		category: "INVALID_ARGUMENT"
+	},
+	30027: {
+		message: "Параметр order_id обязателен.",
+		category: "INVALID_ARGUMENT"
+	},
+	30028: {
+		message: "order_id имеет неверный формат UUID.",
+		category: "INVALID_ARGUMENT"
+	},
+	30029: {
+		message: "Параметр idempotency_key обязателен.",
+		category: "INVALID_ARGUMENT"
+	},
+	30030: {
+		message: "Некорректный idempotency_key.",
+		category: "INVALID_ARGUMENT"
+	},
+	30031: {
+		message: "Параметр depth обязателен.",
+		category: "INVALID_ARGUMENT"
+	},
+	30032: {
+		message: "Некорректный параметр depth.",
+		category: "INVALID_ARGUMENT"
+	},
+	30033: {
+		message: "trade_clearing_account или class_code обязателен.",
+		category: "INVALID_ARGUMENT"
+	},
+	30034: {
+		message: "Недостаточно средств для совершения сделки.",
+		category: "INVALID_ARGUMENT"
+	},
+	30035: {
+		message: "Некорректный stop_price.",
+		category: "INVALID_ARGUMENT"
+	},
+	30036: {
+		message: "Параметр stop_price обязателен.",
+		category: "INVALID_ARGUMENT"
+	},
+	30037: {
+		message: "Параметр stop_order_type обязателен.",
+		category: "INVALID_ARGUMENT"
+	},
+	30038: {
+		message: "Некорректный stop_order_type.",
+		category: "INVALID_ARGUMENT"
+	},
+	30039: {
+		message: "Некорректный параметр trailing_data.",
+		category: "INVALID_ARGUMENT"
+	},
+	30040: {
+		message: "Некорректный expire_date.",
+		category: "INVALID_ARGUMENT"
+	},
+	30041: {
+		message: "Метод доступен только для фьючерсов.",
+		category: "INVALID_ARGUMENT"
+	},
+	30042: {
+		message: "Недостаточно активов для маржинальной сделки.",
+		category: "INVALID_ARGUMENT"
+	},
+	30043: {
+		message: "Параметр expiration_type обязателен.",
+		category: "INVALID_ARGUMENT"
+	},
+	30044: {
+		message: "Некорректный expiration_type.",
+		category: "INVALID_ARGUMENT"
+	},
+	30045: {
+		message: "Параметр ticker обязателен.",
+		category: "INVALID_ARGUMENT"
+	},
+	30047: {
+		message: "Валюта цены не совпадает с валютой расчётов по инструменту.",
+		category: "INVALID_ARGUMENT"
+	},
+	30048: {
+		message: "Метод доступен только для облигаций.",
+		category: "INVALID_ARGUMENT"
+	},
+	30049: {
+		message: "Ошибка выставления торгового поручения: %s",
+		category: "INVALID_ARGUMENT"
+	},
+	30050: {
+		message: "Некорректный instrument_status.",
+		category: "INVALID_ARGUMENT"
+	},
+	30051: {
+		message: "Маржинальная торговля недоступна.",
+		category: "INVALID_ARGUMENT"
+	},
+	30052: {
+		message: "Инструмент запрещён для торгов через API.",
+		category: "INVALID_ARGUMENT"
+	},
+	30053: {
+		message: "Ошибка выставления стоп-заявки: %s",
+		category: "INVALID_ARGUMENT"
+	},
+	30054: {
+		message: "Инструмент не является акцией или ETF.",
+		category: "INVALID_ARGUMENT"
+	},
+	30055: {
+		message: "order_id не может быть длиннее 36 символов.",
+		category: "INVALID_ARGUMENT"
+	},
+	30056: {
+		message: "Валюта стоп-заявки не поддерживается.",
+		category: "INVALID_ARGUMENT"
+	},
+	30057: {
+		message: "Заявка-дубль не найдена.",
+		category: "INVALID_ARGUMENT"
+	},
+	30058: {
+		message: "Задача ещё не завершена, попробуйте позже.",
+		category: "INVALID_ARGUMENT"
+	},
+	30059: {
+		message: "Ошибка отмены заявки: %s",
+		category: "INVALID_ARGUMENT"
+	},
+	30060: {
+		message: "Ошибка отмены стоп-заявки: %s",
+		category: "INVALID_ARGUMENT"
+	},
+	30061: {
+		message: "from вне допустимого диапазона.",
+		category: "INVALID_ARGUMENT"
+	},
+	30062: {
+		message: "to вне допустимого диапазона.",
+		category: "INVALID_ARGUMENT"
+	},
+	30063: {
+		message: "expire_date вне допустимого диапазона.",
+		category: "INVALID_ARGUMENT"
+	},
+	30064: {
+		message: "Период не может превышать 31 день.",
+		category: "INVALID_ARGUMENT"
+	},
+	30065: {
+		message: "Параметр task_id обязателен.",
+		category: "INVALID_ARGUMENT"
+	},
+	30066: {
+		message: "Параметр payload обязателен.",
+		category: "INVALID_ARGUMENT"
+	},
+	30067: {
+		message: "Некорректный action_type.",
+		category: "INVALID_ARGUMENT"
+	},
+	30068: {
+		message: "Доступны только лимитные заявки.",
+		category: "INVALID_ARGUMENT"
+	},
+	30069: {
+		message: "Параметр limit должен быть ≤ 1000.",
+		category: "INVALID_ARGUMENT"
+	},
+	30070: {
+		message: "from не может быть больше текущей даты.",
+		category: "INVALID_ARGUMENT"
+	},
+	30077: {
+		message: "Метод недоступен для внебиржевых инструментов.",
+		category: "INVALID_ARGUMENT"
+	},
+	30078: {
+		message: "Некорректный шаг цены.",
+		category: "INVALID_ARGUMENT"
+	},
+	30079: {
+		message: "Инструмент недоступен для торгов.",
+		category: "INVALID_ARGUMENT"
+	},
+	30080: {
+		message: "Количество лотов должно быть положительным.",
+		category: "INVALID_ARGUMENT"
+	},
+	30081: {
+		message: "Счёт закрыт.",
+		category: "INVALID_ARGUMENT"
+	},
+	30082: {
+		message: "Счёт заблокирован.",
+		category: "INVALID_ARGUMENT"
+	},
+	30083: {
+		message: "Некорректный тип заявки.",
+		category: "INVALID_ARGUMENT"
+	},
+	30084: {
+		message: "Превышен лимит запрашиваемого периода.",
+		category: "INVALID_ARGUMENT"
+	},
+	30085: {
+		message: "Цена в пунктах доступна только для фьючерсов и облигаций.",
+		category: "INVALID_ARGUMENT"
+	},
+	30086: {
+		message: "Некорректный год.",
+		category: "INVALID_ARGUMENT"
+	},
+	30087: {
+		message: "Параметр query обязателен.",
+		category: "INVALID_ARGUMENT"
+	},
+	30088: {
+		message: "from и to должны быть в одном году.",
+		category: "INVALID_ARGUMENT"
+	},
+	30089: {
+		message: "to не должно быть позднее %s.",
+		category: "INVALID_ARGUMENT"
+	},
+	30090: {
+		message: "Параметр siebel_id обязателен.",
+		category: "INVALID_ARGUMENT"
+	},
+	30091: {
+		message: "Количество инструментов не может превышать 100.",
+		category: "INVALID_ARGUMENT"
+	},
+	30092: {
+		message: "Торги недоступны по нерабочим дням.",
+		category: "INVALID_ARGUMENT"
+	},
+	30093: {
+		message: "figi или instrument_id обязателен.",
+		category: "INVALID_ARGUMENT"
+	},
+	30094: {
+		message: "Выставление заявок по опционам недоступно.",
+		category: "INVALID_ARGUMENT"
+	},
+	30095: {
+		message: "Заявка не исполнена биржей.",
+		category: "INVALID_ARGUMENT"
+	},
+	30096: {
+		message: "Заявка отклонена, попробуйте позже.",
+		category: "INVALID_ARGUMENT"
+	},
+	30097: {
+		message: "Несоответствующая торговая сессия.",
+		category: "INVALID_ARGUMENT"
+	},
+	30098: {
+		message: "Торги по инструменту сейчас не проводятся.",
+		category: "INVALID_ARGUMENT"
+	},
+	30099: {
+		message: "Цена вне лимитов по инструменту.",
+		category: "INVALID_ARGUMENT"
+	},
+	30100: {
+		message: "Цена должна быть положительной.",
+		category: "INVALID_ARGUMENT"
+	},
+	30101: {
+		message: "Для торговли инструментом пройдите тестирование.",
+		category: "INVALID_ARGUMENT"
+	},
+	30102: {
+		message: "Обязательные параметры указаны неправильно.",
+		category: "INVALID_ARGUMENT"
+	},
+	30103: {
+		message: "Доступна только заявка по лучшей цене.",
+		category: "INVALID_ARGUMENT"
+	},
+	30104: {
+		message: "Некорректный price_type.",
+		category: "INVALID_ARGUMENT"
+	},
+	30105: {
+		message: "Некорректный exchange_order_type.",
+		category: "INVALID_ARGUMENT"
+	},
+	30106: {
+		message: "Некорректный статус.",
+		category: "INVALID_ARGUMENT"
+	},
+	30107: {
+		message: "limit и page не могут быть отрицательными.",
+		category: "INVALID_ARGUMENT"
+	},
+	30108: {
+		message: "Количество брендов меньше запрашиваемых параметров.",
+		category: "INVALID_ARGUMENT"
+	},
+	30109: {
+		message: "Превышена максимальная сумма сделки.",
+		category: "INVALID_ARGUMENT"
+	},
+	30210: {
+		message: "Не заданы параметры trailing_data.",
+		category: "INVALID_ARGUMENT"
+	},
+	30211: {
+		message: "Не задан indent_type.",
+		category: "INVALID_ARGUMENT"
+	},
+	30212: {
+		message: "Не задан spread_type.",
+		category: "INVALID_ARGUMENT"
+	},
+	30213: {
+		message: "Некорректный indicator_type.",
+		category: "INVALID_ARGUMENT"
+	},
+	30214: {
+		message: "Некорректный type_of_price.",
+		category: "INVALID_ARGUMENT"
+	},
+	30215: {
+		message: "Некорректный length.",
+		category: "INVALID_ARGUMENT"
+	},
+	30216: {
+		message: "Некорректный deviation_data.",
+		category: "INVALID_ARGUMENT"
+	},
+	30217: {
+		message: "Некорректный smoothing_data.",
+		category: "INVALID_ARGUMENT"
+	},
+	30218: {
+		message: "Количество инструментов в списке не может превышать 3000.",
+		category: "INVALID_ARGUMENT"
+	},
+	30219: {
+		message: "Некорректный candle_source_type.",
+		category: "INVALID_ARGUMENT"
+	},
+	30220: {
+		message: "candle_type не поддерживается с limit.",
+		category: "INVALID_ARGUMENT"
+	},
+	30221: {
+		message: "order_request_id должен быть UUID.",
+		category: "INVALID_ARGUMENT"
+	},
+	30222: {
+		message: "signal_id должен быть UUID.",
+		category: "INVALID_ARGUMENT"
+	},
+	30223: {
+		message: "strategy_id должен быть UUID.",
+		category: "INVALID_ARGUMENT"
+	},
+	30224: {
+		message: "Некорректный strategy_type.",
+		category: "INVALID_ARGUMENT"
+	},
+	30225: {
+		message: "Некорректный параметр active.",
+		category: "INVALID_ARGUMENT"
+	},
+	30226: {
+		message: "Количество элементов меньше запрашиваемых параметров.",
+		category: "INVALID_ARGUMENT"
+	},
+	30227: {
+		message: "Заявка отменена.",
+		category: "INVALID_ARGUMENT"
+	},
+	30228: {
+		message: "Необходимо указать from или limit.",
+		category: "INVALID_ARGUMENT"
+	},
+	30229: {
+		message: "Конвертация цены фьючерса недоступна.",
+		category: "INVALID_ARGUMENT"
+	},
+	30230: {
+		message: "Параметр group_id обязателен.",
+		category: "INVALID_ARGUMENT"
+	},
+	30231: {
+		message: "group_name отсутствует или некорректен.",
+		category: "INVALID_ARGUMENT"
+	},
+	30232: {
+		message: "group_color отсутствует или некорректен.",
+		category: "INVALID_ARGUMENT"
+	},
+	30233: {
+		message: "Группа не может быть удалена.",
+		category: "INVALID_ARGUMENT"
+	},
+	30234: {
+		message: "Инструмент не поддерживается методом.",
+		category: "INVALID_ARGUMENT"
+	},
+	30235: {
+		message: "Для данного интервала свечи доступны данные за последние 30 дней.",
+		category: "INVALID_ARGUMENT"
+	},
+	30236: {
+		message: "Конвертация цены фьючерса недоступна.",
+		category: "INVALID_ARGUMENT"
+	},
+	30237: {
+		message: "Параметр instrument_id обязателен.",
+		category: "INVALID_ARGUMENT"
+	},
+	30238: {
+		message: "За указанный интервал операций нет.",
+		category: "INVALID_ARGUMENT"
+	},
+	30240: {
+		message: "Требуется подтверждение для непокрытой позиции.",
+		category: "INVALID_ARGUMENT"
+	},
+	30241: {
+		message: "take_profit_type не применим к данной стоп-заявке.",
+		category: "INVALID_ARGUMENT"
+	},
+	30242: {
+		message: "limit должен быть от 1 до 100.",
+		category: "INVALID_ARGUMENT"
+	},
+	30244: {
+		message: "Превышен максимальный интервал запроса.",
+		category: "INVALID_ARGUMENT"
+	},
+	30245: {
+		message: "Некорректный execution_status.",
+		category: "INVALID_ARGUMENT"
+	},
+	30246: {
+		message: "Некорректный параметр amount.",
+		category: "INVALID_ARGUMENT"
+	},
+	30247: {
+		message: "Параметр amount обязателен.",
+		category: "INVALID_ARGUMENT"
+	},
+	30248: {
+		message: "Параметр to_account_id обязателен.",
+		category: "INVALID_ARGUMENT"
+	},
+	30249: {
+		message: "Параметр from_account_id обязателен.",
+		category: "INVALID_ARGUMENT"
+	},
+	30250: {
+		message: "Некорректный to_account_id.",
+		category: "INVALID_ARGUMENT"
+	},
+	30251: {
+		message: "Ошибка выполнения транзакции.",
+		category: "INVALID_ARGUMENT"
+	},
+	30252: {
+		message: "Некорректный from_account_id.",
+		category: "INVALID_ARGUMENT"
+	},
+	30253: {
+		message: "Некорректная валюта.",
+		category: "INVALID_ARGUMENT"
+	},
+	30254: {
+		message: "Некорректный time_in_force.",
+		category: "INVALID_ARGUMENT"
+	},
+	30255: {
+		message: "Торговля по счёту запрещена.",
+		category: "INVALID_ARGUMENT"
+	},
+	30256: {
+		message: "Параметр transaction_id обязателен.",
+		category: "INVALID_ARGUMENT"
+	},
+	30257: {
+		message: "Некорректный transaction_id.",
+		category: "INVALID_ARGUMENT"
+	},
+	30258: {
+		message: "Указанная валюта недоступна для операции.",
+		category: "INVALID_ARGUMENT"
+	},
+	30260: {
+		message: "Моментальное исполнение не поддерживается этим типом стоп-заявки.",
+		category: "INVALID_ARGUMENT"
+	},
+	35001: {
+		message: "Достигнут лимит на открытие счетов в песочнице.",
+		category: "INVALID_ARGUMENT"
+	},
+	40002: {
+		message: "Недостаточно прав для операции.",
+		category: "PERMISSION_DENIED"
+	},
+	40003: {
+		message: "Токен доступа не найден или неактивен.",
+		category: "UNAUTHENTICATED"
+	},
+	40004: {
+		message: "Выставление заявок недоступно с данного аккаунта.",
+		category: "PERMISSION_DENIED"
+	},
+	40005: {
+		message: "Недостаточно прав для перевода средств.",
+		category: "PERMISSION_DENIED"
+	},
+	50001: {
+		message: "Биржа не найдена.",
+		category: "NOT_FOUND"
+	},
+	50002: {
+		message: "Инструмент не найден.",
+		category: "NOT_FOUND"
+	},
+	50004: {
+		message: "Счёт не найден.",
+		category: "NOT_FOUND"
+	},
+	50005: {
+		message: "Торговое поручение не найдено.",
+		category: "NOT_FOUND"
+	},
+	50006: {
+		message: "Стоп-заявка не найдена.",
+		category: "NOT_FOUND"
+	},
+	50007: {
+		message: "Задача не найдена.",
+		category: "NOT_FOUND"
+	},
+	50008: {
+		message: "Источник данных по стаканам отсутствует.",
+		category: "NOT_FOUND"
+	},
+	50009: {
+		message: "Актив не найден.",
+		category: "NOT_FOUND"
+	},
+	50010: {
+		message: "Бренд не найден.",
+		category: "NOT_FOUND"
+	},
+	50011: {
+		message: "Стратегия не найдена.",
+		category: "NOT_FOUND"
+	},
+	50012: {
+		message: "Сигнал не найден.",
+		category: "NOT_FOUND"
+	},
+	70001: {
+		message: "Внутренняя ошибка сервиса. Попробуйте позже.",
+		category: "INTERNAL"
+	},
+	70002: {
+		message: "Неизвестная сетевая ошибка. Попробуйте позже.",
+		category: "INTERNAL"
+	},
+	70003: {
+		message: "Внутренняя ошибка сервиса. Попробуйте позже.",
+		category: "INTERNAL"
+	},
+	80001: {
+		message: "Превышен лимит одновременных стрим-соединений.",
+		category: "RESOURCE_EXHAUSTED"
+	},
+	80002: {
+		message: "Превышен лимит запросов в минуту.",
+		category: "RESOURCE_EXHAUSTED"
+	},
+	80003: {
+		message: "Превышен лимит отправки СМС.",
+		category: "RESOURCE_EXHAUSTED"
+	},
+	80004: {
+		message: "В стриме отсутствуют активные подписки.",
+		category: "RESOURCE_EXHAUSTED"
+	},
+	80005: {
+		message: "Превышено время жизни стрима.",
+		category: "RESOURCE_EXHAUSTED"
+	},
+	80006: {
+		message: "Превышен лимит ошибок в минуту.",
+		category: "RESOURCE_EXHAUSTED"
+	},
+	90001: {
+		message: "Требуется подтверждение операции: %s",
+		category: "FAILED_PRECONDITION"
+	},
+	90002: {
+		message: "Инструмент доступен только квалифицированным инвесторам.",
+		category: "FAILED_PRECONDITION"
+	},
+	90003: {
+		message: "Цена заявки слишком высокая.",
+		category: "FAILED_PRECONDITION"
+	}
+};
+function handleApiError(error) {
+	const grpcCode = error?.code;
+	const details = error?.details || "";
+	const match = details.match(/\b(\d{5})\b/);
+	const code = (match ? parseInt(match[1], 10) : null) || grpcCode;
+	const info = errorMessages[code] || {
+		message: `Неизвестная ошибка (код ${code}): ${details}`,
+		category: "INTERNAL"
+	};
+	const colorMap = {
+		["INTERNAL"]: "\x1B[31m",
+		["UNAUTHENTICATED"]: "\x1B[31m",
+		["PERMISSION_DENIED"]: "\x1B[31m",
+		["RESOURCE_EXHAUSTED"]: "\x1B[33m",
+		["FAILED_PRECONDITION"]: "\x1B[33m",
+		["INVALID_ARGUMENT"]: "\x1B[34m",
+		["NOT_FOUND"]: "\x1B[90m",
+		["UNIMPLEMENTED"]: "\x1B[90m",
+		["UNAVAILABLE"]: "\x1B[90m"
+	};
+	const reset = "\x1B[0m";
+	const color = colorMap[info.category] || "\x1B[31m";
+	console.error(`${color}[ApiError] ${info.category} (код ${code}): ${info.message}${reset}`);
+	const shouldRetry = info.category === "INTERNAL" || info.category === "RESOURCE_EXHAUSTED";
+	const win = getTradingAssistantWindow();
+	if (win && !win.isDestroyed()) win.webContents.send("api-error", {
+		message: info.message,
+		category: info.category,
+		code,
+		timestamp: Date.now()
+	});
+	return {
+		message: info.message,
+		category: info.category,
+		shouldRetry,
+		retryDelayMs: shouldRetry ? 1e3 : void 0
+	};
+}
+//#endregion
 //#region src/main/services/orderManager.ts
 var OrderManager = class {
 	config;
@@ -6176,6 +6185,17 @@ var OrderManager = class {
 			return null;
 		}
 	}
+	async sendManualOrder(params) {
+		const signal = {
+			instrumentUid: params.instrumentUid,
+			type: params.type,
+			price: params.price || 0,
+			time: (/* @__PURE__ */ new Date()).toISOString(),
+			reason: "Manual order",
+			targetPrice: params.orderType === "limit" ? params.price : void 0
+		};
+		await this.processSignal(signal);
+	}
 };
 //#endregion
 //#region src/main/services/compositeProfile.ts
@@ -6540,9 +6560,6 @@ var AutonomousTrader = class extends events.EventEmitter {
 		this.orderManager.setRunning(true);
 		this.active.set(instrumentUid, { handler });
 		console.log(`[AutonomousTrader] Запущен для ${instrumentUid}`);
-	}
-	async startMultiple(uids, token) {
-		for (const uid of uids) await this.start(uid, token);
 	}
 	stop(instrumentUid) {
 		const entry = this.active.get(instrumentUid);

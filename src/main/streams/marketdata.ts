@@ -1,83 +1,83 @@
-// /src/main/streams/marketdata.ts
-
 import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import { ipcMain } from 'electron';
 import { getProtoPath } from '../utils/protoPath';
 import { marketDataBus } from '../services/marketDataBus';
-import { handleApiError } from '../services/apiErrorHandler';
 
 const MAX_RECONNECT_ATTEMPTS = 3;
 const BASE_DELAY_MS = 3000;
 
-let retryTimeout: ReturnType<typeof setTimeout> | null = null;
-let retryCount = 0;
-let currentStream: grpc.ClientReadableStream<any> | null = null;
-let client: any = null;
+interface StreamState {
+  stream: grpc.ClientReadableStream<any> | null;
+  client: any;
+  retryTimeout: ReturnType<typeof setTimeout> | null;
+  retryCount: number;
+}
 
-function createClient(): any {
-  const PROTO_PATH = getProtoPath('marketdata.proto');
-  const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
-    keepCase: false,
-    longs: String,
-    enums: String,
-    defaults: true,
-    oneofs: true,
-  });
-  const proto = grpc.loadPackageDefinition(packageDefinition) as any;
-  const MarketDataStreamService = proto.tinkoff.public.invest.api.contract.v1.MarketDataStreamService;
+const streams = new Map<string, StreamState>();
 
-  return new MarketDataStreamService(
-    'invest-public-api.tbank.ru:443',
-    grpc.credentials.createSsl(null, null, null, { rejectUnauthorized: false }),
-    { 'grpc.ssl_target_name_override': 'invest-public-api.tbank.ru' }
-  );
+function getOrCreateClient(streamKey: string): any {
+  if (!streams.has(streamKey)) {
+    streams.set(streamKey, { stream: null, client: null, retryTimeout: null, retryCount: 0 });
+  }
+  const state = streams.get(streamKey)!;
+  if (!state.client) {
+    const PROTO_PATH = getProtoPath('marketdata.proto');
+    const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
+      keepCase: false,
+      longs: String,
+      enums: String,
+      defaults: true,
+      oneofs: true,
+    });
+    const proto = grpc.loadPackageDefinition(packageDefinition) as any;
+    const MarketDataStreamService = proto.tinkoff.public.invest.api.contract.v1.MarketDataStreamService;
+    state.client = new MarketDataStreamService(
+      'invest-public-api.tbank.ru:443',
+      grpc.credentials.createSsl(null, null, null, { rejectUnauthorized: false }),
+      { 'grpc.ssl_target_name_override': 'invest-public-api.tbank.ru' }
+    );
+  }
+  return state.client;
 }
 
 export const registerMarketdataStreamHandlers = () => {
   console.log('[Main] registerMDStreamHandlers called');
-  client = createClient(); // начальное создание клиента
 
-  ipcMain.handle('md-stream-start', async (_, token: string, requestBody: any) => {
-    console.log('[Main] md-stream-start called');
+  ipcMain.handle('md-stream-start', async (_, streamKey: string, token: string, requestBody: any) => {
+    console.log(`[Main] md-stream-start called for ${streamKey}`);
+    const state = streams.get(streamKey) || { stream: null, client: null, retryTimeout: null, retryCount: 0 };
+    streams.set(streamKey, state);
 
-    // 1. Остановить текущий стрим, если есть
-    if (currentStream) {
-      currentStream.cancel();
-      currentStream = null;
+    // Остановить текущий стрим, если есть
+    if (state.stream) {
+      state.stream.cancel();
+      state.stream = null;
     }
-    if (retryTimeout) {
-      clearTimeout(retryTimeout);
-      retryTimeout = null;
+    if (state.retryTimeout) {
+      clearTimeout(state.retryTimeout);
+      state.retryTimeout = null;
     }
-    retryCount = 0;
+    state.retryCount = 0;
 
-    // 2. Принудительно закрываем старый клиент и создаём новый,
-    //    чтобы гарантированно освободить ресурс на сервере.
-    if (client) {
-      try { client.close(); } catch (e) {}
-    }
-    client = createClient();
+    const client = getOrCreateClient(streamKey);
 
-    // 3. Функция подключения
     const connect = () => {
-      if (retryCount >= MAX_RECONNECT_ATTEMPTS) {
-        console.error('[Main] Достигнуто максимальное количество попыток переподключения');
+      if (state.retryCount >= MAX_RECONNECT_ATTEMPTS) {
+        console.error(`[Main] Достигнуто максимальное количество попыток для ${streamKey}`);
         return;
       }
 
-      console.log(`[Main] Подключение стрима (попытка ${retryCount + 1})`);
+      console.log(`[Main] Подключение стрима ${streamKey} (попытка ${state.retryCount + 1})`);
       const metadata = new grpc.Metadata();
       metadata.add('Authorization', `Bearer ${token}`);
 
       const stream = client.MarketDataServerSideStream(requestBody, metadata);
       if (!stream) {
-        console.error('[Main] Не удалось создать стрим');
-        // Попробуем переподключиться позже
-        if (retryCount < MAX_RECONNECT_ATTEMPTS) scheduleReconnect();
+        if (state.retryCount < MAX_RECONNECT_ATTEMPTS) scheduleReconnect();
         return;
       }
-      currentStream = stream;
+      state.stream = stream;
 
       let buffer = '';
 
@@ -103,7 +103,7 @@ export const registerMarketdataStreamHandlers = () => {
 
           let parsed: any;
           try { parsed = JSON.parse(jsonStr); }
-          catch (e) { console.warn('[Stream] Ошибка парсинга'); continue; }
+          catch (e) { continue; }
 
           if (parsed.candle) {
             const c = parsed.candle;
@@ -122,38 +122,40 @@ export const registerMarketdataStreamHandlers = () => {
       });
 
       stream.on('end', () => {
-        console.log('[Main] Стрим завершён');
-        currentStream = null;
-        if (retryCount < MAX_RECONNECT_ATTEMPTS) scheduleReconnect();
+        console.log(`[Main] Стрим ${streamKey} завершён`);
+        state.stream = null;
+        if (state.retryCount < MAX_RECONNECT_ATTEMPTS) scheduleReconnect();
       });
 
       stream.on('error', (err: any) => {
-        handleApiError(err);  // цветной вывод уже внутри
-        currentStream = null;
+        console.error(`[Main] Ошибка стрима ${streamKey}: ${err.message}`);
+        state.stream = null;
         if (err.code === 8) { // RESOURCE_EXHAUSTED
-          console.error('[Main] Лимит стримов исчерпан, дальнейшие попытки остановлены');
+          console.error(`[Main] Лимит стримов исчерпан для ${streamKey}`);
           return;
         }
-        if (retryCount < MAX_RECONNECT_ATTEMPTS) scheduleReconnect();
+        if (state.retryCount < MAX_RECONNECT_ATTEMPTS) scheduleReconnect();
       });
     };
+
     const scheduleReconnect = () => {
-      const delay = BASE_DELAY_MS * Math.pow(2, retryCount);
-      retryCount++;
-      console.log(`[Main] Переподключение через ${delay / 1000}с (попытка ${retryCount})`);
-      retryTimeout = setTimeout(connect, delay);
+      const delay = BASE_DELAY_MS * Math.pow(2, state.retryCount);
+      state.retryCount++;
+      console.log(`[Main] Переподключение ${streamKey} через ${delay / 1000}с (попытка ${state.retryCount})`);
+      state.retryTimeout = setTimeout(connect, delay);
     };
 
-    connect(); // первая попытка
+    connect();
   });
 
-  ipcMain.handle('md-stream-stop', async () => {
-    console.log('[Main] md-stream-stop called');
-    if (retryTimeout) { clearTimeout(retryTimeout); retryTimeout = null; }
-    if (currentStream) {
-      currentStream.cancel();
-      currentStream = null;
+  ipcMain.handle('md-stream-stop', async (_, streamKey: string) => {
+    console.log(`[Main] md-stream-stop called for ${streamKey}`);
+    const state = streams.get(streamKey);
+    if (!state) return;
+    if (state.retryTimeout) { clearTimeout(state.retryTimeout); state.retryTimeout = null; }
+    if (state.stream) {
+      state.stream.cancel();
+      state.stream = null;
     }
-    // не закрываем клиент, чтобы можно было быстро перезапустить стрим
   });
 };
