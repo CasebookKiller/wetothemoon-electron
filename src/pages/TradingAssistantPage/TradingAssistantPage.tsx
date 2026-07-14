@@ -41,6 +41,8 @@ import { AutoTraderTab } from '@/components/TRADING_ASSISTANT/AutoTraderTab/Auto
 import { SandboxTab } from '@/components/TRADING_ASSISTANT/SandboxTab/SandboxTab';
 import { BacktestTab } from '@/components/TRADING_ASSISTANT/BacktestTab/BacktestTab';
 import { BatchTab } from '@/components/TRADING_ASSISTANT/BatchTab/BatchTab';
+import { SignalsTab } from '@/components/TRADING_ASSISTANT/SignalsTab/SignalsTab';
+import { ProfileTab } from '@/components/TRADING_ASSISTANT/ProfileTab/ProfileTab';
 
 interface BatchResult {
   batchId: string;
@@ -1385,6 +1387,217 @@ export const TradingAssistantPage: React.FC = () => {
           </TabPanel>
 
           {/* ========== BACKTEST ========== */}
+          <TabPanel header="Backtest">
+            <BacktestTab
+              selectedInstrument={selectedInstrument}
+              setSelectedInstrument={setSelectedInstrument}
+              availableInstruments={availableInstruments}
+              instrumentsLoading={instrumentsLoading}
+              loadAllInstruments={loadAllInstruments}
+              backtest={backtest}
+              updateBacktest={updateBacktest}
+              showBacktestAdvanced={showBacktestAdvanced}
+              setShowBacktestAdvanced={setShowBacktestAdvanced}
+              runBacktest={runBacktest}
+              sendBacktestToSandbox={sendBacktestToSandbox}
+              backtestCandlesData={backtestCandlesData}
+            />
+          </TabPanel>
+          
+          {/* ========== BATCH ============= */}
+          <TabPanel header="Batch">
+            <BatchTab
+              batchParams={batchParams}
+              setBatchParams={setBatchParams}
+              batchInstruments={batchInstruments}
+              setBatchInstruments={setBatchInstruments}
+              batchResults={batchResults}
+              batchRunning={batchRunning}
+              batchStopping={batchStopping}
+              batchProgress={batchProgress}
+              batchVersion={batchVersion}
+              setBatchVersion={setBatchVersion}
+              showBatchDialog={showBatchDialog}
+              setShowBatchDialog={setShowBatchDialog}
+              showInstrumentDialog={showInstrumentDialog}
+              setShowInstrumentDialog={setShowInstrumentDialog}
+              instrumentFilter={instrumentFilter}
+              setInstrumentFilter={setInstrumentFilter}
+              tempSelectedInstruments={tempSelectedInstruments}
+              setTempSelectedInstruments={setTempSelectedInstruments}
+              availableInstruments={availableInstruments}
+              runBatch={runBatch}
+              stopBatch={stopBatch}
+              exportCSV={exportCSV}
+              backtest={backtest}
+              stream={stream}
+            />
+          </TabPanel>
+
+          {/* ========== SIGNALS =========== */}
+          <TabPanel header="Signals">
+            <SignalsTab signals={currentSignals} />
+          </TabPanel>
+
+          {/* ========== PROFILE =========== */}
+          <TabPanel header="Profile">
+            <ProfileTab profile={currentProfile} />
+          </TabPanel>
+
+          {/* ========== TRADES ============ */}
+          <TabPanel header="Trades">
+            <TradesTab currentTrades={currentTrades} trades={backtest.trades} />
+          </TabPanel>
+
+          {/* ========== POS/ORDERS ======== */}
+          <TabPanel header="Pos/Orders">
+            <PositionsOrdersTab accountId={sandbox.accountId} />
+          </TabPanel>
+          
+          {/* ========== POS/ORDERS ======== */}
+          <TabPanel header="Log">
+            <LogTab accountId={sandbox.accountId} />
+          </TabPanel>
+
+          {/* ========== SCREENER ========== */}
+          <TabPanel header="Screener">
+            <ScreenerTab
+              token={stream.token}
+              results={screenerResults}
+              setResults={setScreenerResults}
+              onSendToFarmer={setFarmerInstruments}
+            />
+          </TabPanel>
+
+          {/* ========== CLOUD ============= */}
+          <TabPanel header="Cloud">
+            <CloudTab />
+          </TabPanel>
+
+          {/* ========== FARMER ============ */}
+          <TabPanel header="Farmer">
+            <CloudFarmerTab
+              token={stream.token}
+              batches={farmerBatches}
+              setBatches={setFarmerBatches}
+              farmerInstruments={farmerInstruments}
+              setFarmerInstruments={setFarmerInstruments}
+            />
+          </TabPanel>
+        </TabView>
+      )}
+
+      {/* Выбор типа профиля и графика – только когда не compact или всегда видно? */}
+      {!compactMode && (
+        <>
+          <div style={{ borderLeft: '1px solid #555', height: '8px', margin: '0 8px' }} />
+          <span className="mr-1">Profile:</span>
+          <Dropdown
+            value={profileType}
+            options={['side', 'overlay']}
+            onChange={e => setProfileType(e.value)}
+            className="p-inputtext-sm"
+            style={{ width: '80px' }}
+          />
+          <span className="mr-1">Chart:</span>
+          <Dropdown
+            value={chartLibrary}
+            options={['lightweight', 'chartjs', 'amcharts']}
+            onChange={e => setChartLibrary(e.value)}
+            className="p-inputtext-sm"
+            style={{ width: '100px' }}
+          />
+        </>
+      )}
+   
+      {/* Старый график lightweight-charts */}
+      {chartLibrary === 'lightweight' && (
+        <div className="chart-row">
+          {profileType === 'side' && currentProfile?.volumeByPrice && priceRange.max > 0 && (
+            <div className="volume-profile-container">
+              <VolumeProfileBars
+                data={currentProfile.volumeByPrice}
+                maxVolume={Math.max(...currentProfile.volumeByPrice.map((v: any) => v.volume))}
+                minPrice={priceRange.min}
+                maxPrice={priceRange.max}
+                height={400}
+                poc={currentProfile.poc}
+                vah={currentProfile.valueAreaHigh}
+                val={currentProfile.valueAreaLow}
+              />
+            </div>
+          )}
+          {profileType === 'overlay' && (
+            <VolumeProfileOverlay
+              volumeByPrice={currentProfile?.volumeByPrice}
+              poc={currentProfile?.poc}
+              vah={currentProfile?.valueAreaHigh}
+              val={currentProfile?.valueAreaLow}
+              visible={!!currentProfile?.volumeByPrice}
+            />
+          )}
+          <div className="chart-container" ref={chartContainerRef} />
+        </div>
+      )}
+      {/* Новый график Chart.js */}
+      {chartLibrary === 'chartjs' && (
+        <div className="chart-row">
+          {profileType === 'side' && currentProfile?.volumeByPrice && priceRange.max > 0 && (
+            <div className="volume-profile-container">
+              <VolumeProfileBars
+                data={currentProfile.volumeByPrice}
+                maxVolume={Math.max(...currentProfile.volumeByPrice.map((v: any) => v.volume))}
+                minPrice={priceRange.min}
+                maxPrice={priceRange.max}
+                height={400}
+                poc={currentProfile.poc}
+                vah={currentProfile.valueAreaHigh}
+                val={currentProfile.valueAreaLow}
+              />
+            </div>
+          )}
+          {profileType === 'overlay' && (
+            <VolumeProfileOverlay
+              volumeByPrice={currentProfile?.volumeByPrice}
+              poc={currentProfile?.poc}
+              vah={currentProfile?.valueAreaHigh}
+              val={currentProfile?.valueAreaLow}
+              visible={!!currentProfile?.volumeByPrice}
+            />
+          )}
+          
+          {/* Основной график */}
+          <div className="chart-container" style={{ flex: 1, minWidth: 0, height: 400 }}>
+            <CandlestickChart
+              candlesData={aggregateCandles(currentCandles, stream.displayTimeframe)}
+              poc={currentProfile?.poc}
+              vah={currentProfile?.valueAreaHigh}
+              val={currentProfile?.valueAreaLow}
+              signals={currentSignals}
+              trades={currentTrades}
+              positions={[]}
+            />
+          </div>
+        </div>
+      )}
+      {/* Новый график amcharts */}
+      {chartLibrary === 'amcharts' && (
+        <AmChartsStockChart
+          candlesData={currentCandles}
+          volumeByPrice={currentProfile?.volumeByPrice}
+          poc={currentProfile?.poc}
+          vah={currentProfile?.valueAreaHigh}
+          val={currentProfile?.valueAreaLow}
+        />
+      )}
+    
+    </div>
+  );
+};
+
+
+
+          {/* ========== BACKTEST ========== */}
           {/*<TabPanel header="Backtest">
             <Card className="surface-ground p-0">
               <div className="p-2">
@@ -1533,24 +1746,10 @@ export const TradingAssistantPage: React.FC = () => {
 
               </div>
             </Card>
-          </TabPanel>*/
-          <TabPanel header="Backtest">
-            <BacktestTab
-              selectedInstrument={selectedInstrument}
-              setSelectedInstrument={setSelectedInstrument}
-              availableInstruments={availableInstruments}
-              instrumentsLoading={instrumentsLoading}
-              loadAllInstruments={loadAllInstruments}
-              backtest={backtest}
-              updateBacktest={updateBacktest}
-              showBacktestAdvanced={showBacktestAdvanced}
-              setShowBacktestAdvanced={setShowBacktestAdvanced}
-              runBacktest={runBacktest}
-              sendBacktestToSandbox={sendBacktestToSandbox}
-              backtestCandlesData={backtestCandlesData}
-            />
-          </TabPanel>
-          
+          </TabPanel>*/}
+
+
+
           {/* ========== BATCH ============= */}
           {/*<TabPanel header="Batch">
             <Card className="surface-ground p-0">
@@ -1886,38 +2085,12 @@ export const TradingAssistantPage: React.FC = () => {
               </div>
             </Dialog>
           </TabPanel>*/}
-          
-          <TabPanel header="Batch">
-            <BatchTab
-              batchParams={batchParams}
-              setBatchParams={setBatchParams}
-              batchInstruments={batchInstruments}
-              setBatchInstruments={setBatchInstruments}
-              batchResults={batchResults}
-              batchRunning={batchRunning}
-              batchStopping={batchStopping}
-              batchProgress={batchProgress}
-              batchVersion={batchVersion}
-              setBatchVersion={setBatchVersion}
-              showBatchDialog={showBatchDialog}
-              setShowBatchDialog={setShowBatchDialog}
-              showInstrumentDialog={showInstrumentDialog}
-              setShowInstrumentDialog={setShowInstrumentDialog}
-              instrumentFilter={instrumentFilter}
-              setInstrumentFilter={setInstrumentFilter}
-              tempSelectedInstruments={tempSelectedInstruments}
-              setTempSelectedInstruments={setTempSelectedInstruments}
-              availableInstruments={availableInstruments}
-              runBatch={runBatch}
-              stopBatch={stopBatch}
-              exportCSV={exportCSV}
-              backtest={backtest}
-              stream={stream}
-            />
-          </TabPanel>
+
+
+
 
           {/* ========== SIGNALS =========== */}
-          <TabPanel header="Signals">
+          {/*<TabPanel header="Signals">
             <Card className="surface-ground p-2">
               <h4 className="p-mb-2">Signals</h4>
               {currentSignals.length > 0 ? (
@@ -1930,10 +2103,10 @@ export const TradingAssistantPage: React.FC = () => {
                 <p className="text-center text-500">Ожидание сигналов...</p>
               )}
             </Card>
-          </TabPanel>
+          </TabPanel>*/}
 
           {/* ========== PROFILE =========== */}
-          <TabPanel header="Profile">
+          {/*<TabPanel header="Profile">
             <Card className="surface-ground p-2">
               <h4 className="p-mb-2">Volume Profile Data</h4>
               {currentProfile ? (
@@ -1961,155 +2134,4 @@ export const TradingAssistantPage: React.FC = () => {
                 <p className="text-center text-500">Нет данных профиля</p>
               )}
             </Card>
-          </TabPanel>
-
-          {/* ========== TRADES ============ */}
-          <TabPanel header="Trades">
-            <TradesTab currentTrades={currentTrades} trades={backtest.trades} />
-          </TabPanel>
-
-          {/* ========== POS/ORDERS ======== */}
-          <TabPanel header="Pos/Orders">
-            <PositionsOrdersTab accountId={sandbox.accountId} />
-          </TabPanel>
-          
-          {/* ========== POS/ORDERS ======== */}
-          <TabPanel header="Log">
-            <LogTab accountId={sandbox.accountId} />
-          </TabPanel>
-
-          {/* ========== SCREENER ========== */}
-          <TabPanel header="Screener">
-            <ScreenerTab
-              token={stream.token}
-              results={screenerResults}
-              setResults={setScreenerResults}
-              onSendToFarmer={setFarmerInstruments}
-            />
-          </TabPanel>
-
-          {/* ========== CLOUD ============= */}
-          <TabPanel header="Cloud">
-            <CloudTab />
-          </TabPanel>
-
-          {/* ========== FARMER ============ */}
-          <TabPanel header="Farmer">
-            <CloudFarmerTab
-              token={stream.token}
-              batches={farmerBatches}
-              setBatches={setFarmerBatches}
-              farmerInstruments={farmerInstruments}
-              setFarmerInstruments={setFarmerInstruments}
-            />
-          </TabPanel>
-        </TabView>
-      )}
-
-      {/* Выбор типа профиля и графика – только когда не compact или всегда видно? */}
-      {!compactMode && (
-        <>
-          <div style={{ borderLeft: '1px solid #555', height: '8px', margin: '0 8px' }} />
-          <span className="mr-1">Profile:</span>
-          <Dropdown
-            value={profileType}
-            options={['side', 'overlay']}
-            onChange={e => setProfileType(e.value)}
-            className="p-inputtext-sm"
-            style={{ width: '80px' }}
-          />
-          <span className="mr-1">Chart:</span>
-          <Dropdown
-            value={chartLibrary}
-            options={['lightweight', 'chartjs', 'amcharts']}
-            onChange={e => setChartLibrary(e.value)}
-            className="p-inputtext-sm"
-            style={{ width: '100px' }}
-          />
-        </>
-      )}
-   
-      {/* Старый график lightweight-charts */}
-      {chartLibrary === 'lightweight' && (
-        <div className="chart-row">
-          {profileType === 'side' && currentProfile?.volumeByPrice && priceRange.max > 0 && (
-            <div className="volume-profile-container">
-              <VolumeProfileBars
-                data={currentProfile.volumeByPrice}
-                maxVolume={Math.max(...currentProfile.volumeByPrice.map((v: any) => v.volume))}
-                minPrice={priceRange.min}
-                maxPrice={priceRange.max}
-                height={400}
-                poc={currentProfile.poc}
-                vah={currentProfile.valueAreaHigh}
-                val={currentProfile.valueAreaLow}
-              />
-            </div>
-          )}
-          {profileType === 'overlay' && (
-            <VolumeProfileOverlay
-              volumeByPrice={currentProfile?.volumeByPrice}
-              poc={currentProfile?.poc}
-              vah={currentProfile?.valueAreaHigh}
-              val={currentProfile?.valueAreaLow}
-              visible={!!currentProfile?.volumeByPrice}
-            />
-          )}
-          <div className="chart-container" ref={chartContainerRef} />
-        </div>
-      )}
-      {/* Новый график Chart.js */}
-      {chartLibrary === 'chartjs' && (
-        <div className="chart-row">
-          {profileType === 'side' && currentProfile?.volumeByPrice && priceRange.max > 0 && (
-            <div className="volume-profile-container">
-              <VolumeProfileBars
-                data={currentProfile.volumeByPrice}
-                maxVolume={Math.max(...currentProfile.volumeByPrice.map((v: any) => v.volume))}
-                minPrice={priceRange.min}
-                maxPrice={priceRange.max}
-                height={400}
-                poc={currentProfile.poc}
-                vah={currentProfile.valueAreaHigh}
-                val={currentProfile.valueAreaLow}
-              />
-            </div>
-          )}
-          {profileType === 'overlay' && (
-            <VolumeProfileOverlay
-              volumeByPrice={currentProfile?.volumeByPrice}
-              poc={currentProfile?.poc}
-              vah={currentProfile?.valueAreaHigh}
-              val={currentProfile?.valueAreaLow}
-              visible={!!currentProfile?.volumeByPrice}
-            />
-          )}
-          
-          {/* Основной график */}
-          <div className="chart-container" style={{ flex: 1, minWidth: 0, height: 400 }}>
-            <CandlestickChart
-              candlesData={aggregateCandles(currentCandles, stream.displayTimeframe)}
-              poc={currentProfile?.poc}
-              vah={currentProfile?.valueAreaHigh}
-              val={currentProfile?.valueAreaLow}
-              signals={currentSignals}
-              trades={currentTrades}
-              positions={[]}
-            />
-          </div>
-        </div>
-      )}
-      {/* Новый график amcharts */}
-      {chartLibrary === 'amcharts' && (
-        <AmChartsStockChart
-          candlesData={currentCandles}
-          volumeByPrice={currentProfile?.volumeByPrice}
-          poc={currentProfile?.poc}
-          vah={currentProfile?.valueAreaHigh}
-          val={currentProfile?.valueAreaLow}
-        />
-      )}
-    
-    </div>
-  );
-};
+          </TabPanel>*/}

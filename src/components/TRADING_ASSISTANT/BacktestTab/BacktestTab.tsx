@@ -19,6 +19,7 @@ interface BacktestTabProps {
   runBacktest: () => void;
   sendBacktestToSandbox: () => void;
   backtestCandlesData: any[];
+  setSelectedInstrument: (v: string) => void;
 }
 
 export const BacktestTab: React.FC<BacktestTabProps> = ({
@@ -33,6 +34,7 @@ export const BacktestTab: React.FC<BacktestTabProps> = ({
   runBacktest,
   sendBacktestToSandbox,
   backtestCandlesData,
+  setSelectedInstrument
 }) => {
   return (
     <Card className="surface-ground p-0">
@@ -42,7 +44,8 @@ export const BacktestTab: React.FC<BacktestTabProps> = ({
           <Dropdown
             value={selectedInstrument}
             options={availableInstruments.map(i => ({ label: `${i.name} (${i.ticker})`, value: i.uid }))}
-            onChange={e => updateBacktest({ instrument: e.value })} // если нужно менять инструмент
+            //onChange={e => updateBacktest({ instrument: e.value })} // если нужно менять инструмент
+            onChange={e => setSelectedInstrument(e.value)}
             placeholder="Select"
             filter
             className="p-inputtext-sm flex-1 mr-2"

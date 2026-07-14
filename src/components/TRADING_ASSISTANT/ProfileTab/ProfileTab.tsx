@@ -4,15 +4,11 @@ import React from 'react';
 import { Card } from 'primereact/card';
 
 interface VolumeProfileLevels {
-  instrumentUid: string;
-  timestamp: string;
   poc: number;
   valueAreaHigh: number;
   valueAreaLow: number;
-  hvn: number[];
-  lvn: number[];
   totalVolume: number;
-  volumeByPrice: Array<{ price: number; volume: number }>;
+  volumeByPrice?: Array<{ price: number; volume: number }>;
 }
 
 interface Props {
@@ -22,23 +18,24 @@ interface Props {
 export const ProfileTab: React.FC<Props> = ({ profile }) => {
   if (!profile) {
     return (
-      <Card title="Volume Profile" className="surface-ground">
+      <Card className="surface-ground p-2">
         <p className="text-center text-500">Нет данных профиля</p>
       </Card>
     );
   }
 
   return (
-    <Card title="Volume Profile Data" className="surface-ground">
-      <div style={{ color: '#d1d4dc', marginBottom: '10px' }}>
+    <Card className="surface-ground p-2">
+      <h4 className="p-mb-2">Volume Profile Data</h4>
+      <div className="p-mb-2" style={{ color: '#d1d4dc' }}>
         <p>POC: {profile.poc.toFixed(2)}</p>
         <p>Value Area: {profile.valueAreaLow.toFixed(2)} – {profile.valueAreaHigh.toFixed(2)}</p>
         <p>Total Volume: {profile.totalVolume}</p>
       </div>
-      {profile.volumeByPrice?.length > 0 && (
+      {profile.volumeByPrice && profile.volumeByPrice.length > 0 && (
         <>
-          <h4>Top 10 Levels</h4>
-          <ul style={{ color: '#d1d4dc', maxHeight: '200px', overflowY: 'auto' }}>
+          <h5>Top 10 Levels</h5>
+          <ul className="p-pl-3" style={{ color: '#d1d4dc', maxHeight: '200px', overflowY: 'auto' }}>
             {profile.volumeByPrice
               .sort((a, b) => b.volume - a.volume)
               .slice(0, 10)

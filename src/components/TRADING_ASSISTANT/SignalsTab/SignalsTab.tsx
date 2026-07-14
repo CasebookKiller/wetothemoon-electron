@@ -3,25 +3,17 @@
 import React from 'react';
 import { Card } from 'primereact/card';
 
-interface Signal {
-  instrumentUid: string;
-  time: string;
-  type: string;
-  price: number;
-  level: number;
-  message: string;
-}
-
 interface Props {
-  liveSignals: Signal[];
+  signals: Array<{ type: string; message: string; price: number }>;
 }
 
-export const SignalsTab: React.FC<Props> = ({ liveSignals }) => {
+export const SignalsTab: React.FC<Props> = ({ signals }) => {
   return (
-    <Card title="Live Signals" className="surface-ground">
-      {liveSignals.length > 0 ? (
-        <ul style={{ color: '#d1d4dc', maxHeight: '200px', overflowY: 'auto' }}>
-          {liveSignals.map((sig, idx) => (
+    <Card className="surface-ground p-2">
+      <h4 className="p-mb-2">Signals</h4>
+      {signals.length > 0 ? (
+        <ul className="p-pl-3" style={{ color: '#d1d4dc', maxHeight: '200px', overflowY: 'auto' }}>
+          {signals.map((sig, idx) => (
             <li key={idx}><strong>{sig.type}</strong>: {sig.message} @ {sig.price}</li>
           ))}
         </ul>
