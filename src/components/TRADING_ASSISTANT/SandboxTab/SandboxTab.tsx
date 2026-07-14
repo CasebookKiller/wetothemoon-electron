@@ -42,7 +42,7 @@ export const SandboxTab: React.FC<SandboxTabProps> = ({ availableInstruments }) 
   const [manualType, setManualType] = useState<'BUY' | 'SELL'>('BUY');
   const [manualQuantity, setManualQuantity] = useState(1);
   const [manualPrice, setManualPrice] = useState(0);
-  const [isLimitOrder, setIsLimitOrder] = useState(false);
+  const [manualOrderType, setManualOrderType] = useState<'market' | 'limit'>('market');
 
   // Загрузка счетов
   const loadAccounts = async () => {
@@ -122,8 +122,8 @@ export const SandboxTab: React.FC<SandboxTabProps> = ({ availableInstruments }) 
       instrumentUid: manualInstrument,
       type: manualType,
       quantity: manualQuantity,
-      orderType: isLimitOrder ? 'limit' : 'market',
-      price: isLimitOrder ? manualPrice : undefined,
+      orderType: manualOrderType,
+      price: manualOrderType === 'limit' ? manualPrice : undefined,
     });
     if (res.success) alert('Ордер отправлен');
     else alert('Ошибка: ' + res.error);
@@ -215,11 +215,17 @@ export const SandboxTab: React.FC<SandboxTabProps> = ({ availableInstruments }) 
           <Dropdown value={manualType} options={[{ label: 'BUY', value: 'BUY' }, { label: 'SELL', value: 'SELL' }]} onChange={e => setManualType(e.value)} className="p-inputtext-sm" style={{ width: '80px' }} />
           <label className="mr-1 mb-0">Кол-во</label>
           <InputNumber value={manualQuantity} onValueChange={e => setManualQuantity(e.value ?? 1)} min={1} size={1} className="p-inputtext-sm" />
-          <div className="flex align-items-center">
-            <Checkbox checked={isLimitOrder} onChange={(e: any) => setIsLimitOrder(e.checked)} />
-            <label className="ml-1 mr-2 mb-0">Limit</label>
-            {isLimitOrder && <InputNumber value={manualPrice} onValueChange={e => setManualPrice(e.value ?? 0)} min={0} step={0.01} size={3} className="p-inputtext-sm" />}
-          </div>
+          <label className="mr-1 mb-0">Тип ордера</label>
+          <Dropdown
+            value={manualOrderType}
+            options={[
+              { label: 'Market', value: 'market' },
+              { label: 'Limit', value: 'limit' }
+            ]}
+            onChange={e => setManualOrderType(e.value)}
+            className="p-inputtext-sm"
+            style={{ width: '100px' }}
+          />
           <Button label="Отправить" icon="pi pi-send" onClick={sendManualOrder} className="p-button-sm p-button-success p-1 px-2" />
         </div>
       </Card>

@@ -39,6 +39,8 @@ import { Tag } from 'primereact/tag';
 import { Toast } from 'primereact/toast';
 import { AutoTraderTab } from '@/components/TRADING_ASSISTANT/AutoTraderTab/AutoTraderTab';
 import { SandboxTab } from '@/components/TRADING_ASSISTANT/SandboxTab/SandboxTab';
+import { BacktestTab } from '@/components/TRADING_ASSISTANT/BacktestTab/BacktestTab';
+import { BatchTab } from '@/components/TRADING_ASSISTANT/BatchTab/BatchTab';
 
 interface BatchResult {
   batchId: string;
@@ -1175,7 +1177,7 @@ export const TradingAssistantPage: React.FC = () => {
           <TabPanel header="Sandbox">
             <SandboxTab availableInstruments={availableInstruments} />
           </TabPanel>
-          
+
           {/* ========== SANDBOX (OLD) ==== */}
           <TabPanel header="Sandbox (old)">
             <Card className="surface-ground p-0">
@@ -1383,10 +1385,12 @@ export const TradingAssistantPage: React.FC = () => {
           </TabPanel>
 
           {/* ========== BACKTEST ========== */}
-          <TabPanel header="Backtest">
+          {/*<TabPanel header="Backtest">
             <Card className="surface-ground p-0">
               <div className="p-2">
-                {/* Основная строка: инструмент, кнопка Run, результат */}
+                {
+                  // Основная строка: инструмент, кнопка Run, результат
+                }
                 <div className="flex align-items-center flex-wrap gap-2">
                   <label className="mr-1 mb-0">Instr</label>
                   <Dropdown
@@ -1423,7 +1427,9 @@ export const TradingAssistantPage: React.FC = () => {
                   />
                 </div>
 
-                {/* Расширенные параметры (скрыты по умолчанию) */}
+                {
+                  // Расширенные параметры (скрыты по умолчанию)
+                }
                 {showBacktestAdvanced && (
                   <div className="flex align-items-center flex-wrap gap-2 mt-2">
                     <label className="mr-1 mb-0">Int</label>
@@ -1489,7 +1495,9 @@ export const TradingAssistantPage: React.FC = () => {
                   </div>
                 )}
 
-                {/* Результат бэктеста */}
+                {
+                  // Результат бэктеста
+                }
                 {backtest.result?.stats && (
                   <div className="mt-2">
                     <div className="text-sm align-items-center" style={{ wordBreak: 'break-all' }}>
@@ -1525,13 +1533,31 @@ export const TradingAssistantPage: React.FC = () => {
 
               </div>
             </Card>
+          </TabPanel>*/
+          <TabPanel header="Backtest">
+            <BacktestTab
+              selectedInstrument={selectedInstrument}
+              setSelectedInstrument={setSelectedInstrument}
+              availableInstruments={availableInstruments}
+              instrumentsLoading={instrumentsLoading}
+              loadAllInstruments={loadAllInstruments}
+              backtest={backtest}
+              updateBacktest={updateBacktest}
+              showBacktestAdvanced={showBacktestAdvanced}
+              setShowBacktestAdvanced={setShowBacktestAdvanced}
+              runBacktest={runBacktest}
+              sendBacktestToSandbox={sendBacktestToSandbox}
+              backtestCandlesData={backtestCandlesData}
+            />
           </TabPanel>
-
+          
           {/* ========== BATCH ============= */}
-          <TabPanel header="Batch">
+          {/*<TabPanel header="Batch">
             <Card className="surface-ground p-0">
               <div className="p-2">
-                {/* Компактная строка управления */}
+                {
+                  // Компактная строка управления
+                }
                 <div className="flex align-items-center flex-wrap gap-2 mb-2">
                   <Button
                     label="Configure"
@@ -1573,7 +1599,9 @@ export const TradingAssistantPage: React.FC = () => {
                   <span className="ml-2 text-sm">{batchInstruments.length} instrument(s) selected</span>
                 </div>
 
-                {/* Прогресс */}
+                {
+                  // Прогресс
+                }
                 {batchProgress && (
                   <div className="mb-2">
                     <ProgressBar value={Math.round(batchProgress.total > 0 ? (batchProgress.completed / batchProgress.total) * 100 : 0)} />
@@ -1581,7 +1609,9 @@ export const TradingAssistantPage: React.FC = () => {
                   </div>
                 )}
 
-                {/* Таблица результатов */}
+                {
+                  // Таблица результатов
+                }
                 {batchResults.length > 0 && (
                   <div style={{ maxHeight: '400px', overflowY: 'auto', color: '#d1d4dc' }}>
                     <table className="p-datatable-table" style={{ width: '100%', fontSize: '0.85rem' }}>
@@ -1619,7 +1649,9 @@ export const TradingAssistantPage: React.FC = () => {
               </div>
             </Card>
 
-            {/* Диалог конфигурации Batch */}
+            {
+              // Диалог конфигурации Batch
+            }
             <Dialog
               header="Batch Configuration"
               visible={showBatchDialog}
@@ -1627,7 +1659,9 @@ export const TradingAssistantPage: React.FC = () => {
               onHide={() => setShowBatchDialog(false)}
             >
               <div className="p-fluid">
-                {/* Выбор инструментов */}
+                {
+                  // Выбор инструментов
+                }
                 <div className="p-field mb-3">
                   <label>Instruments</label>
                   <div className="p-inputgroup">
@@ -1644,7 +1678,9 @@ export const TradingAssistantPage: React.FC = () => {
                   )}
                 </div>
 
-                {/* Версия */}
+                {
+                  // Версия
+                }
                 <div className="p-field mb-3">
                   <label>Batch Version</label>
                   <Dropdown
@@ -1655,7 +1691,9 @@ export const TradingAssistantPage: React.FC = () => {
                   />
                 </div>
 
-                {/* Strategy */}
+                {
+                  // Strategy
+                }
                 <div className="p-field mb-3">
                   <label>Strategy</label>
                   <Dropdown
@@ -1680,7 +1718,9 @@ export const TradingAssistantPage: React.FC = () => {
                   />
                 </div>
 
-                {/* Strategy */}
+                {
+                  // Strategy
+                }
                 <div className="p-field mb-3">
                   <label>Interval</label>
                   <Dropdown
@@ -1695,7 +1735,9 @@ export const TradingAssistantPage: React.FC = () => {
                   />
                 </div>
 
-                {/* Size & Risk */}
+                {
+                  // Size & Risk
+                }
                 <div className="p-field mb-3">
                   <label>Position Sizing</label>
                   <div className="flex align-items-center gap-2">
@@ -1720,7 +1762,9 @@ export const TradingAssistantPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Vol Filter */}
+                {
+                  // Vol Filter
+                }
                 <div className="p-field mb-3">
                   <div className="flex align-items-center gap-2">
                     <Checkbox
@@ -1740,7 +1784,9 @@ export const TradingAssistantPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* SL, TP, Trail, Lots (как в старой форме) */}
+                {
+                  // SL, TP, Trail, Lots (как в старой форме)
+                }
                 {['sl', 'tp', 'trail', 'lots'].map((type) => (
                   <div className="p-field mb-3" key={type}>
                     <label>{type.toUpperCase()} % (Lots for Lots)</label>
@@ -1790,7 +1836,9 @@ export const TradingAssistantPage: React.FC = () => {
               </div>
             </Dialog>
 
-            {/* Диалог выбора инструментов (без изменений) */}
+            {
+              // Диалог выбора инструментов (без изменений)
+            }
             <Dialog
               header="Выбор инструментов для Batch"
               visible={showInstrumentDialog}
@@ -1837,6 +1885,35 @@ export const TradingAssistantPage: React.FC = () => {
                   ))}
               </div>
             </Dialog>
+          </TabPanel>*/}
+          
+          <TabPanel header="Batch">
+            <BatchTab
+              batchParams={batchParams}
+              setBatchParams={setBatchParams}
+              batchInstruments={batchInstruments}
+              setBatchInstruments={setBatchInstruments}
+              batchResults={batchResults}
+              batchRunning={batchRunning}
+              batchStopping={batchStopping}
+              batchProgress={batchProgress}
+              batchVersion={batchVersion}
+              setBatchVersion={setBatchVersion}
+              showBatchDialog={showBatchDialog}
+              setShowBatchDialog={setShowBatchDialog}
+              showInstrumentDialog={showInstrumentDialog}
+              setShowInstrumentDialog={setShowInstrumentDialog}
+              instrumentFilter={instrumentFilter}
+              setInstrumentFilter={setInstrumentFilter}
+              tempSelectedInstruments={tempSelectedInstruments}
+              setTempSelectedInstruments={setTempSelectedInstruments}
+              availableInstruments={availableInstruments}
+              runBatch={runBatch}
+              stopBatch={stopBatch}
+              exportCSV={exportCSV}
+              backtest={backtest}
+              stream={stream}
+            />
           </TabPanel>
 
           {/* ========== SIGNALS =========== */}

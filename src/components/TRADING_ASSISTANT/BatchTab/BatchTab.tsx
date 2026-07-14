@@ -1,381 +1,364 @@
-import React, { useState } from 'react';
+// src/components/TRADING_ASSISTANT/BatchTab/BatchTab.tsx
+
+import React from 'react';
 import { Card } from 'primereact/card';
 import { Button } from 'primereact/button';
 import { InputText } from 'primereact/inputtext';
+import { Dropdown } from 'primereact/dropdown';
 import { Checkbox } from 'primereact/checkbox';
 import { Dialog } from 'primereact/dialog';
 import { ProgressBar } from 'primereact/progressbar';
 
-interface Props {
-  batchInstruments: string[];
-  setBatchInstruments: (uids: string[]) => void;
+interface BatchTabProps {
   batchParams: any;
-  setBatchParams: any;
+  setBatchParams: React.Dispatch<React.SetStateAction<any>>;
+  batchInstruments: string[];
+  setBatchInstruments: React.Dispatch<React.SetStateAction<string[]>>;
   batchResults: any[];
-  batchProgress: { completed: number; total: number } | null;
-  runBatch: () => void;
-  exportCSV: () => void;
-  availableInstruments: Array<{ uid: string; name: string; ticker?: string }>;
   batchRunning: boolean;
+  batchStopping: boolean;
+  batchProgress: { completed: number; total: number } | null;
+  batchVersion: 'v1' | 'v2';
+  setBatchVersion: React.Dispatch<React.SetStateAction<'v1' | 'v2'>>;
+  showBatchDialog: boolean;
+  setShowBatchDialog: React.Dispatch<React.SetStateAction<boolean>>;
+  showInstrumentDialog: boolean;
+  setShowInstrumentDialog: React.Dispatch<React.SetStateAction<boolean>>;
+  instrumentFilter: string;
+  setInstrumentFilter: React.Dispatch<React.SetStateAction<string>>;
+  tempSelectedInstruments: string[];
+  setTempSelectedInstruments: React.Dispatch<React.SetStateAction<string[]>>;
+  availableInstruments: Array<{ uid: string; name: string; ticker?: string }>;
+  runBatch: () => void;
+  stopBatch: () => void;
+  exportCSV: () => void;
   backtest: any;
+  stream: { token: string };
 }
 
-export const BatchTab: React.FC<Props> = ({
-  batchInstruments,
-  setBatchInstruments,
+export const BatchTab: React.FC<BatchTabProps> = ({
   batchParams,
   setBatchParams,
+  batchInstruments,
+  setBatchInstruments,
   batchResults,
-  batchProgress,
-  runBatch,
-  exportCSV,
-  availableInstruments,
   batchRunning,
+  batchStopping,
+  batchProgress,
+  batchVersion,
+  setBatchVersion,
+  showBatchDialog,
+  setShowBatchDialog,
+  showInstrumentDialog,
+  setShowInstrumentDialog,
+  instrumentFilter,
+  setInstrumentFilter,
+  tempSelectedInstruments,
+  setTempSelectedInstruments,
+  availableInstruments,
+  runBatch,
+  stopBatch,
+  exportCSV,
+  backtest,
+  stream,
 }) => {
-  const [showDialog, setShowDialog] = useState(false);
-  const [filterText, setFilterText] = useState('');
-  const [tempSelected, setTempSelected] = useState<string[]>([]);
-
-  const filtered = availableInstruments.filter(
-    inst => inst.name.toLowerCase().includes(filterText.toLowerCase()) || inst.ticker?.toLowerCase().includes(filterText.toLowerCase())
-  );
-
-  const toggleInstrument = (uid: string) => {
-    if (tempSelected.includes(uid)) {
-      setTempSelected(tempSelected.filter(id => id !== uid));
-    } else {
-      setTempSelected([...tempSelected, uid]);
-    }
-  };
-
-  const percent = batchProgress ? (batchProgress.completed / batchProgress.total) * 100 : 0;
-
   return (
-    <Card title="Batch Backtest" className="surface-ground">
-      <div className="p-fluid p-formgrid p-grid">
-        {/* Выбор инструментов */}
-        <div className="p-field p-col-12 p-md-6">
-          <label>Instruments</label>
-          <div className="p-inputgroup">
-            <InputText value={`${batchInstruments.length} selected`} readOnly />
-            <Button icon="pi pi-search" onClick={() => {
-              setTempSelected([...batchInstruments]);
-              setShowDialog(true);
-            }} className="p-button-secondary" />
-          </div>
-          {batchInstruments.length > 0 && (
-            <small className="p-mt-1" style={{ color: '#888' }}>
-              {batchInstruments.map(uid => {
-                const inst = availableInstruments.find(i => i.uid === uid);
-                return inst ? inst.ticker || inst.name : uid;
-              }).join(', ')}
-            </small>
-          )}
-        </div>
-
-        {/* Режим SL */}
-        <div className="p-field p-col-12 p-md-6">
-          <label>SL %</label>
-          <div className="p-inputgroup">
-            <select
-              value={batchParams.slMode}
-              onChange={e => setBatchParams({ ...batchParams, slMode: e.target.value })}
-              style={{ width: '100px' }}
-            >
-              <option value="manual">Ручной</option>
-              <option value="range">Диапазон</option>
-            </select>
-            {batchParams.slMode === 'manual' ? (
-              <InputText
-                value={batchParams.slValues}
-                onChange={e => setBatchParams({ ...batchParams, slValues: e.target.value })}
-                placeholder="1,1.5,2"
-              />
-            ) : (
-              <>
-                <InputText
-                  value={batchParams.slMin}
-                  onChange={e => setBatchParams({ ...batchParams, slMin: e.target.value })}
-                  placeholder="Мин"
-                  style={{ width: '80px' }}
-                />
-                <InputText
-                  value={batchParams.slMax}
-                  onChange={e => setBatchParams({ ...batchParams, slMax: e.target.value })}
-                  placeholder="Макс"
-                  style={{ width: '80px' }}
-                />
-                <InputText
-                  value={batchParams.slStep}
-                  onChange={e => setBatchParams({ ...batchParams, slStep: e.target.value })}
-                  placeholder="Шаг"
-                  style={{ width: '80px' }}
-                />
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Режим TP */}
-        <div className="p-field p-col-12 p-md-6">
-          <label>TP %</label>
-          <div className="p-inputgroup">
-            <select
-              value={batchParams.tpMode}
-              onChange={e => setBatchParams({ ...batchParams, tpMode: e.target.value })}
-              style={{ width: '100px' }}
-            >
-              <option value="manual">Ручной</option>
-              <option value="range">Диапазон</option>
-            </select>
-            {batchParams.tpMode === 'manual' ? (
-              <InputText
-                value={batchParams.tpValues}
-                onChange={e => setBatchParams({ ...batchParams, tpValues: e.target.value })}
-                placeholder="2,3,4"
-              />
-            ) : (
-              <>
-                <InputText
-                  value={batchParams.tpMin}
-                  onChange={e => setBatchParams({ ...batchParams, tpMin: e.target.value })}
-                  placeholder="Мин"
-                  style={{ width: '80px' }}
-                />
-                <InputText
-                  value={batchParams.tpMax}
-                  onChange={e => setBatchParams({ ...batchParams, tpMax: e.target.value })}
-                  placeholder="Макс"
-                  style={{ width: '80px' }}
-                />
-                <InputText
-                  value={batchParams.tpStep}
-                  onChange={e => setBatchParams({ ...batchParams, tpStep: e.target.value })}
-                  placeholder="Шаг"
-                  style={{ width: '80px' }}
-                />
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Режим Trail */}
-        <div className="p-field p-col-12 p-md-6">
-          <label>Trail %</label>
-          <div className="p-inputgroup">
-            <select
-              value={batchParams.trailMode}
-              onChange={e => setBatchParams({ ...batchParams, trailMode: e.target.value })}
-              style={{ width: '100px' }}
-            >
-              <option value="manual">Ручной</option>
-              <option value="range">Диапазон</option>
-            </select>
-            {batchParams.trailMode === 'manual' ? (
-              <InputText
-                value={batchParams.trailValues}
-                onChange={e => setBatchParams({ ...batchParams, trailValues: e.target.value })}
-                placeholder="0.5,1"
-              />
-            ) : (
-              <>
-                <InputText
-                  value={batchParams.trailMin}
-                  onChange={e => setBatchParams({ ...batchParams, trailMin: e.target.value })}
-                  placeholder="Мин"
-                  style={{ width: '80px' }}
-                />
-                <InputText
-                  value={batchParams.trailMax}
-                  onChange={e => setBatchParams({ ...batchParams, trailMax: e.target.value })}
-                  placeholder="Макс"
-                  style={{ width: '80px' }}
-                />
-                <InputText
-                  value={batchParams.trailStep}
-                  onChange={e => setBatchParams({ ...batchParams, trailStep: e.target.value })}
-                  placeholder="Шаг"
-                  style={{ width: '80px' }}
-                />
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Режим Lots */}
-        <div className="p-field p-col-12 p-md-6">
-          <label>Lots</label>
-          <div className="p-inputgroup">
-            <select
-              value={batchParams.lotsMode}
-              onChange={e => setBatchParams({ ...batchParams, lotsMode: e.target.value })}
-              style={{ width: '100px' }}
-            >
-              <option value="manual">Ручной</option>
-              <option value="range">Диапазон</option>
-            </select>
-            {batchParams.lotsMode === 'manual' ? (
-              <InputText
-                value={batchParams.lotsValues}
-                onChange={e => setBatchParams({ ...batchParams, lotsValues: e.target.value })}
-                placeholder="10"
-              />
-            ) : (
-              <>
-                <InputText
-                  value={batchParams.lotsMin}
-                  onChange={e => setBatchParams({ ...batchParams, lotsMin: e.target.value })}
-                  placeholder="Мин"
-                  style={{ width: '80px' }}
-                />
-                <InputText
-                  value={batchParams.lotsMax}
-                  onChange={e => setBatchParams({ ...batchParams, lotsMax: e.target.value })}
-                  placeholder="Макс"
-                  style={{ width: '80px' }}
-                />
-                <InputText
-                  value={batchParams.lotsStep}
-                  onChange={e => setBatchParams({ ...batchParams, lotsStep: e.target.value })}
-                  placeholder="Шаг"
-                  style={{ width: '80px' }}
-                />
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Position Sizing */}
-        <div className="p-field p-col-6 p-md-3">
-          <label>Size</label>
-          <select
-            value={batchParams.positionSizing}
-            onChange={e => setBatchParams({ ...batchParams, positionSizing: e.target.value })}
-            style={{ width: '100%' }}
-          >
-            <option value="fixed">Fixed</option>
-            <option value="dynamic">Dynamic</option>
-          </select>
-        </div>
-        {batchParams.positionSizing === 'dynamic' && (
-          <div className="p-field p-col-6 p-md-3">
-            <label>Risk %</label>
-            <InputText
-              value={batchParams.riskPercent}
-              onChange={e => setBatchParams({ ...batchParams, riskPercent: e.target.value })}
-              placeholder="1"
+    <Card className="surface-ground p-0">
+      <div className="p-2">
+        {/* Компактная строка управления */}
+        <div className="flex align-items-center flex-wrap gap-2 mb-2">
+          <Button
+            label="Configure"
+            icon="pi pi-cog"
+            onClick={() => setShowBatchDialog(true)}
+            className="p-button-sm p-button-secondary p-1 px-3"
+          />
+          <Button
+            label={batchRunning ? 'Running...' : 'Run'}
+            onClick={runBatch}
+            disabled={batchRunning || batchStopping}
+            className="p-button-sm p-1 px-3"
+            icon={batchRunning ? 'pi pi-spin pi-spinner' : ''}
+          />
+          {batchRunning && (
+            <Button
+              label="Stop"
+              onClick={stopBatch}
+              disabled={batchStopping}
+              className="p-button-sm p-button-danger p-1 px-3"
             />
+          )}
+          <Button
+            label="Export CSV"
+            onClick={exportCSV}
+            disabled={batchResults.length === 0 || batchRunning}
+            className="p-button-sm p-button-secondary p-1 px-3"
+          />
+          <Button
+            label="JSON"
+            className="p-button-sm p-button-secondary p-1 px-3"
+            disabled={batchResults.length === 0}
+            onClick={async () => {
+              const api = (window as any).electronAPI;
+              await api.saveJson(batchResults, `batch_results_${new Date().toISOString().slice(0,10)}.json`);
+            }}
+          />
+          <span className="ml-2 text-sm">{batchInstruments.length} instrument(s) selected</span>
+        </div>
+
+        {/* Прогресс */}
+        {batchProgress && (
+          <div className="mb-2">
+            <ProgressBar value={Math.round(batchProgress.total > 0 ? (batchProgress.completed / batchProgress.total) * 100 : 0)} />
+            <span className="ml-2">{batchProgress.completed} / {batchProgress.total}</span>
           </div>
         )}
 
-        {/* Volume Filter */}
-        <div className="p-field p-col-12 p-md-4 p-d-flex p-ai-center">
-          <Checkbox
-            checked={batchParams.volumeFilterEnabled}
-            onChange={e => setBatchParams({ ...batchParams, volumeFilterEnabled: e.checked })}
-          />
-          <label className="p-ml-2">Vol Filter</label>
-          {batchParams.volumeFilterEnabled && (
-            <InputText
-              value={batchParams.volumeFilterPeriod}
-              onChange={e => setBatchParams({ ...batchParams, volumeFilterPeriod: e.target.value })}
-              placeholder="Period"
-              style={{ width: '80px', marginLeft: '8px' }}
-            />
-          )}
-        </div>
-
-        {/* Strategy */}
-        <div className="p-field p-col-12 p-md-4">
-          <label>Strategy</label>
-          <select
-            value={batchParams.strategyType}
-            onChange={e => setBatchParams({ ...batchParams, strategyType: e.target.value })}
-            style={{ width: '100%' }}
-          >
-            <option value="volume_accumulation">Vol Accum</option>
-            <option value="trend">Trend</option>
-          </select>
-        </div>
-
-        {/* Кнопки */}
-        <div className="p-field p-col-12 p-md-4 p-d-flex p-ai-end">
-          <Button label="Run Batch" onClick={runBatch} disabled={batchRunning} className="p-mr-2" />
-          <Button label="Export CSV" onClick={exportCSV} disabled={batchResults.length === 0} className="p-button-secondary" />
-        </div>
+        {/* Таблица результатов */}
+        {batchResults.length > 0 && (
+          <div style={{ maxHeight: '400px', overflowY: 'auto', color: '#d1d4dc' }}>
+            <table className="p-datatable-table" style={{ width: '100%', fontSize: '0.85rem' }}>
+              <thead>
+                <tr>
+                  <th>Instrument</th><th>SL%</th><th>TP%</th><th>Trail%</th><th>Lots</th>
+                  <th>Sizing</th><th>Risk%</th><th>VolFilt</th><th>Period</th>
+                  <th>Signals</th><th>Trades</th><th>WinRate</th><th>Profit</th><th>MaxDD</th><th>Capital</th>
+                </tr>
+              </thead>
+              <tbody>
+                {batchResults.map((r, idx) => (
+                  <tr key={idx}>
+                    <td>{r.instrumentUid.slice(0,8)}</td>
+                    <td>{r.params.stopLossPercent}</td>
+                    <td>{r.params.takeProfitPercent}</td>
+                    <td>{r.params.trailingDistancePercent}</td>
+                    <td>{r.params.lots}</td>
+                    <td>{r.params.positionSizing}</td>
+                    <td>{r.params.riskPercent}</td>
+                    <td>{r.params.volumeFilterEnabled ? 'Y' : 'N'}</td>
+                    <td>{r.params.volumeFilterPeriod}</td>
+                    <td>{r.signals}</td>
+                    <td>{r.stats.totalTrades}</td>
+                    <td>{r.stats.winRate?.toFixed(1)}%</td>
+                    <td>{r.stats.totalProfit?.toFixed(2)}</td>
+                    <td>{r.stats.maxDrawdown?.toFixed(2)}</td>
+                    <td>{r.stats.initialCapital}→{r.stats.finalCapital?.toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
-      {/* Прогресс */}
-      {batchProgress && (
-        <div className="p-mt-3">
-          <ProgressBar value={percent} />
-          <span className="p-ml-2">{batchProgress.completed} / {batchProgress.total}</span>
-        </div>
-      )}
+      {/* Диалог конфигурации Batch */}
+      <Dialog
+        header="Batch Configuration"
+        visible={showBatchDialog}
+        style={{ width: '750px', maxHeight: '90vh' }}
+        onHide={() => setShowBatchDialog(false)}
+      >
+        <div className="p-fluid">
+          {/* Выбор инструментов */}
+          <div className="p-field mb-3">
+            <label>Instruments</label>
+            <div className="p-inputgroup">
+              <InputText value={`${batchInstruments.length} selected`} readOnly className="p-inputtext-sm" />
+              <Button icon="pi pi-search" onClick={() => setShowInstrumentDialog(true)} className="p-button-secondary p-button-sm" />
+            </div>
+            {batchInstruments.length > 0 && (
+              <small className="mt-1" style={{ color: '#888' }}>
+                {batchInstruments.map(uid => {
+                  const inst = availableInstruments.find(i => i.uid === uid);
+                  return inst ? inst.ticker || inst.name : uid;
+                }).join(', ')}
+              </small>
+            )}
+          </div>
 
-      {/* Диалог выбора инструментов */}
-      <Dialog header="Select Instruments" visible={showDialog} style={{ width: '450px' }} onHide={() => setShowDialog(false)}>
-        <InputText placeholder="Filter..." value={filterText} onChange={e => setFilterText(e.target.value)} className="p-mb-2" />
-        <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-          {filtered.map(inst => (
-            <div key={inst.uid} className="p-field-checkbox p-mb-1">
-              <Checkbox
-                inputId={`inst-${inst.uid}`}
-                checked={tempSelected.includes(inst.uid)}
-                onChange={() => toggleInstrument(inst.uid)}
+          {/* Версия */}
+          <div className="p-field mb-3">
+            <label>Batch Version</label>
+            <Dropdown
+              value={batchVersion}
+              options={['v1', 'v2']}
+              onChange={e => setBatchVersion(e.value)}
+              className="p-inputtext-sm"
+            />
+          </div>
+
+          {/* Strategy */}
+          <div className="p-field mb-3">
+            <label>Strategy</label>
+            <Dropdown
+              value={batchParams.strategyType}
+              options={[
+                'volume_accumulation', 'trend', 'trend_pro', 'poc_pullback',
+                'daily_va_return', 'fvg_volume', 'rejection', 'initial_balance',
+                'va_breakout_retest', 'sfp', 'anchored_vwap', 'absorption', 'exhaustion',
+              ]}
+              onChange={e => setBatchParams({ ...batchParams, strategyType: e.value })}
+              className="p-inputtext-sm"
+            />
+          </div>
+
+          {/* Interval */}
+          <div className="p-field mb-3">
+            <label>Interval</label>
+            <Dropdown
+              value={batchParams.interval}
+              options={[
+                { label: '1 min', value: 'CANDLE_INTERVAL_1_MIN' },
+                { label: '5 min', value: 'CANDLE_INTERVAL_5_MIN' },
+                { label: '1 hour', value: 'CANDLE_INTERVAL_HOUR' },
+              ]}
+              onChange={e => setBatchParams({ ...batchParams, interval: e.value })}
+              className="p-inputtext-sm"
+            />
+          </div>
+
+          {/* Size & Risk */}
+          <div className="p-field mb-3">
+            <label>Position Sizing</label>
+            <div className="flex align-items-center gap-2">
+              <Dropdown
+                value={batchParams.positionSizing}
+                options={['fixed', 'dynamic']}
+                onChange={e => setBatchParams({ ...batchParams, positionSizing: e.value })}
+                className="p-inputtext-sm"
+                style={{ width: '120px' }}
               />
-              <label htmlFor={`inst-${inst.uid}`}>{inst.name} ({inst.ticker})</label>
+              {batchParams.positionSizing === 'dynamic' && (
+                <>
+                  <label className="ml-2">Risk%:</label>
+                  <InputText
+                    value={batchParams.riskPercent.toString()}
+                    onChange={e => setBatchParams({ ...batchParams, riskPercent: Number(e.target.value) })}
+                    className="p-inputtext-sm"
+                    style={{ width: '100px' }}
+                  />
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Vol Filter */}
+          <div className="p-field mb-3">
+            <div className="flex align-items-center gap-2">
+              <Checkbox
+                checked={batchParams.volumeFilterEnabled}
+                onChange={e => setBatchParams({ ...batchParams, volumeFilterEnabled: e.checked ?? false })}
+              />
+              <label>Volume Filter</label>
+              {batchParams.volumeFilterEnabled && (
+                <InputText
+                  value={batchParams.volumeFilterPeriod.toString()}
+                  onChange={e => setBatchParams({ ...batchParams, volumeFilterPeriod: Number(e.target.value) })}
+                  placeholder="Period"
+                  className="p-inputtext-sm"
+                  style={{ width: '100px' }}
+                />
+              )}
+            </div>
+          </div>
+
+          {/* SL, TP, Trail, Lots */}
+          {['sl', 'tp', 'trail', 'lots'].map((type) => (
+            <div className="p-field mb-3" key={type}>
+              <label>{type.toUpperCase()} % (Lots for Lots)</label>
+              <div className="p-inputgroup">
+                <Dropdown
+                  value={(batchParams as any)[`${type}Mode`]}
+                  options={['manual', 'range']}
+                  onChange={e => setBatchParams({ ...batchParams, [`${type}Mode`]: e.value })}
+                  className="p-inputtext-sm"
+                  style={{ width: '110px' }}
+                />
+                {(batchParams as any)[`${type}Mode`] === 'manual' ? (
+                  <InputText
+                    value={(batchParams as any)[`${type}Values`]}
+                    onChange={e => setBatchParams({ ...batchParams, [`${type}Values`]: e.target.value })}
+                    className="p-inputtext-sm"
+                    placeholder={type === 'lots' ? '10' : '1,1.5,2'}
+                  />
+                ) : (
+                  <>
+                    <InputText
+                      value={(batchParams as any)[`${type}Min`].toString()}
+                      onChange={e => setBatchParams({ ...batchParams, [`${type}Min`]: Number(e.target.value) })}
+                      placeholder="Min"
+                      style={{ width: '70px' }}
+                      className="p-inputtext-sm"
+                    />
+                    <InputText
+                      value={(batchParams as any)[`${type}Max`].toString()}
+                      onChange={e => setBatchParams({ ...batchParams, [`${type}Max`]: Number(e.target.value) })}
+                      placeholder="Max"
+                      style={{ width: '70px' }}
+                      className="p-inputtext-sm"
+                    />
+                    <InputText
+                      value={(batchParams as any)[`${type}Step`].toString()}
+                      onChange={e => setBatchParams({ ...batchParams, [`${type}Step`]: Number(e.target.value) })}
+                      placeholder="Step"
+                      style={{ width: '70px' }}
+                      className="p-inputtext-sm"
+                    />
+                  </>
+                )}
+              </div>
             </div>
           ))}
         </div>
-        <div className="p-d-flex p-jc-end p-mt-2">
-          <Button label="Cancel" onClick={() => setShowDialog(false)} className="p-button-text p-mr-2" />
-          <Button label="Apply" onClick={() => {
-            setBatchInstruments(tempSelected);
-            setShowDialog(false);
-          }} />
-        </div>
       </Dialog>
 
-      {/* Таблица результатов */}
-      {batchResults.length > 0 && (
-        <div className="p-mt-3">
-          <Card subTitle="Results">
-            <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-              <table className="p-datatable-table" style={{ width: '100%', fontSize: '0.85rem' }}>
-                <thead>
-                  <tr>
-                    <th>Instrument</th><th>SL%</th><th>TP%</th><th>Trail%</th><th>Lots</th>
-                    <th>Sizing</th><th>Risk%</th><th>VolFilt</th><th>Period</th>
-                    <th>Signals</th><th>Trades</th><th>WinRate</th><th>Profit</th><th>MaxDD</th><th>Capital</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {batchResults.map((r, idx) => (
-                    <tr key={idx}>
-                      <td>{r.instrumentUid.slice(0,8)}</td>
-                      <td>{r.params.stopLossPercent}</td>
-                      <td>{r.params.takeProfitPercent}</td>
-                      <td>{r.params.trailingDistancePercent}</td>
-                      <td>{r.params.lots}</td>
-                      <td>{r.params.positionSizing}</td>
-                      <td>{r.params.riskPercent}</td>
-                      <td>{r.params.volumeFilterEnabled ? 'Y' : 'N'}</td>
-                      <td>{r.params.volumeFilterPeriod}</td>
-                      <td>{r.signals}</td>
-                      <td>{r.stats.totalTrades}</td>
-                      <td>{r.stats.winRate?.toFixed(1)}%</td>
-                      <td>{r.stats.totalProfit?.toFixed(2)}</td>
-                      <td>{r.stats.maxDrawdown?.toFixed(2)}</td>
-                      <td>{r.stats.initialCapital}→{r.stats.finalCapital?.toFixed(2)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Card>
+      {/* Диалог выбора инструментов */}
+      <Dialog
+        header="Выбор инструментов для Batch"
+        visible={showInstrumentDialog}
+        style={{ width: '450px', maxHeight: '600px' }}
+        onHide={() => setShowInstrumentDialog(false)}
+        footer={
+          <div className="p-d-flex p-jc-end p-gap-2">
+            <Button label="Отмена" onClick={() => setShowInstrumentDialog(false)} className="p-button-sm p-button-secondary" />
+            <Button label="Применить" onClick={() => {
+              setBatchInstruments(tempSelectedInstruments);
+              setShowInstrumentDialog(false);
+            }} className="p-button-sm" />
+          </div>
+        }
+      >
+        <div className="p-mb-2">
+          <InputText
+            placeholder="Поиск инструмента..."
+            value={instrumentFilter}
+            onChange={e => setInstrumentFilter(e.target.value)}
+            className="p-inputtext-sm"
+            style={{ width: '100%' }}
+          />
         </div>
-      )}
+        <div style={{ maxHeight: '350px', overflowY: 'auto', color: '#d1d4dc' }}>
+          {availableInstruments
+            .filter(inst => inst.name.toLowerCase().includes(instrumentFilter.toLowerCase()) || inst.ticker?.toLowerCase().includes(instrumentFilter.toLowerCase()))
+            .map(inst => (
+              <div key={inst.uid} className="p-field-checkbox p-mb-1">
+                <Checkbox
+                  inputId={`inst-${inst.uid}`}
+                  checked={tempSelectedInstruments.includes(inst.uid)}
+                  onChange={(e) => {
+                    if (e.checked) {
+                      setTempSelectedInstruments(prev => [...prev, inst.uid]);
+                    } else {
+                      setTempSelectedInstruments(prev => prev.filter(id => id !== inst.uid));
+                    }
+                  }}
+                  className='mr-1'
+                />
+                <label htmlFor={`inst-${inst.uid}`}>{inst.name} ({inst.ticker})</label>
+              </div>
+            ))}
+        </div>
+      </Dialog>
     </Card>
   );
 };
