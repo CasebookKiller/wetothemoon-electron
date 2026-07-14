@@ -21,7 +21,6 @@ import { InputNumber } from 'primereact/inputnumber';
 import { InputText } from 'primereact/inputtext';
 import { TabView, TabPanel } from 'primereact/tabview';
 import { Dialog } from 'primereact/dialog';
-import { ProgressBar } from 'primereact/progressbar';
 import { Signal } from '@/api/tbank/signalTypes';
 import { VolumeProfileLevels } from '@/main/services/volumeProfileEngine';
 import { VolumeProfileOverlay } from '@/components/TRADING_ASSISTANT/VolumeProfileOverlay/VolumeProfileOverlay';
@@ -29,13 +28,10 @@ import { PositionsOrdersTab } from '@/components/TRADING_ASSISTANT/PositionsOrde
 import { LogTab } from '@/components/TRADING_ASSISTANT/LogTab/LogTab';
 import { CandlestickChart } from '@/components/TRADING_ASSISTANT/CandlestickChart/CandlestickChart';
 import { AmChartsStockChart } from '@/components/TRADING_ASSISTANT/AmChartsStockChart/AmChartsStockChart';
-import { EquityChart } from '@/components/TRADING_ASSISTANT/EquityChart/EquityChart';
 import { TradesTab } from '@/components/TRADING_ASSISTANT/TradesTab/TradesTab';
 import { ScreenerTab } from '@/components/TRADING_ASSISTANT/ScreenerTab/ScreenerTab';
 import { CloudTab } from '@/components/TRADING_ASSISTANT/CloudTab/CloudTab';
 import { CloudFarmerTab } from '@/components/TRADING_ASSISTANT/CloudFarmerTab/CloudFarmerTab';
-import { Tag } from 'primereact/tag';
-
 import { Toast } from 'primereact/toast';
 import { AutoTraderTab } from '@/components/TRADING_ASSISTANT/AutoTraderTab/AutoTraderTab';
 import { SandboxTab } from '@/components/TRADING_ASSISTANT/SandboxTab/SandboxTab';
@@ -52,7 +48,6 @@ interface BatchResult {
   failed: number;
   results?: any[];
 }
-
 
 function quotationToNumber(q: any): number {
   if (!q) return 0;
@@ -101,7 +96,7 @@ function aggregateCandles(
 
 export const TradingAssistantPage: React.FC = () => {
   // ========== СОСТОЯНИЯ ==========
-  // Песочница
+  // Песочница (старая)
   const [sandbox, setSandbox] = useState({
     token: import.meta.env.VITE_TSandBox || '',
     accountId: '',
@@ -117,7 +112,7 @@ export const TradingAssistantPage: React.FC = () => {
     takeProfitPercent: 2,
     trailingEnabled: false,
     trailingPercent: 1,
-    trailingMode: 'percent' as 'percent' | 'volatility',   // <-- добавить
+    trailingMode: 'percent' as 'percent' | 'volatility',
     dailyLossEnabled: false,
     dailyLossLimit: 0,
     maxSignalsPerDay: 0,
@@ -163,9 +158,7 @@ export const TradingAssistantPage: React.FC = () => {
   const [backtestProfile, setBacktestProfile] = useState<any>(null);
   const [showBacktestAdvanced, setShowBacktestAdvanced] = useState(false);
 
-  const [showAdvanced, setShowAdvanced] = useState(false);
-
-  // Batch (пока упрощённо)
+  // Batch
   const [batchParams, setBatchParams] = useState({
     slValues: '1,1.5,2',
     tpValues: '2,3,4',
@@ -197,7 +190,7 @@ export const TradingAssistantPage: React.FC = () => {
     loading: false,
     result: null as any,
     trades: [] as any[],
-    interval: 'CANDLE_INTERVAL_1_MIN', // новое поле    
+    interval: 'CANDLE_INTERVAL_1_MIN',
   });
   const [batchInstruments, setBatchInstruments] = useState<string[]>([]);
   const [batchResults, setBatchResults] = useState<any[]>([]);
@@ -208,7 +201,7 @@ export const TradingAssistantPage: React.FC = () => {
   const [showBatchDialog, setShowBatchDialog] = useState(false);
   const [viewMode, setViewMode] = useState<'live' | 'backtest'>('live');
 
-  // Профиль и сигналы (пустые, будут наполняться позже)
+  // Профиль и сигналы
   const [profile, setProfile] = useState<any>(null);
   const [profileType, setProfileType] = useState<'side' | 'overlay'>('side');
   const [liveSignals, setLiveSignals] = useState<any[]>([]);
@@ -219,9 +212,6 @@ export const TradingAssistantPage: React.FC = () => {
 
   const [farmerInstruments, setFarmerInstruments] = useState<string[]>([]);
 
-  // Активная вкладка
-  const [activeTab, setActiveTab] = useState('sandbox');
-  
   const [candlesData, setCandlesData] = useState<any[]>([]);
   const [priceRange, setPriceRange] = useState({ min: 0, max: 0 });
 
@@ -230,95 +220,22 @@ export const TradingAssistantPage: React.FC = () => {
   const [tempSelectedInstruments, setTempSelectedInstruments] = useState<string[]>([]);
 
   const [positionMarkers, setPositionMarkers] = useState<any[]>([]);
-  
   const [chartLibrary, setChartLibrary] = useState<'lightweight' | 'chartjs' | 'amcharts'>('lightweight');
-
   const [compactMode, setCompactMode] = useState(false);
-
   const [farmerBatches, setFarmerBatches] = useState<BatchResult[]>([]);
-
   const [screenerResults, setScreenerResults] = useState<any[]>([]);
-
-  const [activeAutoTraders, setActiveAutoTraders] = useState<string[]>([]);
-
-  const [autoTraderLog, setAutoTraderLog] = useState<Array<{ time: string; text: string; type: 'signal' | 'order' | 'error' }>>([]);
-
   const [isWeekendMode, setIsWeekendMode] = useState(false);
 
-  const [orderFlowData, setOrderFlowData] = useState<{ delta: number; absorption: any; exhaustion: any } | null>(null);
-
-  const [manualOrder, setManualOrder] = useState({
-    instrumentUid: selectedInstrument,
-    type: 'BUY' as 'BUY' | 'SELL',
-    quantity: 1,
-    orderType: 'market' as 'market' | 'limit',
-    price: 0,
-  });
-
-  useEffect(() => {
-    if (!selectedInstrument) return;
-    const api = (window as any).electronAPI;
-    if (!api?.getOrderFlowSnapshot) return;
-
-    const interval = setInterval(async () => {
-      const data = await api.getOrderFlowSnapshot(selectedInstrument);
-      setOrderFlowData(data);
-    }, 2000);
-
-    return () => clearInterval(interval);
-  }, [selectedInstrument]);
-
-  useEffect(() => {
-    const api = (window as any).electronAPI;
-    if (!api) return;
-
-    api.onAutoTraderSignal((data: any) => {
-      console.log('[UI] Получен signal в рендерере:', data);
-      setAutoTraderLog(prev => [...prev.slice(-19), {
-        time: new Date().toLocaleTimeString(),
-        text: `${data.instrumentUid.slice(0,8)}: ${data.signal.type} @ ${data.signal.price?.toFixed(2)} - ${data.signal.message || ''}`,
-        type: 'signal'
-      }]);
-    });
-    api.onAutoTraderOrderSent((data: any) => {
-      setAutoTraderLog(prev => [...prev.slice(-19), {
-        time: new Date().toLocaleTimeString(),
-        text: `Order sent: ${data.signal.type} ${data.signal.price}`,
-        type: 'order'
-      }]);
-    });
-    api.onAutoTraderOrderError((data: any) => {
-      setAutoTraderLog(prev => [...prev.slice(-19), {
-        time: new Date().toLocaleTimeString(),
-        text: `Order error: ${data.error}`,
-        type: 'error'
-      }]);
-    });
-
-    return () => {
-      api.removeAutoTraderListeners();
-    };
-  }, []);
-
+  // Toast и IPC‑ошибки
   const toast = useRef<Toast>(null);
-
   useEffect(() => {
     const api = (window as any).electronAPI;
     if (!api?.onApiError) return;
-
     const handler = (data: any) => {
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Ошибка API',
-        detail: data.message,
-        life: 5000,
-      });
+      toast.current?.show({ severity: 'error', summary: 'Ошибка API', detail: data.message, life: 5000 });
     };
-
     api.onApiError(handler);
-    return () => {
-      api.removeApiErrorListener?.();
-    };
+    return () => { api.removeApiErrorListener?.(); };
   }, []);
 
   // ========== REFS ДЛЯ ГРАФИКА ==========
@@ -330,9 +247,7 @@ export const TradingAssistantPage: React.FC = () => {
   const exitMarkersRef = useRef<any[]>([]);
   const positionMarkersRef = useRef<ISeriesApi<'Line'> | null>(null);
 
-  // ========== ФУНКЦИИ ==========
-
-  // --- Общие хелперы ---
+  // ========== ХЕЛПЕРЫ ==========
   const updateSandbox = (patch: Partial<typeof sandbox>) => setSandbox(prev => ({ ...prev, ...patch }));
   const updateStream = (patch: Partial<typeof stream>) => setStream(prev => ({ ...prev, ...patch }));
   const updateBacktest = (patch: Partial<typeof backtest>) => setBacktest(prev => ({ ...prev, ...patch }));
@@ -345,14 +260,11 @@ export const TradingAssistantPage: React.FC = () => {
     try {
       const list = await api.getAllInstruments(stream.token);
       setAvailableInstruments(list);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setInstrumentsLoading(false);
-    }
+    } catch (e) { console.error(e); }
+    finally { setInstrumentsLoading(false); }
   };
 
-  // --- Sandbox ---
+  // --- Старая песочница (функции) ---
   const loadAccounts = async () => {
     const api = (window as any).electronAPI;
     if (!api?.getSandboxAccounts) return;
@@ -362,7 +274,6 @@ export const TradingAssistantPage: React.FC = () => {
       updateSandbox({ accounts: list, loadingAccounts: false });
       if (list.length === 1) updateSandbox({ accountId: list[0].id });
     } catch (err: any) {
-      console.error(err);
       alert('Ошибка загрузки счетов: ' + (err.message || 'Неизвестная ошибка'));
       updateSandbox({ accounts: [], loadingAccounts: false });
     }
@@ -374,49 +285,30 @@ export const TradingAssistantPage: React.FC = () => {
     updateSandbox({ creatingAccount: true });
     try {
       const result = await api.createSandboxAccount();
-      if (result.success) {
-        updateSandbox({ accountId: result.accountId });
-        alert(`Счёт создан: ${result.accountId}`);
-        await loadAccounts();
-      } else {
-        alert('Ошибка создания счёта: ' + result.error);
-      }
-    } catch (err: any) {
-      alert('Ошибка: ' + err.message);
-    } finally {
-      updateSandbox({ creatingAccount: false });
-    }
+      if (result.success) { updateSandbox({ accountId: result.accountId }); alert(`Счёт создан: ${result.accountId}`); await loadAccounts(); }
+      else alert('Ошибка создания счёта: ' + result.error);
+    } catch (err: any) { alert('Ошибка: ' + err.message); }
+    finally { updateSandbox({ creatingAccount: false }); }
   };
 
   const handleCloseAccount = async () => {
     if (!sandbox.accountId) return;
-    const confirmed = confirm(`Закрыть счёт ${sandbox.accountId}?`);
-    if (!confirmed) return;
+    if (!confirm(`Закрыть счёт ${sandbox.accountId}?`)) return;
     const api = (window as any).electronAPI;
     if (!api?.closeSandboxAccount) return;
     try {
       const result = await api.closeSandboxAccount(sandbox.accountId);
-      if (result.success) {
-        alert('Счёт закрыт');
-        updateSandbox({ accountId: '' });
-        await loadAccounts();
-      } else {
-        alert('Ошибка: ' + result.error);
-      }
-    } catch (err: any) {
-      alert('Ошибка: ' + err.message);
-    }
+      if (result.success) { alert('Счёт закрыт'); updateSandbox({ accountId: '' }); await loadAccounts(); }
+      else alert('Ошибка: ' + result.error);
+    } catch (err: any) { alert('Ошибка: ' + err.message); }
   };
 
   const refreshBalance = async () => {
     const api = (window as any).electronAPI;
     if (!api?.getBalance || !sandbox.accountId) return;
     const result = await api.getBalance(sandbox.accountId);
-    if (result.success) {
-      updateSandbox({ balance: `Баланс: ${result.balance} ${result.currency}` });
-    } else {
-      updateSandbox({ balance: `Ошибка: ${result.error}` });
-    }
+    if (result.success) updateSandbox({ balance: `Баланс: ${result.balance} ${result.currency}` });
+    else updateSandbox({ balance: `Ошибка: ${result.error}` });
   };
 
   const handlePayIn = async () => {
@@ -424,34 +316,21 @@ export const TradingAssistantPage: React.FC = () => {
     if (!api?.payInSandbox) return;
     updateSandbox({ payMessage: '' });
     const result = await api.payInSandbox(sandbox.payAmount, sandbox.accountId);
-    if (result.success) {
-      updateSandbox({ payMessage: `Счёт пополнен. Баланс: ${JSON.stringify(result.balance)}` });
-      refreshBalance();
-    } else {
-      updateSandbox({ payMessage: `Ошибка: ${result.error}` });
-    }
+    if (result.success) { updateSandbox({ payMessage: `Счёт пополнен. Баланс: ${JSON.stringify(result.balance)}` }); refreshBalance(); }
+    else updateSandbox({ payMessage: `Ошибка: ${result.error}` });
   };
 
   const applyConfig = async () => {
     const api = (window as any).electronAPI;
     if (!api?.updateTradingConfig) return;
     await api.updateTradingConfig({
-      token: sandbox.token,
-      accountId: sandbox.accountId,
-      demoMode: sandbox.demoMode,
-      lotQuantity: sandbox.lotQty,
-      stopLossPercent: sandbox.stopLossPercent,
-      takeProfitPercent: sandbox.takeProfitPercent,
-      trailingEnabled: sandbox.trailingEnabled,
-      trailingPercent: sandbox.trailingPercent,
-      maxSignalsPerDay: sandbox.maxSignalsPerDay,
-      minIntervalMinutes: sandbox.minIntervalMinutes,
-      useDynamicSizing: sandbox.dynamicSizing,
-      riskAmount: sandbox.riskAmount,
-      atrPeriod: sandbox.atrPeriod,       // если используется ATR
-      atrMultiplier: sandbox.atrMultiplier,
-      trailingMode: sandbox.trailingMode,
-      stopMode: sandbox.stopMode,
+      token: sandbox.token, accountId: sandbox.accountId, demoMode: sandbox.demoMode,
+      lotQuantity: sandbox.lotQty, stopLossPercent: sandbox.stopLossPercent,
+      takeProfitPercent: sandbox.takeProfitPercent, trailingEnabled: sandbox.trailingEnabled,
+      trailingPercent: sandbox.trailingPercent, maxSignalsPerDay: sandbox.maxSignalsPerDay,
+      minIntervalMinutes: sandbox.minIntervalMinutes, useDynamicSizing: sandbox.dynamicSizing,
+      riskAmount: sandbox.riskAmount, atrPeriod: sandbox.atrPeriod, atrMultiplier: sandbox.atrMultiplier,
+      trailingMode: sandbox.trailingMode, stopMode: sandbox.stopMode,
     });
     alert('Config applied');
   };
@@ -464,109 +343,29 @@ export const TradingAssistantPage: React.FC = () => {
     setAutoTrading(newState);
   };
 
-  const startAutoTraderHandler = async () => {
-    const api = (window as any).electronAPI;
-    if (!api?.startAutoTrader) return;
-
-    // 1. Сначала применяем текущие настройки риск‑менеджмента
-    await api.updateTradingConfig({
-      token: sandbox.token,
-      accountId: sandbox.accountId,
-      demoMode: sandbox.demoMode,
-      lotQuantity: sandbox.lotQty,
-      stopLossPercent: sandbox.stopLossPercent,
-      takeProfitPercent: sandbox.takeProfitPercent,
-      trailingEnabled: sandbox.trailingEnabled,
-      trailingPercent: sandbox.trailingPercent,
-      trailingMode: sandbox.trailingMode,
-      useDynamicSizing: sandbox.dynamicSizing,
-      riskAmount: sandbox.riskAmount,
-      atrPeriod: sandbox.atrPeriod,
-      atrMultiplier: sandbox.atrMultiplier,
-      stopMode: sandbox.stopMode,
-    });
-
-    // 2. Запускаем автотрейдер
-    await api.startAutoTrader(selectedInstrument);
-    const active = await api.getActiveAutoTraders();
-    setActiveAutoTraders(active);
-  };
-
-  const stopAutoTraderHandler = async () => {
-    const api = (window as any).electronAPI;
-    if (!api?.stopAutoTrader) return;
-    await api.stopAutoTrader(selectedInstrument);
-    const active = await api.getActiveAutoTraders();
-    setActiveAutoTraders(active);
-  };
-
-  const handleSendManualOrder = async () => {
-    const api = (window as any).electronAPI;
-    if (!api?.sendManualOrder) return;
-    const res = await api.sendManualOrder(manualOrder);
-    if (res.success) {
-      alert('Ордер отправлен');
-    } else {
-      alert('Ошибка: ' + res.error);
-    }
-  };
-
   // --- Stream ---
-  useEffect(() => {
-    const fetchActive = async () => {
-      const api = (window as any).electronAPI;
-      if (api?.getActiveAutoTraders) {
-        const active = await api.getActiveAutoTraders();
-        setActiveAutoTraders(active);
-      }
-    };
-    fetchActive();
-  }, []);
-
   const startStream = async () => {
     const api = (window as any).electronAPI;
     if (!api?.startMarketStream || !api?.getTodayCandles || !api?.loadHistoricalProfile) return;
-
     try {
-      // 1. Загружаем исторические свечи за сегодня
-      const historical = await api.getTodayCandles(
-        selectedInstrument,
-        stream.token,
-        '1min'
-      );
-
+      const historical = await api.getTodayCandles(selectedInstrument, stream.token, '1min');
       if (historical && historical.length > 0) {
-        // Форматируем для графика
         const formatted = historical.map((c: any) => ({
           time: (Math.floor(new Date(c.time).getTime() / 1000)) as UTCTimestamp,
-          open: quotationToNumber(c.open),
-          high: quotationToNumber(c.high),
-          low: quotationToNumber(c.low),
-          close: quotationToNumber(c.close),
+          open: quotationToNumber(c.open), high: quotationToNumber(c.high),
+          low: quotationToNumber(c.low), close: quotationToNumber(c.close),
         }));
         setCandlesData(formatted);
-
-        // Отправляем историю в движок профиля
         await api.loadHistoricalProfile(selectedInstrument, historical);
       }
-
-      // 2. Запускаем live-стрим
       await api.startMarketStream(stream.token, {
         subscribeCandlesRequest: {
           subscriptionAction: 'SUBSCRIPTION_ACTION_SUBSCRIBE',
-          instruments: [{
-            instrumentId: selectedInstrument,
-            interval: isWeekendMode
-              ? 'SUBSCRIPTION_INTERVAL_WEEKEND_ONE_MINUTE'
-              : 'SUBSCRIPTION_INTERVAL_ONE_MINUTE'
-          }]
+          instruments: [{ instrumentId: selectedInstrument, interval: isWeekendMode ? 'SUBSCRIPTION_INTERVAL_WEEKEND_ONE_MINUTE' : 'SUBSCRIPTION_INTERVAL_ONE_MINUTE' }]
         }
       }, 'chart');
       updateStream({ active: true });
-    } catch (err: any) {
-      console.error(err);
-      alert('Ошибка запуска стрима: ' + err.message);
-    }
+    } catch (err: any) { console.error(err); alert('Ошибка запуска стрима: ' + err.message); }
   };
 
   const stopStream = async () => {
@@ -583,44 +382,25 @@ export const TradingAssistantPage: React.FC = () => {
     const api = (window as any).electronAPI;
     if (!api?.runBacktest) return;
     const token = import.meta.env.VITE_TReadOnly;
-    const result = await api.runBacktest(
-      selectedInstrument,
-      backtest.dateFrom,
-      backtest.dateTo,
-      backtest.interval,
-      token,
-      {
-        valueAreaPercent: backtest.valueAreaPercent,
-        profileResolution: backtest.profileResolution,
-        strategyType: backtest.strategyType,
-        stopLossPercent: backtest.stopLossPercent,
-        takeProfitPercent: backtest.takeProfitPercent,
-        trailingDistancePercent: backtest.trailingDistancePercent,
-        lots: backtest.lots,
-        positionSizing: backtest.positionSizing,
-        riskPercent: backtest.riskPercent,
-        volumeFilterEnabled: backtest.volumeFilterEnabled,
-        volumeFilterPeriod: backtest.volumeFilterPeriod,
-      }
-    );
+    const result = await api.runBacktest(selectedInstrument, backtest.dateFrom, backtest.dateTo, backtest.interval, token, {
+      valueAreaPercent: backtest.valueAreaPercent, profileResolution: backtest.profileResolution,
+      strategyType: backtest.strategyType, stopLossPercent: backtest.stopLossPercent,
+      takeProfitPercent: backtest.takeProfitPercent, trailingDistancePercent: backtest.trailingDistancePercent,
+      lots: backtest.lots, positionSizing: backtest.positionSizing, riskPercent: backtest.riskPercent,
+      volumeFilterEnabled: backtest.volumeFilterEnabled, volumeFilterPeriod: backtest.volumeFilterPeriod,
+    });
     if (result) {
       if (result.candles?.length) {
         const formatted = result.candles.map((c: any) => ({
           time: (Math.floor(new Date(c.time).getTime() / 1000)) as UTCTimestamp,
-          open: quotationToNumber(c.open),
-          high: quotationToNumber(c.high),
-          low: quotationToNumber(c.low),
-          close: quotationToNumber(c.close),
+          open: quotationToNumber(c.open), high: quotationToNumber(c.high),
+          low: quotationToNumber(c.low), close: quotationToNumber(c.close),
         }));
-        // Удаляем дубликаты по времени (lightweight‑charts требует уникальное время)
-        const uniqueFormatted = formatted.filter((c: any, i: number, arr: any[]) =>
-          i === 0 || c.time !== arr[i - 1].time
-        );
-        setBacktestCandlesData(uniqueFormatted);   // ← бэктест-свечи
+        const uniqueFormatted = formatted.filter((c: any, i: number, arr: any[]) => i === 0 || c.time !== arr[i - 1].time);
+        setBacktestCandlesData(uniqueFormatted);
       }
-      setBacktestProfile(result.profile);    // ← бэктест-профиль
+      setBacktestProfile(result.profile);
       updateBacktest({ signals: result.signals, result, trades: result.trades || [] });
-      // Автоматически переключаемся в режим Backtest после прогона
       setViewMode('backtest');
     }
     updateBacktest({ loading: false });
@@ -633,81 +413,53 @@ export const TradingAssistantPage: React.FC = () => {
     alert('Сигналы отправлены в OrderManager');
   };
 
-  // --- Эффекты (жизненные циклы) ---
-  useEffect(() => {
-    if (sandbox.token) loadAccounts();
-  }, [sandbox.token]);
-
-  useEffect(() => {
-    if (sandbox.accountId) refreshBalance();
-  }, [sandbox.accountId]);
-
-  useEffect(() => {
-    if (stream.token) loadAllInstruments();
-  }, [stream.token]);
+  // --- Эффекты ---
+  useEffect(() => { if (sandbox.token) loadAccounts(); }, [sandbox.token]);
+  useEffect(() => { if (sandbox.accountId) refreshBalance(); }, [sandbox.accountId]);
+  useEffect(() => { if (stream.token) loadAllInstruments(); }, [stream.token]);
 
   useEffect(() => {
     const api = (window as any).electronAPI;
     if (!api?.onCandle) return;
-
     const handleCandle = (streamCandle: any) => {
       let timestampMs: number;
       if (typeof streamCandle.time === 'object' && streamCandle.time.seconds) {
         timestampMs = Number(streamCandle.time.seconds) * 1000 + (streamCandle.time.nanos || 0) / 1e6;
-      } else {
-        timestampMs = new Date(streamCandle.time).getTime();
-      }
+      } else { timestampMs = new Date(streamCandle.time).getTime(); }
       if (isNaN(timestampMs)) return;
-
       const newCandle = {
         time: Math.floor(timestampMs / 1000) as UTCTimestamp,
-        open: quotationToNumber(streamCandle.open),
-        high: quotationToNumber(streamCandle.high),
-        low: quotationToNumber(streamCandle.low),
-        close: quotationToNumber(streamCandle.close),
+        open: quotationToNumber(streamCandle.open), high: quotationToNumber(streamCandle.high),
+        low: quotationToNumber(streamCandle.low), close: quotationToNumber(streamCandle.close),
       };
-
       setCandlesData(prev => {
         if (prev.some(c => c.time === newCandle.time)) return prev;
         const updated = [...prev, newCandle].sort((a, b) => a.time - b.time);
         return updated.slice(-500);
       });
     };
-
     api.onCandle(handleCandle);
     return () => { api.removeCandleListener(); };
   }, []);
 
-  // Запрос позиций каждые 15 секунд (только в live-режиме)
+  // Запрос позиций каждые 15 секунд (live)
   useEffect(() => {
     if (viewMode !== 'live' || !sandbox.accountId) return;
-
     const api = (window as any).electronAPI;
     if (!api?.getPositions) return;
-
     const fetchPositions = async () => {
       const data = await api.getPositions(sandbox.accountId);
       const markers: SeriesMarker<Time>[] = [];
       const now = Math.floor(Date.now() / 1000) as Time;
-
-      // Добавляем маркеры для ценных бумаг
       (data?.securities || []).forEach((pos: any) => {
         if (pos.instrumentUid && pos.averagePositionPrice) {
           const entryPrice = Number(pos.averagePositionPrice.units) + Number(pos.averagePositionPrice.nano) / 1e9;
-          const isLong = (pos.quantity?.units || '0') >= '0'; // примерное определение
-          markers.push({
-            time: now,
-            position: isLong ? 'belowBar' : 'aboveBar',
-            color: isLong ? '#4caf50' : '#f44336',
-            shape: isLong ? 'arrowUp' : 'arrowDown',
-            text: `${isLong ? 'LONG' : 'SHORT'} @ ${entryPrice.toFixed(2)}`,
-          });
+          const isLong = (pos.quantity?.units || '0') >= '0';
+          markers.push({ time: now, position: isLong ? 'belowBar' : 'aboveBar', color: isLong ? '#4caf50' : '#f44336', shape: isLong ? 'arrowUp' : 'arrowDown', text: `${isLong ? 'LONG' : 'SHORT'} @ ${entryPrice.toFixed(2)}` });
         }
       });
-
       setPositionMarkers(markers);
     };
-
     fetchPositions();
     const interval = setInterval(fetchPositions, 15_000);
     return () => clearInterval(interval);
@@ -716,29 +468,18 @@ export const TradingAssistantPage: React.FC = () => {
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart) return;
-
-    if (positionMarkersRef.current) {
-      chart.removeSeries(positionMarkersRef.current);
-    }
-
+    if (positionMarkersRef.current) { chart.removeSeries(positionMarkersRef.current); }
     if (!positionMarkers.length) return;
-
-    const series = chart.addSeries(LineSeries, {
-      lineVisible: false,
-      lastValueVisible: false,
-    });
-
+    const series = chart.addSeries(LineSeries, { lineVisible: false, lastValueVisible: false });
     createSeriesMarkers(series, positionMarkers);
     positionMarkersRef.current = series;
   }, [positionMarkers]);
-  
+
   // ========== BATCH FUNCTIONS ==========
   function generateValuesFromRange(min: number, max: number, step: number): number[] {
     const values: number[] = [];
     if (step <= 0) return [min];
-    for (let v = min; v <= max + 0.0001; v += step) {
-      values.push(Math.round(v * 100) / 100);
-    }
+    for (let v = min; v <= max + 0.0001; v += step) values.push(Math.round(v * 100) / 100);
     return values;
   }
 
@@ -747,86 +488,32 @@ export const TradingAssistantPage: React.FC = () => {
     const tpValues = batchParams.tpValues.split(',').map(Number);
     const trailValues = batchParams.trailValues.split(',').map(Number);
     const lotsValues = batchParams.lotsValues.split(',').map(Number);
-
     const paramSets: any[] = [];
-    for (const sl of slValues) {
-      for (const tp of tpValues) {
-        for (const trail of trailValues) {
-          for (const lots of lotsValues) {
-            paramSets.push({
-              stopLossPercent: sl,
-              takeProfitPercent: tp,
-              trailingDistancePercent: trail,
-              lots,
-              positionSizing: batchParams.positionSizing,
-              riskPercent: batchParams.riskPercent,
-              volumeFilterEnabled: batchParams.volumeFilterEnabled,
-              volumeFilterPeriod: batchParams.volumeFilterPeriod,
-            });
-          }
-        }
-      }
-    }
+    for (const sl of slValues) for (const tp of tpValues) for (const trail of trailValues) for (const lots of lotsValues)
+      paramSets.push({ stopLossPercent: sl, takeProfitPercent: tp, trailingDistancePercent: trail, lots, positionSizing: batchParams.positionSizing, riskPercent: batchParams.riskPercent, volumeFilterEnabled: batchParams.volumeFilterEnabled, volumeFilterPeriod: batchParams.volumeFilterPeriod });
     return paramSets;
   };
 
   const runBatch = () => {
     const api = (window as any).electronAPI;
     if (!api?.batchBacktest || !api?.batchV2) return;
-
-    setBatchRunning(true);
-    setBatchResults([]);
-    setBatchProgress({ completed: 0, total: 0 });
-
+    setBatchRunning(true); setBatchResults([]); setBatchProgress({ completed: 0, total: 0 });
     api.removeBatchListeners();
-    api.onBatchProgress((data: any) => {
-      if (data.item) {
-        setBatchResults(prev => [...prev, data.item]);
-      }
-      setBatchProgress({ completed: data.completed, total: data.total });
-    });
-    api.onBatchComplete(() => {
-      setBatchProgress(null);
-      setBatchRunning(false);
-    });
-
+    api.onBatchProgress((data: any) => { if (data.item) setBatchResults(prev => [...prev, data.item]); setBatchProgress({ completed: data.completed, total: data.total }); });
+    api.onBatchComplete(() => { setBatchProgress(null); setBatchRunning(false); });
     const paramSets = generateParamSets();
-    const uniqueParamSets = paramSets.filter((set, index, self) =>
-      index === self.findIndex(s =>
-        s.stopLossPercent === set.stopLossPercent &&
-        s.takeProfitPercent === set.takeProfitPercent &&
-        s.trailingDistancePercent === set.trailingDistancePercent &&
-        s.lots === set.lots &&
-        s.positionSizing === set.positionSizing &&
-        s.riskPercent === set.riskPercent &&
-        s.volumeFilterEnabled === set.volumeFilterEnabled &&
-        s.volumeFilterPeriod === set.volumeFilterPeriod
-      )
-    );
-
-    // Выбор версии API
+    const uniqueParamSets = paramSets.filter((set, index, self) => index === self.findIndex(s => s.stopLossPercent === set.stopLossPercent && s.takeProfitPercent === set.takeProfitPercent && s.trailingDistancePercent === set.trailingDistancePercent && s.lots === set.lots && s.positionSizing === set.positionSizing && s.riskPercent === set.riskPercent && s.volumeFilterEnabled === set.volumeFilterEnabled && s.volumeFilterPeriod === set.volumeFilterPeriod));
     const batchMethod = batchVersion === 'v1' ? api.batchBacktest : api.batchV2;
-
-    batchMethod(
-      batchInstruments,
-      backtest.dateFrom,
-      backtest.dateTo,
-      batchParams.interval,
-      stream.token,
-      uniqueParamSets,
-      batchParams.strategyType,
-      backtest.profileResolution,
-      backtest.valueAreaPercent
-    );
+    batchMethod(batchInstruments, backtest.dateFrom, backtest.dateTo, batchParams.interval, stream.token, uniqueParamSets, batchParams.strategyType, backtest.profileResolution, backtest.valueAreaPercent);
   };
 
   const stopBatch = async () => {
     setBatchStopping(true);
     const api = (window as any).electronAPI;
     await api.stopBatch();
-    api.removeBatchListeners();        // ← убираем старые подписки
+    api.removeBatchListeners();
     setBatchRunning(false);
-    setBatchProgress(null);            // ← скрываем прогресс-бар
+    setBatchProgress(null);
     setBatchStopping(false);
   };
 
@@ -836,14 +523,9 @@ export const TradingAssistantPage: React.FC = () => {
       const s = r.stats;
       return `${r.instrumentUid},${r.params.stopLossPercent},${r.params.takeProfitPercent},${r.params.trailingDistancePercent},${r.params.lots},${r.params.positionSizing},${r.params.riskPercent},${r.params.volumeFilterEnabled},${r.params.volumeFilterPeriod},${r.signals},${s.totalTrades},${s.winRate?.toFixed(1)}%,${s.totalProfit?.toFixed(2)},${s.maxDrawdown?.toFixed(2)},${s.initialCapital}→${s.finalCapital?.toFixed(2)}`;
     }).join('\n');
-
     const blob = new Blob([header + '\n' + rows], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'batch_results.csv';
-    a.click();
-    URL.revokeObjectURL(url);
+    const a = document.createElement('a'); a.href = url; a.download = 'batch_results.csv'; a.click(); URL.revokeObjectURL(url);
   };
 
   const currentCandles = viewMode === 'live' ? candlesData : backtestCandlesData;
@@ -854,77 +536,33 @@ export const TradingAssistantPage: React.FC = () => {
   // ========== ЭФФЕКТЫ ГРАФИКА ==========
   useEffect(() => {
     if (!chartContainerRef.current) return;
-
-    const containerHeight = compactMode ? window.innerHeight - 60 : 400; // 60px – высота верхней панели
+    const containerHeight = compactMode ? window.innerHeight - 60 : 400;
     const chart = createChart(chartContainerRef.current, {
-      width: chartContainerRef.current.clientWidth,
-      height: containerHeight,
-      layout: {
-        background: { type: ColorType.Solid, color: '#1e1e1e' },
-        textColor: '#d1d4dc',
-      },
-      grid: {
-        vertLines: { color: '#2a2e39' },
-        horzLines: { color: '#2a2e39' },
-      },
+      width: chartContainerRef.current.clientWidth, height: containerHeight,
+      layout: { background: { type: ColorType.Solid, color: '#1e1e1e' }, textColor: '#d1d4dc' },
+      grid: { vertLines: { color: '#2a2e39' }, horzLines: { color: '#2a2e39' } },
       timeScale: { timeVisible: true, borderColor: '#2a2e39' },
       rightPriceScale: { borderColor: '#2a2e39' },
     });
-
     chartRef.current = chart;
-
-    // Подписка на изменение видимого диапазона цен (для гистограммы)
     const timeScale = chart.timeScale();
     const priceScale = chart.priceScale('right');
-    const updatePriceRange = () => {
-      const range = priceScale.getVisibleRange();
-      if (range) setPriceRange({ min: range.from, max: range.to });
-    };
+    const updatePriceRange = () => { const range = priceScale.getVisibleRange(); if (range) setPriceRange({ min: range.from, max: range.to }); };
     timeScale.subscribeVisibleTimeRangeChange(updatePriceRange);
-    updatePriceRange(); // начальное значение
-
-    const resizeObserver = new ResizeObserver(entries => {
-      for (const entry of entries) {
-        const { width, height } = entry.contentRect;
-        chart.resize(width, height);
-      }
-    });
+    updatePriceRange();
+    const resizeObserver = new ResizeObserver(entries => { for (const entry of entries) { const { width, height } = entry.contentRect; chart.resize(width, height); } });
     resizeObserver.observe(chartContainerRef.current);
-
-    return () => {
-      timeScale.unsubscribeVisibleTimeRangeChange(updatePriceRange);
-      resizeObserver.disconnect();
-      chart.remove();
-      chartRef.current = null;
-    };
+    return () => { timeScale.unsubscribeVisibleTimeRangeChange(updatePriceRange); resizeObserver.disconnect(); chart.remove(); chartRef.current = null; };
   }, []);
 
   // Отображение свечей
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart || !currentCandles.length) return;
-
-    if (candleSeriesRef.current) {
-      chart.removeSeries(candleSeriesRef.current);
-    }
-
+    if (candleSeriesRef.current) chart.removeSeries(candleSeriesRef.current);
     const aggregated = aggregateCandles(currentCandles, stream.displayTimeframe);
-
-    // Удаляем дубликаты по времени (lightweight‑charts требует строго возрастающее уникальное время)
-    const uniqueAggregated = aggregated.filter((c, i, arr) => i === 0 || c.time !== arr[i - 1].time);
-    // Дополнительная сортировка на всякий случай
-    uniqueAggregated.sort((a, b) => a.time - b.time);
-
-    const candleSeries = chart.addSeries(CandlestickSeries, {
-      upColor: '#26a69a',
-      downColor: '#ef5350',
-      borderUpColor: '#26a69a',
-      borderDownColor: '#ef5350',
-      wickUpColor: '#26a69a',
-      wickDownColor: '#ef5350',
-      priceLineVisible: true,
-      lastValueVisible: true,
-    });
+    const uniqueAggregated = aggregated.filter((c, i, arr) => i === 0 || c.time !== arr[i - 1].time).sort((a, b) => a.time - b.time);
+    const candleSeries = chart.addSeries(CandlestickSeries, { upColor: '#26a69a', downColor: '#ef5350', borderUpColor: '#26a69a', borderDownColor: '#ef5350', wickUpColor: '#26a69a', wickDownColor: '#ef5350', priceLineVisible: true, lastValueVisible: true });
     candleSeries.setData(uniqueAggregated);
     chart.timeScale().fitContent();
     candleSeriesRef.current = candleSeries;
@@ -934,31 +572,16 @@ export const TradingAssistantPage: React.FC = () => {
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart || !currentProfile || !currentCandles.length || currentCandles.length < 2) return;
-
-    [...levelSeriesRef.current, ...exitMarkersRef.current].forEach(series => {
-      try { chart.removeSeries(series); } catch {}
-    });
+    [...levelSeriesRef.current, ...exitMarkersRef.current].forEach(series => { try { chart.removeSeries(series); } catch {} });
     levelSeriesRef.current = [];
-
     const firstTime = currentCandles[0].time as UTCTimestamp;
     const lastTime = currentCandles[currentCandles.length - 1].time as UTCTimestamp;
-    if (typeof firstTime !== 'number' || typeof lastTime !== 'number') return;
-
-      // === ВОТ ЭТУ СТРОКУ ДОБАВЬТЕ ===
-    if (firstTime === lastTime) return;
-
+    if (typeof firstTime !== 'number' || typeof lastTime !== 'number' || firstTime === lastTime) return;
     const addHorizontalLine = (price: number, color: string, title: string, lineWidth = 2) => {
-      const series = chart.addSeries(LineSeries, {
-        color,
-        lineWidth: lineWidth as any,
-        title,
-        priceLineVisible: false,
-        lastValueVisible: false,
-      });
+      const series = chart.addSeries(LineSeries, { color, lineWidth: lineWidth as any, title, priceLineVisible: false, lastValueVisible: false });
       series.setData([{ time: firstTime, value: price }, { time: lastTime, value: price }]);
       levelSeriesRef.current.push(series);
     };
-
     addHorizontalLine(currentProfile.poc, 'red', 'POC', 3);
     addHorizontalLine(currentProfile.valueAreaHigh, 'green', 'VA High', 2);
     addHorizontalLine(currentProfile.valueAreaLow, 'green', 'VA Low', 2);
@@ -968,24 +591,9 @@ export const TradingAssistantPage: React.FC = () => {
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart || !currentSignals.length) return;
-
-    if (signalSeriesRef.current) {
-      chart.removeSeries(signalSeriesRef.current);
-    }
-
-    const signalSeries = chart.addSeries(LineSeries, {
-      lineVisible: false,
-      lastValueVisible: false,
-    });
-
-    const markers: SeriesMarker<Time>[] = currentSignals.map(sig => ({
-      time: (Math.floor(new Date(sig.time).getTime() / 1000)) as Time,
-      position: sig.type === 'BUY' ? 'belowBar' : 'aboveBar',
-      color: sig.type === 'BUY' ? 'green' : 'red',
-      shape: sig.type === 'BUY' ? 'arrowUp' : 'arrowDown',
-      text: sig.reason,
-    }));
-
+    if (signalSeriesRef.current) chart.removeSeries(signalSeriesRef.current);
+    const signalSeries = chart.addSeries(LineSeries, { lineVisible: false, lastValueVisible: false });
+    const markers: SeriesMarker<Time>[] = currentSignals.map(sig => ({ time: (Math.floor(new Date(sig.time).getTime() / 1000)) as Time, position: sig.type === 'BUY' ? 'belowBar' : 'aboveBar', color: sig.type === 'BUY' ? 'green' : 'red', shape: sig.type === 'BUY' ? 'arrowUp' : 'arrowDown', text: sig.reason }));
     createSeriesMarkers(signalSeries, markers);
     signalSeriesRef.current = signalSeries;
   }, [currentSignals]);
@@ -994,51 +602,18 @@ export const TradingAssistantPage: React.FC = () => {
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart || !currentTrades.length) return;
-
-    exitMarkersRef.current.forEach(series => {
-      try { chart.removeSeries(series); } catch {}
-    });
+    exitMarkersRef.current.forEach(series => { try { chart.removeSeries(series); } catch {} });
     exitMarkersRef.current = [];
-
-    const reasons = [
-      { key: 'TAKE_PROFIT', color: '#4caf50' },
-      { key: 'STOP_LOSS', color: '#f44336' },
-      { key: 'TRAILING_STOP', color: '#2196f3' },
-      { key: 'END_OF_DAY', color: '#ffeb3b' },
-      { key: 'SIGNAL', color: '#9e9e9e' },
-    ];
-
+    const reasons = [{ key: 'TAKE_PROFIT', color: '#4caf50' }, { key: 'STOP_LOSS', color: '#f44336' }, { key: 'TRAILING_STOP', color: '#2196f3' }, { key: 'END_OF_DAY', color: '#ffeb3b' }, { key: 'SIGNAL', color: '#9e9e9e' }];
     reasons.forEach(({ key, color }) => {
       const tradesOfReason = currentTrades.filter((t: any) => t.exitReason === key);
       if (tradesOfReason.length === 0) return;
-
-      const data = tradesOfReason
-        .map((trade: any) => {
-          const timestamp = new Date(trade.exitTime).getTime();
-          if (isNaN(timestamp)) return null; // отбрасываем невалидные даты
-          return {
-            time: Math.floor(timestamp / 1000) as Time,
-            value: trade.exitPrice,
-          };
-        })
-        .filter((d): d is { time: Time; value: number } => d !== null) // удаляем null
-        .filter((d, i, arr) => i === 0 || d.time !== arr[i - 1]?.time) // удаляем дубликаты
-        .sort((a, b) => Number(a.time) - Number(b.time));
-
+      const data = tradesOfReason.map((trade: any) => { const timestamp = new Date(trade.exitTime).getTime(); if (isNaN(timestamp)) return null; return { time: Math.floor(timestamp / 1000) as Time, value: trade.exitPrice }; }).filter((d): d is { time: Time; value: number } => d !== null).filter((d, i, arr) => i === 0 || d.time !== arr[i - 1]?.time).sort((a, b) => Number(a.time) - Number(b.time));
       if (data.length === 0) return;
-
-      const series = chart.addSeries(LineSeries, {
-        lineVisible: false,
-        lastValueVisible: false,
-        pointMarkersVisible: true,
-        pointMarkersRadius: 5,
-        color,
-      });
-
+      const series = chart.addSeries(LineSeries, { lineVisible: false, lastValueVisible: false, pointMarkersVisible: true, pointMarkersRadius: 5, color });
       series.setData(data);
       exitMarkersRef.current.push(series);
     });
-
     chart.timeScale().fitContent();
   }, [currentTrades]);
 
@@ -1046,118 +621,34 @@ export const TradingAssistantPage: React.FC = () => {
   useEffect(() => {
     const api = (window as any).electronAPI;
     if (!api) return;
-
     api.subscribeTradingAssistant();
-
-    const onProfile = (newProfile: VolumeProfileLevels) => {
-      //console.log('[Profile Update]', newProfile);                  // <-- лог
-      //console.log('[Profile volumeByPrice]', newProfile.volumeByPrice?.length); // <-- лог
-      if (newProfile.instrumentUid === selectedInstrument) {
-        setProfile(newProfile);
-      }
-    };
-    const onSignal = (signal: Signal) => {
-      if (signal.instrumentUid === selectedInstrument) {
-        setLiveSignals(prev => [...prev.slice(-50), signal]);
-      }
-    };
-
-    api.onProfileUpdate(onProfile);
-    api.onTradingSignal(onSignal);
-
-    return () => {
-      api.removeProfileUpdateListener();
-      api.removeTradingSignalListener();
-    };
+    const onProfile = (newProfile: VolumeProfileLevels) => { if (newProfile.instrumentUid === selectedInstrument) setProfile(newProfile); };
+    const onSignal = (signal: Signal) => { if (signal.instrumentUid === selectedInstrument) setLiveSignals(prev => [...prev.slice(-50), signal]); };
+    api.onProfileUpdate(onProfile); api.onTradingSignal(onSignal);
+    return () => { api.removeProfileUpdateListener(); api.removeTradingSignalListener(); };
   }, [selectedInstrument]);
 
+  // ========== RENDER ==========
   return (
     <div className="trading-assistant" style={{ padding: '5px', color: '#fff', background: '#1e1e1e' }}>
       <Toast ref={toast} />
-      {/* ВЕРХНЯЯ ПАНЕЛЬ (компактная) */}
+      {/* ВЕРХНЯЯ ПАНЕЛЬ */}
       <div className="flex align-items-center flex-wrap p-2 gap-2" style={{ background: '#1e1e1e', borderBottom: '1px solid #333' }}>
-        {/* Инструмент */}
         <label className="mr-1 mb-0">Instr</label>
-        <Dropdown
-          value={selectedInstrument}
-          options={availableInstruments.map(i => ({ label: `${i.name} (${i.ticker})`, value: i.uid }))}
-          onChange={e => setSelectedInstrument(e.value)}
-          placeholder="Select"
-          filter
-          className="p-inputtext-sm flex-1"
-          style={{ minWidth: '180px', maxWidth: '250px' }}
-        />
-        <Button
-          icon="pi pi-refresh"
-          onClick={loadAllInstruments}
-          disabled={instrumentsLoading}
-          className="p-button-sm p-button-secondary p-1 px-2"
-        />
-
-        {/* Токен (компактный) */}
-        <InputText
-          value={stream.token}
-          onChange={e => updateStream({ token: e.target.value })}
-          className="p-inputtext-sm"
-          placeholder="Token"
-          style={{ width: '120px' }}
-        />
-        {/* TF */}
-        <Dropdown
-          value={stream.displayTimeframe}
-          options={[{label:'1m',value:1},{label:'5m',value:5},{label:'15m',value:15},{label:'1h',value:60}]}
-          onChange={e => updateStream({ displayTimeframe: e.value })}
-          className="p-inputtext-sm"
-          style={{ width: '80px' }}
-        />
-        {/* Start/Stop */}
-        <Button
-          label="Start"
-          onClick={startStream}
-          disabled={stream.active}
-          className="p-button-sm border-round-sm p-1 px-2"
-        />
-        <Button
-          label="Stop"
-          onClick={stopStream}
-          disabled={!stream.active}
-          className="p-button-sm p-button-danger border-round-sm p-1 px-2"
-        />
-        <span style={{ color: stream.active ? '#4caf50' : '#d32f2f', minWidth: '60px', fontSize: '0.85rem' }}>
-          {stream.active ? '● Live' : '○ Stopped'}
-        </span>
-        
+        <Dropdown value={selectedInstrument} options={availableInstruments.map(i => ({ label: `${i.name} (${i.ticker})`, value: i.uid }))} onChange={e => setSelectedInstrument(e.value)} placeholder="Select" filter className="p-inputtext-sm flex-1" style={{ minWidth: '180px', maxWidth: '250px' }} />
+        <Button icon="pi pi-refresh" onClick={loadAllInstruments} disabled={instrumentsLoading} className="p-button-sm p-button-secondary p-1 px-2" />
+        <InputText value={stream.token} onChange={e => updateStream({ token: e.target.value })} className="p-inputtext-sm" placeholder="Token" style={{ width: '120px' }} />
+        <Dropdown value={stream.displayTimeframe} options={[{ label: '1m', value: 1 }, { label: '5m', value: 5 }, { label: '15m', value: 15 }, { label: '1h', value: 60 }]} onChange={e => updateStream({ displayTimeframe: e.value })} className="p-inputtext-sm" style={{ width: '80px' }} />
+        <Button label="Start" onClick={startStream} disabled={stream.active} className="p-button-sm border-round-sm p-1 px-2" />
+        <Button label="Stop" onClick={stopStream} disabled={!stream.active} className="p-button-sm p-button-danger border-round-sm p-1 px-2" />
+        <span style={{ color: stream.active ? '#4caf50' : '#d32f2f', minWidth: '60px', fontSize: '0.85rem' }}>{stream.active ? '● Live' : '○ Stopped'}</span>
         <Checkbox checked={isWeekendMode} onChange={e => setIsWeekendMode(e.checked as boolean)} />
         <label className="ml-1 mb-0" style={{ fontSize: '0.8rem' }}>Weekend</label>
-        
-        {/* Разделитель */}
         <div style={{ borderLeft: '1px solid #555', height: '24px', margin: '0 8px' }} />
-
-        {/* Режим отображения (Live/Backtest) */}
-        <Button
-          label="Live"
-          onClick={() => setViewMode('live')}
-          className={`p-button-sm p-1 px-2 ${viewMode === 'live' ? 'p-button-primary' : 'p-button-secondary'}`}
-        />
-        <Button
-          label="Backtest"
-          onClick={() => setViewMode('backtest')}
-          className={`p-button-sm p-1 px-2 ${viewMode === 'backtest' ? 'p-button-primary' : 'p-button-secondary'}`}
-          disabled={!backtestCandlesData.length}
-        />
-
-        {/* Разделитель */}
+        <Button label="Live" onClick={() => setViewMode('live')} className={`p-button-sm p-1 px-2 ${viewMode === 'live' ? 'p-button-primary' : 'p-button-secondary'}`} />
+        <Button label="Backtest" onClick={() => setViewMode('backtest')} className={`p-button-sm p-1 px-2 ${viewMode === 'backtest' ? 'p-button-primary' : 'p-button-secondary'}`} disabled={!backtestCandlesData.length} />
         <div style={{ borderLeft: '1px solid #555', height: '24px', margin: '0 8px' }} />
-
-        {/* Кнопка компактного режима */}
-        <Button
-          icon={compactMode ? 'pi pi-expand' : 'pi pi-compress'}
-          onClick={() => setCompactMode(!compactMode)}
-          className="p-button-sm p-button-secondary p-1 px-2"
-          tooltip={compactMode ? 'Развернуть панели' : 'Компактный режим'}
-        />
-
-        {/* Доп. кнопки – можно добавить выпадающее меню для дат и параметров бэктеста */}
+        <Button icon={compactMode ? 'pi pi-expand' : 'pi pi-compress'} onClick={() => setCompactMode(!compactMode)} className="p-button-sm p-button-secondary p-1 px-2" tooltip={compactMode ? 'Развернуть панели' : 'Компактный режим'} />
         {!compactMode && (
           <>
             <div style={{ borderLeft: '1px solid #555', height: '24px', margin: '0 8px' }} />
@@ -1172,425 +663,101 @@ export const TradingAssistantPage: React.FC = () => {
         )}
       </div>
 
-      {/* TABVIEW (скрыт в компактном режиме) */}
+      {/* TABVIEW */}
       {!compactMode && (
         <TabView>
-          {/* ========== SANDBOX ========== */}
-          <TabPanel header="Sandbox">
-            <SandboxTab availableInstruments={availableInstruments} />
-          </TabPanel>
-
-          {/* ========== SANDBOX (OLD) ==== */}
+          <TabPanel header="Sandbox"><SandboxTab availableInstruments={availableInstruments} /></TabPanel>
           <TabPanel header="Sandbox (old)">
             <Card className="surface-ground p-0">
               <div className="p-2">
-                {/* Основная строка управления */}
                 <div className="flex align-items-center flex-wrap gap-2">
-                  <Dropdown
-                    value={sandbox.accountId}
-                    options={sandbox.accounts.map((a: any) => ({ label: a.name || a.id, value: a.id }))}
-                    onChange={e => updateSandbox({ accountId: e.value })}
-                    placeholder="Account"
-                    className="p-inputtext-sm"
-                    style={{ minWidth: '180px' }}
-                  />
+                  <Dropdown value={sandbox.accountId} options={sandbox.accounts.map((a: any) => ({ label: a.name || a.id, value: a.id }))} onChange={e => updateSandbox({ accountId: e.value })} placeholder="Account" className="p-inputtext-sm" style={{ minWidth: '180px' }} />
                   <Checkbox checked={sandbox.demoMode} onChange={e => updateSandbox({ demoMode: e.checked })} />
                   <label className="mr-2 mb-0">Demo</label>
-                  <Button
-                    label={autoTrading ? 'Stop' : 'Start'}
-                    onClick={toggleTrading}
-                    className={`p-button-sm ${autoTrading ? 'p-button-danger' : 'p-button-success'} border-round-sm p-1 px-2`}
-                  />
+                  <Button label={autoTrading ? 'Stop' : 'Start'} onClick={toggleTrading} className={`p-button-sm ${autoTrading ? 'p-button-danger' : 'p-button-success'} border-round-sm p-1 px-2`} />
                   <Button label="Apply" onClick={applyConfig} className="p-button-sm p-button-secondary border-round-sm p-1 px-2" />
                 </div>
-                
                 <div className="flex align-items-center flex-wrap gap-2 mt-3">
                   <label className="mr-1 mb-0">Lots</label>
-                  <InputNumber
-                    id="lotQty"
-                    value={sandbox.lotQty}
-                    onValueChange={e => updateSandbox({ lotQty: e.value ?? 1 })}
-                    min={1}
-                    showButtons
-                    mode='decimal'
-                    buttonLayout='horizontal'
-                    decrementButtonClassName='lotQtyDec'
-                    incrementButtonClassName='lotQtyInc'
-                    size={1}
-                    className='mr-2'
-                  />
-
-                  <label className="mr-1 mb-0">SL%</label>
-                  <InputNumber
-                    value={sandbox.stopLossPercent}
-                    onValueChange={e => updateSandbox({ stopLossPercent: e.value ?? 0 })}
-                    step={0.1} min={0} size={2} className="p-inputtext-sm"
-                  />
-
-                  <label className="mr-1 mb-0">TP%</label>
-                  <InputNumber
-                    value={sandbox.takeProfitPercent}
-                    onValueChange={e => updateSandbox({ takeProfitPercent: e.value ?? 0 })}
-                    step={0.1} min={0} size={2} className="p-inputtext-sm"
-                  />
-
-                  {/* Режим стоп‑заявок */}
+                  <InputNumber id="lotQty" value={sandbox.lotQty} onValueChange={e => updateSandbox({ lotQty: e.value ?? 1 })} min={1} showButtons mode="decimal" buttonLayout="horizontal" decrementButtonClassName="lotQtyDec" incrementButtonClassName="lotQtyInc" size={1} className="mr-2" />
+                  <label className="mr-1 mb-0">SL%</label><InputNumber value={sandbox.stopLossPercent} onValueChange={e => updateSandbox({ stopLossPercent: e.value ?? 0 })} step={0.1} min={0} size={2} className="p-inputtext-sm" />
+                  <label className="mr-1 mb-0">TP%</label><InputNumber value={sandbox.takeProfitPercent} onValueChange={e => updateSandbox({ takeProfitPercent: e.value ?? 0 })} step={0.1} min={0} size={2} className="p-inputtext-sm" />
                   <label className="mr-1 mb-0">Stop mode</label>
-                  <Dropdown
-                    value={sandbox.stopMode}
-                    options={[
-                      { label: 'Stop Order', value: 'stop_order' },
-                      { label: 'Limit Order', value: 'limit_order' },
-                    ]}
-                    onChange={e => updateSandbox({ stopMode: e.value })}
-                    className="p-inputtext-sm"
-                    style={{ width: '130px' }}
-                  />
-
+                  <Dropdown value={sandbox.stopMode} options={[{ label: 'Stop Order', value: 'stop_order' }, { label: 'Limit Order', value: 'limit_order' }]} onChange={e => updateSandbox({ stopMode: e.value })} className="p-inputtext-sm" style={{ width: '130px' }} />
                   <label className="mr-1 mb-0">Entry mode</label>
-                  <Dropdown
-                    value={sandbox.entryMode}
-                    options={[
-                      { label: 'Market', value: 'market' },
-                      { label: 'Limit', value: 'limit' },
-                    ]}
-                    onChange={e => updateSandbox({ entryMode: e.value })}
-                    className="p-inputtext-sm"
-                    style={{ width: '100px' }}
-                  />
-
+                  <Dropdown value={sandbox.entryMode} options={[{ label: 'Market', value: 'market' }, { label: 'Limit', value: 'limit' }]} onChange={e => updateSandbox({ entryMode: e.value })} className="p-inputtext-sm" style={{ width: '100px' }} />
                   <Checkbox checked={sandbox.trailingEnabled} onChange={e => updateSandbox({ trailingEnabled: e.checked })} />
                   <label className="mr-1 mb-0">Trail</label>
-                  {sandbox.trailingEnabled && (
-                    <InputNumber
-                      value={sandbox.trailingPercent}
-                      onValueChange={e => updateSandbox({ trailingPercent: e.value ?? 0.5 })}
-                      step={0.1} min={0} size={2} className="p-inputtext-sm"
-                    />
-                  )}
-
-                  {/* Dynamic Lots */}
-                  <Checkbox
-                    checked={sandbox.dynamicSizing}
-                    onChange={e => updateSandbox({ dynamicSizing: e.checked })}
-                  />
+                  {sandbox.trailingEnabled && <InputNumber value={sandbox.trailingPercent} onValueChange={e => updateSandbox({ trailingPercent: e.value ?? 0.5 })} step={0.1} min={0} size={2} className="p-inputtext-sm" />}
+                  <Checkbox checked={sandbox.dynamicSizing} onChange={e => updateSandbox({ dynamicSizing: e.checked })} />
                   <label className="ml-1 mr-2 mb-0">Dyn.Lots</label>
-                  {sandbox.dynamicSizing && (
-                    <InputNumber
-                      value={sandbox.riskAmount}
-                      onValueChange={e => updateSandbox({ riskAmount: e.value ?? 1000 })}
-                      step={100}
-                      min={0}
-                      size={3}
-                      className="p-inputtext-sm"
-                      placeholder="Risk RUB"
-                    />
-                  )}
-
-                  {/* ATR Settings (показываем, только если включён Dynamic Lots или волатильный трейлинг) */}
-                  {(sandbox.dynamicSizing || sandbox.trailingMode === 'volatility') && (
-                    <label className="mr-1 mb-0">ATR Per</label>
-                  )}
-                  {(sandbox.dynamicSizing || sandbox.trailingMode === 'volatility') && (
-                    <InputNumber
-                      value={sandbox.atrPeriod}
-                      onValueChange={e => updateSandbox({ atrPeriod: e.value ?? 14 })}
-                      min={5} max={50} step={1} size={2} className="p-inputtext-sm"
-                    />
-                  )}
-                  {(sandbox.dynamicSizing || sandbox.trailingMode === 'volatility') && (
-                    <label className="ml-2 mr-1 mb-0">Mult</label>
-                  )}
-                  {(sandbox.dynamicSizing || sandbox.trailingMode === 'volatility') && (
-                    <InputNumber
-                      value={sandbox.atrMultiplier}
-                      onValueChange={e => updateSandbox({ atrMultiplier: e.value ?? 2.0 })}
-                      min={0.5} max={5} step={0.1} size={2} className="p-inputtext-sm"
-                    />
-                  )}
-
-                  <Button
-                    icon="pi pi-cog"
-                    onClick={() => setShowSandboxSettings(true)}
-                    className="p-button-sm p-button-secondary p-1 px-2"
-                    tooltip="Settings"
-                  />
-
-                  <span className="ml-auto">
-                    {sandbox.balance && <span className="mr-2">{sandbox.balance}</span>}
-                    {sandbox.payMessage && <span style={{ color: '#4caf50' }}>{sandbox.payMessage}</span>}
-                  </span>
+                  {sandbox.dynamicSizing && <InputNumber value={sandbox.riskAmount} onValueChange={e => updateSandbox({ riskAmount: e.value ?? 1000 })} step={100} min={0} size={3} className="p-inputtext-sm" placeholder="Risk RUB" />}
+                  {(sandbox.dynamicSizing || sandbox.trailingMode === 'volatility') && <label className="mr-1 mb-0">ATR Per</label>}
+                  {(sandbox.dynamicSizing || sandbox.trailingMode === 'volatility') && <InputNumber value={sandbox.atrPeriod} onValueChange={e => updateSandbox({ atrPeriod: e.value ?? 14 })} min={5} max={50} step={1} size={2} className="p-inputtext-sm" />}
+                  {(sandbox.dynamicSizing || sandbox.trailingMode === 'volatility') && <label className="ml-2 mr-1 mb-0">Mult</label>}
+                  {(sandbox.dynamicSizing || sandbox.trailingMode === 'volatility') && <InputNumber value={sandbox.atrMultiplier} onValueChange={e => updateSandbox({ atrMultiplier: e.value ?? 2.0 })} min={0.5} max={5} step={0.1} size={2} className="p-inputtext-sm" />}
+                  <Button icon="pi pi-cog" onClick={() => setShowSandboxSettings(true)} className="p-button-sm p-button-secondary p-1 px-2" tooltip="Settings" />
+                  <span className="ml-auto">{sandbox.balance && <span className="mr-2">{sandbox.balance}</span>}{sandbox.payMessage && <span style={{ color: '#4caf50' }}>{sandbox.payMessage}</span>}</span>
                 </div>
               </div>
             </Card>
-
-            {/* Диалог настроек песочницы */}
-            <Dialog
-              header="Sandbox Settings"
-              visible={showSandboxSettings}
-              style={{ width: '500px' }}
-              onHide={() => setShowSandboxSettings(false)}
-            >
+            <Dialog header="Sandbox Settings" visible={showSandboxSettings} style={{ width: '500px' }} onHide={() => setShowSandboxSettings(false)}>
               <div className="p-fluid">
-                <div className="p-field mb-3">
-                  <label>Token</label>
-                  <InputText
-                    value={sandbox.token}
-                    onChange={e => updateSandbox({ token: e.target.value })}
-                    className="p-inputtext-sm"
-                    placeholder="Sandbox token"
-                  />
-                </div>
-                <div className="p-field mb-3">
-                  <div className="flex gap-2">
-                    <Button
-                      label="Load"
-                      onClick={loadAccounts}
-                      disabled={!sandbox.token || sandbox.loadingAccounts}
-                      className="p-button-sm p-button-secondary"
-                    />
-                    <Button
-                      label="Create"
-                      onClick={handleCreateAccount}
-                      disabled={sandbox.creatingAccount}
-                      className="p-button-sm p-button-success"
-                    />
-                    <Button
-                      label="Delete"
-                      onClick={handleCloseAccount}
-                      disabled={!sandbox.accountId}
-                      className="p-button-sm p-button-danger"
-                    />
-                  </div>
-                </div>
-                <div className="p-field mb-3">
-                  <label>Pay In (RUB)</label>
-                  <div className="p-inputgroup">
-                    <InputNumber
-                      value={sandbox.payAmount}
-                      onValueChange={e => updateSandbox({ payAmount: e.value ?? 1000 })}
-                      min={1000} step={1000} className="p-inputtext-sm"
-                    />
-                    <Button label="Deposit" onClick={handlePayIn} className="p-button-sm" />
-                  </div>
-                </div>
-                <div className="p-field mb-3">
-                  <Button label="Refresh Balance" onClick={refreshBalance} className="p-button-sm p-button-info" />
-                </div>
+                <div className="p-field mb-3"><label>Token</label><InputText value={sandbox.token} onChange={e => updateSandbox({ token: e.target.value })} className="p-inputtext-sm" placeholder="Sandbox token" /></div>
+                <div className="p-field mb-3"><div className="flex gap-2"><Button label="Load" onClick={loadAccounts} disabled={!sandbox.token || sandbox.loadingAccounts} className="p-button-sm p-button-secondary" /><Button label="Create" onClick={handleCreateAccount} disabled={sandbox.creatingAccount} className="p-button-sm p-button-success" /><Button label="Delete" onClick={handleCloseAccount} disabled={!sandbox.accountId} className="p-button-sm p-button-danger" /></div></div>
+                <div className="p-field mb-3"><label>Pay In (RUB)</label><div className="p-inputgroup"><InputNumber value={sandbox.payAmount} onValueChange={e => updateSandbox({ payAmount: e.value ?? 1000 })} min={1000} step={1000} className="p-inputtext-sm" /><Button label="Deposit" onClick={handlePayIn} className="p-button-sm" /></div></div>
+                <div className="p-field mb-3"><Button label="Refresh Balance" onClick={refreshBalance} className="p-button-sm p-button-info" /></div>
               </div>
             </Dialog>
           </TabPanel>
-
-          {/* ========== AUTOTRADER ========== */}
-          <TabPanel header="Autotrader">
-            <AutoTraderTab sandbox={sandbox} availableInstruments={availableInstruments} />
-          </TabPanel>
-
-          {/* ========== BACKTEST ========== */}
+          <TabPanel header="Autotrader"><AutoTraderTab sandbox={sandbox} availableInstruments={availableInstruments} /></TabPanel>
           <TabPanel header="Backtest">
-            <BacktestTab
-              selectedInstrument={selectedInstrument}
-              setSelectedInstrument={setSelectedInstrument}
-              availableInstruments={availableInstruments}
-              instrumentsLoading={instrumentsLoading}
-              loadAllInstruments={loadAllInstruments}
-              backtest={backtest}
-              updateBacktest={updateBacktest}
-              showBacktestAdvanced={showBacktestAdvanced}
-              setShowBacktestAdvanced={setShowBacktestAdvanced}
-              runBacktest={runBacktest}
-              sendBacktestToSandbox={sendBacktestToSandbox}
-              backtestCandlesData={backtestCandlesData}
-            />
+            <BacktestTab selectedInstrument={selectedInstrument} setSelectedInstrument={setSelectedInstrument} availableInstruments={availableInstruments} instrumentsLoading={instrumentsLoading} loadAllInstruments={loadAllInstruments} backtest={backtest} updateBacktest={updateBacktest} showBacktestAdvanced={showBacktestAdvanced} setShowBacktestAdvanced={setShowBacktestAdvanced} runBacktest={runBacktest} sendBacktestToSandbox={sendBacktestToSandbox} backtestCandlesData={backtestCandlesData} />
           </TabPanel>
-          
-          {/* ========== BATCH ============= */}
           <TabPanel header="Batch">
-            <BatchTab
-              batchParams={batchParams}
-              setBatchParams={setBatchParams}
-              batchInstruments={batchInstruments}
-              setBatchInstruments={setBatchInstruments}
-              batchResults={batchResults}
-              batchRunning={batchRunning}
-              batchStopping={batchStopping}
-              batchProgress={batchProgress}
-              batchVersion={batchVersion}
-              setBatchVersion={setBatchVersion}
-              showBatchDialog={showBatchDialog}
-              setShowBatchDialog={setShowBatchDialog}
-              showInstrumentDialog={showInstrumentDialog}
-              setShowInstrumentDialog={setShowInstrumentDialog}
-              instrumentFilter={instrumentFilter}
-              setInstrumentFilter={setInstrumentFilter}
-              tempSelectedInstruments={tempSelectedInstruments}
-              setTempSelectedInstruments={setTempSelectedInstruments}
-              availableInstruments={availableInstruments}
-              runBatch={runBatch}
-              stopBatch={stopBatch}
-              exportCSV={exportCSV}
-              backtest={backtest}
-              stream={stream}
-            />
+            <BatchTab batchParams={batchParams} setBatchParams={setBatchParams} batchInstruments={batchInstruments} setBatchInstruments={setBatchInstruments} batchResults={batchResults} batchRunning={batchRunning} batchStopping={batchStopping} batchProgress={batchProgress} batchVersion={batchVersion} setBatchVersion={setBatchVersion} showBatchDialog={showBatchDialog} setShowBatchDialog={setShowBatchDialog} showInstrumentDialog={showInstrumentDialog} setShowInstrumentDialog={setShowInstrumentDialog} instrumentFilter={instrumentFilter} setInstrumentFilter={setInstrumentFilter} tempSelectedInstruments={tempSelectedInstruments} setTempSelectedInstruments={setTempSelectedInstruments} availableInstruments={availableInstruments} runBatch={runBatch} stopBatch={stopBatch} exportCSV={exportCSV} backtest={backtest} stream={stream} />
           </TabPanel>
-
-          {/* ========== SIGNALS =========== */}
-          <TabPanel header="Signals">
-            <SignalsTab signals={currentSignals} />
-          </TabPanel>
-
-          {/* ========== PROFILE =========== */}
-          <TabPanel header="Profile">
-            <ProfileTab profile={currentProfile} />
-          </TabPanel>
-
-          {/* ========== TRADES ============ */}
-          <TabPanel header="Trades">
-            <TradesTab currentTrades={currentTrades} trades={backtest.trades} />
-          </TabPanel>
-
-          {/* ========== POS/ORDERS ======== */}
-          <TabPanel header="Pos/Orders">
-            <PositionsOrdersTab accountId={sandbox.accountId} />
-          </TabPanel>
-          
-          {/* ========== POS/ORDERS ======== */}
-          <TabPanel header="Log">
-            <LogTab accountId={sandbox.accountId} />
-          </TabPanel>
-
-          {/* ========== SCREENER ========== */}
-          <TabPanel header="Screener">
-            <ScreenerTab
-              token={stream.token}
-              results={screenerResults}
-              setResults={setScreenerResults}
-              onSendToFarmer={setFarmerInstruments}
-            />
-          </TabPanel>
-
-          {/* ========== CLOUD ============= */}
-          <TabPanel header="Cloud">
-            <CloudTab />
-          </TabPanel>
-
-          {/* ========== FARMER ============ */}
-          <TabPanel header="Farmer">
-            <CloudFarmerTab
-              token={stream.token}
-              batches={farmerBatches}
-              setBatches={setFarmerBatches}
-              farmerInstruments={farmerInstruments}
-              setFarmerInstruments={setFarmerInstruments}
-            />
-          </TabPanel>
+          <TabPanel header="Signals"><SignalsTab signals={currentSignals} /></TabPanel>
+          <TabPanel header="Profile"><ProfileTab profile={currentProfile} /></TabPanel>
+          <TabPanel header="Trades"><TradesTab currentTrades={currentTrades} trades={backtest.trades} /></TabPanel>
+          <TabPanel header="Pos/Orders"><PositionsOrdersTab accountId={sandbox.accountId} /></TabPanel>
+          <TabPanel header="Log"><LogTab accountId={sandbox.accountId} /></TabPanel>
+          <TabPanel header="Screener"><ScreenerTab token={stream.token} results={screenerResults} setResults={setScreenerResults} onSendToFarmer={setFarmerInstruments} /></TabPanel>
+          <TabPanel header="Cloud"><CloudTab /></TabPanel>
+          <TabPanel header="Farmer"><CloudFarmerTab token={stream.token} batches={farmerBatches} setBatches={setFarmerBatches} farmerInstruments={farmerInstruments} setFarmerInstruments={setFarmerInstruments} /></TabPanel>
         </TabView>
       )}
-
-      {/* Выбор типа профиля и графика – только когда не compact или всегда видно? */}
+      {/* Графики */}
       {!compactMode && (
         <>
           <div style={{ borderLeft: '1px solid #555', height: '8px', margin: '0 8px' }} />
           <span className="mr-1">Profile:</span>
-          <Dropdown
-            value={profileType}
-            options={['side', 'overlay']}
-            onChange={e => setProfileType(e.value)}
-            className="p-inputtext-sm"
-            style={{ width: '80px' }}
-          />
+          <Dropdown value={profileType} options={['side', 'overlay']} onChange={e => setProfileType(e.value)} className="p-inputtext-sm" style={{ width: '80px' }} />
           <span className="mr-1">Chart:</span>
-          <Dropdown
-            value={chartLibrary}
-            options={['lightweight', 'chartjs', 'amcharts']}
-            onChange={e => setChartLibrary(e.value)}
-            className="p-inputtext-sm"
-            style={{ width: '100px' }}
-          />
+          <Dropdown value={chartLibrary} options={['lightweight', 'chartjs', 'amcharts']} onChange={e => setChartLibrary(e.value)} className="p-inputtext-sm" style={{ width: '100px' }} />
         </>
       )}
-   
-      {/* Старый график lightweight-charts */}
       {chartLibrary === 'lightweight' && (
         <div className="chart-row">
           {profileType === 'side' && currentProfile?.volumeByPrice && priceRange.max > 0 && (
-            <div className="volume-profile-container">
-              <VolumeProfileBars
-                data={currentProfile.volumeByPrice}
-                maxVolume={Math.max(...currentProfile.volumeByPrice.map((v: any) => v.volume))}
-                minPrice={priceRange.min}
-                maxPrice={priceRange.max}
-                height={400}
-                poc={currentProfile.poc}
-                vah={currentProfile.valueAreaHigh}
-                val={currentProfile.valueAreaLow}
-              />
-            </div>
+            <div className="volume-profile-container"><VolumeProfileBars data={currentProfile.volumeByPrice} maxVolume={Math.max(...currentProfile.volumeByPrice.map((v: any) => v.volume))} minPrice={priceRange.min} maxPrice={priceRange.max} height={400} poc={currentProfile.poc} vah={currentProfile.valueAreaHigh} val={currentProfile.valueAreaLow} /></div>
           )}
-          {profileType === 'overlay' && (
-            <VolumeProfileOverlay
-              volumeByPrice={currentProfile?.volumeByPrice}
-              poc={currentProfile?.poc}
-              vah={currentProfile?.valueAreaHigh}
-              val={currentProfile?.valueAreaLow}
-              visible={!!currentProfile?.volumeByPrice}
-            />
-          )}
+          {profileType === 'overlay' && <VolumeProfileOverlay volumeByPrice={currentProfile?.volumeByPrice} poc={currentProfile?.poc} vah={currentProfile?.valueAreaHigh} val={currentProfile?.valueAreaLow} visible={!!currentProfile?.volumeByPrice} />}
           <div className="chart-container" ref={chartContainerRef} />
         </div>
       )}
-      {/* Новый график Chart.js */}
       {chartLibrary === 'chartjs' && (
         <div className="chart-row">
           {profileType === 'side' && currentProfile?.volumeByPrice && priceRange.max > 0 && (
-            <div className="volume-profile-container">
-              <VolumeProfileBars
-                data={currentProfile.volumeByPrice}
-                maxVolume={Math.max(...currentProfile.volumeByPrice.map((v: any) => v.volume))}
-                minPrice={priceRange.min}
-                maxPrice={priceRange.max}
-                height={400}
-                poc={currentProfile.poc}
-                vah={currentProfile.valueAreaHigh}
-                val={currentProfile.valueAreaLow}
-              />
-            </div>
+            <div className="volume-profile-container"><VolumeProfileBars data={currentProfile.volumeByPrice} maxVolume={Math.max(...currentProfile.volumeByPrice.map((v: any) => v.volume))} minPrice={priceRange.min} maxPrice={priceRange.max} height={400} poc={currentProfile.poc} vah={currentProfile.valueAreaHigh} val={currentProfile.valueAreaLow} /></div>
           )}
-          {profileType === 'overlay' && (
-            <VolumeProfileOverlay
-              volumeByPrice={currentProfile?.volumeByPrice}
-              poc={currentProfile?.poc}
-              vah={currentProfile?.valueAreaHigh}
-              val={currentProfile?.valueAreaLow}
-              visible={!!currentProfile?.volumeByPrice}
-            />
-          )}
-          
-          {/* Основной график */}
+          {profileType === 'overlay' && <VolumeProfileOverlay volumeByPrice={currentProfile?.volumeByPrice} poc={currentProfile?.poc} vah={currentProfile?.valueAreaHigh} val={currentProfile?.valueAreaLow} visible={!!currentProfile?.volumeByPrice} />}
           <div className="chart-container" style={{ flex: 1, minWidth: 0, height: 400 }}>
-            <CandlestickChart
-              candlesData={aggregateCandles(currentCandles, stream.displayTimeframe)}
-              poc={currentProfile?.poc}
-              vah={currentProfile?.valueAreaHigh}
-              val={currentProfile?.valueAreaLow}
-              signals={currentSignals}
-              trades={currentTrades}
-              positions={[]}
-            />
+            <CandlestickChart candlesData={aggregateCandles(currentCandles, stream.displayTimeframe)} poc={currentProfile?.poc} vah={currentProfile?.valueAreaHigh} val={currentProfile?.valueAreaLow} signals={currentSignals} trades={currentTrades} positions={[]} />
           </div>
         </div>
       )}
-      {/* Новый график amcharts */}
-      {chartLibrary === 'amcharts' && (
-        <AmChartsStockChart
-          candlesData={currentCandles}
-          volumeByPrice={currentProfile?.volumeByPrice}
-          poc={currentProfile?.poc}
-          vah={currentProfile?.valueAreaHigh}
-          val={currentProfile?.valueAreaLow}
-        />
-      )}
-    
+      {chartLibrary === 'amcharts' && <AmChartsStockChart candlesData={currentCandles} volumeByPrice={currentProfile?.volumeByPrice} poc={currentProfile?.poc} vah={currentProfile?.valueAreaHigh} val={currentProfile?.valueAreaLow} />}
     </div>
   );
 };
