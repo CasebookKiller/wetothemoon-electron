@@ -5958,8 +5958,9 @@ var OrderManager = class {
 					orderId: this.generateUUID()
 				}, token)).stopOrderId || null;
 				console.log(`[OrderManager] Стоп‑лосс установлен на ${slPrice}, stopOrderId=${stopOrderId}`);
-			} catch (e) {
-				console.error("[OrderManager] Ошибка установки стоп‑лосса:", e);
+			} catch (error) {
+				const apiError = handleApiError(error);
+				console.error("[OrderManager] Ошибка установки стоп‑лосса: ", apiError.message);
 			}
 		}
 		if (takeProfitPercent > 0) {
@@ -5984,8 +5985,9 @@ var OrderManager = class {
 					orderId: this.generateUUID()
 				}, token);
 				console.log(`[OrderManager] Тейк‑профит установлен на ${tpPrice}`);
-			} catch (e) {
-				console.error("[OrderManager] Ошибка установки тейк‑профита:", e);
+			} catch (error) {
+				const apiError = handleApiError(error);
+				console.error("[OrderManager] Ошибка установки тейк‑профита:", apiError.message);
 			}
 		}
 		return stopOrderId;
@@ -6034,8 +6036,9 @@ var OrderManager = class {
 					}, token)).orderId || null;
 					console.log(`[OrderManager] Стоп‑лосс (лимитный) выставлен на ${slPrice}, orderId=${stopOrderId}`);
 					await new Promise((resolve) => setTimeout(resolve, 500));
-				} catch (e) {
-					console.error("[OrderManager] Ошибка выставления стоп‑лосса:", e);
+				} catch (error) {
+					const apiError = handleApiError(error);
+					console.error("[OrderManager] Ошибка выставления стоп‑лосса:", apiError.message);
 				}
 			}
 		}
@@ -6059,13 +6062,14 @@ var OrderManager = class {
 				}, token)).orderId || null;
 				console.log(`[OrderManager] Тейк‑профит (лимитный) выставлен на ${tpPrice}, orderId=${takeProfitOrderId}`);
 				break;
-			} catch (e) {
-				if (e?.code === 8 && attempts < maxAttempts - 1) {
+			} catch (error) {
+				if (error?.code === 8 && attempts < maxAttempts - 1) {
 					console.warn(`[OrderManager] Превышен лимит запросов, повтор через 1с (попытка ${attempts + 1})`);
 					await new Promise((resolve) => setTimeout(resolve, 1e3));
 					attempts++;
 				} else {
-					console.error("[OrderManager] Ошибка выставления тейк‑профита:", e);
+					const apiError = handleApiError(error);
+					console.error("[OrderManager] Ошибка выставления тейк‑профита:", apiError.message);
 					break;
 				}
 			}
@@ -6085,8 +6089,9 @@ var OrderManager = class {
 			}, this.config.token);
 			console.log(`[OrderManager] Ордер ${this.activeOrderId} отменён`);
 			this.activeOrderId = null;
-		} catch (e) {
-			console.error("[OrderManager] Ошибка отмены ордера:", e);
+		} catch (error) {
+			const apiError = handleApiError(error);
+			console.error("[OrderManager] Ошибка отмены ордера:", apiError.message);
 		}
 	}
 	startTrailing(instrumentUid, entryPrice, stopOrderId, trailPercent) {
@@ -6135,8 +6140,9 @@ var OrderManager = class {
 				this.trailingEntryPrice = newStopPrice;
 				console.log(`[OrderManager] Трейлинг‑стоп обновлён до ${newStopPrice}`);
 			}
-		} catch (e) {
-			console.error("[OrderManager] Ошибка трейлинга:", e);
+		} catch (error) {
+			const apiError = handleApiError(error);
+			console.error("[OrderManager] Ошибка трейлинга:", apiError.message);
 		}
 	}
 	async getLastPrice(instrumentUid) {
@@ -6147,8 +6153,9 @@ var OrderManager = class {
 				lastPriceType: 1
 			}, this.config.marketDataToken)).lastPrices?.[0]?.price;
 			return p ? Number(p.units) + Number(p.nano) / 1e9 : null;
-		} catch (e) {
-			console.error("[OrderManager] Не удалось получить lastPrice:", e);
+		} catch (error) {
+			const apiError = handleApiError(error);
+			console.error("[OrderManager] Не удалось получить lastPrice:", apiError.message);
 			return null;
 		}
 	}
