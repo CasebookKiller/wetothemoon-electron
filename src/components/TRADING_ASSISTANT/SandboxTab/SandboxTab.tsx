@@ -108,8 +108,8 @@ export const SandboxTab: React.FC<SandboxTabProps> = ({
     await api.updateTradingConfig({
       token,
       accountId: sharedAccountId,
-      lotQuantity: lotQty,
-      stopLossPercent: manualSlPercent || stopLossPercent,   // приоритет ручного ввода
+      lotQuantity: manualQuantity,                // <-- для ручного ордера берём его количество
+      stopLossPercent: manualSlPercent || stopLossPercent,
       takeProfitPercent: manualTpPercent || takeProfitPercent,
       trailingEnabled,
       trailingPercent,
@@ -118,8 +118,8 @@ export const SandboxTab: React.FC<SandboxTabProps> = ({
       atrPeriod,
       atrMultiplier,
       stopMode,
-      entryMode,
-      demoMode,
+      entryMode: manualOrderType,                 // <-- market или limit
+      demoMode,                                   // <-- обязательно
     });
     alert('Конфигурация применена');
   };
@@ -225,11 +225,19 @@ export const SandboxTab: React.FC<SandboxTabProps> = ({
           <label className="mr-1 mb-0">Тип</label>
           <Dropdown value={manualType} options={[{ label: 'BUY', value: 'BUY' }, { label: 'SELL', value: 'SELL' }]} onChange={e => setManualType(e.value)} className="p-inputtext-sm" style={{ width: '80px' }} />
           <label className="mr-1 mb-0">Кол-во</label>
-          <label className="mr-1 mb-0">SL%</label>
-          <InputNumber value={manualSlPercent} onValueChange={e => setManualSlPercent(e.value ?? 0)} step={0.1} min={0} size={2} className="p-inputtext-sm" />
-          <label className="mr-1 mb-0">TP%</label>
-          <InputNumber value={manualTpPercent} onValueChange={e => setManualTpPercent(e.value ?? 0)} step={0.1} min={0} size={2} className="p-inputtext-sm" />
           <InputNumber value={manualQuantity} onValueChange={e => setManualQuantity(e.value ?? 1)} min={1} size={1} className="p-inputtext-sm" />
+
+          {manualOrderType === 'limit' && (
+            <>
+              <label className="mr-1 mb-0">Цена</label>
+              <InputNumber value={manualPrice} onValueChange={e => setManualPrice(e.value ?? 0)} min={0} step={0.01} size={3} className="p-inputtext-sm" />
+              <label className="mr-1 mb-0">SL%</label>
+              <InputNumber value={manualSlPercent} onValueChange={e => setManualSlPercent(e.value ?? 0)} step={0.1} min={0} size={2} className="p-inputtext-sm" />
+              <label className="mr-1 mb-0">TP%</label>
+              <InputNumber value={manualTpPercent} onValueChange={e => setManualTpPercent(e.value ?? 0)} step={0.1} min={0} size={2} className="p-inputtext-sm" />
+            </>
+          )}
+
           <label className="mr-1 mb-0">Тип ордера</label>
           <Dropdown
             value={manualOrderType}
