@@ -9,15 +9,11 @@ import { Checkbox } from 'primereact/checkbox';
 import { Tag } from 'primereact/tag';
 
 interface AutoTraderTabProps {
-  sandbox: any;
   availableInstruments: Array<{ uid: string; name: string; ticker?: string }>;
 }
 
-export const AutoTraderTab: React.FC<AutoTraderTabProps> = ({
-  sandbox,
-  availableInstruments,
-}) => {
-  // Локальные настройки риск‑менеджмента (копия sandbox, но независимо)
+export const AutoTraderTab: React.FC<AutoTraderTabProps> = ({ availableInstruments }) => {
+  // ---------- Параметры риск‑менеджмента ----------
   const [lotQty, setLotQty] = useState(1);
   const [stopLossPercent, setStopLossPercent] = useState(1);
   const [takeProfitPercent, setTakeProfitPercent] = useState(2);
@@ -30,11 +26,14 @@ export const AutoTraderTab: React.FC<AutoTraderTabProps> = ({
   const [entryMode, setEntryMode] = useState<'market' | 'limit'>('market');
   const [stopMode, setStopMode] = useState<'stop_order' | 'limit_order'>('stop_order');
 
+  // ---------- Инструмент и счёт ----------
   const [selectedInstrument, setSelectedInstrument] = useState<string>('');
   const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
+
+  // ---------- Состояние трейдера ----------
   const [activeAutoTraders, setActiveAutoTraders] = useState<string[]>([]);
-  const [autoTraderLog, setAutoTraderLog] = useState<Array<{ time: string; text: string; type: 'signal' | 'order' | 'error' }>>([]);
+  const [autoTraderLog, setAutoTraderLog] = useState<Array<{ time: string; text: string; type: 'signal' | 'order' | 'error' | 'protective' }>>([]);
   const [orderFlowData, setOrderFlowData] = useState<{ delta: number; absorption: any; exhaustion: any } | null>(null);
   const [streamActive, setStreamActive] = useState(false);
 
@@ -49,9 +48,7 @@ export const AutoTraderTab: React.FC<AutoTraderTabProps> = ({
         const list = await api.getSandboxAccounts(token);
         setAccounts(list || []);
         if (list?.length === 1) setSelectedAccountId(list[0].id);
-      } catch (e) {
-        console.error('Ошибка загрузки счетов автотрейдера:', e);
-      }
+      } catch (e) { console.error('Ошибка загрузки счетов автотрейдера:', e); }
     })();
   }, []);
 
@@ -61,15 +58,16 @@ export const AutoTraderTab: React.FC<AutoTraderTabProps> = ({
     api.onAutoTraderSignal((data: any) => {
       setAutoTraderLog(prev => [...prev.slice(-19), {
         time: new Date().toLocaleTimeString(),
-        text: `${data.instrumentUid.slice(0,8)}: ${data.signal.type} @ ${data.signal.price?.toFixed(2)} - ${data.signal.message || ''}`,
+        text: `${data.instrumentUid.slice(0,8)}: ${data.signal.type} @ ${data.signal.price?.toFixed(2)} – ${data.signal.reason || ''}`,
         type: 'signal'
       }]);
     });
     api.onAutoTraderOrderSent((data: any) => {
+      const orderType = data.signal?.reason?.includes('Stop') ? 'protective' : 'order';
       setAutoTraderLog(prev => [...prev.slice(-19), {
         time: new Date().toLocaleTimeString(),
         text: `Order sent: ${data.signal.type} ${data.signal.price}`,
-        type: 'order'
+        type: orderType
       }]);
     });
     api.onAutoTraderOrderError((data: any) => {
@@ -123,12 +121,9 @@ export const AutoTraderTab: React.FC<AutoTraderTabProps> = ({
             subscriptionAction: 'SUBSCRIPTION_ACTION_SUBSCRIBE',
             instruments: [{ instrumentId: selectedInstrument, interval: 'SUBSCRIPTION_INTERVAL_ONE_MINUTE' }]
           }
-        }, 'autotrader'); // стрим автотрейдера
+        }, 'autotrader');
         setStreamActive(true);
-      } catch (err) {
-        console.error('Stream start error:', err);
-        return;
-      }
+      } catch (err) { console.error('Stream start error:', err); return; }
     }
 
     await api.startAutoTrader(selectedInstrument);
@@ -176,7 +171,7 @@ export const AutoTraderTab: React.FC<AutoTraderTabProps> = ({
           />
         </div>
 
-        {/* Настройки риск‑менеджмента (те же, что и раньше) */}
+        {/* Настройки риск‑менеджмента */}
         <div className="flex align-items-center flex-wrap gap-2 mb-2">
           <label className="mr-1 mb-0">Lots</label>
           <InputNumber value={lotQty} onValueChange={e => setLotQty(e.value ?? 1)} min={1} size={1} className="p-inputtext-sm" />
@@ -194,14 +189,14 @@ export const AutoTraderTab: React.FC<AutoTraderTabProps> = ({
           </div>
 
           <div className="flex align-items-center ml-2">
-            <Checkbox checked={dynamicSizing} onChange={(e:any) => setDynamicSizing(e.checked)} disabled={sandbox?.trailingMode === 'volatility'} onInput={ (e:any) => setDynamicSizing(e.checked)} />
+            <Checkbox checked={dynamicSizing} onChange={(e:any) => setDynamicSizing(e.checked)} />
             <label className="ml-1 mr-1 mb-0">Dyn.Lots</label>
             {dynamicSizing && (
               <InputNumber value={riskAmount} onValueChange={e => setRiskAmount(e.value ?? 1000)} step={100} min={0} size={3} className="p-inputtext-sm" placeholder="Risk RUB" />
             )}
           </div>
 
-          {(dynamicSizing || sandbox?.trailingMode === 'volatility') && (
+          {(dynamicSizing || trailingEnabled) && (
             <>
               <label className="ml-2 mr-1 mb-0">ATR Per</label>
               <InputNumber value={atrPeriod} onValueChange={e => setAtrPeriod(e.value ?? 14)} min={5} max={50} step={1} size={2} className="p-inputtext-sm" />
@@ -273,7 +268,7 @@ export const AutoTraderTab: React.FC<AutoTraderTabProps> = ({
             {autoTraderLog.map((entry, i) => (
               <div key={i} style={{ fontSize: '0.8rem', borderBottom: '1px solid #333', padding: '2px 0' }}>
                 <span style={{ color: '#888' }}>{entry.time}</span>{' '}
-                <span style={{ color: entry.type === 'error' ? 'red' : entry.type === 'order' ? '#4caf50' : '#fff' }}>
+                <span style={{ color: entry.type === 'error' ? 'red' : entry.type === 'protective' ? '#ff9800' : entry.type === 'order' ? '#4caf50' : '#fff' }}>
                   {entry.text}
                 </span>
               </div>
