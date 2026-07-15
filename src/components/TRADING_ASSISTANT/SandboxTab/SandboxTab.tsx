@@ -48,6 +48,8 @@ export const SandboxTab: React.FC<SandboxTabProps> = ({
   const [manualQuantity, setManualQuantity] = useState(1);
   const [manualPrice, setManualPrice] = useState(0);
   const [manualOrderType, setManualOrderType] = useState<'market' | 'limit'>('market');
+  const [manualSlPercent, setManualSlPercent] = useState(0);
+  const [manualTpPercent, setManualTpPercent] = useState(0);
 
   // Загрузка счетов
   const loadAccounts = async () => {
@@ -107,8 +109,8 @@ export const SandboxTab: React.FC<SandboxTabProps> = ({
       token,
       accountId: sharedAccountId,
       lotQuantity: lotQty,
-      stopLossPercent,
-      takeProfitPercent,
+      stopLossPercent: manualSlPercent || stopLossPercent,   // приоритет ручного ввода
+      takeProfitPercent: manualTpPercent || takeProfitPercent,
       trailingEnabled,
       trailingPercent,
       useDynamicSizing: dynamicSizing,
@@ -117,7 +119,7 @@ export const SandboxTab: React.FC<SandboxTabProps> = ({
       atrMultiplier,
       stopMode,
       entryMode,
-      demoMode
+      demoMode,
     });
     alert('Конфигурация применена');
   };
@@ -223,6 +225,10 @@ export const SandboxTab: React.FC<SandboxTabProps> = ({
           <label className="mr-1 mb-0">Тип</label>
           <Dropdown value={manualType} options={[{ label: 'BUY', value: 'BUY' }, { label: 'SELL', value: 'SELL' }]} onChange={e => setManualType(e.value)} className="p-inputtext-sm" style={{ width: '80px' }} />
           <label className="mr-1 mb-0">Кол-во</label>
+          <label className="mr-1 mb-0">SL%</label>
+          <InputNumber value={manualSlPercent} onValueChange={e => setManualSlPercent(e.value ?? 0)} step={0.1} min={0} size={2} className="p-inputtext-sm" />
+          <label className="mr-1 mb-0">TP%</label>
+          <InputNumber value={manualTpPercent} onValueChange={e => setManualTpPercent(e.value ?? 0)} step={0.1} min={0} size={2} className="p-inputtext-sm" />
           <InputNumber value={manualQuantity} onValueChange={e => setManualQuantity(e.value ?? 1)} min={1} size={1} className="p-inputtext-sm" />
           <label className="mr-1 mb-0">Тип ордера</label>
           <Dropdown
