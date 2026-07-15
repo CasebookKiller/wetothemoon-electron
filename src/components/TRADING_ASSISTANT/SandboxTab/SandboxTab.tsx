@@ -5,20 +5,24 @@ import { Card } from 'primereact/card';
 import { Button } from 'primereact/button';
 import { Dropdown } from 'primereact/dropdown';
 import { InputNumber } from 'primereact/inputnumber';
-import { InputText } from 'primereact/inputtext';
 import { Checkbox } from 'primereact/checkbox';
 
 interface SandboxTabProps {
   availableInstruments: Array<{ uid: string; name: string; ticker?: string }>;
+  sharedAccountId: string;
+  onAccountChange: (id: string) => void;
 }
 
-export const SandboxTab: React.FC<SandboxTabProps> = ({ availableInstruments }) => {
+export const SandboxTab: React.FC<SandboxTabProps> = ({ 
+  availableInstruments,
+  sharedAccountId,
+  onAccountChange 
+}) => {
   const api = (window as any).electronAPI;
 
   // ---------- Счета ----------
   const [token, setToken] = useState(import.meta.env.VITE_TSandBox || '');
   const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([]);
-  const [selectedAccountId, setSelectedAccountId] = useState('');
   const [loadingAccounts, setLoadingAccounts] = useState(false);
   const [balance, setBalance] = useState<string | null>(null);
   const [payAmount, setPayAmount] = useState(10000);
@@ -37,7 +41,6 @@ export const SandboxTab: React.FC<SandboxTabProps> = ({ availableInstruments }) 
   const [entryMode, setEntryMode] = useState<'market' | 'limit'>('market');
 
   // ---------- Ручной ордер ----------
-  //const [manualUid, setManualUid] = useState('');
   const [manualInstrument, setManualInstrument] = useState<string>('');
   const [manualType, setManualType] = useState<'BUY' | 'SELL'>('BUY');
   const [manualQuantity, setManualQuantity] = useState(1);
@@ -51,7 +54,10 @@ export const SandboxTab: React.FC<SandboxTabProps> = ({ availableInstruments }) 
     try {
       const list = await api.getSandboxAccounts(token);
       setAccounts(list || []);
-      if (list?.length === 1) setSelectedAccountId(list[0].id);
+      // Если счетов ровно один и ещё не выбран – выбираем автоматически
+      if (list?.length === 1 && !sharedAccountId) {
+        onAccountChange(list[0].id);
+      }
     } catch (err: any) {
       alert('Ошибка загрузки счетов: ' + err.message);
     } finally {
@@ -62,13 +68,13 @@ export const SandboxTab: React.FC<SandboxTabProps> = ({ availableInstruments }) 
   useEffect(() => { if (token) loadAccounts(); }, [token]);
 
   const refreshBalance = async () => {
-    if (!api?.getBalance || !selectedAccountId) return;
-    const res = await api.getBalance(selectedAccountId);
+    if (!api?.getBalance || !sharedAccountId) return;
+    const res = await api.getBalance(sharedAccountId);
     if (res.success) setBalance(`${res.balance} ${res.currency}`);
     else setBalance(`Ошибка: ${res.error}`);
   };
 
-  useEffect(() => { if (selectedAccountId) refreshBalance(); }, [selectedAccountId]);
+  useEffect(() => { if (sharedAccountId) refreshBalance(); }, [sharedAccountId]);
 
   const handleCreateAccount = async () => {
     if (!api?.createSandboxAccount) return;
@@ -78,16 +84,16 @@ export const SandboxTab: React.FC<SandboxTabProps> = ({ availableInstruments }) 
   };
 
   const handleCloseAccount = async () => {
-    if (!selectedAccountId) return;
-    if (!confirm(`Закрыть счёт ${selectedAccountId}?`)) return;
-    await api.closeSandboxAccount(selectedAccountId);
-    setSelectedAccountId('');
+    if (!sharedAccountId) return;
+    if (!confirm(`Закрыть счёт ${sharedAccountId}?`)) return;
+    await api.closeSandboxAccount(sharedAccountId);
+    onAccountChange('');
     loadAccounts();
   };
 
   const handlePayIn = async () => {
     if (!api?.payInSandbox) return;
-    const res = await api.payInSandbox(payAmount, selectedAccountId);
+    const res = await api.payInSandbox(payAmount, sharedAccountId);
     if (res.success) { alert('Счёт пополнен'); refreshBalance(); }
     else alert('Ошибка: ' + res.error);
   };
@@ -97,7 +103,7 @@ export const SandboxTab: React.FC<SandboxTabProps> = ({ availableInstruments }) 
     if (!api?.updateTradingConfig) return;
     await api.updateTradingConfig({
       token,
-      accountId: selectedAccountId,
+      accountId: sharedAccountId,
       lotQuantity: lotQty,
       stopLossPercent,
       takeProfitPercent,
@@ -115,8 +121,8 @@ export const SandboxTab: React.FC<SandboxTabProps> = ({ availableInstruments }) 
 
   // Отправить ручной ордер
   const sendManualOrder = async () => {
-    if (!selectedAccountId || !manualInstrument) return;
-    await applyConfig(); // чтобы OrderManager получил актуальные настройки
+    if (!sharedAccountId || !manualInstrument) return;
+    await applyConfig();
     if (!api?.sendManualOrder) return;
     const res = await api.sendManualOrder({
       instrumentUid: manualInstrument,
@@ -137,9 +143,9 @@ export const SandboxTab: React.FC<SandboxTabProps> = ({ availableInstruments }) 
           <div className="flex align-items-center flex-wrap gap-2 mb-2">
             <label className="mr-1 mb-0">Счёт</label>
             <Dropdown
-              value={selectedAccountId}
+              value={sharedAccountId}
               options={accounts.map(a => ({ label: a.name || a.id, value: a.id }))}
-              onChange={e => setSelectedAccountId(e.value)}
+              onChange={e => onAccountChange(e.value)}
               placeholder="Выберите счёт"
               className="p-inputtext-sm"
               style={{ minWidth: '200px' }}
@@ -155,7 +161,6 @@ export const SandboxTab: React.FC<SandboxTabProps> = ({ availableInstruments }) 
               min={1000}
               step={1000}
               className="p-inputtext-sm mr-1"
-              //style={{width: '100px'}}
             />
             <Button label="Пополнить" onClick={handlePayIn} className="p-button-sm p-button-success p-1 px-2" />
           </div>
@@ -193,7 +198,6 @@ export const SandboxTab: React.FC<SandboxTabProps> = ({ availableInstruments }) 
 
             <Button label="Apply" onClick={applyConfig} className="p-button-sm p-button-info p-1 px-2" tooltip="Применить конфигурацию" />
           </div>
-
         </div>
       </Card>
 
@@ -229,7 +233,6 @@ export const SandboxTab: React.FC<SandboxTabProps> = ({ availableInstruments }) 
           <Button label="Отправить" icon="pi pi-send" onClick={sendManualOrder} className="p-button-sm p-button-success p-1 px-2" />
         </div>
       </Card>
-
     </div>
   );
 };
