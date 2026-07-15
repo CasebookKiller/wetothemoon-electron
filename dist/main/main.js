@@ -5992,6 +5992,13 @@ var OrderManager = class {
 	}
 	async placeProtectiveOrders(signal, entryPrice) {
 		const { stopLossPercent, takeProfitPercent, lotQuantity, token, accountId, trailingMode, volatilityMultiplier } = this.config;
+		if (entryPrice <= 0) {
+			console.warn("[OrderManager] entryPrice = 0, защитные ордера не выставляются");
+			return {
+				stopOrderId: null,
+				takeProfitOrderId: null
+			};
+		}
 		if (stopLossPercent <= 0 && takeProfitPercent <= 0 && trailingMode !== "volatility") return {
 			stopOrderId: null,
 			takeProfitOrderId: null
@@ -6196,7 +6203,13 @@ var OrderManager = class {
 			targetPrice: params.orderType === "limit" ? params.price : void 0
 		};
 		console.log("[OrderManager] sendManualOrder signal:", signal);
-		await this.processSignal(signal);
+		try {
+			await this.processSignal(signal);
+		} catch (error) {
+			const apiError = handleApiError(error);
+			console.error("[OrderManager] Ошибка отправки ручного ордера:", apiError.message);
+			throw error;
+		}
 	}
 };
 //#endregion

@@ -289,6 +289,11 @@ export class OrderManager {
       volatilityMultiplier
     } = this.config;
 
+    if (entryPrice <= 0) {
+      console.warn('[OrderManager] entryPrice = 0, защитные ордера не выставляются');
+      return { stopOrderId: null, takeProfitOrderId: null };
+    }
+
     if (stopLossPercent <= 0 && takeProfitPercent <= 0 && trailingMode !== 'volatility')
       return { stopOrderId: null, takeProfitOrderId: null };
     if (!accountId || !token || !signal.instrumentUid)
@@ -540,6 +545,13 @@ export class OrderManager {
       targetPrice: params.orderType === 'limit' ? params.price : undefined,
     };
     console.log('[OrderManager] sendManualOrder signal:', signal);
-    await this.processSignal(signal);
+    try {
+      await this.processSignal(signal);
+    } catch (error) {
+      const apiError = handleApiError(error);
+      console.error('[OrderManager] Ошибка отправки ручного ордера:', apiError.message);
+      // Можно выбросить ошибку дальше, чтобы UI показал toast
+      throw error;
+    }
   }
 }
