@@ -530,14 +530,16 @@ export class OrderManager {
     orderType: 'market' | 'limit';
     price?: number;
   }): Promise<void> {
+    this.isRunning = true; // ← гарантируем, что менеджер активен
     const signal: BacktestSignal = {
       instrumentUid: params.instrumentUid,
       type: params.type,
-      price: params.price || 0, // для market можно 0
+      price: params.price || 0,
       time: new Date().toISOString(),
       reason: 'Manual order',
       targetPrice: params.orderType === 'limit' ? params.price : undefined,
     };
+    console.log('[OrderManager] sendManualOrder signal:', signal);
     await this.processSignal(signal);
   }
 }

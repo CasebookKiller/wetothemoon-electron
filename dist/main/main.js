@@ -6186,6 +6186,7 @@ var OrderManager = class {
 		}
 	}
 	async sendManualOrder(params) {
+		this.isRunning = true;
 		const signal = {
 			instrumentUid: params.instrumentUid,
 			type: params.type,
@@ -6194,6 +6195,7 @@ var OrderManager = class {
 			reason: "Manual order",
 			targetPrice: params.orderType === "limit" ? params.price : void 0
 		};
+		console.log("[OrderManager] sendManualOrder signal:", signal);
 		await this.processSignal(signal);
 	}
 };

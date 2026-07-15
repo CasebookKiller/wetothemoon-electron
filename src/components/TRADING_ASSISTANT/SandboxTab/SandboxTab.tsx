@@ -40,6 +40,8 @@ export const SandboxTab: React.FC<SandboxTabProps> = ({
   const [stopMode, setStopMode] = useState<'stop_order' | 'limit_order'>('stop_order');
   const [entryMode, setEntryMode] = useState<'market' | 'limit'>('market');
 
+  const [demoMode, setDemoMode] = useState(false);
+
   // ---------- Ручной ордер ----------
   const [manualInstrument, setManualInstrument] = useState<string>('');
   const [manualType, setManualType] = useState<'BUY' | 'SELL'>('BUY');
@@ -115,6 +117,7 @@ export const SandboxTab: React.FC<SandboxTabProps> = ({
       atrMultiplier,
       stopMode,
       entryMode,
+      demoMode
     });
     alert('Конфигурация применена');
   };
@@ -153,6 +156,8 @@ export const SandboxTab: React.FC<SandboxTabProps> = ({
             <Button icon="pi pi-refresh" loading={loadingAccounts} onClick={loadAccounts} className="p-button-sm p-button-secondary p-1 px-2" tooltip="Загрузить счета" />
             <Button icon="pi pi-plus" onClick={handleCreateAccount} className="p-button-sm p-button-success p-1 px-2" tooltip="Создать счёт" />
             <Button icon="pi pi-trash" onClick={handleCloseAccount} className="p-button-sm p-button-danger p-1 px-2" tooltip="Удалить счёт" />
+            <Checkbox checked={demoMode} onChange={(e: any) => setDemoMode(e.checked)} />
+            <label className="ml-1 mr-2 mb-0">Demo</label>
             {balance && <label className="mr-1 mb-0">Баланс</label>}
             {balance && <div className="mr-1 mb-0">{balance}</div>}
             <InputNumber
