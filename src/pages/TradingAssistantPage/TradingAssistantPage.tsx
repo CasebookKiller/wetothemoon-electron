@@ -717,7 +717,7 @@ export const TradingAssistantPage: React.FC = () => {
               </div>
             </Dialog>
           </TabPanel>
-          <TabPanel header="Autotrader"><AutoTraderTab sandbox={sandbox} availableInstruments={availableInstruments} /></TabPanel>
+          <TabPanel header="Autotrader"><AutoTraderTab availableInstruments={availableInstruments} /></TabPanel>
           <TabPanel header="Backtest">
             <BacktestTab selectedInstrument={selectedInstrument} setSelectedInstrument={setSelectedInstrument} availableInstruments={availableInstruments} instrumentsLoading={instrumentsLoading} loadAllInstruments={loadAllInstruments} backtest={backtest} updateBacktest={updateBacktest} showBacktestAdvanced={showBacktestAdvanced} setShowBacktestAdvanced={setShowBacktestAdvanced} runBacktest={runBacktest} sendBacktestToSandbox={sendBacktestToSandbox} backtestCandlesData={backtestCandlesData} />
           </TabPanel>
@@ -727,16 +727,6 @@ export const TradingAssistantPage: React.FC = () => {
           <TabPanel header="Signals"><SignalsTab signals={currentSignals} /></TabPanel>
           <TabPanel header="Profile"><ProfileTab profile={currentProfile} /></TabPanel>
           <TabPanel header="Trades"><TradesTab currentTrades={currentTrades} trades={backtest.trades} /></TabPanel>
-          <TabPanel header="Pos/Orders">
-            <PositionsOrdersTab
-              accountId={sharedAccountId || sandbox.accountId}
-            />
-          </TabPanel>
-          <TabPanel header="Log">
-            <LogTab
-              accountId={sharedAccountId || sandbox.accountId}
-            />
-          </TabPanel>
           <TabPanel header="Screener"><ScreenerTab token={stream.token} results={screenerResults} setResults={setScreenerResults} onSendToFarmer={setFarmerInstruments} /></TabPanel>
           <TabPanel header="Cloud"><CloudTab /></TabPanel>
           <TabPanel header="Farmer"><CloudFarmerTab token={stream.token} batches={farmerBatches} setBatches={setFarmerBatches} farmerInstruments={farmerInstruments} setFarmerInstruments={setFarmerInstruments} /></TabPanel>

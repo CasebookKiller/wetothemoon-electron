@@ -90,7 +90,7 @@ export const PositionsOrdersTab: React.FC<Props> = ({ accountId }) => {
           icon="pi pi-refresh"
           onClick={fetchData}
           loading={loading}
-          className="p-button-sm p-button-secondary p-mb-2"
+          className="p-button-sm p-button-secondary p-1 px-2"
         />
 
         <h4 className="p-mb-2">Open Positions</h4>
@@ -126,7 +126,7 @@ export const PositionsOrdersTab: React.FC<Props> = ({ accountId }) => {
           <Column body={row => (
             <Button
               icon="pi pi-ban"
-              className="p-button-sm p-button-warning"
+              className="p-button-sm p-button-warning p-1 px-2"
               onClick={() => cancelOrder(row.orderId)}
               tooltip="Cancel order"
             />

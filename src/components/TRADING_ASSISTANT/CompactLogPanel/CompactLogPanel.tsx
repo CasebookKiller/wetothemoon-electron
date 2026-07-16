@@ -74,12 +74,12 @@ export const CompactLogPanel: React.FC<Props> = ({ accountId }) => {
 
   return (
     <div>
-      <div className="flex justify-content-between align-items-center mb-2">
+      <div className="flex justify-content-between align-items-center mt-2 mb-2">
         <h5 className="m-0">Операции</h5>
-        <div className="flex gap-1">
-          <Button icon="pi pi-download" loading={loading} onClick={exportCSV} className="p-button-sm p-button-success" tooltip="CSV" />
-          <Button icon="pi pi-file" onClick={exportJSON} className="p-button-sm p-button-secondary" tooltip="JSON" />
-          <Button icon="pi pi-refresh" loading={loading} onClick={fetchOperations} className="p-button-sm p-button-secondary" />
+        <div className="flex gap-1 ml-1">
+          <Button icon="pi pi-download" loading={loading} onClick={exportCSV} className="p-button-sm p-button-success p-1 px-2 p-button" tooltip="CSV" />
+          <Button icon="pi pi-file" onClick={exportJSON} className="p-button-sm p-button-secondary p-1 px-2" tooltip="JSON" />
+          <Button icon="pi pi-refresh" loading={loading} onClick={fetchOperations} className="p-button-sm p-button-secondary p-1 px-2" />
         </div>
       </div>
 

@@ -41,9 +41,9 @@ export const CompactPositionsPanel: React.FC<Props> = ({ accountId }) => {
 
   return (
     <div>
-      <div className="flex justify-content-between align-items-center mb-2">
+      <div className="flex justify-content-between align-items-center mt-2mb-2">
         <h5 className="m-0">Позиции и ордера</h5>
-        <Button icon="pi pi-refresh" loading={loading} onClick={fetchData} className="p-button-sm p-button-secondary" />
+        <Button icon="pi pi-refresh" loading={loading} onClick={fetchData} className="p-button-sm p-button-secondary p-1 px-2" />
       </div>
 
       <h6 className="m-1">Позиции</h6>
