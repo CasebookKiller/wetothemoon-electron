@@ -6,6 +6,9 @@ import { Button } from 'primereact/button';
 import { Dropdown } from 'primereact/dropdown';
 import { InputNumber } from 'primereact/inputnumber';
 import { Checkbox } from 'primereact/checkbox';
+import { Panel } from 'primereact/panel';
+import { CompactPositionsPanel } from '../CompactPositionsPanel/CompactPositionsPanel';
+import { CompactLogPanel } from '../CompactLogPanel/CompactLogPanel';
 
 interface SandboxTabProps {
   availableInstruments: Array<{ uid: string; name: string; ticker?: string }>;
@@ -252,6 +255,11 @@ export const SandboxTab: React.FC<SandboxTabProps> = ({
           <Button label="Отправить" icon="pi pi-send" onClick={sendManualOrder} className="p-button-sm p-button-success p-1 px-2" />
         </div>
       </Card>
+
+      <Panel header="Позиции и лог" toggleable className="mt-2">
+        <CompactPositionsPanel accountId={sharedAccountId} />
+        <CompactLogPanel accountId={sharedAccountId} />
+      </Panel>
     </div>
   );
 };

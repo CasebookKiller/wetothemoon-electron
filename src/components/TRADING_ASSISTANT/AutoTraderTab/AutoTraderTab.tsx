@@ -7,6 +7,9 @@ import { Dropdown } from 'primereact/dropdown';
 import { InputNumber } from 'primereact/inputnumber';
 import { Checkbox } from 'primereact/checkbox';
 import { Tag } from 'primereact/tag';
+import { Panel } from 'primereact/panel';
+import { CompactLogPanel } from '../CompactLogPanel/CompactLogPanel';
+import { CompactPositionsPanel } from '../CompactPositionsPanel/CompactPositionsPanel';
 
 const STORAGE_KEY = 'autotrader_config';
 
@@ -315,6 +318,10 @@ export const AutoTraderTab: React.FC<AutoTraderTabProps> = ({ availableInstrumen
           </div>
         </div>
       </Card>
+      <Panel header="Позиции и лог" toggleable className="mt-2">
+        <CompactPositionsPanel accountId={selectedAccountId} />
+        <CompactLogPanel accountId={selectedAccountId} />
+      </Panel>
     </div>
   );
 };
