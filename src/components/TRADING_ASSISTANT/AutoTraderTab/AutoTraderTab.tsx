@@ -119,6 +119,18 @@ export const AutoTraderTab: React.FC<AutoTraderTabProps> = ({ availableInstrumen
     return () => clearInterval(interval);
   }, [selectedInstrument]);
 
+  // Восстановление статуса активных трейдеров при монтировании
+  useEffect(() => {
+    const fetchActive = async () => {
+      const api = (window as any).electronAPI;
+      if (api?.getActiveAutoTraders) {
+        const active = await api.getActiveAutoTraders();
+        setActiveAutoTraders(active);
+      }
+    };
+    fetchActive();
+  }, []);
+
   const handleStart = async () => {
     if (!selectedInstrument || !selectedAccountId) return;
 
