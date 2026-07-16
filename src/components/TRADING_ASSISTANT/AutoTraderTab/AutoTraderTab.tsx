@@ -8,28 +8,43 @@ import { InputNumber } from 'primereact/inputnumber';
 import { Checkbox } from 'primereact/checkbox';
 import { Tag } from 'primereact/tag';
 
+const STORAGE_KEY = 'autotrader_config';
+
+const loadConfig = () => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+};
+
+const saveConfig = (config: any) => {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+};
+
 interface AutoTraderTabProps {
   availableInstruments: Array<{ uid: string; name: string; ticker?: string }>;
 }
 
 export const AutoTraderTab: React.FC<AutoTraderTabProps> = ({ availableInstruments }) => {
+  const saved = loadConfig();
+
   // ---------- Параметры риск‑менеджмента ----------
-  const [lotQty, setLotQty] = useState(1);
-  const [stopLossPercent, setStopLossPercent] = useState(1);
-  const [takeProfitPercent, setTakeProfitPercent] = useState(2);
-  const [trailingEnabled, setTrailingEnabled] = useState(false);
-  const [trailingPercent, setTrailingPercent] = useState(1);
-  const [dynamicSizing, setDynamicSizing] = useState(false);
-  const [riskAmount, setRiskAmount] = useState(1000);
-  const [atrPeriod, setAtrPeriod] = useState(14);
-  const [atrMultiplier, setAtrMultiplier] = useState(2);
-  const [entryMode, setEntryMode] = useState<'market' | 'limit'>('market');
-  const [stopMode, setStopMode] = useState<'stop_order' | 'limit_order'>('stop_order');
+  const [lotQty, setLotQty] = useState(saved.lotQty ?? 1);
+  const [stopLossPercent, setStopLossPercent] = useState(saved.stopLossPercent ?? 1);
+  const [takeProfitPercent, setTakeProfitPercent] = useState(saved.takeProfitPercent ?? 2);
+  const [trailingEnabled, setTrailingEnabled] = useState(saved.trailingEnabled ?? false);
+  const [trailingPercent, setTrailingPercent] = useState(saved.trailingPercent ?? 1);
+  const [dynamicSizing, setDynamicSizing] = useState(saved.dynamicSizing ?? false);
+  const [riskAmount, setRiskAmount] = useState(saved.riskAmount ?? 1000);
+  const [atrPeriod, setAtrPeriod] = useState(saved.atrPeriod ?? 14);
+  const [atrMultiplier, setAtrMultiplier] = useState(saved.atrMultiplier ?? 2);
+  const [entryMode, setEntryMode] = useState<'market' | 'limit'>(saved.entryMode ?? 'market');
+  const [stopMode, setStopMode] = useState<'stop_order' | 'limit_order'>(saved.stopMode ?? 'stop_order');
 
   // ---------- Инструмент и счёт ----------
-  const [selectedInstrument, setSelectedInstrument] = useState<string>('');
+  const [selectedInstrument, setSelectedInstrument] = useState<string>(saved.selectedInstrument ?? '');
+  const [selectedAccountId, setSelectedAccountId] = useState<string>(saved.selectedAccountId ?? '');
   const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([]);
-  const [selectedAccountId, setSelectedAccountId] = useState<string>('');
 
   // ---------- Состояние трейдера ----------
   const [activeAutoTraders, setActiveAutoTraders] = useState<string[]>([]);
@@ -39,6 +54,18 @@ export const AutoTraderTab: React.FC<AutoTraderTabProps> = ({ availableInstrumen
 
   const api = (window as any).electronAPI;
 
+  // Сохранение при любом изменении параметров
+  useEffect(() => {
+    saveConfig({
+      lotQty, stopLossPercent, takeProfitPercent, trailingEnabled, trailingPercent,
+      dynamicSizing, riskAmount, atrPeriod, atrMultiplier,
+      entryMode, stopMode,
+      selectedInstrument, selectedAccountId,
+    });
+  }, [lotQty, stopLossPercent, takeProfitPercent, trailingEnabled, trailingPercent,
+      dynamicSizing, riskAmount, atrPeriod, atrMultiplier,
+      entryMode, stopMode, selectedInstrument, selectedAccountId]);
+
   // Загрузка счетов
   useEffect(() => {
     (async () => {
@@ -47,8 +74,10 @@ export const AutoTraderTab: React.FC<AutoTraderTabProps> = ({ availableInstrumen
       try {
         const list = await api.getSandboxAccounts(token);
         setAccounts(list || []);
-        if (list?.length === 1) setSelectedAccountId(list[0].id);
-      } catch (e) { console.error('Ошибка загрузки счетов автотрейдера:', e); }
+        if (!selectedAccountId && list?.length === 1) {
+          setSelectedAccountId(list[0].id);
+        }
+      } catch (e) { console.error('Ошибка загрузки счетов:', e); }
     })();
   }, []);
 
@@ -93,7 +122,6 @@ export const AutoTraderTab: React.FC<AutoTraderTabProps> = ({ availableInstrumen
   const handleStart = async () => {
     if (!selectedInstrument || !selectedAccountId) return;
 
-    // Применить конфиг
     await api.updateTradingConfig({
       token: import.meta.env.VITE_TSandBox,
       accountId: selectedAccountId,
@@ -112,7 +140,6 @@ export const AutoTraderTab: React.FC<AutoTraderTabProps> = ({ availableInstrumen
       demoMode: false,
     });
 
-    // Запустить стрим
     if (!streamActive) {
       try {
         const token = import.meta.env.VITE_TReadOnly || '';
@@ -181,7 +208,7 @@ export const AutoTraderTab: React.FC<AutoTraderTabProps> = ({ availableInstrumen
           <InputNumber value={takeProfitPercent} onValueChange={e => setTakeProfitPercent(e.value ?? 0)} step={0.1} min={0} size={2} className="p-inputtext-sm" />
 
           <div className="flex align-items-center ml-2">
-            <Checkbox checked={trailingEnabled} onChange={(e:any) => setTrailingEnabled(e.checked)} />
+            <Checkbox checked={trailingEnabled} onChange={e => setTrailingEnabled(e.checked)} />
             <label className="ml-1 mr-1 mb-0">Trail</label>
             {trailingEnabled && (
               <InputNumber value={trailingPercent} onValueChange={e => setTrailingPercent(e.value ?? 0.5)} step={0.1} min={0} size={2} className="p-inputtext-sm" />
@@ -189,7 +216,7 @@ export const AutoTraderTab: React.FC<AutoTraderTabProps> = ({ availableInstrumen
           </div>
 
           <div className="flex align-items-center ml-2">
-            <Checkbox checked={dynamicSizing} onChange={(e:any) => setDynamicSizing(e.checked)} />
+            <Checkbox checked={dynamicSizing} onChange={e => setDynamicSizing(e.checked)} />
             <label className="ml-1 mr-1 mb-0">Dyn.Lots</label>
             {dynamicSizing && (
               <InputNumber value={riskAmount} onValueChange={e => setRiskAmount(e.value ?? 1000)} step={100} min={0} size={3} className="p-inputtext-sm" placeholder="Risk RUB" />
