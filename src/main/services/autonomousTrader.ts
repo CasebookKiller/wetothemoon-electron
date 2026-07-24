@@ -29,6 +29,12 @@ export class AutonomousTrader extends EventEmitter {
 
       console.log(`[AutonomousTrader] signal handler called ${signal.instrumentUid} ${signal.type}`);
 
+      const profile = volumeProfileEngine.getProfile(signal.instrumentUid);
+      if (profile) {
+        // В качестве целевой цены для лимитного входа используем POC
+        signal.targetPrice = profile.poc;
+      }
+
       this.emit('signal', {
         instrumentUid,
         signal: { type: signal.type, price: signal.price, reason: signal.message },

@@ -97,6 +97,8 @@ export class OrderManager {
   }
 
   async processSignal(signal: BacktestSignal): Promise<void> {
+    console.log('[OrderManager] entryMode:', this.config.entryMode, 'targetPrice:', signal.targetPrice, 'stopMode:', this.config.stopMode);
+    
     if (!this.isRunning) return;
     if (this.config.demoMode) {
       console.log(`[OrderManager][DEMO] ${signal.type} ${this.config.lotQuantity} лотов по цене ${signal.price}`);
@@ -105,7 +107,9 @@ export class OrderManager {
     if (!this.config.token || !this.config.accountId) return;
 
     const now = Date.now();
-    if (now - this.lastOrderTime < 5 * 60 * 1000) {
+    //Временное отключение кулдауна
+    //if (now - this.lastOrderTime < 5 * 60 * 1000) {
+    if (now - this.lastOrderTime < 30 * 1000) { // 30 секунд для теста
       console.log('[OrderManager] Кулдаун, пропускаем сигнал');
       return;
     }
@@ -543,6 +547,7 @@ export class OrderManager {
     price?: number;
   }): Promise<void> {
     this.isRunning = true; // ← гарантируем, что менеджер активен
+    //this.lastOrderTime = 0; // временное отключение кулдауна
     const signal: BacktestSignal = {
       instrumentUid: params.instrumentUid,
       type: params.type,

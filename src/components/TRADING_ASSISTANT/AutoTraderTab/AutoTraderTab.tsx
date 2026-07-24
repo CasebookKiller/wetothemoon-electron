@@ -222,22 +222,18 @@ export const AutoTraderTab: React.FC<AutoTraderTabProps> = ({ availableInstrumen
           <label className="ml-2 mr-1 mb-0">TP%</label>
           <InputNumber value={takeProfitPercent} onValueChange={e => setTakeProfitPercent(e.value ?? 0)} step={0.1} min={0} size={2} className="p-inputtext-sm" />
 
-          <div className="flex align-items-center ml-2">
-            <Checkbox checked={trailingEnabled} onChange={e => setTrailingEnabled(e.checked)} />
-            <label className="ml-1 mr-1 mb-0">Trail</label>
-            {trailingEnabled && (
-              <InputNumber value={trailingPercent} onValueChange={e => setTrailingPercent(e.value ?? 0.5)} step={0.1} min={0} size={2} className="p-inputtext-sm" />
-            )}
-          </div>
-
-          <div className="flex align-items-center ml-2">
-            <Checkbox checked={dynamicSizing} onChange={e => setDynamicSizing(e.checked)} />
-            <label className="ml-1 mr-1 mb-0">Dyn.Lots</label>
-            {dynamicSizing && (
-              <InputNumber value={riskAmount} onValueChange={e => setRiskAmount(e.value ?? 1000)} step={100} min={0} size={3} className="p-inputtext-sm" placeholder="Risk RUB" />
-            )}
-          </div>
-
+          <Checkbox checked={trailingEnabled} onChange={e => setTrailingEnabled(e.checked)} />
+          <label className="ml-1 mr-1 mb-0">Trail</label>
+          {trailingEnabled && (
+            <InputNumber value={trailingPercent} onValueChange={e => setTrailingPercent(e.value ?? 0.5)} step={0.1} min={0} size={2} className="p-inputtext-sm" />
+          )}
+          
+          <Checkbox checked={dynamicSizing} onChange={e => setDynamicSizing(e.checked)} />
+          <label className="ml-1 mr-1 mb-0">Dyn.Lots</label>
+          {dynamicSizing && (
+            <InputNumber value={riskAmount} onValueChange={e => setRiskAmount(e.value ?? 1000)} step={100} min={0} size={3} className="p-inputtext-sm" placeholder="Risk RUB" />
+          )}
+          
           {(dynamicSizing || trailingEnabled) && (
             <>
               <label className="ml-2 mr-1 mb-0">ATR Per</label>

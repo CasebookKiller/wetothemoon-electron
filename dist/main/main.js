@@ -5851,6 +5851,7 @@ var OrderManager = class {
 		console.log(`[OrderManager] Автоторговля ${state ? "запущена" : "остановлена"}`);
 	}
 	async processSignal(signal) {
+		console.log("[OrderManager] entryMode:", this.config.entryMode, "targetPrice:", signal.targetPrice, "stopMode:", this.config.stopMode);
 		if (!this.isRunning) return;
 		if (this.config.demoMode) {
 			console.log(`[OrderManager][DEMO] ${signal.type} ${this.config.lotQuantity} лотов по цене ${signal.price}`);
@@ -5858,7 +5859,7 @@ var OrderManager = class {
 		}
 		if (!this.config.token || !this.config.accountId) return;
 		const now = Date.now();
-		if (now - this.lastOrderTime < 300 * 1e3) {
+		if (now - this.lastOrderTime < 30 * 1e3) {
 			console.log("[OrderManager] Кулдаун, пропускаем сигнал");
 			return;
 		}
@@ -6565,6 +6566,8 @@ var AutonomousTrader = class extends events.EventEmitter {
 		const handler = async (signal) => {
 			if (signal.instrumentUid !== instrumentUid) return;
 			console.log(`[AutonomousTrader] signal handler called ${signal.instrumentUid} ${signal.type}`);
+			const profile = volumeProfileEngine.getProfile(signal.instrumentUid);
+			if (profile) signal.targetPrice = profile.poc;
 			this.emit("signal", {
 				instrumentUid,
 				signal: {
