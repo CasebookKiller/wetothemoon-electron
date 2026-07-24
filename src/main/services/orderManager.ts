@@ -26,11 +26,12 @@ export interface OrderManagerConfig {
   useDynamicSizing?: boolean;   // включить расчёт лотов по волатильности
   atrPeriod?: number;           // период ATR (по умолчанию 14)
   atrMultiplier?: number;       // множитель ATR для размера позиции (по умолчанию 2)
-  riskAmount?: number;          // сумма риска на сделку в рублях (если 0 – не используется)
   trailingMode?: 'percent' | 'volatility'; // режим трейлинга
   volatilityMultiplier?: number; // множитель для стопа по волатильности
   stopMode: 'stop_order' | 'limit_order';
   entryMode?: 'market' | 'limit';   // ← добавить
+  riskAmount?: number;            // абсолютный риск (если процент не задан)
+  dynamicSizingPercent?: number;  // процент от депозита (0 = не используется)
 }
 
 export class OrderManager {
@@ -75,6 +76,7 @@ export class OrderManager {
       volatilityMultiplier: 2,
       stopMode: 'stop_order',
       entryMode: 'market',   // ← добавить
+      dynamicSizingPercent: 0,
       ...config,
     };
     this.orderFlow = orderFlow;   // сохраняем отдельно
@@ -98,7 +100,7 @@ export class OrderManager {
 
   async processSignal(signal: BacktestSignal): Promise<void> {
     console.log('[OrderManager] entryMode:', this.config.entryMode, 'targetPrice:', signal.targetPrice, 'stopMode:', this.config.stopMode);
-    
+
     if (!this.isRunning) return;
     if (this.config.demoMode) {
       console.log(`[OrderManager][DEMO] ${signal.type} ${this.config.lotQuantity} лотов по цене ${signal.price}`);
@@ -108,8 +110,8 @@ export class OrderManager {
 
     const now = Date.now();
     //Временное отключение кулдауна
-    //if (now - this.lastOrderTime < 5 * 60 * 1000) {
-    if (now - this.lastOrderTime < 30 * 1000) { // 30 секунд для теста
+    if (now - this.lastOrderTime < 5 * 60 * 1000) {
+    //if (now - this.lastOrderTime < 30 * 1000) { // 30 секунд для теста
       console.log('[OrderManager] Кулдаун, пропускаем сигнал');
       return;
     }
@@ -118,11 +120,25 @@ export class OrderManager {
 
     // === ДИНАМИЧЕСКИЙ РАЗМЕР ПОЗИЦИИ ПО ATR ===
     let quantity = this.config.lotQuantity;
+    let riskAmount = this.config.riskAmount;
+    if (this.config.useDynamicSizing && this.config.dynamicSizingPercent && this.config.dynamicSizingPercent > 0) {
+      try {
+        const balanceRes = await sandboxGrpc.getSandboxPortfolio({ accountId: this.config.accountId }, this.config.token);
+        const total = balanceRes.totalAmountPortfolio;
+        if (total) {
+          const balance = Number(total.units || '0') + (total.nano || 0) / 1e9;
+          riskAmount = balance * (this.config.dynamicSizingPercent / 100);
+          console.log(`[OrderManager] Баланс: ${balance}, риск ${this.config.dynamicSizingPercent}% = ${riskAmount.toFixed(2)}`);
+        }
+      } catch (e) {
+        console.warn('[OrderManager] Не удалось получить баланс, используется абсолютный риск');
+      }
+    }
     if (this.config.useDynamicSizing && this.historicalLoader) {
       const atr = await this.calculateATR(signal.instrumentUid, this.config.token);
-      if (atr && atr > 0 && this.config.riskAmount) {
+      if (atr && atr > 0 && riskAmount > 0) {
         const riskPerLot = atr * this.config.atrMultiplier!;
-        quantity = Math.floor(this.config.riskAmount / riskPerLot);
+        quantity = Math.floor(riskAmount / riskPerLot);
         if (quantity < 1) quantity = 1;
       }
     }

@@ -38,7 +38,9 @@ export const AutoTraderTab: React.FC<AutoTraderTabProps> = ({ availableInstrumen
   const [trailingEnabled, setTrailingEnabled] = useState(saved.trailingEnabled ?? false);
   const [trailingPercent, setTrailingPercent] = useState(saved.trailingPercent ?? 1);
   const [dynamicSizing, setDynamicSizing] = useState(saved.dynamicSizing ?? false);
-  const [riskAmount, setRiskAmount] = useState(saved.riskAmount ?? 1000);
+  //const [riskAmount, setRiskAmount] = useState(saved.riskAmount ?? 1000);
+  const [dynamicSizingPercent, setDynamicSizingPercent] = useState(saved.dynamicSizingPercent ?? 1); // по умолчанию 1%
+
   const [atrPeriod, setAtrPeriod] = useState(saved.atrPeriod ?? 14);
   const [atrMultiplier, setAtrMultiplier] = useState(saved.atrMultiplier ?? 2);
   const [entryMode, setEntryMode] = useState<'market' | 'limit'>(saved.entryMode ?? 'market');
@@ -61,12 +63,12 @@ export const AutoTraderTab: React.FC<AutoTraderTabProps> = ({ availableInstrumen
   useEffect(() => {
     saveConfig({
       lotQty, stopLossPercent, takeProfitPercent, trailingEnabled, trailingPercent,
-      dynamicSizing, riskAmount, atrPeriod, atrMultiplier,
+      dynamicSizing, dynamicSizingPercent, atrPeriod, atrMultiplier,
       entryMode, stopMode,
       selectedInstrument, selectedAccountId,
     });
   }, [lotQty, stopLossPercent, takeProfitPercent, trailingEnabled, trailingPercent,
-      dynamicSizing, riskAmount, atrPeriod, atrMultiplier,
+      dynamicSizing, dynamicSizingPercent, atrPeriod, atrMultiplier,
       entryMode, stopMode, selectedInstrument, selectedAccountId]);
 
   // Загрузка счетов
@@ -147,7 +149,7 @@ export const AutoTraderTab: React.FC<AutoTraderTabProps> = ({ availableInstrumen
       trailingPercent,
       trailingMode: 'percent',
       useDynamicSizing: dynamicSizing,
-      riskAmount,
+      dynamicSizingPercent,
       atrPeriod,
       atrMultiplier,
       stopMode,
@@ -231,7 +233,10 @@ export const AutoTraderTab: React.FC<AutoTraderTabProps> = ({ availableInstrumen
           <Checkbox checked={dynamicSizing} onChange={e => setDynamicSizing(e.checked)} />
           <label className="ml-1 mr-1 mb-0">Dyn.Lots</label>
           {dynamicSizing && (
-            <InputNumber value={riskAmount} onValueChange={e => setRiskAmount(e.value ?? 1000)} step={100} min={0} size={3} className="p-inputtext-sm" placeholder="Risk RUB" />
+            <>
+              <label className="ml-2 mr-1 mb-0">Risk %</label>
+              <InputNumber value={dynamicSizingPercent} onValueChange={e => setDynamicSizingPercent(e.value ?? 1)} step={0.1} min={0} size={3} className="p-inputtext-sm" />
+            </>
           )}
           
           {(dynamicSizing || trailingEnabled) && (

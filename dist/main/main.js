@@ -5830,6 +5830,7 @@ var OrderManager = class {
 			volatilityMultiplier: 2,
 			stopMode: "stop_order",
 			entryMode: "market",
+			dynamicSizingPercent: 0,
 			...config
 		};
 		this.orderFlow = orderFlow;
@@ -5859,17 +5860,28 @@ var OrderManager = class {
 		}
 		if (!this.config.token || !this.config.accountId) return;
 		const now = Date.now();
-		if (now - this.lastOrderTime < 30 * 1e3) {
+		if (now - this.lastOrderTime < 300 * 1e3) {
 			console.log("[OrderManager] Кулдаун, пропускаем сигнал");
 			return;
 		}
 		const direction = signal.type === "BUY" ? OrderDirection.ORDER_DIRECTION_BUY : OrderDirection.ORDER_DIRECTION_SELL;
 		let quantity = this.config.lotQuantity;
+		let riskAmount = this.config.riskAmount;
+		if (this.config.useDynamicSizing && this.config.dynamicSizingPercent && this.config.dynamicSizingPercent > 0) try {
+			const total = (await sandboxGrpc.getSandboxPortfolio({ accountId: this.config.accountId }, this.config.token)).totalAmountPortfolio;
+			if (total) {
+				const balance = Number(total.units || "0") + (total.nano || 0) / 1e9;
+				riskAmount = balance * (this.config.dynamicSizingPercent / 100);
+				console.log(`[OrderManager] Баланс: ${balance}, риск ${this.config.dynamicSizingPercent}% = ${riskAmount.toFixed(2)}`);
+			}
+		} catch (e) {
+			console.warn("[OrderManager] Не удалось получить баланс, используется абсолютный риск");
+		}
 		if (this.config.useDynamicSizing && this.historicalLoader) {
 			const atr = await this.calculateATR(signal.instrumentUid, this.config.token);
-			if (atr && atr > 0 && this.config.riskAmount) {
+			if (atr && atr > 0 && riskAmount > 0) {
 				const riskPerLot = atr * this.config.atrMultiplier;
-				quantity = Math.floor(this.config.riskAmount / riskPerLot);
+				quantity = Math.floor(riskAmount / riskPerLot);
 				if (quantity < 1) quantity = 1;
 			}
 		}
