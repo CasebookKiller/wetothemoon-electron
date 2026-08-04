@@ -57,6 +57,9 @@ export const AutoTraderTab: React.FC<AutoTraderTabProps> = ({ availableInstrumen
   const [orderFlowData, setOrderFlowData] = useState<{ delta: number; absorption: any; exhaustion: any } | null>(null);
   const [streamActive, setStreamActive] = useState(false);
 
+  const [maxSignalsPerDay, setMaxSignalsPerDay] = useState(saved.maxSignalsPerDay ?? 0);
+  const [minIntervalMinutes, setMinIntervalMinutes] = useState(saved.minIntervalMinutes ?? 15);
+
   const api = (window as any).electronAPI;
 
   // Сохранение при любом изменении параметров
@@ -66,6 +69,7 @@ export const AutoTraderTab: React.FC<AutoTraderTabProps> = ({ availableInstrumen
       dynamicSizing, dynamicSizingPercent, atrPeriod, atrMultiplier,
       entryMode, stopMode,
       selectedInstrument, selectedAccountId,
+      maxSignalsPerDay, minIntervalMinutes,
     });
   }, [lotQty, stopLossPercent, takeProfitPercent, trailingEnabled, trailingPercent,
       dynamicSizing, dynamicSizingPercent, atrPeriod, atrMultiplier,
@@ -155,6 +159,8 @@ export const AutoTraderTab: React.FC<AutoTraderTabProps> = ({ availableInstrumen
       stopMode,
       entryMode,
       demoMode: false,
+      maxSignalsPerDay,
+      minIntervalMinutes,
     });
 
     if (!streamActive) {
@@ -265,6 +271,11 @@ export const AutoTraderTab: React.FC<AutoTraderTabProps> = ({ availableInstrumen
             className="p-inputtext-sm"
             style={{ width: '120px' }}
           />
+
+          <label className="ml-2 mr-1 mb-0">Max Signals/Day</label>
+          <InputNumber value={maxSignalsPerDay} onValueChange={e => setMaxSignalsPerDay(e.value ?? 0)} min={0} step={1} size={2} className="p-inputtext-sm" />
+          <label className="ml-2 mr-1 mb-0">Min Interval (min)</label>
+          <InputNumber value={minIntervalMinutes} onValueChange={e => setMinIntervalMinutes(e.value ?? 15)} min={1} step={5} size={2} className="p-inputtext-sm" />
         </div>
 
         {/* Кнопки управления */}

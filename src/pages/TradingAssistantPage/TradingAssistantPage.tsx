@@ -14,18 +14,18 @@ import {
 import VolumeProfileBars from '@/components/TRADING_ASSISTANT/VolumeProfileBars/VolumeProfileBars';
 import './TradingAssistantPage.css';
 import { Button } from 'primereact/button';
-import { Card } from 'primereact/card';
+//import { Card } from 'primereact/card';
 import { Checkbox } from 'primereact/checkbox';
 import { Dropdown } from 'primereact/dropdown';
 import { InputNumber } from 'primereact/inputnumber';
 import { InputText } from 'primereact/inputtext';
 import { TabView, TabPanel } from 'primereact/tabview';
-import { Dialog } from 'primereact/dialog';
+//import { Dialog } from 'primereact/dialog';
 import { Signal } from '@/api/tbank/signalTypes';
 import { VolumeProfileLevels } from '@/main/services/volumeProfileEngine';
 import { VolumeProfileOverlay } from '@/components/TRADING_ASSISTANT/VolumeProfileOverlay/VolumeProfileOverlay';
-import { PositionsOrdersTab } from '@/components/TRADING_ASSISTANT/PositionsOrdersTab/PositionsOrdersTab';
-import { LogTab } from '@/components/TRADING_ASSISTANT/LogTab/LogTab';
+//import { PositionsOrdersTab } from '@/components/TRADING_ASSISTANT/PositionsOrdersTab/PositionsOrdersTab';
+//import { LogTab } from '@/components/TRADING_ASSISTANT/LogTab/LogTab';
 import { CandlestickChart } from '@/components/TRADING_ASSISTANT/CandlestickChart/CandlestickChart';
 import { AmChartsStockChart } from '@/components/TRADING_ASSISTANT/AmChartsStockChart/AmChartsStockChart';
 import { TradesTab } from '@/components/TRADING_ASSISTANT/TradesTab/TradesTab';
@@ -97,7 +97,7 @@ function aggregateCandles(
 export const TradingAssistantPage: React.FC = () => {
   // ========== СОСТОЯНИЯ ==========
   // Песочница (старая)
-  const [sandbox, setSandbox] = useState({
+  /*const [sandbox, setSandbox] = useState({
     token: import.meta.env.VITE_TSandBox || '',
     accountId: '',
     demoMode: true,
@@ -123,8 +123,8 @@ export const TradingAssistantPage: React.FC = () => {
     atrMultiplier: 2,
     stopMode: 'stop_order' as 'stop_order' | 'limit_order',
     entryMode: 'market' as 'market' | 'limit',
-  });
-  const [showSandboxSettings, setShowSandboxSettings] = useState(false);
+  });*/
+  //const [showSandboxSettings, setShowSandboxSettings] = useState(false);
   const [sharedAccountId, setSharedAccountId] = useState<string>('');
 
   // Стрим
@@ -206,7 +206,7 @@ export const TradingAssistantPage: React.FC = () => {
   const [profile, setProfile] = useState<any>(null);
   const [profileType, setProfileType] = useState<'side' | 'overlay'>('side');
   const [liveSignals, setLiveSignals] = useState<any[]>([]);
-  const [autoTrading, setAutoTrading] = useState(false);
+  //const [autoTrading, setAutoTrading] = useState(false);
   const [selectedInstrument, setSelectedInstrument] = useState('e6123145-9665-43e0-8413-cd61b8aa9b13');
   const [availableInstruments, setAvailableInstruments] = useState<Array<{ uid: string; name: string; ticker?: string }>>([]);
   const [instrumentsLoading, setInstrumentsLoading] = useState(false);
@@ -249,7 +249,7 @@ export const TradingAssistantPage: React.FC = () => {
   const positionMarkersRef = useRef<ISeriesApi<'Line'> | null>(null);
 
   // ========== ХЕЛПЕРЫ ==========
-  const updateSandbox = (patch: Partial<typeof sandbox>) => setSandbox(prev => ({ ...prev, ...patch }));
+  //const updateSandbox = (patch: Partial<typeof sandbox>) => setSandbox(prev => ({ ...prev, ...patch }));
   const updateStream = (patch: Partial<typeof stream>) => setStream(prev => ({ ...prev, ...patch }));
   const updateBacktest = (patch: Partial<typeof backtest>) => setBacktest(prev => ({ ...prev, ...patch }));
 
@@ -266,7 +266,7 @@ export const TradingAssistantPage: React.FC = () => {
   };
 
   // --- Старая песочница (функции) ---
-  const loadAccounts = async () => {
+  /*const loadAccounts = async () => {
     const api = (window as any).electronAPI;
     if (!api?.getSandboxAccounts) return;
     updateSandbox({ loadingAccounts: true });
@@ -278,9 +278,9 @@ export const TradingAssistantPage: React.FC = () => {
       alert('Ошибка загрузки счетов: ' + (err.message || 'Неизвестная ошибка'));
       updateSandbox({ accounts: [], loadingAccounts: false });
     }
-  };
+  };*/
 
-  const handleCreateAccount = async () => {
+  /*const handleCreateAccount = async () => {
     const api = (window as any).electronAPI;
     if (!api?.createSandboxAccount) return;
     updateSandbox({ creatingAccount: true });
@@ -290,9 +290,9 @@ export const TradingAssistantPage: React.FC = () => {
       else alert('Ошибка создания счёта: ' + result.error);
     } catch (err: any) { alert('Ошибка: ' + err.message); }
     finally { updateSandbox({ creatingAccount: false }); }
-  };
+  };*/
 
-  const handleCloseAccount = async () => {
+  /*const handleCloseAccount = async () => {
     if (!sandbox.accountId) return;
     if (!confirm(`Закрыть счёт ${sandbox.accountId}?`)) return;
     const api = (window as any).electronAPI;
@@ -302,26 +302,26 @@ export const TradingAssistantPage: React.FC = () => {
       if (result.success) { alert('Счёт закрыт'); updateSandbox({ accountId: '' }); await loadAccounts(); }
       else alert('Ошибка: ' + result.error);
     } catch (err: any) { alert('Ошибка: ' + err.message); }
-  };
+  };*/
 
-  const refreshBalance = async () => {
+  /*const refreshBalance = async () => {
     const api = (window as any).electronAPI;
     if (!api?.getBalance || !sandbox.accountId) return;
     const result = await api.getBalance(sandbox.accountId);
     if (result.success) updateSandbox({ balance: `Баланс: ${result.balance} ${result.currency}` });
     else updateSandbox({ balance: `Ошибка: ${result.error}` });
-  };
+  };*/
 
-  const handlePayIn = async () => {
+  /*const handlePayIn = async () => {
     const api = (window as any).electronAPI;
     if (!api?.payInSandbox) return;
     updateSandbox({ payMessage: '' });
     const result = await api.payInSandbox(sandbox.payAmount, sandbox.accountId);
     if (result.success) { updateSandbox({ payMessage: `Счёт пополнен. Баланс: ${JSON.stringify(result.balance)}` }); refreshBalance(); }
     else updateSandbox({ payMessage: `Ошибка: ${result.error}` });
-  };
+  };*/
 
-  const applyConfig = async () => {
+  /*const applyConfig = async () => {
     const api = (window as any).electronAPI;
     if (!api?.updateTradingConfig) return;
     await api.updateTradingConfig({
@@ -334,15 +334,15 @@ export const TradingAssistantPage: React.FC = () => {
       trailingMode: sandbox.trailingMode, stopMode: sandbox.stopMode,
     });
     alert('Config applied');
-  };
+  };*/
 
-  const toggleTrading = async () => {
+  /*const toggleTrading = async () => {
     const api = (window as any).electronAPI;
     if (!api?.toggleAutoTrading) return;
     const newState = !autoTrading;
     await api.toggleAutoTrading(newState);
     setAutoTrading(newState);
-  };
+  };*/
 
   // --- Stream ---
   const startStream = async () => {
@@ -415,8 +415,8 @@ export const TradingAssistantPage: React.FC = () => {
   };
 
   // --- Эффекты ---
-  useEffect(() => { if (sandbox.token) loadAccounts(); }, [sandbox.token]);
-  useEffect(() => { if (sandbox.accountId) refreshBalance(); }, [sandbox.accountId]);
+  //useEffect(() => { if (sandbox.token) loadAccounts(); }, [sandbox.token]);
+  //useEffect(() => { if (sandbox.accountId) refreshBalance(); }, [sandbox.accountId]);
   useEffect(() => { if (stream.token) loadAllInstruments(); }, [stream.token]);
 
   useEffect(() => {
@@ -445,11 +445,11 @@ export const TradingAssistantPage: React.FC = () => {
 
   // Запрос позиций каждые 15 секунд (live)
   useEffect(() => {
-    if (viewMode !== 'live' || !sandbox.accountId) return;
+    if (viewMode !== 'live' || !sharedAccountId) return;
     const api = (window as any).electronAPI;
     if (!api?.getPositions) return;
     const fetchPositions = async () => {
-      const data = await api.getPositions(sandbox.accountId);
+      const data = await api.getPositions(sharedAccountId);
       const markers: SeriesMarker<Time>[] = [];
       const now = Math.floor(Date.now() / 1000) as Time;
       (data?.securities || []).forEach((pos: any) => {
@@ -464,7 +464,7 @@ export const TradingAssistantPage: React.FC = () => {
     fetchPositions();
     const interval = setInterval(fetchPositions, 15_000);
     return () => clearInterval(interval);
-  }, [viewMode, sandbox.accountId]);
+  }, [viewMode, sharedAccountId]);
 
   useEffect(() => {
     const chart = chartRef.current;
@@ -656,10 +656,6 @@ export const TradingAssistantPage: React.FC = () => {
             <label className="mr-1 mb-0">Period:</label>
             <InputText type="date" value={backtest.dateFrom} onChange={e => updateBacktest({ dateFrom: e.target.value })} className="p-inputtext-sm" style={{ width: '130px' }} />
             <InputText type="date" value={backtest.dateTo} onChange={e => updateBacktest({ dateTo: e.target.value })} className="p-inputtext-sm" style={{ width: '130px' }} />
-            <label className="ml-2 mr-1 mb-0">Max Signals/Day</label>
-            <InputNumber value={sandbox.maxSignalsPerDay} onValueChange={e => updateSandbox({ maxSignalsPerDay: e.value ?? 0 })} min={0} step={1} size={2} className="p-inputtext-sm" />
-            <label className="ml-2 mr-1 mb-0">Min Interval (min)</label>
-            <InputNumber value={sandbox.minIntervalMinutes} onValueChange={e => updateSandbox({ minIntervalMinutes: e.value ?? 15 })} min={1} step={5} size={2} className="p-inputtext-sm" />
           </>
         )}
       </div>
@@ -674,7 +670,8 @@ export const TradingAssistantPage: React.FC = () => {
               onAccountChange={setSharedAccountId}  
             />
           </TabPanel>
-          <TabPanel header="Sandbox (old)">
+
+          {/*<TabPanel header="Sandbox (old)">
             <Card className="surface-ground p-0">
               <div className="p-2">
                 <div className="flex align-items-center flex-wrap gap-2">
@@ -716,7 +713,7 @@ export const TradingAssistantPage: React.FC = () => {
                 <div className="p-field mb-3"><Button label="Refresh Balance" onClick={refreshBalance} className="p-button-sm p-button-info" /></div>
               </div>
             </Dialog>
-          </TabPanel>
+          </TabPanel>*/}
           <TabPanel header="Autotrader"><AutoTraderTab availableInstruments={availableInstruments} /></TabPanel>
           <TabPanel header="Backtest">
             <BacktestTab selectedInstrument={selectedInstrument} setSelectedInstrument={setSelectedInstrument} availableInstruments={availableInstruments} instrumentsLoading={instrumentsLoading} loadAllInstruments={loadAllInstruments} backtest={backtest} updateBacktest={updateBacktest} showBacktestAdvanced={showBacktestAdvanced} setShowBacktestAdvanced={setShowBacktestAdvanced} runBacktest={runBacktest} sendBacktestToSandbox={sendBacktestToSandbox} backtestCandlesData={backtestCandlesData} />
