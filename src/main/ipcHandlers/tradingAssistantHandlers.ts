@@ -1134,4 +1134,14 @@ async function getCloudToken(serverUrl: string): Promise<string | null> {
       return { success: false, error: e.message };
     }
   });
+
+  ipcMain.handle('trading-assistant:cancel-order', async (_, orderId: string, accountId: string) => {
+    const token = process.env.VITE_TSandBox || '';
+    try {
+      await sandboxGrpc.cancelSandboxOrder({ orderId, accountId }, token);
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  });
 };

@@ -8,6 +8,7 @@ import type { OrderFlowEngine } from './orderFlowEngine';
 import { HistoricalDataLoader } from './historicalDataLoader';
 import { StopOrderType, StopOrderDirection, StopOrderExpirationType, ExchangeOrderType } from '@/api/tbank/stopordersTypes';
 import { handleApiError } from './apiErrorHandler';
+import { BrowserWindow } from 'electron';
 
 export interface OrderManagerConfig {
   lotQuantity: number;
@@ -52,6 +53,8 @@ export class OrderManager {
   private orderFlow?: OrderFlowEngine;
   private historicalLoader?: HistoricalDataLoader;
   private activeTakeProfitOrderId: string | null = null;
+  private trailingQuantity: number = 1;
+  private trailingStopPrice: number = 0;
 
   constructor(config: Partial<OrderManagerConfig> = {}, orderFlow?: OrderFlowEngine, historicalLoader?: HistoricalDataLoader) {
     this.config = {
@@ -89,6 +92,7 @@ export class OrderManager {
 
   updateConfig(patch: Partial<OrderManagerConfig>): void {
     this.config = { ...this.config, ...patch };
+    console.log('[OrderManager] updateConfig trailingEnabled:', this.config.trailingEnabled, 'useDynamicSizing:', this.config.useDynamicSizing);
     this.dailyLossCurrent = 0;
     this.lastLossResetDate = new Date().toISOString().split('T')[0];
   }
@@ -110,45 +114,114 @@ export class OrderManager {
 
     const now = Date.now();
     //Временное отключение кулдауна
-    if (now - this.lastOrderTime < 5 * 60 * 1000) {
-    //if (now - this.lastOrderTime < 30 * 1000) { // 30 секунд для теста
+    //if (now - this.lastOrderTime < 5 * 60 * 1000) {
+    if (now - this.lastOrderTime < 60 * 1000) { // 60 секунд для теста
       console.log('[OrderManager] Кулдаун, пропускаем сигнал');
       return;
     }
 
+    // Нормализуем тип сигнала (если приходит POC_BREAKOUT_UP/DOWN)
+    const rawType = (signal as any).type as string;
+    if (rawType === 'POC_BREAKOUT_UP') {
+      (signal as any).type = 'BUY';
+    } else if (rawType === 'POC_BREAKOUT_DOWN') {
+      (signal as any).type = 'SELL';
+    }
+
     const direction = signal.type === 'BUY' ? OrderDirection.ORDER_DIRECTION_BUY : OrderDirection.ORDER_DIRECTION_SELL;
 
-    // === ДИНАМИЧЕСКИЙ РАЗМЕР ПОЗИЦИИ ПО ATR ===
+    // Проверяем, нет ли уже открытой позиции по этому инструменту
+    try {
+      const positionsResp = await sandboxGrpc.getSandboxPositions(
+        { accountId: this.config.accountId },
+        this.config.token
+      );
+      const existingPos = (positionsResp.securities || []).find(
+        (p: any) => p.instrumentUid === signal.instrumentUid && p.quantity && (Number(p.quantity.units) || 0) !== 0
+      );
+      if (existingPos) {
+        console.log('[OrderManager] Уже есть открытая позиция по инструменту, пропускаем сигнал');
+        return;
+      }
+    } catch (e) {
+      console.warn('[OrderManager] Не удалось проверить позиции, продолжаем');
+      // Если API недоступен, лучше пропустить сделку? Решайте сами.
+      // Пока можно продолжить, но в реальности стоит остановить.
+    }
+
+    // === ДИНАМИЧЕСКИЙ РАЗМЕР ПОЗИЦИИ ===
     let quantity = this.config.lotQuantity;
     let riskAmount = this.config.riskAmount;
+    let freeBalance = 0;
+
+    // 1. Получаем свободные средства
     if (this.config.useDynamicSizing && this.config.dynamicSizingPercent && this.config.dynamicSizingPercent > 0) {
       try {
         const balanceRes = await sandboxGrpc.getSandboxPortfolio({ accountId: this.config.accountId }, this.config.token);
-        const total = balanceRes.totalAmountPortfolio;
-        if (total) {
-          const balance = Number(total.units || '0') + (total.nano || 0) / 1e9;
-          riskAmount = balance * (this.config.dynamicSizingPercent / 100);
-          console.log(`[OrderManager] Баланс: ${balance}, риск ${this.config.dynamicSizingPercent}% = ${riskAmount.toFixed(2)}`);
+        //console.log('[OrderManager] Portfolio response:', JSON.stringify(balanceRes, null, 2));
+        const totalCurrencies = (balanceRes as any).totalAmountCurrencies;
+        if (totalCurrencies && totalCurrencies.currency === 'rub') {
+          freeBalance = Number(totalCurrencies.units || 0) + (totalCurrencies.nano || 0) / 1e9;
+        } else {
+          // fallback на случай, если вдруг структура изменится
+          const rubPos = ((balanceRes as any).positions || []).find((p: any) => p.instrumentType === 'currency' && p.ticker === 'RUB000UTSTOM');
+          if (rubPos && rubPos.quantity) {
+            freeBalance = Number(rubPos.quantity.units || 0) + (rubPos.quantity.nano || 0) / 1e9;
+          }
         }
+        riskAmount = freeBalance * (this.config.dynamicSizingPercent / 100);
+        console.log(`[OrderManager] Свободный остаток: ${freeBalance}, риск ${this.config.dynamicSizingPercent}% = ${riskAmount.toFixed(2)}`);
+      
+        // Проверка: не открыта ли уже позиция по этому инструменту?
+        const existingPos = (balanceRes.positions || []).find(
+          (p: any) => p.instrumentUid === signal.instrumentUid && p.quantity && (Number(p.quantity.units) || 0) !== 0
+        );
+        if (existingPos) {
+          console.log('[OrderManager] Уже есть открытая позиция по инструменту, пропускаем сигнал');
+          return;
+        }
+
       } catch (e) {
-        console.warn('[OrderManager] Не удалось получить баланс, используется абсолютный риск');
-      }
-    }
-    if (this.config.useDynamicSizing && this.historicalLoader) {
-      const atr = await this.calculateATR(signal.instrumentUid, this.config.token);
-      if (atr && atr > 0 && riskAmount > 0) {
-        const riskPerLot = atr * this.config.atrMultiplier!;
-        quantity = Math.floor(riskAmount / riskPerLot);
-        if (quantity < 1) quantity = 1;
+        console.warn('[OrderManager] Не удалось получить портфель, используется абсолютный риск');
       }
     }
 
-    // Оценка предыдущей сделки (существующая логика)
-    if (this.lastEntryPrice > 0) {
-      const prevProfit = signal.type === 'BUY'
-        ? signal.price - this.lastEntryPrice
-        : this.lastEntryPrice - signal.price;
-      this.updateDailyLoss(prevProfit);
+    // 2. Определяем риск на 1 лот
+    if (this.config.useDynamicSizing) {
+      const entryPrice = signal.price || signal.targetPrice || 0;
+      let riskPerLot = 0;
+
+      if (this.config.stopLossPercent && this.config.stopLossPercent > 0) {
+        // Стоп-лосс задан в процентах от цены
+        riskPerLot = entryPrice * (this.config.stopLossPercent / 100);
+      } else if (this.config.trailingMode === 'volatility' && this.historicalLoader) {
+        // Используем волатильный стоп
+        const atr = await this.calculateATR(signal.instrumentUid, this.config.token);
+        if (atr) riskPerLot = atr * (this.config.volatilityMultiplier || 2);
+      }
+
+      if (riskPerLot > 0 && riskAmount > 0) {
+        quantity = Math.floor(riskAmount / riskPerLot);
+        console.log(`[OrderManager] riskPerLot=${riskPerLot.toFixed(2)}, quantity before limits=${quantity}`);
+      } else {
+        quantity = this.config.lotQuantity; // fallback
+      }
+
+      // 3. Ограничение на максимальную стоимость позиции (например, не более 10% от свободных средств)
+      const maxPositionPercent = 10; // можно вынести в настройки
+      const maxPositionCost = freeBalance * (maxPositionPercent / 100);
+      const maxLotsByCapital = Math.floor(maxPositionCost / entryPrice);
+      quantity = Math.min(quantity, maxLotsByCapital);
+
+      // 4. Дополнительная страховка: не более 95% от свободных средств (чтобы хватило на комиссию)
+      const maxLotsByFreeBalance = Math.floor((freeBalance * 0.95) / entryPrice);
+      quantity = Math.min(quantity, maxLotsByFreeBalance);
+
+      if (quantity < 1) {
+        console.log('[OrderManager] Недостаточно средств для открытия позиции');
+        return;
+      }
+      console.log(`[OrderManager] Final quantity=${quantity}`);
     }
 
     // ========== ОСНОВНОЙ ОРДЕР (рыночный или лимитный) ==========
@@ -176,8 +249,33 @@ export class OrderManager {
         this.lastOrderTime = now;
         this.lastEntryPrice = limitPrice;
         console.log(`[OrderManager] Лимитный ордер отправлен: ${this.activeOrderId}`);
+        await new Promise(resolve => setTimeout(resolve, 1000)); // пауза 1 сек перед защитными ордерами
       } else {
         // ---- Рыночный вход (текущее поведение) ----
+        
+        // Агрессивный лимитный вход для песочницы (цена +0.2% от lastPrice)
+        const lastPrice = await this.getLastPrice(signal.instrumentUid);
+        const limitPrice = lastPrice ? lastPrice * 1.002 : signal.price;
+        const orderId = this.generateUUID();
+        console.log(`[OrderManager] Агрессивный лимитный ордер на ${limitPrice.toFixed(2)}, orderId=${orderId}`);
+        entryOrderResult = await sandboxGrpc.postSandboxOrder(
+          {
+            instrumentId: signal.instrumentUid,
+            direction: direction as any,
+            orderType: OrderType.ORDER_TYPE_LIMIT,
+            quantity,
+            price: { units: Math.floor(limitPrice), nano: Math.round((limitPrice % 1) * 1e9) },
+            accountId: this.config.accountId,
+            orderId: orderId,
+          },
+          this.config.token
+        );
+        this.activeOrderId = entryOrderResult.orderId ?? null;
+        this.lastOrderTime = now;
+        this.lastEntryPrice = limitPrice;
+        console.log(`[OrderManager] Агрессивный лимитный ордер отправлен: ${this.activeOrderId}`);
+        
+        /*
         const orderId = this.generateUUID();
         console.log('[OrderManager] Выставляю рыночный ордер, orderId=', orderId);
         entryOrderResult = await sandboxGrpc.postSandboxOrder(
@@ -196,20 +294,27 @@ export class OrderManager {
         this.lastOrderTime = now;
         this.lastEntryPrice = signal.price;
         console.log(`[OrderManager] Рыночный ордер отправлен: ${this.activeOrderId}`);
+        */
       }
 
       // ========== ЗАЩИТНЫЕ ОРДЕРА И ТРЕЙЛИНГ ==========
       const entryPrice = this.lastEntryPrice;
       let stopOrderId: string | null = null;
-
-      if (this.config.stopMode === 'stop_order') {
-        stopOrderId = await this.placeStopOrders(signal);
-      } else {
-        const result = await this.placeProtectiveOrders(signal, entryPrice);
-        stopOrderId = result.stopOrderId;
+      try {
+        if (this.config.stopMode === 'stop_order') {
+          stopOrderId = await this.placeStopOrders(signal, quantity);
+        } else {
+          const result = await this.placeProtectiveOrders(signal, entryPrice, quantity);
+          stopOrderId = result.stopOrderId;
+        }
+      } catch (protectiveError) {
+        console.error('[OrderManager] Ошибка установки защитных ордеров:', protectiveError);
       }
 
+      console.log('[OrderManager] trail check:', { trailingEnabled: this.config.trailingEnabled, stopOrderId });
+      
       if (this.config.trailingEnabled && stopOrderId) {
+        this.trailingQuantity = quantity;      // <-- сохраняем для трейлинга
         this.startTrailing(signal.instrumentUid, entryPrice, stopOrderId, this.config.trailingPercent);
       }
     } catch (error) {
@@ -219,11 +324,10 @@ export class OrderManager {
     }
   }
 
-  private async placeStopOrders(signal: BacktestSignal): Promise<string | null> {
+  private async placeStopOrders(signal: BacktestSignal, quantity: number): Promise<string | null> {
     const {
       stopLossPercent,
       takeProfitPercent,
-      lotQuantity,
       token,
       accountId,
     } = this.config;
@@ -240,8 +344,8 @@ export class OrderManager {
         ? entryPrice * (1 - stopLossPercent / 100)
         : entryPrice * (1 + stopLossPercent / 100);
 
-      // Ограничиваем отклонение стоп‑цены (временно 2% для ВТБ)
-      const MAX_SL_DEVIATION = 0.02; // 2%
+      // Ограничиваем отклонение стоп‑цены (временно 2%)
+      const MAX_SL_DEVIATION = 0.02;
       slPrice = isBuy
         ? Math.max(slPrice, entryPrice * (1 - MAX_SL_DEVIATION))
         : Math.min(slPrice, entryPrice * (1 + MAX_SL_DEVIATION));
@@ -254,7 +358,7 @@ export class OrderManager {
             stopOrderType: StopOrderType.STOP_ORDER_TYPE_STOP_LOSS as any,
             price: { units: Math.floor(slPrice), nano: Math.round((slPrice % 1) * 1e9) },
             stopPrice: { units: Math.floor(slPrice), nano: Math.round((slPrice % 1) * 1e9) },
-            quantity: lotQuantity,
+            quantity,                                    // <-- было lotQuantity
             accountId,
             expirationType: StopOrderExpirationType.STOP_ORDER_EXPIRATION_TYPE_GOOD_TILL_CANCEL as any,
             exchangeOrderType: ExchangeOrderType.EXCHANGE_ORDER_TYPE_MARKET as any,
@@ -282,7 +386,7 @@ export class OrderManager {
             stopOrderType: StopOrderType.STOP_ORDER_TYPE_TAKE_PROFIT as any,
             price: { units: Math.floor(tpPrice), nano: Math.round((tpPrice % 1) * 1e9) },
             stopPrice: { units: Math.floor(tpPrice), nano: Math.round((tpPrice % 1) * 1e9) },
-            quantity: lotQuantity,
+            quantity,                                    // <-- было lotQuantity
             accountId,
             expirationType: StopOrderExpirationType.STOP_ORDER_EXPIRATION_TYPE_GOOD_TILL_CANCEL as any,
             exchangeOrderType: ExchangeOrderType.EXCHANGE_ORDER_TYPE_MARKET as any,
@@ -300,11 +404,10 @@ export class OrderManager {
     return stopOrderId;
   }
 
-  private async placeProtectiveOrders(signal: BacktestSignal, entryPrice: number): Promise<{ stopOrderId: string | null; takeProfitOrderId: string | null }> {
+  private async placeProtectiveOrders(signal: BacktestSignal, entryPrice: number, quantity: number): Promise<{ stopOrderId: string | null; takeProfitOrderId: string | null }> {
     const {
       stopLossPercent,
       takeProfitPercent,
-      lotQuantity,
       token,
       accountId,
       trailingMode,
@@ -340,21 +443,22 @@ export class OrderManager {
       }
 
       if (slPrice) {
-        // Ограничиваем отклонение стоп‑цены (временно 2% для ВТБ)
+        console.log(`[OrderManager] Выставляю стоп‑лосс (лимитный) на ${slPrice}`);
+
+        // Ограничиваем отклонение стоп‑цены (временно 2%)
         const MAX_SL_DEVIATION = 0.02;
         slPrice = isBuy
           ? Math.max(slPrice, entryPrice * (1 - MAX_SL_DEVIATION))
           : Math.min(slPrice, entryPrice * (1 + MAX_SL_DEVIATION));
 
         try {
-          //const orderId = `sl_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
           const orderId = this.generateUUID();
           const resp: any = await sandboxGrpc.postSandboxOrder(
             {
               instrumentId: signal.instrumentUid,
               direction: isBuy ? OrderDirection.ORDER_DIRECTION_SELL : OrderDirection.ORDER_DIRECTION_BUY,
               orderType: OrderType.ORDER_TYPE_LIMIT,
-              quantity: lotQuantity,
+              quantity,                                    // <-- было lotQuantity
               price: { units: Math.floor(slPrice), nano: Math.round((slPrice % 1) * 1e9) },
               accountId,
               orderId: orderId,
@@ -363,7 +467,7 @@ export class OrderManager {
           );
           stopOrderId = resp.orderId || null;
           console.log(`[OrderManager] Стоп‑лосс (лимитный) выставлен на ${slPrice}, orderId=${stopOrderId}`);
-          await new Promise(resolve => setTimeout(resolve, 500)); // 500 мс
+          await new Promise(resolve => setTimeout(resolve, 1500)); // 1500 мс
         } catch (error) {
           const apiError = handleApiError(error);
           console.error('[OrderManager] Ошибка выставления стоп‑лосса:', apiError.message);
@@ -387,7 +491,7 @@ export class OrderManager {
               instrumentId: signal.instrumentUid,
               direction: isBuy ? OrderDirection.ORDER_DIRECTION_SELL : OrderDirection.ORDER_DIRECTION_BUY,
               orderType: OrderType.ORDER_TYPE_LIMIT,
-              quantity: lotQuantity,
+              quantity,                                    // <-- было lotQuantity
               price: { units: Math.floor(tpPrice), nano: Math.round((tpPrice % 1) * 1e9) },
               accountId,
               orderId: orderId,
@@ -396,10 +500,9 @@ export class OrderManager {
           );
           takeProfitOrderId = resp.orderId || null;
           console.log(`[OrderManager] Тейк‑профит (лимитный) выставлен на ${tpPrice}, orderId=${takeProfitOrderId}`);
-          break; // успех — выходим из цикла
+          break;
         } catch (error: any) {
           if (error?.code === 8 && attempts < maxAttempts - 1) {
-            // RESOURCE_EXHAUSTED — ждём и повторяем
             console.warn(`[OrderManager] Превышен лимит запросов, повтор через 1с (попытка ${attempts + 1})`);
             await new Promise(resolve => setTimeout(resolve, 1000));
             attempts++;
@@ -435,29 +538,43 @@ export class OrderManager {
       console.log('[OrderManager] Трейлинг уже активен, перезапускаем с новым стоп‑ордером');
       this.stopTrailing();
     }
+
     this.trailingActive = true;
     this.trailingInstrumentUid = instrumentUid;
     this.trailingEntryPrice = entryPrice;
     this.trailingStopOrderId = stopOrderId;
     this.trailingPercent = trailPercent;
-    this.trailingInterval = setInterval(() => this.checkAndUpdateTrailing(), 10_000);
+
+    // Начальный уровень стоп-лосса
+    if (this.config.stopLossPercent > 0) {
+      this.trailingStopPrice = entryPrice * (1 - this.config.stopLossPercent / 100);
+    } else {
+      this.trailingStopPrice = entryPrice; // fallback
+    }
+
+    this.trailingInterval = setInterval(() => this.checkAndUpdateTrailing(), 2_000);
   }
 
   stopTrailing(): void {
     this.trailingActive = false;
-    if (this.trailingInterval) { clearInterval(this.trailingInterval); this.trailingInterval = null; }
+    if (this.trailingInterval) {
+      clearInterval(this.trailingInterval);
+      this.trailingInterval = null;
+    }
     this.trailingInstrumentUid = null;
     this.trailingEntryPrice = null;
     this.trailingStopOrderId = null;
+    this.trailingStopPrice = 0;
   }
 
   private async checkAndUpdateTrailing(): Promise<void> {
     if (!this.trailingActive || !this.trailingStopOrderId || !this.trailingInstrumentUid || !this.trailingEntryPrice) return;
+
     try {
       const lastPrice = await this.getLastPrice(this.trailingInstrumentUid);
       if (!lastPrice) return;
 
-      const isBuy = true; // или определять по текущей позиции, пока для лонгов
+      const isBuy = true; // пока только лонги
       let newStopPrice: number;
 
       if (this.config.trailingMode === 'volatility' && this.config.volatilityMultiplier && this.historicalLoader) {
@@ -472,18 +589,40 @@ export class OrderManager {
           : lastPrice * (1 + this.config.trailingPercent / 100);
       }
 
-      if ((isBuy && newStopPrice > this.trailingEntryPrice) || (!isBuy && newStopPrice < this.trailingEntryPrice)) {
-        await sandboxGrpc.replaceSandboxOrder(
+      if ((isBuy && newStopPrice > this.trailingStopPrice) || (!isBuy && newStopPrice < this.trailingStopPrice)) {
+        // Отменяем предыдущий стоп-ордер
+        try {
+          await sandboxGrpc.cancelSandboxOrder(
+            {
+              accountId: this.config.accountId,
+              orderId: this.trailingStopOrderId,
+              orderIdType: OrderIdType.ORDER_ID_TYPE_EXCHANGE,
+            },
+            this.config.token
+          );
+          console.log(`[OrderManager] Трейлинг: предыдущий стоп-ордер ${this.trailingStopOrderId} отменён`);
+        } catch (cancelError) {
+          console.warn('[OrderManager] Не удалось отменить предыдущий стоп-ордер, продолжаем');
+        }
+
+        // Выставляем новый лимитный стоп-ордер
+        const orderId = this.generateUUID();
+        const resp: any = await sandboxGrpc.postSandboxOrder(
           {
-            accountId: this.config.accountId,
-            orderId: this.trailingStopOrderId,
+            instrumentId: this.trailingInstrumentUid,
+            direction: isBuy ? OrderDirection.ORDER_DIRECTION_SELL : OrderDirection.ORDER_DIRECTION_BUY,
+            orderType: OrderType.ORDER_TYPE_LIMIT,
+            quantity: this.trailingQuantity,
             price: { units: Math.floor(newStopPrice), nano: Math.round((newStopPrice % 1) * 1e9) },
-            quantity: this.config.lotQuantity,
+            accountId: this.config.accountId,
+            orderId: orderId,
           },
           this.config.token
         );
-        this.trailingEntryPrice = newStopPrice;
-        console.log(`[OrderManager] Трейлинг‑стоп обновлён до ${newStopPrice}`);
+
+        this.trailingStopOrderId = resp.orderId || null;
+        this.trailingStopPrice = newStopPrice;
+        console.warn(`\x1b[42m\x1b[30m🚀 TRAILING UPDATE 🚀\x1b[0m \x1b[32m[OrderManager] Трейлинг‑стоп обновлён до ${newStopPrice} (новый ордер ${this.trailingStopOrderId})\x1b[0m \x07`);
       }
     } catch (error) {
       const apiError = handleApiError(error);

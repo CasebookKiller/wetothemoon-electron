@@ -13,6 +13,8 @@ try {
     openPGWindow: () => ipcRenderer.invoke('open-pg-window'),
     openOllamaWindow: () => ipcRenderer.invoke('open-ollama-window'),
     openTasksWindow: () => ipcRenderer.invoke('open-tasks-window'),
+
+    openOsintWindow: () => ipcRenderer.invoke('open-osint-window'),
     sendMessageToAI: (message: string) =>
       ipcRenderer.invoke('send-to-ai', message).then((response) => {
         console.log(response);
@@ -334,6 +336,8 @@ try {
     },
 
     sendManualOrder: (params: any) => ipcRenderer.invoke('trading-assistant:send-manual-order', params),
+
+    scrapeRusprofile: (inn: string) => ipcRenderer.invoke('osint:scrape-rusprofile', inn),
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

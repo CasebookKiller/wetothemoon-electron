@@ -36,12 +36,13 @@ let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_
 _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_fs_extra_lib_index_js = __toESM(_home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_fs_extra_lib_index_js);
 let fs = require("fs");
 fs = __toESM(fs);
+let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_playwright_index_mjs = require("/home/ll/Документы/GitHub/wetothemoon-project/wetothemoon-electron/node_modules/playwright/index.mjs");
 let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_uuid_dist_node_index_js = require("/home/ll/Документы/GitHub/wetothemoon-project/wetothemoon-electron/node_modules/uuid/dist-node/index.js");
 let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_node_cron_dist_esm_node_cron_js = require("/home/ll/Документы/GitHub/wetothemoon-project/wetothemoon-electron/node_modules/node-cron/dist/esm/node-cron.js");
 _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_node_cron_dist_esm_node_cron_js = __toESM(_home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_node_cron_dist_esm_node_cron_js);
 //#region src/main/windows/mainWindow.ts
 var mainWindow = null;
-var preloadPath$7 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var preloadPath$8 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var MAIN_WINDOW_VITE_DEV_SERVER_URL = "http://localhost:5173";
 path.default.join(__dirname, "../../renderer/main-window/index.html");
 var createMainWindow = () => {
@@ -50,7 +51,7 @@ var createMainWindow = () => {
 		height: 768,
 		title: "Мы на Луну!",
 		webPreferences: {
-			preload: preloadPath$7,
+			preload: preloadPath$8,
 			contextIsolation: true,
 			nodeIntegration: false
 		}
@@ -70,7 +71,7 @@ function getMainWindowProdPath() {
 //#endregion
 //#region src/main/windows/aiWindow.ts
 var aiWindow = null;
-var preloadPath$6 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var preloadPath$7 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var createAIWindow = () => {
 	console.log("createAIWindow called");
 	aiWindow = new electron.BrowserWindow({
@@ -78,7 +79,7 @@ var createAIWindow = () => {
 		height: 600,
 		title: "Нейро",
 		webPreferences: {
-			preload: preloadPath$6,
+			preload: preloadPath$7,
 			contextIsolation: true,
 			nodeIntegration: false
 		}
@@ -244,6 +245,10 @@ var mainMenuTemplate = [
 			{
 				label: "Открыть Трейдер",
 				id: "open-trading"
+			},
+			{
+				label: "Открыть OSINT",
+				id: "open-osint"
 			},
 			{ type: "separator" },
 			{
@@ -651,17 +656,34 @@ var tradingAssistantWindowMenuTemplate = [{
 		{ role: "togglefullscreen" }
 	]
 }];
+var osintWindowMenuTemplate = [{
+	label: "Файл",
+	submenu: [{ role: "close" }]
+}, {
+	label: "Вид",
+	submenu: [
+		{ role: "reload" },
+		{ role: "forceReload" },
+		{ role: "toggleDevTools" },
+		{ type: "separator" },
+		{ role: "resetZoom" },
+		{ role: "zoomIn" },
+		{ role: "zoomOut" },
+		{ type: "separator" },
+		{ role: "togglefullscreen" }
+	]
+}];
 //#endregion
 //#region src/main/windows/bondsWindow.ts
 var bondsWindow$1 = null;
-var preloadPath$5 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var preloadPath$6 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var createBondsWindow = () => {
 	bondsWindow$1 = new electron.BrowserWindow({
 		width: 1024,
 		height: 768,
 		title: "Облигации",
 		webPreferences: {
-			preload: preloadPath$5,
+			preload: preloadPath$6,
 			contextIsolation: true,
 			nodeIntegration: false
 		}
@@ -679,14 +701,14 @@ var getBondsWindow = () => bondsWindow$1;
 //#endregion
 //#region src/main/windows/mdWindow.ts
 var mdWindow$1 = null;
-var preloadPath$4 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var preloadPath$5 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var createMDWindow = () => {
 	mdWindow$1 = new electron.BrowserWindow({
 		width: 800,
 		height: 600,
 		title: "Markdown",
 		webPreferences: {
-			preload: preloadPath$4,
+			preload: preloadPath$5,
 			contextIsolation: true,
 			nodeIntegration: false
 		}
@@ -702,14 +724,14 @@ var getMDWindow = () => mdWindow$1;
 //#endregion
 //#region src/main/windows/pgWindow.ts
 var pgWindow$1 = null;
-var preloadPath$3 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var preloadPath$4 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var createPGWindow = () => {
 	pgWindow$1 = new electron.BrowserWindow({
 		width: 800,
 		height: 600,
 		title: "Генератор запросов",
 		webPreferences: {
-			preload: preloadPath$3,
+			preload: preloadPath$4,
 			contextIsolation: true,
 			nodeIntegration: false
 		}
@@ -725,7 +747,7 @@ var getPGWindow = () => pgWindow$1;
 //#endregion
 //#region src/main/windows/ollamaWindow.ts
 var ollamaWindow$1 = null;
-var preloadPath$2 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var preloadPath$3 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var createOllamaWindow = () => {
 	if (ollamaWindow$1) {
 		ollamaWindow$1.focus();
@@ -736,7 +758,7 @@ var createOllamaWindow = () => {
 		height: 600,
 		title: "Клиент Ollama ",
 		webPreferences: {
-			preload: preloadPath$2,
+			preload: preloadPath$3,
 			contextIsolation: true,
 			nodeIntegration: false
 		}
@@ -1229,7 +1251,7 @@ var registerOrdersStreamHandlers = () => {
 //#endregion
 //#region src/main/windows/tradingAssistantWindow.ts
 var tradingAssistantWindow = null;
-var preloadPath$1 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var preloadPath$2 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var createTradingAssistantWindow = () => {
 	if (tradingAssistantWindow && !tradingAssistantWindow.isDestroyed()) {
 		tradingAssistantWindow.focus();
@@ -1240,7 +1262,7 @@ var createTradingAssistantWindow = () => {
 		height: 800,
 		title: "Trading Assistant – Volume Profile",
 		webPreferences: {
-			preload: preloadPath$1,
+			preload: preloadPath$2,
 			contextIsolation: true,
 			nodeIntegration: false
 		}
@@ -4472,7 +4494,183 @@ var registerTradingAssistantHandlers = (historicalLoader, profileEngine, getToke
 			};
 		}
 	});
+	electron.ipcMain.handle("trading-assistant:cancel-order", async (_, orderId, accountId) => {
+		const token = process.env.VITE_TSandBox || "";
+		try {
+			await sandboxGrpc.cancelSandboxOrder({
+				orderId,
+				accountId
+			}, token);
+			return { success: true };
+		} catch (e) {
+			return {
+				success: false,
+				error: e.message
+			};
+		}
+	});
 };
+//#endregion
+//#region src/main/windows/osintWindow.ts
+var osintWindow = null;
+var preloadPath$1 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var createOsintWindow = () => {
+	if (osintWindow && !osintWindow.isDestroyed()) {
+		osintWindow.focus();
+		return osintWindow;
+	}
+	osintWindow = new electron.BrowserWindow({
+		width: 1100,
+		height: 800,
+		title: "OSINT Tools",
+		webPreferences: {
+			preload: preloadPath$1,
+			contextIsolation: true,
+			nodeIntegration: false
+		}
+	});
+	if (process.env.NODE_ENV === "development") osintWindow.loadURL(`${DEV_SERVER_URL}/#/osint`);
+	else osintWindow.loadFile(getMainWindowProdPath(), { hash: "/osint" });
+	const menu = electron.Menu.buildFromTemplate(osintWindowMenuTemplate);
+	osintWindow.setMenu(menu);
+	osintWindow.on("closed", () => {
+		osintWindow = null;
+	});
+	return osintWindow;
+};
+var getOsintWindow = () => osintWindow;
+//#endregion
+//#region src/main/services/osint/playwrightService.ts
+var browser = null;
+async function launchBrowser() {
+	if (browser && browser.isConnected()) return;
+	browser = await _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_playwright_index_mjs.chromium.launch({ headless: false });
+}
+async function closeBrowser() {
+	if (browser) {
+		await browser.close();
+		browser = null;
+	}
+}
+function getBrowser() {
+	return browser;
+}
+function decrypt(buffer) {
+	return electron.safeStorage.decryptString(buffer);
+}
+var credentialsPath = () => path.default.join(electron.app.getPath("userData"), "osint_credentials.json");
+function loadCredentials() {
+	if (!fs.default.existsSync(credentialsPath())) return {};
+	try {
+		const data = fs.default.readFileSync(credentialsPath(), "utf-8");
+		const parsed = JSON.parse(data);
+		for (const site in parsed) {
+			parsed[site].login = decrypt(Buffer.from(parsed[site].login, "base64"));
+			parsed[site].password = decrypt(Buffer.from(parsed[site].password, "base64"));
+		}
+		return parsed;
+	} catch {
+		return {};
+	}
+}
+function getCredentials(site) {
+	return loadCredentials()[site] || null;
+}
+//#endregion
+//#region src/main/services/osint/scrapers/rusprofile.ts
+async function scrapeRusprofile(inn) {
+	const browser = getBrowser();
+	if (!browser) throw new Error("Browser not launched");
+	const page = await browser.newPage();
+	try {
+		await page.goto(`https://www.rusprofile.ru/search?query=${inn}`, { waitUntil: "domcontentloaded" });
+		const creds = getCredentials("rusprofile");
+		if (creds) {
+			await loginToRusprofile(page, creds.login, creds.password);
+			await page.goto(`https://www.rusprofile.ru/search?query=${inn}`, { waitUntil: "domcontentloaded" });
+		}
+		await page.click(".company-item a");
+		await page.waitForSelector(".company-card", { timeout: 1e4 });
+		return await page.evaluate(() => {
+			const name = document.querySelector(".company-name")?.textContent?.trim();
+			const inn = document.querySelector(".company-info__item:has(.label:contains(\"ИНН\")) .value")?.textContent?.trim();
+			return {
+				name: name || "",
+				inn: inn || "",
+				ogrn: "",
+				address: "",
+				director: ""
+			};
+		});
+	} catch (error) {
+		console.error("Rusprofile scraping failed:", error);
+		return null;
+	} finally {
+		await page.close();
+	}
+}
+async function loginToRusprofile(page, login, password) {
+	await page.goto("https://www.rusprofile.ru/login");
+	await page.fill("#login", login);
+	await page.fill("#password", password);
+	await page.click("button[type=\"submit\"]");
+	await page.waitForNavigation();
+}
+//#endregion
+//#region src/main/ipcHandlers/osintHandlers.ts
+function registerOsintHandlers() {
+	electron.ipcMain.handle("osint:open-window", () => {
+		const win = getOsintWindow();
+		if (win && !win.isDestroyed()) {
+			win.focus();
+			return;
+		}
+		createOsintWindow();
+	});
+	electron.ipcMain.handle("open-osint-window", () => {
+		const win = getOsintWindow();
+		if (win && !win.isDestroyed()) {
+			win.focus();
+			return;
+		}
+		createOsintWindow();
+	});
+	electron.ipcMain.handle("osint:launch", async () => {
+		try {
+			await launchBrowser();
+			return { success: true };
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:close", async () => {
+		try {
+			await closeBrowser();
+			return { success: true };
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:scrape-rusprofile", async (_event, inn) => {
+		try {
+			return {
+				success: true,
+				data: await scrapeRusprofile(inn)
+			};
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+}
 //#endregion
 //#region src/shared/types/promptgenerator.ts
 /**
@@ -4717,7 +4915,6 @@ function registerGrpcHandlers() {
 var DATA_DIR = electron.app.getPath("userData");
 var TASKS_FILE = path.join(DATA_DIR, "tasks.json");
 function readTasks() {
-	console.log("[TaskStore] Читаю файл:", TASKS_FILE);
 	try {
 		if (!fs.existsSync(TASKS_FILE)) return [];
 		const raw = fs.readFileSync(TASKS_FILE, "utf-8");
@@ -4747,7 +4944,6 @@ var TaskStore = class {
 	}
 	update(updated) {
 		writeTasks(readTasks().map((t) => t.id === updated.id ? updated : t));
-		console.log("[TaskStore] update – обновлена задача", updated.id);
 	}
 	delete(id) {
 		writeTasks(readTasks().filter((t) => t.id !== id));
@@ -5807,6 +6003,8 @@ var OrderManager = class {
 	orderFlow;
 	historicalLoader;
 	activeTakeProfitOrderId = null;
+	trailingQuantity = 1;
+	trailingStopPrice = 0;
 	constructor(config = {}, orderFlow, historicalLoader) {
 		this.config = {
 			lotQuantity: 1,
@@ -5844,6 +6042,7 @@ var OrderManager = class {
 			...this.config,
 			...patch
 		};
+		console.log("[OrderManager] updateConfig trailingEnabled:", this.config.trailingEnabled, "useDynamicSizing:", this.config.useDynamicSizing);
 		this.dailyLossCurrent = 0;
 		this.lastLossResetDate = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
 	}
@@ -5860,34 +6059,64 @@ var OrderManager = class {
 		}
 		if (!this.config.token || !this.config.accountId) return;
 		const now = Date.now();
-		if (now - this.lastOrderTime < 300 * 1e3) {
+		if (now - this.lastOrderTime < 60 * 1e3) {
 			console.log("[OrderManager] Кулдаун, пропускаем сигнал");
 			return;
 		}
+		const rawType = signal.type;
+		if (rawType === "POC_BREAKOUT_UP") signal.type = "BUY";
+		else if (rawType === "POC_BREAKOUT_DOWN") signal.type = "SELL";
 		const direction = signal.type === "BUY" ? OrderDirection.ORDER_DIRECTION_BUY : OrderDirection.ORDER_DIRECTION_SELL;
-		let quantity = this.config.lotQuantity;
-		let riskAmount = this.config.riskAmount;
-		if (this.config.useDynamicSizing && this.config.dynamicSizingPercent && this.config.dynamicSizingPercent > 0) try {
-			const total = (await sandboxGrpc.getSandboxPortfolio({ accountId: this.config.accountId }, this.config.token)).totalAmountPortfolio;
-			if (total) {
-				const balance = Number(total.units || "0") + (total.nano || 0) / 1e9;
-				riskAmount = balance * (this.config.dynamicSizingPercent / 100);
-				console.log(`[OrderManager] Баланс: ${balance}, риск ${this.config.dynamicSizingPercent}% = ${riskAmount.toFixed(2)}`);
+		try {
+			if (((await sandboxGrpc.getSandboxPositions({ accountId: this.config.accountId }, this.config.token)).securities || []).find((p) => p.instrumentUid === signal.instrumentUid && p.quantity && (Number(p.quantity.units) || 0) !== 0)) {
+				console.log("[OrderManager] Уже есть открытая позиция по инструменту, пропускаем сигнал");
+				return;
 			}
 		} catch (e) {
-			console.warn("[OrderManager] Не удалось получить баланс, используется абсолютный риск");
+			console.warn("[OrderManager] Не удалось проверить позиции, продолжаем");
 		}
-		if (this.config.useDynamicSizing && this.historicalLoader) {
-			const atr = await this.calculateATR(signal.instrumentUid, this.config.token);
-			if (atr && atr > 0 && riskAmount > 0) {
-				const riskPerLot = atr * this.config.atrMultiplier;
-				quantity = Math.floor(riskAmount / riskPerLot);
-				if (quantity < 1) quantity = 1;
+		let quantity = this.config.lotQuantity;
+		let riskAmount = this.config.riskAmount;
+		let freeBalance = 0;
+		if (this.config.useDynamicSizing && this.config.dynamicSizingPercent && this.config.dynamicSizingPercent > 0) try {
+			const balanceRes = await sandboxGrpc.getSandboxPortfolio({ accountId: this.config.accountId }, this.config.token);
+			const totalCurrencies = balanceRes.totalAmountCurrencies;
+			if (totalCurrencies && totalCurrencies.currency === "rub") freeBalance = Number(totalCurrencies.units || 0) + (totalCurrencies.nano || 0) / 1e9;
+			else {
+				const rubPos = (balanceRes.positions || []).find((p) => p.instrumentType === "currency" && p.ticker === "RUB000UTSTOM");
+				if (rubPos && rubPos.quantity) freeBalance = Number(rubPos.quantity.units || 0) + (rubPos.quantity.nano || 0) / 1e9;
 			}
+			riskAmount = freeBalance * (this.config.dynamicSizingPercent / 100);
+			console.log(`[OrderManager] Свободный остаток: ${freeBalance}, риск ${this.config.dynamicSizingPercent}% = ${riskAmount.toFixed(2)}`);
+			if ((balanceRes.positions || []).find((p) => p.instrumentUid === signal.instrumentUid && p.quantity && (Number(p.quantity.units) || 0) !== 0)) {
+				console.log("[OrderManager] Уже есть открытая позиция по инструменту, пропускаем сигнал");
+				return;
+			}
+		} catch (e) {
+			console.warn("[OrderManager] Не удалось получить портфель, используется абсолютный риск");
 		}
-		if (this.lastEntryPrice > 0) {
-			const prevProfit = signal.type === "BUY" ? signal.price - this.lastEntryPrice : this.lastEntryPrice - signal.price;
-			this.updateDailyLoss(prevProfit);
+		if (this.config.useDynamicSizing) {
+			const entryPrice = signal.price || signal.targetPrice || 0;
+			let riskPerLot = 0;
+			if (this.config.stopLossPercent && this.config.stopLossPercent > 0) riskPerLot = entryPrice * (this.config.stopLossPercent / 100);
+			else if (this.config.trailingMode === "volatility" && this.historicalLoader) {
+				const atr = await this.calculateATR(signal.instrumentUid, this.config.token);
+				if (atr) riskPerLot = atr * (this.config.volatilityMultiplier || 2);
+			}
+			if (riskPerLot > 0 && riskAmount > 0) {
+				quantity = Math.floor(riskAmount / riskPerLot);
+				console.log(`[OrderManager] riskPerLot=${riskPerLot.toFixed(2)}, quantity before limits=${quantity}`);
+			} else quantity = this.config.lotQuantity;
+			const maxPositionCost = freeBalance * (10 / 100);
+			const maxLotsByCapital = Math.floor(maxPositionCost / entryPrice);
+			quantity = Math.min(quantity, maxLotsByCapital);
+			const maxLotsByFreeBalance = Math.floor(freeBalance * .95 / entryPrice);
+			quantity = Math.min(quantity, maxLotsByFreeBalance);
+			if (quantity < 1) {
+				console.log("[OrderManager] Недостаточно средств для открытия позиции");
+				return;
+			}
+			console.log(`[OrderManager] Final quantity=${quantity}`);
 		}
 		try {
 			let entryOrderResult = null;
@@ -5911,38 +6140,52 @@ var OrderManager = class {
 				this.lastOrderTime = now;
 				this.lastEntryPrice = limitPrice;
 				console.log(`[OrderManager] Лимитный ордер отправлен: ${this.activeOrderId}`);
+				await new Promise((resolve) => setTimeout(resolve, 1e3));
 			} else {
+				const lastPrice = await this.getLastPrice(signal.instrumentUid);
+				const limitPrice = lastPrice ? lastPrice * 1.002 : signal.price;
 				const orderId = this.generateUUID();
-				console.log("[OrderManager] Выставляю рыночный ордер, orderId=", orderId);
+				console.log(`[OrderManager] Агрессивный лимитный ордер на ${limitPrice.toFixed(2)}, orderId=${orderId}`);
 				entryOrderResult = await sandboxGrpc.postSandboxOrder({
 					instrumentId: signal.instrumentUid,
 					direction,
-					orderType: OrderType.ORDER_TYPE_MARKET,
+					orderType: OrderType.ORDER_TYPE_LIMIT,
 					quantity,
-					price: this.config.useMarketOrder ? void 0 : {
-						units: Math.floor(signal.price),
-						nano: Math.round(signal.price % 1 * 1e9)
+					price: {
+						units: Math.floor(limitPrice),
+						nano: Math.round(limitPrice % 1 * 1e9)
 					},
 					accountId: this.config.accountId,
 					orderId
 				}, this.config.token);
 				this.activeOrderId = entryOrderResult.orderId ?? null;
 				this.lastOrderTime = now;
-				this.lastEntryPrice = signal.price;
-				console.log(`[OrderManager] Рыночный ордер отправлен: ${this.activeOrderId}`);
+				this.lastEntryPrice = limitPrice;
+				console.log(`[OrderManager] Агрессивный лимитный ордер отправлен: ${this.activeOrderId}`);
 			}
 			const entryPrice = this.lastEntryPrice;
 			let stopOrderId = null;
-			if (this.config.stopMode === "stop_order") stopOrderId = await this.placeStopOrders(signal);
-			else stopOrderId = (await this.placeProtectiveOrders(signal, entryPrice)).stopOrderId;
-			if (this.config.trailingEnabled && stopOrderId) this.startTrailing(signal.instrumentUid, entryPrice, stopOrderId, this.config.trailingPercent);
+			try {
+				if (this.config.stopMode === "stop_order") stopOrderId = await this.placeStopOrders(signal, quantity);
+				else stopOrderId = (await this.placeProtectiveOrders(signal, entryPrice, quantity)).stopOrderId;
+			} catch (protectiveError) {
+				console.error("[OrderManager] Ошибка установки защитных ордеров:", protectiveError);
+			}
+			console.log("[OrderManager] trail check:", {
+				trailingEnabled: this.config.trailingEnabled,
+				stopOrderId
+			});
+			if (this.config.trailingEnabled && stopOrderId) {
+				this.trailingQuantity = quantity;
+				this.startTrailing(signal.instrumentUid, entryPrice, stopOrderId, this.config.trailingPercent);
+			}
 		} catch (error) {
 			const apiError = handleApiError(error);
 			console.error("[OrderManager] Ошибка отправки ордера:", apiError.message);
 		}
 	}
-	async placeStopOrders(signal) {
-		const { stopLossPercent, takeProfitPercent, lotQuantity, token, accountId } = this.config;
+	async placeStopOrders(signal, quantity) {
+		const { stopLossPercent, takeProfitPercent, token, accountId } = this.config;
 		if (stopLossPercent <= 0 && takeProfitPercent <= 0) return null;
 		if (!accountId || !token || !signal.instrumentUid) return null;
 		const entryPrice = signal.price;
@@ -5964,7 +6207,7 @@ var OrderManager = class {
 						units: Math.floor(slPrice),
 						nano: Math.round(slPrice % 1 * 1e9)
 					},
-					quantity: lotQuantity,
+					quantity,
 					accountId,
 					expirationType: StopOrderExpirationType.STOP_ORDER_EXPIRATION_TYPE_GOOD_TILL_CANCEL,
 					exchangeOrderType: ExchangeOrderType.EXCHANGE_ORDER_TYPE_MARKET,
@@ -5991,7 +6234,7 @@ var OrderManager = class {
 						units: Math.floor(tpPrice),
 						nano: Math.round(tpPrice % 1 * 1e9)
 					},
-					quantity: lotQuantity,
+					quantity,
 					accountId,
 					expirationType: StopOrderExpirationType.STOP_ORDER_EXPIRATION_TYPE_GOOD_TILL_CANCEL,
 					exchangeOrderType: ExchangeOrderType.EXCHANGE_ORDER_TYPE_MARKET,
@@ -6005,8 +6248,8 @@ var OrderManager = class {
 		}
 		return stopOrderId;
 	}
-	async placeProtectiveOrders(signal, entryPrice) {
-		const { stopLossPercent, takeProfitPercent, lotQuantity, token, accountId, trailingMode, volatilityMultiplier } = this.config;
+	async placeProtectiveOrders(signal, entryPrice, quantity) {
+		const { stopLossPercent, takeProfitPercent, token, accountId, trailingMode, volatilityMultiplier } = this.config;
 		if (entryPrice <= 0) {
 			console.warn("[OrderManager] entryPrice = 0, защитные ордера не выставляются");
 			return {
@@ -6032,6 +6275,7 @@ var OrderManager = class {
 				if (atr && atr > 0) slPrice = isBuy ? entryPrice - atr * volatilityMultiplier : entryPrice + atr * volatilityMultiplier;
 			} else if (stopLossPercent > 0) slPrice = isBuy ? entryPrice * (1 - stopLossPercent / 100) : entryPrice * (1 + stopLossPercent / 100);
 			if (slPrice) {
+				console.log(`[OrderManager] Выставляю стоп‑лосс (лимитный) на ${slPrice}`);
 				slPrice = isBuy ? Math.max(slPrice, entryPrice * .98) : Math.min(slPrice, entryPrice * 1.02);
 				try {
 					const orderId = this.generateUUID();
@@ -6039,7 +6283,7 @@ var OrderManager = class {
 						instrumentId: signal.instrumentUid,
 						direction: isBuy ? OrderDirection.ORDER_DIRECTION_SELL : OrderDirection.ORDER_DIRECTION_BUY,
 						orderType: OrderType.ORDER_TYPE_LIMIT,
-						quantity: lotQuantity,
+						quantity,
 						price: {
 							units: Math.floor(slPrice),
 							nano: Math.round(slPrice % 1 * 1e9)
@@ -6048,7 +6292,7 @@ var OrderManager = class {
 						orderId
 					}, token)).orderId || null;
 					console.log(`[OrderManager] Стоп‑лосс (лимитный) выставлен на ${slPrice}, orderId=${stopOrderId}`);
-					await new Promise((resolve) => setTimeout(resolve, 500));
+					await new Promise((resolve) => setTimeout(resolve, 1500));
 				} catch (error) {
 					const apiError = handleApiError(error);
 					console.error("[OrderManager] Ошибка выставления стоп‑лосса:", apiError.message);
@@ -6065,7 +6309,7 @@ var OrderManager = class {
 					instrumentId: signal.instrumentUid,
 					direction: isBuy ? OrderDirection.ORDER_DIRECTION_SELL : OrderDirection.ORDER_DIRECTION_BUY,
 					orderType: OrderType.ORDER_TYPE_LIMIT,
-					quantity: lotQuantity,
+					quantity,
 					price: {
 						units: Math.floor(tpPrice),
 						nano: Math.round(tpPrice % 1 * 1e9)
@@ -6117,7 +6361,9 @@ var OrderManager = class {
 		this.trailingEntryPrice = entryPrice;
 		this.trailingStopOrderId = stopOrderId;
 		this.trailingPercent = trailPercent;
-		this.trailingInterval = setInterval(() => this.checkAndUpdateTrailing(), 1e4);
+		if (this.config.stopLossPercent > 0) this.trailingStopPrice = entryPrice * (1 - this.config.stopLossPercent / 100);
+		else this.trailingStopPrice = entryPrice;
+		this.trailingInterval = setInterval(() => this.checkAndUpdateTrailing(), 2e3);
 	}
 	stopTrailing() {
 		this.trailingActive = false;
@@ -6128,6 +6374,7 @@ var OrderManager = class {
 		this.trailingInstrumentUid = null;
 		this.trailingEntryPrice = null;
 		this.trailingStopOrderId = null;
+		this.trailingStopPrice = 0;
 	}
 	async checkAndUpdateTrailing() {
 		if (!this.trailingActive || !this.trailingStopOrderId || !this.trailingInstrumentUid || !this.trailingEntryPrice) return;
@@ -6140,18 +6387,33 @@ var OrderManager = class {
 				if (!atr) return;
 				newStopPrice = lastPrice - atr * this.config.volatilityMultiplier;
 			} else newStopPrice = lastPrice * (1 - this.config.trailingPercent / 100);
-			if (newStopPrice > this.trailingEntryPrice || false) {
-				await sandboxGrpc.replaceSandboxOrder({
-					accountId: this.config.accountId,
-					orderId: this.trailingStopOrderId,
+			if (newStopPrice > this.trailingStopPrice || false) {
+				try {
+					await sandboxGrpc.cancelSandboxOrder({
+						accountId: this.config.accountId,
+						orderId: this.trailingStopOrderId,
+						orderIdType: OrderIdType.ORDER_ID_TYPE_EXCHANGE
+					}, this.config.token);
+					console.log(`[OrderManager] Трейлинг: предыдущий стоп-ордер ${this.trailingStopOrderId} отменён`);
+				} catch (cancelError) {
+					console.warn("[OrderManager] Не удалось отменить предыдущий стоп-ордер, продолжаем");
+				}
+				const orderId = this.generateUUID();
+				const resp = await sandboxGrpc.postSandboxOrder({
+					instrumentId: this.trailingInstrumentUid,
+					direction: OrderDirection.ORDER_DIRECTION_SELL,
+					orderType: OrderType.ORDER_TYPE_LIMIT,
+					quantity: this.trailingQuantity,
 					price: {
 						units: Math.floor(newStopPrice),
 						nano: Math.round(newStopPrice % 1 * 1e9)
 					},
-					quantity: this.config.lotQuantity
+					accountId: this.config.accountId,
+					orderId
 				}, this.config.token);
-				this.trailingEntryPrice = newStopPrice;
-				console.log(`[OrderManager] Трейлинг‑стоп обновлён до ${newStopPrice}`);
+				this.trailingStopOrderId = resp.orderId || null;
+				this.trailingStopPrice = newStopPrice;
+				console.warn(`\x1b[42m\x1b[30m🚀 TRAILING UPDATE 🚀\x1b[0m \x1b[32m[OrderManager] Трейлинг‑стоп обновлён до ${newStopPrice} (новый ордер ${this.trailingStopOrderId})\x1b[0m \x07`);
 			}
 		} catch (error) {
 			const apiError = handleApiError(error);
@@ -6686,6 +6948,15 @@ electron.app.whenReady().then(() => {
 				if (win) applyMenuToWindow(win, mainMenuTemplate);
 			}
 		};
+		const openOSINT = fileMenu.items.find((i) => i.label === "Открыть OSINT");
+		if (openOSINT) openOSINT.click = () => {
+			const existing = getOsintWindow();
+			if (existing && !existing.isDestroyed()) existing.focus();
+			else {
+				const win = createOsintWindow();
+				if (win) applyMenuToWindow(win, osintWindowMenuTemplate);
+			}
+		};
 	}
 	mainWindow.setMenu(menu);
 	console.log("Menu items:", menu.items.map((i) => i.label));
@@ -6702,14 +6973,15 @@ electron.app.whenReady().then(() => {
 	registerTasksHandlers();
 	scheduler.start();
 	registerTradingAssistantHandlers(historicalDataLoader, volumeProfileEngine, getToken, strategyManager, compositeProfileService, orderFlowEngine);
+	registerOsintHandlers();
 	const orderManager = new OrderManager({
 		demoMode: true,
 		token: "",
 		accountId: ""
-	}, orderFlowEngine);
+	}, orderFlowEngine, historicalDataLoader);
 	setOrderManagerInstance(orderManager);
 	const autoTrader = new AutonomousTrader(orderManager, strategyManager, compositeProfileService);
-	volumeProfileEngine.on("signal", (s) => console.log("[main test] signal", s.type));
+	volumeProfileEngine.on("signal", (s) => {});
 	marketDataBus.on("candle", (c) => {});
 	console.log("[main] Добавили отладочного слушателя candle, всего слушателей:", marketDataBus.listenerCount("candle"));
 	setAutonomousTraderInstance(autoTrader);
@@ -6752,6 +7024,15 @@ var ollamaWindow = getOllamaWindow();
 electron.ipcMain.handle("open-ollama-window", () => {
 	if (!ollamaWindow) createOllamaWindow();
 	else ollamaWindow.focus();
+});
+electron.ipcMain.handle("open-osint-window", () => {
+	const existing = getOsintWindow();
+	if (existing && !existing.isDestroyed()) {
+		existing.focus();
+		return;
+	}
+	const win = createOsintWindow();
+	if (win) applyMenuToWindow(win, mainMenuTemplate);
 });
 electron.ipcMain.handle("open-file-picker", async () => {
 	try {

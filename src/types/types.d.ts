@@ -12,7 +12,14 @@ declare global {
       startFineTuning: (data: FineTuningData) => Promise<FineTuningResult>;
       onTrainingProgress: (callback: (progress: TrainingProgress) => void) => void;
       offTrainingProgress: (callback: (progress: TrainingProgress) => void) => void; // Для отписки
+
+      launch: () => Promise<{ success: boolean; error?: string }>;
+      close: () => Promise<{ success: boolean; error?: string }>;
+      openWindow: () => Promise<void>;
+      // В будущем здесь появятся методы scrape...
+      scrapeRusprofile: (inn: string) => Promise<{ success: boolean; data?: CompanyInfo; error?: string }>;
     };
+
   }
 }
 

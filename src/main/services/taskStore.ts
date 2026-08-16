@@ -1,5 +1,7 @@
 // src/main/services/taskStore.ts
 
+const DEBUG_TASK_STORE = false; // поменяй на true, чтобы включить логи
+
 import * as fs from 'fs';
 import * as path from 'path';
 import { app } from 'electron';
@@ -9,7 +11,9 @@ const DATA_DIR = app.getPath('userData');
 const TASKS_FILE = path.join(DATA_DIR, 'tasks.json');
 
 function readTasks(): Task[] {
-  console.log('[TaskStore] Читаю файл:', TASKS_FILE);
+  if (DEBUG_TASK_STORE) {
+    console.log('[TaskStore] Читаю файл:', TASKS_FILE);
+  }
   try {
     if (!fs.existsSync(TASKS_FILE)) return [];
     const raw = fs.readFileSync(TASKS_FILE, 'utf-8');
@@ -44,7 +48,9 @@ export class TaskStore {
   update(updated: Task): void {
     const tasks = readTasks().map(t => t.id === updated.id ? updated : t);
     writeTasks(tasks);
-    console.log('[TaskStore] update – обновлена задача', updated.id);
+    if (DEBUG_TASK_STORE) {
+      console.log('[TaskStore] update – обновлена задача', updated.id);
+    } 
   }
 
   delete(id: string): void {

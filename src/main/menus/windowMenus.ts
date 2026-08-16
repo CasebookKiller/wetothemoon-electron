@@ -10,6 +10,7 @@ export const mainMenuTemplate: MenuItemConstructorOptions[] = [
       { label: 'Открыть Облигации', id: 'open-bonds' },
       { label: 'Открыть Генератор запросов', id: 'open-pg' },
       { label: 'Открыть Трейдер', id: 'open-trading' },
+      { label: 'Открыть OSINT', id: 'open-osint' },
       { type: 'separator' },
       { label: 'Выйти', click: () => app.quit(), accelerator: 'CmdOrCtrl+Q' }
     ]
@@ -254,6 +255,29 @@ export const tasksWindowMenuTemplate: MenuItemConstructorOptions[] = [
 
 // Пример простого меню для TradingAssistant (можно скопировать из bondsWindowMenuTemplate)
 export const tradingAssistantWindowMenuTemplate: MenuItemConstructorOptions[] = [
+  {
+    label: 'Файл',
+    submenu: [
+      { role: 'close' }
+    ]
+  },
+  {
+    label: 'Вид',
+    submenu: [
+      { role: 'reload' },
+      { role: 'forceReload' },
+      { role: 'toggleDevTools' },
+      { type: 'separator' },
+      { role: 'resetZoom' },
+      { role: 'zoomIn' },
+      { role: 'zoomOut' },
+      { type: 'separator' },
+      { role: 'togglefullscreen' }
+    ]
+  }
+];
+
+export const osintWindowMenuTemplate: MenuItemConstructorOptions[] = [
   {
     label: 'Файл',
     submenu: [

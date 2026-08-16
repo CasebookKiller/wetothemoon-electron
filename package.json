@@ -83,6 +83,7 @@
     "luxon": "^3.7.2",
     "node-cron": "^4.2.1",
     "ollama": "^0.6.3",
+    "playwright": "^1.62.1",
     "primeflex": "^4.0.0",
     "primeicons": "^7.0.0",
     "primereact": "^10.9.7",

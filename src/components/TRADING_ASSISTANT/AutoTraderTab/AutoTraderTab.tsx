@@ -143,9 +143,22 @@ export const AutoTraderTab: React.FC<AutoTraderTabProps> = ({ availableInstrumen
   const handleStart = async () => {
     if (!selectedInstrument || !selectedAccountId) return;
 
+    console.log('[AutoTraderTab] updateTradingConfig payload:', {
+      lotQuantity: lotQty,
+      stopLossPercent,
+      takeProfitPercent,
+      trailingEnabled,
+      trailingPercent,
+      useDynamicSizing: dynamicSizing,
+      dynamicSizingPercent,
+      stopMode,
+      entryMode,
+    });
+
     await api.updateTradingConfig({
       token: import.meta.env.VITE_TSandBox,
       accountId: selectedAccountId,
+      marketDataToken: import.meta.env.VITE_TReadOnly || '',
       lotQuantity: lotQty,
       stopLossPercent,
       takeProfitPercent,
@@ -233,7 +246,18 @@ export const AutoTraderTab: React.FC<AutoTraderTabProps> = ({ availableInstrumen
           <Checkbox checked={trailingEnabled} onChange={e => setTrailingEnabled(e.checked)} />
           <label className="ml-1 mr-1 mb-0">Trail</label>
           {trailingEnabled && (
-            <InputNumber value={trailingPercent} onValueChange={e => setTrailingPercent(e.value ?? 0.5)} step={0.1} min={0} size={2} className="p-inputtext-sm" />
+            <InputNumber
+              value={trailingPercent}
+              onValueChange={e => setTrailingPercent(e.value ?? 0.5)}
+              step={0.1}
+              min={0}
+              max={10}
+              minFractionDigits={1}
+              maxFractionDigits={2}
+              mode="decimal"
+              size={2}
+              className="p-inputtext-sm"
+            />
           )}
           
           <Checkbox checked={dynamicSizing} onChange={e => setDynamicSizing(e.checked)} />

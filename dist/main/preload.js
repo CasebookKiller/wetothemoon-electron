@@ -11,6 +11,7 @@ try {
 		openPGWindow: () => electron.ipcRenderer.invoke("open-pg-window"),
 		openOllamaWindow: () => electron.ipcRenderer.invoke("open-ollama-window"),
 		openTasksWindow: () => electron.ipcRenderer.invoke("open-tasks-window"),
+		openOsintWindow: () => electron.ipcRenderer.invoke("open-osint-window"),
 		sendMessageToAI: (message) => electron.ipcRenderer.invoke("send-to-ai", message).then((response) => {
 			console.log(response);
 			return response;
@@ -241,7 +242,8 @@ try {
 		removeApiErrorListener: () => {
 			electron.ipcRenderer.removeAllListeners("api-error");
 		},
-		sendManualOrder: (params) => electron.ipcRenderer.invoke("trading-assistant:send-manual-order", params)
+		sendManualOrder: (params) => electron.ipcRenderer.invoke("trading-assistant:send-manual-order", params),
+		scrapeRusprofile: (inn) => electron.ipcRenderer.invoke("osint:scrape-rusprofile", inn)
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {

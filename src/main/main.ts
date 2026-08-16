@@ -29,6 +29,8 @@ import { registerOperationsStreamHandlers } from './streams/operations.ts';
 import { registerOrdersStreamHandlers } from './streams/orders.ts';
 import { createTradingAssistantWindow, getTradingAssistantWindow } from './windows/tradingAssistantWindow';
 import { registerTradingAssistantHandlers } from './ipcHandlers/tradingAssistantHandlers';
+import { createOsintWindow, getOsintWindow } from './windows/osintWindow';
+import { registerOsintHandlers } from './ipcHandlers/osintHandlers';
 
 import fs from 'fs';
 import path from 'path';
@@ -46,7 +48,8 @@ import {
   mainMenuTemplate,
   aiWindowMenuTemplate,
   bondsWindowMenuTemplate,
-  mdWindowMenuTemplate
+  mdWindowMenuTemplate,
+  osintWindowMenuTemplate
 } from './menus/windowMenus.ts';
 import { registerGrpcHandlers } from './ipcHandlers/grpcHandlers.ts';
 import { registerTasksHandlers } from './ipcHandlers/tasksHandlers.ts';
@@ -171,6 +174,19 @@ app.whenReady().then(() => {
         }
       };
     }
+
+    const openOSINT = fileMenu.items.find(i => i.label === 'Открыть OSINT');
+    if (openOSINT) {
+      openOSINT.click = () => {
+        const existing = getOsintWindow();
+        if (existing && !existing.isDestroyed()) {
+          existing.focus();
+        } else {
+          const win = createOsintWindow();
+          if (win) applyMenuToWindow(win, osintWindowMenuTemplate); // используем специальный шаблон
+        }
+      };
+    }
   }
 
   mainWindow.setMenu(menu);
@@ -205,12 +221,14 @@ app.whenReady().then(() => {
     orderFlowEngine            // синглтон OrderFlowEngine
   );
 
+  registerOsintHandlers();
+
   // ----------------- Order Manager -----------------
   const orderManager = new OrderManager({
     demoMode: true,   // включите false, когда будете готовы к реальной песочнице
     token: '',        // можно задать позже через UI
     accountId: '',
-  }, orderFlowEngine);
+  }, orderFlowEngine, historicalDataLoader);
   // connectOrderManager(orderManager); временное отключение для проверки исправления ошибки
   setOrderManagerInstance(orderManager);
   // Подключаем live-стратегию для выбранного инструмента (пока захардкожен)
@@ -222,7 +240,9 @@ app.whenReady().then(() => {
     strategyManager,
     compositeProfileService
   );
-  volumeProfileEngine.on('signal', (s) => console.log('[main test] signal', s.type));
+  volumeProfileEngine.on('signal', (s) => {
+    //console.log('[main test] signal', s.type);
+  });
   marketDataBus.on('candle', (c) => {
     //убираем вывод в дог
     //console.log('[DEBUG candle] uid:', c.instrumentUid, 'time:', c.time);
@@ -302,6 +322,19 @@ ipcMain.handle('open-ollama-window', () => {
     createOllamaWindow();
   } else {
     ollamaWindow.focus();
+  }
+});
+
+// open trader???
+ipcMain.handle('open-osint-window', () => {
+  const existing = getOsintWindow();
+  if (existing && !existing.isDestroyed()) {
+    existing.focus();
+    return;
+  }
+  const win = createOsintWindow();
+  if (win) {
+    applyMenuToWindow(win, mainMenuTemplate);
   }
 });
 
