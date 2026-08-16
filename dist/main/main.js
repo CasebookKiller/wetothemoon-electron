@@ -4617,6 +4617,46 @@ async function loginToRusprofile(page, login, password) {
 	await page.waitForNavigation();
 }
 //#endregion
+//#region src/main/services/osint/scrapers/kadArbitr.ts
+async function scrapeKadArbitr(inn) {
+	const browser = getBrowser();
+	if (!browser) throw new Error("Browser not launched");
+	const page = await browser.newPage();
+	try {
+		await page.goto("https://kad.arbitr.ru/");
+		const creds = getCredentials("kad");
+		if (creds) {
+			await loginToKadArbitr(page, creds.login, creds.password);
+			await page.goto("https://kad.arbitr.ru/");
+		}
+		await page.fill("#participant", inn);
+		await page.click("button[type=\"submit\"]");
+		await page.waitForSelector(".b-results", { timeout: 15e3 });
+		return await page.$$eval(".case-item", (items) => {
+			return items.map((item) => ({
+				caseNumber: item.querySelector(".case-number")?.textContent?.trim() || "",
+				court: item.querySelector(".court")?.textContent?.trim() || "",
+				judge: item.querySelector(".judge")?.textContent?.trim() || "",
+				plaintiff: item.querySelector(".plaintiff")?.textContent?.trim() || "",
+				defendant: item.querySelector(".defendant")?.textContent?.trim() || "",
+				date: item.querySelector(".date")?.textContent?.trim() || ""
+			}));
+		});
+	} catch (error) {
+		console.error("KadArbitr scraping failed:", error);
+		return [];
+	} finally {
+		await page.close();
+	}
+}
+async function loginToKadArbitr(page, login, password) {
+	await page.goto("https://kad.arbitr.ru/login");
+	await page.fill("#login", login);
+	await page.fill("#password", password);
+	await page.click("button[type=\"submit\"]");
+	await page.waitForNavigation();
+}
+//#endregion
 //#region src/main/ipcHandlers/osintHandlers.ts
 function registerOsintHandlers() {
 	electron.ipcMain.handle("osint:open-window", () => {
@@ -4662,6 +4702,19 @@ function registerOsintHandlers() {
 			return {
 				success: true,
 				data: await scrapeRusprofile(inn)
+			};
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:scrape-kad-arbitr", async (_event, inn) => {
+		try {
+			return {
+				success: true,
+				data: await scrapeKadArbitr(inn)
 			};
 		} catch (error) {
 			return {

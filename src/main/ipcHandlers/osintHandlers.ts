@@ -2,6 +2,7 @@ import { ipcMain } from 'electron';
 import { createOsintWindow, getOsintWindow } from '@/main/windows/osintWindow';
 import { launchBrowser, closeBrowser } from '../services/osint/playwrightService'; // будет создан позже
 import { scrapeRusprofile } from '../services/osint/scrapers/rusprofile';
+import { scrapeKadArbitr } from '../services/osint/scrapers/kadArbitr';
 
 export function registerOsintHandlers() {
   // Открыть окно OSINT
@@ -53,5 +54,13 @@ export function registerOsintHandlers() {
       return { success: false, error: (error as Error).message };
     }
   });
-  
+
+  ipcMain.handle('osint:scrape-kad-arbitr', async (_event, inn: string) => {
+    try {
+      const data = await scrapeKadArbitr(inn);
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
 }

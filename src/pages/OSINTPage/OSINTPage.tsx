@@ -28,6 +28,27 @@ export const OSINTPage: React.FC = () => {
     }
   };
 
+  const handleKadArbitr = async () => {
+    if (!inn.trim()) return;
+    setLoading(true);
+    setError('');
+    try {
+      if (!api?.scrapeKadArbitr) return;
+
+      const response = await api.scrapeKadArbitr(inn);
+      if (response.success) {
+        setResult(response.data);
+      } else {
+        setError(response.error || 'Ошибка сбора');
+      }
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
   return (
     <div className="osint-page">
       <h1>OSINT Tools</h1>
@@ -48,6 +69,23 @@ export const OSINTPage: React.FC = () => {
       {result && (
         <pre>{JSON.stringify(result, null, 2)}</pre>
       )}
+
+      <hr />
+      <h2>kad.arbitr.ru</h2>
+      <input
+        value={inn}
+        onChange={(e) => setInn(e.target.value)}
+        placeholder="Введите ИНН"
+      />
+      <button onClick={handleScrape} disabled={loading}>
+        {loading ? 'Сбор...' : 'Собрать данные'}
+      </button>
+      {error && <p style={{ color: 'red' }}>{error}</p>}
+      {result && (
+        <pre>{JSON.stringify(result, null, 2)}</pre>
+      )}
+
+      
     </div>
   );
 };

@@ -338,6 +338,9 @@ try {
     sendManualOrder: (params: any) => ipcRenderer.invoke('trading-assistant:send-manual-order', params),
 
     scrapeRusprofile: (inn: string) => ipcRenderer.invoke('osint:scrape-rusprofile', inn),
+
+    scrapeKadArbitr: (inn: string) => ipcRenderer.invoke('osint:scrape-kad-arbitr', inn),
+    
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

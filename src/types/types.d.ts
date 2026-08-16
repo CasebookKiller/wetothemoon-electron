@@ -18,6 +18,7 @@ declare global {
       openWindow: () => Promise<void>;
       // В будущем здесь появятся методы scrape...
       scrapeRusprofile: (inn: string) => Promise<{ success: boolean; data?: CompanyInfo; error?: string }>;
+      scrapeKadArbitr: (inn: string) => Promise<{ success: boolean; data?: CourtCase[]; error?: string }>;
     };
 
   }

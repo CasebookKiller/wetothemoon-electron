@@ -243,7 +243,8 @@ try {
 			electron.ipcRenderer.removeAllListeners("api-error");
 		},
 		sendManualOrder: (params) => electron.ipcRenderer.invoke("trading-assistant:send-manual-order", params),
-		scrapeRusprofile: (inn) => electron.ipcRenderer.invoke("osint:scrape-rusprofile", inn)
+		scrapeRusprofile: (inn) => electron.ipcRenderer.invoke("osint:scrape-rusprofile", inn),
+		scrapeKadArbitr: (inn) => electron.ipcRenderer.invoke("osint:scrape-kad-arbitr", inn)
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {
