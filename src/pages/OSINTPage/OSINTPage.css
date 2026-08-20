@@ -1,0 +1,15 @@
+.osint-page .p-panel {
+  margin-bottom: 0;
+}
+
+.osint-page .p-inputtext {
+  width: 100%;
+}
+
+.osint-page .p-checkbox {
+  margin-right: 0.5rem;
+}
+
+.osint-page .p-button {
+  min-width: 120px;
+}
