@@ -22,8 +22,10 @@ export const OSINTPage: React.FC = () => {
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
   const [needArbitrDetails, setNeedArbitrDetails] = useState(false);
   const [needConnectionsDetails, setNeedConnectionsDetails] = useState(false);
+  const [needSouDetails, setNeedSouDetails] = useState(false); // <-- новое
 
   const handleInnChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -85,6 +87,7 @@ export const OSINTPage: React.FC = () => {
         maxPages: arbitrFilters.maxPages,
         maxTotalCases: arbitrFilters.maxTotalCases,
         connectionsDetails: needConnectionsDetails,
+        souDetails: needSouDetails, // <-- новое
       };
 
       if (needArbitrDetails) {
@@ -194,6 +197,16 @@ export const OSINTPage: React.FC = () => {
                 onChange={(e) => setNeedConnectionsDetails(e.checked as boolean)}
               />
               <label htmlFor="needConnections" className="ml-2">Собрать детальные связи</label>
+            </div>
+            <div className="mt-2">
+              <Checkbox
+                inputId="needSou"
+                checked={needSouDetails}
+                onChange={(e) => setNeedSouDetails(e.checked as boolean)}
+              />
+              <label htmlFor="needSou" className="ml-2">
+                Собрать детальные суды общей юрисдикции
+              </label>
             </div>
           </div>
         </div>
