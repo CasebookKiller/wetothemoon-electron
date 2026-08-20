@@ -5635,6 +5635,70 @@ async function collectResume(page) {
 		};
 	});
 }
+async function applyArbitrFilters(page, filters) {
+	if (!filters) return;
+	if (filters.sides && Array.isArray(filters.sides) && filters.sides.length > 0) {
+		const sideValues = filters.sides.map((s) => {
+			switch (s) {
+				case "defendant": return "1";
+				case "plaintiff": return "0";
+				case "third": return "2";
+				default: return null;
+			}
+		}).filter(Boolean);
+		for (const value of sideValues) {
+			const checkbox = page.locator(`input[name="sides"][value="${value}"]`);
+			if (await checkbox.count() > 0) {
+				await checkbox.check();
+				await page.waitForTimeout(500);
+			}
+		}
+	}
+	if (filters.status && Array.isArray(filters.status) && filters.status.length > 0) {
+		const statusValues = filters.status.map((s) => {
+			switch (s) {
+				case "in_progress": return "0";
+				case "completed": return "1";
+				default: return null;
+			}
+		}).filter(Boolean);
+		for (const value of statusValues) {
+			const checkbox = page.locator(`input[name="status"][value="${value}"]`);
+			if (await checkbox.count() > 0) {
+				await checkbox.check();
+				await page.waitForTimeout(500);
+			}
+		}
+	}
+	if (filters.outcomes && Array.isArray(filters.outcomes) && filters.outcomes.length > 0) for (const outcome of filters.outcomes) {
+		const checkbox = page.locator(`input[name="outcomes"][value="${outcome}"]`);
+		if (await checkbox.count() > 0) {
+			await checkbox.check();
+			await page.waitForTimeout(500);
+		}
+	}
+	if (filters.categories && Array.isArray(filters.categories) && filters.categories.length > 0) for (const category of filters.categories) {
+		const checkbox = page.locator(`input[name="categories"][value="${category}"]`);
+		if (await checkbox.count() === 0) {
+			const label = page.locator(`label.choice-input:has-text("${category}") input[name="categories"]`);
+			if (await label.count() > 0) {
+				await label.check();
+				await page.waitForTimeout(500);
+			}
+		} else {
+			await checkbox.check();
+			await page.waitForTimeout(500);
+		}
+	}
+	if (filters.search && filters.search.trim() !== "") {
+		const searchInput = page.locator("input[name=\"search\"]");
+		if (await searchInput.count() > 0) {
+			await searchInput.fill(filters.search.trim());
+			await page.locator("button.filters-panel__base-input-btn").first().click();
+			await page.waitForTimeout(1e3);
+		}
+	}
+}
 async function collectArbitrDetails(page, companyId, options = {}) {
 	const data = {
 		total_cases: "",
@@ -5667,8 +5731,94 @@ async function collectArbitrDetails(page, companyId, options = {}) {
 		const items = page.locator("li.filters-results__list-item");
 		const itemCount = await items.count();
 		for (let i = 0; i < itemCount && collectedCases < maxTotalCases; i++) {
-			items.nth(i);
-			collectedCases++;
+			const item = items.nth(i);
+			const caseData = {};
+			const basicInfo = await item.evaluate((li) => {
+				const getText = (selector) => {
+					const el = li.querySelector(selector);
+					return el ? el.textContent?.trim() || "" : "";
+				};
+				const status = getText(".snippet__status");
+				const title = getText(".snippet__row-value.--title");
+				const fields = {};
+				const dl = li.querySelector("dl.snippet__block");
+				if (dl) dl.querySelectorAll(".snippet__row").forEach((row) => {
+					const keyEl = row.querySelector("dt.snippet__row-key");
+					const valueEl = row.querySelector("dd.snippet__row-value");
+					const key = keyEl ? keyEl.textContent?.trim() || "" : "";
+					let value = valueEl ? valueEl.textContent?.trim() || "" : "";
+					const link = valueEl?.querySelector("a.snippet__link");
+					if (link) {
+						value = link.textContent?.trim() || value;
+						fields[key] = {
+							text: value,
+							href: link.href || ""
+						};
+					} else fields[key] = value;
+				});
+				const kadLink = li.querySelector("a.snippet__link[href*='kad.arbitr.ru']");
+				return {
+					status,
+					title,
+					fields,
+					kad_url: kadLink ? kadLink.href || "" : ""
+				};
+			});
+			caseData.status = basicInfo.status;
+			caseData.fields = basicInfo.fields;
+			caseData.kad_url = basicInfo.kad_url;
+			const m = basicInfo.title.match(/№\s*([\w\-/]+)\s*от\s*([\d.]+)/);
+			if (m) {
+				caseData.case_number = m[1];
+				caseData.case_date = m[2];
+			} else {
+				caseData.case_number = basicInfo.title;
+				caseData.case_date = "";
+			}
+			const moreButton = item.locator("button.snippet__more");
+			if (await moreButton.count() > 0) try {
+				await moreButton.click();
+				await page.waitForTimeout(1e3);
+			} catch (e) {
+				console.warn("Не удалось нажать \"Показать все инстанции\"", e);
+			}
+			caseData.events = await item.evaluate((li) => {
+				const blocks = li.querySelectorAll("div.snippet__block");
+				let targetBlock = null;
+				for (const block of blocks) if (block.querySelector("button.snippet__more") || block.querySelector(".snippet__row-value--bold")) {
+					targetBlock = block;
+					break;
+				}
+				if (!targetBlock) return [];
+				const result = [];
+				targetBlock.querySelectorAll("div.snippet__row").forEach((row) => {
+					const timeEl = row.querySelector("time.snippet__row-key");
+					const valueEl = row.querySelector("div.snippet__row-value");
+					const date = timeEl ? timeEl.textContent?.trim() || "" : "";
+					let valueText = valueEl ? valueEl.textContent?.trim() || "" : "";
+					let linkHref = "";
+					const link = valueEl?.querySelector("a.snippet__link");
+					if (link) {
+						linkHref = link.href || "";
+						valueText = link.textContent?.trim() || valueText;
+					}
+					let instanceName = "";
+					const boldEl = valueEl?.querySelector(".snippet__row-value--bold") || (valueEl && valueEl.classList.contains("snippet__row-value--bold") ? valueEl : null);
+					if (boldEl) instanceName = boldEl.textContent?.trim() || "";
+					if (date || valueText || instanceName) result.push({
+						date,
+						text: valueText,
+						link: linkHref,
+						instance: instanceName
+					});
+				});
+				return result;
+			});
+			if (!caseData.events) caseData.events = [];
+			if (caseData.case_number || caseData.status) {
+				data.cases.push(caseData);
+				collectedCases++;
+			}
 		}
 		if (currentPage >= maxPages || collectedCases >= maxTotalCases) break;
 		const showMore = page.locator("button:has-text('Показать ещё')").first();
@@ -5686,52 +5836,6 @@ async function collectArbitrDetails(page, companyId, options = {}) {
 		}
 	}
 	return data;
-}
-async function applyArbitrFilters(page, filters) {
-	if (!filters) return;
-	if (filters.sides && filters.sides.length > 0) {
-		const sideValues = filters.sides.map((s) => {
-			switch (s) {
-				case "defendant": return "1";
-				case "plaintiff": return "0";
-				case "third": return "2";
-				default: return null;
-			}
-		}).filter(Boolean);
-		for (const value of sideValues) {
-			const checkbox = page.locator(`input[name="sides"][value="${value}"]`);
-			if (await checkbox.count() > 0) await checkbox.check();
-		}
-	}
-	if (filters.status && filters.status.length > 0) {
-		const statusValues = filters.status.map((s) => {
-			switch (s) {
-				case "in_progress": return "0";
-				case "completed": return "1";
-				default: return null;
-			}
-		}).filter(Boolean);
-		for (const value of statusValues) {
-			const checkbox = page.locator(`input[name="status"][value="${value}"]`);
-			if (await checkbox.count() > 0) await checkbox.check();
-		}
-	}
-	if (filters.outcomes && filters.outcomes.length > 0) for (const outcome of filters.outcomes) {
-		const checkbox = page.locator(`input[name="outcomes"][value="${outcome}"]`);
-		if (await checkbox.count() > 0) await checkbox.check();
-	}
-	if (filters.categories && filters.categories.length > 0) for (const category of filters.categories) {
-		let checkbox = page.locator(`input[name="categories"][value="${category}"]`);
-		if (await checkbox.count() === 0) checkbox = page.locator(`label.choice-input:has-text("${category}") input[name="categories"]`);
-		if (await checkbox.count() > 0) await checkbox.check();
-	}
-	if (filters.search) {
-		const searchInput = page.locator("input[name=\"search\"]");
-		if (await searchInput.count() > 0) {
-			await searchInput.fill(filters.search);
-			await page.locator("button.filters-panel__base-input-btn").first().click();
-		}
-	}
 }
 async function scrapeRusprofile(inn, options) {
 	let browser = getBrowser();
