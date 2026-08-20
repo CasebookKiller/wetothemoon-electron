@@ -46,6 +46,30 @@ export const OSINTPage: React.FC = () => {
     maxTotalCases: 100,
   });
 
+  const [souFilters, setSouFilters] = useState({
+    sides: [] as string[],
+    status: [] as string[],
+    search: '',
+  });
+
+  const toggleSouSide = (value: string) => {
+    setSouFilters(prev => ({
+      ...prev,
+      sides: prev.sides.includes(value)
+        ? prev.sides.filter(s => s !== value)
+        : [...prev.sides, value],
+    }));
+  };
+
+  const toggleSouStatus = (value: string) => {
+    setSouFilters(prev => ({
+      ...prev,
+      status: prev.status.includes(value)
+        ? prev.status.filter(s => s !== value)
+        : [...prev.status, value],
+    }));
+  };
+
   const api = (window as any).electronAPI;
 
   const handleLaunch = async () => {
@@ -87,7 +111,19 @@ export const OSINTPage: React.FC = () => {
         maxPages: arbitrFilters.maxPages,
         maxTotalCases: arbitrFilters.maxTotalCases,
         connectionsDetails: needConnectionsDetails,
-        souDetails: needSouDetails, // <-- новое
+        souDetails: needSouDetails,
+        // фильтры арбитража
+        filters: needArbitrDetails ? {
+          sides: arbitrFilters.sides.length > 0 ? arbitrFilters.sides : undefined,
+          status: arbitrFilters.status.length > 0 ? arbitrFilters.status : undefined,
+          search: arbitrFilters.search.trim() || undefined,
+        } : undefined,
+        // отдельные фильтры для судов
+        souFilters: needSouDetails ? {
+          sides: souFilters.sides.length > 0 ? souFilters.sides : undefined,
+          status: souFilters.status.length > 0 ? souFilters.status : undefined,
+          search: souFilters.search.trim() || undefined,
+        } : undefined,
       };
 
       if (needArbitrDetails) {
@@ -287,6 +323,66 @@ export const OSINTPage: React.FC = () => {
                   value={String(arbitrFilters.maxTotalCases)}
                   onChange={(e) => setArbitrFilters({ ...arbitrFilters, maxTotalCases: parseInt(e.target.value) || 100 })}
                   className="w-4rem"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Фильтры СОЮ (показываются при включённом чекбоксе) */}
+        {needSouDetails && (
+          <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
+            <div className="flex-1 flex flex-column gap-1 xl:mr-8">
+              <span className="app font-size-subheading">Фильтры судов</span>
+
+              {/* Роль */}
+              <div className="flex align-items-center gap-2 mt-2">
+                <span>Роль:</span>
+                <Checkbox
+                  inputId="souSidePlaintiff"
+                  checked={souFilters.sides.includes('plaintiff')}
+                  onChange={() => toggleSouSide('plaintiff')}
+                />
+                <label htmlFor="souSidePlaintiff" className="ml-1">Истец</label>
+                <Checkbox
+                  inputId="souSideDefendant"
+                  checked={souFilters.sides.includes('defendant')}
+                  onChange={() => toggleSouSide('defendant')}
+                />
+                <label htmlFor="souSideDefendant" className="ml-1">Ответчик</label>
+                <Checkbox
+                  inputId="souSideThird"
+                  checked={souFilters.sides.includes('third')}
+                  onChange={() => toggleSouSide('third')}
+                />
+                <label htmlFor="souSideThird" className="ml-1">Третье лицо</label>
+              </div>
+
+              {/* Статус */}
+              <div className="flex align-items-center gap-2 mt-2">
+                <span>Статус:</span>
+                <Checkbox
+                  inputId="souStatusInProgress"
+                  checked={souFilters.status.includes('in_progress')}
+                  onChange={() => toggleSouStatus('in_progress')}
+                />
+                <label htmlFor="souStatusInProgress" className="ml-1">Рассматривается</label>
+                <Checkbox
+                  inputId="souStatusCompleted"
+                  checked={souFilters.status.includes('completed')}
+                  onChange={() => toggleSouStatus('completed')}
+                />
+                <label htmlFor="souStatusCompleted" className="ml-1">Завершено</label>
+              </div>
+
+              {/* Поиск */}
+              <div className="flex align-items-center gap-2 mt-2">
+                <span>Поиск:</span>
+                <InputText
+                  value={souFilters.search}
+                  onChange={(e) => setSouFilters({ ...souFilters, search: e.target.value })}
+                  placeholder="Номер дела или ИНН"
+                  className="w-full"
                 />
               </div>
             </div>

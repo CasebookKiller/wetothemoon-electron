@@ -1857,9 +1857,10 @@ export async function scrapeRusprofile(
     arbitrDetails?: boolean;
     maxPages?: number;
     maxTotalCases?: number;
-    filters?: any;
+    filters?: any;       // фильтры арбитража
     connectionsDetails?: boolean;
     souDetails?: boolean;
+    souFilters?: any;    // фильтры судов
   }
 ): Promise<CompanyFullData | null> {
 
@@ -2020,7 +2021,7 @@ export async function scrapeRusprofile(
         collectSouDetails(page, companyId, {
           maxPages: options.maxPages,
           maxTotalCases: options.maxTotalCases,
-          filters: options.filters,
+          filters: options.souFilters, // <-- важно
         })
       );
     }
