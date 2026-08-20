@@ -1496,6 +1496,7 @@ async function collectArbitrDetails(
 }
 
 async function collectConnectionsDetails(page: Page, companyId: number): Promise<any> {
+  console.log(`Сбор детальных связей для компании ID ${companyId}...`);
   const data: any = { total_organizations: '', connections: [] };
 
   const connectionsUrl = `https://www.rusprofile.ru/connections/${companyId}`;
@@ -1503,34 +1504,40 @@ async function collectConnectionsDetails(page: Page, companyId: number): Promise
   await page.waitForSelector('ul.similar-table-container', { timeout: 15000 });
   await page.waitForTimeout(1000);
 
-  // Раскрываем все кнопки "Показать ещё" внутри каждого блока
-  let attempts = 0;
-  const maxAttempts = 10; // защита от бесконечного цикла
-  while (attempts < maxAttempts) {
-    const hiddenButtons = page.locator('button.similar-more-btn:not(.hidden), .btn.similar-more-btn:not(.hidden)');
-    const count = await hiddenButtons.count();
+  // Раскрываем все видимые кнопки «Показать ещё» последовательно
+  let maxAttempts = 10;
+  let attempt = 0;
+  while (attempt < maxAttempts) {
+    const buttons = page.locator('.btn.similar-more-btn:not(.hidden)');
+    const count = await buttons.count();
     if (count === 0) break;
 
     for (let i = 0; i < count; i++) {
-      const btn = hiddenButtons.nth(i);
+      const btn = buttons.nth(i);
       try {
         if (await btn.isVisible()) {
           await btn.click();
-          await page.waitForTimeout(500);
+          console.log(`Нажата кнопка «Показать ещё» (попытка ${attempt + 1}, кнопка ${i + 1})`);
+          await page.waitForTimeout(1000); // ждём подгрузки
         }
       } catch (e) {
-        console.warn('Не удалось нажать "Показать ещё":', e);
+        console.warn('Не удалось нажать «Показать ещё»:', e);
       }
     }
-    attempts++;
-    await page.waitForTimeout(1000);
+    attempt++;
+    await page.waitForTimeout(500);
   }
 
-  // Извлекаем данные через page.evaluate
+  // Извлекаем данные
   const parsed = await page.evaluate(() => {
+    // Вспомогательные функции
     const getText = (el: Element | null, selector: string): string => {
       const node = el ? el.querySelector(selector) : null;
       return node ? node.textContent?.trim() || '' : '';
+    };
+
+    const cleanText = (text: string, prefix: string): string => {
+      return text.startsWith(prefix) ? text.substring(prefix.length).trim() : text.trim();
     };
 
     const totalEl = document.querySelector('.export-data__text span');
@@ -1555,12 +1562,10 @@ async function collectConnectionsDetails(page: Page, companyId: number): Promise
           const nameEl = org.querySelector('a.list-element__title');
           const name = nameEl ? nameEl.textContent?.trim() || '' : '';
 
-          // Статус (ликвидирована, реорганизация и т.п.)
+          // Статус
           let status = '';
-          const liquidatedEl = org.querySelector('.liquidated.danger, .liquidating.warning, .reorganizing.warning');
-          if (liquidatedEl) {
-            status = liquidatedEl.textContent?.trim() || '';
-          }
+          const statusEl = org.querySelector('.liquidated.danger, .liquidating.warning, .reorganizing.warning');
+          if (statusEl) status = statusEl.textContent?.trim() || '';
 
           // Вид деятельности
           const activity = getText(org, '.list-element__text');
@@ -1569,19 +1574,28 @@ async function collectConnectionsDetails(page: Page, companyId: number): Promise
           const address = getText(org, '.list-element__address');
 
           // Реквизиты
-          const inn = getText(org, '.list-element__row-info span:nth-child(1)');
-          const ogrn = getText(org, '.list-element__row-info span:nth-child(2)');
-          const regDate = getText(org, '.list-element__row-info span:nth-child(3)');
+          const infoSpans = org.querySelectorAll('.list-element__row-info span');
+          let inn = '';
+          let ogrn = '';
+          let regDate = '';
+          if (infoSpans.length >= 3) {
+            inn = cleanText(infoSpans[0].textContent?.trim() || '', 'ИНН:');
+            ogrn = cleanText(infoSpans[1].textContent?.trim() || '', 'ОГРН:');
+            regDate = cleanText(infoSpans[2].textContent?.trim() || '', 'Дата регистрации:');
+          }
 
-          // Роли/участие
-          const infoBox = org.querySelector('.list-element__info-box');
+          // Роли / участие
           const roles: any[] = [];
+          const infoBox = org.querySelector('.list-element__info-box');
           if (infoBox) {
             const infoItems = infoBox.querySelectorAll('.list-element__info-box-item');
             infoItems.forEach((item) => {
-              const role = item.querySelector('span')?.textContent?.trim() || '';
-              const participant = item.querySelector('mark')?.textContent?.trim() || '';
-              const period = item.querySelector('.time')?.textContent?.trim() || '';
+              const roleEl = item.querySelector('span');
+              const participantEl = item.querySelector('mark');
+              const periodEl = item.querySelector('.time');
+              const role = roleEl ? roleEl.textContent?.trim() || '' : '';
+              const participant = participantEl ? participantEl.textContent?.trim() || '' : '';
+              const period = periodEl ? periodEl.textContent?.trim() || '' : '';
               if (role || participant) {
                 roles.push({ role, participant, period });
               }
@@ -1621,6 +1635,7 @@ async function collectConnectionsDetails(page: Page, companyId: number): Promise
   data.total_organizations = parsed.total_organizations;
   data.connections = parsed.connections;
 
+  console.log(`Собрано связей: ${data.connections.length}, организаций всего: ${data.total_organizations}`);
   return data;
 }
 

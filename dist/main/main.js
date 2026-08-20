@@ -5838,6 +5838,7 @@ async function collectArbitrDetails(page, companyId, options = {}) {
 	return data;
 }
 async function collectConnectionsDetails(page, companyId) {
+	console.log(`Сбор детальных связей для компании ID ${companyId}...`);
 	const data = {
 		total_organizations: "",
 		connections: []
@@ -5849,30 +5850,34 @@ async function collectConnectionsDetails(page, companyId) {
 	});
 	await page.waitForSelector("ul.similar-table-container", { timeout: 15e3 });
 	await page.waitForTimeout(1e3);
-	let attempts = 0;
-	const maxAttempts = 10;
-	while (attempts < maxAttempts) {
-		const hiddenButtons = page.locator("button.similar-more-btn:not(.hidden), .btn.similar-more-btn:not(.hidden)");
-		const count = await hiddenButtons.count();
+	let maxAttempts = 10;
+	let attempt = 0;
+	while (attempt < maxAttempts) {
+		const buttons = page.locator(".btn.similar-more-btn:not(.hidden)");
+		const count = await buttons.count();
 		if (count === 0) break;
 		for (let i = 0; i < count; i++) {
-			const btn = hiddenButtons.nth(i);
+			const btn = buttons.nth(i);
 			try {
 				if (await btn.isVisible()) {
 					await btn.click();
-					await page.waitForTimeout(500);
+					console.log(`Нажата кнопка «Показать ещё» (попытка ${attempt + 1}, кнопка ${i + 1})`);
+					await page.waitForTimeout(1e3);
 				}
 			} catch (e) {
-				console.warn("Не удалось нажать \"Показать ещё\":", e);
+				console.warn("Не удалось нажать «Показать ещё»:", e);
 			}
 		}
-		attempts++;
-		await page.waitForTimeout(1e3);
+		attempt++;
+		await page.waitForTimeout(500);
 	}
 	const parsed = await page.evaluate(() => {
 		const getText = (el, selector) => {
 			const node = el ? el.querySelector(selector) : null;
 			return node ? node.textContent?.trim() || "" : "";
+		};
+		const cleanText = (text, prefix) => {
+			return text.startsWith(prefix) ? text.substring(prefix.length).trim() : text.trim();
 		};
 		const totalEl = document.querySelector(".export-data__text span");
 		const totalText = totalEl ? totalEl.textContent?.trim() || "" : "";
@@ -5888,19 +5893,28 @@ async function collectConnectionsDetails(page, companyId) {
 					const nameEl = org.querySelector("a.list-element__title");
 					const name = nameEl ? nameEl.textContent?.trim() || "" : "";
 					let status = "";
-					const liquidatedEl = org.querySelector(".liquidated.danger, .liquidating.warning, .reorganizing.warning");
-					if (liquidatedEl) status = liquidatedEl.textContent?.trim() || "";
+					const statusEl = org.querySelector(".liquidated.danger, .liquidating.warning, .reorganizing.warning");
+					if (statusEl) status = statusEl.textContent?.trim() || "";
 					const activity = getText(org, ".list-element__text");
 					const address = getText(org, ".list-element__address");
-					const inn = getText(org, ".list-element__row-info span:nth-child(1)");
-					const ogrn = getText(org, ".list-element__row-info span:nth-child(2)");
-					const regDate = getText(org, ".list-element__row-info span:nth-child(3)");
-					const infoBox = org.querySelector(".list-element__info-box");
+					const infoSpans = org.querySelectorAll(".list-element__row-info span");
+					let inn = "";
+					let ogrn = "";
+					let regDate = "";
+					if (infoSpans.length >= 3) {
+						inn = cleanText(infoSpans[0].textContent?.trim() || "", "ИНН:");
+						ogrn = cleanText(infoSpans[1].textContent?.trim() || "", "ОГРН:");
+						regDate = cleanText(infoSpans[2].textContent?.trim() || "", "Дата регистрации:");
+					}
 					const roles = [];
+					const infoBox = org.querySelector(".list-element__info-box");
 					if (infoBox) infoBox.querySelectorAll(".list-element__info-box-item").forEach((item) => {
-						const role = item.querySelector("span")?.textContent?.trim() || "";
-						const participant = item.querySelector("mark")?.textContent?.trim() || "";
-						const period = item.querySelector(".time")?.textContent?.trim() || "";
+						const roleEl = item.querySelector("span");
+						const participantEl = item.querySelector("mark");
+						const periodEl = item.querySelector(".time");
+						const role = roleEl ? roleEl.textContent?.trim() || "" : "";
+						const participant = participantEl ? participantEl.textContent?.trim() || "" : "";
+						const period = periodEl ? periodEl.textContent?.trim() || "" : "";
 						if (role || participant) roles.push({
 							role,
 							participant,
@@ -5932,6 +5946,7 @@ async function collectConnectionsDetails(page, companyId) {
 	});
 	data.total_organizations = parsed.total_organizations;
 	data.connections = parsed.connections;
+	console.log(`Собрано связей: ${data.connections.length}, организаций всего: ${data.total_organizations}`);
 	return data;
 }
 async function scrapeRusprofile(inn, options) {
