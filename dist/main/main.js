@@ -5850,9 +5850,9 @@ async function collectConnectionsDetails(page, companyId) {
 	});
 	await page.waitForSelector("ul.similar-table-container", { timeout: 15e3 });
 	await page.waitForTimeout(1e3);
-	let maxAttempts = 10;
-	let attempt = 0;
-	while (attempt < maxAttempts) {
+	let attempts = 0;
+	const maxAttempts = 10;
+	while (attempts < maxAttempts) {
 		const buttons = page.locator(".btn.similar-more-btn:not(.hidden)");
 		const count = await buttons.count();
 		if (count === 0) break;
@@ -5861,14 +5861,13 @@ async function collectConnectionsDetails(page, companyId) {
 			try {
 				if (await btn.isVisible()) {
 					await btn.click();
-					console.log(`Нажата кнопка «Показать ещё» (попытка ${attempt + 1}, кнопка ${i + 1})`);
-					await page.waitForTimeout(1e3);
+					await page.waitForTimeout(800);
 				}
 			} catch (e) {
 				console.warn("Не удалось нажать «Показать ещё»:", e);
 			}
 		}
-		attempt++;
+		attempts++;
 		await page.waitForTimeout(500);
 	}
 	const parsed = await page.evaluate(() => {

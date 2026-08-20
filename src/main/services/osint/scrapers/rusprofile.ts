@@ -1504,10 +1504,10 @@ async function collectConnectionsDetails(page: Page, companyId: number): Promise
   await page.waitForSelector('ul.similar-table-container', { timeout: 15000 });
   await page.waitForTimeout(1000);
 
-  // Раскрываем все видимые кнопки «Показать ещё» последовательно
-  let maxAttempts = 10;
-  let attempt = 0;
-  while (attempt < maxAttempts) {
+  // Раскрываем все кнопки "Показать ещё"
+  let attempts = 0;
+  const maxAttempts = 10;
+  while (attempts < maxAttempts) {
     const buttons = page.locator('.btn.similar-more-btn:not(.hidden)');
     const count = await buttons.count();
     if (count === 0) break;
@@ -1517,20 +1517,18 @@ async function collectConnectionsDetails(page: Page, companyId: number): Promise
       try {
         if (await btn.isVisible()) {
           await btn.click();
-          console.log(`Нажата кнопка «Показать ещё» (попытка ${attempt + 1}, кнопка ${i + 1})`);
-          await page.waitForTimeout(1000); // ждём подгрузки
+          await page.waitForTimeout(800);
         }
       } catch (e) {
         console.warn('Не удалось нажать «Показать ещё»:', e);
       }
     }
-    attempt++;
+    attempts++;
     await page.waitForTimeout(500);
   }
 
   // Извлекаем данные
   const parsed = await page.evaluate(() => {
-    // Вспомогательные функции
     const getText = (el: Element | null, selector: string): string => {
       const node = el ? el.querySelector(selector) : null;
       return node ? node.textContent?.trim() || '' : '';
@@ -1562,18 +1560,13 @@ async function collectConnectionsDetails(page: Page, companyId: number): Promise
           const nameEl = org.querySelector('a.list-element__title');
           const name = nameEl ? nameEl.textContent?.trim() || '' : '';
 
-          // Статус
           let status = '';
           const statusEl = org.querySelector('.liquidated.danger, .liquidating.warning, .reorganizing.warning');
           if (statusEl) status = statusEl.textContent?.trim() || '';
 
-          // Вид деятельности
           const activity = getText(org, '.list-element__text');
-
-          // Адрес
           const address = getText(org, '.list-element__address');
 
-          // Реквизиты
           const infoSpans = org.querySelectorAll('.list-element__row-info span');
           let inn = '';
           let ogrn = '';
@@ -1584,7 +1577,6 @@ async function collectConnectionsDetails(page: Page, companyId: number): Promise
             regDate = cleanText(infoSpans[2].textContent?.trim() || '', 'Дата регистрации:');
           }
 
-          // Роли / участие
           const roles: any[] = [];
           const infoBox = org.querySelector('.list-element__info-box');
           if (infoBox) {
@@ -1636,7 +1628,7 @@ async function collectConnectionsDetails(page: Page, companyId: number): Promise
   data.connections = parsed.connections;
 
   console.log(`Собрано связей: ${data.connections.length}, организаций всего: ${data.total_organizations}`);
-  return data;
+  return data; // обязательно возвращаем объект
 }
 
 
