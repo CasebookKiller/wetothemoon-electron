@@ -45,7 +45,7 @@ export interface CompanySummary {
 }
 
 export interface CompanyFullData {
-  summary: CompanySummary; // уже существующий или расширенный
+  summary?: any;
   fssp?: any;
   trademarks?: any;
   sou?: any;
@@ -72,6 +72,11 @@ export interface CompanyFullData {
   resume?: any;
   arbitration_details?: any;
   connections_details?: any;
+
+  // === НОВЫЕ ПОЛЯ ===
+  startedAt?: string;
+  timings?: Record<string, number>;
+  totalDurationMs?: number;
 }
 
 async function closeModalIfPresent(page: Page): Promise<void> {
@@ -1692,6 +1697,16 @@ export async function scrapeRusprofile(
   }
 
   try {
+    const startTime = Date.now();
+    const timings: Record<string, number> = {};
+
+    const timed = async (name: string, fn: () => Promise<any>) => {
+      const t0 = Date.now();
+      const data = await fn();
+      timings[name] = Date.now() - t0;
+      return data;
+    };
+
     // Проверяем, авторизованы ли мы уже
     const loginTrigger = page.locator('#menu-personal-trigger');
     await loginTrigger.waitFor({ state: 'visible', timeout: 15000 });
@@ -1726,95 +1741,103 @@ export async function scrapeRusprofile(
     const result = {} as CompanyFullData;
 
     console.log('Сбор сводки...');
-    result.summary = await collectSummary(page);
-    
+    result.summary = await timed('summary', () => collectSummary(page));
+
     console.log('Сбор ФССП...');
-    result.fssp = await collectFssp(page);
+    result.fssp = await timed('fssp', () => collectFssp(page));
 
     console.log('Сбор товарных знаков...');
-    result.trademarks = await collectTrademarks(page);
+    result.trademarks = await timed('trademarks', () => collectTrademarks(page));
 
     console.log('Сбор судов общей юрисдикции...');
-    result.sou = await collectSou(page);
+    result.sou = await timed('sou', () => collectSou(page));
 
     console.log('Сбор арбитражных дел (сводка)...');
-    result.arbitration_tile = await collectArbitrTile(page);
+    result.arbitration_tile = await timed('arbitration_tile', () => collectArbitrTile(page));
 
     console.log('Сбор реестров ФНС...');
-    result.fns_registries = await collectReesters(page);
+    result.fns_registries = await timed('fns_registries', () => collectReesters(page));
 
     console.log('Сбор связей...');
-    result.connections = await collectConnections(page);
+    result.connections = await timed('connections', () => collectConnections(page));
 
     console.log('Сбор сообщений о сущфактах...');
-    result.facts = await collectFacts(page);
+    result.facts = await timed('facts', () => collectFacts(page));
 
     console.log('Сбор госзакупок...');
-    result.government_procurement = await collectGz(page);
+    result.government_procurement = await timed('government_procurement', () => collectGz(page));
 
     console.log('Сбор лизинга...');
-    result.leasing = await collectLeasing(page);
+    result.leasing = await timed('leasing', () => collectLeasing(page));
 
     console.log('Сбор залогов...');
-    result.pledges = await collectPledges(page);
+    result.pledges = await timed('pledges', () => collectPledges(page));
 
     console.log('Сбор лицензий...');
-    result.licenses = await collectLicenses(page);
+    result.licenses = await timed('licenses', () => collectLicenses(page));
 
     console.log('Сбор конкурентов...');
-    result.competitors = await collectCompetitors(page);
+    result.competitors = await timed('competitors', () => collectCompetitors(page));
 
     console.log('Сбор проверок...');
-    result.inspections = await collectInspections(page);
+    result.inspections = await timed('inspections', () => collectInspections(page));
 
     console.log('Сбор финансов...');
-    result.finance = await collectFinance(page);
+    result.finance = await timed('finance', () => collectFinance(page));
 
     console.log('Сбор рисков сотрудничества...');
-    result.risks = await collectRisks(page);
+    result.risks = await timed('risks', () => collectRisks(page));
 
     console.log('Сбор учредителей...');
-    result.founders = await collectFounders(page);
+    result.founders = await timed('founders', () => collectFounders(page));
 
     console.log('Сбор налогов и сборов...');
-    result.taxes = await collectTaxes(page);
+    result.taxes = await timed('taxes', () => collectTaxes(page));
 
     console.log('Сбор надёжности...');
-    result.reliability = await collectReliability(page);
+    result.reliability = await timed('reliability', () => collectReliability(page));
 
     console.log('Сбор топа компаний отрасли...');
-    result.top_okved = await collectTopOkved(page);
+    result.top_okved = await timed('top_okved', () => collectTopOkved(page));
 
     console.log('Сбор филиалов и представительств...');
-    result.branches = await collectBranches(page);
+    result.branches = await timed('branches', () => collectBranches(page));
 
     console.log('Сбор похожих организаций...');
-    result.similar = await collectSimilar(page);
+    result.similar = await timed('similar', () => collectSimilar(page));
 
     console.log('Сбор отчётов и документов...');
-    result.reports = await collectReports(page);
+    result.reports = await timed('reports', () => collectReports(page));
 
     console.log('Сбор событий...');
-    result.events = await collectEvents(page);
+    result.events = await timed('events', () => collectEvents(page));
 
     console.log('Сбор краткой справки...');
-    result.resume = await collectResume(page);
+    result.resume = await timed('resume', () => collectResume(page));
     console.log('Сбор сводки завершен.');
 
     // Если запрошены детальные арбитражные дела
     if (options?.arbitrDetails) {
-      console.log('Сбор детального списка арбитражных дел...');
-      result.arbitration_details = await collectArbitrDetails(page, companyId, {
-        maxPages: options.maxPages || 1,
-        maxTotalCases: options.maxTotalCases || 100,
-        filters: options.filters,
-      });
+      console.log('Сбор детального арбитража...');
+      result.arbitration_details = await timed('arbitration_details', () =>
+        collectArbitrDetails(page, companyId, {
+          maxPages: options.maxPages,
+          maxTotalCases: options.maxTotalCases,
+          filters: options.filters,
+        })
+      );
     }
 
     if (options?.connectionsDetails) {
       console.log('Сбор детальных связей...');
-      result.connections_details = await collectConnectionsDetails(page, companyId);
+      result.connections_details = await timed('connections_details', () =>
+        collectConnectionsDetails(page, companyId)
+      );
     }
+
+    result.startedAt = new Date(startTime).toISOString();
+    result.timings = timings;
+    result.totalDurationMs = Date.now() - startTime;
 
     return result;
   } catch (error) {
