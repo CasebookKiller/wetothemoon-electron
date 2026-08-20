@@ -1501,10 +1501,36 @@ async function collectConnectionsDetails(page: Page, companyId: number): Promise
 
   const connectionsUrl = `https://www.rusprofile.ru/connections/${companyId}`;
   await page.goto(connectionsUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-  await page.waitForSelector('ul.similar-table-container', { timeout: 15000 });
-  await page.waitForTimeout(1000);
+  await page.waitForTimeout(3000); // даём время на инициализацию
 
-  // Раскрываем все кнопки "Показать ещё"
+  // --- Переключение на табличный вид ---
+  const tableButton = page.locator('span[data-show="table"]');
+  if (await tableButton.count() > 0) {
+    const container = page.locator('ul.similar-table-container');
+    let isActive = await container.count() > 0 && await container.evaluate(el => el.classList.contains('active'));
+    if (!isActive) {
+      console.log('Переключаемся на табличный вид');
+      try {
+        // Принудительный клик (может быть перекрыт)
+        await tableButton.first().click({ force: true });
+      } catch (e) {
+        console.warn('Обычный клик не удался, пробуем JavaScript-клик');
+        await page.evaluate(() => {
+          const btn = document.querySelector('span[data-show="table"]');
+          if (btn instanceof HTMLElement) btn.click();
+        });
+      }
+      // Ждём, пока контейнер списка станет активным
+      await page.waitForSelector('ul.similar-table-container.active', { timeout: 15000 });
+      await page.waitForTimeout(1000);
+    } else {
+      console.log('Табличный вид уже активен');
+    }
+  } else {
+    console.warn('Кнопка переключения на таблицу не найдена');
+  }
+
+  // --- Раскрываем все кнопки «Показать ещё» ---
   let attempts = 0;
   const maxAttempts = 10;
   while (attempts < maxAttempts) {
@@ -1517,6 +1543,7 @@ async function collectConnectionsDetails(page: Page, companyId: number): Promise
       try {
         if (await btn.isVisible()) {
           await btn.click();
+          console.log(`Нажата кнопка «Показать ещё» (попытка ${attempts + 1}, кнопка ${i + 1})`);
           await page.waitForTimeout(800);
         }
       } catch (e) {
@@ -1527,7 +1554,16 @@ async function collectConnectionsDetails(page: Page, companyId: number): Promise
     await page.waitForTimeout(500);
   }
 
-  // Извлекаем данные
+  // --- Отладочная информация о количестве элементов ---
+  const debugCounts = await page.evaluate(() => ({
+    similarItems: document.querySelectorAll('li.similar-item').length,
+    subItems: document.querySelectorAll('li.similar-item-sub-item').length,
+    orgItems: document.querySelectorAll('ul.list-element__row > li.list-element').length,
+    totalText: document.querySelector('.export-data__text span')?.textContent?.trim() || ''
+  }));
+  console.log('Отладка после раскрытия:', debugCounts);
+
+  // --- Извлечение данных ---
   const parsed = await page.evaluate(() => {
     const getText = (el: Element | null, selector: string): string => {
       const node = el ? el.querySelector(selector) : null;
@@ -1628,7 +1664,7 @@ async function collectConnectionsDetails(page: Page, companyId: number): Promise
   data.connections = parsed.connections;
 
   console.log(`Собрано связей: ${data.connections.length}, организаций всего: ${data.total_organizations}`);
-  return data; // обязательно возвращаем объект
+  return data;
 }
 
 
