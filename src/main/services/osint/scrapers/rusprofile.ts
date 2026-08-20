@@ -1629,10 +1629,10 @@ export async function scrapeRusprofile(
   inn: string,
   options?: {
     arbitrDetails?: boolean;
-    connections_details?: any;
     maxPages?: number;
     maxTotalCases?: number;
     filters?: any;
+    connectionsDetails?: boolean;
   }
 ): Promise<CompanyFullData | null> {
 
