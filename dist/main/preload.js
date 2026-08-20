@@ -11,6 +11,7 @@ try {
 		openPGWindow: () => electron.ipcRenderer.invoke("open-pg-window"),
 		openOllamaWindow: () => electron.ipcRenderer.invoke("open-ollama-window"),
 		openTasksWindow: () => electron.ipcRenderer.invoke("open-tasks-window"),
+		openTradingAssistantWindow: () => electron.ipcRenderer.invoke("open-trading-window"),
 		openOsintWindow: () => electron.ipcRenderer.invoke("open-osint-window"),
 		sendMessageToAI: (message) => electron.ipcRenderer.invoke("send-to-ai", message).then((response) => {
 			console.log(response);

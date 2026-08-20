@@ -15,7 +15,7 @@ try {
     openPGWindow: () => ipcRenderer.invoke('open-pg-window'),
     openOllamaWindow: () => ipcRenderer.invoke('open-ollama-window'),
     openTasksWindow: () => ipcRenderer.invoke('open-tasks-window'),
-
+    openTradingAssistantWindow: () => ipcRenderer.invoke('open-trading-window'),
     openOsintWindow: () => ipcRenderer.invoke('open-osint-window'),
     sendMessageToAI: (message: string) =>
       ipcRenderer.invoke('send-to-ai', message).then((response) => {

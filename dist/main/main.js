@@ -8353,6 +8353,11 @@ electron.ipcMain.handle("open-ollama-window", () => {
 	if (!ollamaWindow) createOllamaWindow();
 	else ollamaWindow.focus();
 });
+var traderWindow = getTradingAssistantWindow();
+electron.ipcMain.handle("open-trading-window", () => {
+	if (!traderWindow) createTradingAssistantWindow();
+	else traderWindow.focus();
+});
 electron.ipcMain.handle("open-osint-window", () => {
 	const existing = getOsintWindow();
 	if (existing && !existing.isDestroyed()) {

@@ -1,31 +1,21 @@
+// wetothemoon-electron/src/components/DASHBOARD/ButtonsWindows/ButtonsWindows.tsx
+
 import React from 'react';
 import { Button } from 'primereact/button';
 
 export const ButtonsWindows = () => {
   const electronAPI = (window as Window & typeof globalThis & { electronAPI?: any })?.electronAPI;
-  const openAIWindow = () => {
-    electronAPI.openAIWindow();
-  };
 
-  const openBondsWindow = () => {
-    electronAPI.openBondsWindow();
-  };
+  const openAIWindow = () => electronAPI.openAIWindow();
+  const openBondsWindow = () => electronAPI.openBondsWindow();
+  const openMDWindow = () => electronAPI.openMDWindow();
+  const openPGWindow = () => electronAPI.openPGWindow();
+  const openOllamaWindow = () => electronAPI.openOllamaWindow();
+  const openTasksWindow = () => electronAPI.openTasksWindow();
 
-  const openMDWindow = () => {
-    electronAPI.openMDWindow();
-  };
-
-  const openPGWindow = () => {
-    electronAPI.openPGWindow();
-  };
-
-  const openOllamaWindow = () => {
-    electronAPI.openOllamaWindow();
-  };
-
-  const openTasksWindow = () => {
-    electronAPI.openTasksWindow();
-  };
+  // Новые функции
+  const openOsintWindow = () => electronAPI.openOsintWindow?.();
+  const openTradingAssistantWindow = () => electronAPI.openTradingAssistantWindow?.();
 
   return (
     <div className="p-fluid">
@@ -84,6 +74,28 @@ export const ButtonsWindows = () => {
                 onClick={openTasksWindow}
               />
             </div>
+
+            {/* Новая кнопка Trading Assistant */}
+            <div className="col-12 md:col-4 w-full">
+              <Button
+                label="Трейдер"
+                icon="pi pi-chart-bar"
+                className="p-button-lg w-full p-button-raised p-button-accent"
+                onClick={openTradingAssistantWindow}
+              />
+            </div>
+
+            {/* Новая кнопка OSINT */}
+            <div className="col-12 md:col-4 w-full">
+              <Button
+                label="OSINT"
+                icon="pi pi-shield"
+                className="p-button-lg w-full p-button-raised p-button-accent"
+                onClick={openOsintWindow}
+              />
+            </div>
+
+            {/* Заглушки */}
             <div className="col-12 md:col-4 w-full">
               <Button
                 label="Сталкер"

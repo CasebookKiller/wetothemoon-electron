@@ -326,7 +326,15 @@ ipcMain.handle('open-ollama-window', () => {
   }
 });
 
-// open trader???
+const traderWindow = getTradingAssistantWindow();
+ipcMain.handle('open-trading-window', () => {
+  if (!traderWindow) {
+    createTradingAssistantWindow();
+  } else {
+    traderWindow.focus();
+  }
+});
+
 ipcMain.handle('open-osint-window', () => {
   const existing = getOsintWindow();
   if (existing && !existing.isDestroyed()) {
