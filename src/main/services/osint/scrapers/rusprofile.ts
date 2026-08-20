@@ -1691,9 +1691,10 @@ async function collectSouDetails(
   await page.waitForTimeout(1000);
 
   // Применяем фильтры (аналогично арбитражу)
-  await applyArbitrFilters(page, options.filters); // можно универсальную функцию для обоих
-
-  await page.waitForTimeout(2000);
+  if (options.filters) {
+    await applyArbitrFilters(page, options.filters);
+    await page.waitForTimeout(2000);
+  }
 
   // Заголовок с общим количеством
   try {
@@ -1717,7 +1718,7 @@ async function collectSouDetails(
       const item = items.nth(i);
       const caseData: any = {};
 
-      // Извлекаем данные внутри одного элемента
+      // Основные данные
       const basicInfo = await item.evaluate((li) => {
         const getText = (selector: string) => {
           const el = li.querySelector(selector);
@@ -1749,9 +1750,9 @@ async function collectSouDetails(
           });
         }
 
-        // Ссылка на сайт суда (если есть)
-        const kadLink = li.querySelector("a.snippet__link[href*='sudrf.ru'], a.snippet__link[href*='mos-gorsud.ru']");
-        const source_url = kadLink ? (kadLink as HTMLAnchorElement).href || '' : '';
+        // Ссылка на сайт суда
+        const sourceLink = li.querySelector("a.snippet__link[href*='mos-gorsud.ru'], a.snippet__link[href*='sudrf.ru']");
+        const source_url = sourceLink ? (sourceLink as HTMLAnchorElement).href || '' : '';
 
         return { status, title, fields, source_url };
       });
@@ -1760,16 +1761,17 @@ async function collectSouDetails(
       caseData.fields = basicInfo.fields;
       caseData.source_url = basicInfo.source_url;
 
-      const m = basicInfo.title.match(/№\s*([\w\-/]+)(?:\s*от\s*([\d.]+))?/);
+      // Парсим номер дела и дату
+      const m = basicInfo.title.match(/№\s*([\w\-/]+)\s*от\s*([\d.]+)/);
       if (m) {
         caseData.case_number = m[1];
-        caseData.case_date = m[2] || '';
+        caseData.case_date = m[2];
       } else {
         caseData.case_number = basicInfo.title;
         caseData.case_date = '';
       }
 
-      // Пытаемся раскрыть все инстанции/события (если есть)
+      // Раскрываем все инстанции и события
       const moreButton = item.locator('button.snippet__more');
       if (await moreButton.count() > 0) {
         try {
@@ -1780,7 +1782,7 @@ async function collectSouDetails(
         }
       }
 
-      // Извлекаем события (аналогично арбитражу)
+      // Извлекаем события после раскрытия
       const events = await item.evaluate((li) => {
         const blocks = li.querySelectorAll('div.snippet__block');
         let targetBlock: Element | null = null;
