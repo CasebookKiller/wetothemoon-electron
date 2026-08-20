@@ -12,11 +12,27 @@ import { classNames } from '@/css/classnames';
 import './OSINTPage.css'; // при необходимости добавьте свои стили
 
 export const OSINTPage: React.FC = () => {
-  const [inn, setInn] = useState('');
+  const [inn, setInn] = useState<string>(() => {
+    try {
+      return localStorage.getItem('osint_last_inn') || '';
+    } catch {
+      return '';
+    }
+  });
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [needArbitrDetails, setNeedArbitrDetails] = useState(false);
+
+  const handleInnChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setInn(value);
+    try {
+      localStorage.setItem('osint_last_inn', value);
+    } catch {
+      // ignore storage errors
+    }
+  };
 
   // Состояния фильтров арбитража
   const [arbitrFilters, setArbitrFilters] = useState({
@@ -154,7 +170,7 @@ export const OSINTPage: React.FC = () => {
             <div className="flex align-items-center gap-2">
               <InputText
                 value={inn}
-                onChange={(e) => setInn(e.target.value)}
+                onChange={handleInnChange}
                 placeholder="Введите ИНН"
                 className="w-full"
               />
