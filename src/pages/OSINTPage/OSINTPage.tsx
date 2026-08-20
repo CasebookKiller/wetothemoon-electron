@@ -50,6 +50,8 @@ export const OSINTPage: React.FC = () => {
     sides: [] as string[],
     status: [] as string[],
     search: '',
+    maxPages: 1,
+    maxTotalCases: 100,
   });
 
   const toggleSouSide = (value: string) => {
@@ -123,6 +125,8 @@ export const OSINTPage: React.FC = () => {
           sides: souFilters.sides.length > 0 ? souFilters.sides : undefined,
           status: souFilters.status.length > 0 ? souFilters.status : undefined,
           search: souFilters.search.trim() || undefined,
+          maxPages: souFilters.maxPages,
+          maxTotalCases: souFilters.maxTotalCases,
         } : undefined,
       };
 
@@ -338,52 +342,35 @@ export const OSINTPage: React.FC = () => {
               {/* Роль */}
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Роль:</span>
-                <Checkbox
-                  inputId="souSidePlaintiff"
-                  checked={souFilters.sides.includes('plaintiff')}
-                  onChange={() => toggleSouSide('plaintiff')}
-                />
+                <Checkbox inputId="souSidePlaintiff" checked={souFilters.sides.includes('plaintiff')} onChange={() => toggleSouSide('plaintiff')} />
                 <label htmlFor="souSidePlaintiff" className="ml-1">Истец</label>
-                <Checkbox
-                  inputId="souSideDefendant"
-                  checked={souFilters.sides.includes('defendant')}
-                  onChange={() => toggleSouSide('defendant')}
-                />
+                <Checkbox inputId="souSideDefendant" checked={souFilters.sides.includes('defendant')} onChange={() => toggleSouSide('defendant')} />
                 <label htmlFor="souSideDefendant" className="ml-1">Ответчик</label>
-                <Checkbox
-                  inputId="souSideThird"
-                  checked={souFilters.sides.includes('third')}
-                  onChange={() => toggleSouSide('third')}
-                />
+                <Checkbox inputId="souSideThird" checked={souFilters.sides.includes('third')} onChange={() => toggleSouSide('third')} />
                 <label htmlFor="souSideThird" className="ml-1">Третье лицо</label>
               </div>
 
               {/* Статус */}
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Статус:</span>
-                <Checkbox
-                  inputId="souStatusInProgress"
-                  checked={souFilters.status.includes('in_progress')}
-                  onChange={() => toggleSouStatus('in_progress')}
-                />
+                <Checkbox inputId="souStatusInProgress" checked={souFilters.status.includes('in_progress')} onChange={() => toggleSouStatus('in_progress')} />
                 <label htmlFor="souStatusInProgress" className="ml-1">Рассматривается</label>
-                <Checkbox
-                  inputId="souStatusCompleted"
-                  checked={souFilters.status.includes('completed')}
-                  onChange={() => toggleSouStatus('completed')}
-                />
+                <Checkbox inputId="souStatusCompleted" checked={souFilters.status.includes('completed')} onChange={() => toggleSouStatus('completed')} />
                 <label htmlFor="souStatusCompleted" className="ml-1">Завершено</label>
               </div>
 
               {/* Поиск */}
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Поиск:</span>
-                <InputText
-                  value={souFilters.search}
-                  onChange={(e) => setSouFilters({ ...souFilters, search: e.target.value })}
-                  placeholder="Номер дела или ИНН"
-                  className="w-full"
-                />
+                <InputText value={souFilters.search} onChange={(e) => setSouFilters({ ...souFilters, search: e.target.value })} placeholder="Номер дела или ИНН" className="w-full" />
+              </div>
+
+              {/* Лимиты */}
+              <div className="flex align-items-center gap-2 mt-2">
+                <span>Макс. страниц:</span>
+                <InputText type="number" min={1} max={100} value={String(souFilters.maxPages)} onChange={(e) => setSouFilters({ ...souFilters, maxPages: parseInt(e.target.value) || 1 })} className="w-4rem" />
+                <span className="ml-3">Макс. дел:</span>
+                <InputText type="number" min={1} max={1000} value={String(souFilters.maxTotalCases)} onChange={(e) => setSouFilters({ ...souFilters, maxTotalCases: parseInt(e.target.value) || 100 })} className="w-4rem" />
               </div>
             </div>
           </div>

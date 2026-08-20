@@ -1673,6 +1673,65 @@ async function collectConnectionsDetails(page: Page, companyId: number): Promise
   return data;
 }
 
+async function applySouFilters(page: Page, filters?: any): Promise<void> {
+  if (!filters) return;
+
+  // Роль (sides) — предположительно те же value, что и в арбитраже
+  if (filters.sides && Array.isArray(filters.sides) && filters.sides.length > 0) {
+    const sideValues = filters.sides
+      .map((s: string) => {
+        switch (s) {
+          case 'defendant': return '1';
+          case 'plaintiff': return '0';
+          case 'third': return '2';
+          default: return null;
+        }
+      })
+      .filter(Boolean);
+
+    for (const value of sideValues) {
+      const checkbox = page.locator(`input[name="sides"][value="${value}"]`);
+      if (await checkbox.count() > 0) {
+        await checkbox.check();
+        await page.waitForTimeout(500);
+      }
+    }
+  }
+
+  // Статус
+  if (filters.status && Array.isArray(filters.status) && filters.status.length > 0) {
+    const statusValues = filters.status
+      .map((s: string) => {
+        switch (s) {
+          case 'in_progress': return '0';
+          case 'completed': return '1';
+          default: return null;
+        }
+      })
+      .filter(Boolean);
+
+    for (const value of statusValues) {
+      const checkbox = page.locator(`input[name="status"][value="${value}"]`);
+      if (await checkbox.count() > 0) {
+        await checkbox.check();
+        await page.waitForTimeout(500);
+      }
+    }
+  }
+
+  // Поиск
+  if (filters.search && filters.search.trim() !== '') {
+    const searchInput = page.locator('input[name="search"]');
+    if (await searchInput.count() > 0) {
+      await searchInput.fill(filters.search.trim());
+      await page.locator('button.filters-panel__base-input-btn').first().click();
+      await page.waitForTimeout(1000);
+    }
+  }
+
+  // Здесь можно добавить другие специфические фильтры SOU, если они есть
+}
+
 async function collectSouDetails(
   page: Page,
   companyId: number,
@@ -1692,7 +1751,7 @@ async function collectSouDetails(
 
   // Применяем фильтры (аналогично арбитражу)
   if (options.filters) {
-    await applyArbitrFilters(page, options.filters);
+    await applySouFilters(page, options.filters);
     await page.waitForTimeout(2000);
   }
 
@@ -1857,10 +1916,10 @@ export async function scrapeRusprofile(
     arbitrDetails?: boolean;
     maxPages?: number;
     maxTotalCases?: number;
-    filters?: any;       // фильтры арбитража
+    filters?: any;        // фильтры арбитража
     connectionsDetails?: boolean;
     souDetails?: boolean;
-    souFilters?: any;    // фильтры судов
+    souFilters?: any;     // фильтры судов (включая лимиты)
   }
 ): Promise<CompanyFullData | null> {
 
@@ -2019,9 +2078,13 @@ export async function scrapeRusprofile(
       console.log('Сбор детальных судов общей юрисдикции...');
       result.sou_details = await timed('sou_details', () =>
         collectSouDetails(page, companyId, {
-          maxPages: options.maxPages,
-          maxTotalCases: options.maxTotalCases,
-          filters: options.souFilters, // <-- важно
+          maxPages: options.souFilters?.maxPages || 1,
+          maxTotalCases: options.souFilters?.maxTotalCases || 100,
+          filters: {
+            sides: options.souFilters?.sides,
+            status: options.souFilters?.status,
+            search: options.souFilters?.search,
+          },
         })
       );
     }
