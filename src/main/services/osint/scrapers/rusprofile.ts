@@ -72,6 +72,7 @@ export interface CompanyFullData {
   resume?: any;
   arbitration_details?: any;
   connections_details?: any;
+  sou_details?: any;
 
   // === НОВЫЕ ПОЛЯ ===
   startedAt?: string;
@@ -1506,7 +1507,7 @@ async function collectConnectionsDetails(page: Page, companyId: number): Promise
 
   const connectionsUrl = `https://www.rusprofile.ru/connections/${companyId}`;
   await page.goto(connectionsUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-  await page.waitForTimeout(3000); // даём время на инициализацию
+  await page.waitForTimeout(2000); // даём время на инициализацию
 
   // --- Переключение на табличный вид ---
   const tableButton = page.locator('span[data-show="table"]');
@@ -1672,6 +1673,181 @@ async function collectConnectionsDetails(page: Page, companyId: number): Promise
   return data;
 }
 
+async function collectSouDetails(
+  page: Page,
+  companyId: number,
+  options: {
+    maxPages?: number;
+    maxTotalCases?: number;
+    filters?: any;
+  } = {}
+): Promise<any> {
+  console.log(`Сбор детальных судов общей юрисдикции для компании ID ${companyId}...`);
+  const data: any = { total_cases: '', cases: [] };
+
+  const souUrl = `https://www.rusprofile.ru/sou/${companyId}`;
+  await page.goto(souUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await page.waitForSelector('ul.filters-results__list', { timeout: 15000 });
+  await page.waitForTimeout(1000);
+
+  // Применяем фильтры (аналогично арбитражу)
+  await applyArbitrFilters(page, options.filters); // можно универсальную функцию для обоих
+
+  await page.waitForTimeout(2000);
+
+  // Заголовок с общим количеством
+  try {
+    const headText = await page.locator('div.export-data__text').first().innerText();
+    const mCases = headText.match(/Найдено\s*([\d\s]+)\s*дел/);
+    if (mCases) data.total_cases = mCases[1].replace(/\s/g, '');
+  } catch (e) {
+    console.log('Не удалось получить заголовок судов:', e);
+  }
+
+  const maxPages = options.maxPages || 1;
+  const maxTotalCases = options.maxTotalCases || 100;
+  let collectedCases = 0;
+  let currentPage = 1;
+
+  while (currentPage <= maxPages && collectedCases < maxTotalCases) {
+    const items = page.locator('li.filters-results__list-item');
+    const itemCount = await items.count();
+
+    for (let i = 0; i < itemCount && collectedCases < maxTotalCases; i++) {
+      const item = items.nth(i);
+      const caseData: any = {};
+
+      // Извлекаем данные внутри одного элемента
+      const basicInfo = await item.evaluate((li) => {
+        const getText = (selector: string) => {
+          const el = li.querySelector(selector);
+          return el ? el.textContent?.trim() || '' : '';
+        };
+
+        const status = getText('.snippet__status');
+        const title = getText('.snippet__row-value.--title');
+
+        const fields: any = {};
+        const dl = li.querySelector('dl.snippet__block');
+        if (dl) {
+          const rows = dl.querySelectorAll('.snippet__row');
+          rows.forEach((row) => {
+            const keyEl = row.querySelector('dt.snippet__row-key');
+            const valueEl = row.querySelector('dd.snippet__row-value');
+            const key = keyEl ? keyEl.textContent?.trim() || '' : '';
+            let value = valueEl ? valueEl.textContent?.trim() || '' : '';
+            const link = valueEl?.querySelector('a.snippet__link');
+            if (link) {
+              value = link.textContent?.trim() || value;
+              fields[key] = {
+                text: value,
+                href: (link as HTMLAnchorElement).href || ''
+              };
+            } else {
+              fields[key] = value;
+            }
+          });
+        }
+
+        // Ссылка на сайт суда (если есть)
+        const kadLink = li.querySelector("a.snippet__link[href*='sudrf.ru'], a.snippet__link[href*='mos-gorsud.ru']");
+        const source_url = kadLink ? (kadLink as HTMLAnchorElement).href || '' : '';
+
+        return { status, title, fields, source_url };
+      });
+
+      caseData.status = basicInfo.status;
+      caseData.fields = basicInfo.fields;
+      caseData.source_url = basicInfo.source_url;
+
+      const m = basicInfo.title.match(/№\s*([\w\-/]+)(?:\s*от\s*([\d.]+))?/);
+      if (m) {
+        caseData.case_number = m[1];
+        caseData.case_date = m[2] || '';
+      } else {
+        caseData.case_number = basicInfo.title;
+        caseData.case_date = '';
+      }
+
+      // Пытаемся раскрыть все инстанции/события (если есть)
+      const moreButton = item.locator('button.snippet__more');
+      if (await moreButton.count() > 0) {
+        try {
+          await moreButton.click();
+          await page.waitForTimeout(1000);
+        } catch (e) {
+          console.warn('Не удалось нажать "Показать все" в судах:', e);
+        }
+      }
+
+      // Извлекаем события (аналогично арбитражу)
+      const events = await item.evaluate((li) => {
+        const blocks = li.querySelectorAll('div.snippet__block');
+        let targetBlock: Element | null = null;
+        for (const block of blocks) {
+          if (block.querySelector('button.snippet__more') || block.querySelector('.snippet__row-value--bold')) {
+            targetBlock = block;
+            break;
+          }
+        }
+        if (!targetBlock) return [];
+
+        const result: any[] = [];
+        const rows = targetBlock.querySelectorAll('div.snippet__row');
+        rows.forEach((row) => {
+          const timeEl = row.querySelector('time.snippet__row-key');
+          const valueEl = row.querySelector('div.snippet__row-value');
+          const date = timeEl ? timeEl.textContent?.trim() || '' : '';
+          let valueText = valueEl ? valueEl.textContent?.trim() || '' : '';
+          let linkHref = '';
+          const link = valueEl?.querySelector('a.snippet__link');
+          if (link) {
+            linkHref = (link as HTMLAnchorElement).href || '';
+            valueText = link.textContent?.trim() || valueText;
+          }
+          let instanceName = '';
+          const boldEl = valueEl?.querySelector('.snippet__row-value--bold') || (valueEl && valueEl.classList.contains('snippet__row-value--bold') ? valueEl : null);
+          if (boldEl) {
+            instanceName = boldEl.textContent?.trim() || '';
+          }
+          if (date || valueText || instanceName) {
+            result.push({ date, text: valueText, link: linkHref, instance: instanceName });
+          }
+        });
+        return result;
+      });
+
+      caseData.events = events;
+
+      if (caseData.case_number || caseData.status) {
+        data.cases.push(caseData);
+        collectedCases++;
+      }
+    }
+
+    if (currentPage >= maxPages || collectedCases >= maxTotalCases) break;
+
+    // Пагинация
+    const showMore = page.locator("button:has-text('Показать ещё')").first();
+    if (await showMore.count() > 0 && await showMore.isEnabled()) {
+      await showMore.click();
+      await page.waitForTimeout(3000);
+      currentPage++;
+    } else {
+      const nextBtn = page.locator('button.filters-pagination__nav.--next').first();
+      if (await nextBtn.count() > 0 && await nextBtn.isEnabled()) {
+        await nextBtn.click();
+        await page.waitForTimeout(3000);
+        currentPage++;
+      } else {
+        break;
+      }
+    }
+  }
+
+  console.log(`Собрано дел судов: ${data.cases.length}, всего: ${data.total_cases}`);
+  return data;
+}
 
 export async function scrapeRusprofile(
   inn: string,
@@ -1681,6 +1857,7 @@ export async function scrapeRusprofile(
     maxTotalCases?: number;
     filters?: any;
     connectionsDetails?: boolean;
+    souDetails?: boolean;
   }
 ): Promise<CompanyFullData | null> {
 
@@ -1832,6 +2009,17 @@ export async function scrapeRusprofile(
       console.log('Сбор детальных связей...');
       result.connections_details = await timed('connections_details', () =>
         collectConnectionsDetails(page, companyId)
+      );
+    }
+
+    if (options?.souDetails) {
+      console.log('Сбор детальных судов общей юрисдикции...');
+      result.sou_details = await timed('sou_details', () =>
+        collectSouDetails(page, companyId, {
+          maxPages: options.maxPages,
+          maxTotalCases: options.maxTotalCases,
+          filters: options.filters,
+        })
       );
     }
 
