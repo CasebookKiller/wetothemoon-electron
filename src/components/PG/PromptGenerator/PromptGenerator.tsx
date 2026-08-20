@@ -1,3 +1,5 @@
+// @/components/PG/PromptGenerator/PromptGenerator.tsx
+
 import React, { useState, useEffect } from 'react';
 import { Button } from 'primereact/button';
 

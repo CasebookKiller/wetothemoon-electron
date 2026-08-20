@@ -1,3 +1,5 @@
+// wetothemoon-electron/src/navigation/routes.tsx
+
 import type { ComponentType, JSX } from 'react';
 
 import { IndexPage } from '@/pages/IndexPage/IndexPage';
@@ -13,6 +15,7 @@ import { PromptGeneratorPage } from '@/pages/PromptGeneratorPage/PromptGenerator
 import { OllamaPage } from '@/pages/OllamaPage/OllamaPage';
 import { TasksPage } from '@/pages/TasksPage/TasksPage';
 import { TradingAssistantPage } from '@/pages/TradingAssistantPage/TradingAssistantPage';
+import { OSINTPage } from '@/pages/OSINTPage/OSINTPage';
 
 export interface Route {
   path: string;
@@ -35,6 +38,7 @@ const pg: Route = { path: '/pg', Component: PromptGeneratorPage, title: 'Ген�
 const ollama: Route = { path: '/ollama', Component: OllamaPage, title: 'Ollama' };
 const tasks: Route = { path: '/tasks', Component: TasksPage, title: 'План полёта' };
 const tradingAssistant: Route = { path: '/trading-assistant', Component: TradingAssistantPage, title: 'Трейдер' }
+const osint: Route = { path: '/osint', Component: OSINTPage, title: 'OSINT' }
 
 export const routes: Route[] = [];
 
@@ -51,5 +55,6 @@ routes.push(
   pg,
   ollama,
   tasks,
-  tradingAssistant
+  tradingAssistant,
+  osint
 );

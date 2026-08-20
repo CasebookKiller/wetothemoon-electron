@@ -1,3 +1,5 @@
+// src/main/windows/paths.ts 
+
 import path from 'path';
 import { app, BrowserWindow } from 'electron';
 

@@ -1,3 +1,5 @@
+// src/types/types.d.ts
+
 declare module "*.module.css" {
   const classes: { [key: string]: string };
   export default classes;
@@ -13,12 +15,12 @@ declare global {
       onTrainingProgress: (callback: (progress: TrainingProgress) => void) => void;
       offTrainingProgress: (callback: (progress: TrainingProgress) => void) => void; // Для отписки
 
-      launch: () => Promise<{ success: boolean; error?: string }>;
-      close: () => Promise<{ success: boolean; error?: string }>;
-      openWindow: () => Promise<void>;
+      //launch: () => Promise<{ success: boolean; error?: string }>;
+      //close: () => Promise<{ success: boolean; error?: string }>;
+      //openWindow: () => Promise<void>;
       // В будущем здесь появятся методы scrape...
-      scrapeRusprofile: (inn: string) => Promise<{ success: boolean; data?: CompanyInfo; error?: string }>;
-      scrapeKadArbitr: (inn: string) => Promise<{ success: boolean; data?: CourtCase[]; error?: string }>;
+      //scrapeRusprofile: (inn: string) => Promise<{ success: boolean; data?: CompanyInfo; error?: string }>;
+      //scrapeKadArbitr: (inn: string) => Promise<{ success: boolean; data?: CourtCase[]; error?: string }>;
     };
 
   }

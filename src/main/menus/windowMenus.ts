@@ -1,3 +1,5 @@
+// src/main/menus/windowMenus.ts
+
 import { app, BrowserWindow, MenuItemConstructorOptions } from 'electron';
 import { getAIWindow } from '../windows/aiWindow';
 

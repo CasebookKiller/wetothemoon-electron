@@ -1,3 +1,5 @@
+// src/preload.ts
+
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
 import { FineTuningData, TrainingProgress } from './shared/types/types';
 
@@ -337,9 +339,20 @@ try {
 
     sendManualOrder: (params: any) => ipcRenderer.invoke('trading-assistant:send-manual-order', params),
 
-    scrapeRusprofile: (inn: string) => ipcRenderer.invoke('osint:scrape-rusprofile', inn),
+    osintLaunch: () => ipcRenderer.invoke('osint:launch'),
+    osintClose: () => ipcRenderer.invoke('osint:close'),
+
+    scrapeRusprofile: (inn: string, options?: any) =>
+      ipcRenderer.invoke('osint:scrape-rusprofile', inn, options),
 
     scrapeKadArbitr: (inn: string) => ipcRenderer.invoke('osint:scrape-kad-arbitr', inn),
+
+    scrapeMosGorsud: (inn: string) => ipcRenderer.invoke('osint:scrape-mos-gorsud', inn),
+
+    saveOsintCredentials: (site: string, login: string, password: string) =>
+      ipcRenderer.invoke('osint:save-credentials', site, login, password),
+    checkOsintCredentials: (site: string) =>
+      ipcRenderer.invoke('osint:check-credentials', site),
     
   });
 

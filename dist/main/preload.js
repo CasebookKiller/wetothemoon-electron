@@ -243,8 +243,13 @@ try {
 			electron.ipcRenderer.removeAllListeners("api-error");
 		},
 		sendManualOrder: (params) => electron.ipcRenderer.invoke("trading-assistant:send-manual-order", params),
-		scrapeRusprofile: (inn) => electron.ipcRenderer.invoke("osint:scrape-rusprofile", inn),
-		scrapeKadArbitr: (inn) => electron.ipcRenderer.invoke("osint:scrape-kad-arbitr", inn)
+		osintLaunch: () => electron.ipcRenderer.invoke("osint:launch"),
+		osintClose: () => electron.ipcRenderer.invoke("osint:close"),
+		scrapeRusprofile: (inn, options) => electron.ipcRenderer.invoke("osint:scrape-rusprofile", inn, options),
+		scrapeKadArbitr: (inn) => electron.ipcRenderer.invoke("osint:scrape-kad-arbitr", inn),
+		scrapeMosGorsud: (inn) => electron.ipcRenderer.invoke("osint:scrape-mos-gorsud", inn),
+		saveOsintCredentials: (site, login, password) => electron.ipcRenderer.invoke("osint:save-credentials", site, login, password),
+		checkOsintCredentials: (site) => electron.ipcRenderer.invoke("osint:check-credentials", site)
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {

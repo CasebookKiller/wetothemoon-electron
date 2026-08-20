@@ -1,3 +1,5 @@
+// wetothemoon-electron/src/pages/PromptGeneratorPage/PromptGeneratorPage.tsx
+
 import PromptGenerator from '@/components/PG/PromptGenerator/PromptGenerator.tsx';
 import { FC, useEffect } from 'react';
 

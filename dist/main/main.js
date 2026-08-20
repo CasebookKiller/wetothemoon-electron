@@ -4542,79 +4542,1300 @@ var getOsintWindow = () => osintWindow;
 //#endregion
 //#region src/main/services/osint/playwrightService.ts
 var browser = null;
+var currentPage = null;
+function getPage() {
+	return currentPage;
+}
 async function launchBrowser() {
 	if (browser && browser.isConnected()) return;
-	browser = await _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_playwright_index_mjs.chromium.launch({ headless: false });
+	console.log("launching browser...");
+	try {
+		browser = await _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_playwright_index_mjs.chromium.launch({
+			headless: false,
+			args: [
+				"--no-sandbox",
+				"--disable-gpu",
+				"--ozone-platform=x11"
+			]
+		});
+		currentPage = await (await browser.newContext()).newPage();
+		await currentPage.goto("https://www.rusprofile.ru", {
+			waitUntil: "domcontentloaded",
+			timeout: 6e4
+		});
+		console.log("Browser launched and navigated to rusprofile.ru");
+	} catch (error) {
+		console.error("Failed to launch browser:", error);
+		throw error;
+	}
+}
+/**
+* Возвращает путь к файлу сохранённого состояния браузера (cookies, localStorage)
+* для указанного сайта.
+*/
+function getStorageStatePath(site) {
+	return path.default.join(electron.app.getPath("userData"), `${site}_storage.json`);
+}
+/**
+* Запускает браузер, восстанавливая сессию из файла, если он существует.
+* После запуска открывает главную страницу Rusprofile.
+*/
+async function launchBrowserWithSession(site) {
+	if (browser && browser.isConnected()) return;
+	console.log(`Запуск браузера с сессией для ${site}...`);
+	const statePath = getStorageStatePath(site);
+	let contextOptions = {};
+	if (fs.default.existsSync(statePath)) {
+		console.log(`Найден файл сессии ${site}, восстанавливаем состояние.`);
+		contextOptions.storageState = statePath;
+	} else console.log(`Файл сессии ${site} не найден, будет выполнен вход.`);
+	try {
+		browser = await _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_playwright_index_mjs.chromium.launch({
+			headless: false,
+			args: [
+				"--no-sandbox",
+				"--disable-gpu",
+				"--ozone-platform=x11"
+			]
+		});
+		currentPage = await (await browser.newContext(contextOptions)).newPage();
+		await currentPage.goto("https://www.rusprofile.ru", {
+			waitUntil: "domcontentloaded",
+			timeout: 6e4
+		});
+		console.log("Браузер запущен и страница открыта.");
+	} catch (error) {
+		console.error("Ошибка при запуске браузера с сессией:", error);
+		throw error;
+	}
 }
 async function closeBrowser() {
 	if (browser) {
 		await browser.close();
 		browser = null;
+		currentPage = null;
 	}
 }
 function getBrowser() {
 	return browser;
 }
-function decrypt(buffer) {
+function decrypt$1(buffer) {
 	return electron.safeStorage.decryptString(buffer);
 }
-var credentialsPath = () => path.default.join(electron.app.getPath("userData"), "osint_credentials.json");
-function loadCredentials() {
-	if (!fs.default.existsSync(credentialsPath())) return {};
+var credentialsPath$1 = () => path.default.join(electron.app.getPath("userData"), "osint_credentials.json");
+function loadCredentials$1() {
+	if (!fs.default.existsSync(credentialsPath$1())) return {};
 	try {
-		const data = fs.default.readFileSync(credentialsPath(), "utf-8");
+		const data = fs.default.readFileSync(credentialsPath$1(), "utf-8");
 		const parsed = JSON.parse(data);
 		for (const site in parsed) {
-			parsed[site].login = decrypt(Buffer.from(parsed[site].login, "base64"));
-			parsed[site].password = decrypt(Buffer.from(parsed[site].password, "base64"));
+			parsed[site].login = decrypt$1(Buffer.from(parsed[site].login, "base64"));
+			parsed[site].password = decrypt$1(Buffer.from(parsed[site].password, "base64"));
 		}
 		return parsed;
 	} catch {
 		return {};
 	}
 }
+function getCredentials$1(site) {
+	return loadCredentials$1()[site] || null;
+}
+//#endregion
+//#region src/main/services/osint/credentials.ts
+var credentialsPath = () => path.default.join(electron.app.getPath("userData"), "osint_credentials.json");
+function encrypt(text) {
+	return electron.safeStorage.encryptString(text).toString("base64");
+}
+function decrypt(base64) {
+	return electron.safeStorage.decryptString(Buffer.from(base64, "base64"));
+}
+function loadCredentials() {
+	const filePath = credentialsPath();
+	if (!fs.default.existsSync(filePath)) return {};
+	try {
+		const raw = JSON.parse(fs.default.readFileSync(filePath, "utf-8"));
+		const result = {};
+		for (const site in raw) result[site] = {
+			login: decrypt(raw[site].login),
+			password: decrypt(raw[site].password)
+		};
+		return result;
+	} catch (e) {
+		console.error("Ошибка загрузки учётных данных:", e);
+		return {};
+	}
+}
+function saveCredentials(credentials) {
+	const filePath = credentialsPath();
+	const encrypted = {};
+	for (const site in credentials) encrypted[site] = {
+		login: encrypt(credentials[site].login),
+		password: encrypt(credentials[site].password)
+	};
+	fs.default.writeFileSync(filePath, JSON.stringify(encrypted, null, 2), "utf-8");
+}
 function getCredentials(site) {
 	return loadCredentials()[site] || null;
 }
+function setCredentials(site, login, password) {
+	const all = loadCredentials();
+	all[site] = {
+		login,
+		password
+	};
+	saveCredentials(all);
+}
 //#endregion
 //#region src/main/services/osint/scrapers/rusprofile.ts
-async function scrapeRusprofile(inn) {
-	const browser = getBrowser();
-	if (!browser) throw new Error("Browser not launched");
-	const page = await browser.newPage();
+async function closeModalIfPresent(page) {
+	const closeButton = page.locator("button.modal-close.modal-company-description__close");
 	try {
-		await page.goto(`https://www.rusprofile.ru/search?query=${inn}`, { waitUntil: "domcontentloaded" });
-		const creds = getCredentials("rusprofile");
-		if (creds) {
-			await loginToRusprofile(page, creds.login, creds.password);
-			await page.goto(`https://www.rusprofile.ru/search?query=${inn}`, { waitUntil: "domcontentloaded" });
-		}
-		await page.click(".company-item a");
-		await page.waitForSelector(".company-card", { timeout: 1e4 });
-		return await page.evaluate(() => {
-			const name = document.querySelector(".company-name")?.textContent?.trim();
-			const inn = document.querySelector(".company-info__item:has(.label:contains(\"ИНН\")) .value")?.textContent?.trim();
-			return {
-				name: name || "",
-				inn: inn || "",
-				ogrn: "",
-				address: "",
-				director: ""
-			};
+		await closeButton.waitFor({
+			state: "visible",
+			timeout: 15e3
 		});
-	} catch (error) {
-		console.error("Rusprofile scraping failed:", error);
-		return null;
-	} finally {
-		await page.close();
+		await closeButton.click({ force: true });
+		console.log("Модальное окно закрыто");
+	} catch (e) {
+		console.log("Модальное окно не появилось или уже закрыто");
 	}
 }
-async function loginToRusprofile(page, login, password) {
-	await page.goto("https://www.rusprofile.ru/login");
-	await page.fill("#login", login);
-	await page.fill("#password", password);
-	await page.click("button[type=\"submit\"]");
-	await page.waitForNavigation();
+async function closeAllModals(page) {
+	if (page.isClosed()) return;
+	await closeModalIfPresent(page);
+	for (const selector of [
+		"button:has-text('Продолжить работу')",
+		"a:has-text('Продолжить работу')",
+		"button:has-text('Понятно')",
+		"a:has-text('Понятно')"
+	]) {
+		const elements = page.locator(selector);
+		if (await elements.count() > 0) try {
+			await elements.first().click({ timeout: 3e3 });
+			await page.waitForTimeout(1e3);
+		} catch (e) {
+			console.log(`Не удалось закрыть модальное окно с селектором ${selector}:`, e);
+		}
+	}
+}
+function startModalWatcher(page) {
+	(async () => {
+		while (true) {
+			const closeButton = page.locator("button.modal-close.modal-company-description__close");
+			try {
+				await closeButton.waitFor({
+					state: "visible",
+					timeout: 3e4
+				});
+				await closeButton.click({ force: true });
+				console.log("Модальное окно закрыто фоновым наблюдателем");
+				await page.waitForTimeout(2e3);
+			} catch (e) {
+				console.log("Модальное окно не появилось в течение 30 секунд, наблюдатель завершён");
+				break;
+			}
+		}
+	})();
+}
+async function login(page, login, password) {
+	console.log("Выполняем вход на rusprofile...");
+	await page.goto("https://www.rusprofile.ru/", {
+		waitUntil: "domcontentloaded",
+		timeout: 6e4
+	});
+	await page.waitForTimeout(3e3);
+	const loginTrigger = page.locator("#menu-personal-trigger");
+	await loginTrigger.waitFor({
+		state: "visible",
+		timeout: 15e3
+	});
+	if (!(await loginTrigger.innerText().catch(() => "")).includes("Войти")) {
+		console.log("Уже авторизованы, вход не требуется");
+		return;
+	}
+	await loginTrigger.click();
+	console.log("Клик по кнопке Войти выполнен");
+	const emailField = page.locator("input[name=\"email\"]");
+	try {
+		await emailField.waitFor({
+			state: "visible",
+			timeout: 1e4
+		});
+		console.log("Поле email найдено");
+	} catch (e) {
+		console.error("Поле email не появилось после клика. Пробуем альтернативный клик по тексту \"Войти\"");
+		const textLogin = page.getByText("Войти", { exact: true }).first();
+		if (await textLogin.count() > 0) {
+			await textLogin.click();
+			await page.waitForTimeout(2e3);
+		}
+		await emailField.waitFor({
+			state: "visible",
+			timeout: 1e4
+		});
+		console.log("Поле email найдено (после альтернативного клика)");
+	}
+	await emailField.fill(login);
+	await page.getByRole("button", { name: "Продолжить" }).click();
+	await page.waitForTimeout(2e3);
+	const passwordField = page.locator("input[name=\"current-password\"]");
+	await passwordField.waitFor({
+		state: "visible",
+		timeout: 1e4
+	});
+	await passwordField.fill(password);
+	await page.getByRole("button", { name: "Войти" }).click();
+	console.log("Кнопка Войти в форме нажата");
+	await page.waitForTimeout(8e3);
+	await closeAllModals(page);
+	const loginTriggerAfter = page.locator("#menu-personal-trigger");
+	await loginTriggerAfter.waitFor({
+		state: "visible",
+		timeout: 1e4
+	});
+	const textAfter = await loginTriggerAfter.innerText().catch(() => "");
+	if (textAfter.includes("Войти")) console.warn("Вход возможно не выполнен, кнопка всё ещё \"Войти\"");
+	else {
+		console.log("Вход выполнен, кнопка теперь:", textAfter);
+		try {
+			await page.context().storageState({ path: getStorageStatePath("rusprofile") });
+			console.log("Сессия сохранена.");
+		} catch (e) {
+			console.warn("Не удалось сохранить сессию:", e);
+		}
+	}
+}
+async function getCompanyIdByInn(page, inn) {
+	await page.goto("https://www.rusprofile.ru/", {
+		waitUntil: "domcontentloaded",
+		timeout: 6e4
+	});
+	await page.waitForTimeout(2e3);
+	const searchInput = page.locator("input#autocomplete-main-search");
+	await searchInput.waitFor({
+		state: "visible",
+		timeout: 5e3
+	});
+	await searchInput.fill(inn);
+	await searchInput.press("Enter");
+	await page.waitForTimeout(3e3);
+	const match = page.url().match(/\/id\/(\d+)/);
+	if (match) return parseInt(match[1]);
+	await page.locator("a[href*='/id/']").first().click();
+	await page.waitForTimeout(5e3);
+	const newMatch = page.url().match(/\/id\/(\d+)/);
+	if (newMatch) return parseInt(newMatch[1]);
+	throw new Error(`Не удалось найти ID компании по ИНН ${inn}`);
+}
+async function collectSummary(page) {
+	return page.evaluate(() => {
+		const getTextByCss = (selector) => {
+			const el = document.querySelector(selector);
+			return el ? el.textContent?.trim() || "" : "";
+		};
+		const getTextByXPath = (xpath) => {
+			const node = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+			return node ? node.textContent?.trim() || "" : "";
+		};
+		const getTextsByXPath = (xpath) => {
+			const result = document.evaluate(xpath, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+			const texts = [];
+			for (let i = 0; i < result.snapshotLength; i++) {
+				const node = result.snapshotItem(i);
+				if (node && node.textContent) {
+					const text = node.textContent.trim();
+					if (text) texts.push(text);
+				}
+			}
+			return texts;
+		};
+		const data = {};
+		data.name = getTextByCss("h1");
+		data.ogrn = getTextByCss("#clip_ogrn");
+		data.ogrn_date = getTextByXPath("//*[@id='clip_ogrn']/ancestor::dl/dd[contains(@class,'padding-top')]");
+		data.inn = getTextByCss("#clip_inn");
+		data.kpp = getTextByCss("#clip_kpp");
+		data.registration_date = getTextByXPath("//dt[contains(.,'Дата регистрации')]/following-sibling::dd[1]");
+		data.capital = getTextByXPath("//dt[contains(.,'Уставный капитал')]/following-sibling::dd[1]");
+		data.address = getTextByCss("#clip_address");
+		data.manager = {
+			position: getTextByXPath("//span[contains(@class,'chief-title') and (contains(.,'ПРЕЗИДЕНТ') or contains(.,'ДИРЕКТОР') or contains(.,'ГЕНЕРАЛЬНЫЙ'))]"),
+			name: getTextByXPath("//div[contains(@class,'company-row') and .//span[contains(@class,'company-info__title') and contains(.,'Руководитель')]]//a[contains(@href,'/person/')]"),
+			since: getTextByXPath("//div[contains(@class,'company-row') and .//span[contains(@class,'company-info__title') and contains(.,'Руководитель')]]//span[contains(@class,'chief-title') and starts-with(normalize-space(),'с ')]")
+		};
+		data.registry_holder = getTextByXPath("//span[contains(@class,'company-info__title') and contains(.,'Держатель реестра')]/following-sibling::span[1]//a");
+		data.average_employees = getTextByXPath("//dt[contains(.,'Среднесписочная численность')]/following-sibling::dd[1]");
+		data.average_salary = getTextByXPath("//dt[contains(.,'Среднемесячная зарплата')]/following-sibling::dd[1]");
+		data.tax_regime = getTextByXPath("//dt[contains(.,'Специальный налоговый режим')]/following-sibling::dd[1]");
+		data.sme_registry = getTextByXPath("//span[contains(@class,'company-info__title') and contains(.,'Реестр МСП')]/following-sibling::span[1]");
+		data.predecessor = getTextByXPath("//span[contains(@class,'company-info__title') and contains(.,'Правопредшественник')]/following-sibling::div[1]");
+		data.main_activity = getTextByXPath("//span[contains(@class,'company-info__title') and contains(.,'Основной вид деятельности')]/following-sibling::span[1]");
+		data.tax_authority = getTextByXPath("//span[contains(@class,'company-info__title') and contains(.,'Налоговый орган')]/following-sibling::span[1]");
+		data.tax_authority_since = getTextByXPath("//span[contains(@class,'company-info__title') and contains(.,'Налоговый орган')]/following-sibling::span[contains(@class,'chief-title')]");
+		data.stat_codes = {
+			okpo: getTextByCss("#clip_okpo"),
+			okato: getTextByCss("#clip_okato"),
+			oktmo: getTextByCss("#clip_oktmo"),
+			okfs: getTextByCss("#clip_okfs"),
+			okogu: getTextByCss("#clip_okogu"),
+			okopf: getTextByCss("#clip_okopf")
+		};
+		data.contacts = {
+			phones: getTextsByXPath("//div[contains(@class,'company-info__contact') and contains(@class,'phone')]//a[starts-with(@href,'tel:')]"),
+			emails: getTextsByXPath("//div[contains(@class,'company-info__contact') and contains(@class,'mail')]//a[starts-with(@href,'mailto:')]"),
+			sites: getTextsByXPath("//div[contains(@class,'company-info__contact') and contains(@class,'site')]//a[contains(@href,'http')]")
+		};
+		const actualElem = document.querySelector("div[class*='anketa-actual']");
+		data.updated = actualElem ? actualElem.textContent.replace("Актуально на", "").trim() : "";
+		data.detailed_description = getTextByCss("div.anketa-bottom");
+		return data;
+	});
+}
+async function collectFssp(page) {
+	return page.evaluate(() => {
+		const tile = document.querySelector(".fssp-tile");
+		if (!tile) return {};
+		const getTextByXPath = (xpath) => {
+			const node = document.evaluate(xpath, tile, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+			return node ? node.textContent?.trim() || "" : "";
+		};
+		return {
+			total_productions: getTextByXPath(".//a[contains(@class,'num') and contains(@class,'gtm_fs_all')]"),
+			fines: getTextByXPath(".//div[contains(@class,'connexion-col__title') and contains(.,'Штрафы:')]"),
+			collections: getTextByXPath(".//div[contains(@class,'connexion-col__title') and contains(.,'Взыскания:')]"),
+			other: getTextByXPath(".//div[contains(@class,'connexion-col__title') and contains(.,'Прочее:')]"),
+			total_amount: getTextByXPath(".//div[contains(@class,'connexion-col__title') and contains(.,'На сумму')]/following-sibling::div[contains(@class,'connexion-col__num')][1]"),
+			remaining_debt: getTextByXPath(".//div[contains(@class,'connexion-col__title') and contains(.,'Остаток задолженности')]/following-sibling::div[contains(@class,'connexion-col__num')][1]")
+		};
+	});
+}
+async function collectTrademarks(page) {
+	return page.evaluate(() => {
+		const tile = document.querySelector(".trademarks-tile");
+		if (!tile) return {};
+		const getTextByXPath = (xpath) => {
+			const node = document.evaluate(xpath, tile, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+			return node ? node.textContent?.trim() || "" : "";
+		};
+		const getTextByCss = (selector) => {
+			const el = tile.querySelector(selector);
+			return el ? el.textContent?.trim() || "" : "";
+		};
+		const total = getTextByXPath(".//div[contains(@class,'connexion-col') and contains(.,'Всего')]//a");
+		const active = getTextByXPath(".//div[contains(@class,'connexion-col') and contains(.,'Действующие')]//a");
+		const id = getTextByCss("a.tm_item__link");
+		const status = getTextByCss(".tm_status");
+		const type = getTextByXPath(".//dl[contains(.,'Тип')]//dd");
+		const registration_date = getTextByXPath(".//dl[contains(.,'Дата регистрации')]//dd");
+		const expires = getTextByXPath(".//dl[contains(.,'Истекает')]//dd");
+		const other_trademarks_text = getTextByCss("dl.trademarks-tile__info dd");
+		return {
+			total,
+			active,
+			last_trademark: {
+				id,
+				status,
+				type,
+				registration_date,
+				expires
+			},
+			other_trademarks_text
+		};
+	});
+}
+async function collectSou(page) {
+	return page.evaluate(() => {
+		const tile = document.querySelector(".sou-tile");
+		if (!tile) return {
+			total_cases: "",
+			top_categories: []
+		};
+		const activeTab = tile.querySelector(".tab-item.active");
+		if (!activeTab) return {
+			total_cases: "",
+			top_categories: []
+		};
+		const totalEl = activeTab.querySelector(".connexion-col__num a.num");
+		let total_cases = "";
+		if (totalEl) {
+			const m = (totalEl.textContent?.trim() || "").match(/[\d\s]+/);
+			if (m) total_cases = m[0].replace(/\s/g, "");
+		}
+		const top_categories = [];
+		activeTab.querySelectorAll("ul.unstyled li").forEach((li) => {
+			const nameEl = li.querySelector("span.hoverUnderline.colon");
+			const countEl = li.querySelector("span.text-blue");
+			const percentEl = li.querySelector("span.percentWrp");
+			const name = nameEl ? nameEl.textContent?.trim() || "" : "";
+			const count = countEl ? countEl.textContent?.trim() || "" : "";
+			let percent = "";
+			if (percentEl) percent = (percentEl.textContent || "").trim().replace(/[()%]/g, "");
+			if (name || count) top_categories.push({
+				name,
+				count,
+				percent
+			});
+		});
+		return {
+			total_cases,
+			top_categories
+		};
+	});
+}
+async function collectArbitrTile(page) {
+	return page.evaluate(() => {
+		const tile = document.querySelector(".arbitr-tile");
+		if (!tile) return {
+			total_cases: "",
+			total_amount: "",
+			outcomes: [],
+			dynamics: [],
+			categories: []
+		};
+		const activeRole = tile.querySelector(".tab-item.active");
+		if (!activeRole) return {
+			total_cases: "",
+			total_amount: "",
+			outcomes: [],
+			dynamics: [],
+			categories: []
+		};
+		const activeSubtab = activeRole.querySelector(".tab-item.active") || activeRole;
+		const totalBlockEl = activeSubtab.querySelector(".connexion-col__num");
+		const totalBlock = totalBlockEl ? totalBlockEl.textContent?.trim() || "" : "";
+		let total_cases = "";
+		let total_amount = "";
+		if (totalBlock) {
+			const mCases = totalBlock.match(/([\d\s]+?)\s*дел/);
+			if (mCases) total_cases = mCases[1].replace(/\s/g, "");
+			if (totalBlock.includes("на сумму")) total_amount = totalBlock.split("на сумму")[1].trim();
+		}
+		const outcomes = [];
+		activeSubtab.querySelectorAll("ul.unstyled li").forEach((li) => {
+			const nameEl = li.querySelector("span.hoverUnderline.colon");
+			const countEl = li.querySelector("span.text-blue");
+			const percentEl = li.querySelector("span.percentWrp");
+			const name = nameEl ? nameEl.textContent?.trim() || "" : "";
+			const count = countEl ? countEl.textContent?.trim() || "" : "";
+			let percent = "";
+			if (percentEl) percent = (percentEl.textContent || "").trim().replace(/[()%]/g, "");
+			if (name || count) outcomes.push({
+				name,
+				count,
+				percent
+			});
+		});
+		const dynamics = [];
+		activeSubtab.querySelectorAll("table.arbitr-table tbody tr td.text-darkest-grey").forEach((td) => {
+			const m = (td.textContent?.trim() || "").match(/(\d{4}):\s*([\d\s]+?)\s*дел.*?на\s*(.*?)(?:\s*руб\.)?$/);
+			if (m) dynamics.push({
+				year: m[1],
+				cases: m[2].replace(/\s/g, ""),
+				amount: m[3].trim()
+			});
+		});
+		const categories = [];
+		activeSubtab.querySelectorAll(".arbitr-case-categories .badge-list a.badge-status").forEach((link) => {
+			const name = link.childNodes[0]?.textContent?.trim() || "";
+			const countEl = link.querySelector("span");
+			const count = countEl ? countEl.textContent?.trim() || "" : "";
+			if (name || count) categories.push({
+				name,
+				count
+			});
+		});
+		return {
+			total_cases,
+			total_amount,
+			outcomes,
+			dynamics,
+			categories
+		};
+	});
+}
+async function collectReesters(page) {
+	return page.evaluate(() => {
+		const tile = document.querySelector(".reesters-tile");
+		if (!tile) return [];
+		const items = tile.querySelectorAll("ul.reesters-tile__list li");
+		const result = [];
+		items.forEach((li) => {
+			const flagEl = li.querySelector("span.flag");
+			const status = flagEl ? flagEl.textContent?.trim() || "" : "";
+			const fullText = li.textContent?.trim() || "";
+			let category = "";
+			if (status && fullText.startsWith(status)) category = fullText.substring(status.length).trim();
+			else category = fullText;
+			if (category || status) result.push({
+				status,
+				category
+			});
+		});
+		return result;
+	});
+}
+async function collectConnections(page) {
+	return page.evaluate(() => {
+		const tile = document.querySelector(".connections-tile");
+		if (!tile) return {};
+		const tabNames = {
+			conn_1: "actual",
+			conn_2: "historical",
+			conn_3: "all"
+		};
+		const tabs = tile.querySelectorAll("div.tab-item[data-tab_name]");
+		const result = {};
+		tabs.forEach((tab) => {
+			const dataTabName = tab.getAttribute("data-tab_name") || "";
+			const label = tabNames[dataTabName] || dataTabName;
+			const descriptionEl = tab.querySelector("p.tile-item__text.margin-bottom");
+			const description = descriptionEl ? descriptionEl.textContent?.trim() || "" : "";
+			const counts = {};
+			tab.querySelectorAll("div.connexion-col").forEach((col) => {
+				const titleEl = col.querySelector("div.connexion-col__title");
+				const valueEl = col.querySelector("div.connexion-col__num");
+				const title = titleEl ? titleEl.textContent?.trim() || "" : "";
+				const value = valueEl ? valueEl.textContent?.trim() || "" : "";
+				if (title) counts[title] = value;
+			});
+			result[label] = {
+				description,
+				counts
+			};
+		});
+		return result;
+	});
+}
+async function collectFacts(page) {
+	return page.evaluate(() => {
+		const tile = document.querySelector(".facts-tile");
+		if (!tile) return {
+			counts: {},
+			last_messages: []
+		};
+		const counts = {};
+		tile.querySelectorAll("div.responsive-cols__item").forEach((col) => {
+			const titleEl = col.querySelector("div.connexion-col__title");
+			const valueEl = col.querySelector("div.connexion-col__num");
+			const title = titleEl ? titleEl.textContent?.trim() || "" : "";
+			const value = valueEl ? valueEl.textContent?.trim() || "" : "";
+			if (title) counts[title] = value;
+		});
+		const last_messages = [];
+		tile.querySelectorAll("div.history-tile__item").forEach((msg) => {
+			const dateEl = msg.querySelector("div.history-tile__item__title");
+			const descEl = msg.querySelector("div.history-tile__item__description");
+			const date = dateEl ? dateEl.textContent?.trim() || "" : "";
+			const desc = descEl ? descEl.textContent?.trim() || "" : "";
+			if (date || desc) last_messages.push({
+				date,
+				description: desc
+			});
+		});
+		return {
+			counts,
+			last_messages
+		};
+	});
+}
+async function collectGz(page) {
+	return page.evaluate(async () => {
+		const tile = document.querySelector(".gz-tile");
+		if (!tile) return {
+			supplier: {},
+			customer: {}
+		};
+		const collectActiveRoleData = () => {
+			const activeTab = tile.querySelector(".tab-item.active");
+			if (!activeTab) return {};
+			const roleData = {};
+			const purchaseLabelEl = activeTab.querySelector(".connexion-col__num");
+			const purchaseLabel = purchaseLabelEl ? purchaseLabelEl.textContent?.trim() || "" : "";
+			const mPurchases = purchaseLabel.match(/([\d\s]+?)\s*закупок/);
+			if (mPurchases) roleData.purchases_count = mPurchases[1].replace(/\s/g, "");
+			if (purchaseLabel.includes("на сумму")) roleData.purchases_amount = purchaseLabel.split("на сумму")[1].trim();
+			const contractBlockEl = activeTab.querySelectorAll(".connexion-col__num")[1];
+			const contractBlock = contractBlockEl ? contractBlockEl.textContent?.trim() || "" : "";
+			const mContracts = contractBlock.match(/([\d\s]+?)\s*контракта/);
+			if (mContracts) roleData.contracts_count = mContracts[1].replace(/\s/g, "");
+			if (contractBlock.includes("на сумму")) roleData.contracts_amount = contractBlock.split("на сумму")[1].trim();
+			roleData.statuses = [];
+			activeTab.querySelectorAll("ul.statuses-table li").forEach((li) => {
+				const nameEl = li.querySelector("span.hoverUnderline.colon");
+				const countEl = li.querySelector("span.text-blue");
+				const percentEl = li.querySelector("span.percentWrp");
+				const name = nameEl ? nameEl.textContent?.trim() || "" : "";
+				const count = countEl ? countEl.textContent?.trim() || "" : "";
+				let percent = "";
+				if (percentEl) percent = (percentEl.textContent || "").trim().replace(/[()%]/g, "");
+				if (name || count) roleData.statuses.push({
+					name,
+					count,
+					percent
+				});
+			});
+			roleData.top_3 = [];
+			activeTab.querySelectorAll("div.founder-item").forEach((item) => {
+				const top = {};
+				const nameEl = item.querySelector("div.founder-item__title a span");
+				const purchasesEl = item.querySelector("dl.founder-item__dl dt a");
+				const amountEl = item.querySelector("dl.founder-item__dl dd");
+				top.name = nameEl ? nameEl.textContent?.trim() || "" : "";
+				top.purchases = purchasesEl ? purchasesEl.textContent?.trim() || "" : "";
+				top.amount = amountEl ? amountEl.textContent?.trim() || "" : "";
+				if (top.name) roleData.top_3.push(top);
+			});
+			roleData.categories = [];
+			activeTab.querySelectorAll(".gz-case-categories .badge-list a.badge-status").forEach((link) => {
+				const cat = {};
+				cat.name = link.childNodes[0]?.textContent?.trim() || "";
+				const countEl = link.querySelector("span");
+				cat.count = countEl ? countEl.textContent?.trim() || "" : "";
+				if (cat.name || cat.count) roleData.categories.push(cat);
+			});
+			return roleData;
+		};
+		const supplier = collectActiveRoleData();
+		const tabCustomer = Array.from(tile.querySelectorAll("span.tab-opener")).find((el) => el.textContent?.includes("Заказчика"));
+		let customer = {};
+		if (tabCustomer) {
+			tabCustomer.click();
+			await new Promise((resolve) => setTimeout(resolve, 500));
+			customer = collectActiveRoleData();
+		}
+		return {
+			supplier,
+			customer
+		};
+	});
+}
+async function collectLeasing(page) {
+	return page.evaluate(() => {
+		const tile = document.querySelector(".leasing-tile");
+		if (!tile) return {};
+		const tabs = tile.querySelectorAll("div.tab-item[data-tab_name]");
+		const result = {};
+		tabs.forEach((tab) => {
+			const tabName = tab.getAttribute("data-tab_name") || "";
+			let label = tabName;
+			if (tabName === "leasing_all") label = "all";
+			else if (tabName === "leasing_lessee") label = "lessee";
+			const entry = {
+				contracts_count: "",
+				subjects: []
+			};
+			const countEl = tab.querySelector("div.connexion-col__num a.num");
+			entry.contracts_count = countEl ? countEl.textContent?.trim() || "" : "";
+			tab.querySelectorAll(".badge-list a.badge-status").forEach((link) => {
+				const subject = {};
+				subject.name = link.childNodes[0]?.textContent?.trim() || "";
+				const countSpan = link.querySelector("span");
+				subject.count = countSpan ? countSpan.textContent?.trim() || "" : "";
+				if (subject.name || subject.count) entry.subjects.push(subject);
+			});
+			result[label] = entry;
+		});
+		return result;
+	});
+}
+async function collectPledges(page) {
+	return page.evaluate(() => {
+		const tile = document.querySelector(".pledge-tile");
+		if (!tile) return {};
+		const tabs = tile.querySelectorAll("div.tab-item[data-tab_name]");
+		const result = {};
+		tabs.forEach((tab) => {
+			const tabName = tab.getAttribute("data-tab_name") || "";
+			let label = tabName;
+			if (tabName === "pledge_all") label = "all";
+			else if (tabName === "pledge_mortgagee") label = "mortgagee";
+			else if (tabName === "pledge_mortgagor") label = "mortgagor";
+			const entry = {
+				contracts_count: "",
+				subjects: []
+			};
+			const countEl = tab.querySelector("div.connexion-col__num a.num");
+			entry.contracts_count = countEl ? countEl.textContent?.trim() || "" : "";
+			tab.querySelectorAll(".badge-list a.badge-status").forEach((link) => {
+				const subject = {};
+				subject.name = link.childNodes[0]?.textContent?.trim() || "";
+				const countSpan = link.querySelector("span");
+				subject.count = countSpan ? countSpan.textContent?.trim() || "" : "";
+				if (subject.name || subject.count) entry.subjects.push(subject);
+			});
+			result[label] = entry;
+		});
+		return result;
+	});
+}
+async function collectLicenses(page) {
+	return page.evaluate(() => {
+		const tile = document.querySelector(".licenses-tile");
+		if (!tile) return {
+			total_licenses: "",
+			total_activity_types: "",
+			by_source: {}
+		};
+		const textEl = tile.querySelector("p.tile-item__text");
+		const text = textEl ? textEl.textContent?.trim() || "" : "";
+		const mLic = text.match(/(\d+)\s*лицензи/);
+		const mAct = text.match(/(\d+)\s*видам/);
+		const by_source = {};
+		tile.querySelectorAll("div.connexion-col").forEach((col) => {
+			const titleEl = col.querySelector("div.connexion-col__title");
+			const valueEl = col.querySelector("div.connexion-col__num");
+			const source = titleEl ? titleEl.textContent?.trim() || "" : "";
+			const value = valueEl ? valueEl.textContent?.trim() || "" : "";
+			if (source) by_source[source] = value;
+		});
+		return {
+			total_licenses: mLic ? mLic[1] : "",
+			total_activity_types: mAct ? mAct[1] : "",
+			by_source
+		};
+	});
+}
+async function collectCompetitors(page) {
+	return page.evaluate(() => {
+		const tile = document.querySelector(".competitor-tile");
+		if (!tile) return {
+			total_competitors: "",
+			competitors: []
+		};
+		let total_competitors = "";
+		const allLink = tile.querySelector("a.see-details");
+		if (allLink) {
+			const m = (allLink.textContent?.trim() || "").match(/Все\s+([\d\s]+)\s+конкурент/);
+			if (m) total_competitors = m[1].replace(/\s/g, "");
+		}
+		const competitors = [];
+		tile.querySelectorAll("div.founder-item").forEach((item) => {
+			const competitor = {};
+			const nameEl = item.querySelector("div.founder-item__title a span");
+			competitor.name = nameEl ? nameEl.textContent?.trim() || "" : "";
+			const firstDl = item.querySelector("dl.founder-item__dl");
+			if (firstDl) {
+				const lines = (firstDl.textContent?.trim() || "").split("\n").map((l) => l.trim()).filter(Boolean);
+				competitor.revenue = lines[lines.length - 1] || "";
+			} else competitor.revenue = "";
+			const contractsDl = item.querySelectorAll("dl.founder-item__dl")[1];
+			if (contractsDl) {
+				const dtEl = contractsDl.querySelector("dt");
+				const ddEl = contractsDl.querySelector("dd");
+				const mContr = (dtEl ? dtEl.textContent?.trim() || "" : "").match(/([\d\s]+?)\s*госконтрактов/);
+				competitor.contracts_count = mContr ? mContr[1].replace(/\s/g, "") : "";
+				competitor.contracts_amount = ddEl ? ddEl.textContent?.trim() || "" : "";
+			} else {
+				competitor.contracts_count = "";
+				competitor.contracts_amount = "";
+			}
+			if (competitor.name) competitors.push(competitor);
+		});
+		return {
+			total_competitors,
+			competitors
+		};
+	});
+}
+async function collectInspections(page) {
+	return page.evaluate(() => {
+		const tile = document.querySelector(".inspections-tile");
+		if (!tile) return {
+			total_inspections: "",
+			total_preventive: "",
+			categories: {}
+		};
+		const textEl = tile.querySelector("p.tile-item__text");
+		const text = textEl ? textEl.textContent?.trim() || "" : "";
+		const mInsp = text.match(/(\d+)\s*проверок/);
+		const mPrev = text.match(/(\d+)\s*профилактических/);
+		const categories = {};
+		tile.querySelectorAll("div.connexion-col").forEach((col) => {
+			const titleEl = col.querySelector("div.connexion-col__title");
+			const valueEl = col.querySelector("div.connexion-col__num");
+			const title = titleEl ? titleEl.textContent?.trim() || "" : "";
+			const value = valueEl ? valueEl.textContent?.trim() || "" : "";
+			if (title) categories[title] = value;
+		});
+		return {
+			total_inspections: mInsp ? mInsp[1] : "",
+			total_preventive: mPrev ? mPrev[1] : "",
+			categories
+		};
+	});
+}
+async function collectFinance(page) {
+	return page.evaluate(() => {
+		const tile = document.querySelector(".finance-tile");
+		if (!tile) return {};
+		const textEl = tile.querySelector("p.tile-item__text");
+		return { message: textEl ? textEl.textContent?.trim() || "" : "" };
+	});
+}
+async function collectRisks(page) {
+	return page.evaluate(() => {
+		const tile = document.querySelector(".riscs-tile");
+		if (!tile) return {};
+		const result = {};
+		tile.querySelectorAll("div.company-row").forEach((row) => {
+			const titleEl = row.querySelector("span.company-info__title");
+			if (!titleEl) return;
+			const title = titleEl.textContent?.trim() || "";
+			if (!title) return;
+			let fullText = row.textContent?.trim() || "";
+			if (fullText.startsWith(title)) fullText = fullText.substring(title.length).trim();
+			fullText = fullText.replace(/\s*Проверить\s*$/, "").trim();
+			let additional = "";
+			const addEl = row.querySelector("div.additional-info");
+			if (addEl) {
+				additional = addEl.textContent?.trim() || "";
+				if (additional && fullText.includes(additional)) fullText = fullText.replace(additional, "").trim();
+			}
+			result[title] = {
+				text: fullText,
+				additional
+			};
+		});
+		return result;
+	});
+}
+async function collectFounders(page) {
+	return page.evaluate(() => {
+		const tile = document.querySelector(".founders-tile");
+		if (!tile) return {
+			message: "",
+			founders: []
+		};
+		const messageEl = tile.querySelector("p.tile-item__text");
+		const message = messageEl ? messageEl.textContent?.trim() || "" : "";
+		const founders = [];
+		tile.querySelectorAll("div.founder-item").forEach((item) => {
+			const nameEl = item.querySelector("div.founder-item__title a span");
+			const detailsEl = item.querySelector("dl.founder-item__dl");
+			const name = nameEl ? nameEl.textContent?.trim() || "" : "";
+			const details = detailsEl ? detailsEl.textContent?.trim() || "" : "";
+			if (name || details) founders.push({
+				name,
+				details
+			});
+		});
+		return {
+			message,
+			founders
+		};
+	});
+}
+async function collectTaxes(page) {
+	return page.evaluate(() => {
+		const tile = document.querySelector(".taxes-tile");
+		if (!tile) return {};
+		const messageEl = tile.querySelector("div.tile-item__text");
+		const message = messageEl ? messageEl.textContent?.trim() || "" : "";
+		const taxes = [];
+		tile.querySelectorAll("table tbody tr").forEach((row) => {
+			const cells = Array.from(row.querySelectorAll("td")).map((td) => td.textContent?.trim() || "");
+			if (cells.length) taxes.push(cells);
+		});
+		return {
+			message,
+			taxes
+		};
+	});
+}
+async function collectReliability(page) {
+	return page.evaluate(() => {
+		let tile = document.querySelector("div.tile-item.--risks");
+		if (!tile) tile = Array.from(document.querySelectorAll("div.tile-item")).find((el) => el.querySelector("h2 a[href*='/reliability/']")) || null;
+		if (!tile) return {};
+		const titleEl = tile.querySelector("h2.tile-item__title a");
+		const title = titleEl ? titleEl.textContent?.trim() || "" : "";
+		const labelEl = tile.querySelector("div.tile-item__label");
+		const label = labelEl ? labelEl.textContent?.trim() || "" : "";
+		const descEl = tile.querySelector("div.tile-item__text");
+		const description = descEl ? descEl.textContent?.trim() || "" : "";
+		const seeDetails = tile.querySelector("a.see-details");
+		return {
+			title,
+			label,
+			description,
+			more_facts: seeDetails ? seeDetails.textContent?.trim() || "" : "",
+			url: seeDetails ? seeDetails.getAttribute("href") || "" : ""
+		};
+	});
+}
+async function collectTopOkved(page) {
+	return page.evaluate(() => {
+		const tile = document.querySelector(".top_okved-tile");
+		if (!tile) return {
+			description: "",
+			region: {
+				title: "Москва",
+				companies: []
+			},
+			country: {
+				title: "Вся Россия",
+				companies: []
+			}
+		};
+		const description = tile.querySelector("p.tile-item__text.margin-bottom")?.textContent?.trim() || "";
+		const parseTab = (tabName) => {
+			const tab = tile.querySelector(`div.tab-item[data-tab_name='${tabName}']`);
+			if (!tab) return [];
+			const rows = Array.from(tab.querySelectorAll("table tbody tr"));
+			const companies = [];
+			for (const row of rows) {
+				const firstCell = row.querySelector("td.only-tablet-mob");
+				if (firstCell && firstCell.textContent?.includes("Выручка")) continue;
+				const cells = Array.from(row.querySelectorAll("td"));
+				if (cells.length < 2) continue;
+				const position = cells[0]?.textContent?.trim() || "";
+				const nameLink = cells[1]?.querySelector("a");
+				const name = nameLink?.textContent?.trim() || "";
+				const url = nameLink?.getAttribute("href") || "";
+				let revenue = "";
+				if (cells.length > 2) {
+					const revenueDesktop = cells[2]?.querySelector(".hide-less-tablet");
+					revenue = revenueDesktop ? revenueDesktop.textContent?.trim() || "" : cells[2]?.textContent?.trim() || "";
+				}
+				const dynamic = cells.length > 3 ? cells[3]?.textContent?.trim() || "" : "";
+				if (name || revenue) companies.push({
+					position,
+					name,
+					url,
+					revenue,
+					dynamic
+				});
+			}
+			return companies;
+		};
+		return {
+			description,
+			region: {
+				title: "Москва",
+				companies: parseTab("top_okved_region")
+			},
+			country: {
+				title: "Вся Россия",
+				companies: parseTab("top_okved_country")
+			}
+		};
+	});
+}
+async function collectBranches(page) {
+	return page.evaluate(() => {
+		const tile = document.querySelector(".branches-tile");
+		if (!tile) return {};
+		const totalEl = tile.querySelector("div.connexion-col__num a.num");
+		const descEl = tile.querySelector("p.tile-item__text");
+		const urlEl = tile.querySelector("a.see-details");
+		return {
+			total: totalEl ? totalEl.textContent?.trim() || "" : "",
+			description: descEl ? descEl.textContent?.trim() || "" : "",
+			url: urlEl ? urlEl.getAttribute("href") || "" : ""
+		};
+	});
+}
+async function collectSimilar(page) {
+	return page.evaluate(() => {
+		const tile = document.querySelector(".similar-tile");
+		if (!tile) return {
+			description: "",
+			companies: []
+		};
+		const descEl = tile.querySelector("p.tile-item__text");
+		const description = descEl ? descEl.textContent?.trim() || "" : "";
+		const items = tile.querySelectorAll("div.similar-item");
+		const companies = [];
+		items.forEach((item) => {
+			const link = item.querySelector("div.similar-item__title a");
+			if (link) {
+				const name = link.textContent?.trim() || "";
+				const url = link.getAttribute("href") || "";
+				if (name) companies.push({
+					name,
+					url
+				});
+			}
+		});
+		return {
+			description,
+			companies
+		};
+	});
+}
+async function collectReports(page) {
+	return page.evaluate(() => {
+		const tile = document.querySelector(".reports-tile");
+		if (!tile) return { documents: [] };
+		const linkEls = tile.querySelectorAll("div.reports-tile__btns a");
+		const documents = [];
+		linkEls.forEach((link) => {
+			const titleEl = link.querySelector("span.big");
+			const fullTextEl = link.querySelector("span.r-part");
+			const title = titleEl ? titleEl.textContent?.trim() || "" : "";
+			const fullText = fullTextEl ? fullTextEl.textContent?.trim() || "" : "";
+			let description = fullText;
+			if (title && fullText.startsWith(title)) description = fullText.substring(title.length).trim();
+			const url = link.getAttribute("href") || "";
+			if (title || url) documents.push({
+				title,
+				description,
+				url
+			});
+		});
+		return { documents };
+	});
+}
+async function collectEvents(page) {
+	return page.evaluate(() => {
+		const tile = document.querySelector(".history-tile");
+		if (!tile) return {
+			counts: {},
+			last_changes: []
+		};
+		const counts = {};
+		tile.querySelectorAll("div.connexion-col").forEach((col) => {
+			const titleEl = col.querySelector("div.connexion-col__title");
+			const valueEl = col.querySelector("div.connexion-col__num");
+			const title = titleEl ? titleEl.textContent?.trim() || "" : "";
+			const value = valueEl ? valueEl.textContent?.trim() || "" : "";
+			if (title) counts[title] = value;
+		});
+		const last_changes = [];
+		tile.querySelectorAll("div.history-tile__item").forEach((item) => {
+			const dateEl = item.querySelector("div.history-tile__item__title");
+			const descEl = item.querySelector("div.history-tile__item__description");
+			const date = dateEl ? dateEl.textContent?.trim() || "" : "";
+			const description = descEl ? descEl.textContent?.trim() || "" : "";
+			if (date || description) last_changes.push({
+				date,
+				description
+			});
+		});
+		return {
+			counts,
+			last_changes
+		};
+	});
+}
+async function collectResume(page) {
+	return page.evaluate(() => {
+		const tile = document.querySelector(".resume-tile");
+		if (!tile) return {};
+		const titleEl = tile.querySelector("h2.tile-item__title");
+		const title = titleEl ? titleEl.textContent?.trim() || "" : "";
+		const paragraphs = [];
+		tile.querySelectorAll("p.resume-tile__text").forEach((p) => {
+			const text = p.textContent?.trim() || "";
+			if (text) paragraphs.push(text);
+		});
+		return {
+			title,
+			paragraphs
+		};
+	});
+}
+async function collectArbitrDetails(page, companyId, options = {}) {
+	const data = {
+		total_cases: "",
+		total_amount: "",
+		cases: []
+	};
+	const arbitrUrl = `https://www.rusprofile.ru/arbitr/${companyId}`;
+	await page.goto(arbitrUrl, {
+		waitUntil: "domcontentloaded",
+		timeout: 6e4
+	});
+	await page.waitForSelector("ul.filters-results__list", { timeout: 15e3 });
+	await page.waitForTimeout(1e3);
+	await applyArbitrFilters(page, options.filters);
+	await page.waitForTimeout(2e3);
+	try {
+		const headText = await page.locator("div.export-data__text").first().innerText();
+		const mCases = headText.match(/Найдено\s*([\d\s]+)\s*дел/);
+		if (mCases) data.total_cases = mCases[1].replace(/\s/g, "");
+		const mAmount = headText.match(/на сумму\s*(.*?)(?:₽|руб)/);
+		if (mAmount) data.total_amount = mAmount[1].trim();
+	} catch (e) {
+		console.log("Не удалось получить заголовок арбитража:", e);
+	}
+	const maxPages = options.maxPages || 1;
+	const maxTotalCases = options.maxTotalCases || 100;
+	let collectedCases = 0;
+	let currentPage = 1;
+	while (currentPage <= maxPages && collectedCases < maxTotalCases) {
+		const items = page.locator("li.filters-results__list-item");
+		const itemCount = await items.count();
+		for (let i = 0; i < itemCount && collectedCases < maxTotalCases; i++) {
+			items.nth(i);
+			collectedCases++;
+		}
+		if (currentPage >= maxPages || collectedCases >= maxTotalCases) break;
+		const showMore = page.locator("button:has-text('Показать ещё')").first();
+		if (await showMore.count() > 0 && await showMore.isEnabled()) {
+			await showMore.click();
+			await page.waitForTimeout(3e3);
+			currentPage++;
+		} else {
+			const nextBtn = page.locator("button.filters-pagination__nav.--next").first();
+			if (await nextBtn.count() > 0 && await nextBtn.isEnabled()) {
+				await nextBtn.click();
+				await page.waitForTimeout(3e3);
+				currentPage++;
+			} else break;
+		}
+	}
+	return data;
+}
+async function applyArbitrFilters(page, filters) {
+	if (!filters) return;
+	if (filters.sides && filters.sides.length > 0) {
+		const sideValues = filters.sides.map((s) => {
+			switch (s) {
+				case "defendant": return "1";
+				case "plaintiff": return "0";
+				case "third": return "2";
+				default: return null;
+			}
+		}).filter(Boolean);
+		for (const value of sideValues) {
+			const checkbox = page.locator(`input[name="sides"][value="${value}"]`);
+			if (await checkbox.count() > 0) await checkbox.check();
+		}
+	}
+	if (filters.status && filters.status.length > 0) {
+		const statusValues = filters.status.map((s) => {
+			switch (s) {
+				case "in_progress": return "0";
+				case "completed": return "1";
+				default: return null;
+			}
+		}).filter(Boolean);
+		for (const value of statusValues) {
+			const checkbox = page.locator(`input[name="status"][value="${value}"]`);
+			if (await checkbox.count() > 0) await checkbox.check();
+		}
+	}
+	if (filters.outcomes && filters.outcomes.length > 0) for (const outcome of filters.outcomes) {
+		const checkbox = page.locator(`input[name="outcomes"][value="${outcome}"]`);
+		if (await checkbox.count() > 0) await checkbox.check();
+	}
+	if (filters.categories && filters.categories.length > 0) for (const category of filters.categories) {
+		let checkbox = page.locator(`input[name="categories"][value="${category}"]`);
+		if (await checkbox.count() === 0) checkbox = page.locator(`label.choice-input:has-text("${category}") input[name="categories"]`);
+		if (await checkbox.count() > 0) await checkbox.check();
+	}
+	if (filters.search) {
+		const searchInput = page.locator("input[name=\"search\"]");
+		if (await searchInput.count() > 0) {
+			await searchInput.fill(filters.search);
+			await page.locator("button.filters-panel__base-input-btn").first().click();
+		}
+	}
+}
+async function scrapeRusprofile(inn, options) {
+	let browser = getBrowser();
+	if (!browser) {
+		await launchBrowserWithSession("rusprofile");
+		browser = getBrowser();
+	}
+	if (!browser) throw new Error("Не удалось запустить браузер");
+	let page = getPage();
+	if (!page) page = await browser.newPage();
+	try {
+		const loginTrigger = page.locator("#menu-personal-trigger");
+		await loginTrigger.waitFor({
+			state: "visible",
+			timeout: 15e3
+		});
+		if ((await loginTrigger.innerText().catch(() => "")).includes("Войти")) {
+			console.log("Требуется вход. Получаем учётные данные...");
+			let creds = getCredentials("rusprofile");
+			if (!creds) {
+				const envLogin = process.env.VITE_RUSPROFILE_LOGIN;
+				const envPassword = process.env.VITE_RUSPROFILE_PASSWORD;
+				if (envLogin && envPassword) creds = {
+					login: envLogin,
+					password: envPassword
+				};
+			}
+			if (!creds) throw new Error("Нет учётных данных для rusprofile. Добавьте их в .env (VITE_RUSPROFILE_LOGIN, VITE_RUSPROFILE_PASSWORD) или сохраните через интерфейс OSINT.");
+			await login(page, creds.login, creds.password);
+		} else console.log("Сессия восстановлена, вход не требуется.");
+		const companyId = await getCompanyIdByInn(page, inn);
+		const companyUrl = `https://www.rusprofile.ru/id/${companyId}`;
+		await page.goto(companyUrl, {
+			waitUntil: "domcontentloaded",
+			timeout: 6e4
+		});
+		console.log("Перешли на карточку компании, запускаем наблюдатель модальных окон...");
+		startModalWatcher(page);
+		await page.waitForTimeout(2e3);
+		const result = {};
+		console.log("Сбор сводки...");
+		result.summary = await collectSummary(page);
+		console.log("Сбор ФССП...");
+		result.fssp = await collectFssp(page);
+		console.log("Сбор товарных знаков...");
+		result.trademarks = await collectTrademarks(page);
+		console.log("Сбор судов общей юрисдикции...");
+		result.sou = await collectSou(page);
+		console.log("Сбор арбитражных дел (сводка)...");
+		result.arbitration_tile = await collectArbitrTile(page);
+		console.log("Сбор реестров ФНС...");
+		result.fns_registries = await collectReesters(page);
+		console.log("Сбор связей...");
+		result.connections = await collectConnections(page);
+		console.log("Сбор сообщений о сущфактах...");
+		result.facts = await collectFacts(page);
+		console.log("Сбор госзакупок...");
+		result.government_procurement = await collectGz(page);
+		console.log("Сбор лизинга...");
+		result.leasing = await collectLeasing(page);
+		console.log("Сбор залогов...");
+		result.pledges = await collectPledges(page);
+		console.log("Сбор лицензий...");
+		result.licenses = await collectLicenses(page);
+		console.log("Сбор конкурентов...");
+		result.competitors = await collectCompetitors(page);
+		console.log("Сбор проверок...");
+		result.inspections = await collectInspections(page);
+		console.log("Сбор финансов...");
+		result.finance = await collectFinance(page);
+		console.log("Сбор рисков сотрудничества...");
+		result.risks = await collectRisks(page);
+		console.log("Сбор учредителей...");
+		result.founders = await collectFounders(page);
+		console.log("Сбор налогов и сборов...");
+		result.taxes = await collectTaxes(page);
+		console.log("Сбор надёжности...");
+		result.reliability = await collectReliability(page);
+		console.log("Сбор топа компаний отрасли...");
+		result.top_okved = await collectTopOkved(page);
+		console.log("Сбор филиалов и представительств...");
+		result.branches = await collectBranches(page);
+		console.log("Сбор похожих организаций...");
+		result.similar = await collectSimilar(page);
+		console.log("Сбор отчётов и документов...");
+		result.reports = await collectReports(page);
+		console.log("Сбор событий...");
+		result.events = await collectEvents(page);
+		console.log("Сбор краткой справки...");
+		result.resume = await collectResume(page);
+		console.log("Сбор сводки завершен.");
+		if (options?.arbitrDetails) {
+			console.log("Сбор детального списка арбитражных дел...");
+			result.arbitration_details = await collectArbitrDetails(page, companyId, {
+				maxPages: options.maxPages || 1,
+				maxTotalCases: options.maxTotalCases || 100,
+				filters: options.filters
+			});
+		}
+		return result;
+	} catch (error) {
+		console.error("Rusprofile scraping error:", error);
+		return null;
+	}
 }
 //#endregion
 //#region src/main/services/osint/scrapers/kadArbitr.ts
@@ -4624,7 +5845,7 @@ async function scrapeKadArbitr(inn) {
 	const page = await browser.newPage();
 	try {
 		await page.goto("https://kad.arbitr.ru/");
-		const creds = getCredentials("kad");
+		const creds = getCredentials$1("kad");
 		if (creds) {
 			await loginToKadArbitr(page, creds.login, creds.password);
 			await page.goto("https://kad.arbitr.ru/");
@@ -4657,17 +5878,43 @@ async function loginToKadArbitr(page, login, password) {
 	await page.waitForNavigation();
 }
 //#endregion
+//#region src/main/services/osint/scrapers/mosGorsud.ts
+async function scrapeMosGorsud(fio) {
+	const browser = getBrowser();
+	if (!browser) throw new Error("Browser not launched");
+	const page = await browser.newPage();
+	try {
+		await page.goto("https://mos-gorsud.ru/");
+		const creds = getCredentials$1("mosgorsud");
+		if (creds) {
+			await loginToMosGorsud(page, creds.login, creds.password);
+			await page.goto("https://mos-gorsud.ru/");
+		}
+		await page.click("a[href=\"/search\"]");
+		await page.fill("#fio", fio);
+		await page.click("button[type=\"submit\"]");
+		await page.waitForSelector(".search-results", { timeout: 15e3 });
+		return await page.$$eval(".case-item", (items) => {
+			return items.map((item) => ({
+				caseNumber: item.querySelector(".case-number")?.textContent?.trim() || "",
+				court: item.querySelector(".court")?.textContent?.trim() || "",
+				judge: item.querySelector(".judge")?.textContent?.trim() || "",
+				plaintiff: item.querySelector(".plaintiff")?.textContent?.trim() || "",
+				defendant: item.querySelector(".defendant")?.textContent?.trim() || ""
+			}));
+		});
+	} catch (error) {
+		console.error("MosGorsud scraping failed:", error);
+		return [];
+	} finally {
+		await page.close();
+	}
+}
+async function loginToMosGorsud(page, login, password) {}
+//#endregion
 //#region src/main/ipcHandlers/osintHandlers.ts
 function registerOsintHandlers() {
 	electron.ipcMain.handle("osint:open-window", () => {
-		const win = getOsintWindow();
-		if (win && !win.isDestroyed()) {
-			win.focus();
-			return;
-		}
-		createOsintWindow();
-	});
-	electron.ipcMain.handle("open-osint-window", () => {
 		const win = getOsintWindow();
 		if (win && !win.isDestroyed()) {
 			win.focus();
@@ -4697,11 +5944,11 @@ function registerOsintHandlers() {
 			};
 		}
 	});
-	electron.ipcMain.handle("osint:scrape-rusprofile", async (_event, inn) => {
+	electron.ipcMain.handle("osint:scrape-rusprofile", async (_event, inn, options) => {
 		try {
 			return {
 				success: true,
-				data: await scrapeRusprofile(inn)
+				data: await scrapeRusprofile(inn, options)
 			};
 		} catch (error) {
 			return {
@@ -4722,6 +5969,33 @@ function registerOsintHandlers() {
 				error: error.message
 			};
 		}
+	});
+	electron.ipcMain.handle("osint:scrape-mos-gorsud", async (_event, inn) => {
+		try {
+			return {
+				success: true,
+				data: await scrapeMosGorsud(inn)
+			};
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:save-credentials", async (_event, site, login, password) => {
+		try {
+			setCredentials(site, login, password);
+			return { success: true };
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:check-credentials", async (_event, site) => {
+		return { exists: !!getCredentials(site) };
 	});
 }
 //#endregion
@@ -7003,6 +8277,7 @@ electron.app.whenReady().then(() => {
 		};
 		const openOSINT = fileMenu.items.find((i) => i.label === "Открыть OSINT");
 		if (openOSINT) openOSINT.click = () => {
+			console.log("Клик по \"Открыть OSINT\"");
 			const existing = getOsintWindow();
 			if (existing && !existing.isDestroyed()) existing.focus();
 			else {

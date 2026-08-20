@@ -1,3 +1,5 @@
+// wetothemoon-electron/src/pages/IndexPage/IndexPage.tsx
+
 import * as RU from '@/locale/ru.json';
 
 import * as packageJson from '@/../package.json';

@@ -178,12 +178,13 @@ app.whenReady().then(() => {
     const openOSINT = fileMenu.items.find(i => i.label === 'Открыть OSINT');
     if (openOSINT) {
       openOSINT.click = () => {
+        console.log('Клик по "Открыть OSINT"'); // временный лог
         const existing = getOsintWindow();
         if (existing && !existing.isDestroyed()) {
           existing.focus();
         } else {
           const win = createOsintWindow();
-          if (win) applyMenuToWindow(win, osintWindowMenuTemplate); // используем специальный шаблон
+          if (win) applyMenuToWindow(win, osintWindowMenuTemplate);
         }
       };
     }

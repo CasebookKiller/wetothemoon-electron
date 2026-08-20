@@ -1,8 +1,7 @@
 import path from 'path';
 import { app, BrowserWindow, Menu } from 'electron';
-import { mainMenuTemplate } from '../menus/windowMenus'; // или специальный шаблон, если создадите
+import { osintWindowMenuTemplate } from '../menus/windowMenus'; // или mainMenuTemplate
 import { DEV_SERVER_URL, getMainWindowProdPath } from './paths';
-import { osintWindowMenuTemplate } from '../menus/windowMenus';
 
 let osintWindow: BrowserWindow | null = null;
 
@@ -11,6 +10,7 @@ const preloadPath = app.isPackaged
   : path.join(__dirname, '../../dist/main/preload.js');
 
 export const createOsintWindow = (): BrowserWindow => {
+  // Если окно уже существует, просто фокусируемся
   if (osintWindow && !osintWindow.isDestroyed()) {
     osintWindow.focus();
     return osintWindow;
@@ -27,16 +27,16 @@ export const createOsintWindow = (): BrowserWindow => {
     },
   });
 
+  // В dev-режиме загружаем URL dev-сервера с hash-маршрутом
   if (process.env.NODE_ENV === 'development') {
     osintWindow.loadURL(`${DEV_SERVER_URL}/#/osint`);
   } else {
+    // В prod обязательно передаём hash, чтобы открылась нужная страница
     osintWindow.loadFile(getMainWindowProdPath(), { hash: '/osint' });
   }
 
-  // внутри createOsintWindow после создания окна:
-  const menu = Menu.buildFromTemplate(osintWindowMenuTemplate);
+  const menu = Menu.buildFromTemplate(osintWindowMenuTemplate); // или mainMenuTemplate
   osintWindow.setMenu(menu);
-
 
   osintWindow.on('closed', () => {
     osintWindow = null;

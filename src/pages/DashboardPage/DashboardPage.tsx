@@ -1,3 +1,5 @@
+// wetothemoon-electron/src/pages/DashboardPage/DashboardPage.tsx
+
 import { ButtonsWindows } from '@/components/DASHBOARD/ButtonsWindows/ButtonsWindows';
 import { FC, useEffect, useState } from 'react';
 
