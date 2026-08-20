@@ -5837,6 +5837,103 @@ async function collectArbitrDetails(page, companyId, options = {}) {
 	}
 	return data;
 }
+async function collectConnectionsDetails(page, companyId) {
+	const data = {
+		total_organizations: "",
+		connections: []
+	};
+	const connectionsUrl = `https://www.rusprofile.ru/connections/${companyId}`;
+	await page.goto(connectionsUrl, {
+		waitUntil: "domcontentloaded",
+		timeout: 6e4
+	});
+	await page.waitForSelector("ul.similar-table-container", { timeout: 15e3 });
+	await page.waitForTimeout(1e3);
+	let attempts = 0;
+	const maxAttempts = 10;
+	while (attempts < maxAttempts) {
+		const hiddenButtons = page.locator("button.similar-more-btn:not(.hidden), .btn.similar-more-btn:not(.hidden)");
+		const count = await hiddenButtons.count();
+		if (count === 0) break;
+		for (let i = 0; i < count; i++) {
+			const btn = hiddenButtons.nth(i);
+			try {
+				if (await btn.isVisible()) {
+					await btn.click();
+					await page.waitForTimeout(500);
+				}
+			} catch (e) {
+				console.warn("Не удалось нажать \"Показать ещё\":", e);
+			}
+		}
+		attempts++;
+		await page.waitForTimeout(1e3);
+	}
+	const parsed = await page.evaluate(() => {
+		const getText = (el, selector) => {
+			const node = el ? el.querySelector(selector) : null;
+			return node ? node.textContent?.trim() || "" : "";
+		};
+		const totalEl = document.querySelector(".export-data__text span");
+		const totalText = totalEl ? totalEl.textContent?.trim() || "" : "";
+		const connections = [];
+		document.querySelectorAll("li.similar-item").forEach((similarItem) => {
+			similarItem.querySelectorAll("li.similar-item-sub-item").forEach((subItem) => {
+				const titleEl = subItem.querySelector("a.title-sub, span.title-sub");
+				const title = titleEl ? titleEl.textContent?.trim() || "" : "";
+				const descEl = subItem.querySelector("span.description");
+				const description = descEl ? descEl.textContent?.replace(/\s+/g, " ").trim() : "";
+				const organizations = [];
+				subItem.querySelectorAll("ul.list-element__row > li.list-element").forEach((org) => {
+					const nameEl = org.querySelector("a.list-element__title");
+					const name = nameEl ? nameEl.textContent?.trim() || "" : "";
+					let status = "";
+					const liquidatedEl = org.querySelector(".liquidated.danger, .liquidating.warning, .reorganizing.warning");
+					if (liquidatedEl) status = liquidatedEl.textContent?.trim() || "";
+					const activity = getText(org, ".list-element__text");
+					const address = getText(org, ".list-element__address");
+					const inn = getText(org, ".list-element__row-info span:nth-child(1)");
+					const ogrn = getText(org, ".list-element__row-info span:nth-child(2)");
+					const regDate = getText(org, ".list-element__row-info span:nth-child(3)");
+					const infoBox = org.querySelector(".list-element__info-box");
+					const roles = [];
+					if (infoBox) infoBox.querySelectorAll(".list-element__info-box-item").forEach((item) => {
+						const role = item.querySelector("span")?.textContent?.trim() || "";
+						const participant = item.querySelector("mark")?.textContent?.trim() || "";
+						const period = item.querySelector(".time")?.textContent?.trim() || "";
+						if (role || participant) roles.push({
+							role,
+							participant,
+							period
+						});
+					});
+					if (name || inn) organizations.push({
+						name,
+						status,
+						activity,
+						address,
+						inn,
+						ogrn,
+						registration_date: regDate,
+						roles
+					});
+				});
+				if (title || organizations.length > 0) connections.push({
+					title,
+					description,
+					organizations
+				});
+			});
+		});
+		return {
+			total_organizations: totalText,
+			connections
+		};
+	});
+	data.total_organizations = parsed.total_organizations;
+	data.connections = parsed.connections;
+	return data;
+}
 async function scrapeRusprofile(inn, options) {
 	let browser = getBrowser();
 	if (!browser) {
@@ -5934,6 +6031,10 @@ async function scrapeRusprofile(inn, options) {
 				maxTotalCases: options.maxTotalCases || 100,
 				filters: options.filters
 			});
+		}
+		if (options?.connectionsDetails) {
+			console.log("Сбор детальных связей...");
+			result.connections_details = await collectConnectionsDetails(page, companyId);
 		}
 		return result;
 	} catch (error) {
