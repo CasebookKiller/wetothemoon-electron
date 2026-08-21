@@ -81,4 +81,31 @@ export function registerGatewayHandlers(): void {
       return { success: false, error: (error as Error).message };
     }
   });
+
+  ipcMain.handle('gateway:get-current-model', async () => {
+    try {
+      const data = await service.getCurrentModel();
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('gateway:get-deep-thinking', async () => {
+    try {
+      const data = await service.getDeepThinking();
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('gateway:get-search', async () => {
+    try {
+      const data = await service.getSearch();
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
 }

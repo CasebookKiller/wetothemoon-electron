@@ -365,6 +365,9 @@ try {
     gatewaySelectModel: (modelType: string) => ipcRenderer.invoke('gateway:select-model', modelType),
     gatewaySetDeepThinking: (enabled: boolean) => ipcRenderer.invoke('gateway:set-deep-thinking', enabled),
     gatewaySetSearch: (enabled: boolean) => ipcRenderer.invoke('gateway:set-search', enabled),
+    gatewayGetCurrentModel: () => ipcRenderer.invoke('gateway:get-current-model'),
+    gatewayGetDeepThinking: () => ipcRenderer.invoke('gateway:get-deep-thinking'),
+    gatewayGetSearch: () => ipcRenderer.invoke('gateway:get-search'),
 
   });
 

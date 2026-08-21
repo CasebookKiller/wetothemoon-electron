@@ -9074,12 +9074,44 @@ var DeepSeekService = class DeepSeekService {
 	async setSearch(enabled) {
 		if (!this.page) throw new Error("Браузер не запущен");
 		const toggle = this.page.locator("div.ds-toggle-button:has(span:has-text(\"Умный поиск\"))").first();
+		if (!await toggle.isVisible().catch(() => false)) {
+			console.warn("[DeepSeek] Кнопка \"Умный поиск\" недоступна в текущем режиме");
+			return;
+		}
 		await toggle.waitFor({
 			state: "visible",
 			timeout: 1e4
 		});
 		if (await toggle.getAttribute("aria-pressed") === "true" !== enabled) await toggle.click({ force: true });
 		console.log(`[DeepSeek] Умный поиск: ${enabled}`);
+	}
+	/**
+	* Возвращает текущий выбранный режим модели.
+	*/
+	async getCurrentModel() {
+		if (!this.page) throw new Error("Браузер не запущен");
+		for (const type of [
+			"default",
+			"expert",
+			"vision"
+		]) if (await this.page.locator(`[data-model-type="${type}"][role="radio"]`).getAttribute("aria-checked").catch(() => "false") === "true") return type;
+		return "default";
+	}
+	/**
+	* Возвращает состояние "Глубокое мышление".
+	*/
+	async getDeepThinking() {
+		if (!this.page) return false;
+		return await this.page.locator("div.ds-toggle-button:has(span:has-text(\"Глубокое мышление\"))").first().getAttribute("aria-pressed").catch(() => "false") === "true";
+	}
+	/**
+	* Возвращает состояние "Умный поиск" (может быть скрыт в режиме expert).
+	*/
+	async getSearch() {
+		if (!this.page) return false;
+		const toggle = this.page.locator("div.ds-toggle-button:has(span:has-text(\"Умный поиск\"))").first();
+		if (!await toggle.isVisible().catch(() => false)) return false;
+		return await toggle.getAttribute("aria-pressed").catch(() => "false") === "true";
 	}
 };
 //#endregion
@@ -9176,6 +9208,45 @@ function registerGatewayHandlers() {
 		try {
 			await service.setSearch(enabled);
 			return { success: true };
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("gateway:get-current-model", async () => {
+		try {
+			return {
+				success: true,
+				data: await service.getCurrentModel()
+			};
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("gateway:get-deep-thinking", async () => {
+		try {
+			return {
+				success: true,
+				data: await service.getDeepThinking()
+			};
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("gateway:get-search", async () => {
+		try {
+			return {
+				success: true,
+				data: await service.getSearch()
+			};
 		} catch (error) {
 			return {
 				success: false,

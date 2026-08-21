@@ -1,27 +1,28 @@
-// src/pages/GatewayPage/GatewayPage.tsx
-
 import React, { useState, useEffect } from 'react';
 import { Panel } from 'primereact/panel';
 import { Button } from 'primereact/button';
-import { ListBox } from 'primereact/listbox';
-import { Dropdown } from 'primereact/dropdown';
-import { ToggleButton } from 'primereact/togglebutton';
 import { InputTextarea } from 'primereact/inputtextarea';
-import { Divider } from 'primereact/divider';
+import { ToggleButton } from 'primereact/togglebutton';
+import { ListBox } from 'primereact/listbox';
+
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
 
 export const GatewayPage: React.FC = () => {
   const [status, setStatus] = useState('stopped');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [message, setMessage] = useState('');
-  const [response, setResponse] = useState('');
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [conversations, setConversations] = useState<{ id: string; title: string }[]>([]);
+  const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
+  const [modelType, setModelType] = useState<'default' | 'expert' | 'vision'>('default');
+  const [deepThinking, setDeepThinking] = useState(true);
+  const [search, setSearch] = useState(true);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
-  const [conversations, setConversations] = useState<{ id: string; title: string }[]>([]);
-  const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
-  const [modelType, setModelType] = useState<string>('default');
-  const [deepThinking, setDeepThinking] = useState(false);
-  const [search, setSearch] = useState(true);
 
   const api = (window as any).electronAPI;
 
@@ -40,6 +41,26 @@ export const GatewayPage: React.FC = () => {
     const interval = setInterval(updateStatus, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  const syncModelState = async () => {
+    try {
+      const model = await api.gatewayGetCurrentModel();
+      if (model.success) setModelType(model.data);
+      const dt = await api.gatewayGetDeepThinking();
+      if (dt.success) setDeepThinking(dt.data);
+      const st = await api.gatewayGetSearch();
+      if (st.success) setSearch(st.data);
+    } catch (e) {
+      // ignore
+    }
+  };
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      syncModelState();
+      handleRefreshConversations();
+    }
+  }, [isLoggedIn]);
 
   const handleLaunch = async () => {
     setLoading(true);
@@ -68,6 +89,7 @@ export const GatewayPage: React.FC = () => {
       if (result.success) {
         setStatus('stopped');
         setIsLoggedIn(false);
+        setMessages([]);
       } else {
         setError(result.error || 'Ошибка остановки');
       }
@@ -82,11 +104,12 @@ export const GatewayPage: React.FC = () => {
     if (!message.trim()) return;
     setSending(true);
     setError('');
-    setResponse('');
+    // Добавляем сообщение пользователя в ленту
+    setMessages((prev) => [...prev, { role: 'user', content: message }]);
     try {
       const result = await api.gatewaySendMessage(message);
       if (result.success) {
-        setResponse(result.data);
+        setMessages((prev) => [...prev, { role: 'assistant', content: result.data }]);
       } else {
         setError(result.error || 'Ошибка отправки');
       }
@@ -94,6 +117,7 @@ export const GatewayPage: React.FC = () => {
       setError((e as Error).message);
     } finally {
       setSending(false);
+      setMessage('');
     }
   };
 
@@ -121,13 +145,13 @@ export const GatewayPage: React.FC = () => {
     }
   };
 
-  const handleSelectModel = async (value: string) => {
+  const handleSelectModel = async (value: 'default' | 'expert' | 'vision') => {
     setModelType(value);
+    if (value === 'expert') setSearch(false);
     try {
-      const result = await api.gatewaySelectModel(value);
-      if (!result.success) {
-        setError(result.error || 'Ошибка выбора модели');
-      }
+      await api.gatewaySelectModel(value);
+      // Синхронизируем состояния после смены режима
+      await syncModelState();
     } catch (e) {
       setError((e as Error).message);
     }
@@ -151,17 +175,9 @@ export const GatewayPage: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    if (isLoggedIn) {
-      handleRefreshConversations();
-    }
-  }, [isLoggedIn]);
-
   return (
     <React.Fragment>
-      <div className="app p-0" />
-
-      {/* Панель управления */}
+      {/* Панель управления браузером */}
       <Panel className="shadow-5 mx-1" header="Браузер DeepSeek">
         <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
           <div className="flex-1 flex flex-column gap-1 xl:mr-8">
@@ -189,113 +205,134 @@ export const GatewayPage: React.FC = () => {
         </div>
       </Panel>
 
-      <div className="app p-0" />
-
-      {/* Панель отправки сообщения */}
-      <Panel className="shadow-5 mx-1" header="Отправка сообщения">
-        <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
-          <div className="flex-1 flex flex-column gap-1 xl:mr-8">
-            <InputTextarea
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              rows={4}
-              autoResize
-              placeholder="Введите сообщение для DeepSeek"
-              disabled={!isLoggedIn || sending}
-              className="w-full"
-            />
-            <div className="mt-2">
-              <Button
-                label={sending ? 'Отправка...' : 'Отправить'}
-                icon={sending ? 'pi pi-spin pi-spinner' : 'pi pi-send'}
-                className="p-button-lg w-full p-button-raised p-button-accent"
-                onClick={handleSend}
-                disabled={!isLoggedIn || !message.trim() || sending}
-              />
-            </div>
-          </div>
-        </div>
-      </Panel>
-
-      {/* Панель диалогов */}
-      <Panel className="shadow-5 mx-1" header="Диалоги">
-        <div className="p-2">
-          <Button
-            label="Обновить"
-            icon="pi pi-refresh"
-            className="p-button-sm p-button-raised p-button-accent"
-            onClick={handleRefreshConversations}
-          />
-          <ListBox
-            value={selectedConversation}
-            options={conversations}
-            onChange={(e) => {
-              setSelectedConversation(e.value);
-              if (e.value) handleOpenConversation(e.value);
-            }}
-            optionLabel="title"
-            optionValue="id"
-            style={{ width: '100%', marginTop: '10px' }}
-          />
-        </div>
-      </Panel>
-
-      <div className="app p-0" />
-
-      {/* Панель настроек модели */}
-      <Panel className="shadow-5 mx-1" header="Модель и параметры">
-        <div className="p-2 flex flex-column gap-3">
-          <Dropdown
-            value={modelType}
-            options={[
-              { label: 'Быстрый', value: 'default' },
-              { label: 'Эксперт', value: 'expert' },
-              { label: 'Распознавание', value: 'vision' },
-            ]}
-            onChange={(e) => handleSelectModel(e.value)}
-            placeholder="Выберите режим"
-            className="w-full"
-          />
-          <div className="flex flex-wrap gap-2">
-            <ToggleButton
-              checked={deepThinking}
-              onChange={(e) => handleDeepThinkingChange(e.value)}
-              onLabel="Глубокое мышление"
-              offLabel="Глубокое мышление"
-              className="p-button-sm"
-            />
-            <ToggleButton
-              checked={search}
-              onChange={(e) => handleSearchChange(e.value)}
-              onLabel="Умный поиск"
-              offLabel="Умный поиск"
-              className="p-button-sm"
-            />
-          </div>
-        </div>
-      </Panel>
       {error && (
         <div className="app p-0">
           <div className="p-error mx-2">{error}</div>
         </div>
       )}
 
-      {/* Ответ */}
-      {response && (
-        <React.Fragment>
-          <div className="app p-0" />
-          <Panel className="shadow-5 mx-1" header="Ответ DeepSeek">
-            <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
-              <div className="flex-1 flex flex-column gap-1 xl:mr-8">
-                <pre className="app theme-hint-color p-3 border-round" style={{ whiteSpace: 'pre-wrap' }}>
-                  {response}
-                </pre>
+      {/* Основной макет: слева диалоги, справа чат */}
+      <div className="grid mx-1 mt-2" style={{ minHeight: '600px' }}>
+        {/* Боковая панель диалогов */}
+        <div className="col-12 md:col-3">
+          <Panel className="shadow-5 h-full" header="Диалоги">
+            <div className="p-2 flex flex-column" style={{ height: '100%' }}>
+              <Button
+                label="Обновить"
+                icon="pi pi-refresh"
+                className="p-button-sm p-button-raised p-button-accent mb-2"
+                onClick={handleRefreshConversations}
+                disabled={!isLoggedIn}
+              />
+              <ListBox
+                value={selectedConversation}
+                options={conversations}
+                onChange={(e) => {
+                  setSelectedConversation(e.value);
+                  if (e.value) handleOpenConversation(e.value);
+                }}
+                optionLabel="title"
+                optionValue="id"
+                style={{ width: '100%', flex: '1 1 auto' }}
+                listStyle={{ maxHeight: '400px' }}
+              />
+            </div>
+          </Panel>
+        </div>
+
+        {/* Область чата */}
+        <div className="col-12 md:col-9">
+          <Panel className="shadow-5 h-full" header="Чат DeepSeek">
+            <div className="flex flex-column h-full p-2">
+              {/* Выбор режима */}
+              <div className="flex flex-wrap justify-content-center gap-3 mb-3">
+                {[
+                  { type: 'default', label: 'Быстрый', icon: 'pi pi-bolt' },
+                  { type: 'expert', label: 'Эксперт', icon: 'pi pi-star' },
+                  { type: 'vision', label: 'Распознавание', icon: 'pi pi-eye' },
+                ].map((mode) => (
+                  <div
+                    key={mode.type}
+                    className={`flex align-items-center gap-2 px-4 py-2 border-round-3xl cursor-pointer ${
+                      modelType === mode.type ? 'bg-primary text-white' : 'surface-100 text-700'
+                    }`}
+                    onClick={() => handleSelectModel(mode.type as 'default' | 'expert' | 'vision')}
+                  >
+                    <i className={mode.icon} />
+                    <span>{mode.label}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Сообщения */}
+              <div
+                className="flex-1 overflow-y-auto p-3 surface-100 border-round"
+                style={{ minHeight: '300px' }}
+              >
+                {messages.length === 0 ? (
+                  <p className="text-center text-color-secondary">Нет сообщений</p>
+                ) : (
+                  messages.map((msg, idx) => (
+                    <div
+                      key={idx}
+                      className={`flex ${msg.role === 'user' ? 'justify-content-end' : 'justify-content-start'} mb-3`}
+                    >
+                      <div
+                        className={`p-3 border-round-3xl max-w-30rem ${
+                          msg.role === 'user'
+                            ? 'bg-primary text-white'
+                            : 'surface-200 text-900'
+                        }`}
+                        style={{ whiteSpace: 'pre-wrap' }}
+                      >
+                        {msg.content}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Переключатели */}
+              <div className="flex flex-wrap gap-3 mt-3">
+                <ToggleButton
+                  checked={deepThinking}
+                  onChange={(e) => handleDeepThinkingChange(e.value)}
+                  onLabel="Глубокое мышление"
+                  offLabel="Глубокое мышление"
+                  className="p-button-sm p-button-text"
+                />
+                <ToggleButton
+                  checked={search}
+                  onChange={(e) => handleSearchChange(e.value)}
+                  onLabel="Умный поиск"
+                  offLabel="Умный поиск"
+                  className="p-button-sm p-button-text"
+                  disabled={modelType === 'expert'}
+                />
+              </div>
+
+              {/* Поле ввода */}
+              <div className="flex align-items-end gap-2 mt-3">
+                <InputTextarea
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  rows={2}
+                  autoResize
+                  placeholder="Сообщение для DeepSeek"
+                  disabled={!isLoggedIn || sending}
+                  className="flex-1"
+                />
+                <Button
+                  icon="pi pi-arrow-up"
+                  className="p-button-rounded p-button-lg p-button-primary"
+                  onClick={handleSend}
+                  disabled={!isLoggedIn || !message.trim() || sending}
+                />
               </div>
             </div>
           </Panel>
-        </React.Fragment>
-      )}
-      
+        </div>
+      </div>
     </React.Fragment>
   );
 };

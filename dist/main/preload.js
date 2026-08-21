@@ -260,7 +260,10 @@ try {
 		gatewayOpenConversation: (id) => electron.ipcRenderer.invoke("gateway:open-conversation", id),
 		gatewaySelectModel: (modelType) => electron.ipcRenderer.invoke("gateway:select-model", modelType),
 		gatewaySetDeepThinking: (enabled) => electron.ipcRenderer.invoke("gateway:set-deep-thinking", enabled),
-		gatewaySetSearch: (enabled) => electron.ipcRenderer.invoke("gateway:set-search", enabled)
+		gatewaySetSearch: (enabled) => electron.ipcRenderer.invoke("gateway:set-search", enabled),
+		gatewayGetCurrentModel: () => electron.ipcRenderer.invoke("gateway:get-current-model"),
+		gatewayGetDeepThinking: () => electron.ipcRenderer.invoke("gateway:get-deep-thinking"),
+		gatewayGetSearch: () => electron.ipcRenderer.invoke("gateway:get-search")
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {

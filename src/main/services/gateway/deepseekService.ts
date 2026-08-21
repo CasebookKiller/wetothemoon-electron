@@ -525,12 +525,56 @@ export class DeepSeekService {
     if (!this.page) throw new Error('Браузер не запущен');
 
     const toggle = this.page.locator('div.ds-toggle-button:has(span:has-text("Умный поиск"))').first();
-    await toggle.waitFor({ state: 'visible', timeout: 10000 });
+    const isVisible = await toggle.isVisible().catch(() => false);
+    if (!isVisible) {
+      console.warn('[DeepSeek] Кнопка "Умный поиск" недоступна в текущем режиме');
+      return;
+    }
 
+    await toggle.waitFor({ state: 'visible', timeout: 10000 });
     const isPressed = (await toggle.getAttribute('aria-pressed')) === 'true';
     if (isPressed !== enabled) {
       await toggle.click({ force: true });
     }
     console.log(`[DeepSeek] Умный поиск: ${enabled}`);
+  }
+
+  // В классе DeepSeekService добавьте:
+
+  /**
+   * Возвращает текущий выбранный режим модели.
+   */
+  async getCurrentModel(): Promise<'default' | 'expert' | 'vision'> {
+    if (!this.page) throw new Error('Браузер не запущен');
+
+    const types: ('default' | 'expert' | 'vision')[] = ['default', 'expert', 'vision'];
+    for (const type of types) {
+      const radio = this.page.locator(`[data-model-type="${type}"][role="radio"]`);
+      const isChecked = await radio.getAttribute('aria-checked').catch(() => 'false');
+      if (isChecked === 'true') return type;
+    }
+    return 'default';
+  }
+
+  /**
+   * Возвращает состояние "Глубокое мышление".
+   */
+  async getDeepThinking(): Promise<boolean> {
+    if (!this.page) return false;
+    const toggle = this.page.locator('div.ds-toggle-button:has(span:has-text("Глубокое мышление"))').first();
+    const pressed = await toggle.getAttribute('aria-pressed').catch(() => 'false');
+    return pressed === 'true';
+  }
+
+  /**
+   * Возвращает состояние "Умный поиск" (может быть скрыт в режиме expert).
+   */
+  async getSearch(): Promise<boolean> {
+    if (!this.page) return false;
+    const toggle = this.page.locator('div.ds-toggle-button:has(span:has-text("Умный поиск"))').first();
+    const visible = await toggle.isVisible().catch(() => false);
+    if (!visible) return false;
+    const pressed = await toggle.getAttribute('aria-pressed').catch(() => 'false');
+    return pressed === 'true';
   }
 }
