@@ -8742,12 +8742,13 @@ var DeepSeekService = class DeepSeekService {
 	*/
 	async isAuthenticated() {
 		if (!this.page) return false;
-		try {
-			await this.page.waitForSelector("textarea[placeholder*=\"Сообщение\"], textarea[placeholder*=\"Message\"], textarea[placeholder*=\"Send\"]", { timeout: 5e3 });
+		const currentUrl = this.page.url();
+		if (currentUrl.includes("/sign_in") || currentUrl.includes("/sign-in")) return false;
+		for (const selector of ["textarea[placeholder*=\"Сообщение\"], textarea[placeholder*=\"Message\"]", "div._2afd28d"]) try {
+			await this.page.waitForSelector(selector, { timeout: 8e3 });
 			return true;
-		} catch {
-			return false;
-		}
+		} catch {}
+		return false;
 	}
 	/**
 	* Ожидает, пока капча исчезнет из DOM.
@@ -8922,6 +8923,7 @@ var DeepSeekService = class DeepSeekService {
 		this.page = await this.context.newPage();
 		console.log("[DeepSeek] Открываем главную страницу");
 		await this.gotoWithTimeout(DEEPSEEK_URL, 2e4);
+		await this.page.waitForTimeout(3e3);
 		console.log("[DeepSeek] Главная страница загружена (или таймаут проигнорирован)");
 		this.isLoggedIn = await this.isAuthenticated();
 		if (!this.isLoggedIn) {

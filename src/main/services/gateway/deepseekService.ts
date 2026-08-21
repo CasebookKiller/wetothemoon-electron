@@ -104,15 +104,29 @@ export class DeepSeekService {
    */
   private async isAuthenticated(): Promise<boolean> {
     if (!this.page) return false;
-    try {
-      await this.page.waitForSelector(
-        'textarea[placeholder*="Сообщение"], textarea[placeholder*="Message"], textarea[placeholder*="Send"]',
-        { timeout: 5000 }
-      );
-      return true;
-    } catch {
+
+    // Если URL содержит sign_in, точно не авторизованы
+    const currentUrl = this.page.url();
+    if (currentUrl.includes('/sign_in') || currentUrl.includes('/sign-in')) {
       return false;
     }
+
+    // Проверяем наличие textarea или кнопки профиля
+    const selectors = [
+      'textarea[placeholder*="Сообщение"], textarea[placeholder*="Message"]',
+      'div._2afd28d', // кнопка профиля (если textarea не виден)
+    ];
+
+    for (const selector of selectors) {
+      try {
+        await this.page.waitForSelector(selector, { timeout: 8000 });
+        return true;
+      } catch {
+        // пробуем следующий
+      }
+    }
+
+    return false;
   }
 
   /**
@@ -317,6 +331,8 @@ export class DeepSeekService {
     this.page = await this.context!.newPage();
     console.log('[DeepSeek] Открываем главную страницу');
     await this.gotoWithTimeout(DEEPSEEK_URL, 20000);
+    // Даём время на загрузку интерфейса
+    await this.page.waitForTimeout(3000);
     console.log('[DeepSeek] Главная страница загружена (или таймаут проигнорирован)');
 
     this.isLoggedIn = await this.isAuthenticated();
