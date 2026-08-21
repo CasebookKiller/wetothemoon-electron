@@ -16,6 +16,7 @@ import { OllamaPage } from '@/pages/OllamaPage/OllamaPage';
 import { TasksPage } from '@/pages/TasksPage/TasksPage';
 import { TradingAssistantPage } from '@/pages/TradingAssistantPage/TradingAssistantPage';
 import { OSINTPage } from '@/pages/OSINTPage/OSINTPage';
+import { GatewayPage } from '@/pages/GatewayPage/GatewayPage';
 
 export interface Route {
   path: string;
@@ -37,8 +38,9 @@ const dashboard: Route = { path: '/dashboard', Component: DashboardPage, title: 
 const pg: Route = { path: '/pg', Component: PromptGeneratorPage, title: 'Генератор запросов' };
 const ollama: Route = { path: '/ollama', Component: OllamaPage, title: 'Ollama' };
 const tasks: Route = { path: '/tasks', Component: TasksPage, title: 'План полёта' };
-const tradingAssistant: Route = { path: '/trading-assistant', Component: TradingAssistantPage, title: 'Трейдер' }
-const osint: Route = { path: '/osint', Component: OSINTPage, title: 'OSINT' }
+const tradingAssistant: Route = { path: '/trading-assistant', Component: TradingAssistantPage, title: 'Трейдер' };
+const osint: Route = { path: '/osint', Component: OSINTPage, title: 'OSINT' };
+const gateway: Route = { path: '/gateway', Component: GatewayPage, title: 'Шлюз' };
 
 export const routes: Route[] = [];
 

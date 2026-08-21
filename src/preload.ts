@@ -354,6 +354,12 @@ try {
     checkOsintCredentials: (site: string) =>
       ipcRenderer.invoke('osint:check-credentials', site),
     
+    openGatewayWindow: () => ipcRenderer.invoke('gateway:open-window'),
+    gatewayLaunch: () => ipcRenderer.invoke('gateway:launch'),
+    gatewayClose: () => ipcRenderer.invoke('gateway:close'),
+    gatewaySendMessage: (message: string) => ipcRenderer.invoke('gateway:send-message', message),
+    gatewayGetStatus: () => ipcRenderer.invoke('gateway:get-status'),
+
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

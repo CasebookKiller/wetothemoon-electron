@@ -11,12 +11,12 @@
   - [ ] Зафиксировано начальное состояние коммитом
 
 - [ ] **Этап 2. Базовое окно**
-  - [ ] Создан `src/main/windows/gatewayWindow.ts` по аналогии с `osintWindow.ts`
-  - [ ] Добавлен пункт меню «Открыть Шлюз» в `windowMenus.ts`
-  - [ ] Добавлен IPC-обработчик `gateway:open-window`
-  - [ ] В `preload.ts` добавлен метод `openGatewayWindow`
-  - [ ] Создана страница `GatewayPage.tsx` с заглушкой (кнопка «Запустить браузер»)
-  - [ ] Добавлен маршрут `#/gateway` в `routes.tsx` (если требуется)
+  - [x] Создан `src/main/windows/gatewayWindow.ts` по аналогии с `osintWindow.ts`
+  - [x] Добавлен пункт меню «Открыть Шлюз» в `windowMenus.ts`
+  - [x] Добавлен IPC-обработчик `gateway:open-window`
+  - [x] В `preload.ts` добавлен метод `openGatewayWindow`
+  - [x] Создана страница `GatewayPage.tsx` с заглушкой (кнопка «Запустить браузер»)
+  - [x] Добавлен маршрут `#/gateway` в `routes.tsx` (если требуется)
   - [ ] Обновлён ROADMAP, сделан коммит
 
 - [ ] **Этап 3. Интеграция Playwright и DeepSeek-сервис**

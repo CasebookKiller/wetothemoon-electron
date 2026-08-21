@@ -5848,8 +5848,25 @@ async function collectConnectionsDetails(page, companyId) {
 		waitUntil: "domcontentloaded",
 		timeout: 6e4
 	});
-	await page.waitForSelector("ul.similar-table-container", { timeout: 15e3 });
-	await page.waitForTimeout(1e3);
+	await page.waitForTimeout(2e3);
+	const tableButton = page.locator("span[data-show=\"table\"]");
+	if (await tableButton.count() > 0) {
+		const container = page.locator("ul.similar-table-container");
+		if (!(await container.count() > 0 && await container.evaluate((el) => el.classList.contains("active")))) {
+			console.log("Переключаемся на табличный вид");
+			try {
+				await tableButton.first().click({ force: true });
+			} catch (e) {
+				console.warn("Обычный клик не удался, пробуем JavaScript-клик");
+				await page.evaluate(() => {
+					const btn = document.querySelector("span[data-show=\"table\"]");
+					if (btn instanceof HTMLElement) btn.click();
+				});
+			}
+			await page.waitForSelector("ul.similar-table-container.active", { timeout: 15e3 });
+			await page.waitForTimeout(1e3);
+		} else console.log("Табличный вид уже активен");
+	} else console.warn("Кнопка переключения на таблицу не найдена");
 	let attempts = 0;
 	const maxAttempts = 10;
 	while (attempts < maxAttempts) {
@@ -5861,6 +5878,7 @@ async function collectConnectionsDetails(page, companyId) {
 			try {
 				if (await btn.isVisible()) {
 					await btn.click();
+					console.log(`Нажата кнопка «Показать ещё» (попытка ${attempts + 1}, кнопка ${i + 1})`);
 					await page.waitForTimeout(800);
 				}
 			} catch (e) {
@@ -5870,6 +5888,13 @@ async function collectConnectionsDetails(page, companyId) {
 		attempts++;
 		await page.waitForTimeout(500);
 	}
+	const debugCounts = await page.evaluate(() => ({
+		similarItems: document.querySelectorAll("li.similar-item").length,
+		subItems: document.querySelectorAll("li.similar-item-sub-item").length,
+		orgItems: document.querySelectorAll("ul.list-element__row > li.list-element").length,
+		totalText: document.querySelector(".export-data__text span")?.textContent?.trim() || ""
+	}));
+	console.log("Отладка после раскрытия:", debugCounts);
 	const parsed = await page.evaluate(() => {
 		const getText = (el, selector) => {
 			const node = el ? el.querySelector(selector) : null;
@@ -5948,6 +5973,187 @@ async function collectConnectionsDetails(page, companyId) {
 	console.log(`Собрано связей: ${data.connections.length}, организаций всего: ${data.total_organizations}`);
 	return data;
 }
+async function applySouFilters(page, filters) {
+	if (!filters) return;
+	if (filters.sides && Array.isArray(filters.sides) && filters.sides.length > 0) {
+		const sideValues = filters.sides.map((s) => {
+			switch (s) {
+				case "defendant": return "1";
+				case "plaintiff": return "0";
+				case "third": return "2";
+				default: return null;
+			}
+		}).filter(Boolean);
+		for (const value of sideValues) {
+			const checkbox = page.locator(`input[name="sides"][value="${value}"]`);
+			if (await checkbox.count() > 0) {
+				await checkbox.check();
+				await page.waitForTimeout(500);
+			}
+		}
+	}
+	if (filters.status && Array.isArray(filters.status) && filters.status.length > 0) {
+		const statusValues = filters.status.map((s) => {
+			switch (s) {
+				case "in_progress": return "0";
+				case "completed": return "1";
+				default: return null;
+			}
+		}).filter(Boolean);
+		for (const value of statusValues) {
+			const checkbox = page.locator(`input[name="status"][value="${value}"]`);
+			if (await checkbox.count() > 0) {
+				await checkbox.check();
+				await page.waitForTimeout(500);
+			}
+		}
+	}
+	if (filters.search && filters.search.trim() !== "") {
+		const searchInput = page.locator("input[name=\"search\"]");
+		if (await searchInput.count() > 0) {
+			await searchInput.fill(filters.search.trim());
+			await page.locator("button.filters-panel__base-input-btn").first().click();
+			await page.waitForTimeout(1e3);
+		}
+	}
+}
+async function collectSouDetails(page, companyId, options = {}) {
+	console.log(`Сбор детальных судов общей юрисдикции для компании ID ${companyId}...`);
+	const data = {
+		total_cases: "",
+		cases: []
+	};
+	const souUrl = `https://www.rusprofile.ru/sou/${companyId}`;
+	await page.goto(souUrl, {
+		waitUntil: "domcontentloaded",
+		timeout: 6e4
+	});
+	await page.waitForSelector("ul.filters-results__list", { timeout: 15e3 });
+	await page.waitForTimeout(1e3);
+	if (options.filters) {
+		await applySouFilters(page, options.filters);
+		await page.waitForTimeout(2e3);
+	}
+	try {
+		const mCases = (await page.locator("div.export-data__text").first().innerText()).match(/Найдено\s*([\d\s]+)\s*дел/);
+		if (mCases) data.total_cases = mCases[1].replace(/\s/g, "");
+	} catch (e) {
+		console.log("Не удалось получить заголовок судов:", e);
+	}
+	const maxPages = options.maxPages || 1;
+	const maxTotalCases = options.maxTotalCases || 100;
+	let collectedCases = 0;
+	let currentPage = 1;
+	while (currentPage <= maxPages && collectedCases < maxTotalCases) {
+		const items = page.locator("li.filters-results__list-item");
+		const itemCount = await items.count();
+		for (let i = 0; i < itemCount && collectedCases < maxTotalCases; i++) {
+			const item = items.nth(i);
+			const caseData = {};
+			const basicInfo = await item.evaluate((li) => {
+				const getText = (selector) => {
+					const el = li.querySelector(selector);
+					return el ? el.textContent?.trim() || "" : "";
+				};
+				const status = getText(".snippet__status");
+				const title = getText(".snippet__row-value.--title");
+				const fields = {};
+				const dl = li.querySelector("dl.snippet__block");
+				if (dl) dl.querySelectorAll(".snippet__row").forEach((row) => {
+					const keyEl = row.querySelector("dt.snippet__row-key");
+					const valueEl = row.querySelector("dd.snippet__row-value");
+					const key = keyEl ? keyEl.textContent?.trim() || "" : "";
+					let value = valueEl ? valueEl.textContent?.trim() || "" : "";
+					const link = valueEl?.querySelector("a.snippet__link");
+					if (link) {
+						value = link.textContent?.trim() || value;
+						fields[key] = {
+							text: value,
+							href: link.href || ""
+						};
+					} else fields[key] = value;
+				});
+				const sourceLink = li.querySelector("a.snippet__link[href*='mos-gorsud.ru'], a.snippet__link[href*='sudrf.ru']");
+				return {
+					status,
+					title,
+					fields,
+					source_url: sourceLink ? sourceLink.href || "" : ""
+				};
+			});
+			caseData.status = basicInfo.status;
+			caseData.fields = basicInfo.fields;
+			caseData.source_url = basicInfo.source_url;
+			const m = basicInfo.title.match(/№\s*([\w\-/]+)\s*от\s*([\d.]+)/);
+			if (m) {
+				caseData.case_number = m[1];
+				caseData.case_date = m[2];
+			} else {
+				caseData.case_number = basicInfo.title;
+				caseData.case_date = "";
+			}
+			const moreButton = item.locator("button.snippet__more");
+			if (await moreButton.count() > 0) try {
+				await moreButton.click();
+				await page.waitForTimeout(1e3);
+			} catch (e) {
+				console.warn("Не удалось нажать \"Показать все\" в судах:", e);
+			}
+			caseData.events = await item.evaluate((li) => {
+				const blocks = li.querySelectorAll("div.snippet__block");
+				let targetBlock = null;
+				for (const block of blocks) if (block.querySelector("button.snippet__more") || block.querySelector(".snippet__row-value--bold")) {
+					targetBlock = block;
+					break;
+				}
+				if (!targetBlock) return [];
+				const result = [];
+				targetBlock.querySelectorAll("div.snippet__row").forEach((row) => {
+					const timeEl = row.querySelector("time.snippet__row-key");
+					const valueEl = row.querySelector("div.snippet__row-value");
+					const date = timeEl ? timeEl.textContent?.trim() || "" : "";
+					let valueText = valueEl ? valueEl.textContent?.trim() || "" : "";
+					let linkHref = "";
+					const link = valueEl?.querySelector("a.snippet__link");
+					if (link) {
+						linkHref = link.href || "";
+						valueText = link.textContent?.trim() || valueText;
+					}
+					let instanceName = "";
+					const boldEl = valueEl?.querySelector(".snippet__row-value--bold") || (valueEl && valueEl.classList.contains("snippet__row-value--bold") ? valueEl : null);
+					if (boldEl) instanceName = boldEl.textContent?.trim() || "";
+					if (date || valueText || instanceName) result.push({
+						date,
+						text: valueText,
+						link: linkHref,
+						instance: instanceName
+					});
+				});
+				return result;
+			});
+			if (caseData.case_number || caseData.status) {
+				data.cases.push(caseData);
+				collectedCases++;
+			}
+		}
+		if (currentPage >= maxPages || collectedCases >= maxTotalCases) break;
+		const showMore = page.locator("button:has-text('Показать ещё')").first();
+		if (await showMore.count() > 0 && await showMore.isEnabled()) {
+			await showMore.click();
+			await page.waitForTimeout(3e3);
+			currentPage++;
+		} else {
+			const nextBtn = page.locator("button.filters-pagination__nav.--next").first();
+			if (await nextBtn.count() > 0 && await nextBtn.isEnabled()) {
+				await nextBtn.click();
+				await page.waitForTimeout(3e3);
+				currentPage++;
+			} else break;
+		}
+	}
+	console.log(`Собрано дел судов: ${data.cases.length}, всего: ${data.total_cases}`);
+	return data;
+}
 async function scrapeRusprofile(inn, options) {
 	let browser = getBrowser();
 	if (!browser) {
@@ -5958,6 +6164,14 @@ async function scrapeRusprofile(inn, options) {
 	let page = getPage();
 	if (!page) page = await browser.newPage();
 	try {
+		const startTime = Date.now();
+		const timings = {};
+		const timed = async (name, fn) => {
+			const t0 = Date.now();
+			const data = await fn();
+			timings[name] = Date.now() - t0;
+			return data;
+		};
 		const loginTrigger = page.locator("#menu-personal-trigger");
 		await loginTrigger.waitFor({
 			state: "visible",
@@ -5988,68 +6202,83 @@ async function scrapeRusprofile(inn, options) {
 		await page.waitForTimeout(2e3);
 		const result = {};
 		console.log("Сбор сводки...");
-		result.summary = await collectSummary(page);
+		result.summary = await timed("summary", () => collectSummary(page));
 		console.log("Сбор ФССП...");
-		result.fssp = await collectFssp(page);
+		result.fssp = await timed("fssp", () => collectFssp(page));
 		console.log("Сбор товарных знаков...");
-		result.trademarks = await collectTrademarks(page);
+		result.trademarks = await timed("trademarks", () => collectTrademarks(page));
 		console.log("Сбор судов общей юрисдикции...");
-		result.sou = await collectSou(page);
+		result.sou = await timed("sou", () => collectSou(page));
 		console.log("Сбор арбитражных дел (сводка)...");
-		result.arbitration_tile = await collectArbitrTile(page);
+		result.arbitration_tile = await timed("arbitration_tile", () => collectArbitrTile(page));
 		console.log("Сбор реестров ФНС...");
-		result.fns_registries = await collectReesters(page);
+		result.fns_registries = await timed("fns_registries", () => collectReesters(page));
 		console.log("Сбор связей...");
-		result.connections = await collectConnections(page);
+		result.connections = await timed("connections", () => collectConnections(page));
 		console.log("Сбор сообщений о сущфактах...");
-		result.facts = await collectFacts(page);
+		result.facts = await timed("facts", () => collectFacts(page));
 		console.log("Сбор госзакупок...");
-		result.government_procurement = await collectGz(page);
+		result.government_procurement = await timed("government_procurement", () => collectGz(page));
 		console.log("Сбор лизинга...");
-		result.leasing = await collectLeasing(page);
+		result.leasing = await timed("leasing", () => collectLeasing(page));
 		console.log("Сбор залогов...");
-		result.pledges = await collectPledges(page);
+		result.pledges = await timed("pledges", () => collectPledges(page));
 		console.log("Сбор лицензий...");
-		result.licenses = await collectLicenses(page);
+		result.licenses = await timed("licenses", () => collectLicenses(page));
 		console.log("Сбор конкурентов...");
-		result.competitors = await collectCompetitors(page);
+		result.competitors = await timed("competitors", () => collectCompetitors(page));
 		console.log("Сбор проверок...");
-		result.inspections = await collectInspections(page);
+		result.inspections = await timed("inspections", () => collectInspections(page));
 		console.log("Сбор финансов...");
-		result.finance = await collectFinance(page);
+		result.finance = await timed("finance", () => collectFinance(page));
 		console.log("Сбор рисков сотрудничества...");
-		result.risks = await collectRisks(page);
+		result.risks = await timed("risks", () => collectRisks(page));
 		console.log("Сбор учредителей...");
-		result.founders = await collectFounders(page);
+		result.founders = await timed("founders", () => collectFounders(page));
 		console.log("Сбор налогов и сборов...");
-		result.taxes = await collectTaxes(page);
+		result.taxes = await timed("taxes", () => collectTaxes(page));
 		console.log("Сбор надёжности...");
-		result.reliability = await collectReliability(page);
+		result.reliability = await timed("reliability", () => collectReliability(page));
 		console.log("Сбор топа компаний отрасли...");
-		result.top_okved = await collectTopOkved(page);
+		result.top_okved = await timed("top_okved", () => collectTopOkved(page));
 		console.log("Сбор филиалов и представительств...");
-		result.branches = await collectBranches(page);
+		result.branches = await timed("branches", () => collectBranches(page));
 		console.log("Сбор похожих организаций...");
-		result.similar = await collectSimilar(page);
+		result.similar = await timed("similar", () => collectSimilar(page));
 		console.log("Сбор отчётов и документов...");
-		result.reports = await collectReports(page);
+		result.reports = await timed("reports", () => collectReports(page));
 		console.log("Сбор событий...");
-		result.events = await collectEvents(page);
+		result.events = await timed("events", () => collectEvents(page));
 		console.log("Сбор краткой справки...");
-		result.resume = await collectResume(page);
+		result.resume = await timed("resume", () => collectResume(page));
 		console.log("Сбор сводки завершен.");
 		if (options?.arbitrDetails) {
-			console.log("Сбор детального списка арбитражных дел...");
-			result.arbitration_details = await collectArbitrDetails(page, companyId, {
-				maxPages: options.maxPages || 1,
-				maxTotalCases: options.maxTotalCases || 100,
+			console.log("Сбор детального арбитража...");
+			result.arbitration_details = await timed("arbitration_details", () => collectArbitrDetails(page, companyId, {
+				maxPages: options.maxPages,
+				maxTotalCases: options.maxTotalCases,
 				filters: options.filters
-			});
+			}));
 		}
 		if (options?.connectionsDetails) {
 			console.log("Сбор детальных связей...");
-			result.connections_details = await collectConnectionsDetails(page, companyId);
+			result.connections_details = await timed("connections_details", () => collectConnectionsDetails(page, companyId));
 		}
+		if (options?.souDetails) {
+			console.log("Сбор детальных судов общей юрисдикции...");
+			result.sou_details = await timed("sou_details", () => collectSouDetails(page, companyId, {
+				maxPages: options.souFilters?.maxPages || 1,
+				maxTotalCases: options.souFilters?.maxTotalCases || 100,
+				filters: {
+					sides: options.souFilters?.sides,
+					status: options.souFilters?.status,
+					search: options.souFilters?.search
+				}
+			}));
+		}
+		result.startedAt = new Date(startTime).toISOString();
+		result.timings = timings;
+		result.totalDurationMs = Date.now() - startTime;
 		return result;
 	} catch (error) {
 		console.error("Rusprofile scraping error:", error);

@@ -49,7 +49,8 @@ import {
   aiWindowMenuTemplate,
   bondsWindowMenuTemplate,
   mdWindowMenuTemplate,
-  osintWindowMenuTemplate
+  osintWindowMenuTemplate,
+  gatewayWindowMenuTemplate
 } from './menus/windowMenus.ts';
 import { registerGrpcHandlers } from './ipcHandlers/grpcHandlers.ts';
 import { registerTasksHandlers } from './ipcHandlers/tasksHandlers.ts';
@@ -78,6 +79,7 @@ import { AutonomousTrader } from './services/autonomousTrader.ts';
 import { setAutonomousTraderInstance } from './ipcHandlers/tradingAssistantHandlers';
 
 import { marketDataBus } from './services/marketDataBus';
+import { createGatewayWindow, getGatewayWindow } from './windows/gatewayWindow.ts';
 console.log('[main] marketDataBus instance id:', marketDataBus.getInstanceId());
 
 const historicalDataLoader = new HistoricalDataLoader();
@@ -188,6 +190,20 @@ app.whenReady().then(() => {
         }
       };
     }
+
+    const openGateway = fileMenu.items.find(i => i.label === 'Открыть Шлюз');
+    if (openGateway) {
+      openGateway.click = () => {
+        const existing = getGatewayWindow();
+        if (existing && !existing.isDestroyed()) {
+          existing.focus();
+        } else {
+          const win = createGatewayWindow();
+          if (win) applyMenuToWindow(win, gatewayWindowMenuTemplate);
+        }
+      };
+    }
+    
   }
 
   mainWindow.setMenu(menu);
@@ -344,6 +360,18 @@ ipcMain.handle('open-osint-window', () => {
   const win = createOsintWindow();
   if (win) {
     applyMenuToWindow(win, mainMenuTemplate);
+  }
+});
+
+ipcMain.handle('gateway:open-window', () => {
+  const existing = getGatewayWindow();
+  if (existing && !existing.isDestroyed()) {
+    existing.focus();
+    return;
+  }
+  const win = createGatewayWindow();
+  if (win) {
+    applyMenuToWindow(win, gatewayWindowMenuTemplate);
   }
 });
 

@@ -13,6 +13,7 @@ export const mainMenuTemplate: MenuItemConstructorOptions[] = [
       { label: 'Открыть Генератор запросов', id: 'open-pg' },
       { label: 'Открыть Трейдер', id: 'open-trading' },
       { label: 'Открыть OSINT', id: 'open-osint' },
+      { label: 'Открыть Шлюз', id: 'open-gateway' },
       { type: 'separator' },
       { label: 'Выйти', click: () => app.quit(), accelerator: 'CmdOrCtrl+Q' }
     ]
@@ -280,6 +281,29 @@ export const tradingAssistantWindowMenuTemplate: MenuItemConstructorOptions[] = 
 ];
 
 export const osintWindowMenuTemplate: MenuItemConstructorOptions[] = [
+  {
+    label: 'Файл',
+    submenu: [
+      { role: 'close' }
+    ]
+  },
+  {
+    label: 'Вид',
+    submenu: [
+      { role: 'reload' },
+      { role: 'forceReload' },
+      { role: 'toggleDevTools' },
+      { type: 'separator' },
+      { role: 'resetZoom' },
+      { role: 'zoomIn' },
+      { role: 'zoomOut' },
+      { type: 'separator' },
+      { role: 'togglefullscreen' }
+    ]
+  }
+];
+
+export const gatewayWindowMenuTemplate: MenuItemConstructorOptions[] = [
   {
     label: 'Файл',
     submenu: [
