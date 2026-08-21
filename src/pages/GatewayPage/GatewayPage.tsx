@@ -1,54 +1,19 @@
-// wetothemoon-electron/src/pages/GatewayPage/GatewayPage.tsx
+// src/pages/GatewayPage/GatewayPage.tsx
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Panel } from 'primereact/panel';
+import { Button } from 'primereact/button';
+import { Divider } from 'primereact/divider';
+
+import './GatewayPage.css'; // стили по аналогии с OSINTPage
 
 export const GatewayPage: React.FC = () => {
-  const [message, setMessage] = useState('');
-  const [response, setResponse] = useState('');
   const [status, setStatus] = useState('stopped');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const api = (window as any).electronAPI;
-
-  const handleLaunch = async () => {
-    try {
-      const result = await api.gatewayLaunch();
-      setStatus(result.status);
-      if (result.loginRequired) {
-        setIsLoggedIn(false);
-      } else {
-        setIsLoggedIn(true);
-      }
-      setError('');
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  };
-
-  const handleClose = async () => {
-    try {
-      await api.gatewayClose();
-      setStatus('stopped');
-      setIsLoggedIn(false);
-      setError('');
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  };
-
-  const handleSend = async () => {
-    if (!message.trim()) return;
-    try {
-      setResponse('Ожидание ответа...');
-      const answer = await api.gatewaySendMessage(message);
-      setResponse(answer);
-      setError('');
-    } catch (e) {
-      setError((e as Error).message);
-      setResponse('');
-    }
-  };
 
   const updateStatus = async () => {
     try {
@@ -60,44 +25,105 @@ export const GatewayPage: React.FC = () => {
     }
   };
 
-  // Периодически обновляем статус
-  React.useEffect(() => {
+  useEffect(() => {
     updateStatus();
     const interval = setInterval(updateStatus, 5000);
     return () => clearInterval(interval);
   }, []);
 
+  const handleLaunch = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await api.gatewayLaunch();
+      if (response.success) {
+        const result = response.data;
+        setStatus(result.status);
+        setIsLoggedIn(!result.loginRequired);
+      } else {
+        setError(response.error || 'Ошибка запуска');
+      }
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleClose = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await api.gatewayClose();
+      if (response.success) {
+        setStatus('stopped');
+        setIsLoggedIn(false);
+      } else {
+        setError(response.error || 'Ошибка остановки');
+      }
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div style={{ padding: 20 }}>
-      <h1>Шлюз DeepSeek</h1>
-      <div>
-        Статус: {status} {isLoggedIn ? '(авторизован)' : '(не авторизован)'}
-      </div>
-      <div style={{ marginTop: 10 }}>
-        <button onClick={handleLaunch}>Запустить браузер</button>
-        <button onClick={handleClose} style={{ marginLeft: 10 }}>Остановить</button>
-      </div>
-      <hr />
-      <div>
-        <textarea
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          rows={4}
-          cols={50}
-          placeholder="Введите сообщение для DeepSeek"
-          disabled={!isLoggedIn}
-        />
-        <br />
-        <button onClick={handleSend} disabled={!isLoggedIn}>
-          Отправить
-        </button>
-      </div>
-      {error && <p style={{ color: 'red' }}>{error}</p>}
-      {response && (
-        <pre style={{ whiteSpace: 'pre-wrap', background: '#f0f0f0', padding: 10 }}>
-          {response}
-        </pre>
+    <React.Fragment>
+      <div className="app p-0" />
+
+      {/* Панель управления браузером */}
+      <Panel className="shadow-5 mx-1" header="Браузер DeepSeek">
+        <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
+          <div className="flex-1 flex flex-column gap-1 xl:mr-8">
+            <div className="flex align-items-center gap-2">
+              <Button
+                label="Запустить"
+                icon="pi pi-play"
+                className="p-button-lg p-button-raised p-button-accent"
+                onClick={handleLaunch}
+                disabled={loading}
+              />
+              <Button
+                label="Остановить"
+                icon="pi pi-stop"
+                className="p-button-lg p-button-raised p-button-accent"
+                onClick={handleClose}
+                disabled={loading}
+              />
+            </div>
+            <div className="mt-3">
+              <span className="app font-size-subheading">Статус: {status}</span>
+              {isLoggedIn && <span className="ml-2 text-green-600">(авторизован)</span>}
+            </div>
+          </div>
+        </div>
+      </Panel>
+
+      <div className="app p-0" />
+
+      {/* Панель для будущей отправки сообщений (заглушка) */}
+      <Panel className="shadow-5 mx-1" header="Отправка сообщения">
+        <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
+          <div className="flex-1 flex flex-column gap-1 xl:mr-8">
+            <p className="text-color-secondary">
+              Функция отправки сообщений будет доступна на следующем этапе.
+            </p>
+            <Button
+              label="Поле ввода появится позже"
+              icon="pi pi-lock"
+              className="p-button-lg w-full p-button-raised p-button-accent"
+              disabled
+            />
+          </div>
+        </div>
+      </Panel>
+
+      {error && (
+        <div className="app p-0">
+          <div className="p-error mx-2">{error}</div>
+        </div>
       )}
-    </div>
+    </React.Fragment>
   );
 };

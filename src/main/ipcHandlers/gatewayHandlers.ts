@@ -1,0 +1,30 @@
+// src/main/ipcHandlers/gatewayHandlers.ts
+
+import { ipcMain } from 'electron';
+import { DeepSeekService } from '../services/gateway/deepseekService';
+
+export function registerGatewayHandlers(): void {
+  const service = DeepSeekService.getInstance();
+
+  ipcMain.handle('gateway:launch', async () => {
+    try {
+      const result = await service.launch();
+      return { success: true, data: result };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('gateway:close', async () => {
+    try {
+      await service.close();
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('gateway:get-status', () => {
+    return service.getStatus();
+  });
+}

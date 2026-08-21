@@ -5,27 +5,29 @@
 
 ## Этапы
 
-- [ ] **Этап 1. Инициализация**
+- [x] **Этап 1. Инициализация**
   - [x] Создана ветка `feature/gateway`
   - [x] Создан файл GATEWAY_ROADMAP.md
-  - [ ] Зафиксировано начальное состояние коммитом
+  - [x] Зафиксировано начальное состояние коммитом
 
-- [ ] **Этап 2. Базовое окно**
+- [x] **Этап 2. Базовое окно**
   - [x] Создан `src/main/windows/gatewayWindow.ts` по аналогии с `osintWindow.ts`
   - [x] Добавлен пункт меню «Открыть Шлюз» в `windowMenus.ts`
   - [x] Добавлен IPC-обработчик `gateway:open-window`
   - [x] В `preload.ts` добавлен метод `openGatewayWindow`
   - [x] Создана страница `GatewayPage.tsx` с заглушкой (кнопка «Запустить браузер»)
   - [x] Добавлен маршрут `#/gateway` в `routes.tsx` (если требуется)
-  - [ ] Обновлён ROADMAP, сделан коммит
+  - [x] Обновлён ROADMAP, сделан коммит
 
-- [ ] **Этап 3. Интеграция Playwright и DeepSeek-сервис**
-  - [ ] Создан `src/main/services/gateway/deepseekService.ts` (или расширен playwrightService)
-  - [ ] Реализован запуск браузера с восстановлением сессии (`deepseek_storage.json`)
-  - [ ] Реализован вход на chat.deepseek.com (определены селекторы)
-  - [ ] Добавлены IPC-обработчики `gateway:launch`, `gateway:close`
-  - [ ] В `preload.ts` добавлены `gatewayLaunch`, `gatewayClose`
-  - [ ] Обновлён ROADMAP, сделан коммит
+- [x] **Этап 3. Интеграция Playwright и DeepSeek-сервис**
+  - [x] Создан `src/main/services/gateway/deepseekService.ts`
+  - [x] Реализован запуск браузера с восстановлением сессии (`deepseek_storage.json`)
+  - [x] Реализован вход на chat.deepseek.com (селекторы могут быть уточнены)
+  - [x] Добавлены IPC-обработчики `gateway:launch`, `gateway:close`, `gateway:get-status`
+  - [x] В `preload.ts` добавлены `gatewayLaunch`, `gatewayClose`, `gatewayGetStatus`
+  - [x] Обновлён UI страницы GatewayPage с PrimeReact
+  - [x] Реализован автологин с реальными селекторами
+  - [x] Обновлён ROADMAP, сделан коммит (текущий шаг)
 
 - [ ] **Этап 4. Интерфейс отправки сообщений**
   - [ ] В `GatewayPage.tsx` добавлены поле ввода, кнопка «Отправить», область ответа

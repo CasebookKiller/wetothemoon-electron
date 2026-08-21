@@ -1,0 +1,11 @@
+/* src/pages/GatewayPage/GatewayPage.css */
+
+.gateway-page .p-panel {
+  margin-bottom: 0;
+}
+
+.gateway-page .p-button {
+  min-width: 120px;
+}
+
+/* Дополнительные стили при необходимости */

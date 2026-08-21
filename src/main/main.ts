@@ -79,6 +79,7 @@ import { AutonomousTrader } from './services/autonomousTrader.ts';
 import { setAutonomousTraderInstance } from './ipcHandlers/tradingAssistantHandlers';
 
 import { marketDataBus } from './services/marketDataBus';
+import { registerGatewayHandlers } from './ipcHandlers/gatewayHandlers';
 import { createGatewayWindow, getGatewayWindow } from './windows/gatewayWindow.ts';
 console.log('[main] marketDataBus instance id:', marketDataBus.getInstanceId());
 
@@ -239,6 +240,8 @@ app.whenReady().then(() => {
   );
 
   registerOsintHandlers();
+
+  registerGatewayHandlers();
 
   // ----------------- Order Manager -----------------
   const orderManager = new OrderManager({

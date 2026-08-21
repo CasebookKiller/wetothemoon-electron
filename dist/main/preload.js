@@ -250,7 +250,12 @@ try {
 		scrapeKadArbitr: (inn) => electron.ipcRenderer.invoke("osint:scrape-kad-arbitr", inn),
 		scrapeMosGorsud: (inn) => electron.ipcRenderer.invoke("osint:scrape-mos-gorsud", inn),
 		saveOsintCredentials: (site, login, password) => electron.ipcRenderer.invoke("osint:save-credentials", site, login, password),
-		checkOsintCredentials: (site) => electron.ipcRenderer.invoke("osint:check-credentials", site)
+		checkOsintCredentials: (site) => electron.ipcRenderer.invoke("osint:check-credentials", site),
+		openGatewayWindow: () => electron.ipcRenderer.invoke("gateway:open-window"),
+		gatewayLaunch: () => electron.ipcRenderer.invoke("gateway:launch"),
+		gatewayClose: () => electron.ipcRenderer.invoke("gateway:close"),
+		gatewaySendMessage: (message) => electron.ipcRenderer.invoke("gateway:send-message", message),
+		gatewayGetStatus: () => electron.ipcRenderer.invoke("gateway:get-status")
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {

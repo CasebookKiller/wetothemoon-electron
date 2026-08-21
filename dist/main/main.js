@@ -40,9 +40,11 @@ let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_
 let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_uuid_dist_node_index_js = require("/home/ll/Документы/GitHub/wetothemoon-project/wetothemoon-electron/node_modules/uuid/dist-node/index.js");
 let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_node_cron_dist_esm_node_cron_js = require("/home/ll/Документы/GitHub/wetothemoon-project/wetothemoon-electron/node_modules/node-cron/dist/esm/node-cron.js");
 _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_node_cron_dist_esm_node_cron_js = __toESM(_home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_node_cron_dist_esm_node_cron_js);
+let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_dotenv_lib_main_js = require("/home/ll/Документы/GitHub/wetothemoon-project/wetothemoon-electron/node_modules/dotenv/lib/main.js");
+_home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_dotenv_lib_main_js = __toESM(_home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_dotenv_lib_main_js);
 //#region src/main/windows/mainWindow.ts
 var mainWindow = null;
-var preloadPath$8 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var preloadPath$9 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var MAIN_WINDOW_VITE_DEV_SERVER_URL = "http://localhost:5173";
 path.default.join(__dirname, "../../renderer/main-window/index.html");
 var createMainWindow = () => {
@@ -51,7 +53,7 @@ var createMainWindow = () => {
 		height: 768,
 		title: "Мы на Луну!",
 		webPreferences: {
-			preload: preloadPath$8,
+			preload: preloadPath$9,
 			contextIsolation: true,
 			nodeIntegration: false
 		}
@@ -71,7 +73,7 @@ function getMainWindowProdPath() {
 //#endregion
 //#region src/main/windows/aiWindow.ts
 var aiWindow = null;
-var preloadPath$7 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var preloadPath$8 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var createAIWindow = () => {
 	console.log("createAIWindow called");
 	aiWindow = new electron.BrowserWindow({
@@ -79,7 +81,7 @@ var createAIWindow = () => {
 		height: 600,
 		title: "Нейро",
 		webPreferences: {
-			preload: preloadPath$7,
+			preload: preloadPath$8,
 			contextIsolation: true,
 			nodeIntegration: false
 		}
@@ -249,6 +251,10 @@ var mainMenuTemplate = [
 			{
 				label: "Открыть OSINT",
 				id: "open-osint"
+			},
+			{
+				label: "Открыть Шлюз",
+				id: "open-gateway"
 			},
 			{ type: "separator" },
 			{
@@ -673,17 +679,34 @@ var osintWindowMenuTemplate = [{
 		{ role: "togglefullscreen" }
 	]
 }];
+var gatewayWindowMenuTemplate = [{
+	label: "Файл",
+	submenu: [{ role: "close" }]
+}, {
+	label: "Вид",
+	submenu: [
+		{ role: "reload" },
+		{ role: "forceReload" },
+		{ role: "toggleDevTools" },
+		{ type: "separator" },
+		{ role: "resetZoom" },
+		{ role: "zoomIn" },
+		{ role: "zoomOut" },
+		{ type: "separator" },
+		{ role: "togglefullscreen" }
+	]
+}];
 //#endregion
 //#region src/main/windows/bondsWindow.ts
 var bondsWindow$1 = null;
-var preloadPath$6 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var preloadPath$7 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var createBondsWindow = () => {
 	bondsWindow$1 = new electron.BrowserWindow({
 		width: 1024,
 		height: 768,
 		title: "Облигации",
 		webPreferences: {
-			preload: preloadPath$6,
+			preload: preloadPath$7,
 			contextIsolation: true,
 			nodeIntegration: false
 		}
@@ -701,14 +724,14 @@ var getBondsWindow = () => bondsWindow$1;
 //#endregion
 //#region src/main/windows/mdWindow.ts
 var mdWindow$1 = null;
-var preloadPath$5 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var preloadPath$6 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var createMDWindow = () => {
 	mdWindow$1 = new electron.BrowserWindow({
 		width: 800,
 		height: 600,
 		title: "Markdown",
 		webPreferences: {
-			preload: preloadPath$5,
+			preload: preloadPath$6,
 			contextIsolation: true,
 			nodeIntegration: false
 		}
@@ -724,14 +747,14 @@ var getMDWindow = () => mdWindow$1;
 //#endregion
 //#region src/main/windows/pgWindow.ts
 var pgWindow$1 = null;
-var preloadPath$4 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var preloadPath$5 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var createPGWindow = () => {
 	pgWindow$1 = new electron.BrowserWindow({
 		width: 800,
 		height: 600,
 		title: "Генератор запросов",
 		webPreferences: {
-			preload: preloadPath$4,
+			preload: preloadPath$5,
 			contextIsolation: true,
 			nodeIntegration: false
 		}
@@ -747,7 +770,7 @@ var getPGWindow = () => pgWindow$1;
 //#endregion
 //#region src/main/windows/ollamaWindow.ts
 var ollamaWindow$1 = null;
-var preloadPath$3 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var preloadPath$4 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var createOllamaWindow = () => {
 	if (ollamaWindow$1) {
 		ollamaWindow$1.focus();
@@ -758,7 +781,7 @@ var createOllamaWindow = () => {
 		height: 600,
 		title: "Клиент Ollama ",
 		webPreferences: {
-			preload: preloadPath$3,
+			preload: preloadPath$4,
 			contextIsolation: true,
 			nodeIntegration: false
 		}
@@ -1251,7 +1274,7 @@ var registerOrdersStreamHandlers = () => {
 //#endregion
 //#region src/main/windows/tradingAssistantWindow.ts
 var tradingAssistantWindow = null;
-var preloadPath$2 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var preloadPath$3 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var createTradingAssistantWindow = () => {
 	if (tradingAssistantWindow && !tradingAssistantWindow.isDestroyed()) {
 		tradingAssistantWindow.focus();
@@ -1262,7 +1285,7 @@ var createTradingAssistantWindow = () => {
 		height: 800,
 		title: "Trading Assistant – Volume Profile",
 		webPreferences: {
-			preload: preloadPath$2,
+			preload: preloadPath$3,
 			contextIsolation: true,
 			nodeIntegration: false
 		}
@@ -4513,7 +4536,7 @@ var registerTradingAssistantHandlers = (historicalLoader, profileEngine, getToke
 //#endregion
 //#region src/main/windows/osintWindow.ts
 var osintWindow = null;
-var preloadPath$1 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var preloadPath$2 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var createOsintWindow = () => {
 	if (osintWindow && !osintWindow.isDestroyed()) {
 		osintWindow.focus();
@@ -4524,7 +4547,7 @@ var createOsintWindow = () => {
 		height: 800,
 		title: "OSINT Tools",
 		webPreferences: {
-			preload: preloadPath$1,
+			preload: preloadPath$2,
 			contextIsolation: true,
 			nodeIntegration: false
 		}
@@ -6728,7 +6751,7 @@ var taskStore = new TaskStore();
 //#endregion
 //#region src/main/windows/tasksWindow.ts
 var tasksWindow = null;
-var preloadPath = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var preloadPath$1 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var createTasksWindow = () => {
 	if (tasksWindow && !tasksWindow.isDestroyed()) {
 		tasksWindow.focus();
@@ -6739,7 +6762,7 @@ var createTasksWindow = () => {
 		height: 700,
 		title: "Планировщик задач",
 		webPreferences: {
-			preload: preloadPath,
+			preload: preloadPath$1,
 			contextIsolation: true,
 			nodeIntegration: false
 		}
@@ -8651,6 +8674,250 @@ var AutonomousTrader = class extends events.EventEmitter {
 	}
 };
 //#endregion
+//#region src/main/services/gateway/deepseekService.ts
+_home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_dotenv_lib_main_js.config();
+var DEEPSEEK_URL = "https://chat.deepseek.com";
+var LOGIN_URL = "https://chat.deepseek.com/sign_in";
+var STORAGE_FILE = "deepseek_storage.json";
+var DeepSeekService = class DeepSeekService {
+	static instance;
+	browser = null;
+	context = null;
+	page = null;
+	isLoggedIn = false;
+	constructor() {}
+	static getInstance() {
+		if (!DeepSeekService.instance) DeepSeekService.instance = new DeepSeekService();
+		return DeepSeekService.instance;
+	}
+	getStoragePath() {
+		return path.default.join(electron.app.getPath("userData"), STORAGE_FILE);
+	}
+	getCredentialsFromEnv() {
+		const login = process.env.VITE_DEEPSEEK_LOGIN;
+		const password = process.env.VITE_DEEPSEEK_PASSWORD;
+		if (login && password) return {
+			login,
+			password
+		};
+		return null;
+	}
+	getCredentials() {
+		const stored = getCredentials("deepseek");
+		if (stored) return stored;
+		const envCreds = this.getCredentialsFromEnv();
+		if (envCreds) return envCreds;
+		throw new Error("Учётные данные DeepSeek не найдены. Укажите VITE_DEEPSEEK_LOGIN и VITE_DEEPSEEK_PASSWORD в .env или сохраните их через интерфейс.");
+	}
+	async saveStorageState() {
+		if (!this.context) return;
+		const state = await this.context.storageState();
+		fs.default.writeFileSync(this.getStoragePath(), JSON.stringify(state, null, 2), "utf-8");
+		console.log("DeepSeek storage state saved");
+	}
+	async loadStorageState() {
+		const storagePath = this.getStoragePath();
+		if (!fs.default.existsSync(storagePath)) {
+			console.log("DeepSeek storage file not found, will login");
+			return false;
+		}
+		try {
+			const state = JSON.parse(fs.default.readFileSync(storagePath, "utf-8"));
+			if (!state.cookies || state.cookies.length === 0) {
+				console.log("DeepSeek storage empty");
+				return false;
+			}
+			this.context = await this.browser.newContext({ storageState: state });
+			console.log("DeepSeek storage state loaded");
+			return true;
+		} catch (e) {
+			console.error("Ошибка загрузки storage state:", e);
+			return false;
+		}
+	}
+	/**
+	* Проверяет, авторизован ли пользователь.
+	* Ориентируемся на наличие поля ввода сообщения (характерно для авторизованного чата).
+	* Селектор можно уточнить при необходимости.
+	*/
+	async isAuthenticated() {
+		if (!this.page) return false;
+		try {
+			await this.page.waitForSelector("textarea[placeholder*=\"Message\"], textarea[placeholder*=\"Send\"], textarea[placeholder*=\"输入\"], textarea[placeholder*=\"消息\"]", { timeout: 5e3 });
+			return true;
+		} catch {
+			return false;
+		}
+	}
+	/**
+	* Выполняет вход на chat.deepseek.com.
+	* Учётные данные берутся из хранилища или .env.
+	* После входа сохраняет storageState.
+	*/
+	async login() {
+		if (!this.page) throw new Error("Браузер не запущен");
+		const credentials = this.getCredentials();
+		console.log("Выполняется вход в DeepSeek...");
+		await this.page.goto(LOGIN_URL, {
+			waitUntil: "domcontentloaded",
+			timeout: 6e4
+		});
+		const loginInput = this.page.locator("input[type=\"text\"].ds-input__input, input[placeholder=\"Номер телефона / адрес электронной почты\"]").first();
+		const passwordInput = this.page.locator("input[type=\"password\"].ds-input__input, input[placeholder=\"Пароль\"]").first();
+		const submitButton = this.page.locator("div.ds-button--primary.ds-button--filled, div[role=\"button\"]:has-text(\"Войти\")").first();
+		await loginInput.waitFor({
+			state: "visible",
+			timeout: 15e3
+		});
+		await loginInput.fill(credentials.login);
+		await passwordInput.waitFor({
+			state: "visible",
+			timeout: 5e3
+		});
+		await passwordInput.fill(credentials.password);
+		await submitButton.click();
+		await this.page.waitForURL("**/chat.deepseek.com/**", { timeout: 2e4 });
+		this.isLoggedIn = await this.isAuthenticated();
+		if (this.isLoggedIn) {
+			setCredentials("deepseek", credentials.login, credentials.password);
+			await this.saveStorageState();
+			console.log("Вход выполнен успешно");
+		} else throw new Error("Не удалось войти в DeepSeek. Проверьте учётные данные и селекторы.");
+	}
+	/**
+	* Запускает браузер и открывает DeepSeek.
+	* Если сессия есть, восстанавливает её; иначе выполняет вход.
+	*/
+	async launch() {
+		if (this.browser && this.browser.isConnected()) {
+			if (this.page && await this.isAuthenticated()) {
+				this.isLoggedIn = true;
+				return { status: "logged_in" };
+			}
+			return {
+				status: "running",
+				loginRequired: true
+			};
+		}
+		console.log("Запуск браузера для DeepSeek...");
+		this.browser = await _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_playwright_index_mjs.chromium.launch({
+			headless: false,
+			args: [
+				"--no-sandbox",
+				"--disable-gpu",
+				"--ozone-platform=x11"
+			]
+		});
+		if (!await this.loadStorageState()) this.context = await this.browser.newContext();
+		this.page = await this.context.newPage();
+		await this.page.goto(DEEPSEEK_URL, {
+			waitUntil: "domcontentloaded",
+			timeout: 6e4
+		});
+		this.isLoggedIn = await this.isAuthenticated();
+		if (!this.isLoggedIn) {
+			console.log("Сессия недействительна или отсутствует, требуется вход");
+			await this.login();
+			return { status: "logged_in" };
+		}
+		await this.saveStorageState();
+		return { status: "logged_in" };
+	}
+	/**
+	* Закрывает браузер и сохраняет состояние сессии.
+	*/
+	async close() {
+		if (this.browser) {
+			if (this.context) {
+				await this.saveStorageState();
+				await this.context.close();
+				this.context = null;
+			}
+			await this.browser.close();
+			this.browser = null;
+			this.page = null;
+			this.isLoggedIn = false;
+			console.log("Браузер DeepSeek закрыт, сессия сохранена");
+		}
+	}
+	/**
+	* Возвращает текущий статус (для UI).
+	*/
+	getStatus() {
+		return {
+			status: this.browser ? "running" : "stopped",
+			isLoggedIn: this.isLoggedIn
+		};
+	}
+	/**
+	* Возвращает текущую страницу (понадобится для отправки сообщений на этапе 4).
+	*/
+	getPage() {
+		return this.page;
+	}
+};
+//#endregion
+//#region src/main/ipcHandlers/gatewayHandlers.ts
+function registerGatewayHandlers() {
+	const service = DeepSeekService.getInstance();
+	electron.ipcMain.handle("gateway:launch", async () => {
+		try {
+			return {
+				success: true,
+				data: await service.launch()
+			};
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("gateway:close", async () => {
+		try {
+			await service.close();
+			return { success: true };
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("gateway:get-status", () => {
+		return service.getStatus();
+	});
+}
+//#endregion
+//#region src/main/windows/gatewayWindow.ts
+var gatewayWindow = null;
+var preloadPath = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var createGatewayWindow = () => {
+	if (gatewayWindow && !gatewayWindow.isDestroyed()) {
+		gatewayWindow.focus();
+		return gatewayWindow;
+	}
+	gatewayWindow = new electron.BrowserWindow({
+		width: 1100,
+		height: 800,
+		title: "Шлюз (DeepSeek)",
+		webPreferences: {
+			preload: preloadPath,
+			contextIsolation: true,
+			nodeIntegration: false
+		}
+	});
+	if (process.env.NODE_ENV === "development") gatewayWindow.loadURL(`${DEV_SERVER_URL}/#/gateway`);
+	else gatewayWindow.loadFile(getMainWindowProdPath(), { hash: "/gateway" });
+	const menu = electron.Menu.buildFromTemplate(gatewayWindowMenuTemplate);
+	gatewayWindow.setMenu(menu);
+	gatewayWindow.on("closed", () => {
+		gatewayWindow = null;
+	});
+	return gatewayWindow;
+};
+var getGatewayWindow = () => gatewayWindow;
+//#endregion
 //#region src/main/main.ts
 process.on("uncaughtException", (err) => {
 	console.error("Uncaught exception:", err);
@@ -8733,6 +9000,15 @@ electron.app.whenReady().then(() => {
 				if (win) applyMenuToWindow(win, osintWindowMenuTemplate);
 			}
 		};
+		const openGateway = fileMenu.items.find((i) => i.label === "Открыть Шлюз");
+		if (openGateway) openGateway.click = () => {
+			const existing = getGatewayWindow();
+			if (existing && !existing.isDestroyed()) existing.focus();
+			else {
+				const win = createGatewayWindow();
+				if (win) applyMenuToWindow(win, gatewayWindowMenuTemplate);
+			}
+		};
 	}
 	mainWindow.setMenu(menu);
 	console.log("Menu items:", menu.items.map((i) => i.label));
@@ -8750,6 +9026,7 @@ electron.app.whenReady().then(() => {
 	scheduler.start();
 	registerTradingAssistantHandlers(historicalDataLoader, volumeProfileEngine, getToken, strategyManager, compositeProfileService, orderFlowEngine);
 	registerOsintHandlers();
+	registerGatewayHandlers();
 	const orderManager = new OrderManager({
 		demoMode: true,
 		token: "",
@@ -8814,6 +9091,15 @@ electron.ipcMain.handle("open-osint-window", () => {
 	}
 	const win = createOsintWindow();
 	if (win) applyMenuToWindow(win, mainMenuTemplate);
+});
+electron.ipcMain.handle("gateway:open-window", () => {
+	const existing = getGatewayWindow();
+	if (existing && !existing.isDestroyed()) {
+		existing.focus();
+		return;
+	}
+	const win = createGatewayWindow();
+	if (win) applyMenuToWindow(win, gatewayWindowMenuTemplate);
 });
 electron.ipcMain.handle("open-file-picker", async () => {
 	try {

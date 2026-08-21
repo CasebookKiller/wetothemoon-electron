@@ -42,6 +42,7 @@ const tradingAssistant: Route = { path: '/trading-assistant', Component: Trading
 const osint: Route = { path: '/osint', Component: OSINTPage, title: 'OSINT' };
 const gateway: Route = { path: '/gateway', Component: GatewayPage, title: 'Шлюз' };
 
+
 export const routes: Route[] = [];
 
 routes.push(
@@ -58,5 +59,6 @@ routes.push(
   ollama,
   tasks,
   tradingAssistant,
-  osint
+  osint,
+  gateway
 );
