@@ -3,15 +3,17 @@
 import React, { useState, useEffect } from 'react';
 import { Panel } from 'primereact/panel';
 import { Button } from 'primereact/button';
+import { InputTextarea } from 'primereact/inputtextarea';
 import { Divider } from 'primereact/divider';
-
-import './GatewayPage.css'; // стили по аналогии с OSINTPage
 
 export const GatewayPage: React.FC = () => {
   const [status, setStatus] = useState('stopped');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [message, setMessage] = useState('');
+  const [response, setResponse] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [sending, setSending] = useState(false);
 
   const api = (window as any).electronAPI;
 
@@ -35,13 +37,13 @@ export const GatewayPage: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      const response = await api.gatewayLaunch();
-      if (response.success) {
-        const result = response.data;
-        setStatus(result.status);
-        setIsLoggedIn(!result.loginRequired);
+      const result = await api.gatewayLaunch();
+      if (result.success) {
+        const data = result.data;
+        setStatus(data.status);
+        setIsLoggedIn(!data.loginRequired);
       } else {
-        setError(response.error || 'Ошибка запуска');
+        setError(result.error || 'Ошибка запуска');
       }
     } catch (e) {
       setError((e as Error).message);
@@ -54,12 +56,12 @@ export const GatewayPage: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      const response = await api.gatewayClose();
-      if (response.success) {
+      const result = await api.gatewayClose();
+      if (result.success) {
         setStatus('stopped');
         setIsLoggedIn(false);
       } else {
-        setError(response.error || 'Ошибка остановки');
+        setError(result.error || 'Ошибка остановки');
       }
     } catch (e) {
       setError((e as Error).message);
@@ -68,11 +70,30 @@ export const GatewayPage: React.FC = () => {
     }
   };
 
+  const handleSend = async () => {
+    if (!message.trim()) return;
+    setSending(true);
+    setError('');
+    setResponse('');
+    try {
+      const result = await api.gatewaySendMessage(message);
+      if (result.success) {
+        setResponse(result.data);
+      } else {
+        setError(result.error || 'Ошибка отправки');
+      }
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSending(false);
+    }
+  };
+
   return (
     <React.Fragment>
       <div className="app p-0" />
 
-      {/* Панель управления браузером */}
+      {/* Панель управления */}
       <Panel className="shadow-5 mx-1" header="Браузер DeepSeek">
         <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
           <div className="flex-1 flex flex-column gap-1 xl:mr-8">
@@ -82,14 +103,14 @@ export const GatewayPage: React.FC = () => {
                 icon="pi pi-play"
                 className="p-button-lg p-button-raised p-button-accent"
                 onClick={handleLaunch}
-                disabled={loading}
+                disabled={loading || sending}
               />
               <Button
                 label="Остановить"
                 icon="pi pi-stop"
                 className="p-button-lg p-button-raised p-button-accent"
                 onClick={handleClose}
-                disabled={loading}
+                disabled={loading || sending}
               />
             </div>
             <div className="mt-3">
@@ -102,19 +123,28 @@ export const GatewayPage: React.FC = () => {
 
       <div className="app p-0" />
 
-      {/* Панель для будущей отправки сообщений (заглушка) */}
+      {/* Панель отправки сообщения */}
       <Panel className="shadow-5 mx-1" header="Отправка сообщения">
         <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
           <div className="flex-1 flex flex-column gap-1 xl:mr-8">
-            <p className="text-color-secondary">
-              Функция отправки сообщений будет доступна на следующем этапе.
-            </p>
-            <Button
-              label="Поле ввода появится позже"
-              icon="pi pi-lock"
-              className="p-button-lg w-full p-button-raised p-button-accent"
-              disabled
+            <InputTextarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              rows={4}
+              autoResize
+              placeholder="Введите сообщение для DeepSeek"
+              disabled={!isLoggedIn || sending}
+              className="w-full"
             />
+            <div className="mt-2">
+              <Button
+                label={sending ? 'Отправка...' : 'Отправить'}
+                icon={sending ? 'pi pi-spin pi-spinner' : 'pi pi-send'}
+                className="p-button-lg w-full p-button-raised p-button-accent"
+                onClick={handleSend}
+                disabled={!isLoggedIn || !message.trim() || sending}
+              />
+            </div>
           </div>
         </div>
       </Panel>
@@ -123,6 +153,22 @@ export const GatewayPage: React.FC = () => {
         <div className="app p-0">
           <div className="p-error mx-2">{error}</div>
         </div>
+      )}
+
+      {/* Ответ */}
+      {response && (
+        <React.Fragment>
+          <div className="app p-0" />
+          <Panel className="shadow-5 mx-1" header="Ответ DeepSeek">
+            <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
+              <div className="flex-1 flex flex-column gap-1 xl:mr-8">
+                <pre className="app theme-hint-color p-3 border-round" style={{ whiteSpace: 'pre-wrap' }}>
+                  {response}
+                </pre>
+              </div>
+            </div>
+          </Panel>
+        </React.Fragment>
       )}
     </React.Fragment>
   );

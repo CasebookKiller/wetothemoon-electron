@@ -254,8 +254,8 @@ try {
 		openGatewayWindow: () => electron.ipcRenderer.invoke("gateway:open-window"),
 		gatewayLaunch: () => electron.ipcRenderer.invoke("gateway:launch"),
 		gatewayClose: () => electron.ipcRenderer.invoke("gateway:close"),
-		gatewaySendMessage: (message) => electron.ipcRenderer.invoke("gateway:send-message", message),
-		gatewayGetStatus: () => electron.ipcRenderer.invoke("gateway:get-status")
+		gatewayGetStatus: () => electron.ipcRenderer.invoke("gateway:get-status"),
+		gatewaySendMessage: (message) => electron.ipcRenderer.invoke("gateway:send-message", message)
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {

@@ -17,6 +17,7 @@ try {
     openTasksWindow: () => ipcRenderer.invoke('open-tasks-window'),
     openTradingAssistantWindow: () => ipcRenderer.invoke('open-trading-window'),
     openOsintWindow: () => ipcRenderer.invoke('open-osint-window'),
+    
     sendMessageToAI: (message: string) =>
       ipcRenderer.invoke('send-to-ai', message).then((response) => {
         console.log(response);
@@ -357,8 +358,8 @@ try {
     openGatewayWindow: () => ipcRenderer.invoke('gateway:open-window'),
     gatewayLaunch: () => ipcRenderer.invoke('gateway:launch'),
     gatewayClose: () => ipcRenderer.invoke('gateway:close'),
-    gatewaySendMessage: (message: string) => ipcRenderer.invoke('gateway:send-message', message),
     gatewayGetStatus: () => ipcRenderer.invoke('gateway:get-status'),
+    gatewaySendMessage: (message: string) => ipcRenderer.invoke('gateway:send-message', message),
 
   });
 

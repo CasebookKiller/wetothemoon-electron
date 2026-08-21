@@ -8743,7 +8743,7 @@ var DeepSeekService = class DeepSeekService {
 	async isAuthenticated() {
 		if (!this.page) return false;
 		try {
-			await this.page.waitForSelector("textarea[placeholder*=\"Message\"], textarea[placeholder*=\"Send\"], textarea[placeholder*=\"输入\"], textarea[placeholder*=\"消息\"]", { timeout: 5e3 });
+			await this.page.waitForSelector("textarea[placeholder*=\"Сообщение\"], textarea[placeholder*=\"Message\"], textarea[placeholder*=\"Send\"]", { timeout: 5e3 });
 			return true;
 		} catch {
 			return false;
@@ -8763,6 +8763,76 @@ var DeepSeekService = class DeepSeekService {
 		throw new Error("Время ожидания ручного прохождения капчи истекло");
 	}
 	/**
+	* Переходит по URL с минимальным ожиданием (commit), игнорируя таймауты.
+	*/
+	async gotoWithTimeout(url, timeoutMs = 15e3) {
+		if (!this.page) return;
+		try {
+			await this.page.goto(url, {
+				waitUntil: "commit",
+				timeout: timeoutMs
+			});
+			await this.page.evaluate(() => {
+				window.dispatchEvent(new Event("load"));
+				document.querySelectorAll(".loading, .loader, .spinner, [class*=\"loading\"], [class*=\"spinner\"]").forEach((el) => {
+					el.style.display = "none";
+				});
+				if (typeof window.jQuery !== "undefined") window.jQuery(window).trigger("load");
+			});
+			console.log(`[DeepSeek] Переход на ${url} завершён, троббер остановлен`);
+		} catch (error) {
+			console.warn(`[DeepSeek] Переход на ${url} не завершился полностью: ${error.message}`);
+		}
+	}
+	/**
+	* Открывает и закрывает меню профиля, чтобы остановить бесконечный индикатор загрузки.
+	* Это обходной приём, так как DeepSeek после авторизации может держать троббер.
+	*/
+	async stopLoadingSpinner() {
+		const page = this.page;
+		if (!page) return;
+		try {
+			const profileButton = page.locator("div._2afd28d").first();
+			await profileButton.waitFor({
+				state: "visible",
+				timeout: 1e4
+			});
+			await profileButton.scrollIntoViewIfNeeded();
+			await profileButton.click({ force: true });
+			console.log("[DeepSeek] Клик по профилю выполнен");
+			await page.locator("div.ds-dropdown-menu").waitFor({
+				state: "visible",
+				timeout: 5e3
+			});
+			console.log("[DeepSeek] Меню открыто");
+			const settingsItem = page.locator("div.ds-dropdown-menu-option__label", { hasText: "Настройки" });
+			await settingsItem.waitFor({
+				state: "visible",
+				timeout: 5e3
+			});
+			await settingsItem.click({ force: true });
+			console.log("[DeepSeek] Клик по \"Настройки\" выполнен");
+			await page.waitForTimeout(2e3);
+			try {
+				await page.goBack({
+					waitUntil: "commit",
+					timeout: 1e4
+				});
+			} catch (goBackError) {
+				console.warn("[DeepSeek] goBack не сработал, пробуем клик по логотипу");
+				await page.locator("div.e066abb8").first().click({ force: true });
+			}
+			await page.waitForTimeout(1e3);
+			console.log("[DeepSeek] Спиннер остановлен через меню настроек");
+		} catch (error) {
+			console.warn("[DeepSeek] Не удалось остановить спиннер через меню настроек:", error);
+			try {
+				await page.keyboard.press("Escape");
+				await page.waitForTimeout(500);
+			} catch {}
+		}
+	}
+	/**
 	* Выполняет вход на chat.deepseek.com.
 	* Учётные данные берутся из хранилища или .env.
 	* После входа сохраняет storageState.
@@ -8770,14 +8840,14 @@ var DeepSeekService = class DeepSeekService {
 	async login() {
 		if (!this.page) throw new Error("Браузер не запущен");
 		const credentials = this.getCredentials();
-		console.log("Выполняется вход в DeepSeek...");
-		await this.page.goto(LOGIN_URL, {
-			waitUntil: "domcontentloaded",
-			timeout: 6e4
-		});
+		console.log("[DeepSeek] Получены учётные данные");
+		console.log("[DeepSeek] Переходим на страницу входа");
+		await this.gotoWithTimeout(LOGIN_URL, 2e4);
+		console.log("[DeepSeek] Переход выполнен");
 		const loginInput = this.page.locator("input[type=\"text\"].ds-input__input");
 		const passwordInput = this.page.locator("input[type=\"password\"].ds-input__input");
 		const submitButton = this.page.locator("div.ds-button--primary.ds-button--filled");
+		console.log("[DeepSeek] Ожидание полей ввода");
 		await loginInput.waitFor({
 			state: "visible",
 			timeout: 15e3
@@ -8786,22 +8856,43 @@ var DeepSeekService = class DeepSeekService {
 			state: "visible",
 			timeout: 5e3
 		});
+		console.log("[DeepSeek] Поля найдены");
 		await loginInput.fill("");
 		await loginInput.fill(credentials.login);
 		await passwordInput.fill("");
 		await passwordInput.fill(credentials.password);
-		await submitButton.click();
-		await this.page.waitForTimeout(3e3);
-		if (await this.page.locator("#ds_aws_captcha, #cf-overlay").isVisible().catch(() => false)) {
-			console.log("Обнаружена капча. Пожалуйста, пройдите её вручную в открывшемся окне браузера...");
+		console.log("[DeepSeek] Поля заполнены");
+		const captchaSelector = "#ds_aws_captcha, #cf-overlay";
+		if (await this.page.locator(captchaSelector).isVisible().catch(() => false)) {
+			console.log("[DeepSeek] Капча до клика, ждём ручного прохождения...");
 			await this.waitForCaptchaToDisappear(12e4);
 		}
-		this.isLoggedIn = await this.isAuthenticated();
+		console.log("[DeepSeek] Клик по кнопке Войти");
+		await submitButton.click();
+		console.log("[DeepSeek] Клик выполнен");
+		const textareaSelector = "textarea[placeholder*=\"Сообщение\"], textarea[placeholder*=\"Message\"]";
+		try {
+			console.log("[DeepSeek] Ожидание textarea (признак входа)...");
+			await this.page.waitForSelector(textareaSelector, { timeout: 2e4 });
+			console.log("[DeepSeek] Textarea появился");
+		} catch {
+			console.log("[DeepSeek] Textarea не появился, проверяем капчу после клика...");
+			if (await this.page.locator(captchaSelector).isVisible().catch(() => false)) {
+				console.log("[DeepSeek] Капча после клика, ждём...");
+				await this.waitForCaptchaToDisappear(12e4);
+				await this.page.waitForSelector(textareaSelector, { timeout: 2e4 });
+			} else {
+				console.log("[DeepSeek] Капчи нет, возможно ошибка входа");
+				await this.page.waitForTimeout(5e3);
+			}
+		}
+		this.isLoggedIn = true;
 		if (this.isLoggedIn) {
 			setCredentials("deepseek", credentials.login, credentials.password);
 			await this.saveStorageState();
-			console.log("Вход выполнен успешно");
-		} else throw new Error("Не удалось войти в DeepSeek. Проверьте правильность данных и попробуйте ещё раз.");
+			console.log("[DeepSeek] Вход выполнен успешно, сессия сохранена");
+			await this.stopLoadingSpinner();
+		} else throw new Error("Не удалось войти в DeepSeek. Проверьте учётные данные и попробуйте ещё раз.");
 	}
 	/**
 	* Запускает браузер и открывает DeepSeek.
@@ -8829,14 +8920,18 @@ var DeepSeekService = class DeepSeekService {
 		});
 		if (!await this.loadStorageState()) this.context = await this.browser.newContext();
 		this.page = await this.context.newPage();
-		await this.page.goto(DEEPSEEK_URL, {
-			waitUntil: "domcontentloaded",
-			timeout: 6e4
-		});
+		console.log("[DeepSeek] Открываем главную страницу");
+		await this.gotoWithTimeout(DEEPSEEK_URL, 2e4);
+		console.log("[DeepSeek] Главная страница загружена (или таймаут проигнорирован)");
 		this.isLoggedIn = await this.isAuthenticated();
 		if (!this.isLoggedIn) {
-			console.log("Сессия недействительна или отсутствует, требуется вход");
+			console.log("[DeepSeek] Требуется вход");
 			await this.login();
+			return { status: "logged_in" };
+		}
+		if (this.isLoggedIn) {
+			await this.stopLoadingSpinner();
+			await this.saveStorageState();
 			return { status: "logged_in" };
 		}
 		await this.saveStorageState();
@@ -8874,6 +8969,49 @@ var DeepSeekService = class DeepSeekService {
 	getPage() {
 		return this.page;
 	}
+	/**
+	* Проверяет, загружен ли интерфейс чата (поле ввода).
+	* Если открыт экран выбора режима, кликает по "Быстрому" режиму.
+	*/
+	async ensureReadyForChat() {
+		if (!this.page) throw new Error("Браузер не запущен");
+		const textareaSelector = "textarea[placeholder=\"Сообщение для DeepSeek\"]";
+		if (await this.page.locator(textareaSelector).count() > 0) return;
+		console.log("Интерфейс чата не обнаружен, пробуем выбрать режим...");
+		const fastMode = this.page.locator("[data-model-type=\"default\"][role=\"radio\"]");
+		await fastMode.waitFor({
+			state: "visible",
+			timeout: 1e4
+		});
+		await fastMode.click();
+		await this.page.waitForSelector(textareaSelector, { timeout: 15e3 });
+		console.log("Готов к отправке сообщений");
+	}
+	/**
+	* Отправляет сообщение в DeepSeek и возвращает текст ответа.
+	*/
+	async sendMessage(message) {
+		if (!this.page) throw new Error("Браузер не запущен");
+		if (!this.isLoggedIn && !await this.isAuthenticated()) throw new Error("Не авторизован в DeepSeek");
+		await this.ensureReadyForChat();
+		const textareaSelector = "textarea[placeholder=\"Сообщение для DeepSeek\"]";
+		const assistantMessageSelector = ".ds-markdown.ds-assistant-message-main-content";
+		const messagesBefore = await this.page.locator(assistantMessageSelector).count();
+		const textarea = this.page.locator(textareaSelector).first();
+		await textarea.waitFor({
+			state: "visible",
+			timeout: 1e4
+		});
+		await textarea.fill(message);
+		await textarea.press("Enter");
+		await this.page.waitForFunction(({ selector, prevCount }) => {
+			return document.querySelectorAll(selector).length > prevCount;
+		}, {
+			selector: assistantMessageSelector,
+			prevCount: messagesBefore
+		}, { timeout: 6e4 });
+		return (await this.page.locator(assistantMessageSelector).last().innerText()).trim();
+	}
 };
 //#endregion
 //#region src/main/ipcHandlers/gatewayHandlers.ts
@@ -8905,6 +9043,19 @@ function registerGatewayHandlers() {
 	});
 	electron.ipcMain.handle("gateway:get-status", () => {
 		return service.getStatus();
+	});
+	electron.ipcMain.handle("gateway:send-message", async (_event, message) => {
+		try {
+			return {
+				success: true,
+				data: await service.sendMessage(message)
+			};
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
 	});
 }
 //#endregion

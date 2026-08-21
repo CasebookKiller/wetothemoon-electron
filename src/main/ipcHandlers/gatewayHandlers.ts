@@ -27,4 +27,13 @@ export function registerGatewayHandlers(): void {
   ipcMain.handle('gateway:get-status', () => {
     return service.getStatus();
   });
+
+  ipcMain.handle('gateway:send-message', async (_event, message: string) => {
+    try {
+      const response = await service.sendMessage(message);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
 }
