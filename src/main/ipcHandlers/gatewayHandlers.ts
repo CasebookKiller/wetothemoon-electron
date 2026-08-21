@@ -36,4 +36,49 @@ export function registerGatewayHandlers(): void {
       return { success: false, error: (error as Error).message };
     }
   });
+
+  ipcMain.handle('gateway:get-conversations', async () => {
+    try {
+      const data = await service.getConversations();
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('gateway:open-conversation', async (_event, id: string) => {
+    try {
+      await service.openConversation(id);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('gateway:select-model', async (_event, modelType: string) => {
+    try {
+      await service.selectModel(modelType as 'default' | 'expert' | 'vision');
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('gateway:set-deep-thinking', async (_event, enabled: boolean) => {
+    try {
+      await service.setDeepThinking(enabled);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('gateway:set-search', async (_event, enabled: boolean) => {
+    try {
+      await service.setSearch(enabled);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
 }

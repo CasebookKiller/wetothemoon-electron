@@ -3,6 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import { Panel } from 'primereact/panel';
 import { Button } from 'primereact/button';
+import { ListBox } from 'primereact/listbox';
+import { Dropdown } from 'primereact/dropdown';
+import { ToggleButton } from 'primereact/togglebutton';
 import { InputTextarea } from 'primereact/inputtextarea';
 import { Divider } from 'primereact/divider';
 
@@ -14,6 +17,11 @@ export const GatewayPage: React.FC = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
+  const [conversations, setConversations] = useState<{ id: string; title: string }[]>([]);
+  const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
+  const [modelType, setModelType] = useState<string>('default');
+  const [deepThinking, setDeepThinking] = useState(false);
+  const [search, setSearch] = useState(true);
 
   const api = (window as any).electronAPI;
 
@@ -89,6 +97,66 @@ export const GatewayPage: React.FC = () => {
     }
   };
 
+  const handleRefreshConversations = async () => {
+    try {
+      const result = await api.gatewayGetConversations();
+      if (result.success) {
+        setConversations(result.data || []);
+      } else {
+        setError(result.error || 'Ошибка загрузки диалогов');
+      }
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
+  const handleOpenConversation = async (id: string) => {
+    try {
+      const result = await api.gatewayOpenConversation(id);
+      if (!result.success) {
+        setError(result.error || 'Ошибка открытия диалога');
+      }
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
+  const handleSelectModel = async (value: string) => {
+    setModelType(value);
+    try {
+      const result = await api.gatewaySelectModel(value);
+      if (!result.success) {
+        setError(result.error || 'Ошибка выбора модели');
+      }
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
+  const handleDeepThinkingChange = async (value: boolean) => {
+    setDeepThinking(value);
+    try {
+      await api.gatewaySetDeepThinking(value);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
+  const handleSearchChange = async (value: boolean) => {
+    setSearch(value);
+    try {
+      await api.gatewaySetSearch(value);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      handleRefreshConversations();
+    }
+  }, [isLoggedIn]);
+
   return (
     <React.Fragment>
       <div className="app p-0" />
@@ -149,6 +217,63 @@ export const GatewayPage: React.FC = () => {
         </div>
       </Panel>
 
+      {/* Панель диалогов */}
+      <Panel className="shadow-5 mx-1" header="Диалоги">
+        <div className="p-2">
+          <Button
+            label="Обновить"
+            icon="pi pi-refresh"
+            className="p-button-sm p-button-raised p-button-accent"
+            onClick={handleRefreshConversations}
+          />
+          <ListBox
+            value={selectedConversation}
+            options={conversations}
+            onChange={(e) => {
+              setSelectedConversation(e.value);
+              if (e.value) handleOpenConversation(e.value);
+            }}
+            optionLabel="title"
+            optionValue="id"
+            style={{ width: '100%', marginTop: '10px' }}
+          />
+        </div>
+      </Panel>
+
+      <div className="app p-0" />
+
+      {/* Панель настроек модели */}
+      <Panel className="shadow-5 mx-1" header="Модель и параметры">
+        <div className="p-2 flex flex-column gap-3">
+          <Dropdown
+            value={modelType}
+            options={[
+              { label: 'Быстрый', value: 'default' },
+              { label: 'Эксперт', value: 'expert' },
+              { label: 'Распознавание', value: 'vision' },
+            ]}
+            onChange={(e) => handleSelectModel(e.value)}
+            placeholder="Выберите режим"
+            className="w-full"
+          />
+          <div className="flex flex-wrap gap-2">
+            <ToggleButton
+              checked={deepThinking}
+              onChange={(e) => handleDeepThinkingChange(e.value)}
+              onLabel="Глубокое мышление"
+              offLabel="Глубокое мышление"
+              className="p-button-sm"
+            />
+            <ToggleButton
+              checked={search}
+              onChange={(e) => handleSearchChange(e.value)}
+              onLabel="Умный поиск"
+              offLabel="Умный поиск"
+              className="p-button-sm"
+            />
+          </div>
+        </div>
+      </Panel>
       {error && (
         <div className="app p-0">
           <div className="p-error mx-2">{error}</div>
@@ -170,6 +295,7 @@ export const GatewayPage: React.FC = () => {
           </Panel>
         </React.Fragment>
       )}
+      
     </React.Fragment>
   );
 };

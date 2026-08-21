@@ -9014,6 +9014,73 @@ var DeepSeekService = class DeepSeekService {
 		}, { timeout: 6e4 });
 		return (await this.page.locator(assistantMessageSelector).last().innerText()).trim();
 	}
+	/**
+	* Возвращает список диалогов из сайдбара DeepSeek.
+	*/
+	async getConversations() {
+		if (!this.page) throw new Error("Браузер не запущен");
+		return await this.page.$$eval("a._546d736", (links) => {
+			return links.map((link) => {
+				const href = link.getAttribute("href") || "";
+				const titleEl = link.querySelector(".c08e6e93");
+				const title = titleEl ? titleEl.textContent?.trim() : "";
+				return {
+					id: href.split("/").pop() || "",
+					title
+				};
+			}).filter((item) => item.title && item.id);
+		});
+	}
+	/**
+	* Открывает конкретный диалог по ID.
+	*/
+	async openConversation(id) {
+		if (!this.page) throw new Error("Браузер не запущен");
+		const url = `https://chat.deepseek.com/a/chat/s/${id}`;
+		console.log(`[DeepSeek] Открываем диалог: ${url}`);
+		await this.gotoWithTimeout(url, 15e3);
+		await this.page.waitForTimeout(2e3);
+	}
+	/**
+	* Выбирает режим модели: 'default' (Быстрый), 'expert' (Эксперт), 'vision' (Распознавание).
+	*/
+	async selectModel(modelType) {
+		if (!this.page) throw new Error("Браузер не запущен");
+		const selector = `[data-model-type="${modelType}"][role="radio"]`;
+		const radio = this.page.locator(selector).first();
+		await radio.waitFor({
+			state: "visible",
+			timeout: 1e4
+		});
+		await radio.click({ force: true });
+		console.log(`[DeepSeek] Выбран режим: ${modelType}`);
+	}
+	/**
+	* Включает/выключает режим «Глубокое мышление».
+	*/
+	async setDeepThinking(enabled) {
+		if (!this.page) throw new Error("Браузер не запущен");
+		const toggle = this.page.locator("div.ds-toggle-button:has(span:has-text(\"Глубокое мышление\"))").first();
+		await toggle.waitFor({
+			state: "visible",
+			timeout: 1e4
+		});
+		if (await toggle.getAttribute("aria-pressed") === "true" !== enabled) await toggle.click({ force: true });
+		console.log(`[DeepSeek] Глубокое мышление: ${enabled}`);
+	}
+	/**
+	* Включает/выключает режим «Умный поиск».
+	*/
+	async setSearch(enabled) {
+		if (!this.page) throw new Error("Браузер не запущен");
+		const toggle = this.page.locator("div.ds-toggle-button:has(span:has-text(\"Умный поиск\"))").first();
+		await toggle.waitFor({
+			state: "visible",
+			timeout: 1e4
+		});
+		if (await toggle.getAttribute("aria-pressed") === "true" !== enabled) await toggle.click({ force: true });
+		console.log(`[DeepSeek] Умный поиск: ${enabled}`);
+	}
 };
 //#endregion
 //#region src/main/ipcHandlers/gatewayHandlers.ts
@@ -9052,6 +9119,63 @@ function registerGatewayHandlers() {
 				success: true,
 				data: await service.sendMessage(message)
 			};
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("gateway:get-conversations", async () => {
+		try {
+			return {
+				success: true,
+				data: await service.getConversations()
+			};
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("gateway:open-conversation", async (_event, id) => {
+		try {
+			await service.openConversation(id);
+			return { success: true };
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("gateway:select-model", async (_event, modelType) => {
+		try {
+			await service.selectModel(modelType);
+			return { success: true };
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("gateway:set-deep-thinking", async (_event, enabled) => {
+		try {
+			await service.setDeepThinking(enabled);
+			return { success: true };
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("gateway:set-search", async (_event, enabled) => {
+		try {
+			await service.setSearch(enabled);
+			return { success: true };
 		} catch (error) {
 			return {
 				success: false,

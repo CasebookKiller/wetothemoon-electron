@@ -454,4 +454,83 @@ export class DeepSeekService {
 
     return responseText.trim();
   }
+
+  /**
+   * Возвращает список диалогов из сайдбара DeepSeek.
+   */
+  async getConversations(): Promise<{ id: string; title: string }[]> {
+    if (!this.page) throw new Error('Браузер не запущен');
+
+    const conversations = await this.page.$$eval('a._546d736', (links) => {
+      return links
+        .map((link) => {
+          const href = link.getAttribute('href') || '';
+          const titleEl = link.querySelector('.c08e6e93');
+          const title = titleEl ? titleEl.textContent?.trim() : '';
+          // ID — последний сегмент пути
+          const id = href.split('/').pop() || '';
+          return { id, title };
+        })
+        .filter((item) => item.title && item.id);
+    });
+
+    return conversations;
+  }
+
+  /**
+   * Открывает конкретный диалог по ID.
+   */
+  async openConversation(id: string): Promise<void> {
+    if (!this.page) throw new Error('Браузер не запущен');
+
+    const url = `https://chat.deepseek.com/a/chat/s/${id}`;
+    console.log(`[DeepSeek] Открываем диалог: ${url}`);
+    await this.gotoWithTimeout(url, 15000);
+    await this.page.waitForTimeout(2000);
+  }
+
+  /**
+   * Выбирает режим модели: 'default' (Быстрый), 'expert' (Эксперт), 'vision' (Распознавание).
+   */
+  async selectModel(modelType: 'default' | 'expert' | 'vision'): Promise<void> {
+    if (!this.page) throw new Error('Браузер не запущен');
+
+    const selector = `[data-model-type="${modelType}"][role="radio"]`;
+    const radio = this.page.locator(selector).first();
+    await radio.waitFor({ state: 'visible', timeout: 10000 });
+    await radio.click({ force: true });
+    console.log(`[DeepSeek] Выбран режим: ${modelType}`);
+  }
+
+  /**
+   * Включает/выключает режим «Глубокое мышление».
+   */
+  async setDeepThinking(enabled: boolean): Promise<void> {
+    if (!this.page) throw new Error('Браузер не запущен');
+
+    const toggle = this.page.locator('div.ds-toggle-button:has(span:has-text("Глубокое мышление"))').first();
+    await toggle.waitFor({ state: 'visible', timeout: 10000 });
+
+    const isPressed = (await toggle.getAttribute('aria-pressed')) === 'true';
+    if (isPressed !== enabled) {
+      await toggle.click({ force: true });
+    }
+    console.log(`[DeepSeek] Глубокое мышление: ${enabled}`);
+  }
+
+  /**
+   * Включает/выключает режим «Умный поиск».
+   */
+  async setSearch(enabled: boolean): Promise<void> {
+    if (!this.page) throw new Error('Браузер не запущен');
+
+    const toggle = this.page.locator('div.ds-toggle-button:has(span:has-text("Умный поиск"))').first();
+    await toggle.waitFor({ state: 'visible', timeout: 10000 });
+
+    const isPressed = (await toggle.getAttribute('aria-pressed')) === 'true';
+    if (isPressed !== enabled) {
+      await toggle.click({ force: true });
+    }
+    console.log(`[DeepSeek] Умный поиск: ${enabled}`);
+  }
 }

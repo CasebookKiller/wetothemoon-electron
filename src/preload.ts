@@ -360,6 +360,11 @@ try {
     gatewayClose: () => ipcRenderer.invoke('gateway:close'),
     gatewayGetStatus: () => ipcRenderer.invoke('gateway:get-status'),
     gatewaySendMessage: (message: string) => ipcRenderer.invoke('gateway:send-message', message),
+    gatewayGetConversations: () => ipcRenderer.invoke('gateway:get-conversations'),
+    gatewayOpenConversation: (id: string) => ipcRenderer.invoke('gateway:open-conversation', id),
+    gatewaySelectModel: (modelType: string) => ipcRenderer.invoke('gateway:select-model', modelType),
+    gatewaySetDeepThinking: (enabled: boolean) => ipcRenderer.invoke('gateway:set-deep-thinking', enabled),
+    gatewaySetSearch: (enabled: boolean) => ipcRenderer.invoke('gateway:set-search', enabled),
 
   });
 

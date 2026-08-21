@@ -255,7 +255,12 @@ try {
 		gatewayLaunch: () => electron.ipcRenderer.invoke("gateway:launch"),
 		gatewayClose: () => electron.ipcRenderer.invoke("gateway:close"),
 		gatewayGetStatus: () => electron.ipcRenderer.invoke("gateway:get-status"),
-		gatewaySendMessage: (message) => electron.ipcRenderer.invoke("gateway:send-message", message)
+		gatewaySendMessage: (message) => electron.ipcRenderer.invoke("gateway:send-message", message),
+		gatewayGetConversations: () => electron.ipcRenderer.invoke("gateway:get-conversations"),
+		gatewayOpenConversation: (id) => electron.ipcRenderer.invoke("gateway:open-conversation", id),
+		gatewaySelectModel: (modelType) => electron.ipcRenderer.invoke("gateway:select-model", modelType),
+		gatewaySetDeepThinking: (enabled) => electron.ipcRenderer.invoke("gateway:set-deep-thinking", enabled),
+		gatewaySetSearch: (enabled) => electron.ipcRenderer.invoke("gateway:set-search", enabled)
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {
