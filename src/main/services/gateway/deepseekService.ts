@@ -577,4 +577,43 @@ export class DeepSeekService {
     const pressed = await toggle.getAttribute('aria-pressed').catch(() => 'false');
     return pressed === 'true';
   }
+
+  async getConversationMessages(): Promise<{ role: 'user' | 'assistant'; content: string }[]> {
+    if (!this.page) throw new Error('Браузер не запущен');
+
+    // Ждём появления контейнера со списком сообщений
+    try {
+      await this.page.waitForSelector('div.ds-virtual-list-items', { timeout: 10000 });
+    } catch {
+      return []; // если сообщений нет, возвращаем пустой массив
+    }
+
+    const messages = await this.page.evaluate(() => {
+      const result: { role: 'user' | 'assistant'; content: string }[] = [];
+      // Ищем все элементы с data-virtual-list-item-key (по одному на сообщение)
+      const items = document.querySelectorAll('div[data-virtual-list-item-key]');
+      items.forEach((item) => {
+        // Пользовательское сообщение: div.fbb737a4
+        const userContent = item.querySelector('div.fbb737a4');
+        if (userContent) {
+          result.push({
+            role: 'user',
+            content: userContent.textContent?.trim() || '',
+          });
+          return;
+        }
+        // Ассистентское сообщение: div.ds-markdown.ds-assistant-message-main-content
+        const assistantContent = item.querySelector('div.ds-markdown.ds-assistant-message-main-content');
+        if (assistantContent) {
+          result.push({
+            role: 'assistant',
+            content: assistantContent.textContent?.trim() || '',
+          });
+        }
+      });
+      return result;
+    });
+
+    return messages;
+  }
 }

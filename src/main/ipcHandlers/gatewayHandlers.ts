@@ -108,4 +108,13 @@ export function registerGatewayHandlers(): void {
       return { success: false, error: (error as Error).message };
     }
   });
+
+  ipcMain.handle('gateway:get-conversation-messages', async () => {
+    try {
+      const data = await service.getConversationMessages();
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
 }

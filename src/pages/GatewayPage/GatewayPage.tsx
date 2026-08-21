@@ -134,17 +134,6 @@ export const GatewayPage: React.FC = () => {
     }
   };
 
-  const handleOpenConversation = async (id: string) => {
-    try {
-      const result = await api.gatewayOpenConversation(id);
-      if (!result.success) {
-        setError(result.error || 'Ошибка открытия диалога');
-      }
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  };
-
   const handleSelectModel = async (value: 'default' | 'expert' | 'vision') => {
     setModelType(value);
     if (value === 'expert') setSearch(false);
@@ -170,6 +159,26 @@ export const GatewayPage: React.FC = () => {
     setSearch(value);
     try {
       await api.gatewaySetSearch(value);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
+  const handleOpenConversation = async (id: string) => {
+    try {
+      const resultOpen = await api.gatewayOpenConversation(id);
+      if (!resultOpen.success) {
+        setError(resultOpen.error || 'Ошибка открытия диалога');
+        return;
+      }
+
+      // Загружаем историю сообщений из открытого диалога
+      const resultMessages = await api.gatewayGetConversationMessages();
+      if (resultMessages.success) {
+        setMessages(resultMessages.data);
+      } else {
+        setError(resultMessages.error || 'Ошибка загрузки сообщений');
+      }
     } catch (e) {
       setError((e as Error).message);
     }
@@ -245,7 +254,7 @@ export const GatewayPage: React.FC = () => {
           <Panel className="shadow-5 h-full" header="Чат DeepSeek">
             <div className="flex flex-column h-full p-2">
               {/* Выбор режима */}
-              <div className="flex flex-wrap justify-content-center gap-3 mb-3">
+              <div className="flex justify-content-center gap-3 mb-3 flex-nowrap overflow-x-auto">
                 {[
                   { type: 'default', label: 'Быстрый', icon: 'pi pi-bolt' },
                   { type: 'expert', label: 'Эксперт', icon: 'pi pi-star' },
@@ -292,23 +301,27 @@ export const GatewayPage: React.FC = () => {
                 )}
               </div>
 
-              {/* Переключатели */}
-              <div className="flex flex-wrap gap-3 mt-3">
-                <ToggleButton
-                  checked={deepThinking}
-                  onChange={(e) => handleDeepThinkingChange(e.value)}
-                  onLabel="Глубокое мышление"
-                  offLabel="Глубокое мышление"
-                  className="p-button-sm p-button-text"
-                />
-                <ToggleButton
-                  checked={search}
-                  onChange={(e) => handleSearchChange(e.value)}
-                  onLabel="Умный поиск"
-                  offLabel="Умный поиск"
-                  className="p-button-sm p-button-text"
-                  disabled={modelType === 'expert'}
-                />
+              {/* Переключатели "Глубокое мышление" и "Умный поиск" */}
+              <div className="flex gap-3 mt-3">
+                <div
+                  className={`inline-flex align-items-center gap-2 px-3 py-1 border-round-3xl cursor-pointer ${
+                    deepThinking ? 'bg-primary text-white' : 'surface-100 text-700'
+                  }`}
+                  onClick={() => handleDeepThinkingChange(!deepThinking)}
+                >
+                  <i className="pi pi-lightbulb" />
+                  <span>Глубокое мышление</span>
+                </div>
+
+                <div
+                  className={`inline-flex align-items-center gap-2 px-3 py-1 border-round-3xl cursor-pointer ${
+                    search ? 'bg-primary text-white' : 'surface-100 text-700'
+                  } ${modelType === 'expert' ? 'opacity-50 pointer-events-none' : ''}`}
+                  onClick={() => handleSearchChange(!search)}
+                >
+                  <i className="pi pi-search" />
+                  <span>Умный поиск</span>
+                </div>
               </div>
 
               {/* Поле ввода */}

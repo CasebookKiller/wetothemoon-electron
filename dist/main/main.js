@@ -9113,6 +9113,33 @@ var DeepSeekService = class DeepSeekService {
 		if (!await toggle.isVisible().catch(() => false)) return false;
 		return await toggle.getAttribute("aria-pressed").catch(() => "false") === "true";
 	}
+	async getConversationMessages() {
+		if (!this.page) throw new Error("Браузер не запущен");
+		try {
+			await this.page.waitForSelector("div.ds-virtual-list-items", { timeout: 1e4 });
+		} catch {
+			return [];
+		}
+		return await this.page.evaluate(() => {
+			const result = [];
+			document.querySelectorAll("div[data-virtual-list-item-key]").forEach((item) => {
+				const userContent = item.querySelector("div.fbb737a4");
+				if (userContent) {
+					result.push({
+						role: "user",
+						content: userContent.textContent?.trim() || ""
+					});
+					return;
+				}
+				const assistantContent = item.querySelector("div.ds-markdown.ds-assistant-message-main-content");
+				if (assistantContent) result.push({
+					role: "assistant",
+					content: assistantContent.textContent?.trim() || ""
+				});
+			});
+			return result;
+		});
+	}
 };
 //#endregion
 //#region src/main/ipcHandlers/gatewayHandlers.ts
@@ -9246,6 +9273,19 @@ function registerGatewayHandlers() {
 			return {
 				success: true,
 				data: await service.getSearch()
+			};
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("gateway:get-conversation-messages", async () => {
+		try {
+			return {
+				success: true,
+				data: await service.getConversationMessages()
 			};
 		} catch (error) {
 			return {

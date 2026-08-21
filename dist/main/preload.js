@@ -263,7 +263,8 @@ try {
 		gatewaySetSearch: (enabled) => electron.ipcRenderer.invoke("gateway:set-search", enabled),
 		gatewayGetCurrentModel: () => electron.ipcRenderer.invoke("gateway:get-current-model"),
 		gatewayGetDeepThinking: () => electron.ipcRenderer.invoke("gateway:get-deep-thinking"),
-		gatewayGetSearch: () => electron.ipcRenderer.invoke("gateway:get-search")
+		gatewayGetSearch: () => electron.ipcRenderer.invoke("gateway:get-search"),
+		gatewayGetConversationMessages: () => electron.ipcRenderer.invoke("gateway:get-conversation-messages")
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {

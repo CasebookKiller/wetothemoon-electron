@@ -368,6 +368,7 @@ try {
     gatewayGetCurrentModel: () => ipcRenderer.invoke('gateway:get-current-model'),
     gatewayGetDeepThinking: () => ipcRenderer.invoke('gateway:get-deep-thinking'),
     gatewayGetSearch: () => ipcRenderer.invoke('gateway:get-search'),
+    gatewayGetConversationMessages: () => ipcRenderer.invoke('gateway:get-conversation-messages'),
 
   });
 
