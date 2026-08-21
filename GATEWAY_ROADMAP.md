@@ -26,8 +26,10 @@
   - [x] Добавлены IPC-обработчики `gateway:launch`, `gateway:close`, `gateway:get-status`
   - [x] В `preload.ts` добавлены `gatewayLaunch`, `gatewayClose`, `gatewayGetStatus`
   - [x] Обновлён UI страницы GatewayPage с PrimeReact
-  - [x] Реализован автологин с реальными селекторами
+  - [x] Реализован автологин DeepSeek с реальными селекторами
+  - [x] Добавлено ожидание ручного прохождения капчи (AWS WAF / Cloudflare)
   - [x] Обновлён ROADMAP, сделан коммит (текущий шаг)
+  
 
 - [ ] **Этап 4. Интерфейс отправки сообщений**
   - [ ] В `GatewayPage.tsx` добавлены поле ввода, кнопка «Отправить», область ответа

@@ -8750,6 +8750,19 @@ var DeepSeekService = class DeepSeekService {
 		}
 	}
 	/**
+	* Ожидает, пока капча исчезнет из DOM.
+	* Используется для ручного прохождения капчи пользователем.
+	*/
+	async waitForCaptchaToDisappear(timeoutMs) {
+		const captchaSelector = "#ds_aws_captcha, #cf-overlay";
+		const start = Date.now();
+		while (Date.now() - start < timeoutMs) {
+			if (!await this.page.locator(captchaSelector).isVisible().catch(() => false)) return;
+			await this.page.waitForTimeout(2e3);
+		}
+		throw new Error("Время ожидания ручного прохождения капчи истекло");
+	}
+	/**
 	* Выполняет вход на chat.deepseek.com.
 	* Учётные данные берутся из хранилища или .env.
 	* После входа сохраняет storageState.
@@ -8762,27 +8775,33 @@ var DeepSeekService = class DeepSeekService {
 			waitUntil: "domcontentloaded",
 			timeout: 6e4
 		});
-		const loginInput = this.page.locator("input[type=\"text\"].ds-input__input, input[placeholder=\"Номер телефона / адрес электронной почты\"]").first();
-		const passwordInput = this.page.locator("input[type=\"password\"].ds-input__input, input[placeholder=\"Пароль\"]").first();
-		const submitButton = this.page.locator("div.ds-button--primary.ds-button--filled, div[role=\"button\"]:has-text(\"Войти\")").first();
+		const loginInput = this.page.locator("input[type=\"text\"].ds-input__input");
+		const passwordInput = this.page.locator("input[type=\"password\"].ds-input__input");
+		const submitButton = this.page.locator("div.ds-button--primary.ds-button--filled");
 		await loginInput.waitFor({
 			state: "visible",
 			timeout: 15e3
 		});
-		await loginInput.fill(credentials.login);
 		await passwordInput.waitFor({
 			state: "visible",
 			timeout: 5e3
 		});
+		await loginInput.fill("");
+		await loginInput.fill(credentials.login);
+		await passwordInput.fill("");
 		await passwordInput.fill(credentials.password);
 		await submitButton.click();
-		await this.page.waitForURL("**/chat.deepseek.com/**", { timeout: 2e4 });
+		await this.page.waitForTimeout(3e3);
+		if (await this.page.locator("#ds_aws_captcha, #cf-overlay").isVisible().catch(() => false)) {
+			console.log("Обнаружена капча. Пожалуйста, пройдите её вручную в открывшемся окне браузера...");
+			await this.waitForCaptchaToDisappear(12e4);
+		}
 		this.isLoggedIn = await this.isAuthenticated();
 		if (this.isLoggedIn) {
 			setCredentials("deepseek", credentials.login, credentials.password);
 			await this.saveStorageState();
 			console.log("Вход выполнен успешно");
-		} else throw new Error("Не удалось войти в DeepSeek. Проверьте учётные данные и селекторы.");
+		} else throw new Error("Не удалось войти в DeepSeek. Проверьте правильность данных и попробуйте ещё раз.");
 	}
 	/**
 	* Запускает браузер и открывает DeepSeek.

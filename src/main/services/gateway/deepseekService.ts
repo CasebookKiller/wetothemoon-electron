@@ -115,6 +115,24 @@ export class DeepSeekService {
       return false;
     }
   }
+  /**
+   * Ожидает, пока капча исчезнет из DOM.
+   * Используется для ручного прохождения капчи пользователем.
+   */
+
+  private async waitForCaptchaToDisappear(timeoutMs: number): Promise<void> {
+    const captchaSelector = '#ds_aws_captcha, #cf-overlay';
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      const captcha = this.page!.locator(captchaSelector);
+      const visible = await captcha.isVisible().catch(() => false);
+      if (!visible) {
+        return;
+      }
+      await this.page!.waitForTimeout(2000);
+    }
+    throw new Error('Время ожидания ручного прохождения капчи истекло');
+  }
 
   /**
    * Выполняет вход на chat.deepseek.com.
@@ -129,27 +147,36 @@ export class DeepSeekService {
     console.log('Выполняется вход в DeepSeek...');
     await this.page.goto(LOGIN_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-    // Актуальные селекторы страницы входа
-    const loginInput = this.page.locator(
-      'input[type="text"].ds-input__input, input[placeholder="Номер телефона / адрес электронной почты"]'
-    ).first();
-    const passwordInput = this.page.locator(
-      'input[type="password"].ds-input__input, input[placeholder="Пароль"]'
-    ).first();
-    const submitButton = this.page.locator(
-      'div.ds-button--primary.ds-button--filled, div[role="button"]:has-text("Войти")'
-    ).first();
+    // Актуальные селекторы (учитываем русскую и английскую локализацию)
+    const loginInput = this.page.locator('input[type="text"].ds-input__input');
+    const passwordInput = this.page.locator('input[type="password"].ds-input__input');
+    const submitButton = this.page.locator('div.ds-button--primary.ds-button--filled');
 
+    // Ждём появления полей
     await loginInput.waitFor({ state: 'visible', timeout: 15000 });
-    await loginInput.fill(credentials.login);
     await passwordInput.waitFor({ state: 'visible', timeout: 5000 });
+
+    // Очищаем поля и заполняем заново (на случай, если уже заполнены)
+    await loginInput.fill('');
+    await loginInput.fill(credentials.login);
+    await passwordInput.fill('');
     await passwordInput.fill(credentials.password);
+
+    // Нажимаем кнопку «Войти»
     await submitButton.click();
 
-    // Ожидаем перехода на главную страницу чата
-    await this.page.waitForURL('**/chat.deepseek.com/**', { timeout: 20000 });
+    // Даём время на появление капчи (AWS WAF или Cloudflare)
+    await this.page.waitForTimeout(3000);
 
-    // Проверяем, что авторизовались
+    // Проверяем наличие капчи и ждём ручного прохождения
+    const captchaSelector = '#ds_aws_captcha, #cf-overlay';
+    const captchaVisible = await this.page.locator(captchaSelector).isVisible().catch(() => false);
+    if (captchaVisible) {
+      console.log('Обнаружена капча. Пожалуйста, пройдите её вручную в открывшемся окне браузера...');
+      await this.waitForCaptchaToDisappear(120000); // ожидание до 2 минут
+    }
+
+    // После прохождения капчи проверяем авторизацию
     this.isLoggedIn = await this.isAuthenticated();
     if (this.isLoggedIn) {
       // Сохраняем учётные данные в safeStorage (если они были из .env)
@@ -157,7 +184,7 @@ export class DeepSeekService {
       await this.saveStorageState();
       console.log('Вход выполнен успешно');
     } else {
-      throw new Error('Не удалось войти в DeepSeek. Проверьте учётные данные и селекторы.');
+      throw new Error('Не удалось войти в DeepSeek. Проверьте правильность данных и попробуйте ещё раз.');
     }
   }
 
