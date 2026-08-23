@@ -24,7 +24,8 @@ export const createAIWindow = () => {
       preload: preloadPath,//preload: path.join(__dirname, '../../src/preloadai.ts'),
       contextIsolation: true, // обязательно для безопасности
       nodeIntegration: false, // рекомендуется отключить
-    }
+    },
+    backgroundColor:'#212121',
   });
 
   // Загружаем ТОТ ЖЕ сервер, но с параметром в URL

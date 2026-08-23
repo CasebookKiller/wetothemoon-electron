@@ -26,6 +26,7 @@ export const createTasksWindow = () => {
       contextIsolation: true,
       nodeIntegration: false,
     },
+    backgroundColor:'#212121',
   });
 
   const menu = Menu.buildFromTemplate(tasksWindowMenuTemplate);

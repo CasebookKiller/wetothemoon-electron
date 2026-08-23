@@ -17,7 +17,8 @@ export const createMDWindow = () => {
       preload: preloadPath,//path.join(__dirname, '../../../preload.ts'),
       contextIsolation: true,
       nodeIntegration: false,
-    }
+    },
+    backgroundColor:'#212121',
   });
 
   //const mainWindow = getMainWindow();

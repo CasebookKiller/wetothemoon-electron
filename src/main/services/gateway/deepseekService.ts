@@ -23,6 +23,18 @@ interface LaunchResult {
   loginRequired?: boolean;
 }
 
+export interface GatewayChatBlock {
+  type: 'text' | 'code';
+  content: string;
+  language?: string;
+}
+
+export interface GatewayChatMessage {
+  role: 'user' | 'assistant';
+  thinking?: string;
+  blocks: GatewayChatBlock[];
+}
+
 export class DeepSeekService {
   private static instance: DeepSeekService;
   private browser: Browser | null = null;
@@ -290,17 +302,20 @@ export class DeepSeekService {
       }
     }
 
-    this.isLoggedIn = true;
-    if (this.isLoggedIn) {
-      setCredentials('deepseek', credentials.login, credentials.password);
-      await this.saveStorageState();
-      console.log('[DeepSeek] Вход выполнен успешно, сессия сохранена');
-
-      // Останавливаем спиннер через меню профиля
-      await this.stopLoadingSpinner();
-    } else {
+    // Если textarea так и не появился, выбрасываем ошибку
+    const textareaVisible = await this.page.locator(textareaSelector).isVisible().catch(() => false);
+    if (!textareaVisible) {
       throw new Error('Не удалось войти в DeepSeek. Проверьте учётные данные и попробуйте ещё раз.');
     }
+
+    // Успешный вход
+    this.isLoggedIn = true;
+    setCredentials('deepseek', credentials.login, credentials.password);
+    await this.saveStorageState();
+    console.log('[DeepSeek] Вход выполнен успешно, сессия сохранена');
+
+    // Останавливаем спиннер через меню профиля
+    await this.stopLoadingSpinner();
   }
 
   /**
@@ -309,7 +324,6 @@ export class DeepSeekService {
    */
   async launch(): Promise<LaunchResult> {
     if (this.browser && this.browser.isConnected()) {
-      // Если браузер уже запущен, проверяем статус
       if (this.page && (await this.isAuthenticated())) {
         this.isLoggedIn = true;
         return { status: 'logged_in' };
@@ -331,22 +345,19 @@ export class DeepSeekService {
     this.page = await this.context!.newPage();
     console.log('[DeepSeek] Открываем главную страницу');
     await this.gotoWithTimeout(DEEPSEEK_URL, 20000);
-    // Даём время на загрузку интерфейса
     await this.page.waitForTimeout(3000);
     console.log('[DeepSeek] Главная страница загружена (или таймаут проигнорирован)');
 
-    this.isLoggedIn = await this.isAuthenticated();
-    if (!this.isLoggedIn) {
+    const authed = await this.isAuthenticated();
+    if (!authed) {
       console.log('[DeepSeek] Требуется вход');
-      await this.login();
-      return { status: 'logged_in' };
-    }
-    if (this.isLoggedIn) {
-      await this.stopLoadingSpinner();
-      await this.saveStorageState();
+      await this.login(); // login уже устанавливает isLoggedIn = true и сохраняет сессию
       return { status: 'logged_in' };
     }
 
+    // Уже авторизованы
+    this.isLoggedIn = true;
+    await this.stopLoadingSpinner();
     await this.saveStorageState();
     return { status: 'logged_in' };
   }
@@ -413,7 +424,14 @@ export class DeepSeekService {
   /**
    * Отправляет сообщение в DeepSeek и возвращает текст ответа.
    */
-  async sendMessage(message: string): Promise<string> {
+/**
+ * Интерфейс сообщения чата Gateway.
+ */
+
+  /**
+   * Отправляет сообщение в DeepSeek и возвращает структурированный ответ.
+   */
+  async sendMessage(message: string): Promise<GatewayChatMessage> {
     if (!this.page) throw new Error('Браузер не запущен');
     if (!this.isLoggedIn && !(await this.isAuthenticated())) {
       throw new Error('Не авторизован в DeepSeek');
@@ -421,18 +439,20 @@ export class DeepSeekService {
 
     await this.ensureReadyForChat();
 
-    const textareaSelector = 'textarea[placeholder="Сообщение для DeepSeek"]';
-    const assistantMessageSelector = '.ds-markdown.ds-assistant-message-main-content';
+    // Автоматически добавляем просьбу отвечать на русском, если сообщение содержит кириллицу
+    const finalMessage = /[а-яА-ЯёЁ]/.test(message)
+      ? `${message}\n\n(Пожалуйста, ответь на русском языке)`
+      : message;
+
+    const textareaSelector = 'textarea[placeholder*="Сообщение"], textarea[placeholder*="Message"]';
+    const assistantMessageSelector = 'div.ds-markdown.ds-assistant-message-main-content';
 
     // Запоминаем количество сообщений ассистента до отправки
     const messagesBefore = await this.page.locator(assistantMessageSelector).count();
 
-    // Вводим текст
     const textarea = this.page.locator(textareaSelector).first();
     await textarea.waitFor({ state: 'visible', timeout: 10000 });
-    await textarea.fill(message);
-
-    // Отправляем через Enter
+    await textarea.fill(finalMessage);
     await textarea.press('Enter');
 
     // Ждём появления нового сообщения ассистента
@@ -445,14 +465,80 @@ export class DeepSeekService {
       { timeout: 60000 }
     );
 
-    // Ждём, пока сообщение не станет "полным" (может дописываться)
-    // Простая эвристика: подождём немного или дождёмся, когда исчезнет индикатор генерации.
-    // Можно также ждать, пока текст последнего сообщения стабилизируется.
-    // Для начала просто получим текст последнего сообщения.
-    const lastMessage = this.page.locator(assistantMessageSelector).last();
-    const responseText = await lastMessage.innerText();
+    // Небольшая пауза для полной отрисовки
+    await this.page.waitForTimeout(1000);
 
-    return responseText.trim();
+    const lastMessage = this.page.locator(assistantMessageSelector).last();
+
+    const messageData = await lastMessage.evaluate((el) => {
+      const parentMessage = el.closest('div[data-virtual-list-item-key]') as HTMLElement | null;
+
+      let thinking: string | undefined;
+      if (parentMessage) {
+        const thinkingEl = parentMessage.querySelector('div.e1675d8b.ds-think-content');
+        if (thinkingEl) {
+          thinking = thinkingEl.textContent?.trim() || '';
+        }
+      }
+
+      const blocks: any[] = [];
+
+      // Проходим по дочерним узлам основного markdown-контента в исходном порядке
+      el.childNodes.forEach((node) => {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          const element = node as HTMLElement;
+
+          // Если это блок кода
+          if (element.classList.contains('md-code-block')) {
+            const langEl = element.querySelector('span.d813de27');
+            const codeEl = element.querySelector('pre');
+            const language = langEl?.textContent?.trim() || 'text';
+            const code = codeEl?.textContent || '';
+            if (code.trim()) {
+              blocks.push({
+                type: 'code',
+                content: code,
+                language,
+              });
+            }
+          } else {
+            // Любой другой элемент (p, h3, ul, blockquote и т.п.) — текстовый блок
+            const text = element.textContent?.trim() || '';
+            if (text) {
+              blocks.push({
+                type: 'text',
+                content: text,
+              });
+            }
+          }
+        } else if (node.nodeType === Node.TEXT_NODE) {
+          // Могут быть отдельные текстовые узлы (обычно нет, но на всякий случай)
+          const text = node.textContent?.trim() || '';
+          if (text) {
+            blocks.push({
+              type: 'text',
+              content: text,
+            });
+          }
+        }
+      });
+
+      // Если blocks пуст, добавляем весь текст как один блок
+      if (blocks.length === 0) {
+        const text = el.textContent?.trim() || '';
+        if (text) {
+          blocks.push({ type: 'text', content: text });
+        }
+      }
+
+      return {
+        role: 'assistant',
+        thinking,
+        blocks,
+      } as GatewayChatMessage;
+    });
+
+    return messageData;
   }
 
   /**
@@ -578,42 +664,117 @@ export class DeepSeekService {
     return pressed === 'true';
   }
 
-  async getConversationMessages(): Promise<{ role: 'user' | 'assistant'; content: string }[]> {
+  async getConversationMessages(): Promise<GatewayChatMessage[]> {
     if (!this.page) throw new Error('Браузер не запущен');
 
-    // Ждём появления контейнера со списком сообщений
     try {
-      await this.page.waitForSelector('div.ds-virtual-list-items', { timeout: 10000 });
+      await this.page.waitForSelector('div.ds-virtual-list.ds-virtual-list--printable', { timeout: 10000 });
     } catch {
-      return []; // если сообщений нет, возвращаем пустой массив
+      return [];
     }
 
-    const messages = await this.page.evaluate(() => {
-      const result: { role: 'user' | 'assistant'; content: string }[] = [];
-      // Ищем все элементы с data-virtual-list-item-key (по одному на сообщение)
-      const items = document.querySelectorAll('div[data-virtual-list-item-key]');
-      items.forEach((item) => {
-        // Пользовательское сообщение: div.fbb737a4
+    const messages = await this.page.evaluate(async () => {
+      const container = document.querySelector('div.ds-virtual-list.ds-virtual-list--printable') as HTMLElement | null;
+      if (!container) return [];
+
+      // Прокручиваем до верха для подгрузки всех элементов
+      let prevCount = 0;
+      let stableCount = 0;
+      const maxAttempts = 10;
+      for (let i = 0; i < maxAttempts; i++) {
+        container.scrollTop = 0;
+        await new Promise((resolve) => setTimeout(resolve, 1200));
+        const items = container.querySelectorAll('div[data-virtual-list-item-key]');
+        const currentCount = items.length;
+        if (currentCount === prevCount) {
+          stableCount++;
+          if (stableCount >= 2) break;
+        } else {
+          prevCount = currentCount;
+          stableCount = 0;
+        }
+      }
+
+      const result: GatewayChatMessage[] = [];
+      const messageItems = container.querySelectorAll('div[data-virtual-list-item-key]');
+
+      messageItems.forEach((item) => {
+        // Пользовательское сообщение
         const userContent = item.querySelector('div.fbb737a4');
         if (userContent) {
           result.push({
             role: 'user',
-            content: userContent.textContent?.trim() || '',
+            blocks: [{ type: 'text', content: userContent.textContent?.trim() || '' }],
           });
           return;
         }
-        // Ассистентское сообщение: div.ds-markdown.ds-assistant-message-main-content
-        const assistantContent = item.querySelector('div.ds-markdown.ds-assistant-message-main-content');
-        if (assistantContent) {
-          result.push({
-            role: 'assistant',
-            content: assistantContent.textContent?.trim() || '',
-          });
+
+        // Ассистентское сообщение
+        const assistantMain = item.querySelector('div.ds-markdown.ds-assistant-message-main-content');
+        if (!assistantMain) return;
+
+        // Извлекаем размышление
+        let thinking: string | undefined;
+        const thinkingEl = item.querySelector('div.e1675d8b.ds-think-content');
+        if (thinkingEl) {
+          thinking = thinkingEl.textContent?.trim() || '';
         }
+
+        // Извлекаем блоки в исходном порядке
+        const blocks: GatewayChatBlock[] = [];
+        assistantMain.childNodes.forEach((node) => {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            const element = node as HTMLElement;
+            if (element.classList.contains('md-code-block')) {
+              const langEl = element.querySelector('span.d813de27');
+              const codeEl = element.querySelector('pre');
+              const language = langEl?.textContent?.trim() || 'text';
+              const code = codeEl?.textContent || '';
+              if (code.trim()) {
+                blocks.push({ type: 'code', content: code, language });
+              }
+            } else {
+              const text = element.textContent?.trim() || '';
+              if (text) {
+                blocks.push({ type: 'text', content: text });
+              }
+            }
+          } else if (node.nodeType === Node.TEXT_NODE) {
+            const text = node.textContent?.trim() || '';
+            if (text) {
+              blocks.push({ type: 'text', content: text });
+            }
+          }
+        });
+
+        if (blocks.length === 0) {
+          const text = assistantMain.textContent?.trim() || '';
+          if (text) {
+            blocks.push({ type: 'text', content: text });
+          }
+        }
+
+        result.push({
+          role: 'assistant',
+          thinking,
+          blocks,
+        });
       });
-      return result;
+
+      // Дедупликация
+      const seen = new Set<string>();
+      const unique: GatewayChatMessage[] = [];
+      for (const msg of result) {
+        const key = `${msg.role}:${JSON.stringify(msg.blocks)}:${msg.thinking || ''}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          unique.push(msg);
+        }
+      }
+
+      return unique;
     });
 
-    return messages;
+    return messages as GatewayChatMessage[];
   }
 }

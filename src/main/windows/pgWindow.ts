@@ -20,7 +20,8 @@ export const createPGWindow = () => {
       preload: preloadPath,//preload: path.join(__dirname, '../../../preload.ts'),
       contextIsolation: true,
       nodeIntegration: false,
-    }
+    },
+    backgroundColor:'#212121',
   });
 
   //const mainWindow = getMainWindow();

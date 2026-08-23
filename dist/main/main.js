@@ -56,7 +56,8 @@ var createMainWindow = () => {
 			preload: preloadPath$9,
 			contextIsolation: true,
 			nodeIntegration: false
-		}
+		},
+		backgroundColor: "#212121"
 	});
 	mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
 	mainWindow.webContents.openDevTools();
@@ -84,7 +85,8 @@ var createAIWindow = () => {
 			preload: preloadPath$8,
 			contextIsolation: true,
 			nodeIntegration: false
-		}
+		},
+		backgroundColor: "#212121"
 	});
 	if (process.env.NODE_ENV !== "production") aiWindow.loadURL(`${DEV_SERVER_URL}/#/ai`);
 	else aiWindow.loadFile(getMainWindowProdPath());
@@ -709,7 +711,8 @@ var createBondsWindow = () => {
 			preload: preloadPath$7,
 			contextIsolation: true,
 			nodeIntegration: false
-		}
+		},
+		backgroundColor: "#212121"
 	});
 	if (process.env.NODE_ENV === "development") bondsWindow$1.loadURL(`${DEV_SERVER_URL}/#/bonds`);
 	else bondsWindow$1.loadFile(getMainWindowProdPath());
@@ -734,7 +737,8 @@ var createMDWindow = () => {
 			preload: preloadPath$6,
 			contextIsolation: true,
 			nodeIntegration: false
-		}
+		},
+		backgroundColor: "#212121"
 	});
 	if (process.env.NODE_ENV === "development") mdWindow$1.loadURL(`${DEV_SERVER_URL}/#/md`);
 	else mdWindow$1.loadFile(getMainWindowProdPath());
@@ -757,7 +761,8 @@ var createPGWindow = () => {
 			preload: preloadPath$5,
 			contextIsolation: true,
 			nodeIntegration: false
-		}
+		},
+		backgroundColor: "#212121"
 	});
 	if (process.env.NODE_ENV === "development") pgWindow$1.loadURL(`${DEV_SERVER_URL}/#/pg`);
 	else pgWindow$1.loadFile(getMainWindowProdPath());
@@ -784,7 +789,8 @@ var createOllamaWindow = () => {
 			preload: preloadPath$4,
 			contextIsolation: true,
 			nodeIntegration: false
-		}
+		},
+		backgroundColor: "#212121"
 	});
 	if (process.env.NODE_ENV === "development") ollamaWindow$1.loadURL(`${DEV_SERVER_URL}/#/ollama`);
 	else ollamaWindow$1.loadFile(getMainWindowProdPath());
@@ -1288,7 +1294,8 @@ var createTradingAssistantWindow = () => {
 			preload: preloadPath$3,
 			contextIsolation: true,
 			nodeIntegration: false
-		}
+		},
+		backgroundColor: "#212121"
 	});
 	if (process.env.NODE_ENV === "development") tradingAssistantWindow.loadURL(`${DEV_SERVER_URL}/#/trading-assistant`);
 	else tradingAssistantWindow.loadFile(getMainWindowProdPath());
@@ -4550,7 +4557,8 @@ var createOsintWindow = () => {
 			preload: preloadPath$2,
 			contextIsolation: true,
 			nodeIntegration: false
-		}
+		},
+		backgroundColor: "#212121"
 	});
 	if (process.env.NODE_ENV === "development") osintWindow.loadURL(`${DEV_SERVER_URL}/#/osint`);
 	else osintWindow.loadFile(getMainWindowProdPath(), { hash: "/osint" });
@@ -6765,7 +6773,8 @@ var createTasksWindow = () => {
 			preload: preloadPath$1,
 			contextIsolation: true,
 			nodeIntegration: false
-		}
+		},
+		backgroundColor: "#212121"
 	});
 	const menu = electron.Menu.buildFromTemplate(tasksWindowMenuTemplate);
 	tasksWindow.setMenu(menu);
@@ -8887,13 +8896,12 @@ var DeepSeekService = class DeepSeekService {
 				await this.page.waitForTimeout(5e3);
 			}
 		}
+		if (!await this.page.locator(textareaSelector).isVisible().catch(() => false)) throw new Error("Не удалось войти в DeepSeek. Проверьте учётные данные и попробуйте ещё раз.");
 		this.isLoggedIn = true;
-		if (this.isLoggedIn) {
-			setCredentials("deepseek", credentials.login, credentials.password);
-			await this.saveStorageState();
-			console.log("[DeepSeek] Вход выполнен успешно, сессия сохранена");
-			await this.stopLoadingSpinner();
-		} else throw new Error("Не удалось войти в DeepSeek. Проверьте учётные данные и попробуйте ещё раз.");
+		setCredentials("deepseek", credentials.login, credentials.password);
+		await this.saveStorageState();
+		console.log("[DeepSeek] Вход выполнен успешно, сессия сохранена");
+		await this.stopLoadingSpinner();
 	}
 	/**
 	* Запускает браузер и открывает DeepSeek.
@@ -8925,17 +8933,13 @@ var DeepSeekService = class DeepSeekService {
 		await this.gotoWithTimeout(DEEPSEEK_URL, 2e4);
 		await this.page.waitForTimeout(3e3);
 		console.log("[DeepSeek] Главная страница загружена (или таймаут проигнорирован)");
-		this.isLoggedIn = await this.isAuthenticated();
-		if (!this.isLoggedIn) {
+		if (!await this.isAuthenticated()) {
 			console.log("[DeepSeek] Требуется вход");
 			await this.login();
 			return { status: "logged_in" };
 		}
-		if (this.isLoggedIn) {
-			await this.stopLoadingSpinner();
-			await this.saveStorageState();
-			return { status: "logged_in" };
-		}
+		this.isLoggedIn = true;
+		await this.stopLoadingSpinner();
 		await this.saveStorageState();
 		return { status: "logged_in" };
 	}
@@ -8992,19 +8996,26 @@ var DeepSeekService = class DeepSeekService {
 	/**
 	* Отправляет сообщение в DeepSeek и возвращает текст ответа.
 	*/
+	/**
+	* Интерфейс сообщения чата Gateway.
+	*/
+	/**
+	* Отправляет сообщение в DeepSeek и возвращает структурированный ответ.
+	*/
 	async sendMessage(message) {
 		if (!this.page) throw new Error("Браузер не запущен");
 		if (!this.isLoggedIn && !await this.isAuthenticated()) throw new Error("Не авторизован в DeepSeek");
 		await this.ensureReadyForChat();
-		const textareaSelector = "textarea[placeholder=\"Сообщение для DeepSeek\"]";
-		const assistantMessageSelector = ".ds-markdown.ds-assistant-message-main-content";
+		const finalMessage = /[а-яА-ЯёЁ]/.test(message) ? `${message}\n\n(Пожалуйста, ответь на русском языке)` : message;
+		const textareaSelector = "textarea[placeholder*=\"Сообщение\"], textarea[placeholder*=\"Message\"]";
+		const assistantMessageSelector = "div.ds-markdown.ds-assistant-message-main-content";
 		const messagesBefore = await this.page.locator(assistantMessageSelector).count();
 		const textarea = this.page.locator(textareaSelector).first();
 		await textarea.waitFor({
 			state: "visible",
 			timeout: 1e4
 		});
-		await textarea.fill(message);
+		await textarea.fill(finalMessage);
 		await textarea.press("Enter");
 		await this.page.waitForFunction(({ selector, prevCount }) => {
 			return document.querySelectorAll(selector).length > prevCount;
@@ -9012,7 +9023,56 @@ var DeepSeekService = class DeepSeekService {
 			selector: assistantMessageSelector,
 			prevCount: messagesBefore
 		}, { timeout: 6e4 });
-		return (await this.page.locator(assistantMessageSelector).last().innerText()).trim();
+		await this.page.waitForTimeout(1e3);
+		return await this.page.locator(assistantMessageSelector).last().evaluate((el) => {
+			const parentMessage = el.closest("div[data-virtual-list-item-key]");
+			let thinking;
+			if (parentMessage) {
+				const thinkingEl = parentMessage.querySelector("div.e1675d8b.ds-think-content");
+				if (thinkingEl) thinking = thinkingEl.textContent?.trim() || "";
+			}
+			const blocks = [];
+			el.childNodes.forEach((node) => {
+				if (node.nodeType === Node.ELEMENT_NODE) {
+					const element = node;
+					if (element.classList.contains("md-code-block")) {
+						const langEl = element.querySelector("span.d813de27");
+						const codeEl = element.querySelector("pre");
+						const language = langEl?.textContent?.trim() || "text";
+						const code = codeEl?.textContent || "";
+						if (code.trim()) blocks.push({
+							type: "code",
+							content: code,
+							language
+						});
+					} else {
+						const text = element.textContent?.trim() || "";
+						if (text) blocks.push({
+							type: "text",
+							content: text
+						});
+					}
+				} else if (node.nodeType === Node.TEXT_NODE) {
+					const text = node.textContent?.trim() || "";
+					if (text) blocks.push({
+						type: "text",
+						content: text
+					});
+				}
+			});
+			if (blocks.length === 0) {
+				const text = el.textContent?.trim() || "";
+				if (text) blocks.push({
+					type: "text",
+					content: text
+				});
+			}
+			return {
+				role: "assistant",
+				thinking,
+				blocks
+			};
+		});
 	}
 	/**
 	* Возвращает список диалогов из сайдбара DeepSeek.
@@ -9116,28 +9176,98 @@ var DeepSeekService = class DeepSeekService {
 	async getConversationMessages() {
 		if (!this.page) throw new Error("Браузер не запущен");
 		try {
-			await this.page.waitForSelector("div.ds-virtual-list-items", { timeout: 1e4 });
+			await this.page.waitForSelector("div.ds-virtual-list.ds-virtual-list--printable", { timeout: 1e4 });
 		} catch {
 			return [];
 		}
-		return await this.page.evaluate(() => {
+		return await this.page.evaluate(async () => {
+			const container = document.querySelector("div.ds-virtual-list.ds-virtual-list--printable");
+			if (!container) return [];
+			let prevCount = 0;
+			let stableCount = 0;
+			const maxAttempts = 10;
+			for (let i = 0; i < maxAttempts; i++) {
+				container.scrollTop = 0;
+				await new Promise((resolve) => setTimeout(resolve, 1200));
+				const currentCount = container.querySelectorAll("div[data-virtual-list-item-key]").length;
+				if (currentCount === prevCount) {
+					stableCount++;
+					if (stableCount >= 2) break;
+				} else {
+					prevCount = currentCount;
+					stableCount = 0;
+				}
+			}
 			const result = [];
-			document.querySelectorAll("div[data-virtual-list-item-key]").forEach((item) => {
+			container.querySelectorAll("div[data-virtual-list-item-key]").forEach((item) => {
 				const userContent = item.querySelector("div.fbb737a4");
 				if (userContent) {
 					result.push({
 						role: "user",
-						content: userContent.textContent?.trim() || ""
+						blocks: [{
+							type: "text",
+							content: userContent.textContent?.trim() || ""
+						}]
 					});
 					return;
 				}
-				const assistantContent = item.querySelector("div.ds-markdown.ds-assistant-message-main-content");
-				if (assistantContent) result.push({
+				const assistantMain = item.querySelector("div.ds-markdown.ds-assistant-message-main-content");
+				if (!assistantMain) return;
+				let thinking;
+				const thinkingEl = item.querySelector("div.e1675d8b.ds-think-content");
+				if (thinkingEl) thinking = thinkingEl.textContent?.trim() || "";
+				const blocks = [];
+				assistantMain.childNodes.forEach((node) => {
+					if (node.nodeType === Node.ELEMENT_NODE) {
+						const element = node;
+						if (element.classList.contains("md-code-block")) {
+							const langEl = element.querySelector("span.d813de27");
+							const codeEl = element.querySelector("pre");
+							const language = langEl?.textContent?.trim() || "text";
+							const code = codeEl?.textContent || "";
+							if (code.trim()) blocks.push({
+								type: "code",
+								content: code,
+								language
+							});
+						} else {
+							const text = element.textContent?.trim() || "";
+							if (text) blocks.push({
+								type: "text",
+								content: text
+							});
+						}
+					} else if (node.nodeType === Node.TEXT_NODE) {
+						const text = node.textContent?.trim() || "";
+						if (text) blocks.push({
+							type: "text",
+							content: text
+						});
+					}
+				});
+				if (blocks.length === 0) {
+					const text = assistantMain.textContent?.trim() || "";
+					if (text) blocks.push({
+						type: "text",
+						content: text
+					});
+				}
+				result.push({
 					role: "assistant",
-					content: assistantContent.textContent?.trim() || ""
+					thinking,
+					blocks
 				});
 			});
-			return result;
+			const seen = /* @__PURE__ */ new Set();
+			const unique = [];
+			for (const msg of result) {
+				const key = `${msg.role}:${JSON.stringify(msg.blocks)}:${msg.thinking || ""}`;
+				if (!seen.has(key)) {
+					seen.add(key);
+					unique.push(msg);
+				}
+			}
+			return unique;
 		});
 	}
 };
@@ -9312,7 +9442,8 @@ var createGatewayWindow = () => {
 			preload: preloadPath,
 			contextIsolation: true,
 			nodeIntegration: false
-		}
+		},
+		backgroundColor: "#212121"
 	});
 	if (process.env.NODE_ENV === "development") gatewayWindow.loadURL(`${DEV_SERVER_URL}/#/gateway`);
 	else gatewayWindow.loadFile(getMainWindowProdPath(), { hash: "/gateway" });

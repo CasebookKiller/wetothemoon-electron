@@ -27,6 +27,7 @@ export const createTradingAssistantWindow = () => {
       contextIsolation: true,
       nodeIntegration: false,
     },
+    backgroundColor:'#212121',
   });
 
   // Загружаем ТОТ ЖЕ рендерер, но с маршрутом trading-assistant

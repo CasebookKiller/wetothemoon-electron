@@ -41,6 +41,7 @@ export const createMainWindow = (): BrowserWindow => {
       contextIsolation: true,
       nodeIntegration: false,
     },
+    backgroundColor:'#212121',
   });
 
   // Устанавливаем меню только для этого окна

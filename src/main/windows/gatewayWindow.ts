@@ -25,6 +25,7 @@ export const createGatewayWindow = (): BrowserWindow => {
       contextIsolation: true,
       nodeIntegration: false,
     },
+    backgroundColor:'#212121',
   });
 
   if (process.env.NODE_ENV === 'development') {

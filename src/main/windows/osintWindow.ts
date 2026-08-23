@@ -25,6 +25,7 @@ export const createOsintWindow = (): BrowserWindow => {
       contextIsolation: true,
       nodeIntegration: false,
     },
+    backgroundColor:'#212121',
   });
 
   // В dev-режиме загружаем URL dev-сервера с hash-маршрутом

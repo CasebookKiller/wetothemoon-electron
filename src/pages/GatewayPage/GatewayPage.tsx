@@ -7,8 +7,54 @@ import { ListBox } from 'primereact/listbox';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
-  content: string;
+  thinking?: string;
+  blocks: { type: 'text' | 'code'; content: string; language?: string }[];
 }
+
+const CodeBlockWithActions = ({ language, code }: { language: string; code: string }) => {
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+    } catch (e) {
+      console.error('Copy failed', e);
+    }
+  };
+
+  const handleDownload = () => {
+    const blob = new Blob([code], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `code.${language}`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="code-block-container surface-800 text-white border-round p-2 mb-2">
+      <div className="flex justify-content-between align-items-center mb-2">
+        <span className="text-sm font-semibold">{language}</span>
+        <div className="flex gap-2">
+          <Button
+            icon="pi pi-copy"
+            className="p-button-rounded p-button-text p-button-sm"
+            onClick={handleCopy}
+            tooltip="Копировать"
+          />
+          <Button
+            icon="pi pi-download"
+            className="p-button-rounded p-button-text p-button-sm"
+            onClick={handleDownload}
+            tooltip="Скачать"
+          />
+        </div>
+      </div>
+      <pre className="p-2 border-round" style={{ whiteSpace: 'pre-wrap', background: 'rgba(0,0,0,0.2)' }}>
+        {code}
+      </pre>
+    </div>
+  );
+};
 
 export const GatewayPage: React.FC = () => {
   const [status, setStatus] = useState('stopped');
@@ -104,12 +150,19 @@ export const GatewayPage: React.FC = () => {
     if (!message.trim()) return;
     setSending(true);
     setError('');
-    // Добавляем сообщение пользователя в ленту
-    setMessages((prev) => [...prev, { role: 'user', content: message }]);
+
+    // Добавляем сообщение пользователя в новом формате
+    const userMsg: ChatMessage = {
+      role: 'user',
+      blocks: [{ type: 'text', content: message }],
+    };
+    setMessages((prev) => [...prev, userMsg]);
+
     try {
       const result = await api.gatewaySendMessage(message);
       if (result.success) {
-        setMessages((prev) => [...prev, { role: 'assistant', content: result.data }]);
+        // result.data уже соответствует ChatMessage (роль assistant, blocks, thinking)
+        setMessages((prev) => [...prev, result.data as ChatMessage]);
       } else {
         setError(result.error || 'Ошибка отправки');
       }
@@ -182,6 +235,26 @@ export const GatewayPage: React.FC = () => {
     } catch (e) {
       setError((e as Error).message);
     }
+  };
+
+  const ThinkingBlock = ({ thinking }: { thinking: string }) => {
+    const [expanded, setExpanded] = useState(false);
+    return (
+      <div className="mb-2">
+        <div
+          className="flex align-items-center gap-2 cursor-pointer text-600"
+          onClick={() => setExpanded(!expanded)}
+        >
+          <i className={`pi ${expanded ? 'pi-chevron-down' : 'pi-chevron-right'}`} />
+          <span>Размышление</span>
+        </div>
+        {expanded && (
+          <div className="p-2 surface-200 border-round text-700" style={{ whiteSpace: 'pre-wrap' }}>
+            {thinking}
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -294,7 +367,13 @@ export const GatewayPage: React.FC = () => {
                         }`}
                         style={{ whiteSpace: 'pre-wrap' }}
                       >
-                        {msg.content}
+                        {msg.thinking && <ThinkingBlock thinking={msg.thinking} />}
+                        {msg.blocks.map((block, blockIdx) => {
+                          if (block.type === 'code') {
+                            return <CodeBlockWithActions key={blockIdx} language={block.language || 'text'} code={block.content} />;
+                          }
+                          return <div key={blockIdx} style={{ whiteSpace: 'pre-wrap' }}>{block.content}</div>;
+                        })}
                       </div>
                     </div>
                   ))

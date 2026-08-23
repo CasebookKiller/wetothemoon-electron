@@ -19,7 +19,8 @@ export const createBondsWindow = () => {
       preload: preloadPath, // path.join(__dirname, '../../../preload.ts'),
       contextIsolation: true, // обязательно для безопасности
       nodeIntegration: false, // рекомендуется отключить
-    }
+    },
+    backgroundColor:'#212121',
   });
 
   // Загружаем ТОТ ЖЕ сервер, но с параметром в URL
