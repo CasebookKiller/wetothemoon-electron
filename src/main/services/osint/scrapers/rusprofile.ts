@@ -1676,50 +1676,71 @@ async function collectConnectionsDetails(page: Page, companyId: number): Promise
 async function applySouFilters(page: Page, filters?: any): Promise<void> {
   if (!filters) return;
 
-  // Роль (sides) — предположительно те же value, что и в арбитраже
-  if (filters.sides && Array.isArray(filters.sides) && filters.sides.length > 0) {
-    const sideValues = filters.sides
-      .map((s: string) => {
-        switch (s) {
-          case 'defendant': return '1';
-          case 'plaintiff': return '0';
-          case 'third': return '2';
-          default: return null;
-        }
-      })
-      .filter(Boolean);
+  // Роль (radio)
+  if (filters.role && filters.role !== 'all') {
+    const radio = page.locator(`input[name="role"][value="${filters.role}"]`);
+    if (await radio.count() > 0) {
+      await radio.check();
+      await page.waitForTimeout(500);
+    }
+  }
 
-    for (const value of sideValues) {
-      const checkbox = page.locator(`input[name="sides"][value="${value}"]`);
+  // Судопроизводство (checkbox types)
+  if (filters.types && Array.isArray(filters.types) && filters.types.length > 0) {
+    for (const type of filters.types) {
+      const checkbox = page.locator(`input[name="types"][value="${type}"]`);
       if (await checkbox.count() > 0) {
         await checkbox.check();
-        await page.waitForTimeout(500);
+        await page.waitForTimeout(300);
       }
     }
   }
 
-  // Статус
-  if (filters.status && Array.isArray(filters.status) && filters.status.length > 0) {
-    const statusValues = filters.status
-      .map((s: string) => {
-        switch (s) {
-          case 'in_progress': return '0';
-          case 'completed': return '1';
-          default: return null;
-        }
-      })
-      .filter(Boolean);
-
-    for (const value of statusValues) {
-      const checkbox = page.locator(`input[name="status"][value="${value}"]`);
+  // Категория (checkbox categories)
+  if (filters.categories && Array.isArray(filters.categories) && filters.categories.length > 0) {
+    for (const cat of filters.categories) {
+      const checkbox = page.locator(`input[name="categories"][value="${cat}"]`);
       if (await checkbox.count() > 0) {
         await checkbox.check();
-        await page.waitForTimeout(500);
+        await page.waitForTimeout(300);
       }
     }
   }
 
-  // Поиск
+  // Регион (checkbox regions)
+  if (filters.regions && Array.isArray(filters.regions) && filters.regions.length > 0) {
+    for (const region of filters.regions) {
+      const checkbox = page.locator(`input[name="regions"][value="${region}"]`);
+      if (await checkbox.count() > 0) {
+        await checkbox.check();
+        await page.waitForTimeout(300);
+      }
+    }
+  }
+
+  // Статус дела (checkbox results)
+  if (filters.results && Array.isArray(filters.results) && filters.results.length > 0) {
+    for (const result of filters.results) {
+      const checkbox = page.locator(`input[name="results"][value="${result}"]`);
+      if (await checkbox.count() > 0) {
+        await checkbox.check();
+        await page.waitForTimeout(300);
+      }
+    }
+  }
+
+  // Точность совпадения (checkbox match_level)
+  if (filters.matchLevel && Array.isArray(filters.matchLevel) && filters.matchLevel.length > 0) {
+    for (const level of filters.matchLevel) {
+      const checkbox = page.locator(`input[name="match_level"][value="${level}"]`);
+      if (await checkbox.count() > 0) {
+        await checkbox.check();
+        await page.waitForTimeout(300);
+      }
+    }
+  }
+
+  // Поиск (номер дела)
   if (filters.search && filters.search.trim() !== '') {
     const searchInput = page.locator('input[name="search"]');
     if (await searchInput.count() > 0) {
@@ -1728,8 +1749,6 @@ async function applySouFilters(page: Page, filters?: any): Promise<void> {
       await page.waitForTimeout(1000);
     }
   }
-
-  // Здесь можно добавить другие специфические фильтры SOU, если они есть
 }
 
 async function collectSouDetails(
@@ -2080,11 +2099,7 @@ export async function scrapeRusprofile(
         collectSouDetails(page, companyId, {
           maxPages: options.souFilters?.maxPages || 1,
           maxTotalCases: options.souFilters?.maxTotalCases || 100,
-          filters: {
-            sides: options.souFilters?.sides,
-            status: options.souFilters?.status,
-            search: options.souFilters?.search,
-          },
+          filters: options.souFilters, // передаём весь объект фильтров
         })
       );
     }

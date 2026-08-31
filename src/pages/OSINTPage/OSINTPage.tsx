@@ -27,6 +27,12 @@ export const OSINTPage: React.FC = () => {
   const [needConnectionsDetails, setNeedConnectionsDetails] = useState(false);
   const [needSouDetails, setNeedSouDetails] = useState(false); // <-- новое
 
+  const [souRole, setSouRole] = useState('all'); // 'all', 'defendant', 'plaintiff', 'representative', 'third_other_party'
+  const [souMatchLevels, setSouMatchLevels] = useState<string[]>([]); // 'high', 'medium', 'low'
+  const [souSearch, setSouSearch] = useState('');
+  const [souMaxPages, setSouMaxPages] = useState(1);
+  const [souMaxTotalCases, setSouMaxTotalCases] = useState(100);
+
   const handleInnChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setInn(value);
@@ -122,11 +128,11 @@ export const OSINTPage: React.FC = () => {
         } : undefined,
         // отдельные фильтры для судов
         souFilters: needSouDetails ? {
-          sides: souFilters.sides.length > 0 ? souFilters.sides : undefined,
-          status: souFilters.status.length > 0 ? souFilters.status : undefined,
-          search: souFilters.search.trim() || undefined,
-          maxPages: souFilters.maxPages,
-          maxTotalCases: souFilters.maxTotalCases,
+          role: souRole,
+          matchLevel: souMatchLevels,
+          search: souSearch.trim() || undefined,
+          maxPages: souMaxPages,
+          maxTotalCases: souMaxTotalCases,
         } : undefined,
       };
 
@@ -177,6 +183,10 @@ export const OSINTPage: React.FC = () => {
         {JSON.stringify(result, null, 2)}
       </pre>
     );
+  };
+
+  const toggleArrayState = (setter: React.Dispatch<React.SetStateAction<string[]>>, value: string) => {
+    setter(prev => prev.includes(value) ? prev.filter(v => v !== value) : [...prev, value]);
   };
 
   return (
@@ -342,35 +352,38 @@ export const OSINTPage: React.FC = () => {
               {/* Роль */}
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Роль:</span>
-                <Checkbox inputId="souSidePlaintiff" checked={souFilters.sides.includes('plaintiff')} onChange={() => toggleSouSide('plaintiff')} />
-                <label htmlFor="souSidePlaintiff" className="ml-1">Истец</label>
-                <Checkbox inputId="souSideDefendant" checked={souFilters.sides.includes('defendant')} onChange={() => toggleSouSide('defendant')} />
-                <label htmlFor="souSideDefendant" className="ml-1">Ответчик</label>
-                <Checkbox inputId="souSideThird" checked={souFilters.sides.includes('third')} onChange={() => toggleSouSide('third')} />
-                <label htmlFor="souSideThird" className="ml-1">Третье лицо</label>
+                <select value={souRole} onChange={(e) => setSouRole(e.target.value)}>
+                  <option value="all">Все</option>
+                  <option value="defendant">Ответчик</option>
+                  <option value="plaintiff">Истец</option>
+                  <option value="representative">Представитель</option>
+                  <option value="third_other_party">Третье/иное лицо</option>
+                </select>
               </div>
 
-              {/* Статус */}
+              {/* Точность совпадения */}
               <div className="flex align-items-center gap-2 mt-2">
-                <span>Статус:</span>
-                <Checkbox inputId="souStatusInProgress" checked={souFilters.status.includes('in_progress')} onChange={() => toggleSouStatus('in_progress')} />
-                <label htmlFor="souStatusInProgress" className="ml-1">Рассматривается</label>
-                <Checkbox inputId="souStatusCompleted" checked={souFilters.status.includes('completed')} onChange={() => toggleSouStatus('completed')} />
-                <label htmlFor="souStatusCompleted" className="ml-1">Завершено</label>
+                <span>Точность:</span>
+                <Checkbox inputId="souHigh" checked={souMatchLevels.includes('high')} onChange={() => toggleArrayState(setSouMatchLevels, 'high')} />
+                <label htmlFor="souHigh" className="ml-1">Высокая</label>
+                <Checkbox inputId="souMedium" checked={souMatchLevels.includes('medium')} onChange={() => toggleArrayState(setSouMatchLevels, 'medium')} />
+                <label htmlFor="souMedium" className="ml-1">Средняя</label>
+                <Checkbox inputId="souLow" checked={souMatchLevels.includes('low')} onChange={() => toggleArrayState(setSouMatchLevels, 'low')} />
+                <label htmlFor="souLow" className="ml-1">Низкая</label>
               </div>
 
               {/* Поиск */}
               <div className="flex align-items-center gap-2 mt-2">
-                <span>Поиск:</span>
-                <InputText value={souFilters.search} onChange={(e) => setSouFilters({ ...souFilters, search: e.target.value })} placeholder="Номер дела или ИНН" className="w-full" />
+                <span>Поиск (номер дела):</span>
+                <InputText value={souSearch} onChange={(e) => setSouSearch(e.target.value)} placeholder="Номер дела" className="w-full" />
               </div>
 
               {/* Лимиты */}
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Макс. страниц:</span>
-                <InputText type="number" min={1} max={100} value={String(souFilters.maxPages)} onChange={(e) => setSouFilters({ ...souFilters, maxPages: parseInt(e.target.value) || 1 })} className="w-4rem" />
+                <InputText type="number" min={1} max={100} value={String(souMaxPages)} onChange={(e) => setSouMaxPages(parseInt(e.target.value) || 1)} className="w-4rem" />
                 <span className="ml-3">Макс. дел:</span>
-                <InputText type="number" min={1} max={1000} value={String(souFilters.maxTotalCases)} onChange={(e) => setSouFilters({ ...souFilters, maxTotalCases: parseInt(e.target.value) || 100 })} className="w-4rem" />
+                <InputText type="number" min={1} max={1000} value={String(souMaxTotalCases)} onChange={(e) => setSouMaxTotalCases(parseInt(e.target.value) || 100)} className="w-4rem" />
               </div>
             </div>
           </div>
