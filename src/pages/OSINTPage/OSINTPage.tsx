@@ -87,6 +87,16 @@ export const OSINTPage: React.FC = () => {
     }));
   };
 
+  const [needLeasingDetails, setNeedLeasingDetails] = useState(false);
+  const [leasingFilters, setLeasingFilters] = useState({
+    role: 'all', // 'all', 'Lessee', 'Lessor'
+    status: 'all', // 'all', 'ok', 'ended', 'stopped'
+    code: 'all', // 'all', '0000001', '0104008'
+    search: '',
+    maxPages: 1,
+    maxTotalCases: 100,
+  });
+
   const api = (window as any).electronAPI;
 
   const handleLaunch = async () => {
@@ -151,6 +161,16 @@ export const OSINTPage: React.FC = () => {
           search: trademarkFilters.search.trim() || undefined,
           maxPages: trademarkFilters.maxPages,
           maxTotalCases: trademarkFilters.maxTotalCases,
+        } : undefined,
+        // отдельные фильтры для лизинга
+        leasingDetails: needLeasingDetails,
+        leasingFilters: needLeasingDetails ? {
+          role: leasingFilters.role,
+          status: leasingFilters.status,
+          code: leasingFilters.code,
+          search: leasingFilters.search.trim() || undefined,
+          maxPages: leasingFilters.maxPages,
+          maxTotalCases: leasingFilters.maxTotalCases,
         } : undefined,
       };
 
@@ -286,6 +306,18 @@ export const OSINTPage: React.FC = () => {
                 Собрать детальные товарные знаки
               </label>
             </div>
+            <div className="mt-2">
+              <Checkbox
+                inputId="needLeasing"
+                checked={needLeasingDetails}
+                onChange={(e) => setNeedLeasingDetails(e.checked ?? false)}
+              />
+              <label htmlFor="needLeasing" className="ml-2">
+                Собрать детальный лизинг
+              </label>
+            </div>
+
+
           </div>
         </div>
 
@@ -474,6 +506,59 @@ export const OSINTPage: React.FC = () => {
                   onChange={(e) => setTrademarkFilters({ ...trademarkFilters, maxTotalCases: parseInt(e.target.value) || 100 })}
                   className="w-4rem"
                 />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {needLeasingDetails && (
+          <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
+            <div className="flex-1 flex flex-column gap-1 xl:mr-8">
+              <span className="app font-size-subheading">Фильтры лизинга</span>
+
+              <div className="flex align-items-center gap-2 mt-2">
+                <span>Роль:</span>
+                <select value={leasingFilters.role} onChange={(e) => setLeasingFilters({ ...leasingFilters, role: e.target.value })}>
+                  <option value="all">Все</option>
+                  <option value="Lessee">Лизингополучатель</option>
+                  <option value="Lessor">Лизингодатель</option>
+                </select>
+              </div>
+
+              <div className="flex align-items-center gap-2 mt-2">
+                <span>Статус:</span>
+                <select value={leasingFilters.status} onChange={(e) => setLeasingFilters({ ...leasingFilters, status: e.target.value })}>
+                  <option value="all">Все</option>
+                  <option value="ok">Действующий</option>
+                  <option value="ended">Завершённый</option>
+                  <option value="stopped">Прекращённый</option>
+                </select>
+              </div>
+
+              <div className="flex align-items-center gap-2 mt-2">
+                <span>Предмет аренды:</span>
+                <select value={leasingFilters.code} onChange={(e) => setLeasingFilters({ ...leasingFilters, code: e.target.value })}>
+                  <option value="all">Все</option>
+                  <option value="0000001">Материальные активы</option>
+                  <option value="0104008">Металлообрабатывающее оборудование</option>
+                </select>
+              </div>
+
+              <div className="flex align-items-center gap-2 mt-2">
+                <span>Поиск (номер договора):</span>
+                <InputText
+                  value={leasingFilters.search}
+                  onChange={(e) => setLeasingFilters({ ...leasingFilters, search: e.target.value })}
+                  placeholder="Номер договора"
+                  className="w-full"
+                />
+              </div>
+
+              <div className="flex align-items-center gap-2 mt-2">
+                <span>Макс. страниц:</span>
+                <InputText type="number" min={1} max={100} value={String(leasingFilters.maxPages)} onChange={(e) => setLeasingFilters({ ...leasingFilters, maxPages: parseInt(e.target.value) || 1 })} className="w-4rem" />
+                <span className="ml-3">Макс. договоров:</span>
+                <InputText type="number" min={1} max={1000} value={String(leasingFilters.maxTotalCases)} onChange={(e) => setLeasingFilters({ ...leasingFilters, maxTotalCases: parseInt(e.target.value) || 100 })} className="w-4rem" />
               </div>
             </div>
           </div>
