@@ -2123,13 +2123,11 @@ async function collectLeasingDetails(
   await page.waitForSelector('ul.filters-results__list', { timeout: 15000 });
   await page.waitForTimeout(1000);
 
-  // Применяем фильтры
   if (options.filters) {
     await applyLeasingFilters(page, options.filters);
     await page.waitForTimeout(2000);
   }
 
-  // Заголовок
   try {
     const headText = await page.locator('div.export-data__text').first().innerText();
     const m = headText.match(/Найдено\s*([\d\s]+)\s*договоров? лизинга/);
@@ -2151,7 +2149,22 @@ async function collectLeasingDetails(
       const item = items.nth(i);
       const contract: any = {};
 
-      // Извлекаем основные данные
+      // === Раскрываем все триггеры внутри карточки ===
+      const triggers = item.locator('.leasing-changes-trigger');
+      const triggerCount = await triggers.count();
+      for (let j = 0; j < triggerCount; j++) {
+        try {
+          await triggers.nth(j).click({ force: true });
+          // Ждём появления контейнера с деталями
+          await page.waitForTimeout(500);
+        } catch (e) {
+          console.warn('Не удалось раскрыть сообщение лизинга:', e);
+        }
+      }
+      // Дополнительная пауза на полное раскрытие всех контейнеров
+      await page.waitForTimeout(1000);
+
+      // === Извлекаем данные ===
       const basic = await item.evaluate((li) => {
         const getText = (selector: string) => {
           const el = li.querySelector(selector);
@@ -2161,7 +2174,7 @@ async function collectLeasingDetails(
         const status = getText('.snippet__status');
         const title = getText('.snippet__row-value.--title');
 
-        // Собираем все строки dl-блока (ключ-значение)
+        // Основные поля карточки
         const fields: any = {};
         const rows = li.querySelectorAll('div.snippet__row');
         rows.forEach((row) => {
@@ -2175,11 +2188,10 @@ async function collectLeasingDetails(
           }
         });
 
-        // Извлекаем предметы финансовой аренды (вложенные snippet__block)
+        // Предметы финансовой аренды (вложенные блоки)
         const leaseItems: any[] = [];
         const blocks = li.querySelectorAll('div.snippet__block');
         blocks.forEach((block) => {
-          // Ищем блок, содержащий ключи "Идентификатор", "Классификация", "Описание"
           const innerRows = block.querySelectorAll('.snippet__row');
           if (innerRows.length > 0) {
             const hasLeaseFields = Array.from(innerRows).some(row => {
@@ -2198,20 +2210,47 @@ async function collectLeasingDetails(
           }
         });
 
-        // Связанные сообщения
+        // Связанные сообщения с раскрытыми контейнерами
         const changes: any[] = [];
         const changeItems = li.querySelectorAll('.leasing-changes-item');
         changeItems.forEach((changeItem) => {
           const date = changeItem.querySelector('.leasing-changes-trigger__date')?.textContent?.trim() || '';
           const text = changeItem.querySelector('.leasing-changes-trigger__text')?.textContent?.trim() || '';
-          if (date || text) changes.push({ date, text });
+
+          // Ищем контейнер с деталями
+          const container = changeItem.querySelector('.leasing-changes-container');
+          const details: any[] = [];
+          if (container) {
+            // Все строки внутри контейнера
+            const detailRows = container.querySelectorAll('.snippet__row');
+            detailRows.forEach(row => {
+              const key = row.querySelector('.snippet__row-key')?.textContent?.trim() || '';
+              const value = row.querySelector('.snippet__row-value')?.textContent?.trim() || '';
+              if (key) {
+                details.push({ key, value });
+              }
+            });
+
+            // Вложенные связанные блоки (предметы)
+            const relatedBlocks = container.querySelectorAll('.snippet__block-related');
+            relatedBlocks.forEach(block => {
+              const related: any[] = [];
+              block.querySelectorAll('.snippet__row').forEach(row => {
+                const key = row.querySelector('.snippet__row-key')?.textContent?.trim() || '';
+                const value = row.querySelector('.snippet__row-value')?.textContent?.trim() || '';
+                if (key) related.push({ key, value });
+              });
+              if (related.length) details.push({ related });
+            });
+          }
+
+          changes.push({ date, text, details });
         });
 
         return { status, title, fields, leaseItems, changes };
       });
 
       contract.status = basic.status;
-      // Парсим номер и дату из title
       const m = basic.title.match(/№\s*([\w\-/]+)\s*от\s*([\d.]+)/);
       if (m) {
         contract.contract_number = m[1];
@@ -2232,7 +2271,6 @@ async function collectLeasingDetails(
 
     if (currentPage >= maxPages || collected >= maxTotalCases) break;
 
-    // Пагинация (обычно для лизинга немного, но предусмотрим)
     const showMore = page.locator("button:has-text('Показать ещё')").first();
     if (await showMore.count() > 0 && await showMore.isEnabled()) {
       await showMore.click();
