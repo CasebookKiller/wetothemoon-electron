@@ -2149,20 +2149,29 @@ async function collectLeasingDetails(
       const item = items.nth(i);
       const contract: any = {};
 
-      // === Раскрываем все триггеры внутри карточки ===
-      const triggers = item.locator('.leasing-changes-trigger');
-      const triggerCount = await triggers.count();
+      // === Раскрываем связанные сообщения (исправлено) ===
+      const triggerLinks = item.locator('.leasing-changes-trigger__link');
+      const triggerCount = await triggerLinks.count();
       for (let j = 0; j < triggerCount; j++) {
+        const link = triggerLinks.nth(j);
         try {
-          await triggers.nth(j).click({ force: true });
-          // Ждём появления контейнера с деталями
-          await page.waitForTimeout(500);
+          const parentTrigger = link.locator('..'); // .leasing-changes-trigger
+          const container = parentTrigger.locator('.leasing-changes-container');
+          if (await container.count() === 0) {
+            // Кликаем по текстовой части
+            await link.click({ force: true });
+            await page.waitForTimeout(500);
+            // Если контейнер не появился, кликаем по родительскому триггеру
+            if (await container.count() === 0) {
+              await parentTrigger.click({ force: true });
+              await page.waitForTimeout(500);
+            }
+          }
         } catch (e) {
-          console.warn('Не удалось раскрыть сообщение лизинга:', e);
+          console.warn(`Не удалось раскрыть сообщение #${j}:`, e);
         }
       }
-      // Дополнительная пауза на полное раскрытие всех контейнеров
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(500); // даём время на полное раскрытие всех контейнеров
 
       // === Извлекаем данные ===
       const basic = await item.evaluate((li) => {
@@ -2221,7 +2230,6 @@ async function collectLeasingDetails(
           const container = changeItem.querySelector('.leasing-changes-container');
           const details: any[] = [];
           if (container) {
-            // Все строки внутри контейнера
             const detailRows = container.querySelectorAll('.snippet__row');
             detailRows.forEach(row => {
               const key = row.querySelector('.snippet__row-key')?.textContent?.trim() || '';
@@ -2231,7 +2239,6 @@ async function collectLeasingDetails(
               }
             });
 
-            // Вложенные связанные блоки (предметы)
             const relatedBlocks = container.querySelectorAll('.snippet__block-related');
             relatedBlocks.forEach(block => {
               const related: any[] = [];
