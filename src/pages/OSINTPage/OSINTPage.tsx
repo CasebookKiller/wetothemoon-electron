@@ -33,6 +33,15 @@ export const OSINTPage: React.FC = () => {
   const [souMaxPages, setSouMaxPages] = useState(1);
   const [souMaxTotalCases, setSouMaxTotalCases] = useState(100);
 
+  const [needTrademarksDetails, setNeedTrademarksDetails] = useState(false);
+  const [trademarkFilters, setTrademarkFilters] = useState({
+    onlyActual: false,
+    type: 'all', // 'all', 'combined', 'verbal', 'visual', 'unknown'
+    search: '',
+    maxPages: 1,
+    maxTotalCases: 100,
+  });
+
   const handleInnChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setInn(value);
@@ -133,6 +142,15 @@ export const OSINTPage: React.FC = () => {
           search: souSearch.trim() || undefined,
           maxPages: souMaxPages,
           maxTotalCases: souMaxTotalCases,
+        } : undefined,
+        // отдельные фильтры для товарных знаков
+        trademarksDetails: needTrademarksDetails,
+        trademarksFilters: needTrademarksDetails ? {
+          onlyActual: trademarkFilters.onlyActual,
+          type: trademarkFilters.type,
+          search: trademarkFilters.search.trim() || undefined,
+          maxPages: trademarkFilters.maxPages,
+          maxTotalCases: trademarkFilters.maxTotalCases,
         } : undefined,
       };
 
@@ -256,6 +274,16 @@ export const OSINTPage: React.FC = () => {
               />
               <label htmlFor="needSou" className="ml-2">
                 Собрать детальные суды общей юрисдикции
+              </label>
+            </div>
+            <div className="mt-2">
+              <Checkbox
+                inputId="needTrademarks"
+                checked={needTrademarksDetails}
+                onChange={(e) => setNeedTrademarksDetails(e.checked ?? false)}
+              />
+              <label htmlFor="needTrademarks" className="ml-2">
+                Собрать детальные товарные знаки
               </label>
             </div>
           </div>
@@ -389,6 +417,68 @@ export const OSINTPage: React.FC = () => {
           </div>
         )}
 
+        {needTrademarksDetails && (
+          <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
+            <div className="flex-1 flex flex-column gap-1 xl:mr-8">
+              <span className="app font-size-subheading">Фильтры товарных знаков</span>
+
+              <div className="flex align-items-center gap-2 mt-2">
+                <Checkbox
+                  inputId="tmOnlyActual"
+                  checked={trademarkFilters.onlyActual}
+                  onChange={(e) => setTrademarkFilters({ ...trademarkFilters, onlyActual: e.checked ?? false })}
+                />
+                <label htmlFor="tmOnlyActual" className="ml-1">Только действующие</label>
+              </div>
+
+              <div className="flex align-items-center gap-2 mt-2">
+                <span>Тип:</span>
+                <select
+                  value={trademarkFilters.type}
+                  onChange={(e) => setTrademarkFilters({ ...trademarkFilters, type: e.target.value })}
+                >
+                  <option value="all">Все</option>
+                  <option value="combined">Комбинированный</option>
+                  <option value="verbal">Словесный</option>
+                  <option value="visual">Изобразительный</option>
+                  <option value="unknown">Не определено</option>
+                </select>
+              </div>
+
+              <div className="flex align-items-center gap-2 mt-2">
+                <span>Поиск (номер регистрации):</span>
+                <InputText
+                  value={trademarkFilters.search}
+                  onChange={(e) => setTrademarkFilters({ ...trademarkFilters, search: e.target.value })}
+                  placeholder="Номер гос. регистрации"
+                  className="w-full"
+                />
+              </div>
+
+              <div className="flex align-items-center gap-2 mt-2">
+                <span>Макс. страниц:</span>
+                <InputText
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={String(trademarkFilters.maxPages)}
+                  onChange={(e) => setTrademarkFilters({ ...trademarkFilters, maxPages: parseInt(e.target.value) || 1 })}
+                  className="w-4rem"
+                />
+                <span className="ml-3">Макс. знаков:</span>
+                <InputText
+                  type="number"
+                  min={1}
+                  max={1000}
+                  value={String(trademarkFilters.maxTotalCases)}
+                  onChange={(e) => setTrademarkFilters({ ...trademarkFilters, maxTotalCases: parseInt(e.target.value) || 100 })}
+                  className="w-4rem"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-wrap app p-2 align-items-center gap-4">
           <div className="flex-1 flex flex-column gap-1 xl:mr-8">
             <Button
@@ -400,6 +490,8 @@ export const OSINTPage: React.FC = () => {
             />
           </div>
         </div>
+
+
       </Panel>
 
       <div className="app p-0" />
