@@ -184,7 +184,7 @@ export const OSINTPage: React.FC = () => {
       <div className="app p-0" />
 
       {/* Панель управления браузером */}
-      <Panel className="shadow-5 mx-1" header="Браузер OSINT">
+      <Panel className="shadow-5 mx-1" header="Взгляд Фримена">
         <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
           <div className="flex-1 flex flex-column gap-1 xl:mr-8">
             <div className="flex align-items-center gap-2">

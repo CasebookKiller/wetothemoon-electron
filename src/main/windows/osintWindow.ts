@@ -19,7 +19,7 @@ export const createOsintWindow = (): BrowserWindow => {
   osintWindow = new BrowserWindow({
     width: 1100,
     height: 800,
-    title: 'OSINT Tools',
+    title: 'Взгляд Фримена',
     webPreferences: {
       preload: preloadPath,
       contextIsolation: true,
