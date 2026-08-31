@@ -97,6 +97,15 @@ export const OSINTPage: React.FC = () => {
     maxTotalCases: 100,
   });
 
+  const [needPledgesDetails, setNeedPledgesDetails] = useState(false);
+  const [pledgesFilters, setPledgesFilters] = useState({
+    role: 'all',       // 'all', 'Mortgagor', 'Mortgagee'
+    status: 'all',     // 'all', 'ended', 'annul', 'undefined'
+    code: 'all',       // 'all', '01', '0101', ... (можно добавить select)
+    maxPages: 1,
+    maxTotalCases: 100,
+  });
+
   const api = (window as any).electronAPI;
 
   const handleLaunch = async () => {
@@ -171,6 +180,14 @@ export const OSINTPage: React.FC = () => {
           search: leasingFilters.search.trim() || undefined,
           maxPages: leasingFilters.maxPages,
           maxTotalCases: leasingFilters.maxTotalCases,
+        } : undefined,
+        // отдельные фильтры для залогов
+        pledgesDetails: needPledgesDetails,
+        pledgesFilters: needPledgesDetails ? {
+          role: pledgesFilters.role,
+          status: pledgesFilters.status,
+          maxPages: pledgesFilters.maxPages,
+          maxTotalCases: pledgesFilters.maxTotalCases,
         } : undefined,
       };
 
@@ -316,8 +333,16 @@ export const OSINTPage: React.FC = () => {
                 Собрать детальный лизинг
               </label>
             </div>
-
-
+            <div className="mt-2">
+              <Checkbox
+                inputId="needPledges"
+                checked={needPledgesDetails}
+                onChange={(e) => setNeedPledgesDetails(e.checked ?? false)}
+              />
+              <label htmlFor="needPledges" className="ml-2">
+                Собрать детальные залоги
+              </label>
+            </div>
           </div>
         </div>
 
@@ -559,6 +584,40 @@ export const OSINTPage: React.FC = () => {
                 <InputText type="number" min={1} max={100} value={String(leasingFilters.maxPages)} onChange={(e) => setLeasingFilters({ ...leasingFilters, maxPages: parseInt(e.target.value) || 1 })} className="w-4rem" />
                 <span className="ml-3">Макс. договоров:</span>
                 <InputText type="number" min={1} max={1000} value={String(leasingFilters.maxTotalCases)} onChange={(e) => setLeasingFilters({ ...leasingFilters, maxTotalCases: parseInt(e.target.value) || 100 })} className="w-4rem" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {needPledgesDetails && (
+          <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
+            <div className="flex-1 flex flex-column gap-1 xl:mr-8">
+              <span className="app font-size-subheading">Фильтры залогов</span>
+
+              <div className="flex align-items-center gap-2 mt-2">
+                <span>Роль:</span>
+                <select value={pledgesFilters.role} onChange={(e) => setPledgesFilters({ ...pledgesFilters, role: e.target.value })}>
+                  <option value="all">Все</option>
+                  <option value="Mortgagor">Залогодатель</option>
+                  <option value="Mortgagee">Залогодержатель</option>
+                </select>
+              </div>
+
+              <div className="flex align-items-center gap-2 mt-2">
+                <span>Статус:</span>
+                <select value={pledgesFilters.status} onChange={(e) => setPledgesFilters({ ...pledgesFilters, status: e.target.value })}>
+                  <option value="all">Все</option>
+                  <option value="ended">Завершено</option>
+                  <option value="annul">Аннулировано</option>
+                  <option value="undefined">Не определено</option>
+                </select>
+              </div>
+
+              <div className="flex align-items-center gap-2 mt-2">
+                <span>Макс. страниц:</span>
+                <InputText type="number" min={1} max={100} value={String(pledgesFilters.maxPages)} onChange={(e) => setPledgesFilters({ ...pledgesFilters, maxPages: parseInt(e.target.value) || 1 })} className="w-4rem" />
+                <span className="ml-3">Макс. сообщений:</span>
+                <InputText type="number" min={1} max={1000} value={String(pledgesFilters.maxTotalCases)} onChange={(e) => setPledgesFilters({ ...pledgesFilters, maxTotalCases: parseInt(e.target.value) || 100 })} className="w-4rem" />
               </div>
             </div>
           </div>
