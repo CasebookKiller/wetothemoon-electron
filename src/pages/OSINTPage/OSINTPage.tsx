@@ -114,6 +114,13 @@ export const OSINTPage: React.FC = () => {
     maxTotalCases: 100,
   });
 
+  const [needBankruptcyDetails, setNeedBankruptcyDetails] = useState(false);
+  const [bankruptcyFilters, setBankruptcyFilters] = useState({
+    search: '',
+    maxPages: 1,
+    maxTotalCases: 100,
+  });
+
   const api = (window as any).electronAPI;
 
   const handleLaunch = async () => {
@@ -204,6 +211,13 @@ export const OSINTPage: React.FC = () => {
           withAnnulled: factsFilters.withAnnulled,
           maxPages: factsFilters.maxPages,
           maxTotalCases: factsFilters.maxTotalCases,
+        } : undefined,
+        // отдельные фильтры для банкротства
+        bankruptcyDetails: needBankruptcyDetails,
+        bankruptcyFilters: needBankruptcyDetails ? {
+          search: bankruptcyFilters.search.trim() || undefined,
+          maxPages: bankruptcyFilters.maxPages,
+          maxTotalCases: bankruptcyFilters.maxTotalCases,
         } : undefined,
       };
 
@@ -367,6 +381,16 @@ export const OSINTPage: React.FC = () => {
               />
               <label htmlFor="needFacts" className="ml-2">
                 Детальные существенные факты
+              </label>
+            </div>
+            <div className="mt-2">
+              <Checkbox
+                inputId="needBankruptcy"
+                checked={needBankruptcyDetails}
+                onChange={(e) => setNeedBankruptcyDetails(e.checked ?? false)}
+              />
+              <label htmlFor="needBankruptcy" className="ml-2">
+                Детальное банкротство
               </label>
             </div>
           </div>
@@ -679,6 +703,31 @@ export const OSINTPage: React.FC = () => {
                 <InputText type="number" min={1} max={100} value={String(factsFilters.maxPages)} onChange={(e) => setFactsFilters({ ...factsFilters, maxPages: parseInt(e.target.value) || 1 })} className="w-4rem" />
                 <span className="ml-3">Макс. фактов:</span>
                 <InputText type="number" min={1} max={1000} value={String(factsFilters.maxTotalCases)} onChange={(e) => setFactsFilters({ ...factsFilters, maxTotalCases: parseInt(e.target.value) || 100 })} className="w-4rem" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {needBankruptcyDetails && (
+          <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
+            <div className="flex-1 flex flex-column gap-1 xl:mr-8">
+              <span className="app font-size-subheading">Фильтры банкротства</span>
+
+              <div className="flex align-items-center gap-2 mt-2">
+                <span>Поиск (номер сообщения или дела):</span>
+                <InputText
+                  value={bankruptcyFilters.search}
+                  onChange={(e) => setBankruptcyFilters({ ...bankruptcyFilters, search: e.target.value })}
+                  placeholder="Номер сообщения или дела"
+                  className="w-full"
+                />
+              </div>
+
+              <div className="flex align-items-center gap-2 mt-2">
+                <span>Макс. страниц:</span>
+                <InputText type="number" min={1} max={100} value={String(bankruptcyFilters.maxPages)} onChange={(e) => setBankruptcyFilters({ ...bankruptcyFilters, maxPages: parseInt(e.target.value) || 1 })} className="w-4rem" />
+                <span className="ml-3">Макс. сообщений:</span>
+                <InputText type="number" min={1} max={1000} value={String(bankruptcyFilters.maxTotalCases)} onChange={(e) => setBankruptcyFilters({ ...bankruptcyFilters, maxTotalCases: parseInt(e.target.value) || 100 })} className="w-4rem" />
               </div>
             </div>
           </div>
