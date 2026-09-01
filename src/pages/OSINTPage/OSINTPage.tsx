@@ -106,6 +106,14 @@ export const OSINTPage: React.FC = () => {
     maxTotalCases: 100,
   });
 
+  const [needFactsDetails, setNeedFactsDetails] = useState(false);
+  const [factsFilters, setFactsFilters] = useState({
+    group: 'all', // 'all', 'obespechitelnye_interesy_i_obyazatelstva', 'licenzii_razresheniya_samoregulirovaniya', 'bankrotstva_i_ispolnitelnye_proizvodstva', 'prochee'
+    withAnnulled: false,
+    maxPages: 1,
+    maxTotalCases: 100,
+  });
+
   const api = (window as any).electronAPI;
 
   const handleLaunch = async () => {
@@ -188,6 +196,14 @@ export const OSINTPage: React.FC = () => {
           status: pledgesFilters.status,
           maxPages: pledgesFilters.maxPages,
           maxTotalCases: pledgesFilters.maxTotalCases,
+        } : undefined,
+        // отдельные фильтры для существенных фактов
+        factsDetails: needFactsDetails,
+        factsFilters: needFactsDetails ? {
+          group: factsFilters.group,
+          withAnnulled: factsFilters.withAnnulled,
+          maxPages: factsFilters.maxPages,
+          maxTotalCases: factsFilters.maxTotalCases,
         } : undefined,
       };
 
@@ -282,7 +298,7 @@ export const OSINTPage: React.FC = () => {
                 value={inn}
                 onChange={handleInnChange}
                 placeholder="Введите ИНН"
-                className="w-full"
+                className="w-full text-base"
               />
             </div>
             <div className="mt-2">
@@ -292,7 +308,7 @@ export const OSINTPage: React.FC = () => {
                 onChange={(e) => setNeedArbitrDetails(e.checked as boolean)}
               />
               <label htmlFor="needArbitr" className="ml-2">
-                Собрать детальный список арбитражных дел
+                Детальный список арбитражных дел
               </label>
             </div>
             <div className="mt-2">
@@ -301,7 +317,7 @@ export const OSINTPage: React.FC = () => {
                 checked={needConnectionsDetails}
                 onChange={(e) => setNeedConnectionsDetails(e.checked as boolean)}
               />
-              <label htmlFor="needConnections" className="ml-2">Собрать детальные связи</label>
+              <label htmlFor="needConnections" className="ml-2">Детальные связи</label>
             </div>
             <div className="mt-2">
               <Checkbox
@@ -310,7 +326,7 @@ export const OSINTPage: React.FC = () => {
                 onChange={(e) => setNeedSouDetails(e.checked as boolean)}
               />
               <label htmlFor="needSou" className="ml-2">
-                Собрать детальные суды общей юрисдикции
+                Детальные суды общей юрисдикции
               </label>
             </div>
             <div className="mt-2">
@@ -320,7 +336,7 @@ export const OSINTPage: React.FC = () => {
                 onChange={(e) => setNeedTrademarksDetails(e.checked ?? false)}
               />
               <label htmlFor="needTrademarks" className="ml-2">
-                Собрать детальные товарные знаки
+                Детальные товарные знаки
               </label>
             </div>
             <div className="mt-2">
@@ -330,7 +346,7 @@ export const OSINTPage: React.FC = () => {
                 onChange={(e) => setNeedLeasingDetails(e.checked ?? false)}
               />
               <label htmlFor="needLeasing" className="ml-2">
-                Собрать детальный лизинг
+                Детальный лизинг
               </label>
             </div>
             <div className="mt-2">
@@ -340,7 +356,17 @@ export const OSINTPage: React.FC = () => {
                 onChange={(e) => setNeedPledgesDetails(e.checked ?? false)}
               />
               <label htmlFor="needPledges" className="ml-2">
-                Собрать детальные залоги
+                Детальные залоги
+              </label>
+            </div>
+            <div className="mt-2">
+              <Checkbox
+                inputId="needFacts"
+                checked={needFactsDetails}
+                onChange={(e) => setNeedFactsDetails(e.checked ?? false)}
+              />
+              <label htmlFor="needFacts" className="ml-2">
+                Детальные существенные факты
               </label>
             </div>
           </div>
@@ -618,6 +644,41 @@ export const OSINTPage: React.FC = () => {
                 <InputText type="number" min={1} max={100} value={String(pledgesFilters.maxPages)} onChange={(e) => setPledgesFilters({ ...pledgesFilters, maxPages: parseInt(e.target.value) || 1 })} className="w-4rem" />
                 <span className="ml-3">Макс. сообщений:</span>
                 <InputText type="number" min={1} max={1000} value={String(pledgesFilters.maxTotalCases)} onChange={(e) => setPledgesFilters({ ...pledgesFilters, maxTotalCases: parseInt(e.target.value) || 100 })} className="w-4rem" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {needFactsDetails && (
+          <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
+            <div className="flex-1 flex flex-column gap-1 xl:mr-8">
+              <span className="app font-size-subheading">Фильтры фактов</span>
+
+              <div className="flex align-items-center gap-2 mt-2">
+                <span>Категория:</span>
+                <select value={factsFilters.group} onChange={(e) => setFactsFilters({ ...factsFilters, group: e.target.value })}>
+                  <option value="all">Все</option>
+                  <option value="obespechitelnye_interesy_i_obyazatelstva">Обеспечительные интересы и обязательства</option>
+                  <option value="licenzii_razresheniya_samoregulirovaniya">Лицензии, разрешения, саморегулирования</option>
+                  <option value="bankrotstva_i_ispolnitelnye_proizvodstva">Банкротства и исполнительные производства</option>
+                  <option value="prochee">Прочее</option>
+                </select>
+              </div>
+
+              <div className="flex align-items-center gap-2 mt-2">
+                <Checkbox
+                  inputId="withAnnulled"
+                  checked={factsFilters.withAnnulled}
+                  onChange={(e) => setFactsFilters({ ...factsFilters, withAnnulled: e.checked ?? false })}
+                />
+                <label htmlFor="withAnnulled" className="ml-1">Аннулированные сообщения</label>
+              </div>
+
+              <div className="flex align-items-center gap-2 mt-2">
+                <span>Макс. страниц:</span>
+                <InputText type="number" min={1} max={100} value={String(factsFilters.maxPages)} onChange={(e) => setFactsFilters({ ...factsFilters, maxPages: parseInt(e.target.value) || 1 })} className="w-4rem" />
+                <span className="ml-3">Макс. фактов:</span>
+                <InputText type="number" min={1} max={1000} value={String(factsFilters.maxTotalCases)} onChange={(e) => setFactsFilters({ ...factsFilters, maxTotalCases: parseInt(e.target.value) || 100 })} className="w-4rem" />
               </div>
             </div>
           </div>

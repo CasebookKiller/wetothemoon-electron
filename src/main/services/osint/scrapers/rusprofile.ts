@@ -82,6 +82,7 @@ export interface CompanyFullData {
   trademarks_details?: any;
   leasing_details?: any;
   pledges_details?: any;
+  facts_details?: any;
 }
 
 async function closeModalIfPresent(page: Page): Promise<void> {
@@ -253,6 +254,8 @@ async function getCompanyIdByInn(page: Page, inn: string): Promise<number> {
 
   throw new Error(`Не удалось найти ID компании по ИНН ${inn}`);
 }
+
+// Функции для сбора сводки
 async function collectSummary(page: Page): Promise<any> {
   // Выполняем все извлечение данных в контексте страницы за один раз
   return page.evaluate(() => {
@@ -1230,7 +1233,7 @@ async function collectResume(page: Page): Promise<any> {
   });
 }
 
-// Вспомогательная функция для применения фильтров
+// Применение фильтров для арбитражных дел
 async function applyArbitrFilters(page: Page, filters?: any): Promise<void> {
   if (!filters) return;
 
@@ -1319,7 +1322,7 @@ async function applyArbitrFilters(page: Page, filters?: any): Promise<void> {
   // Период (не реализован из-за сложности datepicker, можно добавить позже)
 }
 
-// Основная функция сбора детального арбитража
+// Основная функция сбора арбитражных дел (детальный список)
 async function collectArbitrDetails(
   page: Page,
   companyId: number,
@@ -1505,6 +1508,7 @@ async function collectArbitrDetails(
   return data;
 }
 
+// Основная функция сбора связей (детальный список)
 async function collectConnectionsDetails(page: Page, companyId: number): Promise<any> {
   console.log(`Сбор детальных связей для компании ID ${companyId}...`);
   const data: any = { total_organizations: '', connections: [] };
@@ -1677,6 +1681,7 @@ async function collectConnectionsDetails(page: Page, companyId: number): Promise
   return data;
 }
 
+// Применение фильтров для судов общей юрисдикции
 async function applySouFilters(page: Page, filters?: any): Promise<void> {
   if (!filters) return;
 
@@ -1755,6 +1760,7 @@ async function applySouFilters(page: Page, filters?: any): Promise<void> {
   }
 }
 
+// Основная функция сбора для судов общей юрисдикции (детальный список)
 async function collectSouDetails(
   page: Page,
   companyId: number,
@@ -1933,6 +1939,7 @@ async function collectSouDetails(
   return data;
 }
 
+// Применение фильтров для товарных знаков
 async function applyTrademarksFilters(page: Page, filters?: any): Promise<void> {
   if (!filters) return;
 
@@ -1965,6 +1972,7 @@ async function applyTrademarksFilters(page: Page, filters?: any): Promise<void> 
   }
 }
 
+// Основная функция сбора для товарных знаков (детальный список)
 async function collectTrademarksDetails(
   page: Page,
   companyId: number,
@@ -2066,6 +2074,7 @@ async function collectTrademarksDetails(
   return data;
 }
 
+// Применение фильтров для лизинга
 async function applyLeasingFilters(page: Page, filters?: any): Promise<void> {
   if (!filters) return;
 
@@ -2107,6 +2116,7 @@ async function applyLeasingFilters(page: Page, filters?: any): Promise<void> {
   }
 }
 
+// Основая функция сбора для лизинга (детальный списрк)
 async function collectLeasingDetails(
   page: Page,
   companyId: number,
@@ -2300,6 +2310,7 @@ async function collectLeasingDetails(
   return data;
 }
 
+// Применение фильтров для залога
 async function applyPledgeFilters(page: Page, filters?: any): Promise<void> {
   if (!filters) return;
 
@@ -2328,6 +2339,7 @@ async function applyPledgeFilters(page: Page, filters?: any): Promise<void> {
   }
 }
 
+// Основная функция сбора для залогов (детальный список)
 async function collectPledgesDetails(
   page: Page,
   companyId: number,
@@ -2340,7 +2352,7 @@ async function collectPledgesDetails(
   console.log(`Сбор детальных залогов для компании ID ${companyId}...`);
   const data: any = { total_messages: '', pledges: [] };
 
-  const url = `https://www.rusprofile.ru/pledges/${companyId}`;
+  const url = `https://www.rusprofile.ru/pledge/${companyId}`;
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.waitForSelector('ul.filters-results__list', { timeout: 15000 });
   await page.waitForTimeout(1000);
@@ -2509,6 +2521,206 @@ async function collectPledgesDetails(
   return data;
 }
 
+// Применение фильтров для существенных фактов
+async function applyFactsFilters(page: Page, filters?: any): Promise<void> {
+  if (!filters) return;
+
+  // Категория (radio name="group")
+  if (filters.group && filters.group !== 'all') {
+    const radio = page.locator(`input[name="group"][value="${filters.group}"]`);
+    if (await radio.count() > 0) {
+      await radio.check();
+      await page.waitForTimeout(500);
+    }
+  }
+
+  // Аннулированные сообщения (checkbox)
+  if (filters.withAnnulled) {
+    const checkbox = page.locator('input[name="with_annulled"][value="1"]');
+    if (await checkbox.count() > 0) {
+      await checkbox.check();
+      await page.waitForTimeout(500);
+    }
+  }
+}
+
+// Основная функция сбора для существенных фактов (детальный список) 
+async function collectFactsDetails(
+  page: Page,
+  companyId: number,
+  options: {
+    maxPages?: number;
+    maxTotalCases?: number;
+    filters?: any;
+  } = {}
+): Promise<any> {
+  console.log(`Сбор существенных фактов для компании ID ${companyId}...`);
+  const data: any = { total_messages: '', facts: [] };
+
+  const url = `https://www.rusprofile.ru/facts/${companyId}`;
+  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await page.waitForSelector('ul.filters-results__list', { timeout: 15000 });
+  await page.waitForTimeout(1000);
+
+  if (options.filters) {
+    await applyFactsFilters(page, options.filters);
+    await page.waitForTimeout(2000);
+  }
+
+  try {
+    const headText = await page.locator('div.export-data__text, .filters-results__head').first().innerText();
+    const m = headText.match(/Найдено\s*([\d\s]+)\s*сообщений?/);
+    if (m) data.total_messages = m[1].replace(/\s/g, '');
+  } catch (e) {
+    console.log('Не удалось получить общее количество сообщений:', e);
+  }
+
+  const maxPages = options.maxPages || 1;
+  const maxTotalCases = options.maxTotalCases || 100;
+  let collected = 0;
+  let currentPage = 1;
+
+  while (currentPage <= maxPages && collected < maxTotalCases) {
+    const items = page.locator('li.filters-results__list-item');
+    const itemCount = await items.count();
+
+    for (let i = 0; i < itemCount && collected < maxTotalCases; i++) {
+      const item = items.nth(i);
+      const fact: any = {};
+
+      // === Раскрываем все скрытые блоки ===
+      // Кнопки "Показать полностью" (текст комментария)
+      const moreButtons = item.locator('a.snippet__more:not(.snippet__more--force)');
+      const moreCount = await moreButtons.count();
+      for (let j = 0; j < moreCount; j++) {
+        try {
+          await moreButtons.nth(j).click({ force: true });
+          await page.waitForTimeout(300);
+        } catch (e) {
+          console.warn(`Не удалось нажать "Показать полностью" #${j}:`, e);
+        }
+      }
+
+      // Кнопки "Показать всех" (список кредиторов)
+      const forceButtons = item.locator('a.snippet__more--force');
+      const forceCount = await forceButtons.count();
+      for (let j = 0; j < forceCount; j++) {
+        try {
+          await forceButtons.nth(j).click({ force: true });
+          await page.waitForTimeout(300);
+        } catch (e) {
+          console.warn(`Не удалось нажать "Показать всех" #${j}:`, e);
+        }
+      }
+
+      await page.waitForTimeout(500); // ждём полного раскрытия
+
+      // === Извлекаем данные ===
+      const parsed = await item.evaluate((li) => {
+        const getText = (selector: string) => {
+          const el = li.querySelector(selector);
+          return el ? el.textContent?.trim() || '' : '';
+        };
+
+        // Заголовок (тип сообщения)
+        const title = getText('.snippet__row-value--title');
+
+        // Сообщение (номер и дата)
+        const message = getText('.snippet__row-value span');
+        // Публикатор
+        const publisherLink = li.querySelector('a.snipper__link');
+        const publisher = publisherLink ? publisherLink.textContent?.trim() || '' : '';
+        const publisherHref = publisherLink ? (publisherLink as HTMLAnchorElement).href || '' : '';
+
+        // Должник/Кредитор (находим все строки)
+        const fields: any = {};
+        const rows = li.querySelectorAll('div.snippet__row');
+        rows.forEach((row) => {
+          const keyEl = row.querySelector('.snippet__row-key');
+          const valueEl = row.querySelector('.snippet__row-value');
+          if (!keyEl || !valueEl) return;
+          const key = keyEl.textContent?.trim() || '';
+          const value = valueEl.textContent?.trim() || '';
+          if (key && !key.includes('--subtitle') && key !== 'Комментарий публикатора') {
+            fields[key] = value;
+          }
+        });
+
+        // Полный текст комментария
+        let comment = '';
+        const commentBlock = li.querySelector('.snippet__row--comment .truncate-text');
+        if (commentBlock) comment = commentBlock.textContent?.trim() || '';
+
+        // Список кредиторов (если есть)
+        const creditors: any[] = [];
+        const creditorsContainer = li.querySelector('.creditors-list');
+        if (creditorsContainer) {
+          const creditorLinks = creditorsContainer.querySelectorAll('a.snipper__link');
+          creditorLinks.forEach(link => {
+            creditors.push({
+              name: link.textContent?.trim() || '',
+              href: (link as HTMLAnchorElement).href || ''
+            });
+          });
+          // Также могут быть span без ссылок (иностранные организации)
+          creditorsContainer.querySelectorAll('span').forEach(span => {
+            const text = span.textContent?.trim() || '';
+            if (text && !span.querySelector('a')) {
+              creditors.push({ name: text, href: '' });
+            }
+          });
+        }
+
+        // Документы
+        const documents: any[] = [];
+        const docItems = li.querySelectorAll('.docs-item');
+        docItems.forEach(doc => {
+          const text = doc.textContent?.trim() || '';
+          const guid = (doc as HTMLElement).getAttribute('data-file-guid') || '';
+          if (text || guid) documents.push({ name: text, guid });
+        });
+
+        return { title, message, publisher, publisherHref, fields, comment, creditors, documents };
+      });
+
+      fact.title = parsed.title;
+      fact.message = parsed.message;
+      fact.publisher = parsed.publisher;
+      fact.publisher_href = parsed.publisherHref;
+      fact.fields = parsed.fields;
+      fact.comment = parsed.comment;
+      fact.creditors = parsed.creditors;
+      fact.documents = parsed.documents;
+
+      if (fact.title || fact.message) {
+        data.facts.push(fact);
+        collected++;
+      }
+    }
+
+    if (currentPage >= maxPages || collected >= maxTotalCases) break;
+
+    const showMore = page.locator("button:has-text('Показать ещё')").first();
+    if (await showMore.count() > 0 && await showMore.isEnabled()) {
+      await showMore.click();
+      await page.waitForTimeout(3000);
+      currentPage++;
+    } else {
+      const nextBtn = page.locator('button.filters-pagination__nav.--next').first();
+      if (await nextBtn.count() > 0 && await nextBtn.isEnabled()) {
+        await nextBtn.click();
+        await page.waitForTimeout(3000);
+        currentPage++;
+      } else {
+        break;
+      }
+    }
+  }
+
+  console.log(`Собрано фактов: ${data.facts.length}, всего: ${data.total_messages}`);
+  return data;
+}
+
 export async function scrapeRusprofile(
   inn: string,
   options?: {
@@ -2525,6 +2737,8 @@ export async function scrapeRusprofile(
     leasingFilters?: any;
     pledgesDetails?: boolean;
     pledgesFilters?: any;
+    factsDetails?: boolean;
+    factsFilters?: any;
   }
 ): Promise<CompanyFullData | null> {
 
@@ -2719,6 +2933,17 @@ export async function scrapeRusprofile(
           maxPages: options.pledgesFilters?.maxPages || 1,
           maxTotalCases: options.pledgesFilters?.maxTotalCases || 100,
           filters: options.pledgesFilters,
+        })
+      );
+    }
+
+    if (options?.factsDetails) {
+      console.log('Сбор детальных существенных фактов...');
+      result.facts_details = await timed('facts_details', () =>
+        collectFactsDetails(page, companyId, {
+          maxPages: options.factsFilters?.maxPages || 1,
+          maxTotalCases: options.factsFilters?.maxTotalCases || 100,
+          filters: options.factsFilters,
         })
       );
     }
