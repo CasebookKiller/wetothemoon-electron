@@ -121,6 +121,15 @@ export const OSINTPage: React.FC = () => {
     maxTotalCases: 100,
   });
 
+  const [needFoundersDetails, setNeedFoundersDetails] = useState(false);
+  const [foundersFilters, setFoundersFilters] = useState({
+    types: [] as string[], // 'org_rus', 'person', 'org_foreign', 'state', 'fund'
+    statuses: [] as string[], // 'actual', 'historical'
+    maxPages: 1,
+    maxTotalCases: 100,
+  });
+
+
   const api = (window as any).electronAPI;
 
   const handleLaunch = async () => {
@@ -219,6 +228,14 @@ export const OSINTPage: React.FC = () => {
           maxPages: bankruptcyFilters.maxPages,
           maxTotalCases: bankruptcyFilters.maxTotalCases,
         } : undefined,
+        // отдельные фильтры для учредителей
+        foundersDetails: needFoundersDetails,
+        foundersFilters: needFoundersDetails ? {
+          types: foundersFilters.types,
+          statuses: foundersFilters.statuses,
+          maxPages: foundersFilters.maxPages,
+          maxTotalCases: foundersFilters.maxTotalCases,
+        } : undefined,
       };
 
       if (needArbitrDetails) {
@@ -272,6 +289,20 @@ export const OSINTPage: React.FC = () => {
 
   const toggleArrayState = (setter: React.Dispatch<React.SetStateAction<string[]>>, value: string) => {
     setter(prev => prev.includes(value) ? prev.filter(v => v !== value) : [...prev, value]);
+  };
+
+  const toggleFoundersType = (value: string) => {
+    setFoundersFilters(prev => ({
+      ...prev,
+      types: prev.types.includes(value) ? prev.types.filter(v => v !== value) : [...prev.types, value],
+    }));
+  };
+  
+  const toggleFoundersStatus = (value: string) => {
+    setFoundersFilters(prev => ({
+      ...prev,
+      types: prev.statuses.includes(value) ? prev.statuses.filter(v => v !== value) : [...prev.statuses, value],
+    }));
   };
 
   return (
@@ -393,6 +424,17 @@ export const OSINTPage: React.FC = () => {
                 Детальное банкротство
               </label>
             </div>
+            <div className="mt-2">
+              <Checkbox
+                inputId="needFounders"
+                checked={needFoundersDetails}
+                onChange={(e) => setNeedFoundersDetails(e.checked ?? false)}
+              />
+              <label htmlFor="needFounders" className="ml-2">
+                Детальный список учредителей
+              </label>
+            </div>
+
           </div>
         </div>
 
@@ -728,6 +770,43 @@ export const OSINTPage: React.FC = () => {
                 <InputText type="number" min={1} max={100} value={String(bankruptcyFilters.maxPages)} onChange={(e) => setBankruptcyFilters({ ...bankruptcyFilters, maxPages: parseInt(e.target.value) || 1 })} className="w-4rem" />
                 <span className="ml-3">Макс. сообщений:</span>
                 <InputText type="number" min={1} max={1000} value={String(bankruptcyFilters.maxTotalCases)} onChange={(e) => setBankruptcyFilters({ ...bankruptcyFilters, maxTotalCases: parseInt(e.target.value) || 100 })} className="w-4rem" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {needFoundersDetails && (
+          <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
+            <div className="flex-1 flex flex-column gap-1 xl:mr-8">
+              <span className="app font-size-subheading">Фильтры учредителей</span>
+
+              <div className="flex align-items-center gap-2 mt-2">
+                <span>Тип:</span>
+                <Checkbox inputId="founderOrgRus" checked={foundersFilters.types.includes('org_rus')} onChange={() => toggleFoundersType('org_rus')} />
+                <label htmlFor="founderOrgRus" className="ml-1">Юридические лица</label>
+                <Checkbox inputId="founderPerson" checked={foundersFilters.types.includes('person')} onChange={() => toggleFoundersType('person')} />
+                <label htmlFor="founderPerson" className="ml-1">Физические лица</label>
+                <Checkbox inputId="founderForeign" checked={foundersFilters.types.includes('org_foreign')} onChange={() => toggleFoundersType('org_foreign')} />
+                <label htmlFor="founderForeign" className="ml-1">Иностранные</label>
+                <Checkbox inputId="founderState" checked={foundersFilters.types.includes('state')} onChange={() => toggleFoundersType('state')} />
+                <label htmlFor="founderState" className="ml-1">Госструктуры</label>
+                <Checkbox inputId="founderFund" checked={foundersFilters.types.includes('fund')} onChange={() => toggleFoundersType('fund')} />
+                <label htmlFor="founderFund" className="ml-1">ПИФы</label>
+              </div>
+
+              <div className="flex align-items-center gap-2 mt-2">
+                <span>Статус:</span>
+                <Checkbox inputId="founderActual" checked={foundersFilters.statuses.includes('actual')} onChange={() => toggleFoundersStatus('actual')} />
+                <label htmlFor="founderActual" className="ml-1">Актуальные</label>
+                <Checkbox inputId="founderHistorical" checked={foundersFilters.statuses.includes('historical')} onChange={() => toggleFoundersStatus('historical')} />
+                <label htmlFor="founderHistorical" className="ml-1">Исторические</label>
+              </div>
+
+              <div className="flex align-items-center gap-2 mt-2">
+                <span>Макс. страниц:</span>
+                <InputText type="number" min={1} max={100} value={String(foundersFilters.maxPages)} onChange={(e) => setFoundersFilters({ ...foundersFilters, maxPages: parseInt(e.target.value) || 1 })} className="w-4rem" />
+                <span className="ml-3">Макс. учредителей:</span>
+                <InputText type="number" min={1} max={1000} value={String(foundersFilters.maxTotalCases)} onChange={(e) => setFoundersFilters({ ...foundersFilters, maxTotalCases: parseInt(e.target.value) || 100 })} className="w-4rem" />
               </div>
             </div>
           </div>
