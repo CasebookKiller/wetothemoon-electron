@@ -129,6 +129,8 @@ export const OSINTPage: React.FC = () => {
     maxTotalCases: 100,
   });
 
+  const [needReliabilityDetails, setNeedReliabilityDetails] = useState(false);
+
 
   const api = (window as any).electronAPI;
 
@@ -236,6 +238,8 @@ export const OSINTPage: React.FC = () => {
           maxPages: foundersFilters.maxPages,
           maxTotalCases: foundersFilters.maxTotalCases,
         } : undefined,
+        // сбор данных о надежности
+        reliabilityDetails: needReliabilityDetails,
       };
 
       if (needArbitrDetails) {
@@ -297,7 +301,7 @@ export const OSINTPage: React.FC = () => {
       types: prev.types.includes(value) ? prev.types.filter(v => v !== value) : [...prev.types, value],
     }));
   };
-  
+
   const toggleFoundersStatus = (value: string) => {
     setFoundersFilters(prev => ({
       ...prev,
@@ -432,6 +436,16 @@ export const OSINTPage: React.FC = () => {
               />
               <label htmlFor="needFounders" className="ml-2">
                 Детальный список учредителей
+              </label>
+            </div>
+            <div className="mt-2">
+              <Checkbox
+                inputId="needReliability"
+                checked={needReliabilityDetails}
+                onChange={(e) => setNeedReliabilityDetails(e.checked ?? false)}
+              />
+              <label htmlFor="needReliability" className="ml-2">
+                Собрать детальную надёжность
               </label>
             </div>
 
