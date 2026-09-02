@@ -131,6 +131,9 @@ export const OSINTPage: React.FC = () => {
 
   const [needReliabilityDetails, setNeedReliabilityDetails] = useState(false);
 
+  const [needSanctionsDetails, setNeedSanctionsDetails] = useState(false);
+
+
 
   const api = (window as any).electronAPI;
 
@@ -357,7 +360,7 @@ export const OSINTPage: React.FC = () => {
                 onChange={(e) => setNeedArbitrDetails(e.checked as boolean)}
               />
               <label htmlFor="needArbitr" className="ml-2">
-                Детальный список арбитражных дел
+                Арбитражные дела
               </label>
             </div>
             <div className="mt-2">
@@ -375,7 +378,7 @@ export const OSINTPage: React.FC = () => {
                 onChange={(e) => setNeedSouDetails(e.checked as boolean)}
               />
               <label htmlFor="needSou" className="ml-2">
-                Детальные суды общей юрисдикции
+                Суды общей юрисдикции
               </label>
             </div>
             <div className="mt-2">
@@ -385,7 +388,7 @@ export const OSINTPage: React.FC = () => {
                 onChange={(e) => setNeedTrademarksDetails(e.checked ?? false)}
               />
               <label htmlFor="needTrademarks" className="ml-2">
-                Детальные товарные знаки
+                Товарные знаки
               </label>
             </div>
             <div className="mt-2">
@@ -395,7 +398,7 @@ export const OSINTPage: React.FC = () => {
                 onChange={(e) => setNeedLeasingDetails(e.checked ?? false)}
               />
               <label htmlFor="needLeasing" className="ml-2">
-                Детальный лизинг
+                Лизинг
               </label>
             </div>
             <div className="mt-2">
@@ -405,7 +408,7 @@ export const OSINTPage: React.FC = () => {
                 onChange={(e) => setNeedPledgesDetails(e.checked ?? false)}
               />
               <label htmlFor="needPledges" className="ml-2">
-                Детальные залоги
+                Залоги
               </label>
             </div>
             <div className="mt-2">
@@ -415,7 +418,7 @@ export const OSINTPage: React.FC = () => {
                 onChange={(e) => setNeedFactsDetails(e.checked ?? false)}
               />
               <label htmlFor="needFacts" className="ml-2">
-                Детальные существенные факты
+                Существенные факты
               </label>
             </div>
             <div className="mt-2">
@@ -425,7 +428,7 @@ export const OSINTPage: React.FC = () => {
                 onChange={(e) => setNeedBankruptcyDetails(e.checked ?? false)}
               />
               <label htmlFor="needBankruptcy" className="ml-2">
-                Детальное банкротство
+                Банкротство
               </label>
             </div>
             <div className="mt-2">
@@ -435,7 +438,7 @@ export const OSINTPage: React.FC = () => {
                 onChange={(e) => setNeedFoundersDetails(e.checked ?? false)}
               />
               <label htmlFor="needFounders" className="ml-2">
-                Детальный список учредителей
+                Учредители
               </label>
             </div>
             <div className="mt-2">
@@ -445,7 +448,18 @@ export const OSINTPage: React.FC = () => {
                 onChange={(e) => setNeedReliabilityDetails(e.checked ?? false)}
               />
               <label htmlFor="needReliability" className="ml-2">
-                Собрать детальную надёжность
+                Надёжность
+              </label>
+            </div>
+
+            <div className="mt-2">
+              <Checkbox
+                inputId="needSanctions"
+                checked={needSanctionsDetails}
+                onChange={(e) => setNeedSanctionsDetails(e.checked ?? false)}
+              />
+              <label htmlFor="needSanctions" className="ml-2">
+                Санкции
               </label>
             </div>
 
