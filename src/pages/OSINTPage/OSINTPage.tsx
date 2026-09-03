@@ -133,7 +133,17 @@ export const OSINTPage: React.FC = () => {
 
   const [needSanctionsDetails, setNeedSanctionsDetails] = useState(false);
 
-
+  const [needGzDetails, setNeedGzDetails] = useState(false);
+  const [gzFilters, setGzFilters] = useState({
+    role: 'all',             // 'all', 'supplier', 'customer'
+    purchaseStatus: 'all',   // 'all', 'completed_winner', 'completed_loser', 'unknown', 'cancelled', 'processing'
+    contractStatus: 'all',   // 'all', 'E', 'ET', 'EC'
+    isContractor: 'all',     // 'all', '1', '0'
+    category: 'all',         // можно не выводить все категории, оставить select
+    search: '',
+    maxPages: 1,
+    maxTotalCases: 100,
+  });
 
   const api = (window as any).electronAPI;
 
@@ -243,6 +253,16 @@ export const OSINTPage: React.FC = () => {
         } : undefined,
         // сбор данных о надежности
         reliabilityDetails: needReliabilityDetails,
+        // отдельные фильтры для госзакупок
+        gzDetails: needGzDetails,
+        gzFilters: needGzDetails ? {
+          role: gzFilters.role,
+          purchaseStatus: gzFilters.purchaseStatus,
+          contractStatus: gzFilters.contractStatus,
+          search: gzFilters.search.trim() || undefined,
+          maxPages: gzFilters.maxPages,
+          maxTotalCases: gzFilters.maxTotalCases,
+        } : undefined,
       };
 
       if (needArbitrDetails) {
@@ -463,6 +483,17 @@ export const OSINTPage: React.FC = () => {
               </label>
             </div>
 
+            <div className="mt-2">
+              <Checkbox
+                inputId="needGz"
+                checked={needGzDetails}
+                onChange={(e) => setNeedGzDetails(e.checked ?? false)}
+              />
+              <label htmlFor="needGz" className="ml-2">
+                Собрать детальные госзакупки
+              </label>
+            </div>
+            
           </div>
         </div>
 
@@ -835,6 +866,62 @@ export const OSINTPage: React.FC = () => {
                 <InputText type="number" min={1} max={100} value={String(foundersFilters.maxPages)} onChange={(e) => setFoundersFilters({ ...foundersFilters, maxPages: parseInt(e.target.value) || 1 })} className="w-4rem" />
                 <span className="ml-3">Макс. учредителей:</span>
                 <InputText type="number" min={1} max={1000} value={String(foundersFilters.maxTotalCases)} onChange={(e) => setFoundersFilters({ ...foundersFilters, maxTotalCases: parseInt(e.target.value) || 100 })} className="w-4rem" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {needGzDetails && (
+          <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
+            <div className="flex-1 flex flex-column gap-1 xl:mr-8">
+              <span className="app font-size-subheading">Фильтры госзакупок</span>
+
+              <div className="flex align-items-center gap-2 mt-2">
+                <span>Роль:</span>
+                <select value={gzFilters.role} onChange={(e) => setGzFilters({ ...gzFilters, role: e.target.value })}>
+                  <option value="all">Все</option>
+                  <option value="supplier">Участник</option>
+                  <option value="customer">Заказчик</option>
+                </select>
+              </div>
+
+              <div className="flex align-items-center gap-2 mt-2">
+                <span>Статус закупки:</span>
+                <select value={gzFilters.purchaseStatus} onChange={(e) => setGzFilters({ ...gzFilters, purchaseStatus: e.target.value })}>
+                  <option value="all">Все</option>
+                  <option value="completed_winner">Выиграно</option>
+                  <option value="completed_loser">Не выиграно</option>
+                  <option value="unknown">Не определено</option>
+                  <option value="cancelled">Отменена</option>
+                  <option value="processing">В процессе</option>
+                </select>
+              </div>
+
+              <div className="flex align-items-center gap-2 mt-2">
+                <span>Статус контракта:</span>
+                <select value={gzFilters.contractStatus} onChange={(e) => setGzFilters({ ...gzFilters, contractStatus: e.target.value })}>
+                  <option value="all">Все</option>
+                  <option value="E">Исполнение</option>
+                  <option value="ET">Исполнение прекращено</option>
+                  <option value="EC">Исполнение завершено</option>
+                </select>
+              </div>
+
+              <div className="flex align-items-center gap-2 mt-2">
+                <span>Поиск (номер закупки/контракта):</span>
+                <InputText
+                  value={gzFilters.search}
+                  onChange={(e) => setGzFilters({ ...gzFilters, search: e.target.value })}
+                  placeholder="Номер закупки или контракта"
+                  className="w-full"
+                />
+              </div>
+
+              <div className="flex align-items-center gap-2 mt-2">
+                <span>Макс. страниц:</span>
+                <InputText type="number" min={1} max={100} value={String(gzFilters.maxPages)} onChange={(e) => setGzFilters({ ...gzFilters, maxPages: parseInt(e.target.value) || 1 })} className="w-4rem" />
+                <span className="ml-3">Макс. закупок:</span>
+                <InputText type="number" min={1} max={1000} value={String(gzFilters.maxTotalCases)} onChange={(e) => setGzFilters({ ...gzFilters, maxTotalCases: parseInt(e.target.value) || 100 })} className="w-4rem" />
               </div>
             </div>
           </div>
