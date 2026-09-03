@@ -154,6 +154,15 @@ export const OSINTPage: React.FC = () => {
     maxTotalCases: 100,
   });
 
+  const [needInspectionsDetails, setNeedInspectionsDetails] = useState(false);
+  const [inspectionsFilters, setInspectionsFilters] = useState({
+    planned: [] as string[],   // '0' (внеплановая), '1' (плановая), '2' (профилактическое)
+    statuses: [] as string[], // '1', '0', '2', '3', '4', '5', '6', '8'
+    results: [] as string[],  // '0'..'4'
+    maxPages: 1,
+    maxTotalCases: 100,
+  });
+
   const api = (window as any).electronAPI;
 
   const handleLaunch = async () => {
@@ -279,6 +288,15 @@ export const OSINTPage: React.FC = () => {
           maxPages: fsspFilters.maxPages,
           maxTotalCases: fsspFilters.maxTotalCases,
         } : undefined,
+        // отдельные фильтры для проверок
+        inspectionsDetails: needInspectionsDetails,
+        inspectionsFilters: needInspectionsDetails ? {
+          planned: inspectionsFilters.planned,
+          statuses: inspectionsFilters.statuses,
+          results: inspectionsFilters.results,
+          maxPages: inspectionsFilters.maxPages,
+          maxTotalCases: inspectionsFilters.maxTotalCases,
+        } : undefined,
       };
 
       if (needArbitrDetails) {
@@ -352,6 +370,26 @@ export const OSINTPage: React.FC = () => {
     setFsspFilters(prev => ({
       ...prev,
       statuses: prev.statuses.includes(value) ? prev.statuses.filter(v => v !== value) : [...prev.statuses, value],
+    }));
+  };
+
+  const toggleInspectionsPlanned = (value: string) => {
+    setInspectionsFilters(prev => ({
+      ...prev,
+      planned: prev.planned.includes(value) ? prev.planned.filter(v => v !== value) : [...prev.planned, value],
+    }));
+  };
+  
+  const toggleInspectionsStatus = (value: string) => { 
+    setInspectionsFilters(prev => ({
+      ...prev,
+      status: prev.statuses.includes(value) ? prev.statuses.filter(v => v !== value) : [...prev.statuses, value],
+    }));
+  };
+  const toggleInspectionsResult = (value: string) => { 
+    setInspectionsFilters(prev => ({
+      ...prev,
+      result: prev.results.includes(value) ? prev.results.filter(v => v !== value) : [...prev.results, value],
     }));
   };
 
@@ -527,7 +565,17 @@ export const OSINTPage: React.FC = () => {
                 Исполнительные производства
               </label>
             </div>
-
+            
+            <div className="mt-2">
+              <Checkbox
+                inputId="needInspections"
+                checked={needInspectionsDetails}
+                onChange={(e) => setNeedInspectionsDetails(e.checked ?? false)}
+              />
+              <label htmlFor="needInspections" className="ml-2">
+                Собрать детальные проверки
+              </label>
+            </div>
 
           </div>
         </div>
@@ -985,6 +1033,53 @@ export const OSINTPage: React.FC = () => {
                 <InputText type="number" min={1} max={100} value={String(fsspFilters.maxPages)} onChange={(e) => setFsspFilters({ ...fsspFilters, maxPages: parseInt(e.target.value) || 1 })} className="w-4rem" />
                 <span className="ml-3">Макс. производств:</span>
                 <InputText type="number" min={1} max={1000} value={String(fsspFilters.maxTotalCases)} onChange={(e) => setFsspFilters({ ...fsspFilters, maxTotalCases: parseInt(e.target.value) || 100 })} className="w-4rem" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {needInspectionsDetails && (
+          <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
+            <div className="flex-1 flex flex-column gap-1 xl:mr-8">
+              <span className="app font-size-subheading">Фильтры проверок</span>
+
+              <div className="flex align-items-center gap-2 mt-2">
+                <span>Тип:</span>
+                <Checkbox inputId="inspPlanned0" checked={inspectionsFilters.planned.includes('0')} onChange={() => toggleInspectionsPlanned('0')} />
+                <label htmlFor="inspPlanned0" className="ml-1">Внеплановая</label>
+                <Checkbox inputId="inspPlanned1" checked={inspectionsFilters.planned.includes('1')} onChange={() => toggleInspectionsPlanned('1')} />
+                <label htmlFor="inspPlanned1" className="ml-1">Плановая</label>
+                <Checkbox inputId="inspPlanned2" checked={inspectionsFilters.planned.includes('2')} onChange={() => toggleInspectionsPlanned('2')} />
+                <label htmlFor="inspPlanned2" className="ml-1">Профилактическое</label>
+              </div>
+
+              <div className="flex align-items-center gap-2 mt-2">
+                <span>Статус:</span>
+                <Checkbox inputId="inspStatus1" checked={inspectionsFilters.statuses.includes('1')} onChange={() => toggleInspectionsStatus('1')} />
+                <label htmlFor="inspStatus1" className="ml-1">Завершена</label>
+                <Checkbox inputId="inspStatus0" checked={inspectionsFilters.statuses.includes('0')} onChange={() => toggleInspectionsStatus('0')} />
+                <label htmlFor="inspStatus0" className="ml-1">Неизвестно</label>
+                <Checkbox inputId="inspStatus2" checked={inspectionsFilters.statuses.includes('2')} onChange={() => toggleInspectionsStatus('2')} />
+                <label htmlFor="inspStatus2" className="ml-1">Ожидает завершения</label>
+                <Checkbox inputId="inspStatus4" checked={inspectionsFilters.statuses.includes('4')} onChange={() => toggleInspectionsStatus('4')} />
+                <label htmlFor="inspStatus4" className="ml-1">Ожидает проведения</label>
+              </div>
+
+              <div className="flex align-items-center gap-2 mt-2">
+                <span>Результат:</span>
+                <Checkbox inputId="inspResult0" checked={inspectionsFilters.results.includes('0')} onChange={() => toggleInspectionsResult('0')} />
+                <label htmlFor="inspResult0" className="ml-1">Неизвестно</label>
+                <Checkbox inputId="inspResult1" checked={inspectionsFilters.results.includes('1')} onChange={() => toggleInspectionsResult('1')} />
+                <label htmlFor="inspResult1" className="ml-1">Без нарушений</label>
+                <Checkbox inputId="inspResult2" checked={inspectionsFilters.results.includes('2')} onChange={() => toggleInspectionsResult('2')} />
+                <label htmlFor="inspResult2" className="ml-1">Выявлены нарушения</label>
+              </div>
+
+              <div className="flex align-items-center gap-2 mt-2">
+                <span>Макс. страниц:</span>
+                <InputText type="number" min={1} max={100} value={String(inspectionsFilters.maxPages)} onChange={(e) => setInspectionsFilters({ ...inspectionsFilters, maxPages: parseInt(e.target.value) || 1 })} className="w-4rem" />
+                <span className="ml-3">Макс. проверок:</span>
+                <InputText type="number" min={1} max={1000} value={String(inspectionsFilters.maxTotalCases)} onChange={(e) => setInspectionsFilters({ ...inspectionsFilters, maxTotalCases: parseInt(e.target.value) || 100 })} className="w-4rem" />
               </div>
             </div>
           </div>
