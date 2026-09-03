@@ -145,6 +145,15 @@ export const OSINTPage: React.FC = () => {
     maxTotalCases: 100,
   });
 
+  const [needFsspDetails, setNeedFsspDetails] = useState(false);
+  const [fsspFilters, setFsspFilters] = useState({
+    statuses: [] as string[], // '1', '2'
+    objects: [] as string[],  // '18', '3', и т.д.
+    due: [] as string[],      // '6', '1', '2', '3', '4', '5'
+    maxPages: 1,
+    maxTotalCases: 100,
+  });
+
   const api = (window as any).electronAPI;
 
   const handleLaunch = async () => {
@@ -263,6 +272,13 @@ export const OSINTPage: React.FC = () => {
           maxPages: gzFilters.maxPages,
           maxTotalCases: gzFilters.maxTotalCases,
         } : undefined,
+        // отдельные фильтры для исполнительных производств
+        fsspDetails: needFsspDetails,
+        fsspFilters: needFsspDetails ? {
+          statuses: fsspFilters.statuses,
+          maxPages: fsspFilters.maxPages,
+          maxTotalCases: fsspFilters.maxTotalCases,
+        } : undefined,
       };
 
       if (needArbitrDetails) {
@@ -329,6 +345,13 @@ export const OSINTPage: React.FC = () => {
     setFoundersFilters(prev => ({
       ...prev,
       types: prev.statuses.includes(value) ? prev.statuses.filter(v => v !== value) : [...prev.statuses, value],
+    }));
+  };
+
+  const toggleFsspStatus = (value: string) => {
+    setFsspFilters(prev => ({
+      ...prev,
+      statuses: prev.statuses.includes(value) ? prev.statuses.filter(v => v !== value) : [...prev.statuses, value],
     }));
   };
 
@@ -490,10 +513,22 @@ export const OSINTPage: React.FC = () => {
                 onChange={(e) => setNeedGzDetails(e.checked ?? false)}
               />
               <label htmlFor="needGz" className="ml-2">
-                Собрать детальные госзакупки
+                Госзакупки
               </label>
             </div>
-            
+
+            <div className="mt-2">
+              <Checkbox
+                inputId="needFssp"
+                checked={needFsspDetails}
+                onChange={(e) => setNeedFsspDetails(e.checked ?? false)}
+              />
+              <label htmlFor="needFssp" className="ml-2">
+                Исполнительные производства
+              </label>
+            </div>
+
+
           </div>
         </div>
 
@@ -922,6 +957,34 @@ export const OSINTPage: React.FC = () => {
                 <InputText type="number" min={1} max={100} value={String(gzFilters.maxPages)} onChange={(e) => setGzFilters({ ...gzFilters, maxPages: parseInt(e.target.value) || 1 })} className="w-4rem" />
                 <span className="ml-3">Макс. закупок:</span>
                 <InputText type="number" min={1} max={1000} value={String(gzFilters.maxTotalCases)} onChange={(e) => setGzFilters({ ...gzFilters, maxTotalCases: parseInt(e.target.value) || 100 })} className="w-4rem" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {needFsspDetails && (
+          <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
+            <div className="flex-1 flex flex-column gap-1 xl:mr-8">
+              <span className="app font-size-subheading">Фильтры ФССП</span>
+
+              <div className="flex align-items-center gap-2 mt-2">
+                <span>Статус:</span>
+                <Checkbox inputId="fsspOpen" checked={fsspFilters.statuses.includes('1')} onChange={() => toggleFsspStatus('1')} />
+                <label htmlFor="fsspOpen" className="ml-1">Открыто</label>
+                <Checkbox inputId="fsspClosed" checked={fsspFilters.statuses.includes('2')} onChange={() => toggleFsspStatus('2')} />
+                <label htmlFor="fsspClosed" className="ml-1">Завершено</label>
+              </div>
+
+              <div className="flex align-items-center gap-2 mt-2">
+                <span>Предмет:</span>
+                {/* Можно сделать select с несколькими опциями, для простоты пропустим */}
+              </div>
+
+              <div className="flex align-items-center gap-2 mt-2">
+                <span>Макс. страниц:</span>
+                <InputText type="number" min={1} max={100} value={String(fsspFilters.maxPages)} onChange={(e) => setFsspFilters({ ...fsspFilters, maxPages: parseInt(e.target.value) || 1 })} className="w-4rem" />
+                <span className="ml-3">Макс. производств:</span>
+                <InputText type="number" min={1} max={1000} value={String(fsspFilters.maxTotalCases)} onChange={(e) => setFsspFilters({ ...fsspFilters, maxTotalCases: parseInt(e.target.value) || 100 })} className="w-4rem" />
               </div>
             </div>
           </div>
