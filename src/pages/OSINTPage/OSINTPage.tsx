@@ -171,6 +171,8 @@ export const OSINTPage: React.FC = () => {
     maxTotalCases: 100,
   });
 
+  const [needBranchesDetails, setNeedBranchesDetails] = useState(false);
+
   const api = (window as any).electronAPI;
 
   const handleLaunch = async () => {
@@ -313,6 +315,8 @@ export const OSINTPage: React.FC = () => {
           maxPages: licensesFilters.maxPages,
           maxTotalCases: licensesFilters.maxTotalCases,
         } : undefined,
+        // сбор данных о филиалах
+        branchesDetails: needBranchesDetails,
       };
 
       if (needArbitrDetails) {
@@ -617,7 +621,16 @@ export const OSINTPage: React.FC = () => {
               </label>
             </div>
 
-            
+            <div className="mt-2">
+              <Checkbox
+                inputId="needBranches"
+                checked={needBranchesDetails}
+                onChange={(e) => setNeedBranchesDetails(e.checked ?? false)}
+              />
+              <label htmlFor="needBranches" className="ml-2">
+                Собрать детальные филиалы и представительства
+              </label>
+            </div>          
 
           </div>
         </div>

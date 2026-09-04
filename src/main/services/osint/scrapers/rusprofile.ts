@@ -91,6 +91,7 @@ export interface CompanyFullData {
   fssp_details?: any;
   inspections_details?: any;
   licenses_details?: any;
+  branches_details?: any;
 }
 
 async function closeModalIfPresent(page: Page): Promise<void> {
@@ -4051,7 +4052,73 @@ async function collectLicensesDetails(
   return data;
 }
 
+// Основная функция сбора для филиалов (детальный список)
+async function collectBranchesDetails(
+  page: Page,
+  companyId: number,
+  options: { maxTotalCases?: number } = {}
+): Promise<any> {
+  console.log(`Сбор филиалов и представительств для компании ID ${companyId}...`);
+  const data: any = { total_branches: '', branches: [] };
 
+  const url = `https://www.rusprofile.ru/branches/${companyId}`;
+  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await page.waitForSelector('.branches-company-items', { timeout: 15000 });
+  await page.waitForTimeout(1000);
+
+  // Заголовок с количеством
+  try {
+    const header = await page.locator('.content-frame__title').first().innerText();
+    const m = header.match(/\((\d+)\)/);
+    if (m) data.total_branches = m[1];
+  } catch (e) {
+    console.log('Не удалось получить общее количество филиалов:', e);
+  }
+
+  const maxTotalCases = options.maxTotalCases || 100;
+  let collected = 0;
+
+  // Все элементы находятся в контейнере .branches-company-items
+  const items = page.locator('.branches-company-items .company-item');
+  const itemCount = await items.count();
+
+  for (let i = 0; i < itemCount && collected < maxTotalCases; i++) {
+    const item = items.nth(i);
+    const branch: any = {};
+
+    // Извлекаем данные
+    const parsed = await item.evaluate((el) => {
+      const name = el.querySelector('.company-item__name')?.textContent?.trim() || '';
+      const address = el.querySelector('.company-item-info dd')?.textContent?.trim() || '';
+
+      // Координаты из data-placemark
+      const placemarkAttr = el.getAttribute('data-placemark') || '';
+      let coordinates = null;
+      if (placemarkAttr) {
+        try {
+          coordinates = JSON.parse(placemarkAttr);
+        } catch (e) {
+          // игнорируем
+        }
+      }
+
+      return { name, address, coordinates };
+    });
+
+    branch.name = parsed.name;
+    branch.address = parsed.address;
+    branch.latitude = parsed.coordinates?.latitude || '';
+    branch.longitude = parsed.coordinates?.longitude || '';
+
+    if (branch.name || branch.address) {
+      data.branches.push(branch);
+      collected++;
+    }
+  }
+
+  console.log(`Собрано филиалов/представительств: ${data.branches.length}, всего: ${data.total_branches}`);
+  return data;
+}
 
 export async function scrapeRusprofile(
   inn: string,
@@ -4085,6 +4152,7 @@ export async function scrapeRusprofile(
     inspectionsFilters?: any;
     licensesDetails?: boolean;
     licensesFilters?: any;
+    branchesDetails?: boolean;
   }
 ): Promise<CompanyFullData | null> {
 
@@ -4371,6 +4439,13 @@ export async function scrapeRusprofile(
           maxTotalCases: options.licensesFilters?.maxTotalCases || 100,
           filters: options.licensesFilters,
         })
+      );
+    }
+
+    if (options?.branchesDetails) {
+      console.log('Сбор детальных филиалов и представительств...');
+      result.branches_details = await timed('branches_details', () =>
+        collectBranchesDetails(page, companyId)
       );
     }
 
