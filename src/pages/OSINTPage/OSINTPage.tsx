@@ -163,6 +163,14 @@ export const OSINTPage: React.FC = () => {
     maxTotalCases: 100,
   });
 
+  const [needLicensesDetails, setNeedLicensesDetails] = useState(false);
+  const [licensesFilters, setLicensesFilters] = useState({
+    origins: [] as string[],   // 'egrul', 'ralcr', 'rptrn', 'rkomnbroadcast', 'rtehn', 'fstecszki', 'fstectzki', 'cbr'
+    statuses: [] as string[], // 'active', 'inactive', 'unknown'
+    maxPages: 1,
+    maxTotalCases: 100,
+  });
+
   const api = (window as any).electronAPI;
 
   const handleLaunch = async () => {
@@ -297,6 +305,14 @@ export const OSINTPage: React.FC = () => {
           maxPages: inspectionsFilters.maxPages,
           maxTotalCases: inspectionsFilters.maxTotalCases,
         } : undefined,
+        // отдельные фильтры для лицензий
+        licensesDetails: needLicensesDetails,
+        licensesFilters: needLicensesDetails ? {
+          origins: licensesFilters.origins,
+          statuses: licensesFilters.statuses,
+          maxPages: licensesFilters.maxPages,
+          maxTotalCases: licensesFilters.maxTotalCases,
+        } : undefined,
       };
 
       if (needArbitrDetails) {
@@ -390,6 +406,19 @@ export const OSINTPage: React.FC = () => {
     setInspectionsFilters(prev => ({
       ...prev,
       result: prev.results.includes(value) ? prev.results.filter(v => v !== value) : [...prev.results, value],
+    }));
+  };
+
+  const toggleLicensesOrigin = (value: string) => {
+    setLicensesFilters(prev => ({
+      ...prev,
+      origins: prev.origins.includes(value) ? prev.origins.filter(v => v !== value) : [...prev.origins, value],
+    }));
+  };
+  const toggleLicensesStatus = (value: string) => {
+    setLicensesFilters(prev => ({
+      ...prev,
+      statuses: prev.statuses.includes(value) ? prev.statuses.filter(v => v !== value) : [...prev.statuses, value],
     }));
   };
 
@@ -573,9 +602,22 @@ export const OSINTPage: React.FC = () => {
                 onChange={(e) => setNeedInspectionsDetails(e.checked ?? false)}
               />
               <label htmlFor="needInspections" className="ml-2">
-                Собрать детальные проверки
+                Проверки
               </label>
             </div>
+
+            <div className="mt-2">
+              <Checkbox
+                inputId="needLicenses"
+                checked={needLicensesDetails}
+                onChange={(e) => setNeedLicensesDetails(e.checked ?? false)}
+              />
+              <label htmlFor="needLicenses" className="ml-2">
+                Лицензии
+              </label>
+            </div>
+
+            
 
           </div>
         </div>
@@ -1080,6 +1122,47 @@ export const OSINTPage: React.FC = () => {
                 <InputText type="number" min={1} max={100} value={String(inspectionsFilters.maxPages)} onChange={(e) => setInspectionsFilters({ ...inspectionsFilters, maxPages: parseInt(e.target.value) || 1 })} className="w-4rem" />
                 <span className="ml-3">Макс. проверок:</span>
                 <InputText type="number" min={1} max={1000} value={String(inspectionsFilters.maxTotalCases)} onChange={(e) => setInspectionsFilters({ ...inspectionsFilters, maxTotalCases: parseInt(e.target.value) || 100 })} className="w-4rem" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {needLicensesDetails && (
+          <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
+            <div className="flex-1 flex flex-column gap-1 xl:mr-8">
+              <span className="app font-size-subheading">Фильтры лицензий</span>
+
+              <div className="flex align-items-center gap-2 mt-2">
+                <span>Источник:</span>
+                <Checkbox inputId="licEgrul" checked={licensesFilters.origins.includes('egrul')} onChange={() => toggleLicensesOrigin('egrul')} />
+                <label htmlFor="licEgrul" className="ml-1">ЕГРЮЛ</label>
+                <Checkbox inputId="licCbr" checked={licensesFilters.origins.includes('cbr')} onChange={() => toggleLicensesOrigin('cbr')} />
+                <label htmlFor="licCbr" className="ml-1">Центральный банк</label>
+                <Checkbox inputId="licRalcr" checked={licensesFilters.origins.includes('ralcr')} onChange={() => toggleLicensesOrigin('ralcr')} />
+                <label htmlFor="licRalcr" className="ml-1">Росалкоголь</label>
+                <Checkbox inputId="licRptrn" checked={licensesFilters.origins.includes('rptrn')} onChange={() => toggleLicensesOrigin('rptrn')} />
+                <label htmlFor="licRptrn" className="ml-1">Роспотребнадзор</label>
+                <Checkbox inputId="licRkomnbroadcast" checked={licensesFilters.origins.includes('rkomnbroadcast')} onChange={() => toggleLicensesOrigin('rkomnbroadcast')} />
+                <label htmlFor="licRkomnbroadcast" className="ml-1">Роскомнадзор</label>
+                <Checkbox inputId="licRtehn" checked={licensesFilters.origins.includes('rtehn')} onChange={() => toggleLicensesOrigin('rtehn')} />
+                <label htmlFor="licRtehn" className="ml-1">Ростехнадзор</label>
+              </div>
+
+              <div className="flex align-items-center gap-2 mt-2">
+                <span>Статус:</span>
+                <Checkbox inputId="licActive" checked={licensesFilters.statuses.includes('active')} onChange={() => toggleLicensesStatus('active')} />
+                <label htmlFor="licActive" className="ml-1">Действующая</label>
+                <Checkbox inputId="licInactive" checked={licensesFilters.statuses.includes('inactive')} onChange={() => toggleLicensesStatus('inactive')} />
+                <label htmlFor="licInactive" className="ml-1">Недействующая</label>
+                <Checkbox inputId="licUnknown" checked={licensesFilters.statuses.includes('unknown')} onChange={() => toggleLicensesStatus('unknown')} />
+                <label htmlFor="licUnknown" className="ml-1">Неизвестно</label>
+              </div>
+
+              <div className="flex align-items-center gap-2 mt-2">
+                <span>Макс. страниц:</span>
+                <InputText type="number" min={1} max={100} value={String(licensesFilters.maxPages)} onChange={(e) => setLicensesFilters({ ...licensesFilters, maxPages: parseInt(e.target.value) || 1 })} className="w-4rem" />
+                <span className="ml-3">Макс. лицензий:</span>
+                <InputText type="number" min={1} max={1000} value={String(licensesFilters.maxTotalCases)} onChange={(e) => setLicensesFilters({ ...licensesFilters, maxTotalCases: parseInt(e.target.value) || 100 })} className="w-4rem" />
               </div>
             </div>
           </div>
