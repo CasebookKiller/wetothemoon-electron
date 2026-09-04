@@ -173,6 +173,13 @@ export const OSINTPage: React.FC = () => {
 
   const [needBranchesDetails, setNeedBranchesDetails] = useState(false);
 
+  const [needHistoryDetails, setNeedHistoryDetails] = useState(false);
+  const [historyFilters, setHistoryFilters] = useState({
+    importantOnly: false,
+    maxPages: 1,
+    maxTotalCases: 100,
+  });
+
   const api = (window as any).electronAPI;
 
   const handleLaunch = async () => {
@@ -317,6 +324,13 @@ export const OSINTPage: React.FC = () => {
         } : undefined,
         // сбор данных о филиалах
         branchesDetails: needBranchesDetails,
+        // отдельные фильтры для истории
+        historyDetails: needHistoryDetails,
+        historyFilters: needHistoryDetails ? {
+          importantOnly: historyFilters.importantOnly,
+          maxPages: historyFilters.maxPages,
+          maxTotalCases: historyFilters.maxTotalCases,
+        } : undefined,        
       };
 
       if (needArbitrDetails) {
@@ -630,7 +644,18 @@ export const OSINTPage: React.FC = () => {
               <label htmlFor="needBranches" className="ml-2">
                 Собрать детальные филиалы и представительства
               </label>
-            </div>          
+            </div>     
+
+            <div className="mt-2">
+              <Checkbox
+                inputId="needHistory"
+                checked={needHistoryDetails}
+                onChange={(e) => setNeedHistoryDetails(e.checked ?? false)}
+              />
+              <label htmlFor="needHistory" className="ml-2">
+                Собрать детальную историю
+              </label>
+            </div>     
 
           </div>
         </div>
@@ -1176,6 +1201,30 @@ export const OSINTPage: React.FC = () => {
                 <InputText type="number" min={1} max={100} value={String(licensesFilters.maxPages)} onChange={(e) => setLicensesFilters({ ...licensesFilters, maxPages: parseInt(e.target.value) || 1 })} className="w-4rem" />
                 <span className="ml-3">Макс. лицензий:</span>
                 <InputText type="number" min={1} max={1000} value={String(licensesFilters.maxTotalCases)} onChange={(e) => setLicensesFilters({ ...licensesFilters, maxTotalCases: parseInt(e.target.value) || 100 })} className="w-4rem" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {needHistoryDetails && (
+          <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
+            <div className="flex-1 flex flex-column gap-1 xl:mr-8">
+              <span className="app font-size-subheading">Фильтры истории</span>
+
+              <div className="flex align-items-center gap-2 mt-2">
+                <Checkbox
+                  inputId="historyImportant"
+                  checked={historyFilters.importantOnly}
+                  onChange={(e) => setHistoryFilters({ ...historyFilters, importantOnly: e.checked ?? false })}
+                />
+                <label htmlFor="historyImportant" className="ml-1">Только важные события</label>
+              </div>
+
+              <div className="flex align-items-center gap-2 mt-2">
+                <span>Макс. страниц:</span>
+                <InputText type="number" min={1} max={100} value={String(historyFilters.maxPages)} onChange={(e) => setHistoryFilters({ ...historyFilters, maxPages: parseInt(e.target.value) || 1 })} className="w-4rem" />
+                <span className="ml-3">Макс. записей:</span>
+                <InputText type="number" min={1} max={1000} value={String(historyFilters.maxTotalCases)} onChange={(e) => setHistoryFilters({ ...historyFilters, maxTotalCases: parseInt(e.target.value) || 100 })} className="w-4rem" />
               </div>
             </div>
           </div>
