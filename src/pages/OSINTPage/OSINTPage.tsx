@@ -180,6 +180,8 @@ export const OSINTPage: React.FC = () => {
     maxTotalCases: 100,
   });
 
+  const [needRequisitesDetails, setNeedRequisitesDetails] = useState(false);
+
   const api = (window as any).electronAPI;
 
   const handleLaunch = async () => {
@@ -331,6 +333,8 @@ export const OSINTPage: React.FC = () => {
           maxPages: historyFilters.maxPages,
           maxTotalCases: historyFilters.maxTotalCases,
         } : undefined,        
+        // сбор данных о реквизитах
+        requisitesDetails: needRequisitesDetails,
       };
 
       if (needArbitrDetails) {
@@ -433,6 +437,7 @@ export const OSINTPage: React.FC = () => {
       origins: prev.origins.includes(value) ? prev.origins.filter(v => v !== value) : [...prev.origins, value],
     }));
   };
+
   const toggleLicensesStatus = (value: string) => {
     setLicensesFilters(prev => ({
       ...prev,
@@ -642,7 +647,7 @@ export const OSINTPage: React.FC = () => {
                 onChange={(e) => setNeedBranchesDetails(e.checked ?? false)}
               />
               <label htmlFor="needBranches" className="ml-2">
-                Собрать детальные филиалы и представительства
+                Филиалы и представительства
               </label>
             </div>     
 
@@ -653,9 +658,20 @@ export const OSINTPage: React.FC = () => {
                 onChange={(e) => setNeedHistoryDetails(e.checked ?? false)}
               />
               <label htmlFor="needHistory" className="ml-2">
-                Собрать детальную историю
+                История
               </label>
             </div>     
+
+            <div className="mt-2">
+              <Checkbox
+                inputId="needRequisites"
+                checked={needRequisitesDetails}
+                onChange={(e) => setNeedRequisitesDetails(e.checked ?? false)}
+              />
+              <label htmlFor="needRequisites" className="ml-2">
+                Собрать детальные реквизиты
+              </label>
+            </div>
 
           </div>
         </div>
