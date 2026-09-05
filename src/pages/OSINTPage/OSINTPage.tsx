@@ -184,6 +184,8 @@ export const OSINTPage: React.FC = () => {
 
   const [needOkvedDetails, setNeedOkvedDetails] = useState(false);
 
+  const [needEgrulDetails, setNeedEgrulDetails] = useState(false);
+
   const api = (window as any).electronAPI;
 
   const handleLaunch = async () => {
@@ -339,6 +341,8 @@ export const OSINTPage: React.FC = () => {
         requisitesDetails: needRequisitesDetails,
         // сбор данных о видах деятельности
         okvedDetails: needOkvedDetails,
+        // сбор данных из ЕГРЮЛ
+        egrulDetails: needEgrulDetails,
       };
 
       if (needArbitrDetails) {
@@ -685,6 +689,17 @@ export const OSINTPage: React.FC = () => {
               />
               <label htmlFor="needOkved" className="ml-2">
                 Виды деятельности
+              </label>
+            </div>
+
+            <div className="mt-2">
+              <Checkbox
+                inputId="needEgrul"
+                checked={needEgrulDetails}
+                onChange={(e) => setNeedEgrulDetails(e.checked ?? false)}
+              />
+              <label htmlFor="needEgrul" className="ml-2">
+                Собрать выписку из ЕГРЮЛ
               </label>
             </div>
 

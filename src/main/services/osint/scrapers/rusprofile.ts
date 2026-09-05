@@ -95,6 +95,7 @@ export interface CompanyFullData {
   history_details?: any;
   requisites_details?: any;
   okved_details?: any;
+  egrul_details?: any;
 }
 
 async function closeModalIfPresent(page: Page): Promise<void> {
@@ -4455,6 +4456,99 @@ async function collectOkvedDetails(
   return data;
 }
 
+// Основная функция сбора для ЕГРЮЛ (детальный список)
+async function collectEgrulDetails(
+  page: Page,
+  companyId: number,
+  options: { maxTotalCases?: number } = {}
+): Promise<any> {
+  console.log(`Сбор выписки из ЕГРЮЛ для компании ID ${companyId}...`);
+  const data: any = { basic_info: {}, sections: [] };
+
+  // Получаем ОГРН с карточки компании
+  await page.goto(`https://www.rusprofile.ru/id/${companyId}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await page.waitForSelector('#clip_ogrn', { timeout: 15000 });
+  const ogrn = await page.locator('#clip_ogrn').first().innerText().catch(() => '');
+  if (!ogrn) {
+    console.warn('Не удалось получить ОГРН с карточки, сбор выписки прерван');
+    return data;
+  }
+
+  // Переходим на страницу выписки
+  await page.goto(`https://www.rusprofile.ru/egrul?ogrn=${ogrn}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await page.waitForSelector('.tiles-content', { timeout: 15000 });
+  await page.waitForTimeout(1000);
+
+  // Основная информация (первая таблица на странице)
+  const basicInfo = await page.evaluate(() => {
+    const info: any = {};
+    const firstTable = document.querySelector('.button-tile table.info-table');
+    if (firstTable) {
+      firstTable.querySelectorAll('tbody tr').forEach(row => {
+        const cells = row.querySelectorAll('td');
+        if (cells.length === 3) {
+          const label = cells[1]?.textContent?.trim() || '';
+          const value = cells[2]?.textContent?.trim() || '';
+          if (label) info[label] = value;
+        }
+      });
+    }
+    return info;
+  });
+  data.basic_info = basicInfo;
+
+  // Все секции
+  const sections = await page.evaluate(() => {
+    const result: any[] = [];
+    const content = document.querySelector('.tiles-content');
+    if (!content) return result;
+
+    const tileItems = content.querySelectorAll('.tile-item');
+    tileItems.forEach(tile => {
+      const titleEl = tile.querySelector('.tile-item__title');
+      const title = titleEl ? titleEl.textContent?.trim() || '' : '';
+      if (!title) return;
+
+      const items: any[] = [];
+      const tables = tile.querySelectorAll('table.info-table');
+      tables.forEach(table => {
+        table.querySelectorAll('tbody tr').forEach(row => {
+          const cells = row.querySelectorAll('td');
+          if (cells.length !== 3) return;
+
+          const num = cells[0]?.textContent?.trim() || '';
+          const label = cells[1]?.textContent?.trim() || '';
+          const value = cells[2]?.textContent?.trim() || '';
+
+          // Пропускаем полностью пустые строки
+          if (!num && !label && !value) return;
+
+          // Если num пустой или &nbsp;, это подзаголовок или пустая строка
+          if (!num || num === '&nbsp;') {
+            if (label) {
+              items.push({ type: 'subtitle', label, value: '' });
+            }
+            return;
+          }
+
+          items.push({ number: num, label, value });
+        });
+      });
+
+      if (items.length > 0) {
+        result.push({ title, items });
+      }
+    });
+
+    return result;
+  });
+
+  data.sections = sections;
+
+  console.log(`Собрано секций выписки: ${data.sections.length}`);
+  return data;
+}
+
 export async function scrapeRusprofile(
   inn: string,
   options?: {
@@ -4492,6 +4586,7 @@ export async function scrapeRusprofile(
     historyFilters?: any;
     requisitesDetails?: boolean;
     okvedDetails?: boolean;
+    egrulDetails?: boolean;
   }
 ): Promise<CompanyFullData | null> {
 
@@ -4810,6 +4905,13 @@ export async function scrapeRusprofile(
       console.log('Сбор детальных видов деятельности...');
       result.okved_details = await timed('okved_details', () =>
         collectOkvedDetails(page, companyId)
+      );
+    }
+
+    if (options?.egrulDetails) {
+      console.log('Сбор выписки из ЕГРЮЛ...');
+      result.egrul_details = await timed('egrul_details', () =>
+        collectEgrulDetails(page, companyId)
       );
     }
 
