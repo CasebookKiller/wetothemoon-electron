@@ -182,6 +182,8 @@ export const OSINTPage: React.FC = () => {
 
   const [needRequisitesDetails, setNeedRequisitesDetails] = useState(false);
 
+  const [needOkvedDetails, setNeedOkvedDetails] = useState(false);
+
   const api = (window as any).electronAPI;
 
   const handleLaunch = async () => {
@@ -335,6 +337,8 @@ export const OSINTPage: React.FC = () => {
         } : undefined,        
         // сбор данных о реквизитах
         requisitesDetails: needRequisitesDetails,
+        // сбор данных о видах деятельности
+        okvedDetails: needOkvedDetails,
       };
 
       if (needArbitrDetails) {
@@ -669,7 +673,18 @@ export const OSINTPage: React.FC = () => {
                 onChange={(e) => setNeedRequisitesDetails(e.checked ?? false)}
               />
               <label htmlFor="needRequisites" className="ml-2">
-                Собрать детальные реквизиты
+                Реквизиты
+              </label>
+            </div>
+
+            <div className="mt-2">
+              <Checkbox
+                inputId="needOkved"
+                checked={needOkvedDetails}
+                onChange={(e) => setNeedOkvedDetails(e.checked ?? false)}
+              />
+              <label htmlFor="needOkved" className="ml-2">
+                Виды деятельности
               </label>
             </div>
 
