@@ -1,60 +1,28 @@
+// src/pages/GatewayPage/GatewayPage.tsx
+
 import React, { useState, useEffect } from 'react';
-import { Panel } from 'primereact/panel';
-import { Button } from 'primereact/button';
-import { InputTextarea } from 'primereact/inputtextarea';
-import { ToggleButton } from 'primereact/togglebutton';
-import { ListBox } from 'primereact/listbox';
+
+import { TopControlPanel } from '@/components/GATEWAY/TopControlPanel/TopControlPanel';
+import { GatewaySidebar } from '@/components/GATEWAY/GatewaySidebar/GatewaySidebar';
+import { GatewayChatHeader } from '@/components/GATEWAY/GatewayChatHeader/GatewayChatHeader';
+import { GatewayMessageUser } from '@/components/GATEWAY/GatewayMessageUser/GatewayMessageUser';
+import { GatewayMessageAssistant } from '@/components/GATEWAY/GatewayMessageAssistant/GatewayMessageAssistant';
+import { GatewayInputArea } from '@/components/GATEWAY/GatewayInputArea/GatewayInputArea';
+
+//import './GatewayPage.css';
+//import '@/themes/deepseek-theme/main.css';
+//import '@/themes/deepseek-theme/katex.css';
+import { GatewayModeSelector } from '@/components/GATEWAY/GatewayModeSelector/GatewayModeSelector';
+import GatewayShareModal from '@/components/GATEWAY/GatewayShareModal/GatewayShareModal';
+import { GatewaySelectionPreview } from '@/components/GATEWAY/GatewaySelectionPreview/GatewaySelectionPreview';
+import GatewayDeepseekShadowRoot from '@/components/GATEWAY/GatewayDeepseekShadowRoot/GatewayDeepseekShadowRoot';
+import { CheckIcon } from '@/components/GATEWAY/GatewayIcons/GatewayIcons';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
   thinking?: string;
   blocks: { type: 'text' | 'code'; content: string; language?: string }[];
 }
-
-const CodeBlockWithActions = ({ language, code }: { language: string; code: string }) => {
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(code);
-    } catch (e) {
-      console.error('Copy failed', e);
-    }
-  };
-
-  const handleDownload = () => {
-    const blob = new Blob([code], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `code.${language}`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  return (
-    <div className="code-block-container surface-800 text-white border-round p-2 mb-2">
-      <div className="flex justify-content-between align-items-center mb-2">
-        <span className="text-sm font-semibold">{language}</span>
-        <div className="flex gap-2">
-          <Button
-            icon="pi pi-copy"
-            className="p-button-rounded p-button-text p-button-sm"
-            onClick={handleCopy}
-            tooltip="Копировать"
-          />
-          <Button
-            icon="pi pi-download"
-            className="p-button-rounded p-button-text p-button-sm"
-            onClick={handleDownload}
-            tooltip="Скачать"
-          />
-        </div>
-      </div>
-      <pre className="p-2 border-round" style={{ whiteSpace: 'pre-wrap', background: 'rgba(0,0,0,0.2)' }}>
-        {code}
-      </pre>
-    </div>
-  );
-};
 
 export const GatewayPage: React.FC = () => {
   const [status, setStatus] = useState('stopped');
@@ -69,6 +37,13 @@ export const GatewayPage: React.FC = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
+  const [isCreatingLink, setIsCreatingLink] = useState(false);
+  const [shareModalVisible, setShareModalVisible] = useState(false);
+  const [shareUrl, setShareUrl] = useState('');
+  const [topPanelOpen, setTopPanelOpen] = useState(false);
+  const [panelHovered, setPanelHovered] = useState(false);
 
   const api = (window as any).electronAPI;
 
@@ -87,6 +62,30 @@ export const GatewayPage: React.FC = () => {
     const interval = setInterval(updateStatus, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    document.body.classList.add('dark');
+    document.body.setAttribute('data-ds-dark-theme', 'dark');
+    return () => {
+      document.body.classList.remove('dark');
+      document.body.removeAttribute('data-ds-dark-theme');
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      const centerLeft = window.innerWidth * 0.25;
+      const centerRight = window.innerWidth * 0.75;
+
+      if (e.clientY <= 40 && e.clientX > centerLeft && e.clientX < centerRight) {
+        setTopPanelOpen(true);
+      } else if (!panelHovered && (e.clientY > 100 || e.clientX <= centerLeft || e.clientX >= centerRight)) {
+        setTopPanelOpen(false);
+      }
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, [panelHovered]); // зависимость от panelHovered
 
   const syncModelState = async () => {
     try {
@@ -151,22 +150,22 @@ export const GatewayPage: React.FC = () => {
     setSending(true);
     setError('');
 
-    // Добавляем сообщение пользователя в новом формате
     const userMsg: ChatMessage = {
       role: 'user',
       blocks: [{ type: 'text', content: message }],
     };
-    setMessages((prev) => [...prev, userMsg]);
 
     try {
       const result = await api.gatewaySendMessage(message);
       if (result.success) {
-        // result.data уже соответствует ChatMessage (роль assistant, blocks, thinking)
-        setMessages((prev) => [...prev, result.data as ChatMessage]);
+        const assistantMsg = result.data as ChatMessage;
+        setMessages((prev) => [...prev, userMsg, assistantMsg]);
       } else {
+        setMessages((prev) => [...prev, userMsg]);
         setError(result.error || 'Ошибка отправки');
       }
     } catch (e) {
+      setMessages((prev) => [...prev, userMsg]);
       setError((e as Error).message);
     } finally {
       setSending(false);
@@ -192,7 +191,6 @@ export const GatewayPage: React.FC = () => {
     if (value === 'expert') setSearch(false);
     try {
       await api.gatewaySelectModel(value);
-      // Синхронизируем состояния после смены режима
       await syncModelState();
     } catch (e) {
       setError((e as Error).message);
@@ -218,14 +216,13 @@ export const GatewayPage: React.FC = () => {
   };
 
   const handleOpenConversation = async (id: string) => {
+    setSelectedConversation(id);
     try {
       const resultOpen = await api.gatewayOpenConversation(id);
       if (!resultOpen.success) {
         setError(resultOpen.error || 'Ошибка открытия диалога');
         return;
       }
-
-      // Загружаем историю сообщений из открытого диалога
       const resultMessages = await api.gatewayGetConversationMessages();
       if (resultMessages.success) {
         setMessages(resultMessages.data);
@@ -237,194 +234,413 @@ export const GatewayPage: React.FC = () => {
     }
   };
 
-  const ThinkingBlock = ({ thinking }: { thinking: string }) => {
-    const [expanded, setExpanded] = useState(false);
-    return (
-      <div className="mb-2">
-        <div
-          className="flex align-items-center gap-2 cursor-pointer text-600"
-          onClick={() => setExpanded(!expanded)}
-        >
-          <i className={`pi ${expanded ? 'pi-chevron-down' : 'pi-chevron-right'}`} />
-          <span>Размышление</span>
-        </div>
-        {expanded && (
-          <div className="p-2 surface-200 border-round text-700" style={{ whiteSpace: 'pre-wrap' }}>
-            {thinking}
-          </div>
-        )}
-      </div>
-    );
+  const handleNewChat = () => {
+    setSelectedConversation(null);
+    setMessages([]);
+    setMessage('');
+  };
+
+  const handleToggleSelectMode = async () => {
+    if (selectionMode) {
+      setSelectionMode(false);
+      setSelectedIndices(new Set());
+      await api.gatewayCancelSelectionMode().catch(() => {});
+    } else {
+      setSelectionMode(true);
+      await api.gatewayStartSelectionMode().catch(() => {});
+
+      // Даём интерфейсу DeepSeek время переключиться в режим выбора
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      // Выбираем все сообщения
+      const allIndices = messages.map((_, idx) => idx);
+      setSelectedIndices(new Set(allIndices));
+      await api.gatewaySelectMessages(allIndices).catch(() => {});
+    }
+  };
+
+  const handleToggleMessageSelect = async (index: number) => {
+    const newSelected = new Set(selectedIndices);
+    if (newSelected.has(index)) {
+      newSelected.delete(index);
+    } else {
+      newSelected.add(index);
+    }
+    setSelectedIndices(newSelected);
+    await api.gatewaySelectMessages(Array.from(newSelected)).catch(() => {});
+  };
+
+  const handleSelectAll = async () => {
+    if (selectedIndices.size === messages.length && messages.length > 0) {
+      // Снять выделение со всех
+      setSelectedIndices(new Set());
+      await api.gatewaySelectMessages([]).catch(() => {});
+    } else {
+      const allIndices = messages.map((_, idx) => idx);
+      setSelectedIndices(new Set(allIndices));
+      await api.gatewaySelectMessages(allIndices).catch(() => {});
+    }
+  };
+
+  const createLink = async (): Promise<string> => {
+    const result = await api.gatewayCreatePublicLink();
+    if (!result.success) {
+      throw new Error(result.error || 'Ошибка создания ссылки');
+    }
+    return result.data;
+  };
+
+  const handleCreatePublicLink = () => {
+    console.log('Opening share modal');
+    if (!selectedIndices.size) return;
+    setShareModalVisible(true);
+  };
+
+  /*
+  const handleCreatePublicLink = async () => {
+    console.log('handleCreatePublicLink called, selectedIndices:', selectedIndices);  
+    if (!selectedIndices.size) return;
+    setIsCreatingLink(true);
+    try {
+      await api.gatewaySelectMessages(Array.from(selectedIndices));
+      await new Promise(resolve => setTimeout(resolve, 500)); // даём интерфейсу обновиться
+      const result = await api.gatewayCreatePublicLink();
+      console.log('gatewayCreatePublicLink result:', result);
+      if (result.success) {
+        setShareUrl(result.data);
+        setShareModalVisible(true);
+        setSelectionMode(false);
+        setSelectedIndices(new Set());
+        await api.gatewayCancelSelectionMode().catch(() => {});
+      } else {
+        setError(result.error || 'Ошибка создания ссылки');
+      }
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setIsCreatingLink(false);
+    }
+  };
+  */
+
+  const handleCopyMessage = (text: string) => {
+    navigator.clipboard.writeText(text).catch((err) => {
+      console.error('Ошибка копирования в буфер обмена:', err);
+    });
+  };
+
+  const handleEditMessage = () => {
+    // TODO: Реализовать редактирование сообщения (возможно, вызов IPC)
+    console.warn('Редактирование сообщения пока не реализовано');
+  };
+
+  const handleRegenerate = async (conversationId: string, messageIndex: number) => {
+    if (!conversationId) {
+      setError('Не выбран диалог');
+      return;
+    }
+    try {
+      await api.gatewayRegenerateMessage(conversationId, messageIndex);
+      // Обновляем сообщения после регенерации
+      const result = await api.gatewayGetConversationMessages();
+      if (result.success) {
+        setMessages(result.data);
+      }
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
+  const handleFeedback = async (conversationId: string, messageIndex: number, type: 'like' | 'dislike') => {
+    if (!conversationId) {
+      setError('Не выбран диалог');
+      return;
+    }
+    try {
+      await api.gatewaySendFeedback(conversationId, messageIndex, type);
+      // Локально состояние уже обновлено в компоненте, дополнительно ничего не делаем
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
+  const handleShareSingle = async (index: number) => {
+    setSelectionMode(true);
+    setSelectedIndices(new Set([index]));
+    try {
+      await api.gatewayStartSelectionMode();
+      await api.gatewaySelectMessages([index]);
+    } catch (e) {
+      setError((e as Error).message);
+    }
   };
 
   return (
-    <React.Fragment>
-      {/* Панель управления браузером */}
-      <Panel className="shadow-5 mx-1" header="Браузер DeepSeek">
-        <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
-          <div className="flex-1 flex flex-column gap-1 xl:mr-8">
-            <div className="flex align-items-center gap-2">
-              <Button
-                label="Запустить"
-                icon="pi pi-play"
-                className="p-button-lg p-button-raised p-button-accent"
-                onClick={handleLaunch}
-                disabled={loading || sending}
-              />
-              <Button
-                label="Остановить"
-                icon="pi pi-stop"
-                className="p-button-lg p-button-raised p-button-accent"
-                onClick={handleClose}
-                disabled={loading || sending}
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+      <TopControlPanel
+        status={status}
+        isLoggedIn={isLoggedIn}
+        error={error}
+        loading={loading}
+        sending={sending}
+        onLaunch={handleLaunch}
+        //onClose={handleClose}
+        onRefreshConversations={handleRefreshConversations}
+        onSelectModel={handleSelectModel}
+        onToggleDeepThinking={handleDeepThinkingChange}
+        onToggleSearch={handleSearchChange}
+        modelType={modelType}
+        deepThinking={deepThinking}
+        search={search}
+        isOpen={topPanelOpen}
+        onOpen={() => setTopPanelOpen(true)}
+        onClose={() => setTopPanelOpen(false)}
+        onPanelMouseEnter={() => setPanelHovered(true)}
+        onPanelMouseLeave={() => setPanelHovered(false)}
+      />
+      <GatewayDeepseekShadowRoot>
+        <GatewayShareModal
+          visible={shareModalVisible}
+          onClose={() => setShareModalVisible(false)}
+          onCreateLink={createLink}
+          onCreated={() => {
+            setSelectionMode(false);
+            setSelectedIndices(new Set());
+            api.gatewayCancelSelectionMode().catch(() => {});
+          }}
+        />
+        <div className="cb86951c" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <div className="cddfb2ed" />
+          <div className="c3ecdb44" style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+            <div className="dc04ec1d" style={{ display: 'flex' }}>
+              <GatewaySidebar
+                conversations={conversations}
+                selectedConversation={selectedConversation}
+                onSelectConversation={handleOpenConversation}
+                onRefresh={handleRefreshConversations}
+                isLoggedIn={isLoggedIn}
+                onNewChat={handleNewChat}
               />
             </div>
-            <div className="mt-3">
-              <span className="app font-size-subheading">Статус: {status}</span>
-              {isLoggedIn && <span className="ml-2 text-green-600">(авторизован)</span>}
+            <div className="_4cbcd96" />
+            <div
+              className="_7780f2e"
+              style={{
+                flex: 1,
+                display: 'flex',
+                flexDirection: selectionMode ? 'row' : 'column',
+                minHeight: 0,
+                position: 'relative',
+              }}
+            >
+              {messages.length === 0 ? (
+                <div
+                  className="_765a5cd"
+                  style={{
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    width: '100%',
+                  }}
+                >
+                  <div
+                    className="_660ca72"
+                    style={{
+                      flex: 1,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '0 24px',
+                      width: '100%',
+                    }}
+                  >
+                    <GatewayModeSelector modelType={modelType} onSelectModel={handleSelectModel} />
+                    <div style={{ width: '100%', maxWidth: '780px', margin: '0 auto' }}>
+                      <GatewayInputArea
+                        value={message}
+                        onChange={setMessage}
+                        onSend={handleSend}
+                        disabled={!isLoggedIn}
+                        sending={sending}
+                        deepThinking={deepThinking}
+                        search={search}
+                        onToggleDeepThinking={() => handleDeepThinkingChange(!deepThinking)}
+                        onToggleSearch={() => handleSearchChange(!search)}
+                        isExpert={modelType === 'expert'}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {/* Основная колонка */}
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
+                    <div className="_765a5cd" style={{ flexShrink: 0, width: '100%' }}>
+                      <GatewayChatHeader
+                        title={
+                          selectedConversation
+                            ? conversations.find(c => c.id === selectedConversation)?.title || 'Диалог'
+                            : 'Новый чат'
+                        }
+                        modelType={modelType}
+                        onSelectModel={handleSelectModel}
+                        showTitle={true}
+                        onToggleSelectMode={handleToggleSelectMode}
+                      />
+                    </div>
+
+                    {/* Список сообщений */}
+                    <div
+                      className="ds-virtual-list ds-virtual-list--printable"
+                      style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', minHeight: 0 }}
+                    >
+                      <div
+                        className="ds-virtual-list-items _6f2c522"
+                        style={{
+                          paddingTop: '0px',
+                          paddingLeft: 'calc((100% - var(--message-list-max-width)) / 2)',
+                          paddingRight: 'calc((100% - var(--message-list-max-width)) / 2)',
+                          flexShrink: '0',
+                          flexGrow: '1',
+                          minHeight: '0',
+                        }}
+                      >
+                        <div className="ds-virtual-list-visible-items">
+                          {messages.map((msg, idx) => {
+                            const isLast = idx === messages.length - 1;
+                            return msg.role === 'user' ? (
+                              <GatewayMessageUser
+                                key={idx}
+                                content={msg.blocks[0]?.content || ''}
+                                selectMode={selectionMode}
+                                isSelected={selectedIndices.has(idx)}
+                                onToggleSelect={() => handleToggleMessageSelect(idx)}
+                                isLast={isLast}
+                                onCopy={handleCopyMessage}
+                                onEdit={handleEditMessage}
+                              />
+                            ) : (
+                              <GatewayMessageAssistant
+                                key={idx}
+                                thinking={msg.thinking}
+                                blocks={msg.blocks}
+                                selectMode={selectionMode}
+                                isSelected={selectedIndices.has(idx)}
+                                onToggleSelect={() => handleToggleMessageSelect(idx)}
+                                isLast={isLast}
+                                onCopy={handleCopyMessage}
+                                onRegenerate={() => handleRegenerate(selectedConversation!, idx)}
+                                onFeedback={(type) => handleFeedback(selectedConversation!, idx, type)}
+                                onShare={() => handleShareSingle(idx)}
+                              />
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Поле ввода и подпись скрыты в режиме выбора */}
+                    {!selectionMode && (
+                      <>
+                        <div className="_871cbca">
+                          <div className="d72636e2" />
+                          <GatewayInputArea
+                            value={message}
+                            onChange={setMessage}
+                            onSend={handleSend}
+                            disabled={!isLoggedIn}
+                            sending={sending}
+                            deepThinking={deepThinking}
+                            search={search}
+                            onToggleDeepThinking={() => handleDeepThinkingChange(!deepThinking)}
+                            onToggleSearch={() => handleSearchChange(!search)}
+                            isExpert={modelType === 'expert'}
+                          />
+                        </div>
+                        <div className="_0fcaa63" style={{ width: '100%', flexShrink: 0 }}>
+                          Сгенерировано ИИ, только для справки
+                        </div>
+                      </>
+                    )}
+
+                    {/* Нижняя панель выбора */}
+                    {selectionMode && (
+                      <div className="_43d222b _117e7c4">
+                        <div className="_9f86274">
+                          <div
+                            className="ds-checkbox-wrapper ds-checkbox-wrapper--l _692accd"
+                            style={{
+                              color: 'inherit',
+                              '--dsl-checkbox-font-size': 'inherit',
+                              '--dsl-checkbox-label-gap': '12px',
+                            } as React.CSSProperties}
+                          >
+                            <div className="ds-checkbox-align-wrapper">
+                              <div
+                                className={`ds-checkbox ds-checkbox--l ${
+                                  selectedIndices.size === messages.length && messages.length > 0
+                                    ? 'ds-checkbox--active'
+                                    : ''
+                                } ds-checkbox--none`}
+                                tabIndex={0}
+                                onClick={handleSelectAll}
+                              >
+                                {selectedIndices.size === messages.length && messages.length > 0 && (
+                                  <CheckIcon size={14} />
+                                )}
+                              </div>
+                            </div>
+                            <div className="ds-checkbox-label">Выбрать все</div>
+                          </div>
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="2"
+                            height="15"
+                            viewBox="0 0 2 15"
+                            fill="none"
+                            style={{ color: 'var(--dsw-alias-border-l3)' }}
+                          >
+                            <path d="M1 0.5V14.5" stroke="currentColor" />
+                          </svg>
+                          <span className="dcaa34cd">Выбрано {selectedIndices.size} диалогов</span>
+                          <div className="fab07e97">
+                            <div
+                              role="button"
+                              className="ds-button ds-button--outlinedNeutral ds-button--outlined ds-button--capsule ds-button--m ds-button--icon-relative-m ds-button--min-width _43443f1"
+                              tabIndex={0}
+                              onClick={handleToggleSelectMode}
+                            >
+                              <span className="ds-button__content">Отмена</span>
+                            </div>
+                            <div
+                              role="button"
+                              className={`ds-button ds-button--primary ds-button--filled ds-button--capsule ds-button--m ds-button--icon-relative-m ds-button--min-width ${
+                                selectedIndices.size === 0 ? 'ds-button--disabled' : ''
+                              }`}
+                              tabIndex={0}
+                              onClick={handleCreatePublicLink}
+                              style={{ pointerEvents: selectedIndices.size === 0 ? 'none' : 'auto' }}
+                            >
+                              <span className="ds-button__content">Создать публичную ссылку</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Правая панель предпросмотра */}
+                  {selectionMode && (
+                    <GatewaySelectionPreview messages={messages} selectedIndices={selectedIndices} />
+                  )}
+                </>
+              )}
             </div>
           </div>
         </div>
-      </Panel>
-
-      {error && (
-        <div className="app p-0">
-          <div className="p-error mx-2">{error}</div>
-        </div>
-      )}
-
-      {/* Основной макет: слева диалоги, справа чат */}
-      <div className="grid mx-1 mt-2" style={{ minHeight: '600px' }}>
-        {/* Боковая панель диалогов */}
-        <div className="col-12 md:col-3">
-          <Panel className="shadow-5 h-full" header="Диалоги">
-            <div className="p-2 flex flex-column" style={{ height: '100%' }}>
-              <Button
-                label="Обновить"
-                icon="pi pi-refresh"
-                className="p-button-sm p-button-raised p-button-accent mb-2"
-                onClick={handleRefreshConversations}
-                disabled={!isLoggedIn}
-              />
-              <ListBox
-                value={selectedConversation}
-                options={conversations}
-                onChange={(e) => {
-                  setSelectedConversation(e.value);
-                  if (e.value) handleOpenConversation(e.value);
-                }}
-                optionLabel="title"
-                optionValue="id"
-                style={{ width: '100%', flex: '1 1 auto' }}
-                listStyle={{ maxHeight: '400px' }}
-              />
-            </div>
-          </Panel>
-        </div>
-
-        {/* Область чата */}
-        <div className="col-12 md:col-9">
-          <Panel className="shadow-5 h-full" header="Чат DeepSeek">
-            <div className="flex flex-column h-full p-2">
-              {/* Выбор режима */}
-              <div className="flex justify-content-center gap-3 mb-3 flex-nowrap overflow-x-auto">
-                {[
-                  { type: 'default', label: 'Быстрый', icon: 'pi pi-bolt' },
-                  { type: 'expert', label: 'Эксперт', icon: 'pi pi-star' },
-                  { type: 'vision', label: 'Распознавание', icon: 'pi pi-eye' },
-                ].map((mode) => (
-                  <div
-                    key={mode.type}
-                    className={`flex align-items-center gap-2 px-4 py-2 border-round-3xl cursor-pointer ${
-                      modelType === mode.type ? 'bg-primary text-white' : 'surface-100 text-700'
-                    }`}
-                    onClick={() => handleSelectModel(mode.type as 'default' | 'expert' | 'vision')}
-                  >
-                    <i className={mode.icon} />
-                    <span>{mode.label}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Сообщения */}
-              <div
-                className="flex-1 overflow-y-auto p-3 surface-100 border-round"
-                style={{ minHeight: '300px' }}
-              >
-                {messages.length === 0 ? (
-                  <p className="text-center text-color-secondary">Нет сообщений</p>
-                ) : (
-                  messages.map((msg, idx) => (
-                    <div
-                      key={idx}
-                      className={`flex ${msg.role === 'user' ? 'justify-content-end' : 'justify-content-start'} mb-3`}
-                    >
-                      <div
-                        className={`p-3 border-round-3xl max-w-30rem ${
-                          msg.role === 'user'
-                            ? 'bg-primary text-white'
-                            : 'surface-200 text-900'
-                        }`}
-                        style={{ whiteSpace: 'pre-wrap' }}
-                      >
-                        {msg.thinking && <ThinkingBlock thinking={msg.thinking} />}
-                        {msg.blocks.map((block, blockIdx) => {
-                          if (block.type === 'code') {
-                            return <CodeBlockWithActions key={blockIdx} language={block.language || 'text'} code={block.content} />;
-                          }
-                          return <div key={blockIdx} style={{ whiteSpace: 'pre-wrap' }}>{block.content}</div>;
-                        })}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              {/* Переключатели "Глубокое мышление" и "Умный поиск" */}
-              <div className="flex gap-3 mt-3">
-                <div
-                  className={`inline-flex align-items-center gap-2 px-3 py-1 border-round-3xl cursor-pointer ${
-                    deepThinking ? 'bg-primary text-white' : 'surface-100 text-700'
-                  }`}
-                  onClick={() => handleDeepThinkingChange(!deepThinking)}
-                >
-                  <i className="pi pi-lightbulb" />
-                  <span>Глубокое мышление</span>
-                </div>
-
-                <div
-                  className={`inline-flex align-items-center gap-2 px-3 py-1 border-round-3xl cursor-pointer ${
-                    search ? 'bg-primary text-white' : 'surface-100 text-700'
-                  } ${modelType === 'expert' ? 'opacity-50 pointer-events-none' : ''}`}
-                  onClick={() => handleSearchChange(!search)}
-                >
-                  <i className="pi pi-search" />
-                  <span>Умный поиск</span>
-                </div>
-              </div>
-
-              {/* Поле ввода */}
-              <div className="flex align-items-end gap-2 mt-3">
-                <InputTextarea
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  rows={2}
-                  autoResize
-                  placeholder="Сообщение для DeepSeek"
-                  disabled={!isLoggedIn || sending}
-                  className="flex-1"
-                />
-                <Button
-                  icon="pi pi-arrow-up"
-                  className="p-button-rounded p-button-lg p-button-primary"
-                  onClick={handleSend}
-                  disabled={!isLoggedIn || !message.trim() || sending}
-                />
-              </div>
-            </div>
-          </Panel>
-        </div>
-      </div>
-    </React.Fragment>
+      </GatewayDeepseekShadowRoot>
+    </div>
   );
 };

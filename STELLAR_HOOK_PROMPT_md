@@ -1,0 +1,101 @@
+# Контекст
+
+Я работаю над многомодульным Electron-приложением `wetothemoon-electron` (Node.js, TypeScript, React, Electron Forge, Playwright, PrimeReact/PrimeFlex). У меня уже реализованы окна:
+
+- **OSINT Tools** (`osintWindow.ts`, `osintHandlers.ts`, `OSINTPage.tsx`, `playwrightService.ts`) — скрапинг сайтов rusprofile.ru, kad.arbitr.ru, mos-gorsud.ru.
+- **Шлюз (Gateway)** (`gatewayWindow.ts`, `gatewayHandlers.ts`, `GatewayPage.tsx`, `deepseekService.ts`) — автоматизация входа в чат DeepSeek (https://chat.deepseek.com), отправка сообщений, получение ответов, восстановление сессий, работа с меню и состоянием чата.
+
+В ходе разработки Шлюза я накопил следующие паттерны и решения, которые нужно переиспользовать:
+
+1. **Окно** создаётся по аналогии с `gatewayWindow.ts`:
+   - preload: `app.isPackaged ? path.join(process.resourcesPath, 'preload.js') : path.join(__dirname, '../../dist/main/preload.js')`.
+   - В dev загружается `${DEV_SERVER_URL}/#/<route>`, в prod — `loadFile(getMainWindowProdPath(), { hash: '/<route>' })`.
+   - Хранение ссылки на окно в переменной модуля, фокус при повторном открытии.
+
+2. **IPC-обработчики** (`stellarHandlers.ts`) с префиксом каналов `stellar:`.
+   Регистрируются в `main.ts` через `registerStellarHandlers()`.
+
+3. **Preload API** добавляется в объект `electronAPI` в `src/preload.ts`.
+   Типы объявляются в `src/types/types.d.ts`.
+
+4. **Страница React** (`StellarHookPage.tsx`) использует PrimeReact (Panel, Button, InputText, ListBox, Dropdown, ToggleButton и т.д.) и PrimeFlex классы, аналогично `GatewayPage.tsx`.
+
+5. **Сервис Playwright** для HeadHunter (`hhService.ts`):
+   - Управление браузером (Chromium, headless: false).
+   - Сохранение/восстановление сессии через `storageState` (файл `hh_storage.json`).
+   - Безопасное хранение учётных данных через safeStorage (файл `hh_credentials.json` или ключ `'headhunter'` в `osint_credentials.json`).
+   - Поддержка чтения из `.env` (например, `VITE_HH_LOGIN`, `VITE_HH_PASSWORD`).
+   - Методы: `launch()`, `close()`, `login()`, `isAuthenticated()`, `getStatus()`.
+   - Обработка капчи: ожидание ручного прохождения, `waitForSelector` для исчезновения капчи (например, `#cf-turnstile`, `[class*="captcha"]`).
+   - Остановка бесконечного троббера (спиннера загрузки) через эмуляцию `window.dispatchEvent(new Event('load'))` и скрытие `.loading, .loader, .spinner`.
+   - Прокрутка виртуальных списков для подгрузки всех элементов (например, `container.scrollTop = 0` в цикле с ожиданием).
+
+6. **Скрапинг динамического контента** с HeadHunter:
+   - Селекторы могут быть сложными, их нужно определить через DevTools.
+   - Для загрузки всех вакансий/резюме, возможно, потребуется прокрутка или пагинация.
+
+7. **Меню** (`windowMenus.ts`):
+   - Добавить пункт «Открыть Stellar Hook» в `mainMenuTemplate`.
+   - Создать `stellarWindowMenuTemplate` (по аналогии с `gatewayWindowMenuTemplate`).
+
+8. **Роутер** (`src/navigation/routes.tsx`):
+   - Добавить маршрут `/stellar-hook`.
+
+9. **ROADMAP**:
+   - Создать `STELLAR_HOOK_ROADMAP.md` в корне.
+   - После каждого этапа обновлять его и делать коммит.
+
+# Задача
+
+Создать новое окно **Stellar Hook** для автоматизации работы с сайтом **hh.ru** (HeadHunter). Основные цели:
+
+- Авторизация на hh.ru (сохранение сессии, чтобы не вводить логин/пароль повторно).
+- Поиск вакансий по заданным критериям (ключевые слова, регион, зарплата, опыт и т.д.).
+- Извлечение данных вакансий (название, компания, зарплата, описание, ссылка).
+- Возможно, отображение списка вакансий в UI, экспорт в JSON/CSV.
+- Потенциально: автоматическая отправка откликов (опционально, позже).
+
+Интерфейс окна должен включать:
+
+- Кнопки «Запустить браузер» / «Остановить».
+- Поле для ввода поискового запроса.
+- Кнопку «Найти вакансии».
+- Область для вывода результатов (список вакансий).
+- Блок настроек (город, зарплата, опыт, график работы и т.д.).
+- Индикатор статуса авторизации.
+
+# Требования
+
+- Следовать архитектуре, принятой в проекте (см. Gateway и OSINT окна).
+- Использовать TypeScript, Playwright, Electron, React, PrimeReact/PrimeFlex.
+- Переиспользовать существующие модули, особенно `DeepSeekService` как образец сервиса Playwright.
+- Создать сервис `src/main/services/stellar/hhService.ts` (или `stellarService.ts`).
+- Создать окно `src/main/windows/stellarWindow.ts`.
+- Создать обработчики `src/main/ipcHandlers/stellarHandlers.ts`.
+- Добавить методы в `src/preload.ts` (например, `stellarLaunch`, `stellarClose`, `stellarSearch`, `stellarGetResults`, `stellarGetStatus`).
+- Обновить типы в `src/types/types.d.ts`.
+- Создать страницу `src/pages/StellarHookPage/StellarHookPage.tsx`.
+- Добавить пункт меню и роут.
+- Реализовать безопасное хранение учётных данных (safeStorage) и сессии (`hh_storage.json`).
+- Обрабатывать ошибки и капчу.
+- Код должен быть чистым, с комментариями.
+
+# Этапы
+
+1. **Инициализация**: создать ветку `feature/stellar-hook`, создать `STELLAR_HOOK_ROADMAP.md`, зафиксировать начальное состояние.
+2. **Базовое окно**: создать `stellarWindow.ts`, пункт меню, IPC для открытия окна, preload метод, заглушку страницы, роут. Обновить ROADMAP, коммит.
+3. **Интеграция Playwright и авторизация**: создать `hhService.ts` с методами `launch`, `close`, `login`, `isAuthenticated`. Реализовать сохранение/восстановление сессии и безопасное хранение учётных данных. Добавить IPC `stellar:launch`, `stellar:close`. Подключить preload, UI кнопки. Протестировать вход. Обновить ROADMAP, коммит.
+4. **Поиск вакансий**: реализовать метод `searchVacancies(query, filters)` в `hhService`. Определить селекторы для поиска и извлечения данных. Добавить IPC `stellar:search`. В UI добавить поле запроса, фильтры, кнопку поиска, область результатов. Обновить ROADMAP, коммит.
+5. **Дополнительно**: отображение деталей вакансии, экспорт, пагинация, автопрокрутка, обработка капчи.
+6. **Финальная проверка и слияние**: тестирование, исправление ошибок, обновление ROADMAP, коммит, слияние.
+
+# Важно
+
+- Перед началом работы изучи мои существующие файлы: `deepseekService.ts`, `gatewayHandlers.ts`, `gatewayWindow.ts`, `GatewayPage.tsx`, `preload.ts`, `types.d.ts`, `windowMenus.ts`, `main.ts`, `routes.tsx` (если попросишь, я пришлю фрагменты).
+- После каждого этапа **обновляй STELLAR_HOOK_ROADMAP.md** и **предлагай сообщение для git-коммита**.
+- Если нужны уточнения по селекторам или структуре HeadHunter, задавай вопросы.
+- Используй наработки из Шлюза, особенно методы для обхода спиннеров, ожидания элементов, прокрутки виртуальных списков.
+- Помни, что HeadHunter может иметь антибот-защиту и капчу. Предусмотри ручной режим.
+- Старайся максимально переиспользовать существующий код и паттерны.
+
+Теперь приступай.

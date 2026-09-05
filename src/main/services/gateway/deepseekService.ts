@@ -422,13 +422,6 @@ export class DeepSeekService {
   }
 
   /**
-   * Отправляет сообщение в DeepSeek и возвращает текст ответа.
-   */
-/**
- * Интерфейс сообщения чата Gateway.
- */
-
-  /**
    * Отправляет сообщение в DeepSeek и возвращает структурированный ответ.
    */
   async sendMessage(message: string): Promise<GatewayChatMessage> {
@@ -441,7 +434,7 @@ export class DeepSeekService {
 
     // Автоматически добавляем просьбу отвечать на русском, если сообщение содержит кириллицу
     const finalMessage = /[а-яА-ЯёЁ]/.test(message)
-      ? `${message}\n\n(Пожалуйста, ответь на русском языке)`
+      ? `${message}\n\n(Ответь на русском языке)`
       : message;
 
     const textareaSelector = 'textarea[placeholder*="Сообщение"], textarea[placeholder*="Message"]';
@@ -625,8 +618,6 @@ export class DeepSeekService {
     console.log(`[DeepSeek] Умный поиск: ${enabled}`);
   }
 
-  // В классе DeepSeekService добавьте:
-
   /**
    * Возвращает текущий выбранный режим модели.
    */
@@ -776,5 +767,208 @@ export class DeepSeekService {
     });
 
     return messages as GatewayChatMessage[];
+  }
+
+  /**
+   * Включает режим выбора сообщений (клик по кнопке в шапке).
+   */
+  async startSelectionMode(): Promise<void> {
+    if (!this.page) throw new Error('Браузер не запущен');
+    //const selector = 'div._1aa2651 div._57370c5';
+    const selector = 'div._57370c5._5dedc1e';
+    const button = this.page.locator(selector).first();
+    await button.waitFor({ state: 'visible', timeout: 10000 });
+    await button.click({ force: true });
+    console.log('[DeepSeek] Режим выбора включён');
+  }
+
+  /**
+   * Отменяет режим выбора (клик по Cancel в нижней панели).
+   */
+  async cancelSelectionMode(): Promise<void> {
+    if (!this.page) throw new Error('Браузер не запущен');
+    const cancelButton = this.page.locator('div.fab07e97 .ds-button--outlinedNeutral');
+    if (await cancelButton.isVisible().catch(() => false)) {
+      await cancelButton.click({ force: true });
+      console.log('[DeepSeek] Режим выбора отменён');
+    }
+  }
+
+  /**
+   * Выбирает сообщения по индексам (0-based) в текущем списке.
+   */
+  async selectMessages(indices: number[]): Promise<void> {
+    if (!this.page) throw new Error('Браузер не запущен');
+    if (!indices.length) return;
+
+    const listSelector = 'div.ds-virtual-list';
+    const list = this.page.locator(listSelector);
+    await list.waitFor({ state: 'visible', timeout: 5000 });
+
+    const sorted = [...indices].sort((a, b) => a - b);
+
+    for (const index of sorted) {
+      await this.scrollToMessageIndex(index);
+      const message = this.page.locator(`div[data-virtual-list-item-key]`).nth(index);
+      const checkbox = message.locator('.d30139ff .ds-checkbox');
+      await checkbox.click({ force: true });
+      await this.page.waitForTimeout(200);
+    }
+    console.log(`[DeepSeek] Выбрано сообщений: ${indices.length}`);
+  }
+
+  /**
+   * Прокручивает список до сообщения с указанным индексом.
+   */
+  private async scrollToMessageIndex(index: number): Promise<void> {
+    const page = this.page!;
+    const listSelector = 'div.ds-virtual-list';
+
+    const elementExists = await page.evaluate(
+      ({ listSelector, index }) => {
+        const list = document.querySelector(listSelector);
+        if (!list) return false;
+        const items = list.querySelectorAll('div[data-virtual-list-item-key]');
+        return index < items.length;
+      },
+      { listSelector, index }
+    );
+
+    if (elementExists) {
+      await page.evaluate(
+        ({ listSelector, index }) => {
+          const list = document.querySelector(listSelector);
+          const items = list?.querySelectorAll('div[data-virtual-list-item-key]');
+          if (items && items[index]) {
+            items[index].scrollIntoView({ block: 'center' });
+          }
+        },
+        { listSelector, index }
+      );
+      await page.waitForTimeout(500);
+      return;
+    }
+
+    let attempts = 0;
+    const maxAttempts = 20;
+    while (attempts < maxAttempts) {
+      const found = await page.evaluate(
+        ({ listSelector, index }) => {
+          const list = document.querySelector(listSelector);
+          if (!list) return false;
+          const items = list.querySelectorAll('div[data-virtual-list-item-key]');
+          if (index < items.length) {
+            items[index].scrollIntoView({ block: 'center' });
+            return true;
+          }
+          list.scrollTop = list.scrollHeight;
+          return false;
+        },
+        { listSelector, index }
+      );
+      if (found) {
+        await page.waitForTimeout(500);
+        return;
+      }
+      await page.waitForTimeout(300);
+      attempts++;
+    }
+    throw new Error(`Не удалось прокрутить до сообщения с индексом ${index}`);
+  }
+
+  /**
+   * Создаёт публичную ссылку на выбранные сообщения.
+   */
+  async createPublicLink(): Promise<string> {
+    if (!this.page) throw new Error('Браузер не запущен');
+
+    //const createButton = this.page.locator('div.fab07e97 .ds-button--primary');
+    const createButton = this.page.locator('div.fab07e97 .ds-button--primary:not(.ds-button--disabled)');
+    await createButton.waitFor({ state: 'visible', timeout: 10000 });
+    await createButton.click({ force: true });
+
+    const modal = this.page.locator('div.ds-modal');
+    await modal.waitFor({ state: 'visible', timeout: 10000 });
+
+    const confirmButton = modal.locator('.ds-button--primary');
+    await confirmButton.waitFor({ state: 'visible', timeout: 5000 });
+    await confirmButton.click({ force: true });
+
+    const linkText = modal.locator('.ds-copyable-text-line__text');
+    await linkText.waitFor({ state: 'visible', timeout: 10000 });
+
+    const url = await linkText.textContent();
+    if (!url) throw new Error('Не удалось получить ссылку');
+
+    const closeButton = modal.locator('.ds-modal-content__close');
+    if (await closeButton.isVisible().catch(() => false)) {
+      await closeButton.click({ force: true });
+    }
+
+    return url.trim();
+  }
+
+  /**
+   * Повторно генерирует ответ ассистента для заданного сообщения.
+   * @param conversationId ID текущего диалога
+   * @param messageIndex Индекс сообщения ассистента в списке (0-based)
+   */
+  async regenerateMessage(conversationId: string, messageIndex: number): Promise<void> {
+    if (!this.page) throw new Error('Браузер не запущен');
+
+    // Открываем диалог, если нужно
+    const currentUrl = this.page.url();
+    if (!currentUrl.includes(conversationId)) {
+      await this.openConversation(conversationId);
+    }
+
+    // Ждём появления сообщений
+    await this.page.waitForSelector('div.ds-markdown.ds-assistant-message-main-content', { timeout: 10000 });
+
+    // Находим нужное сообщение по индексу
+    const assistantMessages = this.page.locator('div.ds-markdown.ds-assistant-message-main-content');
+    const count = await assistantMessages.count();
+    if (messageIndex >= count) {
+      throw new Error(`Индекс сообщения вне диапазона: ${messageIndex}, всего ${count}`);
+    }
+
+    // Ищем родительский контейнер сообщения
+    const messageContainer = assistantMessages.nth(messageIndex).locator('xpath=ancestor::div[contains(@class, "_4f9bf79")]').first();
+    
+    // Кнопка "Повторить" — вторая кнопка с классом db183363 в панели кнопок
+    const repeatButton = messageContainer.locator('div.db183363').nth(1); // 0 - copy, 1 - repeat, 2 - like, 3 - dislike, 4 - share
+    await repeatButton.waitFor({ state: 'visible', timeout: 5000 });
+    await repeatButton.click({ force: true });
+
+    // Ждём завершения генерации (можно отследить появление спиннера или просто таймаут)
+    await this.page.waitForTimeout(5000); // TODO: улучшить ожидание
+    console.log(`[DeepSeek] Повторная генерация для сообщения ${messageIndex} выполнена`);
+  }
+
+  /**
+   * Отправляет лайк/дизлайк для сообщения ассистента.
+   */
+  async sendFeedback(conversationId: string, messageIndex: number, type: 'like' | 'dislike'): Promise<void> {
+    if (!this.page) throw new Error('Браузер не запущен');
+
+    const currentUrl = this.page.url();
+    if (!currentUrl.includes(conversationId)) {
+      await this.openConversation(conversationId);
+    }
+
+    await this.page.waitForSelector('div.ds-markdown.ds-assistant-message-main-content', { timeout: 10000 });
+
+    const assistantMessages = this.page.locator('div.ds-markdown.ds-assistant-message-main-content');
+    const count = await assistantMessages.count();
+    if (messageIndex >= count) throw new Error('Индекс сообщения вне диапазона');
+
+    const messageContainer = assistantMessages.nth(messageIndex).locator('xpath=ancestor::div[contains(@class, "_4f9bf79")]').first();
+
+    const buttonIndex = type === 'like' ? 2 : 3; // 2 - like, 3 - dislike
+    const feedbackButton = messageContainer.locator('div.db183363').nth(buttonIndex);
+    await feedbackButton.waitFor({ state: 'visible', timeout: 5000 });
+    await feedbackButton.click({ force: true });
+
+    console.log(`[DeepSeek] Отправлен ${type} для сообщения ${messageIndex}`);
   }
 }

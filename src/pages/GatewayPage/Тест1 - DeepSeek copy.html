@@ -1,0 +1,1768 @@
+<!DOCTYPE html>
+<!-- saved from url=(0071)https://chat.deepseek.com/a/chat/s/db773c99-454a-4f73-bfc0-f4aec17b49f8 -->
+<html lang="ru" class="notranslate" translate="no">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>Тест1 - DeepSeek</title>
+  <meta name="viewport"
+    content="initial-scale=1.0,maximum-scale=1,minimum-scale=1.0,user-scalable=no,width=device-width,viewport-fit=cover">
+  <meta name="commit-id" content="2335d6b">
+  <meta name="description"
+    content="Chat with DeepSeek AI – your intelligent assistant for coding, content creation, file reading, and more. Upload documents, engage in long-context conversations, and get expert help in AI, natural language processing, and beyond. | 深度求索（DeepSeek）助力编程代码开发、创意写作、文件处理等任务，支持文件上传及长文本对话，随时为您提供高效的AI支持。">
+  <meta name="keywords"
+    content="DeepSeek,DeepSeek AI,DeepSeek Chat,AI assistant,coding assistant,long-context LLM,Open Source LLM,natural language processing,AI chatbot,AI long text,AI content creation,large language model,深度求索,大语言模型,自然语言处理,AI聊天机器人,代码开发,创意写作,AI助手,长文本对话,文件处理AI,大模型公司,人工智能,AI开发助手">
+  <meta property="og:url" content="https://chat.deepseek.com">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="DeepSeek">
+  <meta property="og:description" content="Chat with DeepSeek AI.">
+  <meta property="og:image" content="https://cdn.deepseek.com/images/deepseek-chat-open-graph-image.jpeg">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta property="twitter:domain" content="deepseek.com">
+  <meta property="twitter:url" content="https://chat.deepseek.com">
+  <meta name="twitter:title" content="DeepSeek">
+  <meta name="twitter:description" content="Chat with DeepSeek AI.">
+  <meta name="twitter:image" content="https://cdn.deepseek.com/images/deepseek-chat-open-graph-image.jpeg">
+  <meta name="google" content="notranslate">
+  <meta name="ip" content="95.165.17.229">
+  <meta name="region" content="RU">
+  <link rel="apple-touch-icon" sizes="180x180" href="https://fe-static.deepseek.com/chat/icon-180.png">
+  <link rel="icon" type="image/x-icon" href="https://fe-static.deepseek.com/chat/favicon.svg">
+  <link rel="manifest" href="https://fe-static.deepseek.com/chat/manifest.json">
+  <script>"use strict"; (() => { let e; var t, n = { disable_sdk_monitor: !0, enable_ab_test: !1, auto_exposure_expriment: !1, enable_stay_duration: !0, enable_debug: !1 }, a = "volcengine_enabled", o = null, r = () => { let e = Date.now(); if (o && e - o.timestampMs <= 300) return o.state; let t = (() => { var e, t, n; try { let o = localStorage.getItem("__ds_remote_feature_store"); if (!o) return "unknown"; let r = JSON.parse(o), s = (null == r ? void 0 : r.schemaVersion) === 2 ? null == (t = null == (e = null == r ? void 0 : r.entries) ? void 0 : e[a]) ? void 0 : t.value : null == (n = null == r ? void 0 : r.features) ? void 0 : n[a]; return "true" === s ? "enabled" : "false" === s ? "disabled" : "unknown" } catch { return "unknown" } })(); return o = { state: t, timestampMs: e }, t }, s = e => { }, l = e => { var t, n, a, o, r, s, l, i, c, d; t = window, n = document, a = "apmPlus", o = "precollect", r = "addEventListener", (s = function (e) { l = [].slice.call(arguments), l.push(Date.now(), location.href), (e == o ? s.p.a : s.q).push(l) }).q = [], s.p = { a: [] }, t[a] = s, (i = document.createElement("script")).src = "https://apm.volccdn.com/mars-web/apmplus/web/browser.cn.js?aid=0&globalName=" + a, i.crossOrigin = "anonymous", n.getElementsByTagName("head")[0].appendChild(i), r in t && (s.pcErr = function (e) { (c = (e = e || t.event).target || e.srcElement) instanceof Element || c instanceof HTMLElement ? t[a](o, "st", { tagName: c.tagName, url: c.getAttribute("href") || c.getAttribute("src") }) : t[a](o, "err", e.error || e.message) }, s.pcRej = function (e) { e = e || t.event, t[a](o, "reject", e.reason || e.detail && e.detail.reason) }, t[r]("error", s.pcErr, !0), t[r]("unhandledrejection", s.pcRej, !0)), "PerformanceLongTaskTiming" in t && ((d = s.pp = { entries: [] }).observer = new PerformanceObserver(function (e) { d.entries = d.entries.concat(e.getEntries()) }), d.observer.observe({ entryTypes: ["longtask"] })), window.apmPlus("init", { aid: e.aid, token: e.token, env: e.env, release: e.release, domain: e.domain, plugins: { action: { enable: !0 }, performance: { longtask: !1 }, pageview: { routeMode: "manual" } } }), window.apmPlus("start") }, i = "__ds_report_settlers", c = e => { let t = window; Array.isArray(t[i]) || (t[i] = []), t[i].push(e) }, d = () => { let e; (e = document.createElement("script")).defer = !0, e.src = "https://lf3-data.volccdn.com/obj/data-static/log-sdk/collect/5.0/collect-rangers-v5.2.11.js", document.head.appendChild(e) }, u = () => { let e = document.querySelector('meta[name="commit-id"]'); return e ? e.content : "" }; (() => { var e = window, t = "collectEvent"; if (e.LogAnalyticsObject = t, !e[t]) { let n = (...e) => { n.q.push(e) }; n.q = [], e[t] = n } e[t].l = +new Date; let n = r(); switch (n) { case "enabled": d(); return; case "disabled": return; case "unknown": c(e => { e && d() }); return; default: s(n) } })(), t = { timeoutMs: 1e4, rootSelector: "#root", resourcePatterns: [/\/main(?:\.[\da-zA-Z-_]+)?\.js$/, /\/main(?:\.[\da-zA-Z-_]+)?\.css$/, /\/default-vendors(?:\.[\da-zA-Z-_]+)?\.js$/], dataFinderConfig: { appId: 0x13145ad, channelDomain: "https://gator.volces.com", abChannelDomain: "https://tab.volces.com", enableStorage: !1, commitId: u() } }, "enabled" === r() && (e = Date.now(), window.setTimeout(() => { var a, o, r, s; let l, i, c = window.collectEvent; "function" == typeof c && ((e => { var t; if (!0 === window.__dsDataFinderStarted) return; let a = window.collectEvent; "function" == typeof a && (a("init", { ...n, app_id: e.appId, channel_domain: e.channelDomain, ab_channel_domain: e.abChannelDomain, enable_storage: e.enableStorage }), a("config", { commit_id: e.commitId, ds_region: (null == (t = document.querySelector('meta[name="region"]')) ? void 0 : t.content) === "CN" ? "cn" : "overseas" }), a("start"), window.__dsDataFinderStarted = !0) })(t.dataFinderConfig), c("blankScreenCheck", { ds_timeoutMs: t.timeoutMs, ds_elapsedMs: Date.now() - e, ds_isBlank: (a = t.rootSelector, null === (l = document.querySelector(a)) || 0 === l.children.length && "" === (l.textContent || "").trim()), ds_visibilityState: document.visibilityState, ds_resourceStatus: (o = t.resourcePatterns, i = null != (s = null == (r = null == performance ? void 0 : performance.getEntriesByType) ? void 0 : r.call(performance, "resource")) ? s : [], o.map(e => { let t, n = i.find(t => e.test(t.name)); return void 0 === n ? "".concat(e.source, ",missing") : "".concat((t = n.name).split("#")[0].split("?")[0].split("/").pop() || t, ",").concat(n.responseEnd > 0 ? "loaded" : "failed") }).join(";")) })) }, t.timeoutMs)), (e => { let t = r(); switch (t) { case "enabled": l(e); return; case "disabled": return; case "unknown": c(t => { t && l(e) }); return; default: s(t) } })({ aid: 675113, token: "772f2fcc08224a50b0134f8d3c139a21", env: "chat.deepseek.com" === location.hostname ? "production" : "other", release: u(), domain: "https://apmplus.volces.com" }) })()</script>
+  <script defer="" src="./Тест1 - DeepSeek_files/collect-rangers-v5.2.11.js"></script>
+  <script src="./Тест1 - DeepSeek_files/browser.cn.js" crossorigin="anonymous"></script>
+  <style>
+    ._sri-logo {
+      position: absolute;
+      left: 16px;
+      top: 21px;
+      user-select: none;
+      z-index: 1
+    }
+
+    div._sri-ck {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      height: 100vh;
+      width: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      background: #fff;
+      color: #1d1d1f
+    }
+
+    @media (prefers-color-scheme: dark) {
+      div._sri-ck {
+        background: #000;
+        color: #f5f5f7
+      }
+    }
+
+    ._sri-ck .img {
+      width: 120px;
+      height: auto;
+      background-size: cover;
+      margin-bottom: 24px
+    }
+
+    ._sri-ck ._sri-img-dark {
+      display: none
+    }
+
+    @media (prefers-color-scheme: dark) {
+      ._sri-ck ._sri-img-light {
+        display: none
+      }
+
+      ._sri-ck ._sri-img-dark {
+        display: block
+      }
+    }
+
+    ._sri-ck .desc {
+      font-size: 15px;
+      line-height: 22px;
+      margin: 0 0 24px;
+      color: #81858c
+    }
+
+    @media (prefers-color-scheme: dark) {
+      ._sri-ck .desc {
+        color: #adb2b8
+      }
+    }
+
+    ._sri-ck .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 36px;
+      min-width: 72px;
+      padding: 12px 14px;
+      font-size: 14px;
+      font-weight: 500;
+      color: #fff;
+      background: #3964fe;
+      border: none;
+      border-radius: 9999px;
+      cursor: pointer;
+      font-family: inherit;
+      box-sizing: border-box
+    }
+
+    @media (prefers-color-scheme: dark) {
+      ._sri-ck .btn {
+        background: #5686fe
+      }
+    }
+  </style>
+  <script>(() => { "use strict"; let e = null, t = { disable_sdk_monitor: !0, enable_ab_test: !1, auto_exposure_expriment: !1, enable_stay_duration: !0, enable_debug: !1 }, a = function () { return "function" != typeof window.collectEvent ? () => 0 : window.collectEvent.apply(window, arguments) }, o = { en: { d: "Unable to load page resources. Please refresh and try again.", b: "Reload", logo: "DeepSeek" }, zh: { d: "页面资源加载异常，请刷新重试", b: "重新加载", logo: "DeepSeek" } }; window._sriCk = function () { var r; let n, i, s, d, c, l = (e => { let t = navigator.languages || [navigator.language || ""]; for (let a = 0; a < t.length; a++) { let o = t[a].toLowerCase().split("-")[0]; if (e.includes(o)) return o } return null })(Object.keys(o)), g = l ? o[l] : o.en, m = '<img src="https://fe-static.deepseek.com/chat/static/web-logo.svg" alt="' + g.logo + '" class="_sri-logo" width=143 height=23>'; m += '<div class="_sri-ck"><img class="img _sri-img-light" src="https://fe-static.deepseek.com/chat/static/web-error-logo-light.89842be665.png" alt=""><img class="img _sri-img-dark" src="https://fe-static.deepseek.com/chat/static/web-error-logo-dark.7c806d753d.png" alt=""><p class="desc">' + g.d + '</p><button class="btn" onclick="location.reload()">' + g.b + "</button></div>", (i = (n = document).createElement("div"), n.body.replaceChildren(i), i).innerHTML = m, (s = document.head.querySelector('meta[name="commit-id"]')) && (e = s.getAttribute("content")), r = arguments, !0 !== window.__dsDataFinderStarted && (a("start"), a("init", { ...t, app_id: 0x13145ad, channel_domain: "https://gator.volces.com", enable_storage: !1 }), window.__dsDataFinderStarted = !0), a("scriptLoadError", (c = (e => { if (!e || !performance || !performance.getEntriesByName) return; let t = performance.getEntriesByName(e)[0]; if (t) return t })(d = r[0] ? r[0].src : "") || {}, { ds_src: d, dsp__commitId: e, ds_duration: c.duration, ds_encodedBodySize: c.encodedBodySize })) } })()</script>
+  <script defer="" onerror="_sriCk(this)" src="./Тест1 - DeepSeek_files/default-vendors.b9e9755780.js"></script>
+  <script defer="" onerror="_sriCk(this)" src="./Тест1 - DeepSeek_files/main.a006649905.js"></script>
+  <link href="./Тест1 - DeepSeek_files/main.fdf56932b4.css" rel="stylesheet">
+  <style>
+    body.change-theme * {
+      transition: none !important;
+    }
+
+    body.change-theme *::before {
+      transition: none !important;
+    }
+
+    body.change-theme *::after {
+      transition: none !important;
+    }
+  </style>
+  <link data-rspack="@deepseek/chat:chunk-52059" rel="stylesheet" href="./Тест1 - DeepSeek_files/katex.effce08cb3.css">
+</head>
+
+<body class="ru dark" data-ds-dark-theme="dark" style="--app-height: 756px;">
+  <div id="root">
+    <div class="cb86951c">
+      <div class="cddfb2ed"></div>
+      <div class="c3ecdb44">
+        <div class="dc04ec1d">
+          <div class="b8812f16 a2f3d50e">
+            <div class="_262baab">
+              <div class="e066abb8">
+                <!-- вырезан SVG -->
+              </div>
+              <div class="_23e1c55">
+                <div role="button"
+                  class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--m ds-button--icon-relative-m ds-button--sizing-content d05a0287"
+                  tabindex="0" style="--dsl-button-height: 34px;">
+                  <div class="ds-button__background"></div>
+                  <div class="ds-button__icon ds-button__icon--last-child">
+                    <div class="ds-icon" style="font-size: inherit;">
+                      <!-- вырезан SVG -->
+                    </div>
+                  </div>
+                </div>
+                <div role="button"
+                  class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--m ds-button--icon-relative-m ds-button--sizing-content _7d1f5e2"
+                  tabindex="0" style="--dsl-button-height: 34px;">
+                  <div class="ds-button__background"></div>
+                  <div class="ds-button__icon ds-button__icon--last-child">
+                    <div class="ds-icon" style="font-size: inherit;">
+                      <!-- вырезан SVG -->
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="_7b40dad">
+              <div class="dc1f7bee _4bcc731">
+                <div class="_5a8ac7a" tabindex="0" style="justify-content: center;">
+                  <div class="ds-icon _1c42ad7" style="font-size: 16px; width: 16px; height: 16px;">
+                    <!-- вырезан SVG -->
+                  </div><span>Новый чат</span>
+                  <div class="ds-focus-ring"></div>
+                </div>
+              </div>
+            </div>
+            <div class="_3586175 ds-scroll-area ds-scroll-area--show-on-focus-within ds-scroll-area--enabled">
+              <div class="ds-scroll-area__gutters"
+                style="--container-height: 558px; position: sticky; top: 0px; left: 0px; right: 0px; width: 100%; height: 0px;">
+                <div class="ds-scroll-area__horizontal-gutter"
+                  style="left: 3px; right: 3px; display: block; top: calc(var(--container-height) - 11px); height: 8px;">
+                  <div class="ds-scroll-area__horizontal-bar" style="display: none;"></div>
+                </div>
+                <div class="ds-scroll-area__vertical-gutter"
+                  style="right: -10px; top: 3px; bottom: calc(0px - var(--container-height) + 3px); width: 8px;">
+                  <div class="ds-scroll-area__vertical-bar" style="top: 79.4007px; height: 92.3033px;"></div>
+                </div>
+              </div>
+              <div role="button"
+                class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--m ds-button--icon-relative-m ds-button--sizing-content _8023265"
+                tabindex="0" style="--dsl-button-height: 22px; --dsl-button-icon-size: 12px;">
+                <div class="ds-button__background"></div>
+                <div class="ds-button__icon ds-button__icon--last-child">
+                  <div class="ds-icon" style="font-size: 12px; width: 12px; height: 12px;">
+                    <!-- вырезан SVG -->
+                  </div>
+                </div>
+              </div>
+              <div class="_6d215eb ds-scroll-area ds-scroll-area--show-on-focus-within ds-scroll-area--enabled"
+                style="--container-height: 558px;">
+                <div class="_77cdc67 _8a693f3">
+                  <div class="_3098d02 _63701b7">
+                    <div class="f3d18f6a a9b29780">
+                      <div role="button" aria-expanded="true" class="f8ca4798" tabindex="0">
+                        <div class="ds-focus-ring"></div><span class="_7665dfd"><span class="f0a1ba3e _5fbe710"
+                            aria-hidden="true"><span>Закреплено 15 диалогов</span>
+                            <div class="ds-icon" style="font-size: 14px; width: 14px; height: 14px;">
+                              <!-- вырезан SVG -->
+                            </div>
+                          </span><span class="f0a1ba3e" aria-hidden="false"><span>Закреплено</span>
+                            <div class="ds-icon" style="font-size: 14px; width: 14px; height: 14px;">
+                              <!-- вырезан SVG -->
+                            </div>
+                          </span></span>
+                      </div>
+                    </div>
+                    <div class="e07f456c">
+                      <div class="_62cad32"><a class="_546d736"
+                          href="https://chat.deepseek.com/a/chat/s/1ff7ac02-528b-4dfb-9959-90790776c4ac" tabindex="0">
+                          <div class="ds-focus-ring"></div>
+                          <div class="c08e6e93">Шлюз 2</div>
+                          <div class="_254829d">
+                            <div role="button"
+                              class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                              tabindex="0">
+                              <div class="ds-button__background"></div>
+                              <div class="ds-button__icon ds-button__icon--last-child">
+                                <div class="ds-icon" style="font-size: inherit;">
+                                  <!-- вырезан SVG -->
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </a><a class="_546d736"
+                          href="https://chat.deepseek.com/a/chat/s/d08d03f6-2cad-42a0-b41b-b78bbef2ae43" tabindex="0">
+                          <div class="ds-focus-ring"></div>
+                          <div class="c08e6e93">Третье продолжение работы над торговым роботом</div>
+                          <div class="_254829d">
+                            <div role="button"
+                              class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                              tabindex="0">
+                              <div class="ds-button__background"></div>
+                              <div class="ds-button__icon ds-button__icon--last-child">
+                                <div class="ds-icon" style="font-size: inherit;">
+                                  <!-- вырезан SVG -->
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </a><a class="_546d736"
+                          href="https://chat.deepseek.com/a/chat/s/6f89fe38-20ad-450d-885e-b2f53fd7624d" tabindex="0">
+                          <div class="ds-focus-ring"></div>
+                          <div class="c08e6e93">Stellar Hook</div>
+                          <div class="_254829d">
+                            <div role="button"
+                              class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                              tabindex="0">
+                              <div class="ds-button__background"></div>
+                              <div class="ds-button__icon ds-button__icon--last-child">
+                                <div class="ds-icon" style="font-size: inherit;">
+                                  <!-- вырезан SVG -->
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </a><a class="_546d736"
+                          href="https://chat.deepseek.com/a/chat/s/97eda711-5676-4a5b-af2b-b5a6f6f5771a" tabindex="0">
+                          <div class="ds-focus-ring"></div>
+                          <div class="c08e6e93">OSINT TS</div>
+                          <div class="_254829d">
+                            <div role="button"
+                              class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                              tabindex="0">
+                              <div class="ds-button__background"></div>
+                              <div class="ds-button__icon ds-button__icon--last-child">
+                                <div class="ds-icon" style="font-size: inherit;">
+                                  <!-- вырезан SVG -->
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </a><a class="_546d736"
+                          href="https://chat.deepseek.com/a/chat/s/0e67314e-36b0-4c54-ae1d-280757dc0f66" tabindex="0">
+                          <div class="ds-focus-ring"></div>
+                          <div class="c08e6e93">Скрипт-Помощник</div>
+                          <div class="_254829d">
+                            <div role="button"
+                              class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                              tabindex="0">
+                              <div class="ds-button__background"></div>
+                              <div class="ds-button__icon ds-button__icon--last-child">
+                                <div class="ds-icon" style="font-size: inherit;">
+                                  <!-- вырезан SVG -->
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </a><a class="_546d736"
+                          href="https://chat.deepseek.com/a/chat/s/34aeea91-d004-4716-b4fc-807a9131adc5" tabindex="0">
+                          <div class="ds-focus-ring"></div>
+                          <div class="c08e6e93">Разработка планировщика</div>
+                          <div class="_254829d">
+                            <div role="button"
+                              class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                              tabindex="0">
+                              <div class="ds-button__background"></div>
+                              <div class="ds-button__icon ds-button__icon--last-child">
+                                <div class="ds-icon" style="font-size: inherit;">
+                                  <!-- вырезан SVG -->
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </a><a class="_546d736"
+                          href="https://chat.deepseek.com/a/chat/s/e42a0055-1147-472a-aadb-4dd96000d6e6" tabindex="0">
+                          <div class="ds-focus-ring"></div>
+                          <div class="c08e6e93">Server Monitoring Scripts Inquiry</div>
+                          <div class="_254829d">
+                            <div role="button"
+                              class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                              tabindex="0">
+                              <div class="ds-button__background"></div>
+                              <div class="ds-button__icon ds-button__icon--last-child">
+                                <div class="ds-icon" style="font-size: inherit;">
+                                  <!-- вырезан SVG -->
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </a><a class="_546d736"
+                          href="https://chat.deepseek.com/a/chat/s/6bc14696-7beb-40cc-9df6-e1ae03a11441" tabindex="0">
+                          <div class="ds-focus-ring"></div>
+                          <div class="c08e6e93">Создание торгового помощника на основе Volume Profile</div>
+                          <div class="_254829d">
+                            <div role="button"
+                              class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                              tabindex="0">
+                              <div class="ds-button__background"></div>
+                              <div class="ds-button__icon ds-button__icon--last-child">
+                                <div class="ds-icon" style="font-size: inherit;">
+                                  <!-- вырезан SVG -->
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </a><a class="_546d736"
+                          href="https://chat.deepseek.com/a/chat/s/9be7b430-12d5-4d91-850f-0241c4c2bcc2" tabindex="0">
+                          <div class="ds-focus-ring"></div>
+                          <div class="c08e6e93">Стратегии профиля объема и условия прибыльности</div>
+                          <div class="_254829d">
+                            <div role="button"
+                              class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                              tabindex="0">
+                              <div class="ds-button__background"></div>
+                              <div class="ds-button__icon ds-button__icon--last-child">
+                                <div class="ds-icon" style="font-size: inherit;">
+                                  <!-- вырезан SVG -->
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </a><a class="_546d736"
+                          href="https://chat.deepseek.com/a/chat/s/3d0b0c47-d4bf-4b86-90cd-c50d929567e5" tabindex="0">
+                          <div class="ds-focus-ring"></div>
+                          <div class="c08e6e93">Создание нейросети с нуля</div>
+                          <div class="_254829d">
+                            <div role="button"
+                              class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                              tabindex="0">
+                              <div class="ds-button__background"></div>
+                              <div class="ds-button__icon ds-button__icon--last-child">
+                                <div class="ds-icon" style="font-size: inherit;">
+                                  <!-- вырезан SVG -->
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </a><a class="_546d736"
+                          href="https://chat.deepseek.com/a/chat/s/c2ad8620-c845-479c-a7af-9ac644b3862b" tabindex="0">
+                          <div class="ds-focus-ring"></div>
+                          <div class="c08e6e93">Разработка Промтгенератора</div>
+                          <div class="_254829d">
+                            <div role="button"
+                              class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                              tabindex="0">
+                              <div class="ds-button__background"></div>
+                              <div class="ds-button__icon ds-button__icon--last-child">
+                                <div class="ds-icon" style="font-size: inherit;">
+                                  <!-- вырезан SVG -->
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </a><a class="_546d736"
+                          href="https://chat.deepseek.com/a/chat/s/87bed8b4-8828-494c-8450-6ea0eab7bf37" tabindex="0">
+                          <div class="ds-focus-ring"></div>
+                          <div class="c08e6e93">Оптимизация структуры проект</div>
+                          <div class="_254829d">
+                            <div role="button"
+                              class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                              tabindex="0">
+                              <div class="ds-button__background"></div>
+                              <div class="ds-button__icon ds-button__icon--last-child">
+                                <div class="ds-icon" style="font-size: inherit;">
+                                  <!-- вырезан SVG -->
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </a><a class="_546d736"
+                          href="https://chat.deepseek.com/a/chat/s/2abee257-57e4-49d4-9608-38a74d0618a9" tabindex="0">
+                          <div class="ds-focus-ring"></div>
+                          <div class="c08e6e93">Интеграция с Т-Инвестиции через REST и Grpc</div>
+                          <div class="_254829d">
+                            <div role="button"
+                              class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                              tabindex="0">
+                              <div class="ds-button__background"></div>
+                              <div class="ds-button__icon ds-button__icon--last-child">
+                                <div class="ds-icon" style="font-size: inherit;">
+                                  <!-- вырезан SVG -->
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </a><a class="_546d736"
+                          href="https://chat.deepseek.com/a/chat/s/3e7d4c9e-ec72-4f0e-a2d1-c091e92a6747" tabindex="0">
+                          <div class="ds-focus-ring"></div>
+                          <div class="c08e6e93">Настройка Supabase в Electron TypeScript проекте</div>
+                          <div class="_254829d">
+                            <div role="button"
+                              class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                              tabindex="0">
+                              <div class="ds-button__background"></div>
+                              <div class="ds-button__icon ds-button__icon--last-child">
+                                <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                              </div>
+                            </div>
+                          </div>
+                        </a><a class="_546d736"
+                          href="https://chat.deepseek.com/a/chat/s/9efa2f8b-22e4-4555-86e1-8007b5960b7b" tabindex="0">
+                          <div class="ds-focus-ring"></div>
+                          <div class="c08e6e93">Создание ИИ помощника для разработки проектов</div>
+                          <div class="_254829d">
+                            <div role="button"
+                              class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                              tabindex="0">
+                              <div class="ds-button__background"></div>
+                              <div class="ds-button__icon ds-button__icon--last-child">
+                                <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                              </div>
+                            </div>
+                          </div>
+                        </a>
+                        <div class="_33788b3"></div>
+                      </div>
+                    </div>
+                    <div class="_31ac179"></div>
+                  </div>
+                  <div class="_3098d02">
+                    <div class="f3d18f6a">Вчера</div><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/df761cf9-e72c-4302-b3b7-cf1c7af55098" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Продолжение работы на торговым помощником</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/b15d670f-57bd-4e46-a981-84dae5b6ec9c" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Второе продолжение работы над торговым роботом</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/eaa766e8-046b-491b-9cd2-48623bf02014" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Шлюз</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a>
+                  </div>
+                  <div class="_3098d02">
+                    <div class="f3d18f6a">7 дней</div><a class="_546d736 b64fb9ae"
+                      href="https://chat.deepseek.com/a/chat/s/db773c99-454a-4f73-bfc0-f4aec17b49f8" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Тест1</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/eba271f6-c622-4ef5-a3ef-2a3e8056887f" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Перехват SIM-карты</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/ead3dba5-032e-4017-be4f-84210ce7de0f" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Electron темный фон</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/f164d0ea-57cc-4619-bd87-a9f19d9d14bc" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Stellar Hook</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/a82f9795-438c-4f3f-865a-153345ce9bb1" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Playwright настройка адаптации</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/1a0257b9-f52b-48ae-b54a-2ea958d1ec83" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Оптимизация и Шлюз</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/a0511bac-3845-46f3-a924-4d161606f565" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Обжалование бездействия пристава</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/b2c9152b-29cc-44d1-8ab6-5f7477ea0579" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Получение исполнительного листа</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/60a4200d-676a-4e23-abe4-f057da293ddf" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Остановка спиннера</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/a637d333-2b80-481c-bd59-6cd8547d63cf" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Авторизация не завершается</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/c1e643c9-ff5d-4a17-ab1b-be1ee45bebf3" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Режимы DeepSeek</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/c17a6c25-86db-4a92-933c-b9dfc3fecb25" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Фишинг на HackWare</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/7508cdb2-99f1-4323-b7e1-439ab8431254" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Фишинг методы</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a>
+                  </div>
+                  <div class="_3098d02">
+                    <div class="f3d18f6a">2026-07</div><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/64d91bcd-eb8e-4eb6-a558-263d25dc3187" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Проверка плана калькулятора облигаций</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/7b3cd397-abf5-48c6-960f-42dca55d469a" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Вопросы экспертам по заключению</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a>
+                  </div>
+                  <div class="_3098d02">
+                    <div class="f3d18f6a">2026-06</div><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/dcfc1781-03ed-4048-a9fa-c45e4b4cfdc5" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Fix npm EACCES Permission Error</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/80e9b90b-915c-4958-91be-f593c3ee50b2" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Расчет площади по координатам</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/342c2a83-ca89-485a-ab7a-f66d4d91e06a" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Управление сервером через SSH на TypeScript</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/01d163ff-0b13-4b57-8d7c-cfbcbde708bd" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Уточнение для графика с POC VAH VAL</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a>
+                  </div>
+                  <div class="_3098d02">
+                    <div class="f3d18f6a">2026-05</div><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/251856a2-b7b2-4793-8c02-3172f380711e" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Git Push Hangs on Writing Objects Fix</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/9c18d4ce-b8ed-450b-86c6-fa51f1a20ada" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Поддержка расширений Chrome в Electron</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/a600f726-383a-4844-ae76-91326498aea9" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Git push зависает решение</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/f96d7345-aa79-4148-853d-caef76dd7c52" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Tradingview lightweight charts горизонтальная гистограмма React TypeScript
+                      </div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/2bb5342a-5239-4cfa-b1d4-4a3fa3350d12" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Постоянное решение inotify в Ubuntu</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/4759080d-88f3-440e-acdf-dac5998c45f6" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Server startup failure after Ubuntu upgrade</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/7b2f6442-1ee6-4707-acf5-0a2e16ed02b1" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Управление версиями Git в проекте Electron TypeScript</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/217c04d0-c69d-4102-aecf-0b7695660bd8" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Генерация интерфейсов и классов для MarketDataStreamService</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/2a42bb50-bb80-466b-9936-bec930ccfc4e" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Technical Specification for Marketplace Web App</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/c26b0265-4beb-4321-b0eb-07f0ee310a2a" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Как игнорировать ошибку rootDir в VSCode</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/15e45a7e-9d2b-4d11-bd41-4f6a29254942" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Налог при продаже квартиры по сертификату</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/66dd4dc1-bcec-437c-ae45-bf40c037a849" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Список конфигурационных файлов</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/171b00b1-4ade-4dba-a125-3d2ff6448c40" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Бесплатные нейросети чат веб интерфейс</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a>
+                  </div>
+                  <div class="_3098d02">
+                    <div class="f3d18f6a">2026-04</div><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/5d4c8b64-d149-495e-b768-703ae7494113" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Electron внедрение скриптов в сайт</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/7334ccf1-0bf0-47ef-998a-22a8fabfafcd" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Приветствие и предложение помощи</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/5f0e3432-0ad9-4df3-9c4d-7bf204491b91" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Доступ к DeepSeek API из России</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/f868c31d-4ed2-428d-b18a-c0a6ba73a611" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Бесплатные AI ассистенты с веб интерфейсом</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/38b0b2aa-0d15-4579-830a-e7398526d9df" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Создание журнала разработки на Electron React TypeScript</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/443e2ef2-3546-4d1e-8ed9-a2ff7c6151eb" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Разработка продвинутого журнала разработки</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/baf61be4-8929-41c8-98dd-3e115ca86f96" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Название блога по автоматизации юриста</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/3e105546-b906-4e11-99da-fb4546e873d1" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Стоимость токенов ChatGPT</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a>
+                  </div>
+                  <div class="_3098d02">
+                    <div class="f3d18f6a">2026-02</div><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/109d24de-0b60-4db3-92aa-42ca81d046e1" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">MTProto proxy localhost setup</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/dab8dc4a-2355-46a9-bef6-6be88e39d84d" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Обсуждение российского номера телефона</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a>
+                  </div>
+                  <div class="_3098d02">
+                    <div class="f3d18f6a">2026-01</div><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/41ba5e7b-0e15-4127-84a7-a6d2eab0ba40" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Награды Леонида Файнштейна в искусстве</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/4222872c-b7cf-4251-a909-820aa3afa9bd" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Пример использования DeepSeek API в TypeScript</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/7218d976-369d-4b72-8df8-3d382e8bd770" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Леонид Файнштейн: Отец российского мюзикла</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/a074fd25-0481-4b63-ab67-4a65a9e69d08" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Анализ дела по номеру из арбитража</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/2540bfcb-5fd3-429d-bf6b-698ef62453ab" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Участие Муратова и Файнштейна в деле</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a>
+                  </div>
+                  <div class="_3098d02">
+                    <div class="f3d18f6a">2025-07</div><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/065b4df7-ae89-4544-bb5c-8a428eb1d49f" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Поставщики детской одежды для грудных детей</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/061f6a32-1639-4a00-a56c-98cb92e64608" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Отличия Hailo-8 и Hailo-8L</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/1f09173b-d0bc-4599-be71-b68599bbcabd" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Статус ИП на УСН: расходы и налогообложение</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/27c580f4-c1ab-4d58-b396-fe582f6ab526" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Виртуальная аренда помещения для ИП</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/6553be17-fa5e-411d-8147-108573e53ce3" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">ИП на патенте и перепродажа товаров</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/57086427-b5e4-4875-a199-305034acff88" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Бизнес с минимальными вложениями: идеи</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/2fd3ca0e-3c2d-472e-bee1-7339bc1bba3e" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Открытие мини-кофейни: расходы и советы</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a><a class="_546d736"
+                      href="https://chat.deepseek.com/a/chat/s/e0f0751e-3189-4766-8993-b6da0ce85c1d" tabindex="0">
+                      <div class="ds-focus-ring"></div>
+                      <div class="c08e6e93">Поздравление куме с днем рождения</div>
+                      <div class="_254829d">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l _2090548"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                    </a>
+                  </div>
+                </div>
+              </div>
+              <div class="_1d72f01"></div>
+            </div>
+            <div class="_7b40dad f14f3a6d">
+              <div class="dc1f7bee _4bcc731">
+                <div class="_2afd28d" tabindex="0">
+                  <div class="ede5bc47"><img class="fdf01f38" src="./Тест1 - DeepSeek_files/Og5Vsi-3JyYNSKTMzUM4MOYp"
+                      alt="" aria-hidden="true" style="display: block;"></div>
+                  <div class="_9d8da05">Алексей Кузнецов</div>
+                  <div class="ds-icon _39cc453" style="font-size: 16px; width: 16px; height: 16px;"><!-- вырезан SVG --></div>
+                  <div class="ds-focus-ring"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="_4cbcd96"></div>
+        <div class="_7780f2e">
+          <div class="_765a5cd">
+            <div class="_2be88ba">
+              <div class="f8d1e4c0 the-header">
+                <div class="_9fcbeda _7ee190f">
+                  <div class="afa34042 e0a1edb7 e37a04e4 _5a50d80" tabindex="0" style="outline: none;">Тест1</div>
+                  <div class="c03d486a">
+                    <div class="ds-icon a1ac5b47" style="font-size: 12px; width: 12px; height: 12px;"><!-- вырезан SVG --></div><span class="_46a12ab">Быстрый</span>
+                  </div>
+                </div>
+              </div>
+              <div class="_1aa2651 df9f32da the-header">
+                <div class="_99bb5ec">Выберите диалог</div>
+                <div role="button"
+                  class="ds-button ds-button--outlinedNeutral ds-button--outlined ds-button--capsule ds-button--m ds-button--icon-relative-m ds-button--min-width ed2f1453"
+                  tabindex="0">
+                  <div class="ds-button__background"></div>
+                  <div class="ds-button__border"></div><span class="ds-button__content">Отмена</span>
+                </div>
+              </div>
+            </div>
+            <div
+              class="ds-virtual-list ds-virtual-list--printable ds-scroll-area ds-scroll-area--show-on-focus-within ds-scroll-area--enabled _2bd7b35"
+              tabindex="0"
+              style="display: flex; flex-direction: column; --container-height: 696px; --dsl-virtual-list-width: 898px;">
+              <div class="ds-scroll-area__gutters"
+                style="--container-height: 696px; position: sticky; top: 0px; left: 0px; right: 0px; width: 100%; height: 0px;">
+                <div class="ds-scroll-area__horizontal-gutter"
+                  style="left: 3px; right: 3px; display: none; top: calc(var(--container-height) - 11px); height: 8px;">
+                  <div class="ds-scroll-area__horizontal-bar" style="display: none;"></div>
+                </div>
+                <div class="ds-scroll-area__vertical-gutter"
+                  style="right: 3px; top: 3px; bottom: calc(0px - var(--container-height) + 69px); width: 8px;">
+                  <div class="ds-scroll-area__vertical-bar" style="top: 254.065px; height: 369.935px;"></div>
+                </div>
+              </div>
+              <div class="ds-virtual-list-items _6f2c522"
+                style="box-sizing: content-box; padding-top: 0px; padding-left: calc((100% - var(--message-list-max-width)) / 2); padding-right: calc((100% - var(--message-list-max-width)) / 2); flex-shrink: 0; flex-grow: 1; min-height: 998px;">
+                <div class="ds-virtual-list-visible-items"
+                  style="position: relative; transform: translateY(280px); --dsl-virtual-list-transform-y: 280px; --dsl-virtual-list-ios-compensation-y: 0px;">
+                  <div class="_9663006" data-virtual-list-item-key="3">
+                    <div class="d30139ff">
+                      <div class="ad950ab7">
+                        <div class="ds-checkbox-align-wrapper"
+                          style="align-self: flex-start; --dsl-checkbox-line-height: unset;">
+                          <div class="ds-checkbox ds-checkbox--l ds-checkbox--active ds-checkbox--none" tabindex="0">
+                            <!-- вырезан SVG --></div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="d29f3d7d ds-message _6e8caf5 _7729a77" style="--panel-width: 898px;">
+                      <div class="fbb737a4">
+                        <div class="ds-collapsible-text" style="max-height: 192px; transition: none;">
+                          <div><span>Тест 2
+
+                              (Ответь на русском языке)</span></div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="_11d6b3a">
+                      <div class="_425ea0b fa1bcf13">
+                        <div class="ds-flex _78e0558" style="align-items: flex-end; gap: 0px;">
+                          <div role="button"
+                            class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l db183363"
+                            tabindex="0">
+                            <div class="ds-button__background"></div>
+                            <div class="ds-button__icon ds-button__icon--last-child">
+                              <div class="ds-cross-fade">
+                                <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                              </div>
+                            </div>
+                          </div>
+                          <div aria-disabled="false" role="button"
+                            class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l d4910adc"
+                            tabindex="0">
+                            <div class="ds-button__background"></div>
+                            <div class="ds-button__icon ds-button__icon--last-child">
+                              <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="_4f9bf79 _43c05b5" data-virtual-list-item-key="4">
+                    <div class="d30139ff">
+                      <div class="ad950ab7">
+                        <div class="ds-checkbox-align-wrapper"
+                          style="align-self: flex-start; --dsl-checkbox-line-height: unset;">
+                          <div class="ds-checkbox ds-checkbox--l ds-checkbox--active ds-checkbox--none" tabindex="0">
+                            <!-- вырезан SVG --></div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="ds-message _6e8caf5 _7729a77" style="--panel-width: 898px;">
+                      <div class="_74c0879"
+                        style="--collapsible-area-title-height: 34px; --group-title-sticky-base-top: 0px; --group-title-sticky-top: calc(var(--group-title-sticky-base-top) - var(--dsl-virtual-list-transform-y) + var(--dsl-virtual-list-ios-compensation-y));">
+                        <div class="_245c867 a51c5344">
+                          <div class="_5ab5d64">
+                            <div class="ds-icon _970ac5e" style="font-size: 16px; width: 16px; height: 16px;"><!-- вырезан SVG --></div><span class="_5255ff8 _4d41763">Размышление 1 секунд</span>
+                            <div class="ds-icon" style="font-size: 14px; width: 14px; height: 14px;"><!-- вырезан SVG --></div>
+                          </div>
+                          <div class="c99b79f8" style="opacity: 1;"></div>
+                        </div>
+                        <div class="c2b72bb8"></div>
+                        <div class="e1675d8b ds-think-content _767406f">
+                          <div class="ddd26891 _9b52f6c" style="width: 16px; height: 16px;">
+                            <div class="a510c7ce _0652043"></div>
+                          </div>
+                          <div class="_9ecc93a"></div>
+                          <div class="ds-markdown pointer-events-none">
+                            <p class="ds-markdown-paragraph"><span class="">Мы получили запрос "Тест 2" с просьбой
+                                ответить на русском. Это просто еще один тест. Нужно ответить на русском, подтвердив
+                                работоспособность. Можно разнообразить ответ, чтобы не повторяться. Ответим кратко и по
+                                делу.</span></p>
+                          </div>
+                        </div>
+                        <div class="_8f7678d"></div>
+                      </div>
+                      <div class="ds-markdown ds-assistant-message-main-content pointer-events-none">
+                        <p class="ds-markdown-paragraph"><span class="">Второй тест пройден успешно! Я по-прежнему на
+                            связи и готов отвечать по-русски. Жду следующих команд или вопросов. 🇷🇺</span></p>
+                      </div>
+                    </div>
+                    <div class="ds-flex _0a3d93b fa1bcf13"
+                      style="align-items: center; gap: 10px; flex-wrap: wrap-reverse;">
+                      <div class="ds-flex _965abe9" style="align-items: center; gap: 10px;">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l db183363"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-cross-fade">
+                              <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                            </div>
+                          </div>
+                        </div>
+                        <div aria-disabled="false" role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l db183363"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l db183363"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l db183363"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l db183363"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                      <div style="flex: 1 1 0%;"></div>
+                    </div>
+                  </div>
+                  <div class="_9663006" data-virtual-list-item-key="5">
+                    <div class="d30139ff">
+                      <div class="ad950ab7">
+                        <div class="ds-checkbox-align-wrapper"
+                          style="align-self: flex-start; --dsl-checkbox-line-height: unset;">
+                          <div class="ds-checkbox ds-checkbox--l ds-checkbox--active ds-checkbox--none" tabindex="0">
+                            <!-- вырезан SVG --></div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="d29f3d7d ds-message _6e8caf5 _7729a77" style="--panel-width: 898px;">
+                      <div class="fbb737a4">
+                        <div class="ds-collapsible-text" style="max-height: 192px; transition: none;">
+                          <div><span>Тест 3
+
+                              (Ответь на русском языке)</span></div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="_11d6b3a">
+                      <div class="_425ea0b fa1bcf13">
+                        <div class="ds-flex _78e0558 _0bbda35" style="align-items: flex-end; gap: 0px;">
+                          <div role="button"
+                            class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l db183363"
+                            tabindex="0">
+                            <div class="ds-button__background"></div>
+                            <div class="ds-button__icon ds-button__icon--last-child">
+                              <div class="ds-cross-fade">
+                                <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                              </div>
+                            </div>
+                          </div>
+                          <div aria-disabled="false" role="button"
+                            class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l d4910adc"
+                            tabindex="0">
+                            <div class="ds-button__background"></div>
+                            <div class="ds-button__icon ds-button__icon--last-child">
+                              <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="_4f9bf79 d7dc56a8 _43c05b5" data-virtual-list-item-key="6">
+                    <div class="d30139ff">
+                      <div class="ad950ab7">
+                        <div class="ds-checkbox-align-wrapper"
+                          style="align-self: flex-start; --dsl-checkbox-line-height: unset;">
+                          <div class="ds-checkbox ds-checkbox--l ds-checkbox--active ds-checkbox--none" tabindex="0">
+                            <!-- вырезан SVG --></div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="ds-message _6e8caf5 _7729a77" style="--panel-width: 898px;">
+                      <div class="_74c0879"
+                        style="--collapsible-area-title-height: 34px; --group-title-sticky-base-top: 0px; --group-title-sticky-top: calc(var(--group-title-sticky-base-top) - var(--dsl-virtual-list-transform-y) + var(--dsl-virtual-list-ios-compensation-y));">
+                        <div class="_245c867 a51c5344">
+                          <div class="_5ab5d64">
+                            <div class="ds-icon _970ac5e" style="font-size: 16px; width: 16px; height: 16px;"><!-- вырезан SVG --></div><span class="_5255ff8 _4d41763">Размышление 1 секунд</span>
+                            <div class="ds-icon" style="font-size: 14px; width: 14px; height: 14px;"><!-- вырезан SVG --></div>
+                          </div>
+                          <div class="c99b79f8" style="opacity: 0;"></div>
+                        </div>
+                        <div class="c2b72bb8"></div>
+                        <div class="e1675d8b ds-think-content _767406f">
+                          <div class="ddd26891 _9b52f6c" style="width: 16px; height: 16px;">
+                            <div class="a510c7ce _0652043"></div>
+                          </div>
+                          <div class="_9ecc93a"></div>
+                          <div class="ds-markdown pointer-events-none">
+                            <p class="ds-markdown-paragraph"><span class="">Мы уже дважды отвечали на тесты.
+                                Пользователь продолжает тестирование. Нужно просто подтвердить работоспособность, можно
+                                с лёгкой вариацией. Ответим кратко и по-русски.</span></p>
+                          </div>
+                        </div>
+                        <div class="_8f7678d"></div>
+                      </div>
+                      <div class="ds-markdown ds-assistant-message-main-content pointer-events-none">
+                        <p class="ds-markdown-paragraph"><span class="">Тест 3 подтверждаю. Связь стабильная, русский
+                            язык в полном порядке. Можете переходить к основным вопросам — я готов. ✅</span></p>
+                      </div>
+                    </div>
+                    <div class="ds-flex _0a3d93b fa1bcf13"
+                      style="align-items: center; gap: 10px; flex-wrap: wrap-reverse;">
+                      <div class="ds-flex _965abe9 _54866f7" style="align-items: center; gap: 10px;">
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l db183363"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-cross-fade">
+                              <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                            </div>
+                          </div>
+                        </div>
+                        <div aria-disabled="false" role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l db183363"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l db183363"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l db183363"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                        <div role="button"
+                          class="ds-button ds-button--iconLabelTertiary ds-button--icon ds-button--capsule ds-button--xs ds-button--icon-relative-l db183363"
+                          tabindex="0">
+                          <div class="ds-button__background"></div>
+                          <div class="ds-button__icon ds-button__icon--last-child">
+                            <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                          </div>
+                        </div>
+                      </div>
+                      <div style="flex: 1 1 0%;"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div style="padding-bottom: 24px;"></div>
+              <div class="_871cbca fa1bcf13">
+                <div class="d72636e2"></div>
+                <div class="aaff8b8f">
+                  <div class="_77cefa5 _3d616d3">
+                    <div class="_020ab5b">
+                      <div class="_24fad49">
+                        <div class="ds-scroll-area__gutters"
+                          style="--container-height: 60px; position: absolute; inset: 0px; width: 100%;">
+                          <div class="ds-scroll-area__horizontal-gutter"
+                            style="left: 2px; right: 2px; display: block; bottom: 2px; height: 6px;">
+                            <div class="ds-scroll-area__horizontal-bar" style="display: none;"></div>
+                          </div>
+                          <div class="ds-scroll-area__vertical-gutter"
+                            style="right: 2px; top: 16px; bottom: 2px; width: 6px;">
+                            <div class="ds-scroll-area__vertical-bar" style="display: none;"></div>
+                          </div>
+                        </div><textarea
+                          class="_27c9245 ds-scroll-area ds-scroll-area--show-on-focus-within ds-scroll-area--enabled d96f2d2a"
+                          placeholder="Сообщение для DeepSeek" rows="2" autocomplete="off" name="search"
+                          style="--container-height: 60px;"></textarea>
+                        <div class="b13855df">
+                        </div>
+                      </div>
+                      <div class="ec4f5d61">
+                        <div class="_58b31c9">
+                          <div tabindex="0" aria-pressed="true"
+                            class="f79352dc ds-toggle-button ds-toggle-button--m ds-toggle-button--selected"
+                            style="transform: translateZ(0px);">
+                            <div class="ds-toggle-button__icon">
+                              <div class="ds-icon" style="font-size: inherit;">
+                                <div class="_46d2264" aria-hidden="true">
+                                  <div style="width: 14px; height: 14px;"><!-- вырезан SVG --></div>
+                                </div>
+                              </div>
+                            </div><span class="_6dbc175">Глубокое мышление</span>
+                            <div class="ds-focus-ring" style="--dsl-focus-ring-offset: -1px;"></div>
+                          </div>
+                          <div tabindex="0" aria-pressed="true"
+                            class="f79352dc ds-toggle-button ds-toggle-button--m ds-toggle-button--selected"
+                            style="transform: translateZ(0px);">
+                            <div class="ds-toggle-button__icon">
+                              <div class="ds-icon" style="font-size: inherit;">
+                                <div class="_46d2264" aria-hidden="true">
+                                  <div style="width: 14px; height: 14px;"><!-- вырезан SVG --></div>
+                                </div>
+                              </div>
+                            </div><span class="_6dbc175">Умный поиск</span>
+                            <div class="ds-focus-ring" style="--dsl-focus-ring-offset: -1px;"></div>
+                          </div>
+                        </div>
+                        <div class="bf38813a">
+                          <div role="button"
+                            class="ds-button ds-button--iconLabelPrimary ds-button--icon ds-button--capsule ds-button--s ds-button--icon-relative-m f02f0e25"
+                            tabindex="0" style="--dsl-button-height: 34px;">
+                            <div class="ds-button__background"></div>
+                            <div class="ds-button__icon ds-button__icon--last-child">
+                              <div class="ds-icon" style="font-size: inherit;"><!-- вырезан SVG --></div>
+                            </div>
+                          </div><input type="file" multiple=""
+                            accept=".wxml,.wxss,.wxs,.axml,.acss,.sjs,.swan,.ttml,.ttss,.qml,.qss,.pdf,.png,.jpg,.jpeg,.svg,.svgz,.bmp,.gif,.webp,.ico,.xbm,.dib,.pjp,.tif,.pjpeg,.avif,.apng,.tiff,.jfif,.txt,.md,.csv,.tsv,.html,.json,.log,.dot,.go,.h,.c,.cpp,.cxx,.cc,.cs,.java,.js,.css,.jsp,.php,.py,.py3,.asp,.yaml,.yml,.ini,.conf,.ts,.tsx,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.abap,.asc,.ash,.ampl,.mod,.g4,.apib,.apl,.dyalog,.asax,.ascx,.ashx,.asmx,.aspx,.axd,.dats,.hats,.sats,.as,.adb,.ada,.ads,.agda,.als,.apacheconf,.vhost,.cls,.applescript,.scpt,.arc,.ino,.asciidoc,.adoc,.aj,.asm,.a51,.inc,.nasm,.aug,.ahk,.ahkl,.au3,.awk,.auk,.gawk,.mawk,.nawk,.bat,.cmd,.befunge,.bison,.bb,.decls,.bmx,.bsv,.boo,.b,.bf,.brs,.bro,.cats,.idc,.w,.cake,.cshtml,.csx,.c++,.cp,.h++,.hh,.hpp,.hxx,.inl,.ipp,.tcc,.tpp,.c-objdump,.chs,.clp,.cmake,.in,.cob,.cbl,.ccp,.cobol,.cpy,.capnp,.mss,.ceylon,.chpl,.ch,.ck,.cirru,.clw,.icl,.dcl,.click,.clj,.boot,.cl2,.cljc,.cljs,.hl,.cljscm,.cljx,.hic,.coffee,._coffee,.cjsx,.cjs,.cts,.mjs,.mts,.cson,.iced,.cfm,.cfml,.cfc,.lisp,.asd,.cl,.l,.lsp,.ny,.podsl,.sexp,.cps,.coq,.v,.cppobjdump,.c++-objdump,.c++objdump,.cpp-objdump,.cxx-objdump,.creole,.cr,.feature,.cu,.cuh,.cy,.pyx,.pxd,.pxi,.d,.di,.d-objdump,.com,.dm,.zone,.arpa,.darcspatch,.dpatch,.dart,.diff,.patch,.dockerfile,.djs,.dylan,.dyl,.intr,.lid,.E,.ecl,.eclxml,.sch,.brd,.epj,.e,.ex,.exs,.elm,.el,.emacs,.desktop,.em,.emberscript,.erl,.es,.escript,.hrl,.xrl,.yrl,.fs,.fsi,.fsx,.fx,.flux,.f90,.f,.f03,.f08,.f77,.f95,.for,.fpp,.factor,.fy,.fancypack,.fan,.fth,.4th,.forth,.fr,.frt,.ftl,.g,.gco,.gcode,.gms,.gap,.gd,.gi,.tst,.s,.ms,.glsl,.fp,.frag,.frg,.fsh,.fshader,.geo,.geom,.glslv,.gshader,.shader,.vert,.vrx,.vsh,.vshader,.gml,.kid,.ebuild,.eclass,.po,.pot,.glf,.gp,.gnu,.gnuplot,.plot,.plt,.golo,.gs,.gst,.gsx,.vark,.grace,.gradle,.gf,.graphql,.gv,.man,.1in,.1m,.1x,.3in,.3m,.3qt,.3x,.me,.n,.rno,.roff,.groovy,.grt,.gtpl,.gvy,.gsp,.hcl,.tf,.hlsl,.fxh,.hlsli,.htm,.st,.xht,.xhtml,.mustache,.jinja,.eex,.erb,.deface,.phtml,.http,.haml,.handlebars,.hbs,.hb,.hs,.hsc,.hx,.hxsl,.hy,.pro,.dlm,.ipf,.cfg,.prefs,.properties,.irclog,.weechatlog,.idr,.lidr,.ni,.i7x,.iss,.io,.ik,.thy,.ijs,.flex,.jflex,.geojson,.lock,.topojson,.json5,.jsonld,.jq,.jsx,.jade,.j,._js,.bones,.es6,.jake,.jsb,.jscad,.jsfl,.jsm,.jss,.njs,.pac,.sjs,.ssjs,.sublime-build,.sublime-commands,.sublime-completions,.sublime-keymap,.sublime-macro,.sublime-menu,.sublime-mousemap,.sublime-project,.sublime-settings,.sublime-theme,.sublime-workspace,.sublime_metrics,.sublime_session,.xsjs,.xsjslib,.jl,.ipynb,.krl,.kicad_pcb,.kit,.kt,.ktm,.kts,.lfe,.ll,.lol,.lsl,.lslp,.lvproj,.lasso,.las,.lasso8,.lasso9,.ldml,.latte,.lean,.hlean,.less,.lex,.ly,.ily,.m,.ld,.lds,.liquid,.lagda,.litcoffee,.lhs,.ls,._ls,.xm,.x,.xi,.lgt,.logtalk,.lookml,.lua,.fcgi,.nse,.pd_lua,.rbxs,.wlua,.mumps,.m4,.mcfunction,.mcr,.mtml,.muf,.mak,.mk,.mkfile,.mako,.mao,.markdown,.mkd,.mkdn,.mkdown,.ron,.mask,.mathematica,.cdf,.ma,.map,.mt,.nb,.nbp,.wl,.wlt,.matlab,.maxpat,.maxhelp,.maxproj,.mxt,.pat,.mediawiki,.wiki,.moo,.metal,.minid,.druby,.duby,.mir,.mirah,.mo,.mms,.mmk,.monkey,.moon,.myt,.ncl,.nl,.nsi,.nsh,.axs,.axi,.nlogo,.nginxconf,.nim,.nimrod,.ninja,.nit,.nix,.nu,.numpy,.numpyw,.numsc,.ml,.eliom,.eliomi,.ml4,.mli,.mll,.mly,.objdump,.mm,.sj,.omgrofl,.opa,.opal,.opencl,.p,.scad,.org,.ox,.oxh,.oxo,.oxygene,.oz,.pwn,.aw,.ctp,.php3,.php4,.php5,.php6,.php7,.php8,.phps,.phpt,.pls,.pck,.pkb,.pks,.plb,.plsql,.sql,.pov,.pan,.psc,.parrot,.pasm,.pir,.pas,.dfm,.dpr,.lpr,.pp,.pl,.al,.cgi,.perl,.ph,.plx,.pm,.pod,.psgi,.t,.6pl,.6pm,.nqp,.p6,.p6l,.p6m,.pl6,.pm6,.pkl,.pig,.pike,.pmod,.pogo,.pony,.ps,.eps,.ps1,.psd1,.psm1,.pde,.prolog,.yap,.spin,.proto,.pub,.pd,.pb,.pbi,.purs,.bzl,.gyp,.lmi,.pyde,.pyi,.pyp,.pyt,.pyw,.rpy,.tac,.wsgi,.xpy,.pytb,.qml,.qbs,.pri,.r,.rd,.rsx,.raml,.rdoc,.rbbas,.rbfrm,.rbmnu,.rbres,.rbtbar,.rbuistate,.rhtml,.rmd,.rkt,.rktd,.rktl,.scrbl,.rl,.raw,.reb,.r2,.r3,.rebol,.red,.reds,.cw,.rs,.rsh,.robot,.rg,.rb,.builder,.gemspec,.god,.irbrc,.jbuilder,.mspec,.pluginspec,.podspec,.rabl,.rake,.rbuild,.rbw,.rbx,.ru,.ruby,.thor,.watchr,.sas,.scss,.smt2,.smt,.sparql,.rq,.sqf,.hqf,.cql,.ddl,.prc,.tab,.udf,.viw,.db2,.ston,.sage,.sagews,.sls,.sass,.scala,.sbt,.sc,.scaml,.scm,.sld,.sps,.ss,.sci,.sce,.self,.sh,.bash,.bats,.command,.ksh,.tmux,.tool,.zsh,.sh-session,.shen,.sl,.slim,.smali,.tpl,.sp,.sma,.nut,.stan,.ML,.fun,.sig,.sml,.do,.ado,.doh,.ihlp,.mata,.matah,.sthlp,.styl,.scd,.swift,.sv,.svh,.vh,.toml,.txl,.tcl,.adp,.tm,.tcsh,.csh,.tex,.aux,.bbx,.bib,.cbx,.dtx,.ins,.lbx,.ltx,.mkii,.mkiv,.mkvi,.sty,.toc,.tea,.no,.textile,.thrift,.tu,.ttl,.twig,.upc,.anim,.asset,.meta,.prefab,.unity,.uno,.uc,.ur,.urs,.vcl,.vhdl,.vhd,.vhf,.vhi,.vho,.vhs,.vht,.vhw,.vala,.vapi,.veo,.vim,.vb,.bas,.frm,.frx,.vba,.vbhtml,.vbs,.volt,.vue,.owl,.webidl,.x10,.xc,.xml,.ant,.axml,.ccxml,.clixml,.cproject,.csl,.csproj,.ct,.dita,.ditamap,.ditaval,.config,.dotsettings,.filters,.fsproj,.fxml,.glade,.grxml,.iml,.ivy,.jelly,.jsproj,.kml,.launch,.mdpolicy,.mxml,.nproj,.nuspec,.odd,.osm,.plist,.props,.ps1xml,.psc1,.pt,.rdf,.rss,.scxml,.srdf,.storyboard,.stTheme,.sublime-snippet,.targets,.tmCommand,.tml,.tmLanguage,.tmPreferences,.tmSnippet,.tmTheme,.ui,.urdf,.ux,.vbproj,.vcxproj,.vssettings,.vxml,.wsdl,.wsf,.wxi,.wxl,.wxs,.x3d,.xacro,.xaml,.xib,.xlf,.xliff,.xmi,.dist,.xproj,.xsd,.xul,.zcml,.xsp-config,.metadata,.xpl,.xproc,.xquery,.xq,.xql,.xqm,.xqy,.xs,.xslt,.xsl,.xojo_code,.xojo_menu,.xojo_report,.xojo_script,.xojo_toolbar,.xojo_window,.xtend,.reek,.rviz,.sublime-syntax,.syntax,.yang,.y,.yacc,.yy,.zep,.zimpl,.zmpl,.zpl,.ec,.eh,.edn,.fish,.mu,.nc,.ooc,.rst,.rest,.wisp,.prg,.prw,.gitignore,.gitkeep,.gitmodules,.example,.avifs,.blp,.bufr,.bw,.cur,.dcx,.dds,.emf,.fit,.fits,.flc,.fli,.ftc,.ftu,.gbr,.grib,.h5,.hdf,.hif,.icb,.icns,.iim,.im,.j2c,.j2k,.jp2,.jpc,.jpe,.jpf,.jpx,.mpeg,.mpg,.msp,.pbm,.pcd,.pcx,.pfm,.pgm,.pnm,.ppm,.psd,.pxr,.qoi,.ras,.rgb,.rgba,.sgi,.tga,.vda,.vst,.wmf,.xpm,.epub,.mobi"
+                            style="display: none;">
+                          <div style="width: fit-content;">
+                            <div role="button"
+                              class="ds-button ds-button--primary ds-button--filled ds-button--circle ds-button--m ds-button--icon-relative-m ds-button--disabled _52c986b bd74640a"
+                              style="--dsl-button-height: 34px;">
+                              <div class="ds-button__background"></div>
+                              <div class="ds-button__icon ds-button__icon--last-child"><!-- вырезан SVG --></div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="_0fcaa63">Сгенерировано ИИ, только для справки</div>
+              </div>
+            </div>
+            <div class="_43d222b">
+              <div class="_9f86274">
+                <div class="ds-checkbox-wrapper ds-checkbox-wrapper--l _692accd"
+                  style="color: inherit; --dsl-checkbox-font-size: inherit; --dsl-checkbox-label-gap: 12px;">
+                  <div class="ds-checkbox-align-wrapper">
+                    <div class="ds-checkbox ds-checkbox--l ds-checkbox--active ds-checkbox--none" tabindex="0"><!-- вырезан SVG --></div>
+                  </div>
+                  <div class="ds-checkbox-label">Выбрать все</div>
+                </div><!-- вырезан SVG --><span class="dcaa34cd">Выбрано 3 диалогов</span>
+                <div class="fab07e97">
+                  <div role="button"
+                    class="ds-button ds-button--outlinedNeutral ds-button--outlined ds-button--capsule ds-button--m ds-button--icon-relative-m ds-button--min-width _43443f1"
+                    tabindex="0">
+                    <div class="ds-button__background"></div>
+                    <div class="ds-button__border"></div><span class="ds-button__content">Отмена</span>
+                  </div>
+                  <div role="button"
+                    class="ds-button ds-button--primary ds-button--filled ds-button--capsule ds-button--m ds-button--icon-relative-m ds-button--min-width"
+                    tabindex="0">
+                    <div class="ds-button__background"></div>
+                    <div class="ds-button__icon">
+                      <div class="ds-icon" style="font-size: 14px; width: 14px; height: 14px;"><svg width="16"
+                          height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path
+                            d="M9.94133 6.50173C11.3218 7.99603 11.3218 10.3011 9.94128 11.7954C9.88691 11.8542 9.82125 11.9196 9.72099 12.0198L7.75707 13.9838C7.65709 14.0838 7.592 14.1491 7.53334 14.2034C6.03906 15.5843 3.7327 15.5854 2.23827 14.2048C2.17933 14.1503 2.11374 14.0844 2.01315 13.9838C1.91318 13.8839 1.84922 13.8188 1.79495 13.7601C0.413857 12.2657 0.413909 9.95948 1.795 8.46503C1.84923 8.4064 1.91335 8.34115 2.01321 8.24129L3.79275 6.46313C3.71814 7.08101 3.75236 7.71445 3.90115 8.33518L3.00344 9.23151C2.89398 9.34097 2.8535 9.38307 2.82251 9.41658C1.93771 10.3744 1.93704 11.8514 2.82179 12.8092C2.85279 12.8427 2.89383 12.884 3.0034 12.9936C3.11272 13.1029 3.15429 13.1442 3.18777 13.1752C4.14561 14.0603 5.62381 14.0608 6.58178 13.1758C6.61532 13.1448 6.65722 13.1032 6.76685 12.9935L8.73077 11.0296C8.83999 10.9204 8.88142 10.8787 8.91238 10.8452C9.79744 9.88728 9.7969 8.40911 8.91173 7.45124C8.88074 7.41775 8.83944 7.3762 8.73011 7.26687C8.62082 7.15757 8.58061 7.11623 8.54712 7.08526C8.37347 6.92477 8.18243 6.79361 7.98088 6.69165L9.00289 5.66964C9.17506 5.78373 9.34035 5.91265 9.49663 6.05703C9.55538 6.11135 9.62026 6.17652 9.72036 6.27662C9.82094 6.3772 9.88686 6.4428 9.94133 6.50173Z"
+                            fill="currentColor"></path>
+                          <path
+                            d="M6.06816 9.49196C4.68626 7.99724 4.68667 5.68942 6.06885 4.19487C6.12268 4.13671 6.18789 4.07306 6.28706 3.9739L8.24541 2.01416C8.34478 1.91479 8.41018 1.85055 8.46845 1.79665C9.96301 0.414902 12.2689 0.414922 13.7635 1.79665C13.8217 1.85051 13.8866 1.91559 13.9858 2.01486C14.0849 2.11394 14.1502 2.17769 14.204 2.23583C15.5861 3.7304 15.5866 6.03823 14.2047 7.53291C14.1508 7.59125 14.0854 7.65638 13.9858 7.75595L12.1994 9.54098C12.2614 8.92982 12.2185 8.30587 12.0634 7.69657L12.9956 6.76573C13.1044 6.65692 13.1458 6.61529 13.1765 6.58205C14.0621 5.62404 14.0621 4.1454 13.1765 3.18738C13.1458 3.15419 13.104 3.1135 12.9956 3.00508C12.8877 2.89716 12.8471 2.85551 12.814 2.82485C11.8559 1.9389 10.376 1.93886 9.41794 2.82485C9.38479 2.85554 9.34381 2.89622 9.23564 3.00439L7.27728 4.96413C7.16875 5.07265 7.12708 5.11322 7.09636 5.14643C6.21074 6.10441 6.21153 7.58236 7.09705 8.5404C7.12775 8.57357 7.16826 8.61575 7.27659 8.72408C7.38456 8.83205 7.42647 8.87227 7.45958 8.90293C7.62849 9.0591 7.81309 9.1881 8.00856 9.28894L6.98795 10.3095C6.82111 10.1978 6.66052 10.0715 6.50872 9.93114C6.45057 9.87733 6.38547 9.81341 6.28637 9.71431C6.1871 9.61504 6.12202 9.55018 6.06816 9.49196Z"
+                            fill="currentColor"></path>
+                        </svg></div>
+                    </div><span class="ds-button__content">Создать публичную ссылку</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="ds-notification-container ds-theme ds-notification-container--top-right"></div>
+  <div class="ds-notification-container ds-theme"></div>
+  <div id="cf-overlay"
+    style="position: fixed; inset: 0px; background-color: rgba(0, 0, 0, 0.7); border: 1px solid grey; z-index: 10000; display: none;">
+    <p style="color: white; text-align: center; margin-top: 50vh;">One more step before you proceed...</p>
+    <div style="display: flex; flex-wrap: nowrap; align-items: center; justify-content: center;" id="cf-turnstile">
+    </div>
+  </div>
+  <script src="./Тест1 - DeepSeek_files/api.js" defer=""></script>
+</body>
+
+</html>

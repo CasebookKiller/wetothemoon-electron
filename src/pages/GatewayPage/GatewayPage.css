@@ -1,11 +1,41 @@
-/* src/pages/GatewayPage/GatewayPage.css */
-
-.gateway-page .p-panel {
-  margin-bottom: 0;
+:root {
+  --dsw-alias-bg-multi-select: #212123; /* тёмный фон, можно заменить на свой */
 }
 
-.gateway-page .p-button {
-  min-width: 120px;
+/* Ширина поля ввода */
+/*._871cbca {
+  width: 100%;
+  margin: 0 auto;
+  padding-bottom: 24px;
+}*/
+
+/*.aaff8b8f,
+._9a2f8e4 {
+  max-width: 780px;
+  width: 100%;
+  margin: 0 auto;
+}*/
+
+/* Строка "Сгенерировано ИИ" */
+._0fcaa63 {
+  position: static !important;
+  margin-top: 4px;
+  text-align: center;
+  flex-shrink: 0;
 }
 
-/* Дополнительные стили при необходимости */
+/* Убираем лишние отступы у шапки */
+._765a5cd,
+._660ca72,
+._2be88ba,
+._1aa2651,
+.f8d1e4c0 {
+  padding: 0;
+  margin: 0;
+  height: auto;
+  min-height: 0;
+}
+
+.ds-virtual-list {
+  overflow-x: hidden;
+}

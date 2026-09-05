@@ -369,6 +369,14 @@ try {
     gatewayGetDeepThinking: () => ipcRenderer.invoke('gateway:get-deep-thinking'),
     gatewayGetSearch: () => ipcRenderer.invoke('gateway:get-search'),
     gatewayGetConversationMessages: () => ipcRenderer.invoke('gateway:get-conversation-messages'),
+    gatewayStartSelectionMode: () => ipcRenderer.invoke('gateway:start-selection-mode'),
+    gatewaySelectMessages: (indices: number[]) => ipcRenderer.invoke('gateway:select-messages', indices),
+    gatewayCancelSelectionMode: () => ipcRenderer.invoke('gateway:cancel-selection-mode'),
+    gatewayCreatePublicLink: () => ipcRenderer.invoke('gateway:create-public-link'),
+    gatewayRegenerateMessage: (conversationId: string, messageIndex: number) =>
+      ipcRenderer.invoke('gateway:regenerate-message', conversationId, messageIndex),
+    gatewaySendFeedback: (conversationId: string, messageIndex: number, type: 'like' | 'dislike') =>
+      ipcRenderer.invoke('gateway:send-feedback', conversationId, messageIndex, type),
 
   });
 

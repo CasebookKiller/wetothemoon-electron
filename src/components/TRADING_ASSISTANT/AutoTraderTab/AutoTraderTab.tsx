@@ -10,6 +10,7 @@ import { Tag } from 'primereact/tag';
 import { Panel } from 'primereact/panel';
 import { CompactLogPanel } from '../CompactLogPanel/CompactLogPanel';
 import { CompactPositionsPanel } from '../CompactPositionsPanel/CompactPositionsPanel';
+import { RiskLimitsPanel } from '../RiskLimitsPanel/RiskLimitsPanel';
 
 const STORAGE_KEY = 'autotrader_config';
 
@@ -355,6 +356,7 @@ export const AutoTraderTab: React.FC<AutoTraderTabProps> = ({ availableInstrumen
         </div>
       </Card>
       <Panel header="Позиции и лог" toggleable className="mt-2">
+        <RiskLimitsPanel accountId={selectedAccountId} />
         <CompactPositionsPanel accountId={selectedAccountId} />
         <CompactLogPanel accountId={selectedAccountId} />
       </Panel>

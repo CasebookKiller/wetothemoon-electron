@@ -33,6 +33,8 @@ export interface OrderManagerConfig {
   entryMode?: 'market' | 'limit';   // ← добавить
   riskAmount?: number;            // абсолютный риск (если процент не задан)
   dynamicSizingPercent?: number;  // процент от депозита (0 = не используется)
+  maxPositionPercentPerInstrument?: number; // макс. доля на один инструмент (по умолчанию 10%)
+  maxTotalPositionPercent?: number;         // макс. суммарная доля всех бумаг (по умолчанию 30%)
 }
 
 export class OrderManager {
@@ -80,6 +82,8 @@ export class OrderManager {
       stopMode: 'stop_order',
       entryMode: 'market',   // ← добавить
       dynamicSizingPercent: 0,
+      maxPositionPercentPerInstrument: 10,
+      maxTotalPositionPercent: 30,
       ...config,
     };
     this.orderFlow = orderFlow;   // сохраняем отдельно
@@ -112,6 +116,28 @@ export class OrderManager {
     }
     if (!this.config.token || !this.config.accountId) return;
 
+    // Получаем текущее состояние портфеля
+    let balanceRes: any = null;
+    try {
+      balanceRes = await sandboxGrpc.getSandboxPortfolio(
+        { accountId: this.config.accountId },
+        this.config.token
+      );
+    } catch (e) {
+      console.warn('[OrderManager] Не удалось получить портфель, продолжаем без данных о позициях');
+    }
+
+    // Запрещаем открывать новую позицию, если уже есть открытая по этому инструменту
+    if (balanceRes) {
+      const existingPos = (balanceRes.positions || []).find(
+        (p: any) => p.instrumentUid === signal.instrumentUid && p.quantity && (Number(p.quantity.units) || 0) !== 0
+      );
+      if (existingPos) {
+        console.log('[OrderManager] Уже есть открытая позиция по инструменту, пропускаем сигнал');
+        return;
+      }
+    }
+
     const now = Date.now();
     //Временное отключение кулдауна
     //if (now - this.lastOrderTime < 5 * 60 * 1000) {
@@ -132,17 +158,17 @@ export class OrderManager {
 
     // Проверяем, нет ли уже открытой позиции по этому инструменту
     try {
-      const positionsResp = await sandboxGrpc.getSandboxPositions(
-        { accountId: this.config.accountId },
-        this.config.token
-      );
-      const existingPos = (positionsResp.securities || []).find(
-        (p: any) => p.instrumentUid === signal.instrumentUid && p.quantity && (Number(p.quantity.units) || 0) !== 0
-      );
-      if (existingPos) {
-        console.log('[OrderManager] Уже есть открытая позиция по инструменту, пропускаем сигнал');
-        return;
-      }
+      //const positionsResp = await sandboxGrpc.getSandboxPositions(
+      //  { accountId: this.config.accountId },
+      //  this.config.token
+      //);
+      //const existingPos = (positionsResp.securities || []).find(
+      //  (p: any) => p.instrumentUid === signal.instrumentUid && p.quantity && (Number(p.quantity.units) || 0) !== 0
+      //);
+      //if (existingPos) {
+      //  console.log('[OrderManager] Уже есть открытая позиция по инструменту, пропускаем сигнал');
+      //  return;
+      //}
     } catch (e) {
       console.warn('[OrderManager] Не удалось проверить позиции, продолжаем');
       // Если API недоступен, лучше пропустить сделку? Решайте сами.
@@ -157,7 +183,7 @@ export class OrderManager {
     // 1. Получаем свободные средства
     if (this.config.useDynamicSizing && this.config.dynamicSizingPercent && this.config.dynamicSizingPercent > 0) {
       try {
-        const balanceRes = await sandboxGrpc.getSandboxPortfolio({ accountId: this.config.accountId }, this.config.token);
+        //const balanceRes = await sandboxGrpc.getSandboxPortfolio({ accountId: this.config.accountId }, this.config.token);
         //console.log('[OrderManager] Portfolio response:', JSON.stringify(balanceRes, null, 2));
         const totalCurrencies = (balanceRes as any).totalAmountCurrencies;
         if (totalCurrencies && totalCurrencies.currency === 'rub') {
@@ -173,13 +199,13 @@ export class OrderManager {
         console.log(`[OrderManager] Свободный остаток: ${freeBalance}, риск ${this.config.dynamicSizingPercent}% = ${riskAmount.toFixed(2)}`);
       
         // Проверка: не открыта ли уже позиция по этому инструменту?
-        const existingPos = (balanceRes.positions || []).find(
-          (p: any) => p.instrumentUid === signal.instrumentUid && p.quantity && (Number(p.quantity.units) || 0) !== 0
-        );
-        if (existingPos) {
-          console.log('[OrderManager] Уже есть открытая позиция по инструменту, пропускаем сигнал');
-          return;
-        }
+        //const existingPos = (balanceRes.positions || []).find(
+        //  (p: any) => p.instrumentUid === signal.instrumentUid && p.quantity && (Number(p.quantity.units) || 0) !== 0
+        //);
+        //if (existingPos) {
+        //  console.log('[OrderManager] Уже есть открытая позиция по инструменту, пропускаем сигнал');
+        //  return;
+        //}
 
       } catch (e) {
         console.warn('[OrderManager] Не удалось получить портфель, используется абсолютный риск');
@@ -203,19 +229,52 @@ export class OrderManager {
       if (riskPerLot > 0 && riskAmount > 0) {
         quantity = Math.floor(riskAmount / riskPerLot);
         console.log(`[OrderManager] riskPerLot=${riskPerLot.toFixed(2)}, quantity before limits=${quantity}`);
+        // После определения quantity (строки, где quantity = Math.floor(riskAmount / riskPerLot) и т.д.)
+        const entryPrice = signal.price || signal.targetPrice || 0;
+        const portfolioTotal = Number(balanceRes?.totalAmountPortfolio?.units || 0) +
+          (balanceRes?.totalAmountPortfolio?.nano || 0) / 1e9;
+        const currenciesTotal = Number(balanceRes?.totalAmountCurrencies?.units || 0) +
+          (balanceRes?.totalAmountCurrencies?.nano || 0) / 1e9;
+        const securitiesValue = portfolioTotal - currenciesTotal;
+
+        const newPositionCost = quantity * entryPrice;
+        const currentInstrumentPosition = (balanceRes?.positions || []).find(
+          (p: any) => p.instrumentUid === signal.instrumentUid
+        );
+        const currentInstrumentQty = currentInstrumentPosition?.quantity
+          ? Math.abs(Number(currentInstrumentPosition.quantity.units) + (currentInstrumentPosition.quantity.nano || 0) / 1e9)
+          : 0;
+        const currentInstrumentValue = currentInstrumentQty * entryPrice;
+
+        // Лимит на один инструмент
+        const maxInstrumentValue = portfolioTotal * (this.config.maxPositionPercentPerInstrument / 100);
+        if (currentInstrumentValue + newPositionCost > maxInstrumentValue) {
+          const allowedValue = Math.max(0, maxInstrumentValue - currentInstrumentValue);
+          const allowedQty = Math.floor(allowedValue / entryPrice);
+          if (allowedQty < 1) {
+            console.log('[OrderManager] Лимит по инструменту превышен, пропускаем сделку');
+            return;
+          }
+          quantity = Math.min(quantity, allowedQty);
+          console.log(`[OrderManager] Лимит по инструменту: quantity уменьшен до ${quantity}`);
+        }
+
+        // Лимит на суммарную стоимость бумаг
+        const maxTotalSecuritiesValue = portfolioTotal * (this.config.maxTotalPositionPercent / 100);
+        if (securitiesValue + newPositionCost > maxTotalSecuritiesValue) {
+          const allowedTotalValue = Math.max(0, maxTotalSecuritiesValue - securitiesValue);
+          const allowedTotalQty = Math.floor(allowedTotalValue / entryPrice);
+          if (allowedTotalQty < 1) {
+            console.log('[OrderManager] Общий лимит портфеля превышен, пропускаем сделку');
+            return;
+          }
+          quantity = Math.min(quantity, allowedTotalQty);
+          console.log(`[OrderManager] Общий лимит портфеля: quantity уменьшен до ${quantity}`);
+        }
+
       } else {
         quantity = this.config.lotQuantity; // fallback
       }
-
-      // 3. Ограничение на максимальную стоимость позиции (например, не более 10% от свободных средств)
-      const maxPositionPercent = 10; // можно вынести в настройки
-      const maxPositionCost = freeBalance * (maxPositionPercent / 100);
-      const maxLotsByCapital = Math.floor(maxPositionCost / entryPrice);
-      quantity = Math.min(quantity, maxLotsByCapital);
-
-      // 4. Дополнительная страховка: не более 95% от свободных средств (чтобы хватило на комиссию)
-      const maxLotsByFreeBalance = Math.floor((freeBalance * 0.95) / entryPrice);
-      quantity = Math.min(quantity, maxLotsByFreeBalance);
 
       if (quantity < 1) {
         console.log('[OrderManager] Недостаточно средств для открытия позиции');

@@ -117,4 +117,58 @@ export function registerGatewayHandlers(): void {
       return { success: false, error: (error as Error).message };
     }
   });
+
+  ipcMain.handle('gateway:start-selection-mode', async () => {
+    try {
+      await service.startSelectionMode();
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('gateway:select-messages', async (_event, indices: number[]) => {
+    try {
+      await service.selectMessages(indices);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('gateway:cancel-selection-mode', async () => {
+    try {
+      await service.cancelSelectionMode();
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('gateway:create-public-link', async () => {
+    try {
+      const url = await service.createPublicLink();
+      return { success: true, data: url };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('gateway:regenerate-message', async (_event, conversationId: string, messageIndex: number) => {
+    try {
+      await service.regenerateMessage(conversationId, messageIndex);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('gateway:send-feedback', async (_event, conversationId: string, messageIndex: number, type: string) => {
+    try {
+      await service.sendFeedback(conversationId, messageIndex, type as 'like' | 'dislike');
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
 }

@@ -2956,3 +2956,18 @@ ul#ullist.p-datascroller-list {
 .app.theme-bg-link-color {
   color: var(--app-theme-link-color);
 }
+
+.gateway-top-zone {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 30px; /* достаточная зона для наведения */
+  z-index: 10000; /* выше остального */
+  pointer-events: none; /* чтобы не перехватывать клики */
+}
+
+.gateway-top-zone:hover,
+.gateway-top-zone:hover .gateway-top-panel {
+  pointer-events: auto; /* при наведении активируем панель */
+}
