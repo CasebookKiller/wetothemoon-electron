@@ -1,3 +1,5 @@
+// src/main/services/rawStorage.ts
+
 import fs from 'fs';
 import path from 'path';
 import { app } from 'electron';
