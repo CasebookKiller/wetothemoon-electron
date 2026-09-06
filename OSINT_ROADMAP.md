@@ -191,8 +191,8 @@
 - [x] Отображение прогресса сбора
 - [x] Добавить чекбокс для выбора детального сбора связей
 - [ ] Кнопка «Сохранить JSON»
-- [ ] Установка зависимостей (better-sqlite3, @msgpack/msgpack)
-- [ ] Создание схемы SQLite (entities, sources, relations, observations, audit_log, raw_dumps, shards)
+- [-] Установка зависимостей (better-sqlite3, @msgpack/msgpack)
+- [x] Создание схемы SQLite (entities, sources, relations, observations, audit_log, raw_dumps, shards)
 - [ ] Реализация сохранения сырых дампов в формате MessagePack
 - [ ] Реализация нормализации данных скрапера в SQLite
 - [ ] Добавление IPC-обработчика для сохранения компании

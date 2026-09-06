@@ -5,6 +5,7 @@ var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __commonJSMin = (cb, mod) => () => (mod || (cb((mod = { exports: {} }).exports, mod), cb = null), mod.exports);
 var __copyProps = (to, from, except, desc) => {
 	if (from && typeof from === "object" || typeof from === "function") for (var keys = __getOwnPropNames(from), i = 0, n = keys.length, key; i < n; i++) {
 		key = keys[i];
@@ -15,7 +16,7 @@ var __copyProps = (to, from, except, desc) => {
 	}
 	return to;
 };
-var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", {
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(isNodeMode || !mod || !mod.__esModule || !__hasOwnProp.call(mod, "default") ? __defProp(target, "default", {
 	value: mod,
 	enumerable: true
 }) : target, mod));
@@ -38,8 +39,8 @@ let fs = require("fs");
 fs = __toESM(fs);
 let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_playwright_index_mjs = require("/home/ll/Документы/GitHub/wetothemoon-project/wetothemoon-electron/node_modules/playwright/index.mjs");
 let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_uuid_dist_node_index_js = require("/home/ll/Документы/GitHub/wetothemoon-project/wetothemoon-electron/node_modules/uuid/dist-node/index.js");
-let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_node_cron_dist_esm_node_cron_js = require("/home/ll/Документы/GitHub/wetothemoon-project/wetothemoon-electron/node_modules/node-cron/dist/esm/node-cron.js");
-_home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_node_cron_dist_esm_node_cron_js = __toESM(_home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_node_cron_dist_esm_node_cron_js);
+let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_node_cron_dist_node_cron_js = require("/home/ll/Документы/GitHub/wetothemoon-project/wetothemoon-electron/node_modules/node-cron/dist/node-cron.js");
+_home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_node_cron_dist_node_cron_js = __toESM(_home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_node_cron_dist_node_cron_js);
 let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_dotenv_lib_main_js = require("/home/ll/Документы/GitHub/wetothemoon-project/wetothemoon-electron/node_modules/dotenv/lib/main.js");
 _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_dotenv_lib_main_js = __toESM(_home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_dotenv_lib_main_js);
 //#region src/main/windows/mainWindow.ts
@@ -2436,7 +2437,7 @@ var TrendStrategy = class {
 	trendDirection = null;
 	hasPosition = false;
 	lastTradeTime = 0;
-	minIntervalMs = 900 * 1e3;
+	minIntervalMs = 9e5;
 	volumeFilterEnabled;
 	volumeFilterPeriod;
 	volumeHistory = [];
@@ -2673,7 +2674,7 @@ var ScreenerService = class {
 		const instruments = ((await instrumentsGrpc.shares({ instrumentStatus: 1 }, token)).instruments || []).filter((inst) => inst.apiTradeAvailableFlag === true && inst.currency?.toLowerCase() === "rub" && !inst.blockedTrading && inst.ticker && inst.figi && inst.uid);
 		const results = [];
 		const now = /* @__PURE__ */ new Date();
-		const twoDaysAgo = /* @__PURE__ */ new Date(now.getTime() - 2880 * 60 * 1e3);
+		const twoDaysAgo = /* @__PURE__ */ new Date(now.getTime() - 1728e5);
 		for (const instr of instruments) {
 			const uid = instr.uid;
 			const figi = instr.figi;
@@ -4348,7 +4349,7 @@ var registerTradingAssistantHandlers = (historicalLoader, profileEngine, getToke
 		})).json();
 		if (!data.token) throw new Error("Login failed: " + JSON.stringify(data));
 		cachedToken = data.token;
-		tokenExpiry = Date.now() + 20 * 3600 * 1e3;
+		tokenExpiry = Date.now() + 72e6;
 		return cachedToken;
 	}
 	electron.ipcMain.handle("trading-assistant:get-market-phase", async (_, instrumentUid) => {
@@ -8968,11 +8969,11 @@ var Scheduler = class {
 		if (task.enabled) this.registerCronJob(task);
 	}
 	registerCronJob(task) {
-		if (!_home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_node_cron_dist_esm_node_cron_js.validate(task.schedule.value)) {
+		if (!_home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_node_cron_dist_node_cron_js.validate(task.schedule.value)) {
 			console.error(`[Scheduler] Некорректное cron-выражение для задачи ${task.id}: ${task.schedule.value}`);
 			return;
 		}
-		const job = _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_node_cron_dist_esm_node_cron_js.schedule(task.schedule.value, () => {
+		const job = _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_node_cron_dist_node_cron_js.schedule(task.schedule.value, () => {
 			console.log(`[Scheduler] Cron-запуск задачи ${task.id} (${task.name})`);
 			this.executeTask(task);
 			task.lastRun = (/* @__PURE__ */ new Date()).toISOString();
@@ -9018,9 +9019,7 @@ var Scheduler = class {
 				task.nextRun = new Date(base.getTime() + ms).toISOString();
 				break;
 			}
-			case "cron":
-				task.nextRun = void 0;
-				break;
+			case "cron": task.nextRun = void 0;
 		}
 	}
 	async executeTask(task) {
@@ -10033,7 +10032,7 @@ var OrderManager = class {
 			}
 		}
 		const now = Date.now();
-		if (now - this.lastOrderTime < 60 * 1e3) {
+		if (now - this.lastOrderTime < 6e4) {
 			console.log("[OrderManager] Кулдаун, пропускаем сигнал");
 			return;
 		}
@@ -10304,7 +10303,7 @@ var OrderManager = class {
 				console.log(`[OrderManager] Тейк‑профит (лимитный) выставлен на ${tpPrice}, orderId=${takeProfitOrderId}`);
 				break;
 			} catch (error) {
-				if (error?.code === 8 && attempts < maxAttempts - 1) {
+				if (error?.code === 8 && attempts < 2) {
 					console.warn(`[OrderManager] Превышен лимит запросов, повтор через 1с (попытка ${attempts + 1})`);
 					await new Promise((resolve) => setTimeout(resolve, 1e3));
 					attempts++;
@@ -10598,7 +10597,7 @@ var MarketPhaseDetector = class {
 		this.profileEngine = profileEngine;
 	}
 	async detectPhase(instrumentUid) {
-		const candles = await this.historicalLoader.loadIntradayCandles(instrumentUid, /* @__PURE__ */ new Date(Date.now() - 7200 * 1e3), /* @__PURE__ */ new Date(), process.env.VITE_TReadOnly || "", CandleInterval.CANDLE_INTERVAL_5_MIN);
+		const candles = await this.historicalLoader.loadIntradayCandles(instrumentUid, /* @__PURE__ */ new Date(Date.now() - 72e5), /* @__PURE__ */ new Date(), process.env.VITE_TReadOnly || "", CandleInterval.CANDLE_INTERVAL_5_MIN);
 		const profile = this.profileEngine.getProfile(instrumentUid);
 		if (!profile || candles.length < 5) return "CHOP";
 		const { vwap, angle } = this.calcVWAPAngle(candles);
@@ -11859,6 +11858,13 @@ var createGatewayWindow = () => {
 };
 var getGatewayWindow = () => gatewayWindow;
 //#endregion
+//#region __vite-browser-external:node:sqlite
+var require___vite_browser_external_node_sqlite = /* @__PURE__ */ __commonJSMin(((exports, module) => {
+	module.exports = Object.create(new Proxy({}, { get(_, key) {
+		if (key !== "__esModule" && key !== "__proto__" && key !== "constructor" && key !== "splice") throw new Error(`Module "node:sqlite" has been externalized for browser compatibility. Cannot access "node:sqlite.${key}" in client code.  See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.`);
+	} }));
+}));
+//#endregion
 //#region src/main/main.ts
 process.on("uncaughtException", (err) => {
 	console.error("Uncaught exception:", err);
@@ -11866,6 +11872,12 @@ process.on("uncaughtException", (err) => {
 process.on("unhandledRejection", (reason, promise) => {
 	console.error("Unhandled rejection at:", promise, "reason:", reason);
 });
+try {
+	require___vite_browser_external_node_sqlite();
+	console.log("node:sqlite доступен в Electron");
+} catch (e) {
+	console.error("node:sqlite НЕ доступен в Electron", e);
+}
 console.log("[main] marketDataBus instance id:", marketDataBus.getInstanceId());
 var historicalDataLoader = new HistoricalDataLoader();
 var scriptsDir = path.default.join(electron.app.getPath("userData"), "scripts");
@@ -12342,7 +12354,8 @@ electron.ipcMain.handle("save-prompt-template", async (event, template, fileName
 			error: "Сохранение отменено пользователем"
 		};
 		const filePath = result.filePath;
-		await (0, fs_promises.mkdir)(path.default.dirname(filePath), { recursive: true });
+		const dirPath = path.default.dirname(filePath);
+		await (0, fs_promises.mkdir)(dirPath, { recursive: true });
 		await (0, fs_promises.writeFile)(filePath, JSON.stringify({
 			...template,
 			createdAt: new Date(template.createdAt).toISOString().split("T")[0],

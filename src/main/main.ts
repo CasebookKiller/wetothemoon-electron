@@ -81,6 +81,14 @@ import { setAutonomousTraderInstance } from './ipcHandlers/tradingAssistantHandl
 import { marketDataBus } from './services/marketDataBus';
 import { registerGatewayHandlers } from './ipcHandlers/gatewayHandlers';
 import { createGatewayWindow, getGatewayWindow } from './windows/gatewayWindow.ts';
+
+try {
+  require('node:sqlite');
+  console.log('node:sqlite доступен в Electron');
+} catch (e) {
+  console.error('node:sqlite НЕ доступен в Electron', e);
+}
+
 console.log('[main] marketDataBus instance id:', marketDataBus.getInstanceId());
 
 const historicalDataLoader = new HistoricalDataLoader();
