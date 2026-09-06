@@ -27,6 +27,7 @@ function initializeSchema(db: DatabaseSync) {
 
     CREATE TABLE IF NOT EXISTS entities (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      rusprofile_id TEXT UNIQUE,
       type TEXT NOT NULL,
       value TEXT NOT NULL,
       normalized_value TEXT NOT NULL,
@@ -147,6 +148,7 @@ export function normalize(value: string): string {
 }
 
 export function upsertEntity(entity: {
+  rusprofile_id?: string;
   type: string;
   value: string;
   label?: string;
@@ -160,9 +162,10 @@ export function upsertEntity(entity: {
   const normalized = normalize(entity.value);
 
   const stmt = db.prepare(`
-    INSERT INTO entities (type, value, normalized_value, label, first_seen, last_seen, confidence, status, notes, raw_file_path)
+    INSERT INTO entities (rusprofile_id, type, value, normalized_value, label, first_seen, last_seen, confidence, status, notes, raw_file_path)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(type, normalized_value) DO UPDATE SET
+      rusprofile_id = COALESCE(excluded.rusprofile_id, entities.rusprofile_id),
       value = excluded.value,
       label = COALESCE(excluded.label, entities.label),
       last_seen = excluded.last_seen,
@@ -173,6 +176,7 @@ export function upsertEntity(entity: {
   `);
 
   const info = stmt.run(
+    entity.rusprofile_id || null,
     entity.type,
     entity.value,
     normalized,
