@@ -7,6 +7,7 @@ import { scrapeRusprofile } from '../services/osint/scrapers/rusprofile';
 import { scrapeKadArbitr } from '../services/osint/scrapers/kadArbitr';
 import { scrapeMosGorsud } from '../services/osint/scrapers/mosGorsud';
 import { getCredentials, setCredentials } from '../services/osint/credentials';
+import { saveCompanyData } from '../services/osintStorage';
 
 export function registerOsintHandlers() {
   // Открыть окно OSINT
@@ -79,5 +80,14 @@ export function registerOsintHandlers() {
   ipcMain.handle('osint:check-credentials', async (_event, site: string) => {
     const creds = getCredentials(site);
     return { exists: !!creds };
+  });
+
+  ipcMain.handle('osint:save-company', async (_event, companyId: string, companyInn: string, data: any) => {
+    try {
+      const result = saveCompanyData(companyId, companyInn, data);
+      return { success: true, ...result };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
   });
 }

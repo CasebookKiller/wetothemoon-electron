@@ -38,6 +38,8 @@ _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node
 let fs = require("fs");
 fs = __toESM(fs);
 let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_playwright_index_mjs = require("/home/ll/Документы/GitHub/wetothemoon-project/wetothemoon-electron/node_modules/playwright/index.mjs");
+let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__msgpack_msgpack_dist_esm_index_mjs = require("/home/ll/Документы/GitHub/wetothemoon-project/wetothemoon-electron/node_modules/@msgpack/msgpack/dist.esm/index.mjs");
+let crypto$1 = require("crypto");
 let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_uuid_dist_node_index_js = require("/home/ll/Документы/GitHub/wetothemoon-project/wetothemoon-electron/node_modules/uuid/dist-node/index.js");
 let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_node_cron_dist_node_cron_js = require("/home/ll/Документы/GitHub/wetothemoon-project/wetothemoon-electron/node_modules/node-cron/dist/node-cron.js");
 _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_node_cron_dist_node_cron_js = __toESM(_home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_node_cron_dist_node_cron_js);
@@ -8545,6 +8547,423 @@ async function scrapeMosGorsud(fio) {
 }
 async function loginToMosGorsud(page, login, password) {}
 //#endregion
+//#region __vite-browser-external:node:sqlite
+var require___vite_browser_external_node_sqlite = /* @__PURE__ */ __commonJSMin(((exports, module) => {
+	module.exports = Object.create(new Proxy({}, { get(_, key) {
+		if (key !== "__esModule" && key !== "__proto__" && key !== "constructor" && key !== "splice") throw new Error(`Module "node:sqlite" has been externalized for browser compatibility. Cannot access "node:sqlite.${key}" in client code.  See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.`);
+	} }));
+}));
+//#endregion
+//#region src/main/services/database.ts
+var import___vite_browser_external_node_sqlite = require___vite_browser_external_node_sqlite();
+var db = null;
+function getDatabase() {
+	if (!db) {
+		const dbPath = path.default.join(electron.app.getPath("userData"), "osint_data.db");
+		db = new import___vite_browser_external_node_sqlite.DatabaseSync(dbPath);
+		db.exec("PRAGMA journal_mode = WAL;");
+		db.exec("PRAGMA foreign_keys = ON;");
+		initializeSchema(db);
+	}
+	return db;
+}
+function initializeSchema(db) {
+	db.exec(`
+    CREATE TABLE IF NOT EXISTS case_info (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      name TEXT NOT NULL,
+      description TEXT,
+      status TEXT NOT NULL DEFAULT 'active',
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS entities (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      rusprofile_id TEXT UNIQUE,
+      type TEXT NOT NULL,
+      value TEXT NOT NULL,
+      normalized_value TEXT NOT NULL,
+      label TEXT,
+      first_seen TEXT NOT NULL,
+      last_seen TEXT NOT NULL,
+      confidence INTEGER CHECK(confidence BETWEEN 0 AND 100),
+      status TEXT NOT NULL DEFAULT 'unverified',
+      notes TEXT,
+      raw_file_path TEXT
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_entities_unique
+      ON entities(type, normalized_value);
+
+    CREATE TABLE IF NOT EXISTS sources (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      url TEXT NOT NULL,
+      title TEXT,
+      source_type TEXT,
+      source_kind TEXT,
+      provider TEXT,
+      collection_method TEXT,
+      authority_basis TEXT,
+      reliability INTEGER CHECK(reliability BETWEEN 0 AND 100),
+      access_level TEXT,
+      retrieved_at TEXT NOT NULL,
+      local_path TEXT,
+      sha256 TEXT,
+      notes TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS relations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      subject_id INTEGER NOT NULL,
+      predicate TEXT NOT NULL,
+      object_id INTEGER NOT NULL,
+      source_id INTEGER,
+      valid_from TEXT,
+      valid_to TEXT,
+      evidence_text TEXT,
+      confidence INTEGER CHECK(confidence BETWEEN 0 AND 100),
+      status TEXT NOT NULL DEFAULT 'unverified',
+      notes TEXT,
+      raw_file_path TEXT,
+      FOREIGN KEY(subject_id) REFERENCES entities(id),
+      FOREIGN KEY(object_id) REFERENCES entities(id),
+      FOREIGN KEY(source_id) REFERENCES sources(id),
+      UNIQUE(subject_id, object_id, predicate, COALESCE(evidence_text, ''))
+    );
+
+    CREATE TABLE IF NOT EXISTS observations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      entity_id INTEGER NOT NULL,
+      attribute TEXT NOT NULL,
+      value TEXT NOT NULL,
+      source_id INTEGER,
+      observed_at TEXT NOT NULL,
+      confidence INTEGER CHECK(confidence BETWEEN 0 AND 100),
+      notes TEXT,
+      raw_file_path TEXT,
+      FOREIGN KEY(entity_id) REFERENCES entities(id),
+      FOREIGN KEY(source_id) REFERENCES sources(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS audit_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      table_name TEXT NOT NULL,
+      record_id INTEGER NOT NULL,
+      action TEXT NOT NULL,
+      old_value TEXT,
+      new_value TEXT,
+      changed_at TEXT NOT NULL,
+      changed_by TEXT,
+      reason TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS raw_dumps (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      company_inn TEXT NOT NULL,
+      company_id_rusprofile TEXT,
+      dump_file_path TEXT NOT NULL,
+      size_bytes INTEGER,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS shards (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      region_code TEXT,
+      file_path TEXT,
+      torrent_info_hash TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      expires_at TEXT,
+      status TEXT DEFAULT 'pending'
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_entities_inn ON observations(attribute, value);
+    CREATE INDEX IF NOT EXISTS idx_relations_subject ON relations(subject_id);
+    CREATE INDEX IF NOT EXISTS idx_relations_object ON relations(object_id);
+    CREATE INDEX IF NOT EXISTS idx_relations_predicate ON relations(predicate);
+    CREATE INDEX IF NOT EXISTS idx_observations_entity ON observations(entity_id);
+    CREATE INDEX IF NOT EXISTS idx_sources_url ON sources(url);
+    CREATE INDEX IF NOT EXISTS idx_raw_dumps_inn ON raw_dumps(company_inn);
+    CREATE INDEX IF NOT EXISTS idx_shards_status ON shards(status);
+  `);
+	if (!db.prepare("SELECT id FROM case_info WHERE id = 1").get()) db.prepare(`
+      INSERT INTO case_info (id, name, description, status, created_at)
+      VALUES (1, ?, ?, ?, ?)
+    `).run("OSINT Electron", "Локальное OSINT-дело", "active", (/* @__PURE__ */ new Date()).toISOString());
+}
+function normalize(value) {
+	return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+function upsertEntity(entity) {
+	const db = getDatabase();
+	const now = (/* @__PURE__ */ new Date()).toISOString();
+	const normalized = normalize(entity.value);
+	const info = db.prepare(`
+    INSERT INTO entities (rusprofile_id, type, value, normalized_value, label, first_seen, last_seen, confidence, status, notes, raw_file_path)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(type, normalized_value) DO UPDATE SET
+      rusprofile_id = COALESCE(excluded.rusprofile_id, entities.rusprofile_id),
+      value = excluded.value,
+      label = COALESCE(excluded.label, entities.label),
+      last_seen = excluded.last_seen,
+      confidence = COALESCE(excluded.confidence, entities.confidence),
+      status = CASE WHEN excluded.status IS NOT NULL THEN excluded.status ELSE entities.status END,
+      notes = COALESCE(excluded.notes, entities.notes),
+      raw_file_path = COALESCE(excluded.raw_file_path, entities.raw_file_path)
+  `).run(entity.rusprofile_id || null, entity.type, entity.value, normalized, entity.label || entity.value, now, now, entity.confidence ?? 50, entity.status || "unverified", entity.notes || null, entity.raw_file_path || null);
+	return Number(info.lastInsertRowid);
+}
+function addSource(source) {
+	const info = getDatabase().prepare(`
+    INSERT INTO sources (url, title, source_type, source_kind, provider, collection_method,
+      authority_basis, reliability, access_level, retrieved_at, local_path, sha256, notes)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(source.url, source.title || null, source.source_type || null, source.source_kind || null, source.provider || null, source.collection_method || null, source.authority_basis || null, source.reliability ?? 50, source.access_level || "public", source.retrieved_at || (/* @__PURE__ */ new Date()).toISOString(), source.local_path || null, source.sha256 || null, source.notes || null);
+	return Number(info.lastInsertRowid);
+}
+function addRelation(relation) {
+	getDatabase().prepare(`
+    INSERT OR IGNORE INTO relations (subject_id, predicate, object_id, source_id, valid_from,
+      valid_to, evidence_text, confidence, status, notes, raw_file_path)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(relation.subject_id, relation.predicate, relation.object_id, relation.source_id || null, relation.valid_from || null, relation.valid_to || null, relation.evidence_text || null, relation.confidence ?? 50, relation.status || "unverified", relation.notes || null, relation.raw_file_path || null);
+}
+function addObservation(observation) {
+	getDatabase().prepare(`
+    INSERT INTO observations (entity_id, attribute, value, source_id, observed_at, confidence, notes, raw_file_path)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(observation.entity_id, observation.attribute, observation.value, observation.source_id || null, (/* @__PURE__ */ new Date()).toISOString(), observation.confidence ?? 50, observation.notes || null, observation.raw_file_path || null);
+}
+function auditChange(table_name, record_id, action, old_value, new_value, reason) {
+	getDatabase().prepare(`
+    INSERT INTO audit_log (table_name, record_id, action, old_value, new_value, changed_at, changed_by, reason)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(table_name, record_id, action, old_value, new_value, (/* @__PURE__ */ new Date()).toISOString(), "system", reason);
+}
+//#endregion
+//#region src/main/services/rawStorage.ts
+function saveRawDumpSync(companyInn, data) {
+	const summary = data.summary || {};
+	let entityType = "person";
+	let prefix = "unknown";
+	if (summary.ogrn && summary.inn) {
+		entityType = "company";
+		prefix = summary.inn.slice(0, 5) || "unknown";
+	} else if (summary.inn && !summary.ogrn) {
+		entityType = "entrepreneur";
+		prefix = summary.inn.slice(0, 5) || "unknown";
+	} else {
+		entityType = "person";
+		if (summary.inn) prefix = summary.inn.slice(0, 5);
+		else if (summary.region) prefix = summary.region.slice(0, 2);
+		else prefix = "misc";
+	}
+	const dateStr = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
+	const dir = path.default.join(electron.app.getPath("userData"), "raw_dumps", entityType, prefix);
+	fs.default.mkdirSync(dir, { recursive: true });
+	const fileName = `${dateStr}_${(0, crypto$1.randomUUID)()}.msgpack`;
+	const filePath = path.default.join(dir, fileName);
+	const buffer = (0, _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__msgpack_msgpack_dist_esm_index_mjs.encode)(data);
+	fs.default.writeFileSync(filePath, buffer);
+	return {
+		filePath,
+		sizeBytes: fs.default.statSync(filePath).size,
+		entityType,
+		regionPrefix: prefix
+	};
+}
+//#endregion
+//#region src/main/services/osintStorage.ts
+/**
+* Определяет тип сущности по ссылке на профиль Rusprofile.
+* Возможные типы: company (ЮЛ), entrepreneur (ИП), person (физлицо).
+*/
+function detectEntityTypeFromHref(href) {
+	if (!href) return null;
+	if (href.includes("/id/")) return "company";
+	if (href.includes("/ip/")) return "entrepreneur";
+	if (href.includes("/person/")) return "person";
+	return null;
+}
+/**
+* Определяет тип сущности по данным (если нет ссылки).
+*/
+function detectEntityTypeFromData(data) {
+	if (data.ogrn && data.inn) return "company";
+	if (data.inn && !data.ogrn) return "entrepreneur";
+	return "person";
+}
+/**
+* Извлекает уникальный идентификатор Rusprofile из ссылки.
+* Пример: '/id/12345' -> 'id:12345', '/ip/67890' -> 'ip:67890', '/person/abc' -> 'person:abc'
+*/
+function extractRusprofileId(href) {
+	if (!href) return void 0;
+	const match = href.match(/\/(id|ip|person)\/([^/?]+)/);
+	return match ? `${match[1]}:${match[2]}` : void 0;
+}
+function saveCompanyData(companyId, companyInn, data) {
+	const raw = saveRawDumpSync(companyInn, data);
+	const sourceId = addSource({
+		url: `https://www.rusprofile.ru/id/${companyId}`,
+		title: "Rusprofile",
+		source_type: "registry",
+		source_kind: "official_registry",
+		provider: "rusprofile.ru",
+		collection_method: "browser",
+		reliability: 80,
+		access_level: "public",
+		retrieved_at: (/* @__PURE__ */ new Date()).toISOString(),
+		local_path: raw.filePath
+	});
+	const mainSummary = data.summary || {};
+	const mainEntityId = upsertEntity({
+		type: detectEntityTypeFromData(mainSummary),
+		value: mainSummary.name || `Сущность ${companyInn}`,
+		label: mainSummary.name,
+		confidence: 90,
+		status: "confirmed",
+		notes: "Целевая сущность, собранная скраппером",
+		raw_file_path: raw.filePath
+	});
+	const mainObservations = [
+		{
+			attribute: "inn",
+			value: mainSummary.inn
+		},
+		{
+			attribute: "ogrn",
+			value: mainSummary.ogrn
+		},
+		{
+			attribute: "kpp",
+			value: mainSummary.kpp
+		},
+		{
+			attribute: "address",
+			value: mainSummary.address
+		},
+		{
+			attribute: "activity",
+			value: mainSummary.main_activity
+		},
+		{
+			attribute: "director",
+			value: mainSummary.manager?.name
+		}
+	];
+	let savedObservations = 0;
+	for (const obs of mainObservations) if (obs.value) {
+		addObservation({
+			entity_id: mainEntityId,
+			attribute: obs.attribute,
+			value: obs.value,
+			source_id: sourceId,
+			confidence: 90,
+			raw_file_path: raw.filePath
+		});
+		savedObservations++;
+	}
+	let savedEntities = 1;
+	let savedRelations = 0;
+	if (data.founders_details?.founders) for (const founder of data.founders_details.founders) {
+		const founderType = detectEntityTypeFromHref(founder.href) || detectEntityTypeFromData(founder);
+		const founderId = upsertEntity({
+			rusprofile_id: extractRusprofileId(founder.href),
+			type: founderType,
+			value: founder.name || founder.inn || "Неизвестный учредитель",
+			label: founder.name,
+			confidence: 70,
+			status: "hypothesis",
+			raw_file_path: raw.filePath
+		});
+		if (founder.inn) {
+			addObservation({
+				entity_id: founderId,
+				attribute: "inn",
+				value: founder.inn,
+				source_id: sourceId,
+				raw_file_path: raw.filePath
+			});
+			savedObservations++;
+		}
+		if (founder.share) {
+			addObservation({
+				entity_id: founderId,
+				attribute: "share",
+				value: founder.share,
+				source_id: sourceId,
+				raw_file_path: raw.filePath
+			});
+			savedObservations++;
+		}
+		addRelation({
+			subject_id: founderId,
+			predicate: "founder_of",
+			object_id: mainEntityId,
+			source_id: sourceId,
+			evidence_text: founder.share || null,
+			confidence: 75,
+			status: "unverified",
+			raw_file_path: raw.filePath
+		});
+		savedEntities++;
+		savedRelations++;
+	}
+	if (data.connections_details?.connections) {
+		for (const group of data.connections_details.connections) if (group.organizations) for (const org of group.organizations) {
+			const orgType = detectEntityTypeFromHref(org.href) || detectEntityTypeFromData(org);
+			const orgId = upsertEntity({
+				rusprofile_id: extractRusprofileId(org.href) || (org.inn ? `inn:${org.inn}` : void 0),
+				type: orgType,
+				value: org.name || org.inn || "Связанная организация",
+				label: org.name,
+				confidence: 60,
+				status: "unverified",
+				raw_file_path: raw.filePath
+			});
+			if (org.inn) {
+				addObservation({
+					entity_id: orgId,
+					attribute: "inn",
+					value: org.inn,
+					source_id: sourceId,
+					raw_file_path: raw.filePath
+				});
+				savedObservations++;
+			}
+			if (org.ogrn) {
+				addObservation({
+					entity_id: orgId,
+					attribute: "ogrn",
+					value: org.ogrn,
+					source_id: sourceId,
+					raw_file_path: raw.filePath
+				});
+				savedObservations++;
+			}
+			addRelation({
+				subject_id: mainEntityId,
+				predicate: "associated_with",
+				object_id: orgId,
+				source_id: sourceId,
+				evidence_text: group.title || null,
+				confidence: 50,
+				status: "unverified",
+				raw_file_path: raw.filePath
+			});
+			savedEntities++;
+			savedRelations++;
+		}
+	}
+	auditChange("entities", mainEntityId, "create", null, JSON.stringify(mainSummary), "Сохранение сущности из Rusprofile");
+	return {
+		savedEntities,
+		savedRelations,
+		savedObservations,
+		rawDumpPath: raw.filePath
+	};
+}
+//#endregion
 //#region src/main/ipcHandlers/osintHandlers.ts
 function registerOsintHandlers() {
 	electron.ipcMain.handle("osint:open-window", () => {
@@ -8629,6 +9048,19 @@ function registerOsintHandlers() {
 	});
 	electron.ipcMain.handle("osint:check-credentials", async (_event, site) => {
 		return { exists: !!getCredentials(site) };
+	});
+	electron.ipcMain.handle("osint:save-company", async (_event, companyId, companyInn, data) => {
+		try {
+			return {
+				success: true,
+				...saveCompanyData(companyId, companyInn, data)
+			};
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
 	});
 }
 //#endregion
@@ -11857,13 +12289,6 @@ var createGatewayWindow = () => {
 	return gatewayWindow;
 };
 var getGatewayWindow = () => gatewayWindow;
-//#endregion
-//#region __vite-browser-external:node:sqlite
-var require___vite_browser_external_node_sqlite = /* @__PURE__ */ __commonJSMin(((exports, module) => {
-	module.exports = Object.create(new Proxy({}, { get(_, key) {
-		if (key !== "__esModule" && key !== "__proto__" && key !== "constructor" && key !== "splice") throw new Error(`Module "node:sqlite" has been externalized for browser compatibility. Cannot access "node:sqlite.${key}" in client code.  See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.`);
-	} }));
-}));
 //#endregion
 //#region src/main/main.ts
 process.on("uncaughtException", (err) => {
