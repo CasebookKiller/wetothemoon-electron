@@ -270,7 +270,8 @@ try {
 		gatewayCancelSelectionMode: () => electron.ipcRenderer.invoke("gateway:cancel-selection-mode"),
 		gatewayCreatePublicLink: () => electron.ipcRenderer.invoke("gateway:create-public-link"),
 		gatewayRegenerateMessage: (conversationId, messageIndex) => electron.ipcRenderer.invoke("gateway:regenerate-message", conversationId, messageIndex),
-		gatewaySendFeedback: (conversationId, messageIndex, type) => electron.ipcRenderer.invoke("gateway:send-feedback", conversationId, messageIndex, type)
+		gatewaySendFeedback: (conversationId, messageIndex, type) => electron.ipcRenderer.invoke("gateway:send-feedback", conversationId, messageIndex, type),
+		saveCompany: (companyId, companyInn, data) => electron.ipcRenderer.invoke("osint:save-company", companyId, companyInn, data)
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {

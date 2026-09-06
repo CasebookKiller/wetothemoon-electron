@@ -378,6 +378,9 @@ try {
     gatewaySendFeedback: (conversationId: string, messageIndex: number, type: 'like' | 'dislike') =>
       ipcRenderer.invoke('gateway:send-feedback', conversationId, messageIndex, type),
 
+    saveCompany: (companyId: string, companyInn: string, data: any) =>
+      ipcRenderer.invoke('osint:save-company', companyId, companyInn, data),
+
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)
