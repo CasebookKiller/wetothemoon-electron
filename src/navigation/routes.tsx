@@ -17,6 +17,7 @@ import { TasksPage } from '@/pages/TasksPage/TasksPage';
 import { TradingAssistantPage } from '@/pages/TradingAssistantPage/TradingAssistantPage';
 import { OSINTPage } from '@/pages/OSINTPage/OSINTPage';
 import { GatewayPage } from '@/pages/GatewayPage/GatewayPage';
+import { DatabasePage } from '@/pages/DatabasePage/DatabasePage';
 
 export interface Route {
   path: string;
@@ -39,7 +40,8 @@ const pg: Route = { path: '/pg', Component: PromptGeneratorPage, title: 'Ген�
 const ollama: Route = { path: '/ollama', Component: OllamaPage, title: 'Ollama' };
 const tasks: Route = { path: '/tasks', Component: TasksPage, title: 'План полёта' };
 const tradingAssistant: Route = { path: '/trading-assistant', Component: TradingAssistantPage, title: 'Трейдер' };
-const osint: Route = { path: '/osint', Component: OSINTPage, title: 'OSINT' };
+const osint: Route = { path: '/osint', Component: OSINTPage, title: 'Взгляд Фримена' };
+const database: Route = { path: '/database', Component: DatabasePage, title: 'База данных' };
 const gateway: Route = { path: '/gateway', Component: GatewayPage, title: 'Шлюз' };
 
 
@@ -60,5 +62,6 @@ routes.push(
   tasks,
   tradingAssistant,
   osint,
+  database,
   gateway
 );

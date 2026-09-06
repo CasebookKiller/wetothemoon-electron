@@ -381,6 +381,12 @@ try {
     saveCompany: (companyId: string, companyInn: string, data: any) =>
       ipcRenderer.invoke('osint:save-company', companyId, companyInn, data),
 
+    getEntities: (limit = 100, offset = 0) => ipcRenderer.invoke('osint:get-entities', limit, offset),
+    getRelations: (limit = 100, offset = 0) => ipcRenderer.invoke('osint:get-relations', limit, offset),
+    getObservations: (limit = 100, offset = 0) => ipcRenderer.invoke('osint:get-observations', limit, offset),
+    getSources: (limit = 100, offset = 0) => ipcRenderer.invoke('osint:get-sources', limit, offset),
+    openDatabaseWindow: () => ipcRenderer.invoke('open-database-window'),
+
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

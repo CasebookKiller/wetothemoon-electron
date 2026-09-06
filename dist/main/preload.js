@@ -271,7 +271,12 @@ try {
 		gatewayCreatePublicLink: () => electron.ipcRenderer.invoke("gateway:create-public-link"),
 		gatewayRegenerateMessage: (conversationId, messageIndex) => electron.ipcRenderer.invoke("gateway:regenerate-message", conversationId, messageIndex),
 		gatewaySendFeedback: (conversationId, messageIndex, type) => electron.ipcRenderer.invoke("gateway:send-feedback", conversationId, messageIndex, type),
-		saveCompany: (companyId, companyInn, data) => electron.ipcRenderer.invoke("osint:save-company", companyId, companyInn, data)
+		saveCompany: (companyId, companyInn, data) => electron.ipcRenderer.invoke("osint:save-company", companyId, companyInn, data),
+		getEntities: (limit = 100, offset = 0) => electron.ipcRenderer.invoke("osint:get-entities", limit, offset),
+		getRelations: (limit = 100, offset = 0) => electron.ipcRenderer.invoke("osint:get-relations", limit, offset),
+		getObservations: (limit = 100, offset = 0) => electron.ipcRenderer.invoke("osint:get-observations", limit, offset),
+		getSources: (limit = 100, offset = 0) => electron.ipcRenderer.invoke("osint:get-sources", limit, offset),
+		openDatabaseWindow: () => electron.ipcRenderer.invoke("open-database-window")
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {

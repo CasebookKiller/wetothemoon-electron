@@ -50,7 +50,8 @@ import {
   bondsWindowMenuTemplate,
   mdWindowMenuTemplate,
   osintWindowMenuTemplate,
-  gatewayWindowMenuTemplate
+  gatewayWindowMenuTemplate,
+  databaseWindowMenuTemplate
 } from './menus/windowMenus.ts';
 import { registerGrpcHandlers } from './ipcHandlers/grpcHandlers.ts';
 import { registerTasksHandlers } from './ipcHandlers/tasksHandlers.ts';
@@ -81,6 +82,8 @@ import { setAutonomousTraderInstance } from './ipcHandlers/tradingAssistantHandl
 import { marketDataBus } from './services/marketDataBus';
 import { registerGatewayHandlers } from './ipcHandlers/gatewayHandlers';
 import { createGatewayWindow, getGatewayWindow } from './windows/gatewayWindow.ts';
+
+import { createDatabaseWindow, getDatabaseWindow } from './windows/databaseWindow';
 
 try {
   require('node:sqlite');
@@ -186,7 +189,7 @@ app.whenReady().then(() => {
       };
     }
 
-    const openOSINT = fileMenu.items.find(i => i.label === 'Открыть OSINT');
+    const openOSINT = fileMenu.items.find(i => i.label === 'Открыть Взгляд Фримена');
     if (openOSINT) {
       openOSINT.click = () => {
         console.log('Клик по "Открыть OSINT"'); // временный лог
@@ -196,6 +199,18 @@ app.whenReady().then(() => {
         } else {
           const win = createOsintWindow();
           if (win) applyMenuToWindow(win, osintWindowMenuTemplate);
+        }
+      };
+    }
+
+    const openDatabase = fileMenu.items.find(i => i.label === 'Открыть Базу данных');
+    if (openDatabase) {
+      openDatabase.click = () => {
+        const existing = getDatabaseWindow();
+        if (existing && !existing.isDestroyed()) existing.focus();
+        else {
+          const win = createDatabaseWindow();
+          if (win) applyMenuToWindow(win, databaseWindowMenuTemplate);
         }
       };
     }
@@ -372,6 +387,16 @@ ipcMain.handle('open-osint-window', () => {
   if (win) {
     applyMenuToWindow(win, mainMenuTemplate);
   }
+});
+
+
+ipcMain.handle('open-database-window', () => {
+  const existing = getDatabaseWindow();
+  if (existing && !existing.isDestroyed()) {
+    existing.focus();
+    return;
+  }
+  createDatabaseWindow();
 });
 
 ipcMain.handle('gateway:open-window', () => {

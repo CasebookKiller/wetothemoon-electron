@@ -8,6 +8,8 @@ import { scrapeKadArbitr } from '../services/osint/scrapers/kadArbitr';
 import { scrapeMosGorsud } from '../services/osint/scrapers/mosGorsud';
 import { getCredentials, setCredentials } from '../services/osint/credentials';
 import { saveCompanyData } from '../services/osintStorage';
+import { createDatabaseWindow, getDatabaseWindow } from '../windows/databaseWindow';
+import { getDatabase } from '../services/database';
 
 export function registerOsintHandlers() {
   // Открыть окно OSINT
@@ -89,5 +91,57 @@ export function registerOsintHandlers() {
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
+  });
+
+  // Получение всех сущностей
+  ipcMain.handle('osint:get-entities', async (_event, limit = 100, offset = 0) => {
+    const db = getDatabase();
+    const rows = db.prepare(`
+      SELECT id, type, value, label, confidence, status, first_seen, last_seen
+      FROM entities
+      ORDER BY id DESC
+      LIMIT ? OFFSET ?
+    `).all(limit, offset);
+    return rows;
+  });
+
+  // Получение связей с именами сущностей
+  ipcMain.handle('osint:get-relations', async (_event, limit = 100, offset = 0) => {
+    const db = getDatabase();
+    const rows = db.prepare(`
+      SELECT r.id, s.label AS subject_label, r.predicate, o.label AS object_label,
+            r.confidence, r.status, r.valid_from, r.valid_to
+      FROM relations r
+      JOIN entities s ON s.id = r.subject_id
+      JOIN entities o ON o.id = r.object_id
+      ORDER BY r.id DESC
+      LIMIT ? OFFSET ?
+    `).all(limit, offset);
+    return rows;
+  });
+
+  // Получение наблюдений
+  ipcMain.handle('osint:get-observations', async (_event, limit = 100, offset = 0) => {
+    const db = getDatabase();
+    const rows = db.prepare(`
+      SELECT o.id, e.label AS entity_label, o.attribute, o.value, o.observed_at, o.confidence
+      FROM observations o
+      JOIN entities e ON e.id = o.entity_id
+      ORDER BY o.id DESC
+      LIMIT ? OFFSET ?
+    `).all(limit, offset);
+    return rows;
+  });
+
+  // Получение источников
+  ipcMain.handle('osint:get-sources', async (_event, limit = 100, offset = 0) => {
+    const db = getDatabase();
+    const rows = db.prepare(`
+      SELECT id, url, title, source_type, source_kind, provider, access_level, retrieved_at
+      FROM sources
+      ORDER BY id DESC
+      LIMIT ? OFFSET ?
+    `).all(limit, offset);
+    return rows;
   });
 }

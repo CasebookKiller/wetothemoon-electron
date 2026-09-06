@@ -6,11 +6,18 @@ let db: DatabaseSync | null = null;
 
 export function getDatabase(): DatabaseSync {
   if (!db) {
+    console.log('Создаём базу данных...');
     const dbPath = path.join(app.getPath('userData'), 'osint_data.db');
     db = new DatabaseSync(dbPath);
     db.exec('PRAGMA journal_mode = WAL;');
     db.exec('PRAGMA foreign_keys = ON;');
-    initializeSchema(db);
+    try {
+      initializeSchema(db);
+      console.log('Схема инициализирована');
+    } catch (e) {
+      console.error('Ошибка инициализации схемы:', e);
+      throw e;
+    }
   }
   return db;
 }
@@ -75,8 +82,7 @@ function initializeSchema(db: DatabaseSync) {
       raw_file_path TEXT,
       FOREIGN KEY(subject_id) REFERENCES entities(id),
       FOREIGN KEY(object_id) REFERENCES entities(id),
-      FOREIGN KEY(source_id) REFERENCES sources(id),
-      UNIQUE(subject_id, object_id, predicate, COALESCE(evidence_text, ''))
+      FOREIGN KEY(source_id) REFERENCES sources(id)
     );
 
     CREATE TABLE IF NOT EXISTS observations (
@@ -163,7 +169,7 @@ export function upsertEntity(entity: {
 
   const stmt = db.prepare(`
     INSERT INTO entities (rusprofile_id, type, value, normalized_value, label, first_seen, last_seen, confidence, status, notes, raw_file_path)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(type, normalized_value) DO UPDATE SET
       rusprofile_id = COALESCE(excluded.rusprofile_id, entities.rusprofile_id),
       value = excluded.value,

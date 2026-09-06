@@ -5,7 +5,6 @@ var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __commonJSMin = (cb, mod) => () => (mod || (cb((mod = { exports: {} }).exports, mod), cb = null), mod.exports);
 var __copyProps = (to, from, except, desc) => {
 	if (from && typeof from === "object" || typeof from === "function") for (var keys = __getOwnPropNames(from), i = 0, n = keys.length, key; i < n; i++) {
 		key = keys[i];
@@ -38,6 +37,7 @@ _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node
 let fs = require("fs");
 fs = __toESM(fs);
 let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_playwright_index_mjs = require("/home/ll/Документы/GitHub/wetothemoon-project/wetothemoon-electron/node_modules/playwright/index.mjs");
+let node_sqlite = require("node:sqlite");
 let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__msgpack_msgpack_dist_esm_index_mjs = require("/home/ll/Документы/GitHub/wetothemoon-project/wetothemoon-electron/node_modules/@msgpack/msgpack/dist.esm/index.mjs");
 let crypto$1 = require("crypto");
 let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_uuid_dist_node_index_js = require("/home/ll/Документы/GitHub/wetothemoon-project/wetothemoon-electron/node_modules/uuid/dist-node/index.js");
@@ -47,7 +47,7 @@ let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_
 _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_dotenv_lib_main_js = __toESM(_home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_dotenv_lib_main_js);
 //#region src/main/windows/mainWindow.ts
 var mainWindow = null;
-var preloadPath$9 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var preloadPath$10 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var MAIN_WINDOW_VITE_DEV_SERVER_URL = "http://localhost:5173";
 path.default.join(__dirname, "../../renderer/main-window/index.html");
 var createMainWindow = () => {
@@ -56,7 +56,7 @@ var createMainWindow = () => {
 		height: 768,
 		title: "Мы на Луну!",
 		webPreferences: {
-			preload: preloadPath$9,
+			preload: preloadPath$10,
 			contextIsolation: true,
 			nodeIntegration: false
 		},
@@ -77,7 +77,7 @@ function getMainWindowProdPath() {
 //#endregion
 //#region src/main/windows/aiWindow.ts
 var aiWindow = null;
-var preloadPath$8 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var preloadPath$9 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var createAIWindow = () => {
 	console.log("createAIWindow called");
 	aiWindow = new electron.BrowserWindow({
@@ -85,7 +85,7 @@ var createAIWindow = () => {
 		height: 600,
 		title: "Нейро",
 		webPreferences: {
-			preload: preloadPath$8,
+			preload: preloadPath$9,
 			contextIsolation: true,
 			nodeIntegration: false
 		},
@@ -254,8 +254,12 @@ var mainMenuTemplate = [
 				id: "open-trading"
 			},
 			{
-				label: "Открыть OSINT",
+				label: "Открыть Взгляд Фримена",
 				id: "open-osint"
+			},
+			{
+				label: "Открыть Базу данных",
+				id: "open-database"
 			},
 			{
 				label: "Открыть Шлюз",
@@ -701,17 +705,31 @@ var gatewayWindowMenuTemplate = [{
 		{ role: "togglefullscreen" }
 	]
 }];
+var databaseWindowMenuTemplate = [{
+	label: "Файл",
+	submenu: [{ role: "close" }]
+}, {
+	label: "Вид",
+	submenu: [
+		{ role: "reload" },
+		{ role: "toggleDevTools" },
+		{ type: "separator" },
+		{ role: "resetZoom" },
+		{ role: "zoomIn" },
+		{ role: "zoomOut" }
+	]
+}];
 //#endregion
 //#region src/main/windows/bondsWindow.ts
 var bondsWindow$1 = null;
-var preloadPath$7 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var preloadPath$8 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var createBondsWindow = () => {
 	bondsWindow$1 = new electron.BrowserWindow({
 		width: 1024,
 		height: 768,
 		title: "Облигации",
 		webPreferences: {
-			preload: preloadPath$7,
+			preload: preloadPath$8,
 			contextIsolation: true,
 			nodeIntegration: false
 		},
@@ -730,14 +748,14 @@ var getBondsWindow = () => bondsWindow$1;
 //#endregion
 //#region src/main/windows/mdWindow.ts
 var mdWindow$1 = null;
-var preloadPath$6 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var preloadPath$7 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var createMDWindow = () => {
 	mdWindow$1 = new electron.BrowserWindow({
 		width: 800,
 		height: 600,
 		title: "Markdown",
 		webPreferences: {
-			preload: preloadPath$6,
+			preload: preloadPath$7,
 			contextIsolation: true,
 			nodeIntegration: false
 		},
@@ -754,14 +772,14 @@ var getMDWindow = () => mdWindow$1;
 //#endregion
 //#region src/main/windows/pgWindow.ts
 var pgWindow$1 = null;
-var preloadPath$5 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var preloadPath$6 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var createPGWindow = () => {
 	pgWindow$1 = new electron.BrowserWindow({
 		width: 800,
 		height: 600,
 		title: "Генератор запросов",
 		webPreferences: {
-			preload: preloadPath$5,
+			preload: preloadPath$6,
 			contextIsolation: true,
 			nodeIntegration: false
 		},
@@ -778,7 +796,7 @@ var getPGWindow = () => pgWindow$1;
 //#endregion
 //#region src/main/windows/ollamaWindow.ts
 var ollamaWindow$1 = null;
-var preloadPath$4 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var preloadPath$5 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var createOllamaWindow = () => {
 	if (ollamaWindow$1) {
 		ollamaWindow$1.focus();
@@ -789,7 +807,7 @@ var createOllamaWindow = () => {
 		height: 600,
 		title: "Клиент Ollama ",
 		webPreferences: {
-			preload: preloadPath$4,
+			preload: preloadPath$5,
 			contextIsolation: true,
 			nodeIntegration: false
 		},
@@ -1283,7 +1301,7 @@ var registerOrdersStreamHandlers = () => {
 //#endregion
 //#region src/main/windows/tradingAssistantWindow.ts
 var tradingAssistantWindow = null;
-var preloadPath$3 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var preloadPath$4 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var createTradingAssistantWindow = () => {
 	if (tradingAssistantWindow && !tradingAssistantWindow.isDestroyed()) {
 		tradingAssistantWindow.focus();
@@ -1294,7 +1312,7 @@ var createTradingAssistantWindow = () => {
 		height: 800,
 		title: "Trading Assistant – Volume Profile",
 		webPreferences: {
-			preload: preloadPath$3,
+			preload: preloadPath$4,
 			contextIsolation: true,
 			nodeIntegration: false
 		},
@@ -4546,7 +4564,7 @@ var registerTradingAssistantHandlers = (historicalLoader, profileEngine, getToke
 //#endregion
 //#region src/main/windows/osintWindow.ts
 var osintWindow = null;
-var preloadPath$2 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var preloadPath$3 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var createOsintWindow = () => {
 	if (osintWindow && !osintWindow.isDestroyed()) {
 		osintWindow.focus();
@@ -4557,7 +4575,7 @@ var createOsintWindow = () => {
 		height: 800,
 		title: "Взгляд Фримена",
 		webPreferences: {
-			preload: preloadPath$2,
+			preload: preloadPath$3,
 			contextIsolation: true,
 			nodeIntegration: false
 		},
@@ -8547,23 +8565,22 @@ async function scrapeMosGorsud(fio) {
 }
 async function loginToMosGorsud(page, login, password) {}
 //#endregion
-//#region __vite-browser-external:node:sqlite
-var require___vite_browser_external_node_sqlite = /* @__PURE__ */ __commonJSMin(((exports, module) => {
-	module.exports = Object.create(new Proxy({}, { get(_, key) {
-		if (key !== "__esModule" && key !== "__proto__" && key !== "constructor" && key !== "splice") throw new Error(`Module "node:sqlite" has been externalized for browser compatibility. Cannot access "node:sqlite.${key}" in client code.  See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.`);
-	} }));
-}));
-//#endregion
 //#region src/main/services/database.ts
-var import___vite_browser_external_node_sqlite = require___vite_browser_external_node_sqlite();
 var db = null;
 function getDatabase() {
 	if (!db) {
+		console.log("Создаём базу данных...");
 		const dbPath = path.default.join(electron.app.getPath("userData"), "osint_data.db");
-		db = new import___vite_browser_external_node_sqlite.DatabaseSync(dbPath);
+		db = new node_sqlite.DatabaseSync(dbPath);
 		db.exec("PRAGMA journal_mode = WAL;");
 		db.exec("PRAGMA foreign_keys = ON;");
-		initializeSchema(db);
+		try {
+			initializeSchema(db);
+			console.log("Схема инициализирована");
+		} catch (e) {
+			console.error("Ошибка инициализации схемы:", e);
+			throw e;
+		}
 	}
 	return db;
 }
@@ -8627,8 +8644,7 @@ function initializeSchema(db) {
       raw_file_path TEXT,
       FOREIGN KEY(subject_id) REFERENCES entities(id),
       FOREIGN KEY(object_id) REFERENCES entities(id),
-      FOREIGN KEY(source_id) REFERENCES sources(id),
-      UNIQUE(subject_id, object_id, predicate, COALESCE(evidence_text, ''))
+      FOREIGN KEY(source_id) REFERENCES sources(id)
     );
 
     CREATE TABLE IF NOT EXISTS observations (
@@ -8699,7 +8715,7 @@ function upsertEntity(entity) {
 	const normalized = normalize(entity.value);
 	const info = db.prepare(`
     INSERT INTO entities (rusprofile_id, type, value, normalized_value, label, first_seen, last_seen, confidence, status, notes, raw_file_path)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(type, normalized_value) DO UPDATE SET
       rusprofile_id = COALESCE(excluded.rusprofile_id, entities.rusprofile_id),
       value = excluded.value,
@@ -9062,6 +9078,42 @@ function registerOsintHandlers() {
 			};
 		}
 	});
+	electron.ipcMain.handle("osint:get-entities", async (_event, limit = 100, offset = 0) => {
+		return getDatabase().prepare(`
+      SELECT id, type, value, label, confidence, status, first_seen, last_seen
+      FROM entities
+      ORDER BY id DESC
+      LIMIT ? OFFSET ?
+    `).all(limit, offset);
+	});
+	electron.ipcMain.handle("osint:get-relations", async (_event, limit = 100, offset = 0) => {
+		return getDatabase().prepare(`
+      SELECT r.id, s.label AS subject_label, r.predicate, o.label AS object_label,
+            r.confidence, r.status, r.valid_from, r.valid_to
+      FROM relations r
+      JOIN entities s ON s.id = r.subject_id
+      JOIN entities o ON o.id = r.object_id
+      ORDER BY r.id DESC
+      LIMIT ? OFFSET ?
+    `).all(limit, offset);
+	});
+	electron.ipcMain.handle("osint:get-observations", async (_event, limit = 100, offset = 0) => {
+		return getDatabase().prepare(`
+      SELECT o.id, e.label AS entity_label, o.attribute, o.value, o.observed_at, o.confidence
+      FROM observations o
+      JOIN entities e ON e.id = o.entity_id
+      ORDER BY o.id DESC
+      LIMIT ? OFFSET ?
+    `).all(limit, offset);
+	});
+	electron.ipcMain.handle("osint:get-sources", async (_event, limit = 100, offset = 0) => {
+		return getDatabase().prepare(`
+      SELECT id, url, title, source_type, source_kind, provider, access_level, retrieved_at
+      FROM sources
+      ORDER BY id DESC
+      LIMIT ? OFFSET ?
+    `).all(limit, offset);
+	});
 }
 //#endregion
 //#region src/shared/types/promptgenerator.ts
@@ -9345,7 +9397,7 @@ var taskStore = new TaskStore();
 //#endregion
 //#region src/main/windows/tasksWindow.ts
 var tasksWindow = null;
-var preloadPath$1 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var preloadPath$2 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var createTasksWindow = () => {
 	if (tasksWindow && !tasksWindow.isDestroyed()) {
 		tasksWindow.focus();
@@ -9356,7 +9408,7 @@ var createTasksWindow = () => {
 		height: 700,
 		title: "Планировщик задач",
 		webPreferences: {
-			preload: preloadPath$1,
+			preload: preloadPath$2,
 			contextIsolation: true,
 			nodeIntegration: false
 		},
@@ -12262,7 +12314,7 @@ function registerGatewayHandlers() {
 //#endregion
 //#region src/main/windows/gatewayWindow.ts
 var gatewayWindow = null;
-var preloadPath = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var preloadPath$1 = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
 var createGatewayWindow = () => {
 	if (gatewayWindow && !gatewayWindow.isDestroyed()) {
 		gatewayWindow.focus();
@@ -12273,7 +12325,7 @@ var createGatewayWindow = () => {
 		height: 800,
 		title: "Шлюз (DeepSeek)",
 		webPreferences: {
-			preload: preloadPath,
+			preload: preloadPath$1,
 			contextIsolation: true,
 			nodeIntegration: false
 		},
@@ -12290,6 +12342,35 @@ var createGatewayWindow = () => {
 };
 var getGatewayWindow = () => gatewayWindow;
 //#endregion
+//#region src/main/windows/databaseWindow.ts
+var databaseWindow = null;
+var preloadPath = electron.app.isPackaged ? path.default.join(process.resourcesPath, "preload.js") : path.default.join(__dirname, "../../dist/main/preload.js");
+var createDatabaseWindow = () => {
+	if (databaseWindow && !databaseWindow.isDestroyed()) {
+		databaseWindow.focus();
+		return databaseWindow;
+	}
+	databaseWindow = new electron.BrowserWindow({
+		width: 1e3,
+		height: 700,
+		title: "База данных OSINT",
+		webPreferences: {
+			preload: preloadPath,
+			contextIsolation: true,
+			nodeIntegration: false
+		}
+	});
+	if (process.env.NODE_ENV === "development") databaseWindow.loadURL(`${DEV_SERVER_URL}/#/database`);
+	else databaseWindow.loadFile(getMainWindowProdPath(), { hash: "/database" });
+	const menu = electron.Menu.buildFromTemplate(databaseWindowMenuTemplate);
+	databaseWindow.setMenu(menu);
+	databaseWindow.on("closed", () => {
+		databaseWindow = null;
+	});
+	return databaseWindow;
+};
+var getDatabaseWindow = () => databaseWindow;
+//#endregion
 //#region src/main/main.ts
 process.on("uncaughtException", (err) => {
 	console.error("Uncaught exception:", err);
@@ -12298,7 +12379,7 @@ process.on("unhandledRejection", (reason, promise) => {
 	console.error("Unhandled rejection at:", promise, "reason:", reason);
 });
 try {
-	require___vite_browser_external_node_sqlite();
+	require("node:sqlite");
 	console.log("node:sqlite доступен в Electron");
 } catch (e) {
 	console.error("node:sqlite НЕ доступен в Electron", e);
@@ -12368,7 +12449,7 @@ electron.app.whenReady().then(() => {
 				if (win) applyMenuToWindow(win, mainMenuTemplate);
 			}
 		};
-		const openOSINT = fileMenu.items.find((i) => i.label === "Открыть OSINT");
+		const openOSINT = fileMenu.items.find((i) => i.label === "Открыть Взгляд Фримена");
 		if (openOSINT) openOSINT.click = () => {
 			console.log("Клик по \"Открыть OSINT\"");
 			const existing = getOsintWindow();
@@ -12376,6 +12457,15 @@ electron.app.whenReady().then(() => {
 			else {
 				const win = createOsintWindow();
 				if (win) applyMenuToWindow(win, osintWindowMenuTemplate);
+			}
+		};
+		const openDatabase = fileMenu.items.find((i) => i.label === "Открыть Базу данных");
+		if (openDatabase) openDatabase.click = () => {
+			const existing = getDatabaseWindow();
+			if (existing && !existing.isDestroyed()) existing.focus();
+			else {
+				const win = createDatabaseWindow();
+				if (win) applyMenuToWindow(win, databaseWindowMenuTemplate);
 			}
 		};
 		const openGateway = fileMenu.items.find((i) => i.label === "Открыть Шлюз");
@@ -12469,6 +12559,14 @@ electron.ipcMain.handle("open-osint-window", () => {
 	}
 	const win = createOsintWindow();
 	if (win) applyMenuToWindow(win, mainMenuTemplate);
+});
+electron.ipcMain.handle("open-database-window", () => {
+	const existing = getDatabaseWindow();
+	if (existing && !existing.isDestroyed()) {
+		existing.focus();
+		return;
+	}
+	createDatabaseWindow();
 });
 electron.ipcMain.handle("gateway:open-window", () => {
 	const existing = getGatewayWindow();

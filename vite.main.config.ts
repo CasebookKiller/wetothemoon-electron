@@ -9,8 +9,8 @@ export default defineConfig(
       viteStaticCopy({
         targets: [
           {
-            src: 'proto',        // копирует папку proto целиком
-            dest: '.',           // в корень dist/main, получится dist/main/proto
+            src: 'proto',
+            dest: '.',
           },
         ],
       }),
@@ -19,7 +19,10 @@ export default defineConfig(
       sourcemap: mode === "development",
       outDir: path.resolve(__dirname, "dist/main"),
       rollupOptions: {
-        external: mode === "production" ? [] : [/node_modules/],
+        external: [
+          'node:sqlite',                                  // всегда внешний
+          ...(mode === "production" ? [] : [/node_modules/]), // в dev не бандлим node_modules
+        ],
       },
     },
   }),

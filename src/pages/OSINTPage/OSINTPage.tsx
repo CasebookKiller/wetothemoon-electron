@@ -531,7 +531,7 @@ export const OSINTPage: React.FC = () => {
                 checked={needConnectionsDetails}
                 onChange={(e) => setNeedConnectionsDetails(e.checked as boolean)}
               />
-              <label htmlFor="needConnections" className="ml-2">Детальные связи</label>
+              <label htmlFor="needConnections" className="ml-2">Связи</label>
             </div>
             <div className="mt-2">
               <Checkbox
