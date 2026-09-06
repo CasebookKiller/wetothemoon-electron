@@ -186,6 +186,8 @@ export const OSINTPage: React.FC = () => {
 
   const [needEgrulDetails, setNeedEgrulDetails] = useState(false);
 
+  const [saveMessage, setSaveMessage] = useState('');
+
   const api = (window as any).electronAPI;
 
   const handleLaunch = async () => {
@@ -364,6 +366,25 @@ export const OSINTPage: React.FC = () => {
       setError((e as Error).message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSaveToDb = async () => {
+    if (!result) {
+      setSaveMessage('Нет данных для сохранения');
+      return;
+    }
+    try {
+      const response = await api.saveCompany(inn, inn, result);
+      if (response.success) {
+        setSaveMessage(
+          `Сохранено: сущностей ${response.savedEntities}, связей ${response.savedRelations}, наблюдений ${response.savedObservations}`
+        );
+      } else {
+        setSaveMessage(`Ошибка: ${response.error}`);
+      }
+    } catch (e) {
+      setSaveMessage((e as Error).message);
     }
   };
 
@@ -1334,6 +1355,18 @@ export const OSINTPage: React.FC = () => {
             </div>
           </Panel>
         </React.Fragment>
+      )}
+
+      {result && (
+        <div className="app p-0">
+          <Button
+            label="Сохранить в базу данных"
+            icon="pi pi-save"
+            className="p-button-lg w-full p-button-raised p-button-accent"
+            onClick={handleSaveToDb}
+          />
+          {saveMessage && <p className="p-error">{saveMessage}</p>}
+        </div>
       )}
     </React.Fragment>
   );
