@@ -300,9 +300,7 @@ async function getEntityIdByInn(page: Page, inn: string): Promise<{ id: number; 
 
 // Функции для сбора сводки
 async function collectSummary(page: Page): Promise<any> {
-  // Выполняем все извлечение данных в контексте страницы за один раз
   return page.evaluate(() => {
-    // Вспомогательные функции для работы внутри браузера
     const getTextByCss = (selector: string): string => {
       const el = document.querySelector(selector);
       return el ? el.textContent?.trim() || '' : '';
@@ -339,38 +337,65 @@ async function collectSummary(page: Page): Promise<any> {
       return texts;
     };
 
-    // Извлечение данных
-    const data: any = {};
+    // Определяем тип страницы
+    const isCompany = !!document.querySelector('#clip_ogrn');
+    const isEntrepreneur = !!document.querySelector('#clip_ogrnip');
+    const isPerson = !isCompany && !isEntrepreneur;
+    const entityType = isCompany ? 'company' : isEntrepreneur ? 'entrepreneur' : 'person';
 
-    // Название
+    const data: any = {};
+    data.entity_type = entityType;
+
+    // Название (для всех типов)
     data.name = getTextByCss('h1');
 
-    // ОГРН и дата
-    data.ogrn = getTextByCss('#clip_ogrn');
-    data.ogrn_date = getTextByXPath("//*[@id='clip_ogrn']/ancestor::dl/dd[contains(@class,'padding-top')]");
+    // ОГРН или ОГРНИП
+    if (isCompany) {
+      data.ogrn = getTextByCss('#clip_ogrn');
+      data.ogrn_date = getTextByXPath("//*[@id='clip_ogrn']/ancestor::dl/dd[contains(@class,'padding-top')]");
+    } else if (isEntrepreneur) {
+      data.ogrnip = getTextByCss('#clip_ogrnip');
+      data.ogrn_date = getTextByXPath("//*[@id='clip_ogrnip']/ancestor::dl/dd[contains(@class,'padding-top')]");
+    } else {
+      data.ogrn = '';
+      data.ogrnip = '';
+      data.ogrn_date = '';
+    }
 
     // ИНН и КПП
     data.inn = getTextByCss('#clip_inn');
-    data.kpp = getTextByCss('#clip_kpp');
+    data.kpp = isCompany ? getTextByCss('#clip_kpp') : '';
 
-    // Дата регистрации
+    // Дата регистрации (универсально)
     data.registration_date = getTextByXPath("//dt[contains(.,'Дата регистрации')]/following-sibling::dd[1]");
 
-    // Уставный капитал
-    data.capital = getTextByXPath("//dt[contains(.,'Уставный капитал')]/following-sibling::dd[1]");
+    // Уставный капитал (только для ЮЛ)
+    data.capital = isCompany ? getTextByXPath("//dt[contains(.,'Уставный капитал')]/following-sibling::dd[1]") : '';
 
-    // Юридический адрес
+    // Юридический адрес (название поля может отличаться, но обычно это адрес)
     data.address = getTextByCss('#clip_address');
 
-    // Руководитель
-    data.manager = {
-      position: getTextByXPath("//span[contains(@class,'chief-title') and (contains(.,'ПРЕЗИДЕНТ') or contains(.,'ДИРЕКТОР') or contains(.,'ГЕНЕРАЛЬНЫЙ'))]"),
-      name: getTextByXPath("//div[contains(@class,'company-row') and .//span[contains(@class,'company-info__title') and contains(.,'Руководитель')]]//a[contains(@href,'/person/')]"),
-      since: getTextByXPath("//div[contains(@class,'company-row') and .//span[contains(@class,'company-info__title') and contains(.,'Руководитель')]]//span[contains(@class,'chief-title') and starts-with(normalize-space(),'с ')]")
-    };
+    // Руководитель (для ЮЛ) или сам ИП (для ИП); для ФЛ может отсутствовать
+    if (isCompany) {
+      data.manager = {
+        position: getTextByXPath("//span[contains(@class,'chief-title') and (contains(.,'ПРЕЗИДЕНТ') or contains(.,'ДИРЕКТОР') or contains(.,'ГЕНЕРАЛЬНЫЙ'))]"),
+        name: getTextByXPath("//div[contains(@class,'company-row') and .//span[contains(@class,'company-info__title') and contains(.,'Руководитель')]]//a[contains(@href,'/person/')]"),
+        since: getTextByXPath("//div[contains(@class,'company-row') and .//span[contains(@class,'company-info__title') and contains(.,'Руководитель')]]//span[contains(@class,'chief-title') and starts-with(normalize-space(),'с ')]")
+      };
+    } else if (isEntrepreneur) {
+      data.manager = {
+        position: 'Индивидуальный предприниматель',
+        name: data.name, // ИП является руководителем сам себе
+        since: ''
+      };
+    } else {
+      data.manager = { position: '', name: '', since: '' };
+    }
 
-    // Держатель реестра акционеров
-    data.registry_holder = getTextByXPath("//span[contains(@class,'company-info__title') and contains(.,'Держатель реестра')]/following-sibling::span[1]//a");
+    // Держатель реестра акционеров (только ЮЛ)
+    data.registry_holder = isCompany
+      ? getTextByXPath("//span[contains(@class,'company-info__title') and contains(.,'Держатель реестра')]/following-sibling::span[1]//a")
+      : '';
 
     // Среднесписочная численность
     data.average_employees = getTextByXPath("//dt[contains(.,'Среднесписочная численность')]/following-sibling::dd[1]");
@@ -378,14 +403,16 @@ async function collectSummary(page: Page): Promise<any> {
     // Среднемесячная зарплата
     data.average_salary = getTextByXPath("//dt[contains(.,'Среднемесячная зарплата')]/following-sibling::dd[1]");
 
-    // Специальный налоговый режим
+    // Специальный налоговый режим (для ИП может быть)
     data.tax_regime = getTextByXPath("//dt[contains(.,'Специальный налоговый режим')]/following-sibling::dd[1]");
 
     // Реестр МСП
     data.sme_registry = getTextByXPath("//span[contains(@class,'company-info__title') and contains(.,'Реестр МСП')]/following-sibling::span[1]");
 
-    // Правопредшественник
-    data.predecessor = getTextByXPath("//span[contains(@class,'company-info__title') and contains(.,'Правопредшественник')]/following-sibling::div[1]");
+    // Правопредшественник (только ЮЛ)
+    data.predecessor = isCompany
+      ? getTextByXPath("//span[contains(@class,'company-info__title') and contains(.,'Правопредшественник')]/following-sibling::div[1]")
+      : '';
 
     // Основной вид деятельности
     data.main_activity = getTextByXPath("//span[contains(@class,'company-info__title') and contains(.,'Основной вид деятельности')]/following-sibling::span[1]");
@@ -394,7 +421,7 @@ async function collectSummary(page: Page): Promise<any> {
     data.tax_authority = getTextByXPath("//span[contains(@class,'company-info__title') and contains(.,'Налоговый орган')]/following-sibling::span[1]");
     data.tax_authority_since = getTextByXPath("//span[contains(@class,'company-info__title') and contains(.,'Налоговый орган')]/following-sibling::span[contains(@class,'chief-title')]");
 
-    // Коды статистики
+    // Коды статистики (для ИП могут быть не все)
     data.stat_codes = {
       okpo: getTextByCss('#clip_okpo'),
       okato: getTextByCss('#clip_okato'),

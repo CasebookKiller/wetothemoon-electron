@@ -4907,26 +4907,49 @@ async function collectSummary(page) {
 			}
 			return texts;
 		};
+		const isCompany = !!document.querySelector("#clip_ogrn");
+		const isEntrepreneur = !!document.querySelector("#clip_ogrnip");
+		const entityType = isCompany ? "company" : isEntrepreneur ? "entrepreneur" : "person";
 		const data = {};
+		data.entity_type = entityType;
 		data.name = getTextByCss("h1");
-		data.ogrn = getTextByCss("#clip_ogrn");
-		data.ogrn_date = getTextByXPath("//*[@id='clip_ogrn']/ancestor::dl/dd[contains(@class,'padding-top')]");
+		if (isCompany) {
+			data.ogrn = getTextByCss("#clip_ogrn");
+			data.ogrn_date = getTextByXPath("//*[@id='clip_ogrn']/ancestor::dl/dd[contains(@class,'padding-top')]");
+		} else if (isEntrepreneur) {
+			data.ogrnip = getTextByCss("#clip_ogrnip");
+			data.ogrn_date = getTextByXPath("//*[@id='clip_ogrnip']/ancestor::dl/dd[contains(@class,'padding-top')]");
+		} else {
+			data.ogrn = "";
+			data.ogrnip = "";
+			data.ogrn_date = "";
+		}
 		data.inn = getTextByCss("#clip_inn");
-		data.kpp = getTextByCss("#clip_kpp");
+		data.kpp = isCompany ? getTextByCss("#clip_kpp") : "";
 		data.registration_date = getTextByXPath("//dt[contains(.,'Дата регистрации')]/following-sibling::dd[1]");
-		data.capital = getTextByXPath("//dt[contains(.,'Уставный капитал')]/following-sibling::dd[1]");
+		data.capital = isCompany ? getTextByXPath("//dt[contains(.,'Уставный капитал')]/following-sibling::dd[1]") : "";
 		data.address = getTextByCss("#clip_address");
-		data.manager = {
+		if (isCompany) data.manager = {
 			position: getTextByXPath("//span[contains(@class,'chief-title') and (contains(.,'ПРЕЗИДЕНТ') or contains(.,'ДИРЕКТОР') or contains(.,'ГЕНЕРАЛЬНЫЙ'))]"),
 			name: getTextByXPath("//div[contains(@class,'company-row') and .//span[contains(@class,'company-info__title') and contains(.,'Руководитель')]]//a[contains(@href,'/person/')]"),
 			since: getTextByXPath("//div[contains(@class,'company-row') and .//span[contains(@class,'company-info__title') and contains(.,'Руководитель')]]//span[contains(@class,'chief-title') and starts-with(normalize-space(),'с ')]")
 		};
-		data.registry_holder = getTextByXPath("//span[contains(@class,'company-info__title') and contains(.,'Держатель реестра')]/following-sibling::span[1]//a");
+		else if (isEntrepreneur) data.manager = {
+			position: "Индивидуальный предприниматель",
+			name: data.name,
+			since: ""
+		};
+		else data.manager = {
+			position: "",
+			name: "",
+			since: ""
+		};
+		data.registry_holder = isCompany ? getTextByXPath("//span[contains(@class,'company-info__title') and contains(.,'Держатель реестра')]/following-sibling::span[1]//a") : "";
 		data.average_employees = getTextByXPath("//dt[contains(.,'Среднесписочная численность')]/following-sibling::dd[1]");
 		data.average_salary = getTextByXPath("//dt[contains(.,'Среднемесячная зарплата')]/following-sibling::dd[1]");
 		data.tax_regime = getTextByXPath("//dt[contains(.,'Специальный налоговый режим')]/following-sibling::dd[1]");
 		data.sme_registry = getTextByXPath("//span[contains(@class,'company-info__title') and contains(.,'Реестр МСП')]/following-sibling::span[1]");
-		data.predecessor = getTextByXPath("//span[contains(@class,'company-info__title') and contains(.,'Правопредшественник')]/following-sibling::div[1]");
+		data.predecessor = isCompany ? getTextByXPath("//span[contains(@class,'company-info__title') and contains(.,'Правопредшественник')]/following-sibling::div[1]") : "";
 		data.main_activity = getTextByXPath("//span[contains(@class,'company-info__title') and contains(.,'Основной вид деятельности')]/following-sibling::span[1]");
 		data.tax_authority = getTextByXPath("//span[contains(@class,'company-info__title') and contains(.,'Налоговый орган')]/following-sibling::span[1]");
 		data.tax_authority_since = getTextByXPath("//span[contains(@class,'company-info__title') and contains(.,'Налоговый орган')]/following-sibling::span[contains(@class,'chief-title')]");
