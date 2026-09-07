@@ -4667,14 +4667,18 @@ export async function scrapeRusprofile(
     }
 
     // Найти ID компании
-    const companyId = await getCompanyIdByInn(page, inn);
-    const companyUrl = `https://www.rusprofile.ru/id/${companyId}`;
+    const entityInfo = await getEntityIdByInn(page, inn);
+    const companyId = entityInfo.id;
+    const entityType = entityInfo.type;
+    const companyUrl = `https://www.rusprofile.ru/${entityType}/${companyId}`;
     await page.goto(companyUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
     console.log('Перешли на карточку компании, запускаем наблюдатель модальных окон...');
     startModalWatcher(page);
     await page.waitForTimeout(2000);
 
-    const result = {} as CompanyFullData;
+    const result = {} as CompanyFullData & { company_id?: number; entity_type?: string };
+    result.company_id = companyId;
+    result.entity_type = entityType;
 
     console.log('Сбор сводки...');
     result.summary = await timed('summary', () => collectSummary(page));

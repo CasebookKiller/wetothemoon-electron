@@ -4857,7 +4857,7 @@ async function login(page, login, password) {
 		}
 	}
 }
-async function getCompanyIdByInn(page, inn) {
+async function getEntityIdByInn(page, inn) {
 	await page.goto("https://www.rusprofile.ru/", {
 		waitUntil: "domcontentloaded",
 		timeout: 6e4
@@ -4871,13 +4871,19 @@ async function getCompanyIdByInn(page, inn) {
 	await searchInput.fill(inn);
 	await searchInput.press("Enter");
 	await page.waitForTimeout(3e3);
-	const match = page.url().match(/\/id\/(\d+)/);
-	if (match) return parseInt(match[1]);
-	await page.locator("a[href*='/id/']").first().click();
+	const match = page.url().match(/\/(id|ip|person)\/(\d+)/);
+	if (match) return {
+		id: parseInt(match[2]),
+		type: match[1]
+	};
+	await page.locator("a[href*='/id/'], a[href*='/ip/'], a[href*='/person/']").first().click();
 	await page.waitForTimeout(5e3);
-	const newMatch = page.url().match(/\/id\/(\d+)/);
-	if (newMatch) return parseInt(newMatch[1]);
-	throw new Error(`Не удалось найти ID компании по ИНН ${inn}`);
+	const newMatch = page.url().match(/\/(id|ip|person)\/(\d+)/);
+	if (newMatch) return {
+		id: parseInt(newMatch[2]),
+		type: newMatch[1]
+	};
+	throw new Error(`Не удалось найти сущность по ИНН ${inn}`);
 }
 async function collectSummary(page) {
 	return page.evaluate(() => {
@@ -8288,8 +8294,10 @@ async function scrapeRusprofile(inn, options) {
 			if (!creds) throw new Error("Нет учётных данных для rusprofile. Добавьте их в .env (VITE_RUSPROFILE_LOGIN, VITE_RUSPROFILE_PASSWORD) или сохраните через интерфейс OSINT.");
 			await login(page, creds.login, creds.password);
 		} else console.log("Сессия восстановлена, вход не требуется.");
-		const companyId = await getCompanyIdByInn(page, inn);
-		const companyUrl = `https://www.rusprofile.ru/id/${companyId}`;
+		const entityInfo = await getEntityIdByInn(page, inn);
+		const companyId = entityInfo.id;
+		const entityType = entityInfo.type;
+		const companyUrl = `https://www.rusprofile.ru/${entityType}/${companyId}`;
 		await page.goto(companyUrl, {
 			waitUntil: "domcontentloaded",
 			timeout: 6e4
@@ -8298,6 +8306,8 @@ async function scrapeRusprofile(inn, options) {
 		startModalWatcher(page);
 		await page.waitForTimeout(2e3);
 		const result = {};
+		result.company_id = companyId;
+		result.entity_type = entityType;
 		console.log("Сбор сводки...");
 		result.summary = await timed("summary", () => collectSummary(page));
 		console.log("Сбор ФССП...");
