@@ -375,7 +375,14 @@ export const OSINTPage: React.FC = () => {
       return;
     }
     try {
-      const response = await api.saveCompany(inn, inn, result);
+      // Получаем числовой ID из результата
+      const companyId = result.company_id;
+      if (!companyId) {
+        setSaveMessage('Не удалось определить ID сущности. Проверьте, что сбор прошёл успешно.');
+        return;
+      }
+
+      const response = await api.saveCompany(companyId, inn, result);
       if (response.success) {
         setSaveMessage(
           `Сохранено: сущностей ${response.savedEntities}, связей ${response.savedRelations}, наблюдений ${response.savedObservations}`
