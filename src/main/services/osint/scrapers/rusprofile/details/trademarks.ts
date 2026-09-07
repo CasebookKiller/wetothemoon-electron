@@ -1,11 +1,9 @@
 // src/main/services/osint/scrapers/rusprofile/details/trademarks.ts
 import { Page } from 'playwright';
 
-// Применение фильтров для товарных знаков
 export async function applyTrademarksFilters(page: Page, filters?: any): Promise<void> {
   if (!filters) return;
 
-  // Только действующие
   if (filters.onlyActual) {
     const checkbox = page.locator('input[name="status"][value="actual"]');
     if (await checkbox.count() > 0) {
@@ -14,7 +12,6 @@ export async function applyTrademarksFilters(page: Page, filters?: any): Promise
     }
   }
 
-  // Тип товарного знака (radio)
   if (filters.type && filters.type !== 'all') {
     const radio = page.locator(`input[name="type"][value="${filters.type}"]`);
     if (await radio.count() > 0) {
@@ -23,7 +20,6 @@ export async function applyTrademarksFilters(page: Page, filters?: any): Promise
     }
   }
 
-  // Поиск по номеру регистрации
   if (filters.search && filters.search.trim() !== '') {
     const searchInput = page.locator('input[name="search"]');
     if (await searchInput.count() > 0) {
@@ -34,7 +30,6 @@ export async function applyTrademarksFilters(page: Page, filters?: any): Promise
   }
 }
 
-// Основная функция сбора для товарных знаков (детальный список)
 export async function collectTrademarksDetails(
   page: Page,
   companyId: number,
@@ -49,19 +44,18 @@ export async function collectTrademarksDetails(
 
   const url = `https://www.rusprofile.ru/trademarks/${companyId}`;
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-  await page.waitForSelector('ul.filters-results__list, .trademarks-list, .similar-table-container', { timeout: 15000 });
+  await page.waitForSelector('ul.filters-results__list', { timeout: 15000 });
   await page.waitForTimeout(1000);
 
-  // Применяем фильтры
   if (options.filters) {
     await applyTrademarksFilters(page, options.filters);
     await page.waitForTimeout(2000);
   }
 
-  // Заголовок с общим количеством
+  // Получаем общее количество из уведомления о пагинации
   try {
-    const headText = await page.locator('div.export-data__text').first().innerText();
-    const m = headText.match(/Найдено\s*([\d\s]+)\s*товарных знаков?/i) || headText.match(/Найдено\s*([\d\s]+)/);
+    const noticeText = await page.locator('.filters-pagination__notice').first().innerText({ timeout: 5000 });
+    const m = noticeText.match(/из\s*([\d\s]+)/);
     if (m) data.total_trademarks = m[1].replace(/\s/g, '');
   } catch (e) {
     console.log('Не удалось получить общее количество товарных знаков:', e);
@@ -73,38 +67,62 @@ export async function collectTrademarksDetails(
   let currentPage = 1;
 
   while (currentPage <= maxPages && collected < maxTotalCases) {
-    // Здесь предполагаем, что каждый товарный знак находится в li.filters-results__list-item
-    // Если структура другая, замените селектор
-    const items = page.locator('li.filters-results__list-item, .trademark-item, .tm_item');
+    const items = page.locator('li.filters-results__list-item');
     const itemCount = await items.count();
 
     for (let i = 0; i < itemCount && collected < maxTotalCases; i++) {
       const item = items.nth(i);
-      const trademark: any = {};
 
-      // Извлекаем данные через evaluate
-      const details = await item.evaluate((el) => {
-        const getText = (selector: string) => {
-          const node = el.querySelector(selector);
-          return node ? node.textContent?.trim() || '' : '';
+      // Извлекаем данные (аккордеоны раскрывать не требуется, текст доступен в DOM)
+      const details = await item.evaluate((li) => {
+        const getValueByTitle = (title: string, container?: Element | null): string => {
+          const target = container || li;
+          const items = target.querySelectorAll('.info__item');
+          for (const item of items) {
+            const titleEl = item.querySelector('.company-info__title');
+            if (titleEl && titleEl.textContent?.trim() === title) {
+              const valueEl = item.querySelector('.company-info__text');
+              return valueEl ? valueEl.textContent?.trim() || '' : '';
+            }
+          }
+          return '';
         };
 
-        const id = getText('.tm_item__link, .trademark-item__number, .snippet__row-value--title');
-        const status = getText('.tm_status, .snippet__status');
-        const type = getText("dl:has-text('Тип') dd, .trademark-item__type");
-        const regDate = getText("dl:has-text('Дата регистрации') dd, .trademark-item__date");
-        const expires = getText("dl:has-text('Истекает') dd, .trademark-item__expires");
-        const classes = getText('.tm_classes, .trademark-item__classes');
+        const id = getValueByTitle('Номер гос. регистрации');
+        const status = getValueByTitle('Статус');
+        const regDate = getValueByTitle('Дата гос. регистрации');
+        const country = getValueByTitle('Страна правообладателя');
 
-        return { id, status, type, regDate, expires, classes };
+        const descriptionAccordion = li.querySelector('.accordion__item[data-resolver="description"]');
+        const type = getValueByTitle('Тип товарного знака', descriptionAccordion);
+
+        const generalAccordion = li.querySelector('.accordion__item[data-resolver="general_information"]');
+        const expires = getValueByTitle('Дата истечения срока действия исключительного права', generalAccordion);
+
+        const mktuAccordion = li.querySelector('.accordion__item[data-resolver="mktu"]');
+        let classes = '';
+        if (mktuAccordion) {
+          const textEl = mktuAccordion.querySelector('.truncate-textBlock__content');
+          if (textEl) classes = textEl.textContent?.trim() || '';
+        }
+
+        // Изображение товарного знака
+        const imgEl = li.querySelector('.trademarks-img img');
+        const imageUrl = imgEl ? (imgEl as HTMLImageElement).getAttribute('src') || '' : '';
+
+        return { id, status, regDate, country, type, expires, classes, imageUrl };
       });
 
-      trademark.id = details.id;
-      trademark.status = details.status;
-      trademark.type = details.type;
-      trademark.registration_date = details.regDate;
-      trademark.expires = details.expires;
-      trademark.classes = details.classes;
+      const trademark: any = {
+        id: details.id,
+        status: details.status,
+        registration_date: details.regDate,
+        country: details.country,
+        type: details.type,
+        expires: details.expires,
+        classes: details.classes,
+        image_url: details.imageUrl,
+      };
 
       if (trademark.id || trademark.status) {
         data.trademarks.push(trademark);
@@ -114,7 +132,7 @@ export async function collectTrademarksDetails(
 
     if (currentPage >= maxPages || collected >= maxTotalCases) break;
 
-    // Пагинация (если есть)
+    // Пагинация
     const showMore = page.locator("button:has-text('Показать ещё')").first();
     if (await showMore.count() > 0 && await showMore.isEnabled()) {
       await showMore.click();

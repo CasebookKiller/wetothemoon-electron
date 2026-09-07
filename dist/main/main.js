@@ -6266,15 +6266,14 @@ async function collectTrademarksDetails(page, companyId, options = {}) {
 		waitUntil: "domcontentloaded",
 		timeout: 6e4
 	});
-	await page.waitForSelector("ul.filters-results__list, .trademarks-list, .similar-table-container", { timeout: 15e3 });
+	await page.waitForSelector("ul.filters-results__list", { timeout: 15e3 });
 	await page.waitForTimeout(1e3);
 	if (options.filters) {
 		await applyTrademarksFilters(page, options.filters);
 		await page.waitForTimeout(2e3);
 	}
 	try {
-		const headText = await page.locator("div.export-data__text").first().innerText();
-		const m = headText.match(/Найдено\s*([\d\s]+)\s*товарных знаков?/i) || headText.match(/Найдено\s*([\d\s]+)/);
+		const m = (await page.locator(".filters-pagination__notice").first().innerText({ timeout: 5e3 })).match(/из\s*([\d\s]+)/);
 		if (m) data.total_trademarks = m[1].replace(/\s/g, "");
 	} catch (e) {
 		console.log("Не удалось получить общее количество товарных знаков:", e);
@@ -6284,31 +6283,56 @@ async function collectTrademarksDetails(page, companyId, options = {}) {
 	let collected = 0;
 	let currentPage = 1;
 	while (currentPage <= maxPages && collected < maxTotalCases) {
-		const items = page.locator("li.filters-results__list-item, .trademark-item, .tm_item");
+		const items = page.locator("li.filters-results__list-item");
 		const itemCount = await items.count();
 		for (let i = 0; i < itemCount && collected < maxTotalCases; i++) {
-			const item = items.nth(i);
-			const trademark = {};
-			const details = await item.evaluate((el) => {
-				const getText = (selector) => {
-					const node = el.querySelector(selector);
-					return node ? node.textContent?.trim() || "" : "";
+			const details = await items.nth(i).evaluate((li) => {
+				const getValueByTitle = (title, container) => {
+					const items = (container || li).querySelectorAll(".info__item");
+					for (const item of items) {
+						const titleEl = item.querySelector(".company-info__title");
+						if (titleEl && titleEl.textContent?.trim() === title) {
+							const valueEl = item.querySelector(".company-info__text");
+							return valueEl ? valueEl.textContent?.trim() || "" : "";
+						}
+					}
+					return "";
 				};
+				const id = getValueByTitle("Номер гос. регистрации");
+				const status = getValueByTitle("Статус");
+				const regDate = getValueByTitle("Дата гос. регистрации");
+				const country = getValueByTitle("Страна правообладателя");
+				const type = getValueByTitle("Тип товарного знака", li.querySelector(".accordion__item[data-resolver=\"description\"]"));
+				const expires = getValueByTitle("Дата истечения срока действия исключительного права", li.querySelector(".accordion__item[data-resolver=\"general_information\"]"));
+				const mktuAccordion = li.querySelector(".accordion__item[data-resolver=\"mktu\"]");
+				let classes = "";
+				if (mktuAccordion) {
+					const textEl = mktuAccordion.querySelector(".truncate-textBlock__content");
+					if (textEl) classes = textEl.textContent?.trim() || "";
+				}
+				const imgEl = li.querySelector(".trademarks-img img");
+				const imageUrl = imgEl ? imgEl.getAttribute("src") || "" : "";
 				return {
-					id: getText(".tm_item__link, .trademark-item__number, .snippet__row-value--title"),
-					status: getText(".tm_status, .snippet__status"),
-					type: getText("dl:has-text('Тип') dd, .trademark-item__type"),
-					regDate: getText("dl:has-text('Дата регистрации') dd, .trademark-item__date"),
-					expires: getText("dl:has-text('Истекает') dd, .trademark-item__expires"),
-					classes: getText(".tm_classes, .trademark-item__classes")
+					id,
+					status,
+					regDate,
+					country,
+					type,
+					expires,
+					classes,
+					imageUrl
 				};
 			});
-			trademark.id = details.id;
-			trademark.status = details.status;
-			trademark.type = details.type;
-			trademark.registration_date = details.regDate;
-			trademark.expires = details.expires;
-			trademark.classes = details.classes;
+			const trademark = {
+				id: details.id,
+				status: details.status,
+				registration_date: details.regDate,
+				country: details.country,
+				type: details.type,
+				expires: details.expires,
+				classes: details.classes,
+				image_url: details.imageUrl
+			};
 			if (trademark.id || trademark.status) {
 				data.trademarks.push(trademark);
 				collected++;
