@@ -49,12 +49,18 @@ export function saveCompanyData(
   savedObservations: number;
   rawDumpPath: string;
 } {
-  // 1. Сохраняем сырой дамп (с разделением по региону и типу)
+  // 1. Сохраняем сырой дамп
   const raw = saveRawDumpSync(companyInn, data);
 
-  // 2. Создаём источник
+  // 2. Определяем тип сущности
+  const mainSummary = data.summary || {};
+  const mainType = detectEntityTypeFromData(mainSummary);
+  const urlPath = mainType === 'company' ? 'id' : mainType === 'entrepreneur' ? 'ip' : 'person';
+  const sourceUrl = `https://www.rusprofile.ru/${urlPath}/${companyId}`;
+
+  // 3. Создаём источник
   const sourceId = addSource({
-    url: `https://www.rusprofile.ru/id/${companyId}`,
+    url: sourceUrl,
     title: 'Rusprofile',
     source_type: 'registry',
     source_kind: 'official_registry',
@@ -66,11 +72,7 @@ export function saveCompanyData(
     local_path: raw.filePath,
   });
 
-  // 3. Сохраняем основную сущность (целевую компанию или ИП/ФЛ)
-  const mainSummary = data.summary || {};
-  const mainType = detectEntityTypeFromData(mainSummary);
-  const urlPath = mainType === 'company' ? 'id' : mainType === 'entrepreneur' ? 'ip' : 'person';
-  const sourceUrl = `https://www.rusprofile.ru/${urlPath}/${companyId}`;
+  // 4. Сохраняем основную сущность
   const mainEntityId = upsertEntity({
     type: mainType,
     value: mainSummary.name || `Сущность ${companyInn}`,
@@ -81,10 +83,11 @@ export function saveCompanyData(
     raw_file_path: raw.filePath,
   });
 
-  // 4. Добавляем наблюдения для основной сущности
+  // 5. Добавляем наблюдения для основной сущности
   const mainObservations: Array<{ attribute: string; value?: string }> = [
     { attribute: 'inn', value: mainSummary.inn },
     { attribute: 'ogrn', value: mainSummary.ogrn },
+    { attribute: 'ogrnip', value: mainSummary.ogrnip },
     { attribute: 'kpp', value: mainSummary.kpp },
     { attribute: 'address', value: mainSummary.address },
     { attribute: 'activity', value: mainSummary.main_activity },
@@ -106,10 +109,10 @@ export function saveCompanyData(
     }
   }
 
-  let savedEntities = 1; // основная сущность
+  let savedEntities = 1;
   let savedRelations = 0;
 
-  // 5. Обработка учредителей
+  // 6. Обработка учредителей (если есть)
   if (data.founders_details?.founders) {
     for (const founder of data.founders_details.founders) {
       const founderType =
@@ -132,6 +135,26 @@ export function saveCompanyData(
           entity_id: founderId,
           attribute: 'inn',
           value: founder.inn,
+          source_id: sourceId,
+          raw_file_path: raw.filePath,
+        });
+        savedObservations++;
+      }
+      if (founder.ogrn) {
+        addObservation({
+          entity_id: founderId,
+          attribute: 'ogrn',
+          value: founder.ogrn,
+          source_id: sourceId,
+          raw_file_path: raw.filePath,
+        });
+        savedObservations++;
+      }
+      if (founder.ogrnip) {
+        addObservation({
+          entity_id: founderId,
+          attribute: 'ogrnip',
+          value: founder.ogrnip,
           source_id: sourceId,
           raw_file_path: raw.filePath,
         });
@@ -164,7 +187,7 @@ export function saveCompanyData(
     }
   }
 
-  // 6. Обработка связей (connections)
+  // 7. Обработка связей (connections_details)
   if (data.connections_details?.connections) {
     for (const group of data.connections_details.connections) {
       if (group.organizations) {
@@ -204,6 +227,16 @@ export function saveCompanyData(
             });
             savedObservations++;
           }
+          if (org.ogrnip) {
+            addObservation({
+              entity_id: orgId,
+              attribute: 'ogrnip',
+              value: org.ogrnip,
+              source_id: sourceId,
+              raw_file_path: raw.filePath,
+            });
+            savedObservations++;
+          }
 
           addRelation({
             subject_id: mainEntityId,
@@ -223,7 +256,7 @@ export function saveCompanyData(
     }
   }
 
-  // 7. Аудит
+  // 8. Аудит
   auditChange(
     'entities',
     mainEntityId,

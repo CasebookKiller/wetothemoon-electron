@@ -4738,7 +4738,7 @@ function setCredentials(site, login, password) {
 	saveCredentials(all);
 }
 //#endregion
-//#region src/main/services/osint/scrapers/rusprofile.ts
+//#region src/main/services/osint/scrapers/rusprofile/helpers.ts
 async function closeModalIfPresent(page) {
 	const closeButton = page.locator("button.modal-close.modal-company-description__close");
 	try {
@@ -4789,6 +4789,8 @@ function startModalWatcher(page) {
 		}
 	})();
 }
+//#endregion
+//#region src/main/services/osint/scrapers/rusprofile.ts
 async function login(page, login, password) {
 	console.log("Выполняем вход на rusprofile...");
 	await page.goto("https://www.rusprofile.ru/", {
@@ -8863,8 +8865,10 @@ function extractRusprofileId(href) {
 }
 function saveCompanyData(companyId, companyInn, data) {
 	const raw = saveRawDumpSync(companyInn, data);
+	const mainSummary = data.summary || {};
+	const mainType = detectEntityTypeFromData(mainSummary);
 	const sourceId = addSource({
-		url: `https://www.rusprofile.ru/id/${companyId}`,
+		url: `https://www.rusprofile.ru/${mainType === "company" ? "id" : mainType === "entrepreneur" ? "ip" : "person"}/${companyId}`,
 		title: "Rusprofile",
 		source_type: "registry",
 		source_kind: "official_registry",
@@ -8875,9 +8879,6 @@ function saveCompanyData(companyId, companyInn, data) {
 		retrieved_at: (/* @__PURE__ */ new Date()).toISOString(),
 		local_path: raw.filePath
 	});
-	const mainSummary = data.summary || {};
-	const mainType = detectEntityTypeFromData(mainSummary);
-	`${companyId}`;
 	const mainEntityId = upsertEntity({
 		type: mainType,
 		value: mainSummary.name || `Сущность ${companyInn}`,
@@ -8895,6 +8896,10 @@ function saveCompanyData(companyId, companyInn, data) {
 		{
 			attribute: "ogrn",
 			value: mainSummary.ogrn
+		},
+		{
+			attribute: "ogrnip",
+			value: mainSummary.ogrnip
 		},
 		{
 			attribute: "kpp",
@@ -8943,6 +8948,26 @@ function saveCompanyData(companyId, companyInn, data) {
 				entity_id: founderId,
 				attribute: "inn",
 				value: founder.inn,
+				source_id: sourceId,
+				raw_file_path: raw.filePath
+			});
+			savedObservations++;
+		}
+		if (founder.ogrn) {
+			addObservation({
+				entity_id: founderId,
+				attribute: "ogrn",
+				value: founder.ogrn,
+				source_id: sourceId,
+				raw_file_path: raw.filePath
+			});
+			savedObservations++;
+		}
+		if (founder.ogrnip) {
+			addObservation({
+				entity_id: founderId,
+				attribute: "ogrnip",
+				value: founder.ogrnip,
 				source_id: sourceId,
 				raw_file_path: raw.filePath
 			});
@@ -8998,6 +9023,16 @@ function saveCompanyData(companyId, companyInn, data) {
 					entity_id: orgId,
 					attribute: "ogrn",
 					value: org.ogrn,
+					source_id: sourceId,
+					raw_file_path: raw.filePath
+				});
+				savedObservations++;
+			}
+			if (org.ogrnip) {
+				addObservation({
+					entity_id: orgId,
+					attribute: "ogrnip",
+					value: org.ogrnip,
 					source_id: sourceId,
 					raw_file_path: raw.filePath
 				});
