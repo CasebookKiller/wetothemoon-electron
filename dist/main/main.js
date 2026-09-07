@@ -8804,6 +8804,9 @@ function saveRawDumpSync(companyInn, data) {
 	if (summary.ogrn && summary.inn) {
 		entityType = "company";
 		prefix = summary.inn.slice(0, 5) || "unknown";
+	} else if (summary.ogrnip && summary.inn) {
+		entityType = "entrepreneur";
+		prefix = summary.inn.slice(0, 5) || "unknown";
 	} else if (summary.inn && !summary.ogrn) {
 		entityType = "entrepreneur";
 		prefix = summary.inn.slice(0, 5) || "unknown";
@@ -8845,6 +8848,7 @@ function detectEntityTypeFromHref(href) {
 */
 function detectEntityTypeFromData(data) {
 	if (data.ogrn && data.inn) return "company";
+	if (data.ogrnip && data.inn) return "entrepreneur";
 	if (data.inn && !data.ogrn) return "entrepreneur";
 	return "person";
 }
@@ -8872,8 +8876,10 @@ function saveCompanyData(companyId, companyInn, data) {
 		local_path: raw.filePath
 	});
 	const mainSummary = data.summary || {};
+	const mainType = detectEntityTypeFromData(mainSummary);
+	`${companyId}`;
 	const mainEntityId = upsertEntity({
-		type: detectEntityTypeFromData(mainSummary),
+		type: mainType,
 		value: mainSummary.name || `Сущность ${companyInn}`,
 		label: mainSummary.name,
 		confidence: 90,

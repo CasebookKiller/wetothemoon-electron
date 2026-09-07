@@ -22,16 +22,18 @@ export function saveRawDumpSync(companyInn: string, data: any): SavedRawDump {
   if (summary.ogrn && summary.inn) {
     entityType = 'company';
     prefix = summary.inn.slice(0, 5) || 'unknown';
+  } else if (summary.ogrnip && summary.inn) {
+    entityType = 'entrepreneur';
+    prefix = summary.inn.slice(0, 5) || 'unknown';
   } else if (summary.inn && !summary.ogrn) {
     entityType = 'entrepreneur';
     prefix = summary.inn.slice(0, 5) || 'unknown';
   } else {
-    // Физлицо — пытаемся вытащить ИНН из связанных полей или используем регион
     entityType = 'person';
     if (summary.inn) {
       prefix = summary.inn.slice(0, 5);
     } else if (summary.region) {
-      prefix = summary.region.slice(0, 2); // упрощённо
+      prefix = summary.region.slice(0, 2);
     } else {
       prefix = 'misc';
     }

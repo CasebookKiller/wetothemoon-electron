@@ -24,8 +24,9 @@ function detectEntityTypeFromHref(href?: string): string | null {
  */
 function detectEntityTypeFromData(data: any): string {
   if (data.ogrn && data.inn) return 'company';
-  if (data.inn && !data.ogrn) return 'entrepreneur'; // ИП тоже имеют 12-значный ИНН
-  return 'person'; // физлицо или неизвестное
+  if (data.ogrnip && data.inn) return 'entrepreneur';
+  if (data.inn && !data.ogrn) return 'entrepreneur';
+  return 'person';
 }
 
 /**
@@ -68,6 +69,8 @@ export function saveCompanyData(
   // 3. Сохраняем основную сущность (целевую компанию или ИП/ФЛ)
   const mainSummary = data.summary || {};
   const mainType = detectEntityTypeFromData(mainSummary);
+  const urlPath = mainType === 'company' ? 'id' : mainType === 'entrepreneur' ? 'ip' : 'person';
+  const sourceUrl = `https://www.rusprofile.ru/${urlPath}/${companyId}`;
   const mainEntityId = upsertEntity({
     type: mainType,
     value: mainSummary.name || `Сущность ${companyInn}`,
