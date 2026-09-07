@@ -5695,35 +5695,7 @@ async function collectResume(page) {
 	});
 }
 //#endregion
-//#region src/main/services/osint/scrapers/rusprofile.ts
-async function getEntityIdByInn(page, inn) {
-	await page.goto("https://www.rusprofile.ru/", {
-		waitUntil: "domcontentloaded",
-		timeout: 6e4
-	});
-	await page.waitForTimeout(2e3);
-	const searchInput = page.locator("input#autocomplete-main-search");
-	await searchInput.waitFor({
-		state: "visible",
-		timeout: 5e3
-	});
-	await searchInput.fill(inn);
-	await searchInput.press("Enter");
-	await page.waitForTimeout(3e3);
-	const match = page.url().match(/\/(id|ip|person)\/(\d+)/);
-	if (match) return {
-		id: parseInt(match[2]),
-		type: match[1]
-	};
-	await page.locator("a[href*='/id/'], a[href*='/ip/'], a[href*='/person/']").first().click();
-	await page.waitForTimeout(5e3);
-	const newMatch = page.url().match(/\/(id|ip|person)\/(\d+)/);
-	if (newMatch) return {
-		id: parseInt(newMatch[2]),
-		type: newMatch[1]
-	};
-	throw new Error(`Не удалось найти сущность по ИНН ${inn}`);
-}
+//#region src/main/services/osint/scrapers/rusprofile/details/arbitr.ts
 async function applyArbitrFilters(page, filters) {
 	if (!filters) return;
 	if (filters.sides && Array.isArray(filters.sides) && filters.sides.length > 0) {
@@ -5926,6 +5898,8 @@ async function collectArbitrDetails(page, companyId, options = {}) {
 	}
 	return data;
 }
+//#endregion
+//#region src/main/services/osint/scrapers/rusprofile/details/connections.ts
 async function collectConnectionsDetails(page, companyId) {
 	console.log(`Сбор детальных связей для компании ID ${companyId}...`);
 	const data = {
@@ -6062,6 +6036,8 @@ async function collectConnectionsDetails(page, companyId) {
 	console.log(`Собрано связей: ${data.connections.length}, организаций всего: ${data.total_organizations}`);
 	return data;
 }
+//#endregion
+//#region src/main/services/osint/scrapers/rusprofile/details/sou.ts
 async function applySouFilters(page, filters) {
 	if (!filters) return;
 	if (filters.role && filters.role !== "all") {
@@ -6252,6 +6228,8 @@ async function collectSouDetails(page, companyId, options = {}) {
 	console.log(`Собрано дел судов: ${data.cases.length}, всего: ${data.total_cases}`);
 	return data;
 }
+//#endregion
+//#region src/main/services/osint/scrapers/rusprofile/details/trademarks.ts
 async function applyTrademarksFilters(page, filters) {
 	if (!filters) return;
 	if (filters.onlyActual) {
@@ -6354,6 +6332,8 @@ async function collectTrademarksDetails(page, companyId, options = {}) {
 	console.log(`Собрано товарных знаков: ${data.trademarks.length}, всего: ${data.total_trademarks}`);
 	return data;
 }
+//#endregion
+//#region src/main/services/osint/scrapers/rusprofile/details/leasing.ts
 async function applyLeasingFilters(page, filters) {
 	if (!filters) return;
 	if (filters.role && filters.role !== "all") {
@@ -6554,6 +6534,8 @@ async function collectLeasingDetails(page, companyId, options = {}) {
 	console.log(`Собрано договоров лизинга: ${data.contracts.length}, всего: ${data.total_contracts}`);
 	return data;
 }
+//#endregion
+//#region src/main/services/osint/scrapers/rusprofile/details/pledges.ts
 async function applyPledgeFilters(page, filters) {
 	if (!filters) return;
 	if (filters.role && filters.role !== "all") {
@@ -6725,6 +6707,8 @@ async function collectPledgesDetails(page, companyId, options = {}) {
 	console.log(`Собрано сообщений о залогах: ${data.pledges.length}, всего: ${data.total_messages}`);
 	return data;
 }
+//#endregion
+//#region src/main/services/osint/scrapers/rusprofile/details/facts.ts
 async function applyFactsFilters(page, filters) {
 	if (!filters) return;
 	if (filters.group && filters.group !== "all") {
@@ -6882,6 +6866,8 @@ async function collectFactsDetails(page, companyId, options = {}) {
 	console.log(`Собрано фактов: ${data.facts.length}, всего: ${data.total_messages}`);
 	return data;
 }
+//#endregion
+//#region src/main/services/osint/scrapers/rusprofile/details/bankruptcy.ts
 async function collectBankruptcyDetails(page, companyId, options = {}) {
 	console.log(`Сбор банкротства для компании ID ${companyId}...`);
 	const data = {
@@ -7008,6 +6994,8 @@ async function collectBankruptcyDetails(page, companyId, options = {}) {
 	console.log(`Собрано сообщений о банкротстве: ${data.messages.length}`);
 	return data;
 }
+//#endregion
+//#region src/main/services/osint/scrapers/rusprofile/details/founders.ts
 async function applyFoundersFilters(page, filters) {
 	if (!filters) return;
 	if (filters.types && Array.isArray(filters.types) && filters.types.length > 0) for (const type of filters.types) {
@@ -7142,6 +7130,8 @@ async function collectFoundersDetails(page, companyId, options = {}) {
 	console.log(`Собрано учредителей: ${data.founders.length}`);
 	return data;
 }
+//#endregion
+//#region src/main/services/osint/scrapers/rusprofile/details/reliability.ts
 async function collectReliabilityDetails(page, companyId, options = {}) {
 	console.log(`Сбор надёжности для компании ID ${companyId}...`);
 	const data = {
@@ -7232,6 +7222,8 @@ async function collectReliabilityDetails(page, companyId, options = {}) {
 	console.log(`Собрано групп фактов: ${data.groups.length}`);
 	return data;
 }
+//#endregion
+//#region src/main/services/osint/scrapers/rusprofile/details/sanctions.ts
 async function collectSanctionsDetails(page, companyId, options = {}) {
 	console.log(`Сбор санкций для компании ID ${companyId}...`);
 	const data = {
@@ -7343,6 +7335,8 @@ async function collectSanctionsDetails(page, companyId, options = {}) {
 	console.log(`Собрано групп рисков: ${data.risk_groups.length}, связанных организаций: ${data.related_organizations.length}`);
 	return data;
 }
+//#endregion
+//#region src/main/services/osint/scrapers/rusprofile/details/gz.ts
 async function applyGzFilters(page, filters) {
 	if (!filters) return;
 	if (filters.role && filters.role !== "all") {
@@ -7533,6 +7527,8 @@ async function collectGzDetails(page, companyId, options = {}) {
 	console.log(`Собрано закупок: ${data.purchases.length}, всего: ${data.total_purchases}`);
 	return data;
 }
+//#endregion
+//#region src/main/services/osint/scrapers/rusprofile/details/fssp.ts
 async function applyFsspFilters(page, filters) {
 	if (!filters) return;
 	if (filters.statuses && Array.isArray(filters.statuses) && filters.statuses.length > 0) for (const status of filters.statuses) {
@@ -7656,6 +7652,8 @@ async function collectFsspDetails(page, companyId, options = {}) {
 	console.log(`Собрано исполнительных производств: ${data.productions.length}, всего: ${data.total_productions}`);
 	return data;
 }
+//#endregion
+//#region src/main/services/osint/scrapers/rusprofile/details/inspections.ts
 async function applyInspectionsFilters(page, filters) {
 	if (!filters) return;
 	if (filters.planned && Array.isArray(filters.planned) && filters.planned.length > 0) for (const value of filters.planned) {
@@ -7789,6 +7787,8 @@ async function collectInspectionsDetails(page, companyId, options = {}) {
 	console.log(`Собрано проверок: ${data.inspections.length}, всего: ${data.total_inspections}`);
 	return data;
 }
+//#endregion
+//#region src/main/services/osint/scrapers/rusprofile/details/licenses.ts
 async function applyLicensesFilters(page, filters) {
 	if (!filters) return;
 	if (filters.origins && Array.isArray(filters.origins) && filters.origins.length > 0) for (const origin of filters.origins) {
@@ -7909,6 +7909,8 @@ async function collectLicensesDetails(page, companyId, options = {}) {
 	console.log(`Собрано лицензий: ${data.licenses.length}, всего: ${data.total_licenses}`);
 	return data;
 }
+//#endregion
+//#region src/main/services/osint/scrapers/rusprofile/details/branches.ts
 async function collectBranchesDetails(page, companyId, options = {}) {
 	console.log(`Сбор филиалов и представительств для компании ID ${companyId}...`);
 	const data = {
@@ -7961,6 +7963,8 @@ async function collectBranchesDetails(page, companyId, options = {}) {
 	console.log(`Собрано филиалов/представительств: ${data.branches.length}, всего: ${data.total_branches}`);
 	return data;
 }
+//#endregion
+//#region src/main/services/osint/scrapers/rusprofile/details/history.ts
 async function applyHistoryFilters(page, filters) {
 	if (!filters) return;
 	if (filters.importantOnly) {
@@ -8099,6 +8103,8 @@ async function collectHistoryDetails(page, companyId, options = {}) {
 	console.log(`Собрано записей истории: ${data.history.length}, всего событий: ${data.total_events}`);
 	return data;
 }
+//#endregion
+//#region src/main/services/osint/scrapers/rusprofile/details/requisites.ts
 async function collectRequisitesDetails(page, companyId, options = {}) {
 	console.log(`Сбор реквизитов для компании ID ${companyId}...`);
 	const data = { sections: [] };
@@ -8142,6 +8148,8 @@ async function collectRequisitesDetails(page, companyId, options = {}) {
 	console.log(`Собрано секций реквизитов: ${data.sections.length}`);
 	return data;
 }
+//#endregion
+//#region src/main/services/osint/scrapers/rusprofile/details/okved.ts
 async function collectOkvedDetails(page, companyId, options = {}) {
 	console.log(`Сбор видов деятельности для компании ID ${companyId}...`);
 	const data = {
@@ -8211,6 +8219,8 @@ async function collectOkvedDetails(page, companyId, options = {}) {
 	console.log(`Собрано ОКВЭД: отрасль "${data.industry}", доп. видов: ${data.additional_activities.length}, топ компаний: ${data.top_companies.length}`);
 	return data;
 }
+//#endregion
+//#region src/main/services/osint/scrapers/rusprofile/details/egrul.ts
 async function collectEgrulDetails(page, companyId, options = {}) {
 	console.log(`Сбор выписки из ЕГРЮЛ/ЕГРИП для ID ${companyId}, тип: ${options.entityType || "company"}...`);
 	const data = {
@@ -8294,6 +8304,36 @@ async function collectEgrulDetails(page, companyId, options = {}) {
 	});
 	console.log(`Собрано секций выписки: ${data.sections.length}`);
 	return data;
+}
+//#endregion
+//#region src/main/services/osint/scrapers/rusprofile.ts
+async function getEntityIdByInn(page, inn) {
+	await page.goto("https://www.rusprofile.ru/", {
+		waitUntil: "domcontentloaded",
+		timeout: 6e4
+	});
+	await page.waitForTimeout(2e3);
+	const searchInput = page.locator("input#autocomplete-main-search");
+	await searchInput.waitFor({
+		state: "visible",
+		timeout: 5e3
+	});
+	await searchInput.fill(inn);
+	await searchInput.press("Enter");
+	await page.waitForTimeout(3e3);
+	const match = page.url().match(/\/(id|ip|person)\/(\d+)/);
+	if (match) return {
+		id: parseInt(match[2]),
+		type: match[1]
+	};
+	await page.locator("a[href*='/id/'], a[href*='/ip/'], a[href*='/person/']").first().click();
+	await page.waitForTimeout(5e3);
+	const newMatch = page.url().match(/\/(id|ip|person)\/(\d+)/);
+	if (newMatch) return {
+		id: parseInt(newMatch[2]),
+		type: newMatch[1]
+	};
+	throw new Error(`Не удалось найти сущность по ИНН ${inn}`);
 }
 async function scrapeRusprofile(inn, options) {
 	let browser = getBrowser();
