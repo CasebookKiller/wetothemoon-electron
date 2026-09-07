@@ -4949,35 +4949,7 @@ async function collectSummary(page) {
 	});
 }
 //#endregion
-//#region src/main/services/osint/scrapers/rusprofile.ts
-async function getEntityIdByInn(page, inn) {
-	await page.goto("https://www.rusprofile.ru/", {
-		waitUntil: "domcontentloaded",
-		timeout: 6e4
-	});
-	await page.waitForTimeout(2e3);
-	const searchInput = page.locator("input#autocomplete-main-search");
-	await searchInput.waitFor({
-		state: "visible",
-		timeout: 5e3
-	});
-	await searchInput.fill(inn);
-	await searchInput.press("Enter");
-	await page.waitForTimeout(3e3);
-	const match = page.url().match(/\/(id|ip|person)\/(\d+)/);
-	if (match) return {
-		id: parseInt(match[2]),
-		type: match[1]
-	};
-	await page.locator("a[href*='/id/'], a[href*='/ip/'], a[href*='/person/']").first().click();
-	await page.waitForTimeout(5e3);
-	const newMatch = page.url().match(/\/(id|ip|person)\/(\d+)/);
-	if (newMatch) return {
-		id: parseInt(newMatch[2]),
-		type: newMatch[1]
-	};
-	throw new Error(`Не удалось найти сущность по ИНН ${inn}`);
-}
+//#region src/main/services/osint/scrapers/rusprofile/collectTiles.ts
 async function collectFssp(page) {
 	return page.evaluate(() => {
 		const tile = document.querySelector(".fssp-tile");
@@ -5721,6 +5693,36 @@ async function collectResume(page) {
 			paragraphs
 		};
 	});
+}
+//#endregion
+//#region src/main/services/osint/scrapers/rusprofile.ts
+async function getEntityIdByInn(page, inn) {
+	await page.goto("https://www.rusprofile.ru/", {
+		waitUntil: "domcontentloaded",
+		timeout: 6e4
+	});
+	await page.waitForTimeout(2e3);
+	const searchInput = page.locator("input#autocomplete-main-search");
+	await searchInput.waitFor({
+		state: "visible",
+		timeout: 5e3
+	});
+	await searchInput.fill(inn);
+	await searchInput.press("Enter");
+	await page.waitForTimeout(3e3);
+	const match = page.url().match(/\/(id|ip|person)\/(\d+)/);
+	if (match) return {
+		id: parseInt(match[2]),
+		type: match[1]
+	};
+	await page.locator("a[href*='/id/'], a[href*='/ip/'], a[href*='/person/']").first().click();
+	await page.waitForTimeout(5e3);
+	const newMatch = page.url().match(/\/(id|ip|person)\/(\d+)/);
+	if (newMatch) return {
+		id: parseInt(newMatch[2]),
+		type: newMatch[1]
+	};
+	throw new Error(`Не удалось найти сущность по ИНН ${inn}`);
 }
 async function applyArbitrFilters(page, filters) {
 	if (!filters) return;
