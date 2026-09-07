@@ -4517,22 +4517,32 @@ async function collectOkvedDetails(
 async function collectEgrulDetails(
   page: Page,
   companyId: number,
-  options: { maxTotalCases?: number } = {}
+  options: { maxTotalCases?: number; entityType?: string } = {}
 ): Promise<any> {
-  console.log(`Сбор выписки из ЕГРЮЛ для компании ID ${companyId}...`);
+  console.log(`Сбор выписки из ЕГРЮЛ/ЕГРИП для ID ${companyId}, тип: ${options.entityType || 'company'}...`);
   const data: any = { basic_info: {}, sections: [] };
 
-  // Получаем ОГРН с карточки компании
-  await page.goto(`https://www.rusprofile.ru/id/${companyId}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
-  await page.waitForSelector('#clip_ogrn', { timeout: 15000 });
-  const ogrn = await page.locator('#clip_ogrn').first().innerText().catch(() => '');
+  // Если entityType == 'person', выписка недоступна
+  if (options.entityType === 'person') {
+    console.log('Для физических лиц выписка ЕГРЮЛ/ЕГРИП не предусмотрена.');
+    return data;
+  }
+
+  const urlPath = options.entityType === 'entrepreneur' ? 'ip' : 'id';
+  const selector = options.entityType === 'entrepreneur' ? '#clip_ogrnip' : '#clip_ogrn';
+  const queryParam = options.entityType === 'entrepreneur' ? 'ogrnip' : 'ogrn';
+
+  // Получаем ОГРН/ОГРНИП с карточки
+  await page.goto(`https://www.rusprofile.ru/${urlPath}/${companyId}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await page.waitForSelector(selector, { timeout: 15000 });
+  const ogrn = await page.locator(selector).first().innerText().catch(() => '');
   if (!ogrn) {
-    console.warn('Не удалось получить ОГРН с карточки, сбор выписки прерван');
+    console.warn('Не удалось получить ОГРН/ОГРНИП с карточки, сбор выписки прерван');
     return data;
   }
 
   // Переходим на страницу выписки
-  await page.goto(`https://www.rusprofile.ru/egrul?ogrn=${ogrn}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await page.goto(`https://www.rusprofile.ru/egrul?${queryParam}=${ogrn}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.waitForSelector('.tiles-content', { timeout: 15000 });
   await page.waitForTimeout(1000);
 

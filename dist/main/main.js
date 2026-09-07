@@ -8204,22 +8204,29 @@ async function collectOkvedDetails(page, companyId, options = {}) {
 	return data;
 }
 async function collectEgrulDetails(page, companyId, options = {}) {
-	console.log(`Сбор выписки из ЕГРЮЛ для компании ID ${companyId}...`);
+	console.log(`Сбор выписки из ЕГРЮЛ/ЕГРИП для ID ${companyId}, тип: ${options.entityType || "company"}...`);
 	const data = {
 		basic_info: {},
 		sections: []
 	};
-	await page.goto(`https://www.rusprofile.ru/id/${companyId}`, {
+	if (options.entityType === "person") {
+		console.log("Для физических лиц выписка ЕГРЮЛ/ЕГРИП не предусмотрена.");
+		return data;
+	}
+	const urlPath = options.entityType === "entrepreneur" ? "ip" : "id";
+	const selector = options.entityType === "entrepreneur" ? "#clip_ogrnip" : "#clip_ogrn";
+	const queryParam = options.entityType === "entrepreneur" ? "ogrnip" : "ogrn";
+	await page.goto(`https://www.rusprofile.ru/${urlPath}/${companyId}`, {
 		waitUntil: "domcontentloaded",
 		timeout: 6e4
 	});
-	await page.waitForSelector("#clip_ogrn", { timeout: 15e3 });
-	const ogrn = await page.locator("#clip_ogrn").first().innerText().catch(() => "");
+	await page.waitForSelector(selector, { timeout: 15e3 });
+	const ogrn = await page.locator(selector).first().innerText().catch(() => "");
 	if (!ogrn) {
-		console.warn("Не удалось получить ОГРН с карточки, сбор выписки прерван");
+		console.warn("Не удалось получить ОГРН/ОГРНИП с карточки, сбор выписки прерван");
 		return data;
 	}
-	await page.goto(`https://www.rusprofile.ru/egrul?ogrn=${ogrn}`, {
+	await page.goto(`https://www.rusprofile.ru/egrul?${queryParam}=${ogrn}`, {
 		waitUntil: "domcontentloaded",
 		timeout: 6e4
 	});
