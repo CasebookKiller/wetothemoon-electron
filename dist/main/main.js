@@ -8920,6 +8920,22 @@ function addRawDumpRecord(companyInn, companyIdRusprofile, dumpFilePath, sizeByt
 	console.log("Inserted raw_dump id:", Number(info.lastInsertRowid));
 	return Number(info.lastInsertRowid);
 }
+function findLatestRawDump(companyInn, companyIdRusprofile) {
+	const db = getDatabase();
+	const query = companyIdRusprofile ? `SELECT id, dump_file_path, collected_sections FROM raw_dumps
+       WHERE company_inn = ? AND company_id_rusprofile = ?
+       ORDER BY created_at DESC, id DESC LIMIT 1` : `SELECT id, dump_file_path, collected_sections FROM raw_dumps
+       WHERE company_inn = ?
+       ORDER BY created_at DESC, id DESC LIMIT 1`;
+	const params = companyIdRusprofile ? [companyInn, companyIdRusprofile] : [companyInn];
+	const row = db.prepare(query).get(...params);
+	if (!row) return null;
+	return {
+		id: row.id,
+		dump_file_path: row.dump_file_path,
+		collected_sections: row.collected_sections ? JSON.parse(row.collected_sections) : null
+	};
+}
 function normalize(value) {
 	return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
@@ -8971,6 +8987,15 @@ function auditChange(table_name, record_id, action, old_value, new_value, reason
 }
 //#endregion
 //#region src/main/services/rawStorage.ts
+function loadRawDumpSync(filePath) {
+	try {
+		const buffer = fs.default.readFileSync(filePath);
+		return (0, _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__msgpack_msgpack_dist_esm_index_mjs.decode)(buffer);
+	} catch (error) {
+		console.error(`Ошибка чтения дампа ${filePath}:`, error);
+		throw error;
+	}
+}
 function saveRawDumpSync(companyInn, data) {
 	const summary = data.summary || {};
 	let entityType = "person";
@@ -9044,7 +9069,7 @@ function saveCompanyData(companyId, companyInn, data) {
 		"startedAt",
 		"totalDurationMs"
 	].includes(key));
-	addRawDumpRecord(companyInn, data.summary?.rusprofile_id || null, raw.filePath, raw.sizeBytes, collectedSections);
+	addRawDumpRecord(companyInn, companyId, raw.filePath, raw.sizeBytes, collectedSections);
 	const mainSummary = data.summary || {};
 	const mainType = detectEntityTypeFromData(mainSummary);
 	const sourceId = addSource({
@@ -9240,6 +9265,25 @@ function saveCompanyData(companyId, companyInn, data) {
 		rawDumpPath: raw.filePath
 	};
 }
+/**
+* Объединяет существующий дамп с новыми частичными данными.
+* Если поле в newData определено (не undefined), оно замещает старое значение.
+* Служебные поля (timings, startedAt, totalDurationMs) не переносятся.
+*/
+function mergeCompanyDumps(existingData, newData) {
+	const merged = { ...existingData };
+	for (const key of Object.keys(newData)) {
+		if ([
+			"timings",
+			"startedAt",
+			"totalDurationMs",
+			"company_id",
+			"entity_type"
+		].includes(key)) continue;
+		if (newData[key] !== void 0) merged[key] = newData[key];
+	}
+	return merged;
+}
 //#endregion
 //#region src/main/ipcHandlers/osintHandlers.ts
 function registerOsintHandlers() {
@@ -9374,6 +9418,31 @@ function registerOsintHandlers() {
       ORDER BY id DESC
       LIMIT ? OFFSET ?
     `).all(limit, offset);
+	});
+	electron.ipcMain.handle("osint:supplement-company", async (_event, inn, onlySections) => {
+		try {
+			const newData = await scrapeRusprofile(inn, { onlySections });
+			if (!newData) return {
+				success: false,
+				error: "Не удалось собрать данные с rusprofile"
+			};
+			const latestDump = findLatestRawDump(inn);
+			if (!latestDump) return {
+				success: false,
+				error: "Не найден существующий дамп для этой компании"
+			};
+			const mergedData = mergeCompanyDumps(loadRawDumpSync(latestDump.dump_file_path), newData);
+			return {
+				success: true,
+				...saveCompanyData(String(newData.company_id ?? ""), inn, mergedData)
+			};
+		} catch (error) {
+			console.error("Ошибка дозагрузки разделов:", error);
+			return {
+				success: false,
+				error: error.message
+			};
+		}
 	});
 }
 //#endregion

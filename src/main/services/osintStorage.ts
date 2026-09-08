@@ -7,6 +7,8 @@ import {
   upsertEntity,
 } from './database';
 import { saveRawDumpSync } from './rawStorage';
+import { findLatestRawDump } from './database';
+import { loadRawDumpSync } from './rawStorage';
 
 /**
  * Определяет тип сущности по ссылке на профиль Rusprofile.
@@ -60,7 +62,7 @@ export function saveCompanyData(
   // Сохраняем запись в raw_dumps
   addRawDumpRecord(
     companyInn,
-    data.summary?.rusprofile_id || null,
+    companyId,  // сохраняем переданный ID (например, "id:2835629")
     raw.filePath,
     raw.sizeBytes,
     collectedSections
@@ -286,4 +288,26 @@ export function saveCompanyData(
     savedObservations,
     rawDumpPath: raw.filePath,
   };
+}
+
+/**
+ * Объединяет существующий дамп с новыми частичными данными.
+ * Если поле в newData определено (не undefined), оно замещает старое значение.
+ * Служебные поля (timings, startedAt, totalDurationMs) не переносятся.
+ */
+export function mergeCompanyDumps(existingData: any, newData: any): any {
+  const merged = { ...existingData };
+
+  for (const key of Object.keys(newData)) {
+    if (
+      ['timings', 'startedAt', 'totalDurationMs', 'company_id', 'entity_type'].includes(key)
+    ) {
+      continue; // эти поля не должны перезаписывать старые или не важны
+    }
+    if (newData[key] !== undefined) {
+      merged[key] = newData[key];
+    }
+  }
+
+  return merged;
 }

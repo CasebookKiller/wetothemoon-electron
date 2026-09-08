@@ -386,7 +386,8 @@ try {
     getObservations: (limit = 100, offset = 0) => ipcRenderer.invoke('osint:get-observations', limit, offset),
     getSources: (limit = 100, offset = 0) => ipcRenderer.invoke('osint:get-sources', limit, offset),
     openDatabaseWindow: () => ipcRenderer.invoke('open-database-window'),
-
+    supplementCompany: (inn: string, onlySections: string[]) =>
+      ipcRenderer.invoke('osint:supplement-company', inn, onlySections),
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

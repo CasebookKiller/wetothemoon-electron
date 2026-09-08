@@ -7,9 +7,11 @@ import { scrapeRusprofile } from '../services/osint/scrapers/rusprofile/index';
 import { scrapeKadArbitr } from '../services/osint/scrapers/kadArbitr';
 import { scrapeMosGorsud } from '../services/osint/scrapers/mosGorsud';
 import { getCredentials, setCredentials } from '../services/osint/credentials';
-import { saveCompanyData } from '../services/osintStorage';
 import { createDatabaseWindow, getDatabaseWindow } from '../windows/databaseWindow';
 import { getDatabase } from '../services/database';
+import { findLatestRawDump } from '../services/database';
+import { loadRawDumpSync } from '../services/rawStorage';
+import { mergeCompanyDumps, saveCompanyData } from '../services/osintStorage';
 
 export function registerOsintHandlers() {
   // Открыть окно OSINT
@@ -143,5 +145,39 @@ export function registerOsintHandlers() {
       LIMIT ? OFFSET ?
     `).all(limit, offset);
     return rows;
+  });
+
+  ipcMain.handle('osint:supplement-company', async (_event, inn: string, onlySections: string[]) => {
+    try {
+      // 1. Собираем только указанные разделы
+      const newData = await scrapeRusprofile(inn, { onlySections });
+      if (!newData) {
+        return { success: false, error: 'Не удалось собрать данные с rusprofile' };
+      }
+
+      // 2. Находим последний дамп для этой компании
+      const latestDump = findLatestRawDump(inn);
+      if (!latestDump) {
+        return { success: false, error: 'Не найден существующий дамп для этой компании' };
+      }
+
+      // 3. Загружаем старый дамп
+      const existingData = loadRawDumpSync(latestDump.dump_file_path);
+
+      // 4. Объединяем
+      const mergedData = mergeCompanyDumps(existingData, newData);
+
+      // 5. Сохраняем объединённый дамп (создаст новый файл и обновит БД)
+      const result = saveCompanyData(
+        String(newData.company_id ?? ''), // используем ID из новых данных (он всегда есть)
+        inn,
+        mergedData
+      );
+
+      return { success: true, ...result };
+    } catch (error) {
+      console.error('Ошибка дозагрузки разделов:', error);
+      return { success: false, error: (error as Error).message };
+    }
   });
 }

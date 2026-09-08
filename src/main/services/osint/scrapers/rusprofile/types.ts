@@ -92,4 +92,7 @@ export interface CompanyFullData {
   requisites_details?: any;
   okved_details?: any;
   egrul_details?: any;
+
+  company_id?: number;
+  entity_type?: string;
 }
