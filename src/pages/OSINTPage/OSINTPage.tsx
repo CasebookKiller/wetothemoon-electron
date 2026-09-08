@@ -188,6 +188,10 @@ export const OSINTPage: React.FC = () => {
 
   const [saveMessage, setSaveMessage] = useState('');
 
+  const [selectedSections, setSelectedSections] = useState<string[]>([]);
+  const [supplementLoading, setSupplementLoading] = useState(false);
+  const [supplementMessage, setSupplementMessage] = useState('');
+
   const api = (window as any).electronAPI;
 
   const handleLaunch = async () => {
@@ -395,6 +399,34 @@ export const OSINTPage: React.FC = () => {
     }
   };
 
+  const handleSupplement = async () => {
+    if (!inn.trim()) {
+      setError('Введите ИНН');
+      return;
+    }
+    if (selectedSections.length === 0) {
+      setSupplementMessage('Выберите хотя бы один раздел');
+      return;
+    }
+    setSupplementLoading(true);
+    setSupplementMessage('');
+    setError('');
+    try {
+      const response = await api.supplementCompany(inn.trim(), selectedSections);
+      if (response.success) {
+        setSupplementMessage(
+          `Дозагрузка завершена: сущностей ${response.savedEntities}, связей ${response.savedRelations}, наблюдений ${response.savedObservations}`
+        );
+      } else {
+        setSupplementMessage(`Ошибка: ${response.error}`);
+      }
+    } catch (e) {
+      setSupplementMessage((e as Error).message);
+    } finally {
+      setSupplementLoading(false);
+    }
+  };
+
   const toggleSide = (value: string) => {
     setArbitrFilters(prev => ({
       ...prev,
@@ -479,6 +511,12 @@ export const OSINTPage: React.FC = () => {
       ...prev,
       statuses: prev.statuses.includes(value) ? prev.statuses.filter(v => v !== value) : [...prev.statuses, value],
     }));
+  };
+
+  const toggleSelectedSection = (section: string) => {
+    setSelectedSections(prev =>
+      prev.includes(section) ? prev.filter(s => s !== section) : [...prev, section]
+    );
   };
 
   return (
@@ -1363,6 +1401,49 @@ export const OSINTPage: React.FC = () => {
           </Panel>
         </React.Fragment>
       )}
+
+      <Panel className="shadow-5 mx-1" header="Дозагрузка разделов">
+        <div className="flex flex-wrap app p-2 align-items-center gap-4">
+          <div className="flex-1 flex flex-column gap-1">
+            <span className="app font-size-subheading">Выберите разделы для обновления:</span>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {[
+                'summary', 'fssp', 'trademarks', 'sou', 'arbitration_tile',
+                'fns_registries', 'connections', 'facts', 'government_procurement',
+                'leasing', 'pledges', 'licenses', 'competitors', 'inspections',
+                'finance', 'risks', 'founders', 'taxes', 'reliability',
+                'top_okved', 'branches', 'similar', 'reports', 'events', 'resume',
+                'arbitration_details', 'connections_details', 'sou_details',
+                'trademarks_details', 'leasing_details', 'pledges_details',
+                'facts_details', 'bankruptcy_details', 'founders_details',
+                'reliability_details', 'sanctions_details', 'gz_details',
+                'fssp_details', 'inspections_details', 'licenses_details',
+                'branches_details', 'history_details', 'requisites_details',
+                'okved_details', 'egrul_details'
+              ].map(section => (
+                <div key={section} className="flex align-items-center gap-2">
+                  <Checkbox
+                    inputId={`supplement_${section}`}
+                    checked={selectedSections.includes(section)}
+                    onChange={() => toggleSelectedSection(section)}
+                  />
+                  <label htmlFor={`supplement_${section}`} className="ml-1">
+                    {section}
+                  </label>
+                </div>
+              ))}
+            </div>
+            <Button
+              label={supplementLoading ? 'Дозагрузка...' : 'Дополнить выбранные разделы'}
+              icon={supplementLoading ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'}
+              className="p-button-lg w-full p-button-raised p-button-accent mt-3"
+              onClick={handleSupplement}
+              disabled={supplementLoading}
+            />
+            {supplementMessage && <p className="p-error mt-2">{supplementMessage}</p>}
+          </div>
+        </div>
+      </Panel>
 
       {result && (
         <div className="app p-0">

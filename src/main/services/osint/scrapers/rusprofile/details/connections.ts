@@ -7,49 +7,58 @@ export async function collectConnectionsDetails(page: Page, companyId: number): 
 
   const connectionsUrl = `https://www.rusprofile.ru/connections/${companyId}`;
   await page.goto(connectionsUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-  await page.waitForTimeout(2000);
+  await page.waitForTimeout(3000); // увеличенная пауза для полной загрузки
 
-  // === Переключение на табличный вид ===
+  // === Всегда кликаем по кнопке "Скрыть схему" (data-show="table") ===
   const tableButton = page.locator('span[data-show="table"]');
   if (await tableButton.count() > 0) {
-    const container = page.locator('ul.similar-table-container');
-    const isActive = await container.count() > 0 && await container.evaluate(el => el.classList.contains('active'));
-    if (!isActive) {
-      console.log('Переключаемся на табличный вид');
-      try {
-        await tableButton.first().click({ force: true });
-      } catch (e) {
-        console.warn('Обычный клик не удался, пробуем JavaScript-клик');
-        await page.evaluate(() => {
-          const btn = document.querySelector('span[data-show="table"]');
-          if (btn instanceof HTMLElement) btn.click();
-        });
-      }
-      await page.waitForSelector('ul.similar-table-container.active', { timeout: 15000 });
-      await page.waitForTimeout(1000);
-    } else {
-      console.log('Табличный вид уже активен');
+    console.log('Кликаем по кнопке «Скрыть схему» для отображения списка');
+    try {
+      await tableButton.first().click({ force: true });
+    } catch (e) {
+      console.warn('Обычный клик не удался, пробуем JavaScript-клик');
+      await page.evaluate(() => {
+        const btn = document.querySelector('span[data-show="table"]');
+        if (btn instanceof HTMLElement) btn.click();
+      });
     }
+    await page.waitForTimeout(2000);
   } else {
     console.warn('Кнопка переключения на таблицу не найдена');
   }
 
-  // === Ожидаем появление элементов списка ===
-  await page.waitForSelector(
-    'ul.similar-table-container.active li.similar-item, ul.similar-table-container.active li.similar-item-empty',
-    { timeout: 15000 }
-  );
-  await page.waitForTimeout(1000);
+  // === Ждём появления элементов списка (li.similar-item) в DOM ===
+  await page.waitForFunction(() => {
+    const container = document.querySelector('ul.similar-table-container.active');
+    if (!container) return false;
+    const items = container.querySelectorAll('li.similar-item');
+    return items.length > 0;
+  }, { timeout: 15000 }).catch(() => {
+    console.log('Элементы связей не появились, продолжаем с пустым результатом');
+  });
 
-  // === Отладочная информация ===
-  const debugCounts = await page.evaluate(() => ({
-    similarItems: document.querySelectorAll('ul.similar-table-container.active li.similar-item').length,
-    emptyItems: document.querySelectorAll('ul.similar-table-container.active li.similar-item-empty').length,
-    subItems: document.querySelectorAll('ul.similar-table-container.active li.similar-item-sub-item').length,
-    orgItems: document.querySelectorAll('ul.similar-table-container.active li.list-element').length,
-    totalText: document.querySelector('.export-data__text span')?.textContent?.trim() || ''
-  }));
-  console.log('Отладка после ожидания:', debugCounts);
+  // === Раскрываем все кнопки «Показать ещё» ===
+  let attempts = 0;
+  const maxAttempts = 5;
+  while (attempts < maxAttempts) {
+    const buttons = page.locator('ul.similar-table-container.active .similar-more-btn:not(.hidden)');
+    const count = await buttons.count();
+    if (count === 0) break;
+
+    for (let i = 0; i < count; i++) {
+      const btn = buttons.nth(i);
+      try {
+        if (await btn.isVisible()) {
+          await btn.click();
+          console.log(`Нажата кнопка «Показать ещё» (попытка ${attempts + 1}, кнопка ${i + 1})`);
+          await page.waitForTimeout(1000);
+        }
+      } catch (e) {
+        console.warn('Не удалось нажать «Показать ещё»:', e);
+      }
+    }
+    attempts++;
+  }
 
   // === Извлечение данных ===
   const parsed = await page.evaluate(() => {
@@ -62,12 +71,19 @@ export async function collectConnectionsDetails(page: Page, companyId: number): 
       return text.startsWith(prefix) ? text.substring(prefix.length).trim() : text.trim();
     };
 
+    const container = document.querySelector('ul.similar-table-container.active');
+    if (!container) return { total_organizations: '', connections: [] };
+
+    // Если есть только сообщение об отсутствии связей
+    if (container.querySelectorAll('li.similar-item').length === 0 && container.querySelector('li.similar-item-empty')) {
+      return { total_organizations: '', connections: [] };
+    }
+
     const totalEl = document.querySelector('.export-data__text span');
     const totalText = totalEl ? totalEl.textContent?.trim() || '' : '';
 
     const connections: any[] = [];
-    // Исправляем порядок: li.similar-item содержит ul.similar-item-sub, внутри li.similar-item-sub-item
-    const similarItems = document.querySelectorAll('ul.similar-table-container.active li.similar-item');
+    const similarItems = container.querySelectorAll('li.similar-item');
 
     similarItems.forEach((similarItem) => {
       const subItems = similarItem.querySelectorAll(':scope > ul.similar-item-sub > li.similar-item-sub-item');
@@ -103,7 +119,6 @@ export async function collectConnectionsDetails(page: Page, companyId: number): 
             regDate = cleanText(infoSpans[2].textContent?.trim() || '', 'Дата регистрации:');
           }
 
-          // Роли (информация в info-box)
           const roles: any[] = [];
           const infoBox = org.querySelector('.list-element__info-box');
           if (infoBox) {

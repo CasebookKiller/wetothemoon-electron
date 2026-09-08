@@ -8205,35 +8205,48 @@ async function collectConnectionsDetails(page, companyId) {
 		waitUntil: "domcontentloaded",
 		timeout: 6e4
 	});
-	await page.waitForTimeout(2e3);
+	await page.waitForTimeout(3e3);
 	const tableButton = page.locator("span[data-show=\"table\"]");
 	if (await tableButton.count() > 0) {
-		const container = page.locator("ul.similar-table-container");
-		if (!(await container.count() > 0 && await container.evaluate((el) => el.classList.contains("active")))) {
-			console.log("Переключаемся на табличный вид");
-			try {
-				await tableButton.first().click({ force: true });
-			} catch (e) {
-				console.warn("Обычный клик не удался, пробуем JavaScript-клик");
-				await page.evaluate(() => {
-					const btn = document.querySelector("span[data-show=\"table\"]");
-					if (btn instanceof HTMLElement) btn.click();
-				});
-			}
-			await page.waitForSelector("ul.similar-table-container.active", { timeout: 15e3 });
-			await page.waitForTimeout(1e3);
-		} else console.log("Табличный вид уже активен");
+		console.log("Кликаем по кнопке «Скрыть схему» для отображения списка");
+		try {
+			await tableButton.first().click({ force: true });
+		} catch (e) {
+			console.warn("Обычный клик не удался, пробуем JavaScript-клик");
+			await page.evaluate(() => {
+				const btn = document.querySelector("span[data-show=\"table\"]");
+				if (btn instanceof HTMLElement) btn.click();
+			});
+		}
+		await page.waitForTimeout(2e3);
 	} else console.warn("Кнопка переключения на таблицу не найдена");
-	await page.waitForSelector("ul.similar-table-container.active li.similar-item, ul.similar-table-container.active li.similar-item-empty", { timeout: 15e3 });
-	await page.waitForTimeout(1e3);
-	const debugCounts = await page.evaluate(() => ({
-		similarItems: document.querySelectorAll("ul.similar-table-container.active li.similar-item").length,
-		emptyItems: document.querySelectorAll("ul.similar-table-container.active li.similar-item-empty").length,
-		subItems: document.querySelectorAll("ul.similar-table-container.active li.similar-item-sub-item").length,
-		orgItems: document.querySelectorAll("ul.similar-table-container.active li.list-element").length,
-		totalText: document.querySelector(".export-data__text span")?.textContent?.trim() || ""
-	}));
-	console.log("Отладка после ожидания:", debugCounts);
+	await page.waitForFunction(() => {
+		const container = document.querySelector("ul.similar-table-container.active");
+		if (!container) return false;
+		return container.querySelectorAll("li.similar-item").length > 0;
+	}, { timeout: 15e3 }).catch(() => {
+		console.log("Элементы связей не появились, продолжаем с пустым результатом");
+	});
+	let attempts = 0;
+	const maxAttempts = 5;
+	while (attempts < maxAttempts) {
+		const buttons = page.locator("ul.similar-table-container.active .similar-more-btn:not(.hidden)");
+		const count = await buttons.count();
+		if (count === 0) break;
+		for (let i = 0; i < count; i++) {
+			const btn = buttons.nth(i);
+			try {
+				if (await btn.isVisible()) {
+					await btn.click();
+					console.log(`Нажата кнопка «Показать ещё» (попытка ${attempts + 1}, кнопка ${i + 1})`);
+					await page.waitForTimeout(1e3);
+				}
+			} catch (e) {
+				console.warn("Не удалось нажать «Показать ещё»:", e);
+			}
+		}
+		attempts++;
+	}
 	const parsed = await page.evaluate(() => {
 		const getText = (el, selector) => {
 			const node = el ? el.querySelector(selector) : null;
@@ -8242,10 +8255,19 @@ async function collectConnectionsDetails(page, companyId) {
 		const cleanText = (text, prefix) => {
 			return text.startsWith(prefix) ? text.substring(prefix.length).trim() : text.trim();
 		};
+		const container = document.querySelector("ul.similar-table-container.active");
+		if (!container) return {
+			total_organizations: "",
+			connections: []
+		};
+		if (container.querySelectorAll("li.similar-item").length === 0 && container.querySelector("li.similar-item-empty")) return {
+			total_organizations: "",
+			connections: []
+		};
 		const totalEl = document.querySelector(".export-data__text span");
 		const totalText = totalEl ? totalEl.textContent?.trim() || "" : "";
 		const connections = [];
-		document.querySelectorAll("ul.similar-table-container.active li.similar-item").forEach((similarItem) => {
+		container.querySelectorAll("li.similar-item").forEach((similarItem) => {
 			similarItem.querySelectorAll(":scope > ul.similar-item-sub > li.similar-item-sub-item").forEach((subItem) => {
 				const titleEl = subItem.querySelector("div.similar-item-sub-head a.title-sub, div.similar-item-sub-head span.title-sub");
 				const title = titleEl ? titleEl.textContent?.trim() || "" : "";
