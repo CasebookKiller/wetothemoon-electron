@@ -8224,34 +8224,16 @@ async function collectConnectionsDetails(page, companyId) {
 			await page.waitForTimeout(1e3);
 		} else console.log("Табличный вид уже активен");
 	} else console.warn("Кнопка переключения на таблицу не найдена");
-	let attempts = 0;
-	const maxAttempts = 10;
-	while (attempts < maxAttempts) {
-		const buttons = page.locator(".btn.similar-more-btn:not(.hidden)");
-		const count = await buttons.count();
-		if (count === 0) break;
-		for (let i = 0; i < count; i++) {
-			const btn = buttons.nth(i);
-			try {
-				if (await btn.isVisible()) {
-					await btn.click();
-					console.log(`Нажата кнопка «Показать ещё» (попытка ${attempts + 1}, кнопка ${i + 1})`);
-					await page.waitForTimeout(800);
-				}
-			} catch (e) {
-				console.warn("Не удалось нажать «Показать ещё»:", e);
-			}
-		}
-		attempts++;
-		await page.waitForTimeout(500);
-	}
+	await page.waitForSelector("ul.similar-table-container.active li.similar-item, ul.similar-table-container.active li.similar-item-empty", { timeout: 15e3 });
+	await page.waitForTimeout(1e3);
 	const debugCounts = await page.evaluate(() => ({
-		similarItems: document.querySelectorAll("li.similar-item").length,
-		subItems: document.querySelectorAll("li.similar-item-sub-item").length,
-		orgItems: document.querySelectorAll("ul.list-element__row > li.list-element").length,
+		similarItems: document.querySelectorAll("ul.similar-table-container.active li.similar-item").length,
+		emptyItems: document.querySelectorAll("ul.similar-table-container.active li.similar-item-empty").length,
+		subItems: document.querySelectorAll("ul.similar-table-container.active li.similar-item-sub-item").length,
+		orgItems: document.querySelectorAll("ul.similar-table-container.active li.list-element").length,
 		totalText: document.querySelector(".export-data__text span")?.textContent?.trim() || ""
 	}));
-	console.log("Отладка после раскрытия:", debugCounts);
+	console.log("Отладка после ожидания:", debugCounts);
 	const parsed = await page.evaluate(() => {
 		const getText = (el, selector) => {
 			const node = el ? el.querySelector(selector) : null;
@@ -8263,16 +8245,17 @@ async function collectConnectionsDetails(page, companyId) {
 		const totalEl = document.querySelector(".export-data__text span");
 		const totalText = totalEl ? totalEl.textContent?.trim() || "" : "";
 		const connections = [];
-		document.querySelectorAll("li.similar-item").forEach((similarItem) => {
-			similarItem.querySelectorAll("li.similar-item-sub-item").forEach((subItem) => {
-				const titleEl = subItem.querySelector("a.title-sub, span.title-sub");
+		document.querySelectorAll("ul.similar-table-container.active li.similar-item").forEach((similarItem) => {
+			similarItem.querySelectorAll(":scope > ul.similar-item-sub > li.similar-item-sub-item").forEach((subItem) => {
+				const titleEl = subItem.querySelector("div.similar-item-sub-head a.title-sub, div.similar-item-sub-head span.title-sub");
 				const title = titleEl ? titleEl.textContent?.trim() || "" : "";
-				const descEl = subItem.querySelector("span.description");
+				const descEl = subItem.querySelector("div.similar-item-sub-head span.description");
 				const description = descEl ? descEl.textContent?.replace(/\s+/g, " ").trim() : "";
 				const organizations = [];
-				subItem.querySelectorAll("ul.list-element__row > li.list-element").forEach((org) => {
+				subItem.querySelectorAll("div.similar-item-sub-content ul.list-element__row > li.list-element").forEach((org) => {
 					const nameEl = org.querySelector("a.list-element__title");
 					const name = nameEl ? nameEl.textContent?.trim() || "" : "";
+					const href = nameEl ? nameEl.href || "" : "";
 					let status = "";
 					const statusEl = org.querySelector(".liquidated.danger, .liquidating.warning, .reorganizing.warning");
 					if (statusEl) status = statusEl.textContent?.trim() || "";
@@ -8304,6 +8287,7 @@ async function collectConnectionsDetails(page, companyId) {
 					});
 					if (name || inn) organizations.push({
 						name,
+						href,
 						status,
 						activity,
 						address,
