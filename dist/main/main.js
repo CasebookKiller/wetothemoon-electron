@@ -8991,6 +8991,9 @@ function auditChange(table_name, record_id, action, old_value, new_value, reason
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `).run(table_name, record_id, action, old_value, new_value, (/* @__PURE__ */ new Date()).toISOString(), "system", reason);
 }
+function hasRawDumpForInn(inn) {
+	return !!getDatabase().prepare("SELECT id FROM raw_dumps WHERE company_inn = ? LIMIT 1").get(inn);
+}
 //#endregion
 //#region src/main/services/rawStorage.ts
 function loadRawDumpSync(filePath) {
@@ -9446,6 +9449,16 @@ function registerOsintHandlers() {
 			console.error("Ошибка дозагрузки разделов:", error);
 			return {
 				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:check-dump-exists", async (_event, inn) => {
+		try {
+			return { exists: hasRawDumpForInn(inn) };
+		} catch (error) {
+			return {
+				exists: false,
 				error: error.message
 			};
 		}

@@ -388,6 +388,9 @@ try {
     openDatabaseWindow: () => ipcRenderer.invoke('open-database-window'),
     supplementCompany: (inn: string, onlySections: string[]) =>
       ipcRenderer.invoke('osint:supplement-company', inn, onlySections),
+
+    checkDumpExists: (inn: string) => ipcRenderer.invoke('osint:check-dump-exists', inn),
+    
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

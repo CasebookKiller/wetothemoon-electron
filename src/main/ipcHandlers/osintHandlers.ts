@@ -8,7 +8,7 @@ import { scrapeKadArbitr } from '../services/osint/scrapers/kadArbitr';
 import { scrapeMosGorsud } from '../services/osint/scrapers/mosGorsud';
 import { getCredentials, setCredentials } from '../services/osint/credentials';
 import { createDatabaseWindow, getDatabaseWindow } from '../windows/databaseWindow';
-import { getDatabase } from '../services/database';
+import { getDatabase, hasRawDumpForInn } from '../services/database';
 import { findLatestRawDump } from '../services/database';
 import { loadRawDumpSync } from '../services/rawStorage';
 import { mergeCompanyDumps, saveCompanyData } from '../services/osintStorage';
@@ -180,4 +180,13 @@ export function registerOsintHandlers() {
       return { success: false, error: (error as Error).message };
     }
   });
+
+  ipcMain.handle('osint:check-dump-exists', async (_event, inn: string) => {
+    try {
+      return { exists: hasRawDumpForInn(inn) };
+    } catch (error) {
+      return { exists: false, error: (error as Error).message };
+    }
+  });
+
 }

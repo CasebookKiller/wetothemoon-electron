@@ -373,3 +373,9 @@ export function auditChange(
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `).run(table_name, record_id, action, old_value, new_value, new Date().toISOString(), 'system', reason);
 }
+
+export function hasRawDumpForInn(inn: string): boolean {
+  const db = getDatabase();
+  const row = db.prepare('SELECT id FROM raw_dumps WHERE company_inn = ? LIMIT 1').get(inn);
+  return !!row;
+}

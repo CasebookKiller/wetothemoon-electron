@@ -1,6 +1,6 @@
 // wetothemoon-electron/src/pages/OSINTPage/OSINTPage.tsx
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Panel } from 'primereact/panel';
 import { Button } from 'primereact/button';
 import { InputText } from 'primereact/inputtext';
@@ -42,16 +42,6 @@ export const OSINTPage: React.FC = () => {
     maxTotalCases: 100,
   });
 
-  const handleInnChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setInn(value);
-    try {
-      localStorage.setItem('osint_last_inn', value);
-    } catch {
-      // ignore storage errors
-    }
-  };
-
   // Состояния фильтров арбитража
   const [arbitrFilters, setArbitrFilters] = useState({
     sides: [] as string[],       // 'plaintiff', 'defendant', 'third'
@@ -68,24 +58,6 @@ export const OSINTPage: React.FC = () => {
     maxPages: 1,
     maxTotalCases: 100,
   });
-
-  const toggleSouSide = (value: string) => {
-    setSouFilters(prev => ({
-      ...prev,
-      sides: prev.sides.includes(value)
-        ? prev.sides.filter(s => s !== value)
-        : [...prev.sides, value],
-    }));
-  };
-
-  const toggleSouStatus = (value: string) => {
-    setSouFilters(prev => ({
-      ...prev,
-      status: prev.status.includes(value)
-        ? prev.status.filter(s => s !== value)
-        : [...prev.status, value],
-    }));
-  };
 
   const [needLeasingDetails, setNeedLeasingDetails] = useState(false);
   const [leasingFilters, setLeasingFilters] = useState({
@@ -192,7 +164,42 @@ export const OSINTPage: React.FC = () => {
   const [supplementLoading, setSupplementLoading] = useState(false);
   const [supplementMessage, setSupplementMessage] = useState('');
 
+  const [dumpExists, setDumpExists] = useState<boolean>(false);
+
   const api = (window as any).electronAPI;
+
+  useEffect(() => {
+    if (inn.trim()) {
+      checkDump(inn);
+    }
+  }, []); // пустой массив зависимостей — только при первом рендере
+
+  const handleInnChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setInn(value);
+    try {
+      localStorage.setItem('osint_last_inn', value);
+    } catch {
+      // ignore storage errors
+    }
+
+    // Проверяем наличие дампа при изменении ИНН
+    if (value.trim()) {
+      checkDump(value);
+    } else {
+      setDumpExists(false);
+    }
+  };
+  
+  const checkDump = async (innToCheck: string) => {
+    if (!innToCheck.trim()) return;
+    try {
+      const res = await api.checkDumpExists(innToCheck.trim());
+      setDumpExists(res.exists);
+    } catch (e) {
+      console.error('Ошибка проверки дампа:', e);
+    }
+  };
 
   const handleLaunch = async () => {
     try {
@@ -448,7 +455,10 @@ export const OSINTPage: React.FC = () => {
   const renderResult = () => {
     if (!result) return null;
     return (
-      <pre className="app theme-hint-color p-3 border-round">
+      <pre
+        className="app theme-hint-color p-3 border-round"
+        style={{ maxHeight: '50vh', overflowY: 'auto' }}
+      >
         {JSON.stringify(result, null, 2)}
       </pre>
     );
@@ -468,7 +478,7 @@ export const OSINTPage: React.FC = () => {
   const toggleFoundersStatus = (value: string) => {
     setFoundersFilters(prev => ({
       ...prev,
-      types: prev.statuses.includes(value) ? prev.statuses.filter(v => v !== value) : [...prev.statuses, value],
+      statuses: prev.statuses.includes(value) ? prev.statuses.filter(v => v !== value) : [...prev.statuses, value],
     }));
   };
 
@@ -519,6 +529,63 @@ export const OSINTPage: React.FC = () => {
     );
   };
 
+  const toggleSouSide = (value: string) => {
+    setSouFilters(prev => ({
+      ...prev,
+      sides: prev.sides.includes(value)
+        ? prev.sides.filter(s => s !== value)
+        : [...prev.sides, value],
+    }));
+  };
+
+  const toggleSouStatus = (value: string) => {
+    setSouFilters(prev => ({
+      ...prev,
+      status: prev.status.includes(value)
+        ? prev.status.filter(s => s !== value)
+        : [...prev.status, value],
+    }));
+  };
+
+
+  const sectionOptions = [
+    { key: 'needArbitrDetails', label: 'Арбитражные дела' },
+    { key: 'needConnectionsDetails', label: 'Связи' },
+    { key: 'needSouDetails', label: 'Суды общей юрисдикции' },
+    { key: 'needTrademarksDetails', label: 'Товарные знаки' },
+    { key: 'needLeasingDetails', label: 'Лизинг' },
+    { key: 'needPledgesDetails', label: 'Залоги' },
+    { key: 'needFactsDetails', label: 'Существенные факты' },
+    { key: 'needBankruptcyDetails', label: 'Банкротство' },
+    { key: 'needFoundersDetails', label: 'Учредители' },
+    { key: 'needReliabilityDetails', label: 'Надёжность' },
+    { key: 'needSanctionsDetails', label: 'Санкции' },
+    { key: 'needGzDetails', label: 'Госзакупки' },
+    { key: 'needFsspDetails', label: 'Исполнительные производства' },
+    { key: 'needInspectionsDetails', label: 'Проверки' },
+    { key: 'needLicensesDetails', label: 'Лицензии' },
+    { key: 'needBranchesDetails', label: 'Филиалы и представительства' },
+    { key: 'needHistoryDetails', label: 'История' },
+    { key: 'needRequisitesDetails', label: 'Реквизиты' },
+    { key: 'needOkvedDetails', label: 'Виды деятельности' },
+    { key: 'needEgrulDetails', label: 'Выписка из ЕГРЮЛ' },
+  ];
+
+  const supplementSections = [
+    'summary', 'fssp', 'trademarks', 'sou', 'arbitration_tile',
+    'fns_registries', 'connections', 'facts', 'government_procurement',
+    'leasing', 'pledges', 'licenses', 'competitors', 'inspections',
+    'finance', 'risks', 'founders', 'taxes', 'reliability',
+    'top_okved', 'branches', 'similar', 'reports', 'events', 'resume',
+    'arbitration_details', 'connections_details', 'sou_details',
+    'trademarks_details', 'leasing_details', 'pledges_details',
+    'facts_details', 'bankruptcy_details', 'founders_details',
+    'reliability_details', 'sanctions_details', 'gz_details',
+    'fssp_details', 'inspections_details', 'licenses_details',
+    'branches_details', 'history_details', 'requisites_details',
+    'okved_details', 'egrul_details'
+  ];
+
   return (
     <React.Fragment>
       <div className="app p-0" />
@@ -560,213 +627,67 @@ export const OSINTPage: React.FC = () => {
                 className="w-full text-base"
               />
             </div>
-            <div className="mt-2">
-              <Checkbox
-                inputId="needArbitr"
-                checked={needArbitrDetails}
-                onChange={(e) => setNeedArbitrDetails(e.checked as boolean)}
-              />
-              <label htmlFor="needArbitr" className="ml-2">
-                Арбитражные дела
-              </label>
-            </div>
-            <div className="mt-2">
-              <Checkbox
-                inputId="needConnections"
-                checked={needConnectionsDetails}
-                onChange={(e) => setNeedConnectionsDetails(e.checked as boolean)}
-              />
-              <label htmlFor="needConnections" className="ml-2">Связи</label>
-            </div>
-            <div className="mt-2">
-              <Checkbox
-                inputId="needSou"
-                checked={needSouDetails}
-                onChange={(e) => setNeedSouDetails(e.checked as boolean)}
-              />
-              <label htmlFor="needSou" className="ml-2">
-                Суды общей юрисдикции
-              </label>
-            </div>
-            <div className="mt-2">
-              <Checkbox
-                inputId="needTrademarks"
-                checked={needTrademarksDetails}
-                onChange={(e) => setNeedTrademarksDetails(e.checked ?? false)}
-              />
-              <label htmlFor="needTrademarks" className="ml-2">
-                Товарные знаки
-              </label>
-            </div>
-            <div className="mt-2">
-              <Checkbox
-                inputId="needLeasing"
-                checked={needLeasingDetails}
-                onChange={(e) => setNeedLeasingDetails(e.checked ?? false)}
-              />
-              <label htmlFor="needLeasing" className="ml-2">
-                Лизинг
-              </label>
-            </div>
-            <div className="mt-2">
-              <Checkbox
-                inputId="needPledges"
-                checked={needPledgesDetails}
-                onChange={(e) => setNeedPledgesDetails(e.checked ?? false)}
-              />
-              <label htmlFor="needPledges" className="ml-2">
-                Залоги
-              </label>
-            </div>
-            <div className="mt-2">
-              <Checkbox
-                inputId="needFacts"
-                checked={needFactsDetails}
-                onChange={(e) => setNeedFactsDetails(e.checked ?? false)}
-              />
-              <label htmlFor="needFacts" className="ml-2">
-                Существенные факты
-              </label>
-            </div>
-            <div className="mt-2">
-              <Checkbox
-                inputId="needBankruptcy"
-                checked={needBankruptcyDetails}
-                onChange={(e) => setNeedBankruptcyDetails(e.checked ?? false)}
-              />
-              <label htmlFor="needBankruptcy" className="ml-2">
-                Банкротство
-              </label>
-            </div>
-            <div className="mt-2">
-              <Checkbox
-                inputId="needFounders"
-                checked={needFoundersDetails}
-                onChange={(e) => setNeedFoundersDetails(e.checked ?? false)}
-              />
-              <label htmlFor="needFounders" className="ml-2">
-                Учредители
-              </label>
-            </div>
-            <div className="mt-2">
-              <Checkbox
-                inputId="needReliability"
-                checked={needReliabilityDetails}
-                onChange={(e) => setNeedReliabilityDetails(e.checked ?? false)}
-              />
-              <label htmlFor="needReliability" className="ml-2">
-                Надёжность
-              </label>
-            </div>
+            <div className="grid mt-2">
+              {sectionOptions.map(({ key, label }) => {
+                const checked = 
+                  key === 'needArbitrDetails' ? needArbitrDetails :
+                  key === 'needConnectionsDetails' ? needConnectionsDetails :
+                  key === 'needSouDetails' ? needSouDetails :
+                  key === 'needTrademarksDetails' ? needTrademarksDetails :
+                  key === 'needLeasingDetails' ? needLeasingDetails :
+                  key === 'needPledgesDetails' ? needPledgesDetails :
+                  key === 'needFactsDetails' ? needFactsDetails :
+                  key === 'needBankruptcyDetails' ? needBankruptcyDetails :
+                  key === 'needFoundersDetails' ? needFoundersDetails :
+                  key === 'needReliabilityDetails' ? needReliabilityDetails :
+                  key === 'needSanctionsDetails' ? needSanctionsDetails :
+                  key === 'needGzDetails' ? needGzDetails :
+                  key === 'needFsspDetails' ? needFsspDetails :
+                  key === 'needInspectionsDetails' ? needInspectionsDetails :
+                  key === 'needLicensesDetails' ? needLicensesDetails :
+                  key === 'needBranchesDetails' ? needBranchesDetails :
+                  key === 'needHistoryDetails' ? needHistoryDetails :
+                  key === 'needRequisitesDetails' ? needRequisitesDetails :
+                  key === 'needOkvedDetails' ? needOkvedDetails :
+                  key === 'needEgrulDetails' ? needEgrulDetails : false;
 
-            <div className="mt-2">
-              <Checkbox
-                inputId="needSanctions"
-                checked={needSanctionsDetails}
-                onChange={(e) => setNeedSanctionsDetails(e.checked ?? false)}
-              />
-              <label htmlFor="needSanctions" className="ml-2">
-                Санкции
-              </label>
-            </div>
+                const onChange = (e: any) => {
+                  const val = e.checked;
+                  switch (key) {
+                    case 'needArbitrDetails': setNeedArbitrDetails(val); break;
+                    case 'needConnectionsDetails': setNeedConnectionsDetails(val); break;
+                    case 'needSouDetails': setNeedSouDetails(val); break;
+                    case 'needTrademarksDetails': setNeedTrademarksDetails(val); break;
+                    case 'needLeasingDetails': setNeedLeasingDetails(val); break;
+                    case 'needPledgesDetails': setNeedPledgesDetails(val); break;
+                    case 'needFactsDetails': setNeedFactsDetails(val); break;
+                    case 'needBankruptcyDetails': setNeedBankruptcyDetails(val); break;
+                    case 'needFoundersDetails': setNeedFoundersDetails(val); break;
+                    case 'needReliabilityDetails': setNeedReliabilityDetails(val); break;
+                    case 'needSanctionsDetails': setNeedSanctionsDetails(val); break;
+                    case 'needGzDetails': setNeedGzDetails(val); break;
+                    case 'needFsspDetails': setNeedFsspDetails(val); break;
+                    case 'needInspectionsDetails': setNeedInspectionsDetails(val); break;
+                    case 'needLicensesDetails': setNeedLicensesDetails(val); break;
+                    case 'needBranchesDetails': setNeedBranchesDetails(val); break;
+                    case 'needHistoryDetails': setNeedHistoryDetails(val); break;
+                    case 'needRequisitesDetails': setNeedRequisitesDetails(val); break;
+                    case 'needOkvedDetails': setNeedOkvedDetails(val); break;
+                    case 'needEgrulDetails': setNeedEgrulDetails(val); break;
+                  }
+                };
 
-            <div className="mt-2">
-              <Checkbox
-                inputId="needGz"
-                checked={needGzDetails}
-                onChange={(e) => setNeedGzDetails(e.checked ?? false)}
-              />
-              <label htmlFor="needGz" className="ml-2">
-                Госзакупки
-              </label>
-            </div>
-
-            <div className="mt-2">
-              <Checkbox
-                inputId="needFssp"
-                checked={needFsspDetails}
-                onChange={(e) => setNeedFsspDetails(e.checked ?? false)}
-              />
-              <label htmlFor="needFssp" className="ml-2">
-                Исполнительные производства
-              </label>
-            </div>
-            
-            <div className="mt-2">
-              <Checkbox
-                inputId="needInspections"
-                checked={needInspectionsDetails}
-                onChange={(e) => setNeedInspectionsDetails(e.checked ?? false)}
-              />
-              <label htmlFor="needInspections" className="ml-2">
-                Проверки
-              </label>
-            </div>
-
-            <div className="mt-2">
-              <Checkbox
-                inputId="needLicenses"
-                checked={needLicensesDetails}
-                onChange={(e) => setNeedLicensesDetails(e.checked ?? false)}
-              />
-              <label htmlFor="needLicenses" className="ml-2">
-                Лицензии
-              </label>
-            </div>
-
-            <div className="mt-2">
-              <Checkbox
-                inputId="needBranches"
-                checked={needBranchesDetails}
-                onChange={(e) => setNeedBranchesDetails(e.checked ?? false)}
-              />
-              <label htmlFor="needBranches" className="ml-2">
-                Филиалы и представительства
-              </label>
-            </div>     
-
-            <div className="mt-2">
-              <Checkbox
-                inputId="needHistory"
-                checked={needHistoryDetails}
-                onChange={(e) => setNeedHistoryDetails(e.checked ?? false)}
-              />
-              <label htmlFor="needHistory" className="ml-2">
-                История
-              </label>
-            </div>     
-
-            <div className="mt-2">
-              <Checkbox
-                inputId="needRequisites"
-                checked={needRequisitesDetails}
-                onChange={(e) => setNeedRequisitesDetails(e.checked ?? false)}
-              />
-              <label htmlFor="needRequisites" className="ml-2">
-                Реквизиты
-              </label>
-            </div>
-
-            <div className="mt-2">
-              <Checkbox
-                inputId="needOkved"
-                checked={needOkvedDetails}
-                onChange={(e) => setNeedOkvedDetails(e.checked ?? false)}
-              />
-              <label htmlFor="needOkved" className="ml-2">
-                Виды деятельности
-              </label>
-            </div>
-
-            <div className="mt-2">
-              <Checkbox
-                inputId="needEgrul"
-                checked={needEgrulDetails}
-                onChange={(e) => setNeedEgrulDetails(e.checked ?? false)}
-              />
-              <label htmlFor="needEgrul" className="ml-2">
-                Собрать выписку из ЕГРЮЛ
-              </label>
+                return (
+                  <div className="col-12 md:col-6 lg:col-4 xl:col-3" key={key}>
+                    <Checkbox
+                      inputId={key}
+                      checked={checked}
+                      onChange={onChange}
+                    />
+                    <label htmlFor={key} className="ml-2">{label}</label>
+                  </div>
+                );
+              })}
             </div>
 
           </div>
@@ -1402,34 +1323,20 @@ export const OSINTPage: React.FC = () => {
         </React.Fragment>
       )}
 
+      <div className="app p-0" />
       <Panel className="shadow-5 mx-1" header="Дозагрузка разделов">
         <div className="flex flex-wrap app p-2 align-items-center gap-4">
           <div className="flex-1 flex flex-column gap-1">
             <span className="app font-size-subheading">Выберите разделы для обновления:</span>
-            <div className="flex flex-wrap gap-2 mt-2">
-              {[
-                'summary', 'fssp', 'trademarks', 'sou', 'arbitration_tile',
-                'fns_registries', 'connections', 'facts', 'government_procurement',
-                'leasing', 'pledges', 'licenses', 'competitors', 'inspections',
-                'finance', 'risks', 'founders', 'taxes', 'reliability',
-                'top_okved', 'branches', 'similar', 'reports', 'events', 'resume',
-                'arbitration_details', 'connections_details', 'sou_details',
-                'trademarks_details', 'leasing_details', 'pledges_details',
-                'facts_details', 'bankruptcy_details', 'founders_details',
-                'reliability_details', 'sanctions_details', 'gz_details',
-                'fssp_details', 'inspections_details', 'licenses_details',
-                'branches_details', 'history_details', 'requisites_details',
-                'okved_details', 'egrul_details'
-              ].map(section => (
-                <div key={section} className="flex align-items-center gap-2">
+            <div className="grid mt-2">
+              {supplementSections.map(section => (
+                <div className="col-12 md:col-6 lg:col-4 xl:col-3" key={section}>
                   <Checkbox
                     inputId={`supplement_${section}`}
                     checked={selectedSections.includes(section)}
                     onChange={() => toggleSelectedSection(section)}
                   />
-                  <label htmlFor={`supplement_${section}`} className="ml-1">
-                    {section}
-                  </label>
+                  <label htmlFor={`supplement_${section}`} className="ml-1">{section}</label>
                 </div>
               ))}
             </div>
@@ -1446,15 +1353,19 @@ export const OSINTPage: React.FC = () => {
       </Panel>
 
       {result && (
-        <div className="app p-0">
-          <Button
-            label="Сохранить в базу данных"
-            icon="pi pi-save"
-            className="p-button-lg w-full p-button-raised p-button-accent"
-            onClick={handleSaveToDb}
-          />
-          {saveMessage && <p className="p-error">{saveMessage}</p>}
-        </div>
+        <Button
+          label="Сохранить в базу данных"
+          icon="pi pi-save"
+          className="p-button-lg w-full p-button-raised p-button-accent"
+          onClick={handleSaveToDb}
+          disabled={dumpExists}
+        />
+      )}
+
+      {dumpExists && (
+        <p className="p-warning mt-2">
+          Дамп для этой организации уже существует. Используйте «Дополнить выбранные разделы» для обновления.
+        </p>
       )}
     </React.Fragment>
   );

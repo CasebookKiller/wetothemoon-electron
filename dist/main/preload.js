@@ -277,7 +277,8 @@ try {
 		getObservations: (limit = 100, offset = 0) => electron.ipcRenderer.invoke("osint:get-observations", limit, offset),
 		getSources: (limit = 100, offset = 0) => electron.ipcRenderer.invoke("osint:get-sources", limit, offset),
 		openDatabaseWindow: () => electron.ipcRenderer.invoke("open-database-window"),
-		supplementCompany: (inn, onlySections) => electron.ipcRenderer.invoke("osint:supplement-company", inn, onlySections)
+		supplementCompany: (inn, onlySections) => electron.ipcRenderer.invoke("osint:supplement-company", inn, onlySections),
+		checkDumpExists: (inn) => electron.ipcRenderer.invoke("osint:check-dump-exists", inn)
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {
