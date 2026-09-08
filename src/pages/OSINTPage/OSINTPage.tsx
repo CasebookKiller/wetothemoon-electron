@@ -571,20 +571,59 @@ export const OSINTPage: React.FC = () => {
     { key: 'needEgrulDetails', label: 'Выписка из ЕГРЮЛ' },
   ];
 
-  const supplementSections = [
-    'summary', 'fssp', 'trademarks', 'sou', 'arbitration_tile',
-    'fns_registries', 'connections', 'facts', 'government_procurement',
-    'leasing', 'pledges', 'licenses', 'competitors', 'inspections',
-    'finance', 'risks', 'founders', 'taxes', 'reliability',
-    'top_okved', 'branches', 'similar', 'reports', 'events', 'resume',
-    'arbitration_details', 'connections_details', 'sou_details',
-    'trademarks_details', 'leasing_details', 'pledges_details',
-    'facts_details', 'bankruptcy_details', 'founders_details',
-    'reliability_details', 'sanctions_details', 'gz_details',
-    'fssp_details', 'inspections_details', 'licenses_details',
-    'branches_details', 'history_details', 'requisites_details',
-    'okved_details', 'egrul_details'
+  const supplementSectionOptions = [
+    { value: 'summary', label: 'Сводка' },
+    { value: 'fssp', label: 'ФССП' },
+    { value: 'trademarks', label: 'Товарные знаки (сводка)' },
+    { value: 'sou', label: 'Суды общей юрисдикции (сводка)' },
+    { value: 'arbitration_tile', label: 'Арбитраж (сводка)' },
+    { value: 'fns_registries', label: 'Реестры ФНС' },
+    { value: 'connections', label: 'Связи (сводка)' },
+    { value: 'facts', label: 'Существенные факты (сводка)' },
+    { value: 'government_procurement', label: 'Госзакупки (сводка)' },
+    { value: 'leasing', label: 'Лизинг (сводка)' },
+    { value: 'pledges', label: 'Залоги (сводка)' },
+    { value: 'licenses', label: 'Лицензии (сводка)' },
+    { value: 'competitors', label: 'Конкуренты' },
+    { value: 'inspections', label: 'Проверки (сводка)' },
+    { value: 'finance', label: 'Финансы' },
+    { value: 'risks', label: 'Риски' },
+    { value: 'founders', label: 'Учредители (сводка)' },
+    { value: 'taxes', label: 'Налоги' },
+    { value: 'reliability', label: 'Надёжность (сводка)' },
+    { value: 'top_okved', label: 'Топ компаний отрасли' },
+    { value: 'branches', label: 'Филиалы (сводка)' },
+    { value: 'similar', label: 'Похожие организации' },
+    { value: 'reports', label: 'Отчёты' },
+    { value: 'events', label: 'События' },
+    { value: 'resume', label: 'Краткая справка' },
+    { value: 'arbitration_details', label: 'Арбитраж (детально)' },
+    { value: 'connections_details', label: 'Связи (детально)' },
+    { value: 'sou_details', label: 'Суды (детально)' },
+    { value: 'trademarks_details', label: 'Товарные знаки (детально)' },
+    { value: 'leasing_details', label: 'Лизинг (детально)' },
+    { value: 'pledges_details', label: 'Залоги (детально)' },
+    { value: 'facts_details', label: 'Факты (детально)' },
+    { value: 'bankruptcy_details', label: 'Банкротство (детально)' },
+    { value: 'founders_details', label: 'Учредители (детально)' },
+    { value: 'reliability_details', label: 'Надёжность (детально)' },
+    { value: 'sanctions_details', label: 'Санкции' },
+    { value: 'gz_details', label: 'Госзакупки (детально)' },
+    { value: 'fssp_details', label: 'ФССП (детально)' },
+    { value: 'inspections_details', label: 'Проверки (детально)' },
+    { value: 'licenses_details', label: 'Лицензии (детально)' },
+    { value: 'branches_details', label: 'Филиалы (детально)' },
+    { value: 'history_details', label: 'История (детально)' },
+    { value: 'requisites_details', label: 'Реквизиты' },
+    { value: 'okved_details', label: 'Виды деятельности' },
+    { value: 'egrul_details', label: 'Выписка ЕГРЮЛ/ЕГРИП' }
   ];
+
+  const footer = dumpExists && (
+    <p className="p-warning mt-2">
+      Дамп для этой организации уже существует. Используйте «Дополнить выбранные разделы» для обновления.
+    </p>
+  );
 
   return (
     <React.Fragment>
@@ -615,7 +654,11 @@ export const OSINTPage: React.FC = () => {
       <div className="app p-0" />
 
       {/* Панель ввода данных */}
-      <Panel className="shadow-5 mx-1" header="Поиск компании">
+      <Panel
+        className="shadow-5 mx-1"
+        header="Поиск компании"
+        footer={footer}
+      >
         <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
           <div className="flex-1 flex flex-column gap-1 xl:mr-8">
             <span className="app font-size-subheading">ИНН</span>
@@ -1313,7 +1356,10 @@ export const OSINTPage: React.FC = () => {
       {result && (
         <React.Fragment>
           <div className="app p-0" />
-          <Panel className="shadow-5 mx-1" header="Результат">
+          <Panel
+            className="shadow-5 mx-1" 
+            header="Результат"
+          >
             <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
               <div className="flex-1 flex flex-column gap-1 xl:mr-8">
                 {renderResult()}
@@ -1324,19 +1370,25 @@ export const OSINTPage: React.FC = () => {
       )}
 
       <div className="app p-0" />
-      <Panel className="shadow-5 mx-1" header="Дозагрузка разделов">
+      <Panel
+        className="shadow-5 mx-1"
+        header="Дозагрузка разделов"
+        footer={footer}
+      >
         <div className="flex flex-wrap app p-2 align-items-center gap-4">
           <div className="flex-1 flex flex-column gap-1">
             <span className="app font-size-subheading">Выберите разделы для обновления:</span>
             <div className="grid mt-2">
-              {supplementSections.map(section => (
-                <div className="col-12 md:col-6 lg:col-4 xl:col-3" key={section}>
+              {supplementSectionOptions.map(({ value, label }) => (
+                <div key={value} className="flex align-items-center gap-2">
                   <Checkbox
-                    inputId={`supplement_${section}`}
-                    checked={selectedSections.includes(section)}
-                    onChange={() => toggleSelectedSection(section)}
+                    inputId={`supplement_${value}`}
+                    checked={selectedSections.includes(value)}
+                    onChange={() => toggleSelectedSection(value)}
                   />
-                  <label htmlFor={`supplement_${section}`} className="ml-1">{section}</label>
+                  <label htmlFor={`supplement_${value}`} className="ml-1">
+                    {label}
+                  </label>
                 </div>
               ))}
             </div>
@@ -1360,12 +1412,6 @@ export const OSINTPage: React.FC = () => {
           onClick={handleSaveToDb}
           disabled={dumpExists}
         />
-      )}
-
-      {dumpExists && (
-        <p className="p-warning mt-2">
-          Дамп для этой организации уже существует. Используйте «Дополнить выбранные разделы» для обновления.
-        </p>
       )}
     </React.Fragment>
   );
