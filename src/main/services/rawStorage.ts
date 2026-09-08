@@ -5,12 +5,23 @@ import path from 'path';
 import { app } from 'electron';
 import { encode } from '@msgpack/msgpack';
 import { randomUUID } from 'crypto';
+import { decode } from '@msgpack/msgpack';
 
 export interface SavedRawDump {
   filePath: string;
   sizeBytes: number;
   entityType: string;
   regionPrefix: string;
+}
+
+export function loadRawDumpSync(filePath: string): any {
+  try {
+    const buffer = fs.readFileSync(filePath);
+    return decode(buffer);
+  } catch (error) {
+    console.error(`Ошибка чтения дампа ${filePath}:`, error);
+    throw error;
+  }
 }
 
 export function saveRawDumpSync(companyInn: string, data: any): SavedRawDump {

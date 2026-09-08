@@ -117,7 +117,8 @@ function initializeSchema(db: DatabaseSync) {
       company_id_rusprofile TEXT,
       dump_file_path TEXT NOT NULL,
       size_bytes INTEGER,
-      created_at TEXT DEFAULT (datetime('now'))
+      created_at TEXT DEFAULT (datetime('now')),
+      collected_sections TEXT  -- JSON-массив названий собранных разделов
     );
 
     CREATE TABLE IF NOT EXISTS shards (
@@ -140,6 +141,13 @@ function initializeSchema(db: DatabaseSync) {
     CREATE INDEX IF NOT EXISTS idx_shards_status ON shards(status);
   `);
 
+  // Проверяем наличие колонки collected_sections в raw_dumps
+  const rawDumpColumns = db.prepare(`PRAGMA table_info(raw_dumps)`).all() as { name: string }[];
+  if (!rawDumpColumns.some(col => col.name === 'collected_sections')) {
+    db.exec(`ALTER TABLE raw_dumps ADD COLUMN collected_sections TEXT;`);
+    console.log('Добавлена колонка collected_sections в raw_dumps');
+  }
+
   const caseRow = db.prepare('SELECT id FROM case_info WHERE id = 1').get();
   if (!caseRow) {
     db.prepare(`
@@ -147,6 +155,60 @@ function initializeSchema(db: DatabaseSync) {
       VALUES (1, ?, ?, ?, ?)
     `).run('OSINT Electron', 'Локальное OSINT-дело', 'active', new Date().toISOString());
   }
+}
+
+export function addRawDumpRecord(
+  companyInn: string,
+  companyIdRusprofile: string | null,
+  dumpFilePath: string,
+  sizeBytes: number,
+  collectedSections: string[]
+): number {
+  const db = getDatabase();
+  const stmt = db.prepare(`
+    INSERT INTO raw_dumps (company_inn, company_id_rusprofile, dump_file_path, size_bytes, collected_sections)
+    VALUES (?, ?, ?, ?, ?)
+  `);
+  console.log('addRawDumpRecord called with:', { companyInn, companyIdRusprofile, dumpFilePath, sizeBytes, collectedSections });
+  const info = stmt.run(
+    companyInn,
+    companyIdRusprofile || null,
+    dumpFilePath,
+    sizeBytes,
+    JSON.stringify(collectedSections)
+  );
+  console.log('Inserted raw_dump id:', Number(info.lastInsertRowid));
+  
+  return Number(info.lastInsertRowid);
+}
+
+export function findLatestRawDump(companyInn: string, companyIdRusprofile?: string): {
+  id: number;
+  dump_file_path: string;
+  collected_sections: string[] | null;
+} | null {
+  const db = getDatabase();
+  const query = companyIdRusprofile
+    ? `SELECT id, dump_file_path, collected_sections FROM raw_dumps
+       WHERE company_inn = ? AND company_id_rusprofile = ?
+       ORDER BY created_at DESC, id DESC LIMIT 1`
+    : `SELECT id, dump_file_path, collected_sections FROM raw_dumps
+       WHERE company_inn = ?
+       ORDER BY created_at DESC, id DESC LIMIT 1`;
+  const params = companyIdRusprofile ? [companyInn, companyIdRusprofile] : [companyInn];
+  const row = db.prepare(query).get(...params) as any;
+  if (!row) return null;
+  return {
+    id: row.id,
+    dump_file_path: row.dump_file_path,
+    collected_sections: row.collected_sections ? JSON.parse(row.collected_sections) : null,
+  };
+}
+
+export function updateRawDumpSections(dumpId: number, collectedSections: string[]): void {
+  const db = getDatabase();
+  db.prepare(`UPDATE raw_dumps SET collected_sections = ? WHERE id = ?`)
+    .run(JSON.stringify(collectedSections), dumpId);
 }
 
 export function normalize(value: string): string {

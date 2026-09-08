@@ -69,6 +69,7 @@ export async function collectOkvedDetails(
     result.top_companies = topCompanies;
 
     // Дополнительные виды деятельности
+    result.additional_activities = [];
     const additionalList = document.querySelector('#other');
     if (additionalList) {
       const list = additionalList.nextElementSibling;

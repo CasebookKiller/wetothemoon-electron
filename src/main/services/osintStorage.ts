@@ -1,5 +1,6 @@
 import {
   addObservation,
+  addRawDumpRecord,
   addRelation,
   addSource,
   auditChange,
@@ -51,6 +52,19 @@ export function saveCompanyData(
 } {
   // 1. Сохраняем сырой дамп
   const raw = saveRawDumpSync(companyInn, data);
+
+  // Определяем список собранных разделов (все ключи верхнего уровня, кроме служебных)
+  const collectedSections = Object.keys(data).filter(
+    (key) => !['company_id', 'entity_type', 'timings', 'startedAt', 'totalDurationMs'].includes(key)
+  );
+  // Сохраняем запись в raw_dumps
+  addRawDumpRecord(
+    companyInn,
+    data.summary?.rusprofile_id || null,
+    raw.filePath,
+    raw.sizeBytes,
+    collectedSections
+  );
 
   // 2. Определяем тип сущности
   const mainSummary = data.summary || {};

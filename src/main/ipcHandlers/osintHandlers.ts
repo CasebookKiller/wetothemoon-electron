@@ -3,7 +3,7 @@
 import { ipcMain } from 'electron';
 import { createOsintWindow, getOsintWindow } from '@/main/windows/osintWindow';
 import { launchBrowser, closeBrowser } from '../services/osint/playwrightService'; // будет создан позже
-import { scrapeRusprofile } from '../services/osint/scrapers/rusprofile';
+import { scrapeRusprofile } from '../services/osint/scrapers/rusprofile/index';
 import { scrapeKadArbitr } from '../services/osint/scrapers/kadArbitr';
 import { scrapeMosGorsud } from '../services/osint/scrapers/mosGorsud';
 import { getCredentials, setCredentials } from '../services/osint/credentials';
