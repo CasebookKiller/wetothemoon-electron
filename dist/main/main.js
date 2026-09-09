@@ -8379,32 +8379,66 @@ async function collectConnectionsDetails(page, companyId) {
 }
 //#endregion
 //#region src/main/services/osint/scrapers/rusprofile/search.ts
-async function getEntityIdByInn(page, inn) {
+async function getEntityIdByInn(page, inn, preferredType) {
 	await page.goto("https://www.rusprofile.ru/", {
 		waitUntil: "domcontentloaded",
 		timeout: 6e4
 	});
+	await page.waitForSelector("input#autocomplete-main-search", { timeout: 15e3 });
+	await page.fill("input#autocomplete-main-search", inn);
+	await page.keyboard.press("Enter");
 	await page.waitForTimeout(2e3);
-	const searchInput = page.locator("input#autocomplete-main-search");
-	await searchInput.waitFor({
-		state: "visible",
-		timeout: 5e3
-	});
-	await searchInput.fill(inn);
-	await searchInput.press("Enter");
-	await page.waitForTimeout(3e3);
-	const match = page.url().match(/\/(id|ip|person)\/(\d+)/);
-	if (match) return {
-		id: parseInt(match[2]),
-		type: match[1]
+	const directMatch = page.url().match(/\/(id|ip|person)\/(\d+)/);
+	if (directMatch) return {
+		id: parseInt(directMatch[2]),
+		type: directMatch[1]
 	};
-	await page.locator("a[href*='/id/'], a[href*='/ip/'], a[href*='/person/']").first().click();
-	await page.waitForTimeout(5e3);
-	const newMatch = page.url().match(/\/(id|ip|person)\/(\d+)/);
-	if (newMatch) return {
-		id: parseInt(newMatch[2]),
-		type: newMatch[1]
+	try {
+		await page.waitForSelector(".head-drop-results__tabs", { timeout: 5e3 });
+	} catch {
+		const firstLink = page.locator("a[href*='/id/'], a[href*='/ip/'], a[href*='/person/']").first();
+		if (await firstLink.count() > 0) {
+			const href = await firstLink.getAttribute("href");
+			if (href) {
+				const match = href.match(/\/(id|ip|person)\/(\d+)/);
+				if (match) return {
+					id: parseInt(match[2]),
+					type: match[1]
+				};
+			}
+		}
+		throw new Error(`Не удалось найти сущность по ИНН ${inn}`);
+	}
+	const tabLabels = {
+		company: "Юрлица",
+		entrepreneur: "ИП",
+		person: "Физлица"
 	};
+	let tabsToTry = [];
+	if (preferredType && tabLabels[preferredType]) tabsToTry.push(tabLabels[preferredType]);
+	else tabsToTry = [
+		"ИП",
+		"Физлица",
+		"Юрлица"
+	];
+	for (const tabText of tabsToTry) {
+		const tab = page.locator(`.head-drop-results__tab:has-text("${tabText}")`).first();
+		if (await tab.count() > 0) {
+			await tab.click();
+			await page.waitForTimeout(500);
+			const links = page.locator(".head-drop-results__list a[href*=\"/id/\"], .head-drop-results__list a[href*=\"/ip/\"], .head-drop-results__list a[href*=\"/person/\"]");
+			if (await links.count() > 0) {
+				const href = await links.first().getAttribute("href");
+				if (href) {
+					const match = href.match(/\/(id|ip|person)\/(\d+)/);
+					if (match) return {
+						id: parseInt(match[2]),
+						type: match[1]
+					};
+				}
+			}
+		}
+	}
 	throw new Error(`Не удалось найти сущность по ИНН ${inn}`);
 }
 //#endregion
@@ -8475,7 +8509,7 @@ async function scrapeRusprofile(inn, options) {
 			if (!creds) throw new Error("Нет учётных данных для rusprofile. Добавьте их в .env (VITE_RUSPROFILE_LOGIN, VITE_RUSPROFILE_PASSWORD) или сохраните через интерфейс OSINT.");
 			await login(page, creds.login, creds.password);
 		} else console.log("Сессия восстановлена, вход не требуется.");
-		const entityInfo = await getEntityIdByInn(page, inn);
+		const entityInfo = await getEntityIdByInn(page, inn, options?.preferredType);
 		const companyId = entityInfo.id;
 		const entityType = entityInfo.type;
 		const companyUrl = `https://www.rusprofile.ru/${entityType}/${companyId}`;

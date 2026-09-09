@@ -96,6 +96,7 @@ export async function scrapeRusprofile(
     okvedDetails?: boolean;
     egrulDetails?: boolean;
     onlySections?: string[];   // список разделов для дозагрузки
+    preferredType?: 'company' | 'entrepreneur' | 'person';
   }
 ): Promise<CompanyFullData | null> {
 
@@ -183,7 +184,7 @@ export async function scrapeRusprofile(
     }
 
     // Найти ID компании (всегда нужно)
-    const entityInfo = await getEntityIdByInn(page, inn);
+    const entityInfo = await getEntityIdByInn(page, inn, options?.preferredType);
     const companyId = entityInfo.id;
     const entityType = entityInfo.type;
     const companyUrl = `https://www.rusprofile.ru/${entityType}/${companyId}`;

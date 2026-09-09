@@ -161,6 +161,8 @@ export const OSINTPage: React.FC = () => {
   const [dumpExists, setDumpExists] = useState<boolean>(false);
   const [dumpInfo, setDumpInfo] = useState<any>(null);
 
+  const [entityTypeFilter, setEntityTypeFilter] = useState<'auto' | 'company' | 'entrepreneur' | 'person'>('auto');
+
   const api = (window as any).electronAPI;
 
   useEffect(() => {
@@ -333,6 +335,7 @@ export const OSINTPage: React.FC = () => {
         requisitesDetails: needRequisitesDetails,
         okvedDetails: needOkvedDetails,
         egrulDetails: needEgrulDetails,
+        preferredType: entityTypeFilter === 'auto' ? undefined : entityTypeFilter,
       };
 
       if (needArbitrDetails) {
@@ -623,6 +626,50 @@ export const OSINTPage: React.FC = () => {
                 placeholder="Введите ИНН"
                 className="w-full text-base"
               />
+            </div>
+
+            <div className="flex align-items-center gap-3 mt-2">
+              <span>Тип:</span>
+              <label className="flex align-items-center gap-1">
+                <input
+                  type="radio"
+                  name="entityType"
+                  value="auto"
+                  checked={entityTypeFilter === 'auto'}
+                  onChange={() => setEntityTypeFilter('auto')}
+                />
+                Авто
+              </label>
+              <label className="flex align-items-center gap-1">
+                <input
+                  type="radio"
+                  name="entityType"
+                  value="company"
+                  checked={entityTypeFilter === 'company'}
+                  onChange={() => setEntityTypeFilter('company')}
+                />
+                Юрлицо
+              </label>
+              <label className="flex align-items-center gap-1">
+                <input
+                  type="radio"
+                  name="entityType"
+                  value="entrepreneur"
+                  checked={entityTypeFilter === 'entrepreneur'}
+                  onChange={() => setEntityTypeFilter('entrepreneur')}
+                />
+                ИП
+              </label>
+              <label className="flex align-items-center gap-1">
+                <input
+                  type="radio"
+                  name="entityType"
+                  value="person"
+                  checked={entityTypeFilter === 'person'}
+                  onChange={() => setEntityTypeFilter('person')}
+                />
+                Физлицо
+              </label>
             </div>
 
             <div className="grid mt-2">
