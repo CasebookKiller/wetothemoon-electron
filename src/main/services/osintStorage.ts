@@ -1,9 +1,14 @@
+import fs from 'fs';
+import { encode } from '@msgpack/msgpack';
+
 import {
   addObservation,
   addRawDumpRecord,
   addRelation,
   addSource,
   auditChange,
+  getDumpSectionsUpdatedAt,
+  updateRawDumpSections,
   upsertEntity,
 } from './database';
 import { saveRawDumpSync } from './rawStorage';
@@ -42,53 +47,19 @@ function extractRusprofileId(href?: string): string | undefined {
   return match ? `${match[1]}:${match[2]}` : undefined;
 }
 
-export function saveCompanyData(
+function persistCompanyData(
   companyId: string,
   companyInn: string,
-  data: any
+  data: any,
+  rawFilePath: string,
+  sourceId: number
 ): {
   savedEntities: number;
   savedRelations: number;
   savedObservations: number;
-  rawDumpPath: string;
 } {
-  // 1. Сохраняем сырой дамп
-  const raw = saveRawDumpSync(companyInn, data);
-
-  // Определяем список собранных разделов (все ключи верхнего уровня, кроме служебных)
-  const collectedSections = Object.keys(data).filter(
-    (key) => !['company_id', 'entity_type', 'timings', 'startedAt', 'totalDurationMs'].includes(key)
-  );
-  // Сохраняем запись в raw_dumps
-  addRawDumpRecord(
-    companyInn,
-    companyId,  // сохраняем переданный ID (например, "id:2835629")
-    raw.filePath,
-    raw.sizeBytes,
-    collectedSections
-  );
-
-  // 2. Определяем тип сущности
   const mainSummary = data.summary || {};
   const mainType = detectEntityTypeFromData(mainSummary);
-  const urlPath = mainType === 'company' ? 'id' : mainType === 'entrepreneur' ? 'ip' : 'person';
-  const sourceUrl = `https://www.rusprofile.ru/${urlPath}/${companyId}`;
-
-  // 3. Создаём источник
-  const sourceId = addSource({
-    url: sourceUrl,
-    title: 'Rusprofile',
-    source_type: 'registry',
-    source_kind: 'official_registry',
-    provider: 'rusprofile.ru',
-    collection_method: 'browser',
-    reliability: 80,
-    access_level: 'public',
-    retrieved_at: new Date().toISOString(),
-    local_path: raw.filePath,
-  });
-
-  // 4. Сохраняем основную сущность
   const mainEntityId = upsertEntity({
     type: mainType,
     value: mainSummary.name || `Сущность ${companyInn}`,
@@ -96,11 +67,11 @@ export function saveCompanyData(
     confidence: 90,
     status: 'confirmed',
     notes: 'Целевая сущность, собранная скраппером',
-    raw_file_path: raw.filePath,
+    raw_file_path: rawFilePath,
   });
 
-  // 5. Добавляем наблюдения для основной сущности
-  const mainObservations: Array<{ attribute: string; value?: string }> = [
+  let savedObservations = 0;
+  const mainObservations = [
     { attribute: 'inn', value: mainSummary.inn },
     { attribute: 'ogrn', value: mainSummary.ogrn },
     { attribute: 'ogrnip', value: mainSummary.ogrnip },
@@ -109,8 +80,6 @@ export function saveCompanyData(
     { attribute: 'activity', value: mainSummary.main_activity },
     { attribute: 'director', value: mainSummary.manager?.name },
   ];
-
-  let savedObservations = 0;
   for (const obs of mainObservations) {
     if (obs.value) {
       addObservation({
@@ -119,7 +88,7 @@ export function saveCompanyData(
         value: obs.value,
         source_id: sourceId,
         confidence: 90,
-        raw_file_path: raw.filePath,
+        raw_file_path: rawFilePath,
       });
       savedObservations++;
     }
@@ -128,7 +97,7 @@ export function saveCompanyData(
   let savedEntities = 1;
   let savedRelations = 0;
 
-  // 6. Обработка учредителей (если есть)
+  // Обработка учредителей (как раньше)
   if (data.founders_details?.founders) {
     for (const founder of data.founders_details.founders) {
       const founderType =
@@ -143,47 +112,23 @@ export function saveCompanyData(
         label: founder.name,
         confidence: 70,
         status: 'hypothesis',
-        raw_file_path: raw.filePath,
+        raw_file_path: rawFilePath,
       });
 
       if (founder.inn) {
-        addObservation({
-          entity_id: founderId,
-          attribute: 'inn',
-          value: founder.inn,
-          source_id: sourceId,
-          raw_file_path: raw.filePath,
-        });
+        addObservation({ entity_id: founderId, attribute: 'inn', value: founder.inn, source_id: sourceId, raw_file_path: rawFilePath });
         savedObservations++;
       }
       if (founder.ogrn) {
-        addObservation({
-          entity_id: founderId,
-          attribute: 'ogrn',
-          value: founder.ogrn,
-          source_id: sourceId,
-          raw_file_path: raw.filePath,
-        });
+        addObservation({ entity_id: founderId, attribute: 'ogrn', value: founder.ogrn, source_id: sourceId, raw_file_path: rawFilePath });
         savedObservations++;
       }
       if (founder.ogrnip) {
-        addObservation({
-          entity_id: founderId,
-          attribute: 'ogrnip',
-          value: founder.ogrnip,
-          source_id: sourceId,
-          raw_file_path: raw.filePath,
-        });
+        addObservation({ entity_id: founderId, attribute: 'ogrnip', value: founder.ogrnip, source_id: sourceId, raw_file_path: rawFilePath });
         savedObservations++;
       }
       if (founder.share) {
-        addObservation({
-          entity_id: founderId,
-          attribute: 'share',
-          value: founder.share,
-          source_id: sourceId,
-          raw_file_path: raw.filePath,
-        });
+        addObservation({ entity_id: founderId, attribute: 'share', value: founder.share, source_id: sourceId, raw_file_path: rawFilePath });
         savedObservations++;
       }
 
@@ -195,15 +140,14 @@ export function saveCompanyData(
         evidence_text: founder.share || null,
         confidence: 75,
         status: 'unverified',
-        raw_file_path: raw.filePath,
+        raw_file_path: rawFilePath,
       });
-
       savedEntities++;
       savedRelations++;
     }
   }
 
-  // 7. Обработка связей (connections_details)
+  // Обработка связей (connections_details)
   if (data.connections_details?.connections) {
     for (const group of data.connections_details.connections) {
       if (group.organizations) {
@@ -220,37 +164,19 @@ export function saveCompanyData(
             label: org.name,
             confidence: 60,
             status: 'unverified',
-            raw_file_path: raw.filePath,
+            raw_file_path: rawFilePath,
           });
 
           if (org.inn) {
-            addObservation({
-              entity_id: orgId,
-              attribute: 'inn',
-              value: org.inn,
-              source_id: sourceId,
-              raw_file_path: raw.filePath,
-            });
+            addObservation({ entity_id: orgId, attribute: 'inn', value: org.inn, source_id: sourceId, raw_file_path: rawFilePath });
             savedObservations++;
           }
           if (org.ogrn) {
-            addObservation({
-              entity_id: orgId,
-              attribute: 'ogrn',
-              value: org.ogrn,
-              source_id: sourceId,
-              raw_file_path: raw.filePath,
-            });
+            addObservation({ entity_id: orgId, attribute: 'ogrn', value: org.ogrn, source_id: sourceId, raw_file_path: rawFilePath });
             savedObservations++;
           }
           if (org.ogrnip) {
-            addObservation({
-              entity_id: orgId,
-              attribute: 'ogrnip',
-              value: org.ogrnip,
-              source_id: sourceId,
-              raw_file_path: raw.filePath,
-            });
+            addObservation({ entity_id: orgId, attribute: 'ogrnip', value: org.ogrnip, source_id: sourceId, raw_file_path: rawFilePath });
             savedObservations++;
           }
 
@@ -262,9 +188,8 @@ export function saveCompanyData(
             evidence_text: group.title || null,
             confidence: 50,
             status: 'unverified',
-            raw_file_path: raw.filePath,
+            raw_file_path: rawFilePath,
           });
-
           savedEntities++;
           savedRelations++;
         }
@@ -272,21 +197,133 @@ export function saveCompanyData(
     }
   }
 
-  // 8. Аудит
-  auditChange(
-    'entities',
-    mainEntityId,
-    'create',
-    null,
-    JSON.stringify(mainSummary),
-    'Сохранение сущности из Rusprofile'
+  // Аудит
+  auditChange('entities', mainEntityId, 'update', null, JSON.stringify(mainSummary), 'Сохранение/обновление сущности из Rusprofile');
+
+  return { savedEntities, savedRelations, savedObservations };
+}
+
+export function saveCompanyData(
+  companyId: string,
+  companyInn: string,
+  data: any
+): {
+  savedEntities: number;
+  savedRelations: number;
+  savedObservations: number;
+  rawDumpPath: string;
+} {
+  // 1. Сохраняем сырой дамп
+  const raw = saveRawDumpSync(companyInn, data);
+
+  // 2. Собираем список собранных разделов
+  const collectedSections = Object.keys(data).filter(
+    (key) => !['company_id', 'entity_type', 'timings', 'startedAt', 'totalDurationMs'].includes(key)
   );
 
+  const sectionUpdatedAt: Record<string, string> = {};
+  const nowIso = new Date().toISOString();
+  for (const section of collectedSections) {
+    sectionUpdatedAt[section] = nowIso;
+  }
+
+  // 3. Добавляем запись в raw_dumps
+  addRawDumpRecord(
+    companyInn,
+    companyId,
+    raw.filePath,
+    raw.sizeBytes,
+    collectedSections,
+    sectionUpdatedAt
+  );
+
+  // 4. Определяем тип и URL источника
+  const mainSummary = data.summary || {};
+  const mainType = detectEntityTypeFromData(mainSummary);
+  const urlPath = mainType === 'company' ? 'id' : mainType === 'entrepreneur' ? 'ip' : 'person';
+  const sourceUrl = `https://www.rusprofile.ru/${urlPath}/${companyId}`;
+
+  // 5. Создаём источник
+  const sourceId = addSource({
+    url: sourceUrl,
+    title: 'Rusprofile',
+    source_type: 'registry',
+    source_kind: 'official_registry',
+    provider: 'rusprofile.ru',
+    collection_method: 'browser',
+    reliability: 80,
+    access_level: 'public',
+    retrieved_at: new Date().toISOString(),
+    local_path: raw.filePath,
+  });
+
+  // 6. Сохраняем данные в БД
+  const result = persistCompanyData(companyId, companyInn, data, raw.filePath, sourceId);
+
   return {
-    savedEntities,
-    savedRelations,
-    savedObservations,
+    ...result,
     rawDumpPath: raw.filePath,
+  };
+}
+
+export function updateCompanyData(
+  companyId: string,
+  companyInn: string,
+  data: any,
+  existingDumpPath: string,
+  existingDumpId: number
+): {
+  savedEntities: number;
+  savedRelations: number;
+  savedObservations: number;
+  rawDumpPath: string;
+} {
+  // 1. Перезаписываем существующий файл дампа
+  const buffer = encode(data);
+  fs.writeFileSync(existingDumpPath, buffer);
+  const stat = fs.statSync(existingDumpPath);
+
+  // 2. Обновляем список собранных разделов в raw_dumps
+  const collectedSections = Object.keys(data).filter(
+    (key) => !['company_id', 'entity_type', 'timings', 'startedAt', 'totalDurationMs'].includes(key)
+  );
+  // Получаем старые даты
+  const oldSectionDates = getDumpSectionsUpdatedAt(existingDumpId) || {};
+  const nowIso = new Date().toISOString();
+  for (const section of collectedSections) {
+    oldSectionDates[section] = nowIso;
+  }
+
+  updateRawDumpSections(existingDumpId, collectedSections, oldSectionDates);
+
+  // 3. Определяем тип и URL источника
+  const mainSummary = data.summary || {};
+  const mainType = detectEntityTypeFromData(mainSummary);
+  const urlPath = mainType === 'company' ? 'id' : mainType === 'entrepreneur' ? 'ip' : 'person';
+  const sourceUrl = `https://www.rusprofile.ru/${urlPath}/${companyId}`;
+
+  // 4. Создаём источник (если ещё нет, можно добавить; но для простоты создадим новый? 
+  // Лучше использовать существующий источник, но мы не храним его ID. 
+  // Пока добавим новый, чтобы не усложнять, но в будущем можно искать по URL)
+  const sourceId = addSource({
+    url: sourceUrl,
+    title: 'Rusprofile',
+    source_type: 'registry',
+    source_kind: 'official_registry',
+    provider: 'rusprofile.ru',
+    collection_method: 'browser',
+    reliability: 80,
+    access_level: 'public',
+    retrieved_at: new Date().toISOString(),
+    local_path: existingDumpPath,
+  });
+
+  // 5. Сохраняем данные в БД
+  const result = persistCompanyData(companyId, companyInn, data, existingDumpPath, sourceId);
+
+  return {
+    ...result,
+    rawDumpPath: existingDumpPath,
   };
 }
 

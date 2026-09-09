@@ -118,6 +118,7 @@ function initializeSchema(db: DatabaseSync) {
       dump_file_path TEXT NOT NULL,
       size_bytes INTEGER,
       created_at TEXT DEFAULT (datetime('now')),
+      section_updated_at TEXT,
       collected_sections TEXT  -- JSON-массив названий собранных разделов
     );
 
@@ -145,7 +146,9 @@ function initializeSchema(db: DatabaseSync) {
   const rawDumpColumns = db.prepare(`PRAGMA table_info(raw_dumps)`).all() as { name: string }[];
   if (!rawDumpColumns.some(col => col.name === 'collected_sections')) {
     db.exec(`ALTER TABLE raw_dumps ADD COLUMN collected_sections TEXT;`);
-    console.log('Добавлена колонка collected_sections в raw_dumps');
+  }
+  if (!rawDumpColumns.some(col => col.name === 'section_updated_at')) {
+    db.exec(`ALTER TABLE raw_dumps ADD COLUMN section_updated_at TEXT;`);
   }
 
   const caseRow = db.prepare('SELECT id FROM case_info WHERE id = 1').get();
@@ -162,23 +165,22 @@ export function addRawDumpRecord(
   companyIdRusprofile: string | null,
   dumpFilePath: string,
   sizeBytes: number,
-  collectedSections: string[]
+  collectedSections: string[],
+  sectionUpdatedAt?: Record<string, string> // optional
 ): number {
   const db = getDatabase();
   const stmt = db.prepare(`
-    INSERT INTO raw_dumps (company_inn, company_id_rusprofile, dump_file_path, size_bytes, collected_sections)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO raw_dumps (company_inn, company_id_rusprofile, dump_file_path, size_bytes, collected_sections, section_updated_at)
+    VALUES (?, ?, ?, ?, ?, ?)
   `);
-  console.log('addRawDumpRecord called with:', { companyInn, companyIdRusprofile, dumpFilePath, sizeBytes, collectedSections });
   const info = stmt.run(
     companyInn,
     companyIdRusprofile || null,
     dumpFilePath,
     sizeBytes,
-    JSON.stringify(collectedSections)
+    JSON.stringify(collectedSections),
+    sectionUpdatedAt ? JSON.stringify(sectionUpdatedAt) : null
   );
-  console.log('Inserted raw_dump id:', Number(info.lastInsertRowid));
-  
   return Number(info.lastInsertRowid);
 }
 
@@ -205,10 +207,25 @@ export function findLatestRawDump(companyInn: string, companyIdRusprofile?: stri
   };
 }
 
-export function updateRawDumpSections(dumpId: number, collectedSections: string[]): void {
+export function updateRawDumpSections(
+  dumpId: number,
+  collectedSections: string[],
+  sectionUpdatedAt?: Record<string, string>
+): void {
   const db = getDatabase();
-  db.prepare(`UPDATE raw_dumps SET collected_sections = ? WHERE id = ?`)
-    .run(JSON.stringify(collectedSections), dumpId);
+  db.prepare(`UPDATE raw_dumps SET collected_sections = ?, section_updated_at = ? WHERE id = ?`)
+    .run(
+      JSON.stringify(collectedSections),
+      sectionUpdatedAt ? JSON.stringify(sectionUpdatedAt) : null,
+      dumpId
+    );
+}
+
+export function getDumpSectionsUpdatedAt(dumpId: number): Record<string, string> | null {
+  const db = getDatabase();
+  const row = db.prepare('SELECT section_updated_at FROM raw_dumps WHERE id = ?').get(dumpId) as any;
+  if (!row || !row.section_updated_at) return null;
+  return JSON.parse(row.section_updated_at);
 }
 
 export function normalize(value: string): string {
@@ -229,35 +246,57 @@ export function upsertEntity(entity: {
   const now = new Date().toISOString();
   const normalized = normalize(entity.value);
 
-  const stmt = db.prepare(`
-    INSERT INTO entities (rusprofile_id, type, value, normalized_value, label, first_seen, last_seen, confidence, status, notes, raw_file_path)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(type, normalized_value) DO UPDATE SET
-      rusprofile_id = COALESCE(excluded.rusprofile_id, entities.rusprofile_id),
-      value = excluded.value,
-      label = COALESCE(excluded.label, entities.label),
-      last_seen = excluded.last_seen,
-      confidence = COALESCE(excluded.confidence, entities.confidence),
-      status = CASE WHEN excluded.status IS NOT NULL THEN excluded.status ELSE entities.status END,
-      notes = COALESCE(excluded.notes, entities.notes),
-      raw_file_path = COALESCE(excluded.raw_file_path, entities.raw_file_path)
-  `);
+  // Сначала ищем существующую запись
+  const existing = db.prepare(
+    'SELECT id FROM entities WHERE type = ? AND normalized_value = ?'
+  ).get(entity.type, normalized) as { id: number } | undefined;
 
-  const info = stmt.run(
-    entity.rusprofile_id || null,
-    entity.type,
-    entity.value,
-    normalized,
-    entity.label || entity.value,
-    now,
-    now,
-    entity.confidence ?? 50,
-    entity.status || 'unverified',
-    entity.notes || null,
-    entity.raw_file_path || null
-  );
-
-  return Number(info.lastInsertRowid);
+  if (existing) {
+    // Обновляем существующую
+    db.prepare(`
+      UPDATE entities SET
+        rusprofile_id = COALESCE(?, rusprofile_id),
+        value = ?,
+        label = COALESCE(?, label),
+        last_seen = ?,
+        confidence = COALESCE(?, confidence),
+        status = CASE WHEN ? IS NOT NULL THEN ? ELSE status END,
+        notes = COALESCE(?, notes),
+        raw_file_path = COALESCE(?, raw_file_path)
+      WHERE id = ?
+    `).run(
+      entity.rusprofile_id || null,
+      entity.value,
+      entity.label || entity.value,
+      now,
+      entity.confidence ?? 50,
+      entity.status || 'unverified',
+      entity.status || 'unverified',
+      entity.notes || null,
+      entity.raw_file_path || null,
+      existing.id
+    );
+    return existing.id;
+  } else {
+    // Вставляем новую
+    const info = db.prepare(`
+      INSERT INTO entities (rusprofile_id, type, value, normalized_value, label, first_seen, last_seen, confidence, status, notes, raw_file_path)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      entity.rusprofile_id || null,
+      entity.type,
+      entity.value,
+      normalized,
+      entity.label || entity.value,
+      now,
+      now,
+      entity.confidence ?? 50,
+      entity.status || 'unverified',
+      entity.notes || null,
+      entity.raw_file_path || null
+    );
+    return Number(info.lastInsertRowid);
+  }
 }
 
 export function addSource(source: {

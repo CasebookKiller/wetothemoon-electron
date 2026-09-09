@@ -8,10 +8,10 @@ import { scrapeKadArbitr } from '../services/osint/scrapers/kadArbitr';
 import { scrapeMosGorsud } from '../services/osint/scrapers/mosGorsud';
 import { getCredentials, setCredentials } from '../services/osint/credentials';
 import { createDatabaseWindow, getDatabaseWindow } from '../windows/databaseWindow';
-import { getDatabase, hasRawDumpForInn } from '../services/database';
+import { getDatabase, getDumpSectionsUpdatedAt, hasRawDumpForInn } from '../services/database';
 import { findLatestRawDump } from '../services/database';
 import { loadRawDumpSync } from '../services/rawStorage';
-import { mergeCompanyDumps, saveCompanyData } from '../services/osintStorage';
+import { mergeCompanyDumps, saveCompanyData, updateCompanyData } from '../services/osintStorage';
 
 export function registerOsintHandlers() {
   // Открыть окно OSINT
@@ -168,10 +168,12 @@ export function registerOsintHandlers() {
       const mergedData = mergeCompanyDumps(existingData, newData);
 
       // 5. Сохраняем объединённый дамп (создаст новый файл и обновит БД)
-      const result = saveCompanyData(
-        String(newData.company_id ?? ''), // используем ID из новых данных (он всегда есть)
+      const result = updateCompanyData(
+        String(newData.company_id ?? ''),
         inn,
-        mergedData
+        mergedData,
+        latestDump.dump_file_path,
+        latestDump.id
       );
 
       return { success: true, ...result };
@@ -183,7 +185,22 @@ export function registerOsintHandlers() {
 
   ipcMain.handle('osint:check-dump-exists', async (_event, inn: string) => {
     try {
-      return { exists: hasRawDumpForInn(inn) };
+      const exists = hasRawDumpForInn(inn);
+      if (!exists) return { exists: false, dumpInfo: null };
+
+      const latestDump = findLatestRawDump(inn);
+      if (!latestDump) return { exists: false, dumpInfo: null };
+
+      const sectionDates = getDumpSectionsUpdatedAt(latestDump.id);
+      return {
+        exists: true,
+        dumpInfo: {
+          id: latestDump.id,
+          collectedSections: latestDump.collected_sections,
+          sectionUpdatedAt: sectionDates,
+          dumpFilePath: latestDump.dump_file_path,
+        }
+      };
     } catch (error) {
       return { exists: false, error: (error as Error).message };
     }

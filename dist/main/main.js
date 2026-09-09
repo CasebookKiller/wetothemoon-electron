@@ -8879,6 +8879,7 @@ function initializeSchema(db) {
       dump_file_path TEXT NOT NULL,
       size_bytes INTEGER,
       created_at TEXT DEFAULT (datetime('now')),
+      section_updated_at TEXT,
       collected_sections TEXT  -- JSON-массив названий собранных разделов
     );
 
@@ -8901,29 +8902,19 @@ function initializeSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_raw_dumps_inn ON raw_dumps(company_inn);
     CREATE INDEX IF NOT EXISTS idx_shards_status ON shards(status);
   `);
-	if (!db.prepare(`PRAGMA table_info(raw_dumps)`).all().some((col) => col.name === "collected_sections")) {
-		db.exec(`ALTER TABLE raw_dumps ADD COLUMN collected_sections TEXT;`);
-		console.log("Добавлена колонка collected_sections в raw_dumps");
-	}
+	const rawDumpColumns = db.prepare(`PRAGMA table_info(raw_dumps)`).all();
+	if (!rawDumpColumns.some((col) => col.name === "collected_sections")) db.exec(`ALTER TABLE raw_dumps ADD COLUMN collected_sections TEXT;`);
+	if (!rawDumpColumns.some((col) => col.name === "section_updated_at")) db.exec(`ALTER TABLE raw_dumps ADD COLUMN section_updated_at TEXT;`);
 	if (!db.prepare("SELECT id FROM case_info WHERE id = 1").get()) db.prepare(`
       INSERT INTO case_info (id, name, description, status, created_at)
       VALUES (1, ?, ?, ?, ?)
     `).run("OSINT Electron", "Локальное OSINT-дело", "active", (/* @__PURE__ */ new Date()).toISOString());
 }
-function addRawDumpRecord(companyInn, companyIdRusprofile, dumpFilePath, sizeBytes, collectedSections) {
-	const stmt = getDatabase().prepare(`
-    INSERT INTO raw_dumps (company_inn, company_id_rusprofile, dump_file_path, size_bytes, collected_sections)
-    VALUES (?, ?, ?, ?, ?)
-  `);
-	console.log("addRawDumpRecord called with:", {
-		companyInn,
-		companyIdRusprofile,
-		dumpFilePath,
-		sizeBytes,
-		collectedSections
-	});
-	const info = stmt.run(companyInn, companyIdRusprofile || null, dumpFilePath, sizeBytes, JSON.stringify(collectedSections));
-	console.log("Inserted raw_dump id:", Number(info.lastInsertRowid));
+function addRawDumpRecord(companyInn, companyIdRusprofile, dumpFilePath, sizeBytes, collectedSections, sectionUpdatedAt) {
+	const info = getDatabase().prepare(`
+    INSERT INTO raw_dumps (company_inn, company_id_rusprofile, dump_file_path, size_bytes, collected_sections, section_updated_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(companyInn, companyIdRusprofile || null, dumpFilePath, sizeBytes, JSON.stringify(collectedSections), sectionUpdatedAt ? JSON.stringify(sectionUpdatedAt) : null);
 	return Number(info.lastInsertRowid);
 }
 function findLatestRawDump(companyInn, companyIdRusprofile) {
@@ -8942,6 +8933,14 @@ function findLatestRawDump(companyInn, companyIdRusprofile) {
 		collected_sections: row.collected_sections ? JSON.parse(row.collected_sections) : null
 	};
 }
+function updateRawDumpSections(dumpId, collectedSections, sectionUpdatedAt) {
+	getDatabase().prepare(`UPDATE raw_dumps SET collected_sections = ?, section_updated_at = ? WHERE id = ?`).run(JSON.stringify(collectedSections), sectionUpdatedAt ? JSON.stringify(sectionUpdatedAt) : null, dumpId);
+}
+function getDumpSectionsUpdatedAt(dumpId) {
+	const row = getDatabase().prepare("SELECT section_updated_at FROM raw_dumps WHERE id = ?").get(dumpId);
+	if (!row || !row.section_updated_at) return null;
+	return JSON.parse(row.section_updated_at);
+}
 function normalize(value) {
 	return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
@@ -8949,20 +8948,28 @@ function upsertEntity(entity) {
 	const db = getDatabase();
 	const now = (/* @__PURE__ */ new Date()).toISOString();
 	const normalized = normalize(entity.value);
-	const info = db.prepare(`
-    INSERT INTO entities (rusprofile_id, type, value, normalized_value, label, first_seen, last_seen, confidence, status, notes, raw_file_path)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(type, normalized_value) DO UPDATE SET
-      rusprofile_id = COALESCE(excluded.rusprofile_id, entities.rusprofile_id),
-      value = excluded.value,
-      label = COALESCE(excluded.label, entities.label),
-      last_seen = excluded.last_seen,
-      confidence = COALESCE(excluded.confidence, entities.confidence),
-      status = CASE WHEN excluded.status IS NOT NULL THEN excluded.status ELSE entities.status END,
-      notes = COALESCE(excluded.notes, entities.notes),
-      raw_file_path = COALESCE(excluded.raw_file_path, entities.raw_file_path)
-  `).run(entity.rusprofile_id || null, entity.type, entity.value, normalized, entity.label || entity.value, now, now, entity.confidence ?? 50, entity.status || "unverified", entity.notes || null, entity.raw_file_path || null);
-	return Number(info.lastInsertRowid);
+	const existing = db.prepare("SELECT id FROM entities WHERE type = ? AND normalized_value = ?").get(entity.type, normalized);
+	if (existing) {
+		db.prepare(`
+      UPDATE entities SET
+        rusprofile_id = COALESCE(?, rusprofile_id),
+        value = ?,
+        label = COALESCE(?, label),
+        last_seen = ?,
+        confidence = COALESCE(?, confidence),
+        status = CASE WHEN ? IS NOT NULL THEN ? ELSE status END,
+        notes = COALESCE(?, notes),
+        raw_file_path = COALESCE(?, raw_file_path)
+      WHERE id = ?
+    `).run(entity.rusprofile_id || null, entity.value, entity.label || entity.value, now, entity.confidence ?? 50, entity.status || "unverified", entity.status || "unverified", entity.notes || null, entity.raw_file_path || null, existing.id);
+		return existing.id;
+	} else {
+		const info = db.prepare(`
+      INSERT INTO entities (rusprofile_id, type, value, normalized_value, label, first_seen, last_seen, confidence, status, notes, raw_file_path)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(entity.rusprofile_id || null, entity.type, entity.value, normalized, entity.label || entity.value, now, now, entity.confidence ?? 50, entity.status || "unverified", entity.notes || null, entity.raw_file_path || null);
+		return Number(info.lastInsertRowid);
+	}
 }
 function addSource(source) {
 	const info = getDatabase().prepare(`
@@ -9069,39 +9076,18 @@ function extractRusprofileId(href) {
 	const match = href.match(/\/(id|ip|person)\/([^/?]+)/);
 	return match ? `${match[1]}:${match[2]}` : void 0;
 }
-function saveCompanyData(companyId, companyInn, data) {
-	const raw = saveRawDumpSync(companyInn, data);
-	const collectedSections = Object.keys(data).filter((key) => ![
-		"company_id",
-		"entity_type",
-		"timings",
-		"startedAt",
-		"totalDurationMs"
-	].includes(key));
-	addRawDumpRecord(companyInn, companyId, raw.filePath, raw.sizeBytes, collectedSections);
+function persistCompanyData(companyId, companyInn, data, rawFilePath, sourceId) {
 	const mainSummary = data.summary || {};
-	const mainType = detectEntityTypeFromData(mainSummary);
-	const sourceId = addSource({
-		url: `https://www.rusprofile.ru/${mainType === "company" ? "id" : mainType === "entrepreneur" ? "ip" : "person"}/${companyId}`,
-		title: "Rusprofile",
-		source_type: "registry",
-		source_kind: "official_registry",
-		provider: "rusprofile.ru",
-		collection_method: "browser",
-		reliability: 80,
-		access_level: "public",
-		retrieved_at: (/* @__PURE__ */ new Date()).toISOString(),
-		local_path: raw.filePath
-	});
 	const mainEntityId = upsertEntity({
-		type: mainType,
+		type: detectEntityTypeFromData(mainSummary),
 		value: mainSummary.name || `Сущность ${companyInn}`,
 		label: mainSummary.name,
 		confidence: 90,
 		status: "confirmed",
 		notes: "Целевая сущность, собранная скраппером",
-		raw_file_path: raw.filePath
+		raw_file_path: rawFilePath
 	});
+	let savedObservations = 0;
 	const mainObservations = [
 		{
 			attribute: "inn",
@@ -9132,7 +9118,6 @@ function saveCompanyData(companyId, companyInn, data) {
 			value: mainSummary.manager?.name
 		}
 	];
-	let savedObservations = 0;
 	for (const obs of mainObservations) if (obs.value) {
 		addObservation({
 			entity_id: mainEntityId,
@@ -9140,7 +9125,7 @@ function saveCompanyData(companyId, companyInn, data) {
 			value: obs.value,
 			source_id: sourceId,
 			confidence: 90,
-			raw_file_path: raw.filePath
+			raw_file_path: rawFilePath
 		});
 		savedObservations++;
 	}
@@ -9155,7 +9140,7 @@ function saveCompanyData(companyId, companyInn, data) {
 			label: founder.name,
 			confidence: 70,
 			status: "hypothesis",
-			raw_file_path: raw.filePath
+			raw_file_path: rawFilePath
 		});
 		if (founder.inn) {
 			addObservation({
@@ -9163,7 +9148,7 @@ function saveCompanyData(companyId, companyInn, data) {
 				attribute: "inn",
 				value: founder.inn,
 				source_id: sourceId,
-				raw_file_path: raw.filePath
+				raw_file_path: rawFilePath
 			});
 			savedObservations++;
 		}
@@ -9173,7 +9158,7 @@ function saveCompanyData(companyId, companyInn, data) {
 				attribute: "ogrn",
 				value: founder.ogrn,
 				source_id: sourceId,
-				raw_file_path: raw.filePath
+				raw_file_path: rawFilePath
 			});
 			savedObservations++;
 		}
@@ -9183,7 +9168,7 @@ function saveCompanyData(companyId, companyInn, data) {
 				attribute: "ogrnip",
 				value: founder.ogrnip,
 				source_id: sourceId,
-				raw_file_path: raw.filePath
+				raw_file_path: rawFilePath
 			});
 			savedObservations++;
 		}
@@ -9193,7 +9178,7 @@ function saveCompanyData(companyId, companyInn, data) {
 				attribute: "share",
 				value: founder.share,
 				source_id: sourceId,
-				raw_file_path: raw.filePath
+				raw_file_path: rawFilePath
 			});
 			savedObservations++;
 		}
@@ -9205,7 +9190,7 @@ function saveCompanyData(companyId, companyInn, data) {
 			evidence_text: founder.share || null,
 			confidence: 75,
 			status: "unverified",
-			raw_file_path: raw.filePath
+			raw_file_path: rawFilePath
 		});
 		savedEntities++;
 		savedRelations++;
@@ -9220,7 +9205,7 @@ function saveCompanyData(companyId, companyInn, data) {
 				label: org.name,
 				confidence: 60,
 				status: "unverified",
-				raw_file_path: raw.filePath
+				raw_file_path: rawFilePath
 			});
 			if (org.inn) {
 				addObservation({
@@ -9228,7 +9213,7 @@ function saveCompanyData(companyId, companyInn, data) {
 					attribute: "inn",
 					value: org.inn,
 					source_id: sourceId,
-					raw_file_path: raw.filePath
+					raw_file_path: rawFilePath
 				});
 				savedObservations++;
 			}
@@ -9238,7 +9223,7 @@ function saveCompanyData(companyId, companyInn, data) {
 					attribute: "ogrn",
 					value: org.ogrn,
 					source_id: sourceId,
-					raw_file_path: raw.filePath
+					raw_file_path: rawFilePath
 				});
 				savedObservations++;
 			}
@@ -9248,7 +9233,7 @@ function saveCompanyData(companyId, companyInn, data) {
 					attribute: "ogrnip",
 					value: org.ogrnip,
 					source_id: sourceId,
-					raw_file_path: raw.filePath
+					raw_file_path: rawFilePath
 				});
 				savedObservations++;
 			}
@@ -9260,18 +9245,80 @@ function saveCompanyData(companyId, companyInn, data) {
 				evidence_text: group.title || null,
 				confidence: 50,
 				status: "unverified",
-				raw_file_path: raw.filePath
+				raw_file_path: rawFilePath
 			});
 			savedEntities++;
 			savedRelations++;
 		}
 	}
-	auditChange("entities", mainEntityId, "create", null, JSON.stringify(mainSummary), "Сохранение сущности из Rusprofile");
+	auditChange("entities", mainEntityId, "update", null, JSON.stringify(mainSummary), "Сохранение/обновление сущности из Rusprofile");
 	return {
 		savedEntities,
 		savedRelations,
-		savedObservations,
+		savedObservations
+	};
+}
+function saveCompanyData(companyId, companyInn, data) {
+	const raw = saveRawDumpSync(companyInn, data);
+	const collectedSections = Object.keys(data).filter((key) => ![
+		"company_id",
+		"entity_type",
+		"timings",
+		"startedAt",
+		"totalDurationMs"
+	].includes(key));
+	const sectionUpdatedAt = {};
+	const nowIso = (/* @__PURE__ */ new Date()).toISOString();
+	for (const section of collectedSections) sectionUpdatedAt[section] = nowIso;
+	addRawDumpRecord(companyInn, companyId, raw.filePath, raw.sizeBytes, collectedSections, sectionUpdatedAt);
+	const mainType = detectEntityTypeFromData(data.summary || {});
+	const sourceId = addSource({
+		url: `https://www.rusprofile.ru/${mainType === "company" ? "id" : mainType === "entrepreneur" ? "ip" : "person"}/${companyId}`,
+		title: "Rusprofile",
+		source_type: "registry",
+		source_kind: "official_registry",
+		provider: "rusprofile.ru",
+		collection_method: "browser",
+		reliability: 80,
+		access_level: "public",
+		retrieved_at: (/* @__PURE__ */ new Date()).toISOString(),
+		local_path: raw.filePath
+	});
+	return {
+		...persistCompanyData(companyId, companyInn, data, raw.filePath, sourceId),
 		rawDumpPath: raw.filePath
+	};
+}
+function updateCompanyData(companyId, companyInn, data, existingDumpPath, existingDumpId) {
+	const buffer = (0, _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__msgpack_msgpack_dist_esm_index_mjs.encode)(data);
+	fs.default.writeFileSync(existingDumpPath, buffer);
+	fs.default.statSync(existingDumpPath);
+	const collectedSections = Object.keys(data).filter((key) => ![
+		"company_id",
+		"entity_type",
+		"timings",
+		"startedAt",
+		"totalDurationMs"
+	].includes(key));
+	const oldSectionDates = getDumpSectionsUpdatedAt(existingDumpId) || {};
+	const nowIso = (/* @__PURE__ */ new Date()).toISOString();
+	for (const section of collectedSections) oldSectionDates[section] = nowIso;
+	updateRawDumpSections(existingDumpId, collectedSections, oldSectionDates);
+	const mainType = detectEntityTypeFromData(data.summary || {});
+	return {
+		...persistCompanyData(companyId, companyInn, data, existingDumpPath, addSource({
+			url: `https://www.rusprofile.ru/${mainType === "company" ? "id" : mainType === "entrepreneur" ? "ip" : "person"}/${companyId}`,
+			title: "Rusprofile",
+			source_type: "registry",
+			source_kind: "official_registry",
+			provider: "rusprofile.ru",
+			collection_method: "browser",
+			reliability: 80,
+			access_level: "public",
+			retrieved_at: (/* @__PURE__ */ new Date()).toISOString(),
+			local_path: existingDumpPath
+		})),
+		rawDumpPath: existingDumpPath
 	};
 }
 /**
@@ -9443,7 +9490,7 @@ function registerOsintHandlers() {
 			const mergedData = mergeCompanyDumps(loadRawDumpSync(latestDump.dump_file_path), newData);
 			return {
 				success: true,
-				...saveCompanyData(String(newData.company_id ?? ""), inn, mergedData)
+				...updateCompanyData(String(newData.company_id ?? ""), inn, mergedData, latestDump.dump_file_path, latestDump.id)
 			};
 		} catch (error) {
 			console.error("Ошибка дозагрузки разделов:", error);
@@ -9455,7 +9502,25 @@ function registerOsintHandlers() {
 	});
 	electron.ipcMain.handle("osint:check-dump-exists", async (_event, inn) => {
 		try {
-			return { exists: hasRawDumpForInn(inn) };
+			if (!hasRawDumpForInn(inn)) return {
+				exists: false,
+				dumpInfo: null
+			};
+			const latestDump = findLatestRawDump(inn);
+			if (!latestDump) return {
+				exists: false,
+				dumpInfo: null
+			};
+			const sectionDates = getDumpSectionsUpdatedAt(latestDump.id);
+			return {
+				exists: true,
+				dumpInfo: {
+					id: latestDump.id,
+					collectedSections: latestDump.collected_sections,
+					sectionUpdatedAt: sectionDates,
+					dumpFilePath: latestDump.dump_file_path
+				}
+			};
 		} catch (error) {
 			return {
 				exists: false,

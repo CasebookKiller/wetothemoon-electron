@@ -9,7 +9,7 @@ import { Divider } from 'primereact/divider';
 
 import { classNames } from '@/css/classnames';
 
-import './OSINTPage.css'; // при необходимости добавьте свои стили
+import './OSINTPage.css';
 
 export const OSINTPage: React.FC = () => {
   const [inn, setInn] = useState<string>(() => {
@@ -25,10 +25,10 @@ export const OSINTPage: React.FC = () => {
 
   const [needArbitrDetails, setNeedArbitrDetails] = useState(false);
   const [needConnectionsDetails, setNeedConnectionsDetails] = useState(false);
-  const [needSouDetails, setNeedSouDetails] = useState(false); // <-- новое
+  const [needSouDetails, setNeedSouDetails] = useState(false);
 
-  const [souRole, setSouRole] = useState('all'); // 'all', 'defendant', 'plaintiff', 'representative', 'third_other_party'
-  const [souMatchLevels, setSouMatchLevels] = useState<string[]>([]); // 'high', 'medium', 'low'
+  const [souRole, setSouRole] = useState('all');
+  const [souMatchLevels, setSouMatchLevels] = useState<string[]>([]);
   const [souSearch, setSouSearch] = useState('');
   const [souMaxPages, setSouMaxPages] = useState(1);
   const [souMaxTotalCases, setSouMaxTotalCases] = useState(100);
@@ -36,16 +36,15 @@ export const OSINTPage: React.FC = () => {
   const [needTrademarksDetails, setNeedTrademarksDetails] = useState(false);
   const [trademarkFilters, setTrademarkFilters] = useState({
     onlyActual: false,
-    type: 'all', // 'all', 'combined', 'verbal', 'visual', 'unknown'
+    type: 'all',
     search: '',
     maxPages: 1,
     maxTotalCases: 100,
   });
 
-  // Состояния фильтров арбитража
   const [arbitrFilters, setArbitrFilters] = useState({
-    sides: [] as string[],       // 'plaintiff', 'defendant', 'third'
-    status: [] as string[],      // 'in_progress', 'completed'
+    sides: [] as string[],
+    status: [] as string[],
     search: '',
     maxPages: 1,
     maxTotalCases: 100,
@@ -61,9 +60,9 @@ export const OSINTPage: React.FC = () => {
 
   const [needLeasingDetails, setNeedLeasingDetails] = useState(false);
   const [leasingFilters, setLeasingFilters] = useState({
-    role: 'all', // 'all', 'Lessee', 'Lessor'
-    status: 'all', // 'all', 'ok', 'ended', 'stopped'
-    code: 'all', // 'all', '0000001', '0104008'
+    role: 'all',
+    status: 'all',
+    code: 'all',
     search: '',
     maxPages: 1,
     maxTotalCases: 100,
@@ -71,16 +70,16 @@ export const OSINTPage: React.FC = () => {
 
   const [needPledgesDetails, setNeedPledgesDetails] = useState(false);
   const [pledgesFilters, setPledgesFilters] = useState({
-    role: 'all',       // 'all', 'Mortgagor', 'Mortgagee'
-    status: 'all',     // 'all', 'ended', 'annul', 'undefined'
-    code: 'all',       // 'all', '01', '0101', ... (можно добавить select)
+    role: 'all',
+    status: 'all',
+    code: 'all',
     maxPages: 1,
     maxTotalCases: 100,
   });
 
   const [needFactsDetails, setNeedFactsDetails] = useState(false);
   const [factsFilters, setFactsFilters] = useState({
-    group: 'all', // 'all', 'obespechitelnye_interesy_i_obyazatelstva', 'licenzii_razresheniya_samoregulirovaniya', 'bankrotstva_i_ispolnitelnye_proizvodstva', 'prochee'
+    group: 'all',
     withAnnulled: false,
     maxPages: 1,
     maxTotalCases: 100,
@@ -95,23 +94,22 @@ export const OSINTPage: React.FC = () => {
 
   const [needFoundersDetails, setNeedFoundersDetails] = useState(false);
   const [foundersFilters, setFoundersFilters] = useState({
-    types: [] as string[], // 'org_rus', 'person', 'org_foreign', 'state', 'fund'
-    statuses: [] as string[], // 'actual', 'historical'
+    types: [] as string[],
+    statuses: [] as string[],
     maxPages: 1,
     maxTotalCases: 100,
   });
 
   const [needReliabilityDetails, setNeedReliabilityDetails] = useState(false);
-
   const [needSanctionsDetails, setNeedSanctionsDetails] = useState(false);
 
   const [needGzDetails, setNeedGzDetails] = useState(false);
   const [gzFilters, setGzFilters] = useState({
-    role: 'all',             // 'all', 'supplier', 'customer'
-    purchaseStatus: 'all',   // 'all', 'completed_winner', 'completed_loser', 'unknown', 'cancelled', 'processing'
-    contractStatus: 'all',   // 'all', 'E', 'ET', 'EC'
-    isContractor: 'all',     // 'all', '1', '0'
-    category: 'all',         // можно не выводить все категории, оставить select
+    role: 'all',
+    purchaseStatus: 'all',
+    contractStatus: 'all',
+    isContractor: 'all',
+    category: 'all',
     search: '',
     maxPages: 1,
     maxTotalCases: 100,
@@ -119,26 +117,26 @@ export const OSINTPage: React.FC = () => {
 
   const [needFsspDetails, setNeedFsspDetails] = useState(false);
   const [fsspFilters, setFsspFilters] = useState({
-    statuses: [] as string[], // '1', '2'
-    objects: [] as string[],  // '18', '3', и т.д.
-    due: [] as string[],      // '6', '1', '2', '3', '4', '5'
+    statuses: [] as string[],
+    objects: [] as string[],
+    due: [] as string[],
     maxPages: 1,
     maxTotalCases: 100,
   });
 
   const [needInspectionsDetails, setNeedInspectionsDetails] = useState(false);
   const [inspectionsFilters, setInspectionsFilters] = useState({
-    planned: [] as string[],   // '0' (внеплановая), '1' (плановая), '2' (профилактическое)
-    statuses: [] as string[], // '1', '0', '2', '3', '4', '5', '6', '8'
-    results: [] as string[],  // '0'..'4'
+    planned: [] as string[],
+    statuses: [] as string[],
+    results: [] as string[],
     maxPages: 1,
     maxTotalCases: 100,
   });
 
   const [needLicensesDetails, setNeedLicensesDetails] = useState(false);
   const [licensesFilters, setLicensesFilters] = useState({
-    origins: [] as string[],   // 'egrul', 'ralcr', 'rptrn', 'rkomnbroadcast', 'rtehn', 'fstecszki', 'fstectzki', 'cbr'
-    statuses: [] as string[], // 'active', 'inactive', 'unknown'
+    origins: [] as string[],
+    statuses: [] as string[],
     maxPages: 1,
     maxTotalCases: 100,
   });
@@ -153,18 +151,15 @@ export const OSINTPage: React.FC = () => {
   });
 
   const [needRequisitesDetails, setNeedRequisitesDetails] = useState(false);
-
   const [needOkvedDetails, setNeedOkvedDetails] = useState(false);
-
   const [needEgrulDetails, setNeedEgrulDetails] = useState(false);
 
   const [saveMessage, setSaveMessage] = useState('');
-
-  const [selectedSections, setSelectedSections] = useState<string[]>([]);
   const [supplementLoading, setSupplementLoading] = useState(false);
   const [supplementMessage, setSupplementMessage] = useState('');
 
   const [dumpExists, setDumpExists] = useState<boolean>(false);
+  const [dumpInfo, setDumpInfo] = useState<any>(null);
 
   const api = (window as any).electronAPI;
 
@@ -172,7 +167,7 @@ export const OSINTPage: React.FC = () => {
     if (inn.trim()) {
       checkDump(inn);
     }
-  }, []); // пустой массив зависимостей — только при первом рендере
+  }, []);
 
   const handleInnChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -180,22 +175,22 @@ export const OSINTPage: React.FC = () => {
     try {
       localStorage.setItem('osint_last_inn', value);
     } catch {
-      // ignore storage errors
+      // ignore
     }
-
-    // Проверяем наличие дампа при изменении ИНН
     if (value.trim()) {
       checkDump(value);
     } else {
       setDumpExists(false);
+      setDumpInfo(null);
     }
   };
-  
+
   const checkDump = async (innToCheck: string) => {
     if (!innToCheck.trim()) return;
     try {
       const res = await api.checkDumpExists(innToCheck.trim());
       setDumpExists(res.exists);
+      setDumpInfo(res.dumpInfo || null);
     } catch (e) {
       console.error('Ошибка проверки дампа:', e);
     }
@@ -241,13 +236,11 @@ export const OSINTPage: React.FC = () => {
         maxTotalCases: arbitrFilters.maxTotalCases,
         connectionsDetails: needConnectionsDetails,
         souDetails: needSouDetails,
-        // фильтры арбитража
         filters: needArbitrDetails ? {
           sides: arbitrFilters.sides.length > 0 ? arbitrFilters.sides : undefined,
           status: arbitrFilters.status.length > 0 ? arbitrFilters.status : undefined,
           search: arbitrFilters.search.trim() || undefined,
         } : undefined,
-        // отдельные фильтры для судов
         souFilters: needSouDetails ? {
           role: souRole,
           matchLevel: souMatchLevels,
@@ -255,7 +248,6 @@ export const OSINTPage: React.FC = () => {
           maxPages: souMaxPages,
           maxTotalCases: souMaxTotalCases,
         } : undefined,
-        // отдельные фильтры для товарных знаков
         trademarksDetails: needTrademarksDetails,
         trademarksFilters: needTrademarksDetails ? {
           onlyActual: trademarkFilters.onlyActual,
@@ -264,7 +256,6 @@ export const OSINTPage: React.FC = () => {
           maxPages: trademarkFilters.maxPages,
           maxTotalCases: trademarkFilters.maxTotalCases,
         } : undefined,
-        // отдельные фильтры для лизинга
         leasingDetails: needLeasingDetails,
         leasingFilters: needLeasingDetails ? {
           role: leasingFilters.role,
@@ -274,7 +265,6 @@ export const OSINTPage: React.FC = () => {
           maxPages: leasingFilters.maxPages,
           maxTotalCases: leasingFilters.maxTotalCases,
         } : undefined,
-        // отдельные фильтры для залогов
         pledgesDetails: needPledgesDetails,
         pledgesFilters: needPledgesDetails ? {
           role: pledgesFilters.role,
@@ -282,7 +272,6 @@ export const OSINTPage: React.FC = () => {
           maxPages: pledgesFilters.maxPages,
           maxTotalCases: pledgesFilters.maxTotalCases,
         } : undefined,
-        // отдельные фильтры для существенных фактов
         factsDetails: needFactsDetails,
         factsFilters: needFactsDetails ? {
           group: factsFilters.group,
@@ -290,14 +279,12 @@ export const OSINTPage: React.FC = () => {
           maxPages: factsFilters.maxPages,
           maxTotalCases: factsFilters.maxTotalCases,
         } : undefined,
-        // отдельные фильтры для банкротства
         bankruptcyDetails: needBankruptcyDetails,
         bankruptcyFilters: needBankruptcyDetails ? {
           search: bankruptcyFilters.search.trim() || undefined,
           maxPages: bankruptcyFilters.maxPages,
           maxTotalCases: bankruptcyFilters.maxTotalCases,
         } : undefined,
-        // отдельные фильтры для учредителей
         foundersDetails: needFoundersDetails,
         foundersFilters: needFoundersDetails ? {
           types: foundersFilters.types,
@@ -305,9 +292,7 @@ export const OSINTPage: React.FC = () => {
           maxPages: foundersFilters.maxPages,
           maxTotalCases: foundersFilters.maxTotalCases,
         } : undefined,
-        // сбор данных о надежности
         reliabilityDetails: needReliabilityDetails,
-        // отдельные фильтры для госзакупок
         gzDetails: needGzDetails,
         gzFilters: needGzDetails ? {
           role: gzFilters.role,
@@ -317,14 +302,12 @@ export const OSINTPage: React.FC = () => {
           maxPages: gzFilters.maxPages,
           maxTotalCases: gzFilters.maxTotalCases,
         } : undefined,
-        // отдельные фильтры для исполнительных производств
         fsspDetails: needFsspDetails,
         fsspFilters: needFsspDetails ? {
           statuses: fsspFilters.statuses,
           maxPages: fsspFilters.maxPages,
           maxTotalCases: fsspFilters.maxTotalCases,
         } : undefined,
-        // отдельные фильтры для проверок
         inspectionsDetails: needInspectionsDetails,
         inspectionsFilters: needInspectionsDetails ? {
           planned: inspectionsFilters.planned,
@@ -333,7 +316,6 @@ export const OSINTPage: React.FC = () => {
           maxPages: inspectionsFilters.maxPages,
           maxTotalCases: inspectionsFilters.maxTotalCases,
         } : undefined,
-        // отдельные фильтры для лицензий
         licensesDetails: needLicensesDetails,
         licensesFilters: needLicensesDetails ? {
           origins: licensesFilters.origins,
@@ -341,20 +323,15 @@ export const OSINTPage: React.FC = () => {
           maxPages: licensesFilters.maxPages,
           maxTotalCases: licensesFilters.maxTotalCases,
         } : undefined,
-        // сбор данных о филиалах
         branchesDetails: needBranchesDetails,
-        // отдельные фильтры для истории
         historyDetails: needHistoryDetails,
         historyFilters: needHistoryDetails ? {
           importantOnly: historyFilters.importantOnly,
           maxPages: historyFilters.maxPages,
           maxTotalCases: historyFilters.maxTotalCases,
-        } : undefined,        
-        // сбор данных о реквизитах
+        } : undefined,
         requisitesDetails: needRequisitesDetails,
-        // сбор данных о видах деятельности
         okvedDetails: needOkvedDetails,
-        // сбор данных из ЕГРЮЛ
         egrulDetails: needEgrulDetails,
       };
 
@@ -386,10 +363,9 @@ export const OSINTPage: React.FC = () => {
       return;
     }
     try {
-      // Получаем числовой ID из результата
       const companyId = result.company_id;
       if (!companyId) {
-        setSaveMessage('Не удалось определить ID сущности. Проверьте, что сбор прошёл успешно.');
+        setSaveMessage('Не удалось определить ID сущности.');
         return;
       }
 
@@ -411,19 +387,42 @@ export const OSINTPage: React.FC = () => {
       setError('Введите ИНН');
       return;
     }
-    if (selectedSections.length === 0) {
-      setSupplementMessage('Выберите хотя бы один раздел');
-      return;
-    }
+
+    const sectionsToUpdate: string[] = [];
+    if (needArbitrDetails) sectionsToUpdate.push('arbitration_details');
+    if (needConnectionsDetails) sectionsToUpdate.push('connections_details');
+    if (needSouDetails) sectionsToUpdate.push('sou_details');
+    if (needTrademarksDetails) sectionsToUpdate.push('trademarks_details');
+    if (needLeasingDetails) sectionsToUpdate.push('leasing_details');
+    if (needPledgesDetails) sectionsToUpdate.push('pledges_details');
+    if (needFactsDetails) sectionsToUpdate.push('facts_details');
+    if (needBankruptcyDetails) sectionsToUpdate.push('bankruptcy_details');
+    if (needFoundersDetails) sectionsToUpdate.push('founders_details');
+    if (needReliabilityDetails) sectionsToUpdate.push('reliability_details');
+    if (needSanctionsDetails) sectionsToUpdate.push('sanctions_details');
+    if (needGzDetails) sectionsToUpdate.push('gz_details');
+    if (needFsspDetails) sectionsToUpdate.push('fssp_details');
+    if (needInspectionsDetails) sectionsToUpdate.push('inspections_details');
+    if (needLicensesDetails) sectionsToUpdate.push('licenses_details');
+    if (needBranchesDetails) sectionsToUpdate.push('branches_details');
+    if (needHistoryDetails) sectionsToUpdate.push('history_details');
+    if (needRequisitesDetails) sectionsToUpdate.push('requisites_details');
+    if (needOkvedDetails) sectionsToUpdate.push('okved_details');
+    if (needEgrulDetails) sectionsToUpdate.push('egrul_details');
+
+    // Сводка всегда обновляется
+    sectionsToUpdate.push('summary');
+
     setSupplementLoading(true);
     setSupplementMessage('');
     setError('');
     try {
-      const response = await api.supplementCompany(inn.trim(), selectedSections);
+      const response = await api.supplementCompany(inn.trim(), sectionsToUpdate);
       if (response.success) {
         setSupplementMessage(
           `Дозагрузка завершена: сущностей ${response.savedEntities}, связей ${response.savedRelations}, наблюдений ${response.savedObservations}`
         );
+        await checkDump(inn.trim());
       } else {
         setSupplementMessage(`Ошибка: ${response.error}`);
       }
@@ -499,13 +498,13 @@ export const OSINTPage: React.FC = () => {
   const toggleInspectionsStatus = (value: string) => { 
     setInspectionsFilters(prev => ({
       ...prev,
-      status: prev.statuses.includes(value) ? prev.statuses.filter(v => v !== value) : [...prev.statuses, value],
+      statuses: prev.statuses.includes(value) ? prev.statuses.filter(v => v !== value) : [...prev.statuses, value],
     }));
   };
   const toggleInspectionsResult = (value: string) => { 
     setInspectionsFilters(prev => ({
       ...prev,
-      result: prev.results.includes(value) ? prev.results.filter(v => v !== value) : [...prev.results, value],
+      results: prev.results.includes(value) ? prev.results.filter(v => v !== value) : [...prev.results, value],
     }));
   };
 
@@ -521,12 +520,6 @@ export const OSINTPage: React.FC = () => {
       ...prev,
       statuses: prev.statuses.includes(value) ? prev.statuses.filter(v => v !== value) : [...prev.statuses, value],
     }));
-  };
-
-  const toggleSelectedSection = (section: string) => {
-    setSelectedSections(prev =>
-      prev.includes(section) ? prev.filter(s => s !== section) : [...prev, section]
-    );
   };
 
   const toggleSouSide = (value: string) => {
@@ -546,7 +539,6 @@ export const OSINTPage: React.FC = () => {
         : [...prev.status, value],
     }));
   };
-
 
   const sectionOptions = [
     { key: 'needArbitrDetails', label: 'Арбитражные дела' },
@@ -571,53 +563,61 @@ export const OSINTPage: React.FC = () => {
     { key: 'needEgrulDetails', label: 'Выписка из ЕГРЮЛ' },
   ];
 
-  const supplementSectionOptions = [
-    { value: 'summary', label: 'Сводка' },
-    { value: 'fssp', label: 'ФССП' },
-    { value: 'trademarks', label: 'Товарные знаки (сводка)' },
-    { value: 'sou', label: 'Суды общей юрисдикции (сводка)' },
-    { value: 'arbitration_tile', label: 'Арбитраж (сводка)' },
-    { value: 'fns_registries', label: 'Реестры ФНС' },
-    { value: 'connections', label: 'Связи (сводка)' },
-    { value: 'facts', label: 'Существенные факты (сводка)' },
-    { value: 'government_procurement', label: 'Госзакупки (сводка)' },
-    { value: 'leasing', label: 'Лизинг (сводка)' },
-    { value: 'pledges', label: 'Залоги (сводка)' },
-    { value: 'licenses', label: 'Лицензии (сводка)' },
-    { value: 'competitors', label: 'Конкуренты' },
-    { value: 'inspections', label: 'Проверки (сводка)' },
-    { value: 'finance', label: 'Финансы' },
-    { value: 'risks', label: 'Риски' },
-    { value: 'founders', label: 'Учредители (сводка)' },
-    { value: 'taxes', label: 'Налоги' },
-    { value: 'reliability', label: 'Надёжность (сводка)' },
-    { value: 'top_okved', label: 'Топ компаний отрасли' },
-    { value: 'branches', label: 'Филиалы (сводка)' },
-    { value: 'similar', label: 'Похожие организации' },
-    { value: 'reports', label: 'Отчёты' },
-    { value: 'events', label: 'События' },
-    { value: 'resume', label: 'Краткая справка' },
-    { value: 'arbitration_details', label: 'Арбитраж (детально)' },
-    { value: 'connections_details', label: 'Связи (детально)' },
-    { value: 'sou_details', label: 'Суды (детально)' },
-    { value: 'trademarks_details', label: 'Товарные знаки (детально)' },
-    { value: 'leasing_details', label: 'Лизинг (детально)' },
-    { value: 'pledges_details', label: 'Залоги (детально)' },
-    { value: 'facts_details', label: 'Факты (детально)' },
-    { value: 'bankruptcy_details', label: 'Банкротство (детально)' },
-    { value: 'founders_details', label: 'Учредители (детально)' },
-    { value: 'reliability_details', label: 'Надёжность (детально)' },
-    { value: 'sanctions_details', label: 'Санкции' },
-    { value: 'gz_details', label: 'Госзакупки (детально)' },
-    { value: 'fssp_details', label: 'ФССП (детально)' },
-    { value: 'inspections_details', label: 'Проверки (детально)' },
-    { value: 'licenses_details', label: 'Лицензии (детально)' },
-    { value: 'branches_details', label: 'Филиалы (детально)' },
-    { value: 'history_details', label: 'История (детально)' },
-    { value: 'requisites_details', label: 'Реквизиты' },
-    { value: 'okved_details', label: 'Виды деятельности' },
-    { value: 'egrul_details', label: 'Выписка ЕГРЮЛ/ЕГРИП' }
-  ];
+  const formatDate = (iso?: string) => {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleString();
+  };
+
+  const sectionLabel = (section: string) => {
+    const map: Record<string, string> = {
+      'summary': 'Сводка',
+      'fssp': 'ФССП',
+      'trademarks': 'Товарные знаки (сводка)',
+      'sou': 'Суды (сводка)',
+      'arbitration_tile': 'Арбитраж (сводка)',
+      'fns_registries': 'Реестры ФНС',
+      'connections': 'Связи (сводка)',
+      'facts': 'Факты (сводка)',
+      'government_procurement': 'Госзакупки (сводка)',
+      'leasing': 'Лизинг (сводка)',
+      'pledges': 'Залоги (сводка)',
+      'licenses': 'Лицензии (сводка)',
+      'competitors': 'Конкуренты',
+      'inspections': 'Проверки (сводка)',
+      'finance': 'Финансы',
+      'risks': 'Риски',
+      'founders': 'Учредители (сводка)',
+      'taxes': 'Налоги',
+      'reliability': 'Надёжность (сводка)',
+      'top_okved': 'Топ отраслей',
+      'branches': 'Филиалы (сводка)',
+      'similar': 'Похожие организации',
+      'reports': 'Отчёты',
+      'events': 'События',
+      'resume': 'Краткая справка',
+      'arbitration_details': 'Арбитраж (детально)',
+      'connections_details': 'Связи (детально)',
+      'sou_details': 'Суды (детально)',
+      'trademarks_details': 'Товарные знаки (детально)',
+      'leasing_details': 'Лизинг (детально)',
+      'pledges_details': 'Залоги (детально)',
+      'facts_details': 'Факты (детально)',
+      'bankruptcy_details': 'Банкротство',
+      'founders_details': 'Учредители (детально)',
+      'reliability_details': 'Надёжность (детально)',
+      'sanctions_details': 'Санкции',
+      'gz_details': 'Госзакупки (детально)',
+      'fssp_details': 'ФССП (детально)',
+      'inspections_details': 'Проверки (детально)',
+      'licenses_details': 'Лицензии (детально)',
+      'branches_details': 'Филиалы (детально)',
+      'history_details': 'История',
+      'requisites_details': 'Реквизиты',
+      'okved_details': 'Виды деятельности',
+      'egrul_details': 'Выписка ЕГРЮЛ/ЕГРИП',
+    };
+    return map[section] || section;
+  };
 
   const footer = dumpExists && (
     <p className="p-warning mt-2">
@@ -629,7 +629,6 @@ export const OSINTPage: React.FC = () => {
     <React.Fragment>
       <div className="app p-0" />
 
-      {/* Панель управления браузером */}
       <Panel className="shadow-5 mx-1" header="Взгляд Фримена">
         <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
           <div className="flex-1 flex flex-column gap-1 xl:mr-8">
@@ -653,7 +652,6 @@ export const OSINTPage: React.FC = () => {
 
       <div className="app p-0" />
 
-      {/* Панель ввода данных */}
       <Panel
         className="shadow-5 mx-1"
         header="Поиск компании"
@@ -670,6 +668,24 @@ export const OSINTPage: React.FC = () => {
                 className="w-full text-base"
               />
             </div>
+
+            {dumpExists && dumpInfo?.sectionUpdatedAt && (
+              <div className="mt-2 p-2 border-round surface-100">
+                <div className="font-bold">Даты последнего обновления:</div>
+                <div className="text-sm">
+                  <div>Сводка: {formatDate(dumpInfo.sectionUpdatedAt.summary)}</div>
+                  {Object.entries(dumpInfo.sectionUpdatedAt)
+                    .filter(([key]) => key !== 'summary')
+                    .sort(([a], [b]) => a.localeCompare(b))
+                    .map(([section, date]) => (
+                      <div key={section}>
+                        {sectionLabel(section)}: {formatDate(date as string)}
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+
             <div className="grid mt-2">
               {sectionOptions.map(({ key, label }) => {
                 const checked = 
@@ -732,99 +748,52 @@ export const OSINTPage: React.FC = () => {
                 );
               })}
             </div>
-
           </div>
         </div>
 
-        {/* Фильтры арбитража (показываются при включённом чекбоксе) */}
         {needArbitrDetails && (
           <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
             <div className="flex-1 flex flex-column gap-1 xl:mr-8">
               <span className="app font-size-subheading">Фильтры арбитража</span>
 
-              {/* Роль */}
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Роль:</span>
-                <Checkbox
-                  inputId="sidePlaintiff"
-                  checked={arbitrFilters.sides.includes('plaintiff')}
-                  onChange={() => toggleSide('plaintiff')}
-                />
+                <Checkbox inputId="sidePlaintiff" checked={arbitrFilters.sides.includes('plaintiff')} onChange={() => toggleSide('plaintiff')} />
                 <label htmlFor="sidePlaintiff" className="ml-1">Истец</label>
-                <Checkbox
-                  inputId="sideDefendant"
-                  checked={arbitrFilters.sides.includes('defendant')}
-                  onChange={() => toggleSide('defendant')}
-                />
+                <Checkbox inputId="sideDefendant" checked={arbitrFilters.sides.includes('defendant')} onChange={() => toggleSide('defendant')} />
                 <label htmlFor="sideDefendant" className="ml-1">Ответчик</label>
-                <Checkbox
-                  inputId="sideThird"
-                  checked={arbitrFilters.sides.includes('third')}
-                  onChange={() => toggleSide('third')}
-                />
+                <Checkbox inputId="sideThird" checked={arbitrFilters.sides.includes('third')} onChange={() => toggleSide('third')} />
                 <label htmlFor="sideThird" className="ml-1">Третье лицо</label>
               </div>
 
-              {/* Статус */}
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Статус:</span>
-                <Checkbox
-                  inputId="statusInProgress"
-                  checked={arbitrFilters.status.includes('in_progress')}
-                  onChange={() => toggleStatus('in_progress')}
-                />
+                <Checkbox inputId="statusInProgress" checked={arbitrFilters.status.includes('in_progress')} onChange={() => toggleStatus('in_progress')} />
                 <label htmlFor="statusInProgress" className="ml-1">Рассматривается</label>
-                <Checkbox
-                  inputId="statusCompleted"
-                  checked={arbitrFilters.status.includes('completed')}
-                  onChange={() => toggleStatus('completed')}
-                />
+                <Checkbox inputId="statusCompleted" checked={arbitrFilters.status.includes('completed')} onChange={() => toggleStatus('completed')} />
                 <label htmlFor="statusCompleted" className="ml-1">Завершено</label>
               </div>
 
-              {/* Поиск */}
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Поиск:</span>
-                <InputText
-                  value={arbitrFilters.search}
-                  onChange={(e) => setArbitrFilters({ ...arbitrFilters, search: e.target.value })}
-                  placeholder="Номер дела или ИНН"
-                  className="w-full"
-                />
+                <InputText value={arbitrFilters.search} onChange={(e) => setArbitrFilters({ ...arbitrFilters, search: e.target.value })} placeholder="Номер дела или ИНН" className="w-full" />
               </div>
 
-              {/* Лимиты */}
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Макс. страниц:</span>
-                <InputText
-                  type="number"
-                  min={1}
-                  max={100}
-                  value={String(arbitrFilters.maxPages)}
-                  onChange={(e) => setArbitrFilters({ ...arbitrFilters, maxPages: parseInt(e.target.value) || 1 })}
-                  className="w-4rem"
-                />
+                <InputText type="number" min={1} max={100} value={String(arbitrFilters.maxPages)} onChange={(e) => setArbitrFilters({ ...arbitrFilters, maxPages: parseInt(e.target.value) || 1 })} className="w-4rem" />
                 <span className="ml-3">Макс. дел:</span>
-                <InputText
-                  type="number"
-                  min={1}
-                  max={1000}
-                  value={String(arbitrFilters.maxTotalCases)}
-                  onChange={(e) => setArbitrFilters({ ...arbitrFilters, maxTotalCases: parseInt(e.target.value) || 100 })}
-                  className="w-4rem"
-                />
+                <InputText type="number" min={1} max={1000} value={String(arbitrFilters.maxTotalCases)} onChange={(e) => setArbitrFilters({ ...arbitrFilters, maxTotalCases: parseInt(e.target.value) || 100 })} className="w-4rem" />
               </div>
             </div>
           </div>
         )}
 
-        {/* Фильтры СОЮ (показываются при включённом чекбоксе) */}
         {needSouDetails && (
           <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
             <div className="flex-1 flex flex-column gap-1 xl:mr-8">
               <span className="app font-size-subheading">Фильтры судов</span>
 
-              {/* Роль */}
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Роль:</span>
                 <select value={souRole} onChange={(e) => setSouRole(e.target.value)}>
@@ -836,7 +805,6 @@ export const OSINTPage: React.FC = () => {
                 </select>
               </div>
 
-              {/* Точность совпадения */}
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Точность:</span>
                 <Checkbox inputId="souHigh" checked={souMatchLevels.includes('high')} onChange={() => toggleArrayState(setSouMatchLevels, 'high')} />
@@ -847,13 +815,11 @@ export const OSINTPage: React.FC = () => {
                 <label htmlFor="souLow" className="ml-1">Низкая</label>
               </div>
 
-              {/* Поиск */}
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Поиск (номер дела):</span>
                 <InputText value={souSearch} onChange={(e) => setSouSearch(e.target.value)} placeholder="Номер дела" className="w-full" />
               </div>
 
-              {/* Лимиты */}
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Макс. страниц:</span>
                 <InputText type="number" min={1} max={100} value={String(souMaxPages)} onChange={(e) => setSouMaxPages(parseInt(e.target.value) || 1)} className="w-4rem" />
@@ -868,22 +834,13 @@ export const OSINTPage: React.FC = () => {
           <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
             <div className="flex-1 flex flex-column gap-1 xl:mr-8">
               <span className="app font-size-subheading">Фильтры товарных знаков</span>
-
               <div className="flex align-items-center gap-2 mt-2">
-                <Checkbox
-                  inputId="tmOnlyActual"
-                  checked={trademarkFilters.onlyActual}
-                  onChange={(e) => setTrademarkFilters({ ...trademarkFilters, onlyActual: e.checked ?? false })}
-                />
+                <Checkbox inputId="tmOnlyActual" checked={trademarkFilters.onlyActual} onChange={(e) => setTrademarkFilters({ ...trademarkFilters, onlyActual: e.checked ?? false })} />
                 <label htmlFor="tmOnlyActual" className="ml-1">Только действующие</label>
               </div>
-
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Тип:</span>
-                <select
-                  value={trademarkFilters.type}
-                  onChange={(e) => setTrademarkFilters({ ...trademarkFilters, type: e.target.value })}
-                >
+                <select value={trademarkFilters.type} onChange={(e) => setTrademarkFilters({ ...trademarkFilters, type: e.target.value })}>
                   <option value="all">Все</option>
                   <option value="combined">Комбинированный</option>
                   <option value="verbal">Словесный</option>
@@ -891,36 +848,15 @@ export const OSINTPage: React.FC = () => {
                   <option value="unknown">Не определено</option>
                 </select>
               </div>
-
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Поиск (номер регистрации):</span>
-                <InputText
-                  value={trademarkFilters.search}
-                  onChange={(e) => setTrademarkFilters({ ...trademarkFilters, search: e.target.value })}
-                  placeholder="Номер гос. регистрации"
-                  className="w-full"
-                />
+                <InputText value={trademarkFilters.search} onChange={(e) => setTrademarkFilters({ ...trademarkFilters, search: e.target.value })} placeholder="Номер гос. регистрации" className="w-full" />
               </div>
-
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Макс. страниц:</span>
-                <InputText
-                  type="number"
-                  min={1}
-                  max={100}
-                  value={String(trademarkFilters.maxPages)}
-                  onChange={(e) => setTrademarkFilters({ ...trademarkFilters, maxPages: parseInt(e.target.value) || 1 })}
-                  className="w-4rem"
-                />
+                <InputText type="number" min={1} max={100} value={String(trademarkFilters.maxPages)} onChange={(e) => setTrademarkFilters({ ...trademarkFilters, maxPages: parseInt(e.target.value) || 1 })} className="w-4rem" />
                 <span className="ml-3">Макс. знаков:</span>
-                <InputText
-                  type="number"
-                  min={1}
-                  max={1000}
-                  value={String(trademarkFilters.maxTotalCases)}
-                  onChange={(e) => setTrademarkFilters({ ...trademarkFilters, maxTotalCases: parseInt(e.target.value) || 100 })}
-                  className="w-4rem"
-                />
+                <InputText type="number" min={1} max={1000} value={String(trademarkFilters.maxTotalCases)} onChange={(e) => setTrademarkFilters({ ...trademarkFilters, maxTotalCases: parseInt(e.target.value) || 100 })} className="w-4rem" />
               </div>
             </div>
           </div>
@@ -930,7 +866,6 @@ export const OSINTPage: React.FC = () => {
           <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
             <div className="flex-1 flex flex-column gap-1 xl:mr-8">
               <span className="app font-size-subheading">Фильтры лизинга</span>
-
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Роль:</span>
                 <select value={leasingFilters.role} onChange={(e) => setLeasingFilters({ ...leasingFilters, role: e.target.value })}>
@@ -939,7 +874,6 @@ export const OSINTPage: React.FC = () => {
                   <option value="Lessor">Лизингодатель</option>
                 </select>
               </div>
-
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Статус:</span>
                 <select value={leasingFilters.status} onChange={(e) => setLeasingFilters({ ...leasingFilters, status: e.target.value })}>
@@ -949,7 +883,6 @@ export const OSINTPage: React.FC = () => {
                   <option value="stopped">Прекращённый</option>
                 </select>
               </div>
-
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Предмет аренды:</span>
                 <select value={leasingFilters.code} onChange={(e) => setLeasingFilters({ ...leasingFilters, code: e.target.value })}>
@@ -958,17 +891,10 @@ export const OSINTPage: React.FC = () => {
                   <option value="0104008">Металлообрабатывающее оборудование</option>
                 </select>
               </div>
-
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Поиск (номер договора):</span>
-                <InputText
-                  value={leasingFilters.search}
-                  onChange={(e) => setLeasingFilters({ ...leasingFilters, search: e.target.value })}
-                  placeholder="Номер договора"
-                  className="w-full"
-                />
+                <InputText value={leasingFilters.search} onChange={(e) => setLeasingFilters({ ...leasingFilters, search: e.target.value })} placeholder="Номер договора" className="w-full" />
               </div>
-
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Макс. страниц:</span>
                 <InputText type="number" min={1} max={100} value={String(leasingFilters.maxPages)} onChange={(e) => setLeasingFilters({ ...leasingFilters, maxPages: parseInt(e.target.value) || 1 })} className="w-4rem" />
@@ -983,7 +909,6 @@ export const OSINTPage: React.FC = () => {
           <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
             <div className="flex-1 flex flex-column gap-1 xl:mr-8">
               <span className="app font-size-subheading">Фильтры залогов</span>
-
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Роль:</span>
                 <select value={pledgesFilters.role} onChange={(e) => setPledgesFilters({ ...pledgesFilters, role: e.target.value })}>
@@ -992,7 +917,6 @@ export const OSINTPage: React.FC = () => {
                   <option value="Mortgagee">Залогодержатель</option>
                 </select>
               </div>
-
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Статус:</span>
                 <select value={pledgesFilters.status} onChange={(e) => setPledgesFilters({ ...pledgesFilters, status: e.target.value })}>
@@ -1002,7 +926,6 @@ export const OSINTPage: React.FC = () => {
                   <option value="undefined">Не определено</option>
                 </select>
               </div>
-
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Макс. страниц:</span>
                 <InputText type="number" min={1} max={100} value={String(pledgesFilters.maxPages)} onChange={(e) => setPledgesFilters({ ...pledgesFilters, maxPages: parseInt(e.target.value) || 1 })} className="w-4rem" />
@@ -1017,7 +940,6 @@ export const OSINTPage: React.FC = () => {
           <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
             <div className="flex-1 flex flex-column gap-1 xl:mr-8">
               <span className="app font-size-subheading">Фильтры фактов</span>
-
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Категория:</span>
                 <select value={factsFilters.group} onChange={(e) => setFactsFilters({ ...factsFilters, group: e.target.value })}>
@@ -1028,16 +950,10 @@ export const OSINTPage: React.FC = () => {
                   <option value="prochee">Прочее</option>
                 </select>
               </div>
-
               <div className="flex align-items-center gap-2 mt-2">
-                <Checkbox
-                  inputId="withAnnulled"
-                  checked={factsFilters.withAnnulled}
-                  onChange={(e) => setFactsFilters({ ...factsFilters, withAnnulled: e.checked ?? false })}
-                />
+                <Checkbox inputId="withAnnulled" checked={factsFilters.withAnnulled} onChange={(e) => setFactsFilters({ ...factsFilters, withAnnulled: e.checked ?? false })} />
                 <label htmlFor="withAnnulled" className="ml-1">Аннулированные сообщения</label>
               </div>
-
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Макс. страниц:</span>
                 <InputText type="number" min={1} max={100} value={String(factsFilters.maxPages)} onChange={(e) => setFactsFilters({ ...factsFilters, maxPages: parseInt(e.target.value) || 1 })} className="w-4rem" />
@@ -1052,17 +968,10 @@ export const OSINTPage: React.FC = () => {
           <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
             <div className="flex-1 flex flex-column gap-1 xl:mr-8">
               <span className="app font-size-subheading">Фильтры банкротства</span>
-
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Поиск (номер сообщения или дела):</span>
-                <InputText
-                  value={bankruptcyFilters.search}
-                  onChange={(e) => setBankruptcyFilters({ ...bankruptcyFilters, search: e.target.value })}
-                  placeholder="Номер сообщения или дела"
-                  className="w-full"
-                />
+                <InputText value={bankruptcyFilters.search} onChange={(e) => setBankruptcyFilters({ ...bankruptcyFilters, search: e.target.value })} placeholder="Номер сообщения или дела" className="w-full" />
               </div>
-
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Макс. страниц:</span>
                 <InputText type="number" min={1} max={100} value={String(bankruptcyFilters.maxPages)} onChange={(e) => setBankruptcyFilters({ ...bankruptcyFilters, maxPages: parseInt(e.target.value) || 1 })} className="w-4rem" />
@@ -1077,7 +986,6 @@ export const OSINTPage: React.FC = () => {
           <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
             <div className="flex-1 flex flex-column gap-1 xl:mr-8">
               <span className="app font-size-subheading">Фильтры учредителей</span>
-
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Тип:</span>
                 <Checkbox inputId="founderOrgRus" checked={foundersFilters.types.includes('org_rus')} onChange={() => toggleFoundersType('org_rus')} />
@@ -1091,7 +999,6 @@ export const OSINTPage: React.FC = () => {
                 <Checkbox inputId="founderFund" checked={foundersFilters.types.includes('fund')} onChange={() => toggleFoundersType('fund')} />
                 <label htmlFor="founderFund" className="ml-1">ПИФы</label>
               </div>
-
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Статус:</span>
                 <Checkbox inputId="founderActual" checked={foundersFilters.statuses.includes('actual')} onChange={() => toggleFoundersStatus('actual')} />
@@ -1099,7 +1006,6 @@ export const OSINTPage: React.FC = () => {
                 <Checkbox inputId="founderHistorical" checked={foundersFilters.statuses.includes('historical')} onChange={() => toggleFoundersStatus('historical')} />
                 <label htmlFor="founderHistorical" className="ml-1">Исторические</label>
               </div>
-
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Макс. страниц:</span>
                 <InputText type="number" min={1} max={100} value={String(foundersFilters.maxPages)} onChange={(e) => setFoundersFilters({ ...foundersFilters, maxPages: parseInt(e.target.value) || 1 })} className="w-4rem" />
@@ -1114,7 +1020,6 @@ export const OSINTPage: React.FC = () => {
           <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
             <div className="flex-1 flex flex-column gap-1 xl:mr-8">
               <span className="app font-size-subheading">Фильтры госзакупок</span>
-
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Роль:</span>
                 <select value={gzFilters.role} onChange={(e) => setGzFilters({ ...gzFilters, role: e.target.value })}>
@@ -1123,7 +1028,6 @@ export const OSINTPage: React.FC = () => {
                   <option value="customer">Заказчик</option>
                 </select>
               </div>
-
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Статус закупки:</span>
                 <select value={gzFilters.purchaseStatus} onChange={(e) => setGzFilters({ ...gzFilters, purchaseStatus: e.target.value })}>
@@ -1135,7 +1039,6 @@ export const OSINTPage: React.FC = () => {
                   <option value="processing">В процессе</option>
                 </select>
               </div>
-
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Статус контракта:</span>
                 <select value={gzFilters.contractStatus} onChange={(e) => setGzFilters({ ...gzFilters, contractStatus: e.target.value })}>
@@ -1145,17 +1048,10 @@ export const OSINTPage: React.FC = () => {
                   <option value="EC">Исполнение завершено</option>
                 </select>
               </div>
-
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Поиск (номер закупки/контракта):</span>
-                <InputText
-                  value={gzFilters.search}
-                  onChange={(e) => setGzFilters({ ...gzFilters, search: e.target.value })}
-                  placeholder="Номер закупки или контракта"
-                  className="w-full"
-                />
+                <InputText value={gzFilters.search} onChange={(e) => setGzFilters({ ...gzFilters, search: e.target.value })} placeholder="Номер закупки или контракта" className="w-full" />
               </div>
-
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Макс. страниц:</span>
                 <InputText type="number" min={1} max={100} value={String(gzFilters.maxPages)} onChange={(e) => setGzFilters({ ...gzFilters, maxPages: parseInt(e.target.value) || 1 })} className="w-4rem" />
@@ -1170,7 +1066,6 @@ export const OSINTPage: React.FC = () => {
           <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
             <div className="flex-1 flex flex-column gap-1 xl:mr-8">
               <span className="app font-size-subheading">Фильтры ФССП</span>
-
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Статус:</span>
                 <Checkbox inputId="fsspOpen" checked={fsspFilters.statuses.includes('1')} onChange={() => toggleFsspStatus('1')} />
@@ -1178,12 +1073,6 @@ export const OSINTPage: React.FC = () => {
                 <Checkbox inputId="fsspClosed" checked={fsspFilters.statuses.includes('2')} onChange={() => toggleFsspStatus('2')} />
                 <label htmlFor="fsspClosed" className="ml-1">Завершено</label>
               </div>
-
-              <div className="flex align-items-center gap-2 mt-2">
-                <span>Предмет:</span>
-                {/* Можно сделать select с несколькими опциями, для простоты пропустим */}
-              </div>
-
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Макс. страниц:</span>
                 <InputText type="number" min={1} max={100} value={String(fsspFilters.maxPages)} onChange={(e) => setFsspFilters({ ...fsspFilters, maxPages: parseInt(e.target.value) || 1 })} className="w-4rem" />
@@ -1198,7 +1087,6 @@ export const OSINTPage: React.FC = () => {
           <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
             <div className="flex-1 flex flex-column gap-1 xl:mr-8">
               <span className="app font-size-subheading">Фильтры проверок</span>
-
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Тип:</span>
                 <Checkbox inputId="inspPlanned0" checked={inspectionsFilters.planned.includes('0')} onChange={() => toggleInspectionsPlanned('0')} />
@@ -1208,7 +1096,6 @@ export const OSINTPage: React.FC = () => {
                 <Checkbox inputId="inspPlanned2" checked={inspectionsFilters.planned.includes('2')} onChange={() => toggleInspectionsPlanned('2')} />
                 <label htmlFor="inspPlanned2" className="ml-1">Профилактическое</label>
               </div>
-
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Статус:</span>
                 <Checkbox inputId="inspStatus1" checked={inspectionsFilters.statuses.includes('1')} onChange={() => toggleInspectionsStatus('1')} />
@@ -1220,7 +1107,6 @@ export const OSINTPage: React.FC = () => {
                 <Checkbox inputId="inspStatus4" checked={inspectionsFilters.statuses.includes('4')} onChange={() => toggleInspectionsStatus('4')} />
                 <label htmlFor="inspStatus4" className="ml-1">Ожидает проведения</label>
               </div>
-
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Результат:</span>
                 <Checkbox inputId="inspResult0" checked={inspectionsFilters.results.includes('0')} onChange={() => toggleInspectionsResult('0')} />
@@ -1230,7 +1116,6 @@ export const OSINTPage: React.FC = () => {
                 <Checkbox inputId="inspResult2" checked={inspectionsFilters.results.includes('2')} onChange={() => toggleInspectionsResult('2')} />
                 <label htmlFor="inspResult2" className="ml-1">Выявлены нарушения</label>
               </div>
-
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Макс. страниц:</span>
                 <InputText type="number" min={1} max={100} value={String(inspectionsFilters.maxPages)} onChange={(e) => setInspectionsFilters({ ...inspectionsFilters, maxPages: parseInt(e.target.value) || 1 })} className="w-4rem" />
@@ -1245,7 +1130,6 @@ export const OSINTPage: React.FC = () => {
           <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
             <div className="flex-1 flex flex-column gap-1 xl:mr-8">
               <span className="app font-size-subheading">Фильтры лицензий</span>
-
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Источник:</span>
                 <Checkbox inputId="licEgrul" checked={licensesFilters.origins.includes('egrul')} onChange={() => toggleLicensesOrigin('egrul')} />
@@ -1261,7 +1145,6 @@ export const OSINTPage: React.FC = () => {
                 <Checkbox inputId="licRtehn" checked={licensesFilters.origins.includes('rtehn')} onChange={() => toggleLicensesOrigin('rtehn')} />
                 <label htmlFor="licRtehn" className="ml-1">Ростехнадзор</label>
               </div>
-
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Статус:</span>
                 <Checkbox inputId="licActive" checked={licensesFilters.statuses.includes('active')} onChange={() => toggleLicensesStatus('active')} />
@@ -1271,7 +1154,6 @@ export const OSINTPage: React.FC = () => {
                 <Checkbox inputId="licUnknown" checked={licensesFilters.statuses.includes('unknown')} onChange={() => toggleLicensesStatus('unknown')} />
                 <label htmlFor="licUnknown" className="ml-1">Неизвестно</label>
               </div>
-
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Макс. страниц:</span>
                 <InputText type="number" min={1} max={100} value={String(licensesFilters.maxPages)} onChange={(e) => setLicensesFilters({ ...licensesFilters, maxPages: parseInt(e.target.value) || 1 })} className="w-4rem" />
@@ -1286,16 +1168,10 @@ export const OSINTPage: React.FC = () => {
           <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
             <div className="flex-1 flex flex-column gap-1 xl:mr-8">
               <span className="app font-size-subheading">Фильтры истории</span>
-
               <div className="flex align-items-center gap-2 mt-2">
-                <Checkbox
-                  inputId="historyImportant"
-                  checked={historyFilters.importantOnly}
-                  onChange={(e) => setHistoryFilters({ ...historyFilters, importantOnly: e.checked ?? false })}
-                />
+                <Checkbox inputId="historyImportant" checked={historyFilters.importantOnly} onChange={(e) => setHistoryFilters({ ...historyFilters, importantOnly: e.checked ?? false })} />
                 <label htmlFor="historyImportant" className="ml-1">Только важные события</label>
               </div>
-
               <div className="flex align-items-center gap-2 mt-2">
                 <span>Макс. страниц:</span>
                 <InputText type="number" min={1} max={100} value={String(historyFilters.maxPages)} onChange={(e) => setHistoryFilters({ ...historyFilters, maxPages: parseInt(e.target.value) || 1 })} className="w-4rem" />
@@ -1308,22 +1184,29 @@ export const OSINTPage: React.FC = () => {
 
         <div className="flex flex-wrap app p-2 align-items-center gap-4">
           <div className="flex-1 flex flex-column gap-1 xl:mr-8">
-            <Button
-              label={loading ? 'Сбор...' : 'Собрать данные'}
-              icon={loading ? 'pi pi-spin pi-spinner' : 'pi pi-search'}
-              className="p-button-lg w-full p-button-raised p-button-accent"
-              onClick={handleScrapeRusprofile}
-              disabled={loading}
-            />
+            {!dumpExists ? (
+              <Button
+                label={loading ? 'Сбор...' : 'Собрать данные'}
+                icon={loading ? 'pi pi-spin pi-spinner' : 'pi pi-search'}
+                className="p-button-lg w-full p-button-raised p-button-accent"
+                onClick={handleScrapeRusprofile}
+                disabled={loading}
+              />
+            ) : (
+              <Button
+                label={supplementLoading ? 'Дозагрузка...' : 'Дополнить выбранные разделы'}
+                icon={supplementLoading ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'}
+                className="p-button-lg w-full p-button-raised p-button-accent"
+                onClick={handleSupplement}
+                disabled={supplementLoading}
+              />
+            )}
           </div>
         </div>
-
-
       </Panel>
 
       <div className="app p-0" />
 
-      {/* Панель для kad.arbitr.ru и mos-gorsud.ru */}
       <Panel className="shadow-5 mx-1" header="Дополнительные источники">
         <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
           <div className="flex-1 flex flex-column gap-1 xl:mr-8">
@@ -1356,10 +1239,7 @@ export const OSINTPage: React.FC = () => {
       {result && (
         <React.Fragment>
           <div className="app p-0" />
-          <Panel
-            className="shadow-5 mx-1" 
-            header="Результат"
-          >
+          <Panel className="shadow-5 mx-1" header="Результат">
             <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
               <div className="flex-1 flex flex-column gap-1 xl:mr-8">
                 {renderResult()}
@@ -1368,41 +1248,6 @@ export const OSINTPage: React.FC = () => {
           </Panel>
         </React.Fragment>
       )}
-
-      <div className="app p-0" />
-      <Panel
-        className="shadow-5 mx-1"
-        header="Дозагрузка разделов"
-        footer={footer}
-      >
-        <div className="flex flex-wrap app p-2 align-items-center gap-4">
-          <div className="flex-1 flex flex-column gap-1">
-            <span className="app font-size-subheading">Выберите разделы для обновления:</span>
-            <div className="grid mt-2">
-              {supplementSectionOptions.map(({ value, label }) => (
-                <div key={value} className="flex align-items-center gap-2">
-                  <Checkbox
-                    inputId={`supplement_${value}`}
-                    checked={selectedSections.includes(value)}
-                    onChange={() => toggleSelectedSection(value)}
-                  />
-                  <label htmlFor={`supplement_${value}`} className="ml-1">
-                    {label}
-                  </label>
-                </div>
-              ))}
-            </div>
-            <Button
-              label={supplementLoading ? 'Дозагрузка...' : 'Дополнить выбранные разделы'}
-              icon={supplementLoading ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'}
-              className="p-button-lg w-full p-button-raised p-button-accent mt-3"
-              onClick={handleSupplement}
-              disabled={supplementLoading}
-            />
-            {supplementMessage && <p className="p-error mt-2">{supplementMessage}</p>}
-          </div>
-        </div>
-      </Panel>
 
       {result && (
         <Button
