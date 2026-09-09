@@ -8386,13 +8386,6 @@ async function getEntityIdByInn(page, inn, preferredType) {
 	});
 	await page.waitForSelector("input#autocomplete-main-search", { timeout: 15e3 });
 	await page.fill("input#autocomplete-main-search", inn);
-	await page.keyboard.press("Enter");
-	await page.waitForTimeout(2e3);
-	const directMatch = page.url().match(/\/(id|ip|person)\/(\d+)/);
-	if (directMatch) return {
-		id: parseInt(directMatch[2]),
-		type: directMatch[1]
-	};
 	try {
 		await page.waitForSelector(".head-drop-results__tabs", { timeout: 5e3 });
 	} catch {
@@ -8400,42 +8393,56 @@ async function getEntityIdByInn(page, inn, preferredType) {
 		if (await firstLink.count() > 0) {
 			const href = await firstLink.getAttribute("href");
 			if (href) {
-				const match = href.match(/\/(id|ip|person)\/(\d+)/);
+				const match = href.match(/\/(id|ip|person)\/([^/?]+)/);
 				if (match) return {
-					id: parseInt(match[2]),
+					id: match[1] === "person" ? 0 : parseInt(match[2]),
 					type: match[1]
 				};
 			}
 		}
 		throw new Error(`Не удалось найти сущность по ИНН ${inn}`);
 	}
-	const tabLabels = {
+	const tabLabelMap = {
 		company: "Юрлица",
 		entrepreneur: "ИП",
 		person: "Физлица"
 	};
-	let tabsToTry = [];
-	if (preferredType && tabLabels[preferredType]) tabsToTry.push(tabLabels[preferredType]);
-	else tabsToTry = [
-		"ИП",
-		"Физлица",
-		"Юрлица"
-	];
-	for (const tabText of tabsToTry) {
-		const tab = page.locator(`.head-drop-results__tab:has-text("${tabText}")`).first();
-		if (await tab.count() > 0) {
-			await tab.click();
-			await page.waitForTimeout(500);
-			const links = page.locator(".head-drop-results__list a[href*=\"/id/\"], .head-drop-results__list a[href*=\"/ip/\"], .head-drop-results__list a[href*=\"/person/\"]");
-			if (await links.count() > 0) {
-				const href = await links.first().getAttribute("href");
-				if (href) {
-					const match = href.match(/\/(id|ip|person)\/(\d+)/);
-					if (match) return {
-						id: parseInt(match[2]),
-						type: match[1]
-					};
-				}
+	let desiredTab = "";
+	if (preferredType && tabLabelMap[preferredType]) desiredTab = tabLabelMap[preferredType];
+	else desiredTab = "ИП";
+	const tab = page.locator(`.head-drop-results__tab:has-text("${desiredTab}")`).first();
+	if (await tab.count() === 0) {
+		const fallbackTabs = [
+			"ИП",
+			"Физлица",
+			"Юрлица"
+		].filter((t) => t !== desiredTab);
+		for (const label of fallbackTabs) {
+			const fallbackTab = page.locator(`.head-drop-results__tab:has-text("${label}")`).first();
+			if (await fallbackTab.count() > 0) {
+				await fallbackTab.click();
+				await page.waitForTimeout(500);
+				break;
+			}
+		}
+	} else {
+		await tab.click();
+		await page.waitForTimeout(500);
+	}
+	const link = page.locator(".head-drop-results__list a[href*=\"/ip/\"], .head-drop-results__list a[href*=\"/id/\"], .head-drop-results__list a[href*=\"/person/\"]").first();
+	if (await link.count() > 0) {
+		const href = await link.getAttribute("href");
+		if (href) {
+			const match = href.match(/\/(id|ip|person)\/([^/?]+)/);
+			if (match) {
+				await page.goto(`https://www.rusprofile.ru${href}`, {
+					waitUntil: "domcontentloaded",
+					timeout: 6e4
+				});
+				return {
+					id: match[1] === "person" ? 0 : parseInt(match[2]),
+					type: match[1]
+				};
 			}
 		}
 	}
