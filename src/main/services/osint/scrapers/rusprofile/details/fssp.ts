@@ -63,9 +63,14 @@ export async function collectFsspDetails(
   const data: any = { total_productions: '', productions: [] };
 
   const url = `https://www.rusprofile.ru/fssp/${companyId}`;
-  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-  await page.waitForSelector('ul.filters-results__list', { timeout: 15000 });
-  await page.waitForTimeout(1000);
+  try {
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await page.waitForSelector('ul.filters-results__list', { timeout: 15000 });
+    await page.waitForTimeout(1000);
+  } catch (error) {
+    console.warn('Не удалось загрузить страницу ФССП, пропускаем сбор:', error);
+    return data; // вернёт { total_productions: '', productions: [] }
+  }
 
   if (options.filters) {
     await applyFsspFilters(page, options.filters);

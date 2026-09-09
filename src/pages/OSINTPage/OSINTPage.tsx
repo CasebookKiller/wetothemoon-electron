@@ -541,26 +541,26 @@ export const OSINTPage: React.FC = () => {
   };
 
   const sectionOptions = [
-    { key: 'needArbitrDetails', label: 'Арбитражные дела' },
-    { key: 'needConnectionsDetails', label: 'Связи' },
-    { key: 'needSouDetails', label: 'Суды общей юрисдикции' },
-    { key: 'needTrademarksDetails', label: 'Товарные знаки' },
-    { key: 'needLeasingDetails', label: 'Лизинг' },
-    { key: 'needPledgesDetails', label: 'Залоги' },
-    { key: 'needFactsDetails', label: 'Существенные факты' },
-    { key: 'needBankruptcyDetails', label: 'Банкротство' },
-    { key: 'needFoundersDetails', label: 'Учредители' },
-    { key: 'needReliabilityDetails', label: 'Надёжность' },
-    { key: 'needSanctionsDetails', label: 'Санкции' },
-    { key: 'needGzDetails', label: 'Госзакупки' },
-    { key: 'needFsspDetails', label: 'Исполнительные производства' },
-    { key: 'needInspectionsDetails', label: 'Проверки' },
-    { key: 'needLicensesDetails', label: 'Лицензии' },
-    { key: 'needBranchesDetails', label: 'Филиалы и представительства' },
-    { key: 'needHistoryDetails', label: 'История' },
-    { key: 'needRequisitesDetails', label: 'Реквизиты' },
-    { key: 'needOkvedDetails', label: 'Виды деятельности' },
-    { key: 'needEgrulDetails', label: 'Выписка из ЕГРЮЛ' },
+    { key: 'needArbitrDetails', label: 'Арбитражные дела', section: 'arbitration_details' },
+    { key: 'needConnectionsDetails', label: 'Связи', section: 'connections_details' },
+    { key: 'needSouDetails', label: 'Суды общей юрисдикции', section: 'sou_details' },
+    { key: 'needTrademarksDetails', label: 'Товарные знаки', section: 'trademarks_details' },
+    { key: 'needLeasingDetails', label: 'Лизинг', section: 'leasing_details' },
+    { key: 'needPledgesDetails', label: 'Залоги', section: 'pledges_details' },
+    { key: 'needFactsDetails', label: 'Существенные факты', section: 'facts_details' },
+    { key: 'needBankruptcyDetails', label: 'Банкротство', section: 'bankruptcy_details' },
+    { key: 'needFoundersDetails', label: 'Учредители', section: 'founders_details' },
+    { key: 'needReliabilityDetails', label: 'Надёжность', section: 'reliability_details' },
+    { key: 'needSanctionsDetails', label: 'Санкции', section: 'sanctions_details' },
+    { key: 'needGzDetails', label: 'Госзакупки', section: 'gz_details' },
+    { key: 'needFsspDetails', label: 'Исполнительные производства', section: 'fssp_details' },
+    { key: 'needInspectionsDetails', label: 'Проверки', section: 'inspections_details' },
+    { key: 'needLicensesDetails', label: 'Лицензии', section: 'licenses_details' },
+    { key: 'needBranchesDetails', label: 'Филиалы и представительства', section: 'branches_details' },
+    { key: 'needHistoryDetails', label: 'История', section: 'history_details' },
+    { key: 'needRequisitesDetails', label: 'Реквизиты', section: 'requisites_details' },
+    { key: 'needOkvedDetails', label: 'Виды деятельности', section: 'okved_details' },
+    { key: 'needEgrulDetails', label: 'Выписка из ЕГРЮЛ', section: 'egrul_details' },
   ];
 
   const formatDate = (iso?: string) => {
@@ -568,61 +568,17 @@ export const OSINTPage: React.FC = () => {
     return new Date(iso).toLocaleString();
   };
 
-  const sectionLabel = (section: string) => {
-    const map: Record<string, string> = {
-      'summary': 'Сводка',
-      'fssp': 'ФССП',
-      'trademarks': 'Товарные знаки (сводка)',
-      'sou': 'Суды (сводка)',
-      'arbitration_tile': 'Арбитраж (сводка)',
-      'fns_registries': 'Реестры ФНС',
-      'connections': 'Связи (сводка)',
-      'facts': 'Факты (сводка)',
-      'government_procurement': 'Госзакупки (сводка)',
-      'leasing': 'Лизинг (сводка)',
-      'pledges': 'Залоги (сводка)',
-      'licenses': 'Лицензии (сводка)',
-      'competitors': 'Конкуренты',
-      'inspections': 'Проверки (сводка)',
-      'finance': 'Финансы',
-      'risks': 'Риски',
-      'founders': 'Учредители (сводка)',
-      'taxes': 'Налоги',
-      'reliability': 'Надёжность (сводка)',
-      'top_okved': 'Топ отраслей',
-      'branches': 'Филиалы (сводка)',
-      'similar': 'Похожие организации',
-      'reports': 'Отчёты',
-      'events': 'События',
-      'resume': 'Краткая справка',
-      'arbitration_details': 'Арбитраж (детально)',
-      'connections_details': 'Связи (детально)',
-      'sou_details': 'Суды (детально)',
-      'trademarks_details': 'Товарные знаки (детально)',
-      'leasing_details': 'Лизинг (детально)',
-      'pledges_details': 'Залоги (детально)',
-      'facts_details': 'Факты (детально)',
-      'bankruptcy_details': 'Банкротство',
-      'founders_details': 'Учредители (детально)',
-      'reliability_details': 'Надёжность (детально)',
-      'sanctions_details': 'Санкции',
-      'gz_details': 'Госзакупки (детально)',
-      'fssp_details': 'ФССП (детально)',
-      'inspections_details': 'Проверки (детально)',
-      'licenses_details': 'Лицензии (детально)',
-      'branches_details': 'Филиалы (детально)',
-      'history_details': 'История',
-      'requisites_details': 'Реквизиты',
-      'okved_details': 'Виды деятельности',
-      'egrul_details': 'Выписка ЕГРЮЛ/ЕГРИП',
-    };
-    return map[section] || section;
-  };
-
   const footer = dumpExists && (
-    <p className="p-warning mt-2">
-      Дамп для этой организации уже существует. Используйте «Дополнить выбранные разделы» для обновления.
-    </p>
+    <div>
+      <p className="p-warning mt-2">
+        Дамп для этой организации уже существует. Используйте «Дополнить выбранные разделы» для обновления.
+      </p>
+      {dumpInfo?.sectionUpdatedAt?.summary && (
+        <p className="text-xs mt-1">
+          Сводка обновлена: {formatDate(dumpInfo.sectionUpdatedAt.summary)}
+        </p>
+      )}
+    </div>
   );
 
   return (
@@ -669,25 +625,8 @@ export const OSINTPage: React.FC = () => {
               />
             </div>
 
-            {dumpExists && dumpInfo?.sectionUpdatedAt && (
-              <div className="mt-2 p-2 border-round surface-100">
-                <div className="font-bold">Даты последнего обновления:</div>
-                <div className="text-sm">
-                  <div>Сводка: {formatDate(dumpInfo.sectionUpdatedAt.summary)}</div>
-                  {Object.entries(dumpInfo.sectionUpdatedAt)
-                    .filter(([key]) => key !== 'summary')
-                    .sort(([a], [b]) => a.localeCompare(b))
-                    .map(([section, date]) => (
-                      <div key={section}>
-                        {sectionLabel(section)}: {formatDate(date as string)}
-                      </div>
-                    ))}
-                </div>
-              </div>
-            )}
-
             <div className="grid mt-2">
-              {sectionOptions.map(({ key, label }) => {
+              {sectionOptions.map(({ key, label, section }) => {
                 const checked = 
                   key === 'needArbitrDetails' ? needArbitrDetails :
                   key === 'needConnectionsDetails' ? needConnectionsDetails :
@@ -738,12 +677,19 @@ export const OSINTPage: React.FC = () => {
 
                 return (
                   <div className="col-12 md:col-6 lg:col-4 xl:col-3" key={key}>
-                    <Checkbox
-                      inputId={key}
-                      checked={checked}
-                      onChange={onChange}
-                    />
-                    <label htmlFor={key} className="ml-2">{label}</label>
+                    <div className="flex align-items-start">
+                      <Checkbox
+                        inputId={key}
+                        checked={checked}
+                        onChange={onChange}
+                      />
+                      <label htmlFor={key} className="ml-2">{label}</label>
+                    </div>
+                    <div className="text-xs mt-1" style={{ fontSize: '0.75rem', color: 'gray', marginLeft: '1.75rem' }}>
+                      {dumpExists && dumpInfo?.sectionUpdatedAt?.[section]
+                        ? formatDate(dumpInfo.sectionUpdatedAt[section])
+                        : 'Нет данных'}
+                    </div>
                   </div>
                 );
               })}

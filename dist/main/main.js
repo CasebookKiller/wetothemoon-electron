@@ -4888,13 +4888,13 @@ async function collectSummary(page) {
 		const entityType = isCompany ? "company" : isEntrepreneur ? "entrepreneur" : "person";
 		const data = {};
 		data.entity_type = entityType;
-		data.name = getTextByCss("h1");
+		data.name = getTextByCss("#clip_name") || getTextByCss("h1") || "";
 		if (isCompany) {
 			data.ogrn = getTextByCss("#clip_ogrn");
 			data.ogrn_date = getTextByXPath("//*[@id='clip_ogrn']/ancestor::dl/dd[contains(@class,'padding-top')]");
 		} else if (isEntrepreneur) {
 			data.ogrnip = getTextByCss("#clip_ogrnip");
-			data.ogrn_date = getTextByXPath("//*[@id='clip_ogrnip']/ancestor::dl/dd[contains(@class,'padding-top')]");
+			data.ogrn_date = getTextByXPath("//*[@id='clip_ogrnip']/ancestor::dl//dd[contains(@class,'company-info__text')][2]").replace(/от\s*/i, "").trim();
 		} else {
 			data.ogrn = "";
 			data.ogrnip = "";
@@ -4904,7 +4904,7 @@ async function collectSummary(page) {
 		data.kpp = isCompany ? getTextByCss("#clip_kpp") : "";
 		data.registration_date = getTextByXPath("//dt[contains(.,'Дата регистрации')]/following-sibling::dd[1]");
 		data.capital = isCompany ? getTextByXPath("//dt[contains(.,'Уставный капитал')]/following-sibling::dd[1]") : "";
-		data.address = getTextByCss("#clip_address");
+		data.address = getTextByCss("#clip_address") || getTextByXPath("//dt[contains(.,'Регион')]/following-sibling::dd[1]") || "";
 		if (isCompany) data.manager = {
 			position: getTextByXPath("//span[contains(@class,'chief-title') and (contains(.,'ПРЕЗИДЕНТ') or contains(.,'ДИРЕКТОР') or contains(.,'ГЕНЕРАЛЬНЫЙ'))]"),
 			name: getTextByXPath("//div[contains(@class,'company-row') and .//span[contains(@class,'company-info__title') and contains(.,'Руководитель')]]//a[contains(@href,'/person/')]"),
@@ -4926,16 +4926,41 @@ async function collectSummary(page) {
 		data.tax_regime = getTextByXPath("//dt[contains(.,'Специальный налоговый режим')]/following-sibling::dd[1]");
 		data.sme_registry = getTextByXPath("//span[contains(@class,'company-info__title') and contains(.,'Реестр МСП')]/following-sibling::span[1]");
 		data.predecessor = isCompany ? getTextByXPath("//span[contains(@class,'company-info__title') and contains(.,'Правопредшественник')]/following-sibling::div[1]") : "";
-		data.main_activity = getTextByXPath("//span[contains(@class,'company-info__title') and contains(.,'Основной вид деятельности')]/following-sibling::span[1]");
-		data.tax_authority = getTextByXPath("//span[contains(@class,'company-info__title') and contains(.,'Налоговый орган')]/following-sibling::span[1]");
+		if (isCompany) data.main_activity = getTextByXPath("//span[contains(@class,'company-info__title') and contains(.,'Основной вид деятельности')]/following-sibling::span[1]");
+		else if (isEntrepreneur) {
+			data.main_activity = getTextByXPath("//div[contains(@class,'okved-tile')]//div[contains(@class,'tile-item__text-title') and contains(.,'Основной')]/following-sibling::p[1]");
+			if (!data.main_activity) {
+				const match = getTextByXPath("//div[contains(@class,'resume-tile')]//p[1]").match(/Основным видом деятельности является «([^»]+)»/);
+				if (match) data.main_activity = match[1];
+			}
+		} else data.main_activity = "";
+		data.tax_authority = "";
+		if (isCompany) data.tax_authority = getTextByXPath("//span[contains(@class,'company-info__title') and contains(.,'Налоговый орган')]/following-sibling::span[1]");
+		else if (isEntrepreneur) data.tax_authority = getTextByXPath("//div[contains(@class,'requisites-ip')]//dt[contains(.,'Наименование налогового органа')]/following-sibling::dd[1]");
 		data.tax_authority_since = getTextByXPath("//span[contains(@class,'company-info__title') and contains(.,'Налоговый орган')]/following-sibling::span[contains(@class,'chief-title')]");
-		data.stat_codes = {
+		if (isCompany) data.stat_codes = {
 			okpo: getTextByCss("#clip_okpo"),
 			okato: getTextByCss("#clip_okato"),
 			oktmo: getTextByCss("#clip_oktmo"),
 			okfs: getTextByCss("#clip_okfs"),
 			okogu: getTextByCss("#clip_okogu"),
 			okopf: getTextByCss("#clip_okopf")
+		};
+		else if (isEntrepreneur) data.stat_codes = {
+			okpo: getTextByCss("#req_okpo"),
+			okato: getTextByCss("#req_okato"),
+			oktmo: getTextByCss("#req_oktmo"),
+			okfs: "",
+			okogu: "",
+			okopf: ""
+		};
+		else data.stat_codes = {
+			okpo: "",
+			okato: "",
+			oktmo: "",
+			okfs: "",
+			okogu: "",
+			okopf: ""
 		};
 		data.contacts = {
 			phones: getTextsByXPath("//div[contains(@class,'company-info__contact') and contains(@class,'phone')]//a[starts-with(@href,'tel:')]"),
@@ -4945,6 +4970,17 @@ async function collectSummary(page) {
 		const actualElem = document.querySelector("div[class*='anketa-actual']");
 		data.updated = actualElem ? actualElem.textContent.replace("Актуально на", "").trim() : "";
 		data.detailed_description = getTextByCss("div.anketa-bottom");
+		if (isEntrepreneur) {
+			const getRequisite = (dtText) => getTextByXPath(`//div[contains(@class,'requisites-ip')]//dt[contains(.,'${dtText}')]/following-sibling::dd[1]`);
+			data.gender = getTextByXPath("//dt[contains(.,'Пол')]/following-sibling::dd[1]");
+			data.citizenship = getTextByXPath("//dt[contains(.,'Гражданство')]/following-sibling::dd[1]");
+			data.registrar = getRequisite("Регистратор");
+			data.pension_reg_number = getRequisite("Регистрационный номер");
+			data.pension_reg_date = getTextByXPath("//div[contains(@class,'requisites-ip')]//dt[contains(.,'Дата регистрации')]/following-sibling::dd[1]");
+			data.pension_authority = getRequisite("Наименование территориального органа");
+			data.special_tax_regime = getRequisite("Применяется");
+			data.msp_category = getTextByXPath("//div[contains(@class,'requisites-ip')]//dt[contains(.,'Категория субъекта')]/following-sibling::dd[1]");
+		}
 		return data;
 	});
 }
@@ -7454,12 +7490,17 @@ async function collectFsspDetails(page, companyId, options = {}) {
 		productions: []
 	};
 	const url = `https://www.rusprofile.ru/fssp/${companyId}`;
-	await page.goto(url, {
-		waitUntil: "domcontentloaded",
-		timeout: 6e4
-	});
-	await page.waitForSelector("ul.filters-results__list", { timeout: 15e3 });
-	await page.waitForTimeout(1e3);
+	try {
+		await page.goto(url, {
+			waitUntil: "domcontentloaded",
+			timeout: 6e4
+		});
+		await page.waitForSelector("ul.filters-results__list", { timeout: 15e3 });
+		await page.waitForTimeout(1e3);
+	} catch (error) {
+		console.warn("Не удалось загрузить страницу ФССП, пропускаем сбор:", error);
+		return data;
+	}
 	if (options.filters) {
 		await applyFsspFilters(page, options.filters);
 		await page.waitForTimeout(2e3);
