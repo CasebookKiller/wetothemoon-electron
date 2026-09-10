@@ -8261,9 +8261,11 @@ async function collectEgrulDetails(page, companyId, options = {}) {
 		console.log("Для физических лиц выписка ЕГРЮЛ/ЕГРИП не предусмотрена.");
 		return data;
 	}
-	const isEntrepreneur = entityType === "entrepreneur";
+	const isEntrepreneur = entityType === "entrepreneur" || entityType === "ip";
+	console.log(`DEBUG egrul: isEntrepreneur = ${isEntrepreneur}`);
 	const cardUrlPath = isEntrepreneur ? "ip" : "id";
 	const ogrnSelector = isEntrepreneur ? "#clip_ogrnip" : "#clip_ogrn";
+	console.log(`DEBUG egrul: cardUrl = https://www.rusprofile.ru/${cardUrlPath}/${companyId}`);
 	await page.goto(`https://www.rusprofile.ru/${cardUrlPath}/${companyId}`, {
 		waitUntil: "domcontentloaded",
 		timeout: 6e4
@@ -8280,6 +8282,7 @@ async function collectEgrulDetails(page, companyId, options = {}) {
 		return data;
 	}
 	const extractUrl = isEntrepreneur ? `https://www.rusprofile.ru/egrip?ogrnip=${ogrn}` : `https://www.rusprofile.ru/egrul?ogrn=${ogrn}`;
+	console.log(`DEBUG egrul: переход на ${extractUrl}`);
 	let response = null;
 	try {
 		response = await page.goto(extractUrl, {
@@ -8377,7 +8380,7 @@ async function collectEgrulDetails(page, companyId, options = {}) {
 	});
 	data.basic_info = parsed.basic_info;
 	data.sections = parsed.sections;
-	console.log(`Собрано секций выписки: ${data.sections.length}, базовых полей: ${Object.keys(data.basic_info).length}`);
+	console.log(`Собрано секций выписки: ${data.sections.length}`);
 	return data;
 }
 //#endregion
@@ -8541,10 +8544,7 @@ async function getEntityIdByInn(page, inn, preferredType) {
 			const href = await firstLink.getAttribute("href");
 			if (href) {
 				const match = href.match(/\/(id|ip|person)\/([^/?]+)/);
-				if (match) return {
-					id: match[1] === "person" ? 0 : parseInt(match[2]),
-					type: match[1]
-				};
+				if (match) return normalizeEntity(match[1], match[2]);
 			}
 		}
 		throw new Error(`Не удалось найти сущность по ИНН ${inn}`);
@@ -8586,14 +8586,29 @@ async function getEntityIdByInn(page, inn, preferredType) {
 					waitUntil: "domcontentloaded",
 					timeout: 6e4
 				});
-				return {
-					id: match[1] === "person" ? 0 : parseInt(match[2]),
-					type: match[1]
-				};
+				return normalizeEntity(match[1], match[2]);
 			}
 		}
 	}
 	throw new Error(`Не удалось найти сущность по ИНН ${inn}`);
+}
+/**
+* Преобразует URL-сегмент (id/ip/person) и идентификатор в нормализованный тип.
+* Для физических лиц ID пока не числовой — возвращаем 0.
+*/
+function normalizeEntity(segment, rawId) {
+	if (segment === "id") return {
+		id: parseInt(rawId),
+		type: "company"
+	};
+	if (segment === "ip") return {
+		id: parseInt(rawId),
+		type: "entrepreneur"
+	};
+	return {
+		id: 0,
+		type: "person"
+	};
 }
 //#endregion
 //#region src/main/services/osint/scrapers/rusprofile/index.ts
@@ -8907,7 +8922,7 @@ async function scrapeRusprofile(inn, options) {
 		}
 		if (options?.egrulDetails && shouldCollect("egrul_details")) {
 			console.log("Сбор выписки из ЕГРЮЛ/ЕГРИП...");
-			result.egrul_details = await timed("egrul_details", () => collectEgrulDetails(page, companyId));
+			result.egrul_details = await timed("egrul_details", () => collectEgrulDetails(page, companyId, { entityType }));
 		}
 		result.startedAt = new Date(startTime).toISOString();
 		result.timings = timings;

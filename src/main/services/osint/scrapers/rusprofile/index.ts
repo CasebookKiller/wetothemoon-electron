@@ -514,7 +514,7 @@ export async function scrapeRusprofile(
     if (options?.egrulDetails && shouldCollect('egrul_details')) {
       console.log('Сбор выписки из ЕГРЮЛ/ЕГРИП...');
       result.egrul_details = await timed('egrul_details', () =>
-        collectEgrulDetails(page, companyId)
+        collectEgrulDetails(page, companyId, { entityType })   // ← передаём тип
       );
     }
 

@@ -9,30 +9,26 @@ export async function getEntityIdByInn(
   await page.goto('https://www.rusprofile.ru/', { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.waitForSelector('input#autocomplete-main-search', { timeout: 15000 });
 
-  // Вводим ИНН без нажатия Enter
   await page.fill('input#autocomplete-main-search', inn);
-  // Ждём появления выпадающего списка (обычно 1-2 секунды)
+
   try {
     await page.waitForSelector('.head-drop-results__tabs', { timeout: 5000 });
   } catch {
-    // Если выпадающий список не появился, пробуем обычный поиск по первой ссылке
+    // Выпадающий список не появился — пробуем первую попавшуюся ссылку
     const firstLink = page.locator("a[href*='/id/'], a[href*='/ip/'], a[href*='/person/']").first();
     if (await firstLink.count() > 0) {
       const href = await firstLink.getAttribute('href');
       if (href) {
         const match = href.match(/\/(id|ip|person)\/([^/?]+)/);
         if (match) {
-          return {
-            id: match[1] === 'person' ? 0 : parseInt(match[2]), // для person пока не поддерживаем
-            type: match[1] as any,
-          };
+          return normalizeEntity(match[1], match[2]);
         }
       }
     }
     throw new Error(`Не удалось найти сущность по ИНН ${inn}`);
   }
 
-  // Определяем, какую вкладку нужно активировать
+  // Определяем, какую вкладку активировать
   const tabLabelMap: Record<string, string> = {
     company: 'Юрлица',
     entrepreneur: 'ИП',
@@ -43,14 +39,11 @@ export async function getEntityIdByInn(
   if (preferredType && tabLabelMap[preferredType]) {
     desiredTab = tabLabelMap[preferredType];
   } else {
-    // Если тип не задан, пробуем в порядке: ИП, Физлица, Юрлица (для 12-значного ИНН сначала ИП)
     desiredTab = 'ИП';
   }
 
-  // Кликаем нужную вкладку, если она есть
   const tab = page.locator(`.head-drop-results__tab:has-text("${desiredTab}")`).first();
   if (await tab.count() === 0) {
-    // Если желаемой вкладки нет, пробуем остальные
     const fallbackTabs = ['ИП', 'Физлица', 'Юрлица'].filter(t => t !== desiredTab);
     for (const label of fallbackTabs) {
       const fallbackTab = page.locator(`.head-drop-results__tab:has-text("${label}")`).first();
@@ -72,15 +65,26 @@ export async function getEntityIdByInn(
     if (href) {
       const match = href.match(/\/(id|ip|person)\/([^/?]+)/);
       if (match) {
-        // Переходим по ссылке для загрузки карточки
+        // Переходим на карточку
         await page.goto(`https://www.rusprofile.ru${href}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
-        return {
-          id: match[1] === 'person' ? 0 : parseInt(match[2]), // person пока не поддерживаем числовым id
-          type: match[1] as any,
-        };
+        return normalizeEntity(match[1], match[2]);
       }
     }
   }
 
   throw new Error(`Не удалось найти сущность по ИНН ${inn}`);
+}
+
+/**
+ * Преобразует URL-сегмент (id/ip/person) и идентификатор в нормализованный тип.
+ * Для физических лиц ID пока не числовой — возвращаем 0.
+ */
+function normalizeEntity(
+  segment: string,
+  rawId: string
+): { id: number; type: 'company' | 'entrepreneur' | 'person' } {
+  if (segment === 'id') return { id: parseInt(rawId), type: 'company' };
+  if (segment === 'ip') return { id: parseInt(rawId), type: 'entrepreneur' };
+  // person — пока возвращаем 0, тип 'person'
+  return { id: 0, type: 'person' };
 }

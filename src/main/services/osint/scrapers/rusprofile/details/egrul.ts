@@ -10,27 +10,32 @@ export async function collectEgrulDetails(
   console.log(`Сбор выписки ЕГРЮЛ/ЕГРИП для ID ${companyId}, тип: ${entityType}`);
   const data: any = { basic_info: {}, sections: [] };
 
-  // Для физлица выписка не предусмотрена
   if (entityType === 'person') {
     console.log('Для физических лиц выписка ЕГРЮЛ/ЕГРИП не предусмотрена.');
     return data;
   }
 
+  const isEntrepreneur = entityType === 'entrepreneur' || entityType === 'ip';
+  console.log(`DEBUG egrul: isEntrepreneur = ${isEntrepreneur}`);
+
   // === Получаем ОГРН/ОГРНИП с карточки ===
-  const isEntrepreneur = entityType === 'entrepreneur';
   const cardUrlPath = isEntrepreneur ? 'ip' : 'id';
   const ogrnSelector = isEntrepreneur ? '#clip_ogrnip' : '#clip_ogrn';
+
+  console.log(`DEBUG egrul: cardUrl = https://www.rusprofile.ru/${cardUrlPath}/${companyId}`);
 
   await page.goto(`https://www.rusprofile.ru/${cardUrlPath}/${companyId}`, {
     waitUntil: 'domcontentloaded',
     timeout: 60000,
   });
+
   try {
     await page.waitForSelector(ogrnSelector, { timeout: 15000 });
   } catch {
     console.warn('Не удалось найти ОГРН/ОГРНИП на карточке, выписка пропущена');
     return data;
   }
+
   const ogrn = await page.locator(ogrnSelector).first().innerText().catch(() => '');
   if (!ogrn) {
     console.warn('Пустой ОГРН/ОГРНИП, выписка пропущена');
@@ -42,6 +47,8 @@ export async function collectEgrulDetails(
     ? `https://www.rusprofile.ru/egrip?ogrnip=${ogrn}`
     : `https://www.rusprofile.ru/egrul?ogrn=${ogrn}`;
 
+  console.log(`DEBUG egrul: переход на ${extractUrl}`);
+
   let response: any = null;
   try {
     response = await page.goto(extractUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
@@ -49,6 +56,7 @@ export async function collectEgrulDetails(
     console.warn('Не удалось открыть страницу выписки:', e);
     return data;
   }
+
   if (!response || response.status() === 404) {
     console.log(`Страница выписки недоступна (HTTP ${response?.status()})`);
     return data;
@@ -66,7 +74,6 @@ export async function collectEgrulDetails(
   const parsed = await page.evaluate(() => {
     const result: any = { basic_info: {}, sections: [] };
 
-    // Заголовок и шапка (общие данные)
     const headerTile = document.querySelector('.tile-item.button-tile');
     if (headerTile) {
       const desc = headerTile.querySelector('.statement-description')?.textContent?.trim() || '';
@@ -83,7 +90,6 @@ export async function collectEgrulDetails(
       result.basic_info = { description: desc, name, ...headerRows };
     }
 
-    // Все секции: .tile-item.striped-table (кроме button-tile)
     const tiles = document.querySelectorAll('.tiles-content .tile-item.striped-table');
     tiles.forEach((tile) => {
       if (tile.classList.contains('button-tile')) return;
@@ -92,7 +98,6 @@ export async function collectEgrulDetails(
       if (!title) return;
 
       const items: any[] = [];
-      // Итерируем по дочерним элементам, чтобы отслеживать подзаголовки и add-statement-num
       const children = Array.from(tile.children);
       for (const child of children) {
         const el = child as HTMLElement;
@@ -133,6 +138,6 @@ export async function collectEgrulDetails(
   data.basic_info = parsed.basic_info;
   data.sections = parsed.sections;
 
-  console.log(`Собрано секций выписки: ${data.sections.length}, базовых полей: ${Object.keys(data.basic_info).length}`);
+  console.log(`Собрано секций выписки: ${data.sections.length}`);
   return data;
 }
