@@ -8251,87 +8251,133 @@ async function collectOkvedDetails(page, companyId, options = {}) {
 //#endregion
 //#region src/main/services/osint/scrapers/rusprofile/details/egrul.ts
 async function collectEgrulDetails(page, companyId, options = {}) {
-	console.log(`Сбор выписки из ЕГРЮЛ/ЕГРИП для ID ${companyId}, тип: ${options.entityType || "company"}...`);
+	const entityType = options.entityType || "company";
+	console.log(`Сбор выписки ЕГРЮЛ/ЕГРИП для ID ${companyId}, тип: ${entityType}`);
 	const data = {
 		basic_info: {},
 		sections: []
 	};
-	if (options.entityType === "person") {
+	if (entityType === "person") {
 		console.log("Для физических лиц выписка ЕГРЮЛ/ЕГРИП не предусмотрена.");
 		return data;
 	}
-	const urlPath = options.entityType === "entrepreneur" ? "ip" : "id";
-	const selector = options.entityType === "entrepreneur" ? "#clip_ogrnip" : "#clip_ogrn";
-	const queryParam = options.entityType === "entrepreneur" ? "ogrnip" : "ogrn";
-	await page.goto(`https://www.rusprofile.ru/${urlPath}/${companyId}`, {
+	const isEntrepreneur = entityType === "entrepreneur";
+	const cardUrlPath = isEntrepreneur ? "ip" : "id";
+	const ogrnSelector = isEntrepreneur ? "#clip_ogrnip" : "#clip_ogrn";
+	await page.goto(`https://www.rusprofile.ru/${cardUrlPath}/${companyId}`, {
 		waitUntil: "domcontentloaded",
 		timeout: 6e4
 	});
-	await page.waitForSelector(selector, { timeout: 15e3 });
-	const ogrn = await page.locator(selector).first().innerText().catch(() => "");
-	if (!ogrn) {
-		console.warn("Не удалось получить ОГРН/ОГРНИП с карточки, сбор выписки прерван");
+	try {
+		await page.waitForSelector(ogrnSelector, { timeout: 15e3 });
+	} catch {
+		console.warn("Не удалось найти ОГРН/ОГРНИП на карточке, выписка пропущена");
 		return data;
 	}
-	await page.goto(`https://www.rusprofile.ru/egrul?${queryParam}=${ogrn}`, {
-		waitUntil: "domcontentloaded",
-		timeout: 6e4
-	});
-	await page.waitForSelector(".tiles-content", { timeout: 15e3 });
-	await page.waitForTimeout(1e3);
-	data.basic_info = await page.evaluate(() => {
-		const info = {};
-		const firstTable = document.querySelector(".button-tile table.info-table");
-		if (firstTable) firstTable.querySelectorAll("tbody tr").forEach((row) => {
-			const cells = row.querySelectorAll("td");
-			if (cells.length === 3) {
-				const label = cells[1]?.textContent?.trim() || "";
-				const value = cells[2]?.textContent?.trim() || "";
-				if (label) info[label] = value;
-			}
+	const ogrn = await page.locator(ogrnSelector).first().innerText().catch(() => "");
+	if (!ogrn) {
+		console.warn("Пустой ОГРН/ОГРНИП, выписка пропущена");
+		return data;
+	}
+	const extractUrl = isEntrepreneur ? `https://www.rusprofile.ru/egrip?ogrnip=${ogrn}` : `https://www.rusprofile.ru/egrul?ogrn=${ogrn}`;
+	let response = null;
+	try {
+		response = await page.goto(extractUrl, {
+			waitUntil: "domcontentloaded",
+			timeout: 6e4
 		});
-		return info;
-	});
-	data.sections = await page.evaluate(() => {
-		const result = [];
-		const content = document.querySelector(".tiles-content");
-		if (!content) return result;
-		content.querySelectorAll(".tile-item").forEach((tile) => {
-			const titleEl = tile.querySelector(".tile-item__title");
-			const title = titleEl ? titleEl.textContent?.trim() || "" : "";
+	} catch (e) {
+		console.warn("Не удалось открыть страницу выписки:", e);
+		return data;
+	}
+	if (!response || response.status() === 404) {
+		console.log(`Страница выписки недоступна (HTTP ${response?.status()})`);
+		return data;
+	}
+	try {
+		await page.waitForSelector(".tiles-content, .tiles", { timeout: 15e3 });
+	} catch {
+		console.log("Контейнер выписки не найден");
+		return data;
+	}
+	await page.waitForTimeout(500);
+	const parsed = await page.evaluate(() => {
+		const result = {
+			basic_info: {},
+			sections: []
+		};
+		const headerTile = document.querySelector(".tile-item.button-tile");
+		if (headerTile) {
+			const desc = headerTile.querySelector(".statement-description")?.textContent?.trim() || "";
+			const name = headerTile.querySelector(".statement-name")?.textContent?.trim() || "";
+			const headerRows = {};
+			headerTile.querySelectorAll("table.info-table tbody tr").forEach((tr) => {
+				const cells = tr.querySelectorAll("td");
+				if (cells.length >= 3) {
+					const label = cells[1]?.textContent?.trim() || "";
+					const value = cells[2]?.textContent?.trim() || "";
+					if (label) headerRows[label] = value;
+				}
+			});
+			result.basic_info = {
+				description: desc,
+				name,
+				...headerRows
+			};
+		}
+		document.querySelectorAll(".tiles-content .tile-item.striped-table").forEach((tile) => {
+			if (tile.classList.contains("button-tile")) return;
+			const title = tile.querySelector(".tile-item__title")?.textContent?.trim() || "";
 			if (!title) return;
 			const items = [];
-			tile.querySelectorAll("table.info-table").forEach((table) => {
-				table.querySelectorAll("tbody tr").forEach((row) => {
-					const cells = row.querySelectorAll("td");
-					if (cells.length !== 3) return;
+			const children = Array.from(tile.children);
+			for (const child of children) {
+				const el = child;
+				if (el.classList.contains("tile-item__info")) {
+					items.push({
+						type: "info",
+						text: el.textContent?.trim() || ""
+					});
+					continue;
+				}
+				if (el.classList.contains("table-title")) {
+					items.push({
+						type: "subtitle",
+						text: el.textContent?.trim() || ""
+					});
+					continue;
+				}
+				if (el.classList.contains("add-statement-num")) {
+					items.push({
+						type: "number",
+						text: el.textContent?.trim() || ""
+					});
+					continue;
+				}
+				if (el.tagName === "TABLE" && el.classList.contains("info-table")) el.querySelectorAll("tbody tr").forEach((tr) => {
+					const cells = tr.querySelectorAll("td");
+					if (cells.length < 2) return;
 					const num = cells[0]?.textContent?.trim() || "";
 					const label = cells[1]?.textContent?.trim() || "";
 					const value = cells[2]?.textContent?.trim() || "";
 					if (!num && !label && !value) return;
-					if (!num || num === "&nbsp;") {
-						if (label) items.push({
-							type: "subtitle",
-							label,
-							value: ""
-						});
-						return;
-					}
 					items.push({
 						number: num,
 						label,
 						value
 					});
 				});
-			});
-			if (items.length > 0) result.push({
+			}
+			if (items.length > 0) result.sections.push({
 				title,
 				items
 			});
 		});
 		return result;
 	});
-	console.log(`Собрано секций выписки: ${data.sections.length}`);
+	data.basic_info = parsed.basic_info;
+	data.sections = parsed.sections;
+	console.log(`Собрано секций выписки: ${data.sections.length}, базовых полей: ${Object.keys(data.basic_info).length}`);
 	return data;
 }
 //#endregion

@@ -1,105 +1,138 @@
 // src/main/services/osint/scrapers/rusprofile/details/egrul.ts
 import { Page } from 'playwright';
 
-// Основная функция сбора для ЕГРЮЛ (детальный список)
 export async function collectEgrulDetails(
   page: Page,
   companyId: number,
   options: { maxTotalCases?: number; entityType?: string } = {}
 ): Promise<any> {
-  console.log(`Сбор выписки из ЕГРЮЛ/ЕГРИП для ID ${companyId}, тип: ${options.entityType || 'company'}...`);
+  const entityType = options.entityType || 'company';
+  console.log(`Сбор выписки ЕГРЮЛ/ЕГРИП для ID ${companyId}, тип: ${entityType}`);
   const data: any = { basic_info: {}, sections: [] };
 
-  // Если entityType == 'person', выписка недоступна
-  if (options.entityType === 'person') {
+  // Для физлица выписка не предусмотрена
+  if (entityType === 'person') {
     console.log('Для физических лиц выписка ЕГРЮЛ/ЕГРИП не предусмотрена.');
     return data;
   }
 
-  const urlPath = options.entityType === 'entrepreneur' ? 'ip' : 'id';
-  const selector = options.entityType === 'entrepreneur' ? '#clip_ogrnip' : '#clip_ogrn';
-  const queryParam = options.entityType === 'entrepreneur' ? 'ogrnip' : 'ogrn';
+  // === Получаем ОГРН/ОГРНИП с карточки ===
+  const isEntrepreneur = entityType === 'entrepreneur';
+  const cardUrlPath = isEntrepreneur ? 'ip' : 'id';
+  const ogrnSelector = isEntrepreneur ? '#clip_ogrnip' : '#clip_ogrn';
 
-  // Получаем ОГРН/ОГРНИП с карточки
-  await page.goto(`https://www.rusprofile.ru/${urlPath}/${companyId}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
-  await page.waitForSelector(selector, { timeout: 15000 });
-  const ogrn = await page.locator(selector).first().innerText().catch(() => '');
+  await page.goto(`https://www.rusprofile.ru/${cardUrlPath}/${companyId}`, {
+    waitUntil: 'domcontentloaded',
+    timeout: 60000,
+  });
+  try {
+    await page.waitForSelector(ogrnSelector, { timeout: 15000 });
+  } catch {
+    console.warn('Не удалось найти ОГРН/ОГРНИП на карточке, выписка пропущена');
+    return data;
+  }
+  const ogrn = await page.locator(ogrnSelector).first().innerText().catch(() => '');
   if (!ogrn) {
-    console.warn('Не удалось получить ОГРН/ОГРНИП с карточки, сбор выписки прерван');
+    console.warn('Пустой ОГРН/ОГРНИП, выписка пропущена');
     return data;
   }
 
-  // Переходим на страницу выписки
-  await page.goto(`https://www.rusprofile.ru/egrul?${queryParam}=${ogrn}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
-  await page.waitForSelector('.tiles-content', { timeout: 15000 });
-  await page.waitForTimeout(1000);
+  // === Формируем URL выписки ===
+  const extractUrl = isEntrepreneur
+    ? `https://www.rusprofile.ru/egrip?ogrnip=${ogrn}`
+    : `https://www.rusprofile.ru/egrul?ogrn=${ogrn}`;
 
-  // Основная информация (первая таблица на странице)
-  const basicInfo = await page.evaluate(() => {
-    const info: any = {};
-    const firstTable = document.querySelector('.button-tile table.info-table');
-    if (firstTable) {
-      firstTable.querySelectorAll('tbody tr').forEach(row => {
-        const cells = row.querySelectorAll('td');
-        if (cells.length === 3) {
+  let response: any = null;
+  try {
+    response = await page.goto(extractUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  } catch (e) {
+    console.warn('Не удалось открыть страницу выписки:', e);
+    return data;
+  }
+  if (!response || response.status() === 404) {
+    console.log(`Страница выписки недоступна (HTTP ${response?.status()})`);
+    return data;
+  }
+
+  try {
+    await page.waitForSelector('.tiles-content, .tiles', { timeout: 15000 });
+  } catch {
+    console.log('Контейнер выписки не найден');
+    return data;
+  }
+  await page.waitForTimeout(500);
+
+  // === Извлекаем данные ===
+  const parsed = await page.evaluate(() => {
+    const result: any = { basic_info: {}, sections: [] };
+
+    // Заголовок и шапка (общие данные)
+    const headerTile = document.querySelector('.tile-item.button-tile');
+    if (headerTile) {
+      const desc = headerTile.querySelector('.statement-description')?.textContent?.trim() || '';
+      const name = headerTile.querySelector('.statement-name')?.textContent?.trim() || '';
+      const headerRows: any = {};
+      headerTile.querySelectorAll('table.info-table tbody tr').forEach((tr) => {
+        const cells = tr.querySelectorAll('td');
+        if (cells.length >= 3) {
           const label = cells[1]?.textContent?.trim() || '';
           const value = cells[2]?.textContent?.trim() || '';
-          if (label) info[label] = value;
+          if (label) headerRows[label] = value;
         }
       });
+      result.basic_info = { description: desc, name, ...headerRows };
     }
-    return info;
-  });
-  data.basic_info = basicInfo;
 
-  // Все секции
-  const sections = await page.evaluate(() => {
-    const result: any[] = [];
-    const content = document.querySelector('.tiles-content');
-    if (!content) return result;
+    // Все секции: .tile-item.striped-table (кроме button-tile)
+    const tiles = document.querySelectorAll('.tiles-content .tile-item.striped-table');
+    tiles.forEach((tile) => {
+      if (tile.classList.contains('button-tile')) return;
 
-    const tileItems = content.querySelectorAll('.tile-item');
-    tileItems.forEach(tile => {
-      const titleEl = tile.querySelector('.tile-item__title');
-      const title = titleEl ? titleEl.textContent?.trim() || '' : '';
+      const title = tile.querySelector('.tile-item__title')?.textContent?.trim() || '';
       if (!title) return;
 
       const items: any[] = [];
-      const tables = tile.querySelectorAll('table.info-table');
-      tables.forEach(table => {
-        table.querySelectorAll('tbody tr').forEach(row => {
-          const cells = row.querySelectorAll('td');
-          if (cells.length !== 3) return;
+      // Итерируем по дочерним элементам, чтобы отслеживать подзаголовки и add-statement-num
+      const children = Array.from(tile.children);
+      for (const child of children) {
+        const el = child as HTMLElement;
 
-          const num = cells[0]?.textContent?.trim() || '';
-          const label = cells[1]?.textContent?.trim() || '';
-          const value = cells[2]?.textContent?.trim() || '';
-
-          // Пропускаем полностью пустые строки
-          if (!num && !label && !value) return;
-
-          // Если num пустой или &nbsp;, это подзаголовок или пустая строка
-          if (!num || num === '&nbsp;') {
-            if (label) {
-              items.push({ type: 'subtitle', label, value: '' });
-            }
-            return;
-          }
-
-          items.push({ number: num, label, value });
-        });
-      });
+        if (el.classList.contains('tile-item__info')) {
+          items.push({ type: 'info', text: el.textContent?.trim() || '' });
+          continue;
+        }
+        if (el.classList.contains('table-title')) {
+          items.push({ type: 'subtitle', text: el.textContent?.trim() || '' });
+          continue;
+        }
+        if (el.classList.contains('add-statement-num')) {
+          items.push({ type: 'number', text: el.textContent?.trim() || '' });
+          continue;
+        }
+        if (el.tagName === 'TABLE' && el.classList.contains('info-table')) {
+          el.querySelectorAll('tbody tr').forEach((tr) => {
+            const cells = tr.querySelectorAll('td');
+            if (cells.length < 2) return;
+            const num = cells[0]?.textContent?.trim() || '';
+            const label = cells[1]?.textContent?.trim() || '';
+            const value = cells[2]?.textContent?.trim() || '';
+            if (!num && !label && !value) return;
+            items.push({ number: num, label, value });
+          });
+        }
+      }
 
       if (items.length > 0) {
-        result.push({ title, items });
+        result.sections.push({ title, items });
       }
     });
 
     return result;
   });
 
-  data.sections = sections;
+  data.basic_info = parsed.basic_info;
+  data.sections = parsed.sections;
 
-  console.log(`Собрано секций выписки: ${data.sections.length}`);
+  console.log(`Собрано секций выписки: ${data.sections.length}, базовых полей: ${Object.keys(data.basic_info).length}`);
   return data;
 }
