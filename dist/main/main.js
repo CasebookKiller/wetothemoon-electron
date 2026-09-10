@@ -4865,19 +4865,26 @@ async function collectTabs(page) {
 	return page.evaluate(() => {
 		const result = [];
 		const seen = /* @__PURE__ */ new Set();
-		document.querySelectorAll(".tiles__aside .tiles__item[data-name], .tiles__main .tiles__item[data-name], .tiles__row .tiles__item[data-name]").forEach((el) => {
-			const key = el.getAttribute("data-name") || "";
-			if (!key || seen.has(key)) return;
+		const addTab = (key, title, url) => {
+			if (!key || !url || seen.has(key)) return;
 			seen.add(key);
-			const title = el.querySelector(".tile-item__title a, .tile-item__title")?.textContent?.trim() || "";
-			const linkEl = el.querySelector(".tile-item__title a");
-			const url = linkEl ? linkEl.href : "";
 			result.push({
 				key,
 				title,
 				url
 			});
+		};
+		document.querySelectorAll(".tiles__aside .tiles__item[data-name], .tiles__main .tiles__item[data-name], .tiles__row .tiles__item[data-name]").forEach((el) => {
+			const key = el.getAttribute("data-name") || "";
+			if (!key) return;
+			const linkEl = el.querySelector(".tile-item__title a");
+			if (!linkEl) return;
+			addTab(key, linkEl.textContent?.trim() || "", linkEl.href || "");
 		});
+		const sanctionsLink = document.querySelector("a[href*=\"/sanctions/\"]");
+		if (sanctionsLink) addTab("sanctions", "Санкции", sanctionsLink.href);
+		const egrulLink = document.querySelector("a[href*=\"/egrul\"], a[href*=\"/egrip\"]");
+		if (egrulLink) addTab("egrul", "Выписка ЕГРЮЛ/ЕГРИП", egrulLink.href);
 		return result;
 	});
 }
@@ -9789,13 +9796,18 @@ function registerOsintHandlers() {
 				dumpInfo: null
 			};
 			const sectionDates = getDumpSectionsUpdatedAt(latestDump.id);
+			let availableTabs = [];
+			try {
+				availableTabs = loadRawDumpSync(latestDump.dump_file_path)?.summary?.available_tabs || [];
+			} catch {}
 			return {
 				exists: true,
 				dumpInfo: {
 					id: latestDump.id,
 					collectedSections: latestDump.collected_sections,
 					sectionUpdatedAt: sectionDates,
-					dumpFilePath: latestDump.dump_file_path
+					dumpFilePath: latestDump.dump_file_path,
+					availableTabs
 				}
 			};
 		} catch (error) {

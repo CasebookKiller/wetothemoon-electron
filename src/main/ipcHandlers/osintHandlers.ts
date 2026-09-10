@@ -186,6 +186,16 @@ export function registerOsintHandlers() {
       if (!latestDump) return { exists: false, dumpInfo: null };
 
       const sectionDates = getDumpSectionsUpdatedAt(latestDump.id);
+
+      // Загружаем summary из дампа, чтобы получить available_tabs
+      let availableTabs: any[] = [];
+      try {
+        const dumpData = loadRawDumpSync(latestDump.dump_file_path);
+        availableTabs = dumpData?.summary?.available_tabs || [];
+      } catch {
+        // ignore
+      }
+
       return {
         exists: true,
         dumpInfo: {
@@ -193,11 +203,12 @@ export function registerOsintHandlers() {
           collectedSections: latestDump.collected_sections,
           sectionUpdatedAt: sectionDates,
           dumpFilePath: latestDump.dump_file_path,
+          availableTabs,
         }
       };
     } catch (error) {
       return { exists: false, error: (error as Error).message };
     }
   });
-
+  
 }

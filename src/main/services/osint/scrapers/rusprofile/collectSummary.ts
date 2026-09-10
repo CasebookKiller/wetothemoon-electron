@@ -7,22 +7,34 @@ async function collectTabs(page: Page): Promise<Array<{ key: string; title: stri
     const result: Array<{ key: string; title: string; url: string }> = [];
     const seen = new Set<string>();
 
-    const nodes = document.querySelectorAll(
-      '.tiles__aside .tiles__item[data-name], .tiles__main .tiles__item[data-name], .tiles__row .tiles__item[data-name]'
-    );
-
-    nodes.forEach((el) => {
-      const key = el.getAttribute('data-name') || '';
-      if (!key || seen.has(key)) return;
+    const addTab = (key: string, title: string, url: string) => {
+      if (!key || !url || seen.has(key)) return;
       seen.add(key);
-
-      const titleEl = el.querySelector('.tile-item__title a, .tile-item__title');
-      const title = titleEl?.textContent?.trim() || '';
-      const linkEl = el.querySelector('.tile-item__title a') as HTMLAnchorElement | null;
-      const url = linkEl ? linkEl.href : '';
-
       result.push({ key, title, url });
+    };
+
+    // 1. Плитки с ссылками в заголовке
+    document.querySelectorAll(
+      '.tiles__aside .tiles__item[data-name], .tiles__main .tiles__item[data-name], .tiles__row .tiles__item[data-name]'
+    ).forEach((el) => {
+      const key = el.getAttribute('data-name') || '';
+      if (!key) return;
+      const linkEl = el.querySelector('.tile-item__title a') as HTMLAnchorElement | null;
+      if (!linkEl) return;
+      addTab(key, linkEl.textContent?.trim() || '', linkEl.href || '');
     });
+
+    // 2. Санкции — ссылка внутри блока "Риски сотрудничества"
+    const sanctionsLink = document.querySelector('a[href*="/sanctions/"]') as HTMLAnchorElement | null;
+    if (sanctionsLink) {
+      addTab('sanctions', 'Санкции', sanctionsLink.href);
+    }
+
+    // 3. Выписка ЕГРЮЛ/ЕГРИП — кнопка в шапке карточки
+    const egrulLink = document.querySelector('a[href*="/egrul"], a[href*="/egrip"]') as HTMLAnchorElement | null;
+    if (egrulLink) {
+      addTab('egrul', 'Выписка ЕГРЮЛ/ЕГРИП', egrulLink.href);
+    }
 
     return result;
   });

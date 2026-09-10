@@ -1,0 +1,24 @@
+// Соответствие: ключ вкладки на карточке rusprofile → ключ детального раздела
+export const TAB_TO_SECTION: Record<string, string> = {
+  'connections': 'connections_details',
+  'leasing': 'leasing_details',
+  'history': 'history_details',
+  'facts': 'facts_details',
+  'pledge': 'pledges_details',           // ← не pledges, а pledge!
+  'trademarks': 'trademarks_details',
+  'inspections': 'inspections_details',
+  'licenses': 'licenses_details',
+  'arbitr': 'arbitration_details',
+  'sou': 'sou_details',
+  'gz': 'gz_details',
+  'founders': 'founders_details',
+  'fssp': 'fssp_details',
+  'reliability': 'reliability_details',
+  'risk': 'reliability_details',          // «Риски сотрудничества» из той же группы
+  'sanctions': 'sanctions_details',
+  'okved': 'okved_details',
+  'requisites': 'requisites_details',
+  'egrul': 'egrul_details',
+  'branches': 'branches_details',
+  'bankruptcy': 'bankruptcy_details',
+};

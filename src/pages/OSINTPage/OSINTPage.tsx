@@ -10,6 +10,7 @@ import { Divider } from 'primereact/divider';
 import { classNames } from '@/css/classnames';
 
 import './OSINTPage.css';
+import { TAB_TO_SECTION } from '@/main/services/osint/scrapers/rusprofile/sectionMap';
 
 export const OSINTPage: React.FC = () => {
   const [inn, setInn] = useState<string>(() => {
@@ -163,6 +164,8 @@ export const OSINTPage: React.FC = () => {
 
   const [entityTypeFilter, setEntityTypeFilter] = useState<'auto' | 'company' | 'entrepreneur' | 'person'>('auto');
 
+  const [availableSections, setAvailableSections] = useState<Set<string>>(new Set());
+
   const api = (window as any).electronAPI;
 
   const innDigits = inn.replace(/\D/g, '');
@@ -207,6 +210,18 @@ export const OSINTPage: React.FC = () => {
       const res = await api.checkDumpExists(innToCheck.trim());
       setDumpExists(res.exists);
       setDumpInfo(res.dumpInfo || null);
+
+      // Собираем доступные разделы из summary.available_tabs в дампе
+      if (res.exists && res.dumpInfo?.availableTabs) {
+        const sections = new Set<string>();
+        for (const tab of res.dumpInfo.availableTabs) {
+          const mapped = TAB_TO_SECTION[tab.key];
+          if (mapped) sections.add(mapped);
+        }
+        setAvailableSections(sections);
+      } else {
+        setAvailableSections(new Set());
+      }
     } catch (e) {
       console.error('Ошибка проверки дампа:', e);
     }
@@ -764,8 +779,15 @@ export const OSINTPage: React.FC = () => {
                   }
                 };
 
+                const isAvailable = availableSections.has(section);
+                const isMissing = dumpExists && !isAvailable;
+
+                const containerClass = `col-12 md:col-6 lg:col-4 xl:col-3 ${
+                  dumpExists ? (isAvailable ? 'section-available' : 'section-missing') : ''
+                }`;
+
                 return (
-                  <div className="col-12 md:col-6 lg:col-4 xl:col-3" key={key}>
+                  <div className={containerClass} key={key}>
                     <div className="flex align-items-start">
                       <Checkbox
                         inputId={key}
@@ -778,11 +800,15 @@ export const OSINTPage: React.FC = () => {
                           : label}
                       </label>
                     </div>
-                    <div className="text-xs mt-1" style={{ fontSize: '0.75rem', color: 'gray', marginLeft: '1.75rem' }}>
-                      {dumpExists && dumpInfo?.sectionUpdatedAt?.[section]
-                        ? formatDate(dumpInfo.sectionUpdatedAt[section])
-                        : 'Нет данных'}
-                    </div>
+                    {dumpExists && dumpInfo?.sectionUpdatedAt?.[section] ? (
+                      <div className="text-xs text-500 mt-1" style={{ fontSize: '0.75rem', color: 'gray', marginLeft: '1.75rem' }}>
+                        {formatDate(dumpInfo.sectionUpdatedAt[section])}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-500 mt-1" style={{ fontSize: '0.75rem', color: 'gray', marginLeft: '1.75rem' }}>
+                        Нет данных
+                      </div>
+                    )}
                   </div>
                 );
               })}

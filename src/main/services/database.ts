@@ -422,3 +422,4 @@ export function hasRawDumpForInn(inn: string): boolean {
   const row = db.prepare('SELECT id FROM raw_dumps WHERE company_inn = ? LIMIT 1').get(inn);
   return !!row;
 }
+
