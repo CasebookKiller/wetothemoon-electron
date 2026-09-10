@@ -4,7 +4,7 @@ import { Page } from 'playwright';
 export async function collectEgrulDetails(
   page: Page,
   companyId: number,
-  options: { maxTotalCases?: number; entityType?: string } = {}
+  options: { maxTotalCases?: number; entityType?: string; ogrn?: string } = {}
 ): Promise<any> {
   const entityType = options.entityType || 'company';
   console.log(`Сбор выписки ЕГРЮЛ/ЕГРИП для ID ${companyId}, тип: ${entityType}`);
@@ -18,28 +18,34 @@ export async function collectEgrulDetails(
   const isEntrepreneur = entityType === 'entrepreneur' || entityType === 'ip';
   console.log(`DEBUG egrul: isEntrepreneur = ${isEntrepreneur}`);
 
-  // === Получаем ОГРН/ОГРНИП с карточки ===
-  const cardUrlPath = isEntrepreneur ? 'ip' : 'id';
-  const ogrnSelector = isEntrepreneur ? '#clip_ogrnip' : '#clip_ogrn';
+  // === ОГРН/ОГРНИП: берём из опций, если передан, иначе — с карточки ===
+  let ogrn = options.ogrn || '';
 
-  console.log(`DEBUG egrul: cardUrl = https://www.rusprofile.ru/${cardUrlPath}/${companyId}`);
-
-  await page.goto(`https://www.rusprofile.ru/${cardUrlPath}/${companyId}`, {
-    waitUntil: 'domcontentloaded',
-    timeout: 60000,
-  });
-
-  try {
-    await page.waitForSelector(ogrnSelector, { timeout: 15000 });
-  } catch {
-    console.warn('Не удалось найти ОГРН/ОГРНИП на карточке, выписка пропущена');
-    return data;
-  }
-
-  const ogrn = await page.locator(ogrnSelector).first().innerText().catch(() => '');
   if (!ogrn) {
-    console.warn('Пустой ОГРН/ОГРНИП, выписка пропущена');
-    return data;
+    const cardUrlPath = isEntrepreneur ? 'ip' : 'id';
+    const ogrnSelector = isEntrepreneur ? '#clip_ogrnip' : '#clip_ogrn';
+
+    console.log(`DEBUG egrul: cardUrl = https://www.rusprofile.ru/${cardUrlPath}/${companyId}`);
+
+    await page.goto(`https://www.rusprofile.ru/${cardUrlPath}/${companyId}`, {
+      waitUntil: 'domcontentloaded',
+      timeout: 60000,
+    });
+
+    try {
+      await page.waitForSelector(ogrnSelector, { timeout: 15000 });
+    } catch {
+      console.warn('Не удалось найти ОГРН/ОГРНИП на карточке, выписка пропущена');
+      return data;
+    }
+
+    ogrn = await page.locator(ogrnSelector).first().innerText().catch(() => '');
+    if (!ogrn) {
+      console.warn('Пустой ОГРН/ОГРНИП, выписка пропущена');
+      return data;
+    }
+  } else {
+    console.log(`DEBUG egrul: ОГРН/ОГРНИП получен из опций: ${ogrn}`);
   }
 
   // === Формируем URL выписки ===

@@ -8263,24 +8263,27 @@ async function collectEgrulDetails(page, companyId, options = {}) {
 	}
 	const isEntrepreneur = entityType === "entrepreneur" || entityType === "ip";
 	console.log(`DEBUG egrul: isEntrepreneur = ${isEntrepreneur}`);
-	const cardUrlPath = isEntrepreneur ? "ip" : "id";
-	const ogrnSelector = isEntrepreneur ? "#clip_ogrnip" : "#clip_ogrn";
-	console.log(`DEBUG egrul: cardUrl = https://www.rusprofile.ru/${cardUrlPath}/${companyId}`);
-	await page.goto(`https://www.rusprofile.ru/${cardUrlPath}/${companyId}`, {
-		waitUntil: "domcontentloaded",
-		timeout: 6e4
-	});
-	try {
-		await page.waitForSelector(ogrnSelector, { timeout: 15e3 });
-	} catch {
-		console.warn("Не удалось найти ОГРН/ОГРНИП на карточке, выписка пропущена");
-		return data;
-	}
-	const ogrn = await page.locator(ogrnSelector).first().innerText().catch(() => "");
+	let ogrn = options.ogrn || "";
 	if (!ogrn) {
-		console.warn("Пустой ОГРН/ОГРНИП, выписка пропущена");
-		return data;
-	}
+		const cardUrlPath = isEntrepreneur ? "ip" : "id";
+		const ogrnSelector = isEntrepreneur ? "#clip_ogrnip" : "#clip_ogrn";
+		console.log(`DEBUG egrul: cardUrl = https://www.rusprofile.ru/${cardUrlPath}/${companyId}`);
+		await page.goto(`https://www.rusprofile.ru/${cardUrlPath}/${companyId}`, {
+			waitUntil: "domcontentloaded",
+			timeout: 6e4
+		});
+		try {
+			await page.waitForSelector(ogrnSelector, { timeout: 15e3 });
+		} catch {
+			console.warn("Не удалось найти ОГРН/ОГРНИП на карточке, выписка пропущена");
+			return data;
+		}
+		ogrn = await page.locator(ogrnSelector).first().innerText().catch(() => "");
+		if (!ogrn) {
+			console.warn("Пустой ОГРН/ОГРНИП, выписка пропущена");
+			return data;
+		}
+	} else console.log(`DEBUG egrul: ОГРН/ОГРНИП получен из опций: ${ogrn}`);
 	const extractUrl = isEntrepreneur ? `https://www.rusprofile.ru/egrip?ogrnip=${ogrn}` : `https://www.rusprofile.ru/egrul?ogrn=${ogrn}`;
 	console.log(`DEBUG egrul: переход на ${extractUrl}`);
 	let response = null;
@@ -8581,13 +8584,7 @@ async function getEntityIdByInn(page, inn, preferredType) {
 		const href = await link.getAttribute("href");
 		if (href) {
 			const match = href.match(/\/(id|ip|person)\/([^/?]+)/);
-			if (match) {
-				await page.goto(`https://www.rusprofile.ru${href}`, {
-					waitUntil: "domcontentloaded",
-					timeout: 6e4
-				});
-				return normalizeEntity(match[1], match[2]);
-			}
+			if (match) return normalizeEntity(match[1], match[2]);
 		}
 	}
 	throw new Error(`Не удалось найти сущность по ИНН ${inn}`);
@@ -8681,7 +8678,8 @@ async function scrapeRusprofile(inn, options) {
 		const entityInfo = await getEntityIdByInn(page, inn, options?.preferredType);
 		const companyId = entityInfo.id;
 		const entityType = entityInfo.type;
-		const companyUrl = `https://www.rusprofile.ru/${entityType}/${companyId}`;
+		const companyUrl = `https://www.rusprofile.ru/${entityType === "company" ? "id" : entityType === "entrepreneur" ? "ip" : "person"}/${companyId}`;
+		console.log(`DEBUG index: переход на карточку ${companyUrl}`);
 		await page.goto(companyUrl, {
 			waitUntil: "domcontentloaded",
 			timeout: 6e4
@@ -8922,7 +8920,10 @@ async function scrapeRusprofile(inn, options) {
 		}
 		if (options?.egrulDetails && shouldCollect("egrul_details")) {
 			console.log("Сбор выписки из ЕГРЮЛ/ЕГРИП...");
-			result.egrul_details = await timed("egrul_details", () => collectEgrulDetails(page, companyId, { entityType }));
+			result.egrul_details = await timed("egrul_details", () => collectEgrulDetails(page, companyId, {
+				entityType,
+				ogrn: result.summary?.ogrnip || result.summary?.ogrn || ""
+			}));
 		}
 		result.startedAt = new Date(startTime).toISOString();
 		result.timings = timings;

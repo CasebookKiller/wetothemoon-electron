@@ -584,7 +584,7 @@ export const OSINTPage: React.FC = () => {
     { key: 'needHistoryDetails', label: 'История', section: 'history_details' },
     { key: 'needRequisitesDetails', label: 'Реквизиты', section: 'requisites_details' },
     { key: 'needOkvedDetails', label: 'Виды деятельности', section: 'okved_details' },
-    { key: 'needEgrulDetails', label: 'Выписка из ЕГРЮЛ', section: 'egrul_details' },
+    { key: 'needEgrulDetails', label: '', section: 'egrul_details' },
   ];
 
   const formatDate = (iso?: string) => {
@@ -772,7 +772,11 @@ export const OSINTPage: React.FC = () => {
                         checked={checked}
                         onChange={onChange}
                       />
-                      <label htmlFor={key} className="ml-2">{label}</label>
+                      <label htmlFor={key} className="ml-2">
+                        {key === 'needEgrulDetails'
+                          ? (isIndividualInn ? 'Выписка из ЕГРИП' : 'Выписка из ЕГРЮЛ')
+                          : label}
+                      </label>
                     </div>
                     <div className="text-xs mt-1" style={{ fontSize: '0.75rem', color: 'gray', marginLeft: '1.75rem' }}>
                       {dumpExists && dumpInfo?.sectionUpdatedAt?.[section]

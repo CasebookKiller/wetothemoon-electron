@@ -187,7 +187,11 @@ export async function scrapeRusprofile(
     const entityInfo = await getEntityIdByInn(page, inn, options?.preferredType);
     const companyId = entityInfo.id;
     const entityType = entityInfo.type;
-    const companyUrl = `https://www.rusprofile.ru/${entityType}/${companyId}`;
+
+    // Формируем правильный URL: id для ЮЛ, ip для ИП, person для ФЛ
+    const urlPath = entityType === 'company' ? 'id' : entityType === 'entrepreneur' ? 'ip' : 'person';
+    const companyUrl = `https://www.rusprofile.ru/${urlPath}/${companyId}`;
+    console.log(`DEBUG index: переход на карточку ${companyUrl}`);
     await page.goto(companyUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
     console.log('Перешли на карточку компании, запускаем наблюдатель модальных окон...');
     startModalWatcher(page);
@@ -514,7 +518,10 @@ export async function scrapeRusprofile(
     if (options?.egrulDetails && shouldCollect('egrul_details')) {
       console.log('Сбор выписки из ЕГРЮЛ/ЕГРИП...');
       result.egrul_details = await timed('egrul_details', () =>
-        collectEgrulDetails(page, companyId, { entityType })   // ← передаём тип
+        collectEgrulDetails(page, companyId, {
+          entityType,
+          ogrn: result.summary?.ogrnip || result.summary?.ogrn || '',
+        })
       );
     }
 
