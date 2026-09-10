@@ -165,11 +165,25 @@ export const OSINTPage: React.FC = () => {
 
   const api = (window as any).electronAPI;
 
+  const innDigits = inn.replace(/\D/g, '');
+  const isLegalEntityInn = innDigits.length === 10;
+  const isIndividualInn = innDigits.length === 12;
+
   useEffect(() => {
     if (inn.trim()) {
       checkDump(inn);
     }
   }, []);
+
+  useEffect(() => {
+    if (isLegalEntityInn) {
+      setEntityTypeFilter('company');
+    } else if (isIndividualInn) {
+      if (entityTypeFilter === 'company') {
+        setEntityTypeFilter('auto');
+      }
+    }
+  }, [isLegalEntityInn, isIndividualInn]);
 
   const handleInnChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -380,6 +394,7 @@ export const OSINTPage: React.FC = () => {
         );
         // Обновляем информацию о дампе (появятся даты, кнопка заблокируется)
         await checkDump(inn);
+        setResult(null); // раскомментируйте, если хотите скрыть JSON после сохранения
       } else {
         setSaveMessage(`Ошибка: ${response.error}`);
       }
@@ -616,7 +631,7 @@ export const OSINTPage: React.FC = () => {
 
       <Panel
         className="shadow-5 mx-1"
-        header="Поиск компании"
+        header="Поиск по ИНН"
         footer={footer}
       >
         <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
@@ -630,6 +645,11 @@ export const OSINTPage: React.FC = () => {
                 className="w-full text-base"
               />
             </div>
+            <div className="flex align-items-center gap-2">
+              {innDigits.length > 0 && innDigits.length !== 10 && innDigits.length !== 12 && (
+                <small className="p-error">ИНН должен содержать 10 или 12 цифр</small>
+              )}
+            </div>
 
             <div className="flex align-items-center gap-3 mt-2">
               <span>Тип:</span>
@@ -640,6 +660,7 @@ export const OSINTPage: React.FC = () => {
                   value="auto"
                   checked={entityTypeFilter === 'auto'}
                   onChange={() => setEntityTypeFilter('auto')}
+                  disabled={isLegalEntityInn}
                 />
                 Авто
               </label>
@@ -650,6 +671,7 @@ export const OSINTPage: React.FC = () => {
                   value="company"
                   checked={entityTypeFilter === 'company'}
                   onChange={() => setEntityTypeFilter('company')}
+                  disabled={isIndividualInn}
                 />
                 Юрлицо
               </label>
@@ -660,6 +682,7 @@ export const OSINTPage: React.FC = () => {
                   value="entrepreneur"
                   checked={entityTypeFilter === 'entrepreneur'}
                   onChange={() => setEntityTypeFilter('entrepreneur')}
+                  disabled={isLegalEntityInn}
                 />
                 ИП
               </label>
@@ -670,6 +693,7 @@ export const OSINTPage: React.FC = () => {
                   value="person"
                   checked={entityTypeFilter === 'person'}
                   onChange={() => setEntityTypeFilter('person')}
+                  disabled={isLegalEntityInn}
                 />
                 Физлицо
               </label>
