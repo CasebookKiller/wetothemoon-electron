@@ -4861,8 +4861,28 @@ async function login(page, login, password) {
 }
 //#endregion
 //#region src/main/services/osint/scrapers/rusprofile/collectSummary.ts
-async function collectSummary(page) {
+async function collectTabs(page) {
 	return page.evaluate(() => {
+		const result = [];
+		const seen = /* @__PURE__ */ new Set();
+		document.querySelectorAll(".tiles__aside .tiles__item[data-name], .tiles__main .tiles__item[data-name], .tiles__row .tiles__item[data-name]").forEach((el) => {
+			const key = el.getAttribute("data-name") || "";
+			if (!key || seen.has(key)) return;
+			seen.add(key);
+			const title = el.querySelector(".tile-item__title a, .tile-item__title")?.textContent?.trim() || "";
+			const linkEl = el.querySelector(".tile-item__title a");
+			const url = linkEl ? linkEl.href : "";
+			result.push({
+				key,
+				title,
+				url
+			});
+		});
+		return result;
+	});
+}
+async function collectSummary(page) {
+	const summary = await page.evaluate(() => {
 		const getTextByCss = (selector) => {
 			const el = document.querySelector(selector);
 			return el ? el.textContent?.trim() || "" : "";
@@ -4983,6 +5003,13 @@ async function collectSummary(page) {
 		}
 		return data;
 	});
+	try {
+		summary.available_tabs = await collectTabs(page);
+	} catch (e) {
+		console.warn("Не удалось собрать список вкладок:", e);
+		summary.available_tabs = [];
+	}
+	return summary;
 }
 //#endregion
 //#region src/main/services/osint/scrapers/rusprofile/collectTiles.ts

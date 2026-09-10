@@ -2,8 +2,34 @@
 
 import { Page } from 'playwright';
 
-export async function collectSummary(page: Page): Promise<any> {
+async function collectTabs(page: Page): Promise<Array<{ key: string; title: string; url: string }>> {
   return page.evaluate(() => {
+    const result: Array<{ key: string; title: string; url: string }> = [];
+    const seen = new Set<string>();
+
+    const nodes = document.querySelectorAll(
+      '.tiles__aside .tiles__item[data-name], .tiles__main .tiles__item[data-name], .tiles__row .tiles__item[data-name]'
+    );
+
+    nodes.forEach((el) => {
+      const key = el.getAttribute('data-name') || '';
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+
+      const titleEl = el.querySelector('.tile-item__title a, .tile-item__title');
+      const title = titleEl?.textContent?.trim() || '';
+      const linkEl = el.querySelector('.tile-item__title a') as HTMLAnchorElement | null;
+      const url = linkEl ? linkEl.href : '';
+
+      result.push({ key, title, url });
+    });
+
+    return result;
+  });
+}
+
+export async function collectSummary(page: Page): Promise<any> {
+  const summary = await page.evaluate(() => {
     const getTextByCss = (selector: string): string => {
       const el = document.querySelector(selector);
       return el ? el.textContent?.trim() || '' : '';
@@ -178,4 +204,15 @@ export async function collectSummary(page: Page): Promise<any> {
 
     return data;
   });
+
+  // Дополнительно собираем список доступных вкладок (с ссылками)
+  try {
+    const tabs = await collectTabs(page);
+    summary.available_tabs = tabs;
+  } catch (e) {
+    console.warn('Не удалось собрать список вкладок:', e);
+    summary.available_tabs = [];
+  }
+
+  return summary;
 }
