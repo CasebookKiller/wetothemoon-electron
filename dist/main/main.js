@@ -9021,7 +9021,11 @@ function updateRawDumpSections(dumpId, collectedSections, sectionUpdatedAt) {
 function getDumpSectionsUpdatedAt(dumpId) {
 	const row = getDatabase().prepare("SELECT section_updated_at FROM raw_dumps WHERE id = ?").get(dumpId);
 	if (!row || !row.section_updated_at) return null;
-	return JSON.parse(row.section_updated_at);
+	try {
+		return JSON.parse(row.section_updated_at);
+	} catch {
+		return null;
+	}
 }
 function normalize(value) {
 	return value.trim().toLowerCase().replace(/\s+/g, " ");
@@ -9567,12 +9571,13 @@ function registerOsintHandlers() {
 			const latestDump = findLatestRawDump(inn);
 			if (!latestDump) return {
 				success: false,
-				error: "Не найден существующий дамп для этой компании"
+				error: "Не найден существующий дамп"
 			};
 			const mergedData = mergeCompanyDumps(loadRawDumpSync(latestDump.dump_file_path), newData);
 			return {
 				success: true,
-				...updateCompanyData(String(newData.company_id ?? ""), inn, mergedData, latestDump.dump_file_path, latestDump.id)
+				...updateCompanyData(String(newData.company_id ?? ""), inn, mergedData, latestDump.dump_file_path, latestDump.id),
+				data: mergedData
 			};
 		} catch (error) {
 			console.error("Ошибка дозагрузки разделов:", error);

@@ -443,6 +443,9 @@ export const OSINTPage: React.FC = () => {
         setSupplementMessage(
           `Дозагрузка завершена: сущностей ${response.savedEntities}, связей ${response.savedRelations}, наблюдений ${response.savedObservations}`
         );
+        if (response.data) {
+          setResult(response.data);
+        }
         await checkDump(inn.trim());
       } else {
         setSupplementMessage(`Ошибка: ${response.error}`);
@@ -653,7 +656,10 @@ export const OSINTPage: React.FC = () => {
 
             <div className="flex align-items-center gap-3 mt-2">
               <span>Тип:</span>
-              <label className="flex align-items-center gap-1">
+              <label
+                className="flex align-items-center gap-1"
+                style={{ color: isLegalEntityInn ? '#999' : 'inherit' }}
+              >
                 <input
                   type="radio"
                   name="entityType"
@@ -664,7 +670,10 @@ export const OSINTPage: React.FC = () => {
                 />
                 Авто
               </label>
-              <label className="flex align-items-center gap-1">
+              <label
+                className="flex align-items-center gap-1"
+                style={{ color: isIndividualInn ? '#999' : 'inherit' }}
+              >
                 <input
                   type="radio"
                   name="entityType"
@@ -675,7 +684,10 @@ export const OSINTPage: React.FC = () => {
                 />
                 Юрлицо
               </label>
-              <label className="flex align-items-center gap-1">
+              <label
+                className="flex align-items-center gap-1"
+                style={{ color: isLegalEntityInn ? '#999' : 'inherit' }}
+              >
                 <input
                   type="radio"
                   name="entityType"
@@ -686,7 +698,10 @@ export const OSINTPage: React.FC = () => {
                 />
                 ИП
               </label>
-              <label className="flex align-items-center gap-1">
+              <label
+                className="flex align-items-center gap-1"
+                style={{ color: isLegalEntityInn ? '#999' : 'inherit' }}
+              >
                 <input
                   type="radio"
                   name="entityType"
@@ -1225,6 +1240,41 @@ export const OSINTPage: React.FC = () => {
         </div>
       </Panel>
 
+      {error && (
+        <div className="app p-0">
+          <div className="p-error mx-2">{error}</div>
+        </div>
+      )}
+
+      {result && (
+        <React.Fragment>
+          <div className="app p-0" />
+          <Panel className="shadow-5 mx-1" header="Результат">
+            <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
+              <div className="flex-1 flex flex-column gap-1 xl:mr-8">
+                {renderResult()}
+              </div>
+            </div>
+          </Panel>
+        </React.Fragment>
+      )}
+
+      {result && !dumpExists && (
+        <>
+          <Button
+            label="Сохранить в базу данных"
+            icon="pi pi-save"
+            className="p-button-lg w-full p-button-raised p-button-accent"
+            onClick={handleSaveToDb}
+          />
+          {saveMessage && (
+            <p className="p-info mt-2" style={{ color: saveMessage.startsWith('Ошибка') ? 'red' : 'green' }}>
+              {saveMessage}
+            </p>
+          )}
+        </>
+      )}
+
       <div className="app p-0" />
 
       <Panel className="shadow-5 mx-1" header="Дополнительные источники">
@@ -1249,42 +1299,6 @@ export const OSINTPage: React.FC = () => {
           </div>
         </div>
       </Panel>
-
-      {error && (
-        <div className="app p-0">
-          <div className="p-error mx-2">{error}</div>
-        </div>
-      )}
-
-      {result && (
-        <React.Fragment>
-          <div className="app p-0" />
-          <Panel className="shadow-5 mx-1" header="Результат">
-            <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
-              <div className="flex-1 flex flex-column gap-1 xl:mr-8">
-                {renderResult()}
-              </div>
-            </div>
-          </Panel>
-        </React.Fragment>
-      )}
-
-      {result && (
-        <>
-          <Button
-            label="Сохранить в базу данных"
-            icon="pi pi-save"
-            className="p-button-lg w-full p-button-raised p-button-accent"
-            onClick={handleSaveToDb}
-            disabled={dumpExists}
-          />
-          {saveMessage && (
-            <p className="p-info mt-2" style={{ color: saveMessage.startsWith('Ошибка') ? 'red' : 'green' }}>
-              {saveMessage}
-            </p>
-          )}
-        </>
-      )}
     </React.Fragment>
   );
 };

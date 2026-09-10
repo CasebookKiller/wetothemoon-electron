@@ -149,25 +149,19 @@ export function registerOsintHandlers() {
 
   ipcMain.handle('osint:supplement-company', async (_event, inn: string, onlySections: string[]) => {
     try {
-      // 1. Собираем только указанные разделы
       const newData = await scrapeRusprofile(inn, { onlySections });
       if (!newData) {
         return { success: false, error: 'Не удалось собрать данные с rusprofile' };
       }
 
-      // 2. Находим последний дамп для этой компании
       const latestDump = findLatestRawDump(inn);
       if (!latestDump) {
-        return { success: false, error: 'Не найден существующий дамп для этой компании' };
+        return { success: false, error: 'Не найден существующий дамп' };
       }
 
-      // 3. Загружаем старый дамп
       const existingData = loadRawDumpSync(latestDump.dump_file_path);
-
-      // 4. Объединяем
       const mergedData = mergeCompanyDumps(existingData, newData);
 
-      // 5. Сохраняем объединённый дамп (создаст новый файл и обновит БД)
       const result = updateCompanyData(
         String(newData.company_id ?? ''),
         inn,
@@ -176,7 +170,7 @@ export function registerOsintHandlers() {
         latestDump.id
       );
 
-      return { success: true, ...result };
+      return { success: true, ...result, data: mergedData };
     } catch (error) {
       console.error('Ошибка дозагрузки разделов:', error);
       return { success: false, error: (error as Error).message };

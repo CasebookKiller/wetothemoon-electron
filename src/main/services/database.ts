@@ -166,7 +166,7 @@ export function addRawDumpRecord(
   dumpFilePath: string,
   sizeBytes: number,
   collectedSections: string[],
-  sectionUpdatedAt?: Record<string, string> // optional
+  sectionUpdatedAt?: Record<string, string>
 ): number {
   const db = getDatabase();
   const stmt = db.prepare(`
@@ -225,7 +225,11 @@ export function getDumpSectionsUpdatedAt(dumpId: number): Record<string, string>
   const db = getDatabase();
   const row = db.prepare('SELECT section_updated_at FROM raw_dumps WHERE id = ?').get(dumpId) as any;
   if (!row || !row.section_updated_at) return null;
-  return JSON.parse(row.section_updated_at);
+  try {
+    return JSON.parse(row.section_updated_at);
+  } catch {
+    return null;
+  }
 }
 
 export function normalize(value: string): string {
