@@ -8061,13 +8061,28 @@ async function collectRequisitesDetails(page, companyId, options = {}) {
 	console.log(`Сбор реквизитов для компании ID ${companyId}...`);
 	const data = { sections: [] };
 	const url = `https://www.rusprofile.ru/requisites/${companyId}`;
-	await page.goto(url, {
-		waitUntil: "domcontentloaded",
-		timeout: 6e4
-	});
-	await page.waitForSelector(".requisites-list", { timeout: 15e3 });
-	await page.waitForTimeout(1e3);
-	data.sections = await page.evaluate(() => {
+	let response = null;
+	try {
+		response = await page.goto(url, {
+			waitUntil: "domcontentloaded",
+			timeout: 6e4
+		});
+	} catch (e) {
+		console.warn("Не удалось открыть страницу реквизитов:", e);
+		return data;
+	}
+	if (!response || response.status() === 404) {
+		console.log(`Страница реквизитов недоступна (HTTP ${response?.status()}). Пропускаем.`);
+		return data;
+	}
+	try {
+		await page.waitForSelector(".requisites-list, .requisites-ip, .content-frame", { timeout: 1e4 });
+	} catch {
+		console.log("Структура страницы реквизитов не найдена, возвращаем пустой результат");
+		return data;
+	}
+	await page.waitForTimeout(500);
+	const sectionsFromUl = await page.evaluate(() => {
 		const result = [];
 		const container = document.querySelector(".main-wrap__content");
 		if (!container) return result;
@@ -8097,7 +8112,32 @@ async function collectRequisitesDetails(page, companyId, options = {}) {
 		}
 		return result;
 	});
-	console.log(`Собрано секций реквизитов: ${data.sections.length}`);
+	if (sectionsFromUl.length > 0) {
+		data.sections = sectionsFromUl;
+		console.log(`Собрано секций реквизитов (ЮЛ): ${data.sections.length}`);
+		return data;
+	}
+	data.sections = await page.evaluate(() => {
+		const result = [];
+		document.querySelectorAll(".requisites-ip").forEach((block) => {
+			const title = block.querySelector(".requisites-ip__title")?.textContent?.trim() || "";
+			const items = [];
+			block.querySelectorAll("dl.requisites-ip__list").forEach((dl) => {
+				const name = dl.querySelector("dt")?.textContent?.trim() || "";
+				const value = dl.querySelector("dd")?.textContent?.replace(/\s+/g, " ").trim() || "";
+				if (name || value) items.push({
+					name,
+					value
+				});
+			});
+			if (items.length > 0) result.push({
+				title: title || "Без заголовка",
+				items
+			});
+		});
+		return result;
+	});
+	console.log(`Собрано секций реквизитов (ИП): ${data.sections.length}`);
 	return data;
 }
 //#endregion
