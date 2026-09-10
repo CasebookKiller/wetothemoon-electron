@@ -47,19 +47,53 @@ export async function collectHistoryDetails(
 
   const url = `https://www.rusprofile.ru/history/${companyId}`;
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-  await page.waitForSelector('ul.filters-results__list', { timeout: 15000 });
-  await page.waitForTimeout(1000);
+  try {
+    await page.waitForSelector('ul.filters-results__list', { timeout: 5000 });
+  } catch {
+    console.log('Список истории не появился (возможно, нет событий)');
+  }
+  await page.waitForTimeout(500);
 
   if (options.filters) {
     await applyHistoryFilters(page, options.filters);
     await page.waitForTimeout(2000);
   }
 
-  // Общее количество событий
+  // Общее количество событий: пагинация может быть скрыта, если записей мало.
+  // Сначала пробуем найти счётчик «из N», затем — количество <li> на странице.
   try {
-    const notice = await page.locator('.filters-pagination__notice').first().innerText();
-    const m = notice.match(/из\s*([\d\s]+)/);
-    if (m) data.total_events = m[1].replace(/\s/g, '');
+    let total: string | null = null;
+    const paginationSelectors = [
+      '.filters-pagination__notice',
+      '.export-data__text',
+      '.filters-results__head .export-data__text',
+    ];
+
+    for (const sel of paginationSelectors) {
+      const el = page.locator(sel).first();
+      if (await el.count() > 0) {
+        try {
+          const text = await el.innerText({ timeout: 2000 });
+          if (text) {
+            const m = text.match(/из\s*([\d\s]+)/) || text.match(/([\d\s]+)/);
+            if (m) {
+              total = m[1].replace(/\s/g, '');
+              break;
+            }
+          }
+        } catch {
+          // пропускаем
+        }
+      }
+    }
+
+    if (!total) {
+      // Счётчика нет — считаем элементы на странице
+      const count = await page.locator('li.filters-results__list-item').count();
+      total = String(count);
+    }
+
+    data.total_events = total;
   } catch (e) {
     console.log('Не удалось получить общее количество событий:', e);
   }

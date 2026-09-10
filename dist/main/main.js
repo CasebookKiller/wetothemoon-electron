@@ -7936,15 +7936,40 @@ async function collectHistoryDetails(page, companyId, options = {}) {
 		waitUntil: "domcontentloaded",
 		timeout: 6e4
 	});
-	await page.waitForSelector("ul.filters-results__list", { timeout: 15e3 });
-	await page.waitForTimeout(1e3);
+	try {
+		await page.waitForSelector("ul.filters-results__list", { timeout: 5e3 });
+	} catch {
+		console.log("Список истории не появился (возможно, нет событий)");
+	}
+	await page.waitForTimeout(500);
 	if (options.filters) {
 		await applyHistoryFilters(page, options.filters);
 		await page.waitForTimeout(2e3);
 	}
 	try {
-		const m = (await page.locator(".filters-pagination__notice").first().innerText()).match(/из\s*([\d\s]+)/);
-		if (m) data.total_events = m[1].replace(/\s/g, "");
+		let total = null;
+		for (const sel of [
+			".filters-pagination__notice",
+			".export-data__text",
+			".filters-results__head .export-data__text"
+		]) {
+			const el = page.locator(sel).first();
+			if (await el.count() > 0) try {
+				const text = await el.innerText({ timeout: 2e3 });
+				if (text) {
+					const m = text.match(/из\s*([\d\s]+)/) || text.match(/([\d\s]+)/);
+					if (m) {
+						total = m[1].replace(/\s/g, "");
+						break;
+					}
+				}
+			} catch {}
+		}
+		if (!total) {
+			const count = await page.locator("li.filters-results__list-item").count();
+			total = String(count);
+		}
+		data.total_events = total;
 	} catch (e) {
 		console.log("Не удалось получить общее количество событий:", e);
 	}
