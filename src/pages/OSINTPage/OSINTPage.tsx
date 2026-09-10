@@ -365,6 +365,7 @@ export const OSINTPage: React.FC = () => {
       setSaveMessage('Нет данных для сохранения');
       return;
     }
+    setSaveMessage('');
     try {
       const companyId = result.company_id;
       if (!companyId) {
@@ -377,6 +378,8 @@ export const OSINTPage: React.FC = () => {
         setSaveMessage(
           `Сохранено: сущностей ${response.savedEntities}, связей ${response.savedRelations}, наблюдений ${response.savedObservations}`
         );
+        // Обновляем информацию о дампе (появятся даты, кнопка заблокируется)
+        await checkDump(inn);
       } else {
         setSaveMessage(`Ошибка: ${response.error}`);
       }
@@ -1243,13 +1246,20 @@ export const OSINTPage: React.FC = () => {
       )}
 
       {result && (
-        <Button
-          label="Сохранить в базу данных"
-          icon="pi pi-save"
-          className="p-button-lg w-full p-button-raised p-button-accent"
-          onClick={handleSaveToDb}
-          disabled={dumpExists}
-        />
+        <>
+          <Button
+            label="Сохранить в базу данных"
+            icon="pi pi-save"
+            className="p-button-lg w-full p-button-raised p-button-accent"
+            onClick={handleSaveToDb}
+            disabled={dumpExists}
+          />
+          {saveMessage && (
+            <p className="p-info mt-2" style={{ color: saveMessage.startsWith('Ошибка') ? 'red' : 'green' }}>
+              {saveMessage}
+            </p>
+          )}
+        </>
       )}
     </React.Fragment>
   );

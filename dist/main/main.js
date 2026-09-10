@@ -258,7 +258,7 @@ var mainMenuTemplate = [
 				id: "open-osint"
 			},
 			{
-				label: "Открыть Базу данных",
+				label: "Открыть Ситч",
 				id: "open-database"
 			},
 			{

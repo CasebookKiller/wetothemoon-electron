@@ -29,6 +29,7 @@ export const ButtonsWindows = () => {
     { label: 'План полёта', icon: 'pi pi-list', action: call('openTasksWindow') },
     { label: 'Трейдер', icon: 'pi pi-chart-bar', action: call('openTradingAssistantWindow') },
     { label: 'Взгляд Фримена', icon: 'pi pi-eye', action: call('openOsintWindow') },
+    { label: 'Ситч', icon: 'pi pi-warehouse', action: call('openDatabaseWindow') },
     // Новая кнопка «Шлюз»
     { label: 'Шлюз', icon: 'pi pi-server', action: call('openGatewayWindow') },
 

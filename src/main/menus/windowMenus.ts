@@ -13,7 +13,7 @@ export const mainMenuTemplate: MenuItemConstructorOptions[] = [
       { label: 'Открыть Генератор запросов', id: 'open-pg' },
       { label: 'Открыть Трейдер', id: 'open-trading' },
       { label: 'Открыть Взгляд Фримена', id: 'open-osint' },
-      { label: 'Открыть Базу данных', id: 'open-database' },
+      { label: 'Открыть Ситч', id: 'open-database' },
       { label: 'Открыть Шлюз', id: 'open-gateway' },
       { type: 'separator' },
       { label: 'Выйти', click: () => app.quit(), accelerator: 'CmdOrCtrl+Q' }
