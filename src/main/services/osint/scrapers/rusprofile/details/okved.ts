@@ -1,23 +1,85 @@
+// Основная функция сбора для оквед (детальный список)
 // src/main/services/osint/scrapers/rusprofile/details/okved.ts
 import { Page } from 'playwright';
 
-// Основная функция сбора для оквед (детальный список)
 export async function collectOkvedDetails(
   page: Page,
   companyId: number,
   options: { maxTotalCases?: number } = {}
 ): Promise<any> {
   console.log(`Сбор видов деятельности для компании ID ${companyId}...`);
-  const data: any = { industry: '', main_activity: '', region: '', average_revenue: '', top_companies: [], additional_activities: [] };
+  const data: any = {
+    industry: '',
+    main_activity: '',
+    region: '',
+    average_revenue: '',
+    top_companies: [],
+    additional_activities: [],
+    total_activities: '',
+  };
 
   const url = `https://www.rusprofile.ru/okved/${companyId}`;
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-  await page.waitForSelector('.okved-list', { timeout: 15000 });
+
+  // Универсальное ожидание: либо ЮЛ-структура, либо ИП-структура
+  try {
+    await page.waitForSelector(
+      '.okved-list, .text-box, .content-frame__title',
+      { timeout: 15000 }
+    );
+  } catch {
+    console.log('Страница ОКВЭД не загрузилась, возвращаем пустой результат');
+    return data;
+  }
   await page.waitForTimeout(1000);
 
-  // Извлекаем данные
   const parsed = await page.evaluate(() => {
-    const result: any = {};
+    const result: any = {
+      industry: '',
+      main_activity: '',
+      region: '',
+      average_revenue: '',
+      top_companies: [],
+      additional_activities: [],
+      total_activities: '',
+    };
+
+    // === Определяем формат страницы ===
+    const contentFrameTitle = document.querySelector('.content-frame__title')?.textContent?.trim() || '';
+    const isIpFormat = contentFrameTitle.includes('Виды деятельности ОКВЭД');
+
+    if (isIpFormat) {
+      // === Формат ИП ===
+      const totalMatch = contentFrameTitle.match(/\((\d+)\)/);
+      if (totalMatch) result.total_activities = totalMatch[1];
+
+      // Собираем заголовки и соответствующие списки
+      const titles = document.querySelectorAll('.okved-list-title');
+      const lists = document.querySelectorAll('ul.okved-list');
+
+      titles.forEach((titleEl, index) => {
+        const titleText = titleEl.textContent?.trim() || '';
+        const list = lists[index];
+        if (!list) return;
+
+        const items = list.querySelectorAll('li.okved-item');
+        items.forEach((li) => {
+          const num = li.querySelector('.okved-item__num')?.textContent?.trim() || '';
+          const text = li.querySelector('.okved-item__text')?.textContent?.trim() || '';
+          if (!num && !text) return;
+
+          if (titleText.startsWith('Основной')) {
+            result.main_activity = `${text} (${num})`;
+          } else if (titleText.startsWith('Дополнительные')) {
+            result.additional_activities.push({ code: num, description: text });
+          }
+        });
+      });
+
+      return result;
+    }
+
+    // === Формат ЮЛ (оригинальная логика) ===
 
     // Отрасль
     const industryBlock = Array.from(document.querySelectorAll('.text-box')).find(el =>
@@ -51,7 +113,6 @@ export async function collectOkvedDetails(
     }
 
     // Топ компаний
-    const topCompanies: any[] = [];
     const topList = document.querySelector('ul.okved-list');
     if (topList) {
       const items = topList.querySelectorAll('li.okved-item');
@@ -62,13 +123,12 @@ export async function collectOkvedDetails(
         const href = nameEl ? (nameEl as HTMLAnchorElement).href || '' : '';
         const revenue = item.querySelector('.okved-item__text .num')?.textContent?.trim() || '';
         if (name || position) {
-          topCompanies.push({ position, name, href, revenue });
+          result.top_companies.push({ position, name, href, revenue });
         }
       });
     }
-    result.top_companies = topCompanies;
 
-    // Дополнительные виды деятельности
+    // Дополнительные виды деятельности (ЮЛ)
     result.additional_activities = [];
     const additionalList = document.querySelector('#other');
     if (additionalList) {
@@ -94,7 +154,8 @@ export async function collectOkvedDetails(
   data.average_revenue = parsed.average_revenue;
   data.top_companies = parsed.top_companies;
   data.additional_activities = parsed.additional_activities;
+  data.total_activities = parsed.total_activities;
 
-  console.log(`Собрано ОКВЭД: отрасль "${data.industry}", доп. видов: ${data.additional_activities.length}, топ компаний: ${data.top_companies.length}`);
+  console.log(`Собрано ОКВЭД: основной="${data.main_activity}", доп. видов: ${data.additional_activities.length}, топ компаний: ${data.top_companies.length}`);
   return data;
 }
