@@ -9172,7 +9172,10 @@ async function collectPersonHistoryDetails(page, slug) {
 	console.log(`Сбор истории для ФЛ ${slug}...`);
 	const url = `https://www.rusprofile.ru/person/${slug}/history`;
 	const data = {
+		title: "",
+		description: "",
 		total_events: "",
+		filter_tabs: [],
 		history: []
 	};
 	let response = null;
@@ -9190,69 +9193,77 @@ async function collectPersonHistoryDetails(page, slug) {
 		return data;
 	}
 	try {
-		await page.waitForSelector("ul.filters-results__list, .content-frame, .history-box", { timeout: 15e3 });
+		await page.waitForSelector(".history-wrapper, .history-box, .content-frame__title", { timeout: 15e3 });
 	} catch {
-		console.log("Список истории не появился");
+		console.log("История ФЛ не найдена");
 	}
 	await page.waitForTimeout(500);
-	try {
-		let total = null;
-		for (const sel of [".filters-pagination__notice", ".export-data__text"]) {
-			const el = page.locator(sel).first();
-			if (await el.count() > 0) try {
-				const text = await el.innerText({ timeout: 2e3 });
-				if (text) {
-					const m = text.match(/из\s*([\d\s]+)/) || text.match(/([\d\s]+)/);
-					if (m) {
-						total = m[1].replace(/\s/g, "");
-						break;
-					}
-				}
-			} catch {}
-		}
-		if (!total) {
-			const count = await page.locator("li.filters-results__list-item").count();
-			total = String(count);
-		}
-		data.total_events = total;
-	} catch (e) {
-		console.log("Не удалось получить общее количество событий:", e);
-	}
-	data.history = (await page.evaluate(() => {
-		const result = { history: [] };
-		document.querySelectorAll("li.filters-results__list-item").forEach((item) => {
-			const date = item.querySelector(".history-box__header-title")?.textContent?.trim() || "";
+	const parsed = await page.evaluate(() => {
+		const result = {
+			title: "",
+			description: "",
+			total_events: "",
+			filter_tabs: [],
+			history: []
+		};
+		result.title = document.querySelector(".content-frame__title")?.textContent?.trim() || "";
+		result.description = document.querySelector(".content-frame__description")?.textContent?.replace(/\s+/g, " ").trim() || "";
+		const totalMatch = (document.querySelector(".filter-block__info-text")?.textContent?.trim() || "").match(/из\s*([\d\s]+)/);
+		if (totalMatch) result.total_events = totalMatch[1].replace(/\s/g, "");
+		document.querySelectorAll(".filter-block__item .custom-select__tab").forEach((tab) => {
+			const text = tab.textContent?.trim() || "";
+			const href = tab.href || "";
+			if (text) result.filter_tabs.push({
+				text,
+				href
+			});
+		});
+		document.querySelectorAll(".history-wrapper .history-box").forEach((box) => {
+			const date = box.querySelector(".history-box__header-title")?.textContent?.trim() || "";
+			if (!date) return;
 			const groups = [];
-			item.querySelectorAll(".history-box__item").forEach((groupEl) => {
+			box.querySelectorAll(".history-box__item").forEach((groupEl) => {
 				const title = groupEl.querySelector(".history-box__item-title")?.textContent?.trim() || "";
 				const entries = [];
-				groupEl.querySelectorAll("li").forEach((entryEl) => {
-					let text = entryEl.textContent?.replace(/\s+/g, " ").trim() || "";
+				groupEl.querySelectorAll(".history-box__item-list > li").forEach((li) => {
+					const textEl = li.querySelector(".history-box__item-list-text");
+					if (!textEl) return;
+					let fullText = textEl.textContent?.replace(/\s+/g, " ").trim() || "";
 					const links = [];
-					entryEl.querySelectorAll("a").forEach((link) => {
-						links.push({
-							text: link.textContent?.trim() || "",
-							href: link.href || ""
+					textEl.querySelectorAll("a").forEach((a) => {
+						const linkText = a.textContent?.trim() || "";
+						const href = a.href || "";
+						if (href) links.push({
+							text: linkText,
+							href
 						});
 					});
-					entries.push({
-						text,
+					const icon = li.querySelector("i")?.getAttribute("data-ico") || "";
+					const level = icon === "warning" ? "warning" : icon === "success" ? "success" : icon === "danger" ? "danger" : "info";
+					if (fullText || links.length > 0) entries.push({
+						text: fullText,
+						level,
 						links
 					});
 				});
-				groups.push({
+				if (title || entries.length > 0) groups.push({
 					title,
 					entries
 				});
 			});
-			if (date || groups.length > 0) result.history.push({
+			if (groups.length > 0) result.history.push({
 				date,
 				groups
 			});
 		});
 		return result;
-	})).history;
-	console.log(`Собрано истории (ФЛ): ${data.history.length}, всего: ${data.total_events}`);
+	});
+	data.title = parsed.title;
+	data.description = parsed.description;
+	data.total_events = parsed.total_events;
+	data.filter_tabs = parsed.filter_tabs;
+	data.history = parsed.history;
+	console.log(`Собрано истории (ФЛ): ${data.history.length} дат, всего событий: ${data.total_events}`);
 	return data;
 }
 //#endregion
