@@ -397,6 +397,9 @@ try {
 
     deleteDump: (companyInn: string, companyIdRusprofile: string | null) =>
       ipcRenderer.invoke('osint:delete-dump', companyInn, companyIdRusprofile),
+
+    searchEntities: (query: string, type?: string, limit = 100, offset = 0) =>
+      ipcRenderer.invoke('osint:search-entities', query, type, limit, offset),
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

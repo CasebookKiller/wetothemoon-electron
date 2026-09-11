@@ -826,7 +826,7 @@ export const OSINTPage: React.FC = () => {
                   {/* Кнопка удаления */}
                   <Button
                     icon={isDeleting ? 'pi pi-spin pi-spinner' : 'pi pi-trash'}
-                    className="p-button-sm p-button-text p-button-danger"
+                    className="p-button-sm p-button-text p-button-accent"
                     tooltip="Удалить все дампы этой сущности"
                     tooltipOptions={{ position: 'left' }}
                     onClick={(e) => handleDeleteDump(item, e)}

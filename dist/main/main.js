@@ -10064,6 +10064,30 @@ function deleteDumpsByEntity(companyInn, companyIdRusprofile) {
 		fileErrors
 	};
 }
+/**
+* Поиск сущностей по подстроке в value / label / normalized_value.
+* Опционально можно фильтровать по типу.
+*/
+function searchEntities(query, type, limit = 100, offset = 0) {
+	const db = getDatabase();
+	const normalizedQuery = `%${query.trim().toLowerCase()}%`;
+	const rawQuery = `%${query.trim()}%`;
+	if (type && type !== "all") return db.prepare(`
+      SELECT id, type, value, label, confidence, status, first_seen, last_seen, notes
+      FROM entities
+      WHERE type = ?
+        AND (value LIKE ? OR label LIKE ? OR normalized_value LIKE ?)
+      ORDER BY last_seen DESC
+      LIMIT ? OFFSET ?
+    `).all(type, rawQuery, rawQuery, normalizedQuery, limit, offset);
+	return db.prepare(`
+    SELECT id, type, value, label, confidence, status, first_seen, last_seen, notes
+    FROM entities
+    WHERE value LIKE ? OR label LIKE ? OR normalized_value LIKE ?
+    ORDER BY last_seen DESC
+    LIMIT ? OFFSET ?
+  `).all(rawQuery, rawQuery, normalizedQuery, limit, offset);
+}
 //#endregion
 //#region src/main/services/rawStorage.ts
 function loadRawDumpSync(filePath) {
@@ -10654,6 +10678,19 @@ function registerOsintHandlers() {
 			return {
 				success: true,
 				...deleteDumpsByEntity(companyInn, companyIdRusprofile || null)
+			};
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:search-entities", async (_event, query, type, limit = 100, offset = 0) => {
+		try {
+			return {
+				success: true,
+				items: searchEntities(query, type, limit, offset)
 			};
 		} catch (error) {
 			return {

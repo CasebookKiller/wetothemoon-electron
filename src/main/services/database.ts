@@ -516,3 +516,37 @@ export function deleteDumpsByEntity(
     fileErrors,
   };
 }
+
+/**
+ * Поиск сущностей по подстроке в value / label / normalized_value.
+ * Опционально можно фильтровать по типу.
+ */
+export function searchEntities(
+  query: string,
+  type?: string,
+  limit = 100,
+  offset = 0
+): any[] {
+  const db = getDatabase();
+  const normalizedQuery = `%${query.trim().toLowerCase()}%`;
+  const rawQuery = `%${query.trim()}%`;
+
+  if (type && type !== 'all') {
+    return db.prepare(`
+      SELECT id, type, value, label, confidence, status, first_seen, last_seen, notes
+      FROM entities
+      WHERE type = ?
+        AND (value LIKE ? OR label LIKE ? OR normalized_value LIKE ?)
+      ORDER BY last_seen DESC
+      LIMIT ? OFFSET ?
+    `).all(type, rawQuery, rawQuery, normalizedQuery, limit, offset) as unknown as any[];
+  }
+
+  return db.prepare(`
+    SELECT id, type, value, label, confidence, status, first_seen, last_seen, notes
+    FROM entities
+    WHERE value LIKE ? OR label LIKE ? OR normalized_value LIKE ?
+    ORDER BY last_seen DESC
+    LIMIT ? OFFSET ?
+  `).all(rawQuery, rawQuery, normalizedQuery, limit, offset) as unknown as any[];
+}

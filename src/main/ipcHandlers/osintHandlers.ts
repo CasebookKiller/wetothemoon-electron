@@ -8,7 +8,7 @@ import { scrapeKadArbitr } from '../services/osint/scrapers/kadArbitr';
 import { scrapeMosGorsud } from '../services/osint/scrapers/mosGorsud';
 import { getCredentials, setCredentials } from '../services/osint/credentials';
 import { createDatabaseWindow, getDatabaseWindow } from '../windows/databaseWindow';
-import { deleteDumpsByEntity, findLatestRawDump } from '../services/database';
+import { deleteDumpsByEntity, findLatestRawDump, searchEntities } from '../services/database';
 import { loadRawDumpSync } from '../services/rawStorage';
 import { mergeCompanyDumps, saveCompanyData, updateCompanyData } from '../services/osintStorage';
 import { getDatabase, getDumpSectionsUpdatedAt, hasRawDumpForInn, listDumps } from '../services/database';
@@ -237,4 +237,14 @@ export function registerOsintHandlers() {
       return { success: false, error: (error as Error).message };
     }
   });
+
+  ipcMain.handle('osint:search-entities', async (_event, query: string, type?: string, limit = 100, offset = 0) => {
+    try {
+      const rows = searchEntities(query, type, limit, offset);
+      return { success: true, items: rows };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
 }

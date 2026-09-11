@@ -1,0 +1,24 @@
+/* Стиль кнопок пагинации в акцентном цвете */
+.p-paginator .p-paginator-page,
+.p-paginator .p-paginator-next,
+.p-paginator .p-paginator-prev,
+.p-paginator .p-paginator-first,
+.p-paginator .p-paginator-last {
+  color: var(--accent-color, #ec4899) !important;
+}
+
+.p-paginator .p-paginator-page:hover,
+.p-paginator .p-paginator-next:hover,
+.p-paginator .p-paginator-prev:hover,
+.p-paginator .p-paginator-first:hover,
+.p-paginator .p-paginator-last:hover {
+  background-color: rgba(236, 72, 153, 0.12) !important;
+  color: var(--accent-color, #ec4899) !important;
+}
+
+.p-paginator .p-paginator-page.p-highlight,
+.p-paginator .p-paginator-page.p-paginator-page-selected {
+  background-color: var(--accent-color, #ec4899) !important;
+  border-color: var(--accent-color, #ec4899) !important;
+  color: #fff !important;
+}
