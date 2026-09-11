@@ -172,6 +172,9 @@ export const OSINTPage: React.FC = () => {
   const [needPersonReliability, setNeedPersonReliability] = useState(false);
   const [needPersonHistory, setNeedPersonHistory] = useState(false);
 
+  const [dumpsList, setDumpsList] = useState<any[]>([]);
+  const [dumpsLoading, setDumpsLoading] = useState(false);
+
   const api = (window as any).electronAPI;
 
   const innDigits = inn.replace(/\D/g, '');
@@ -233,6 +236,38 @@ export const OSINTPage: React.FC = () => {
       console.error('Ошибка проверки дампа:', e);
     }
   };
+
+  const loadDumpsList = async () => {
+    setDumpsLoading(true);
+    try {
+      const res = await api.listDumps();
+      if (res.success) setDumpsList(res.items || []);
+    } catch (e) {
+      console.error('Ошибка загрузки списка дампов:', e);
+    } finally {
+      setDumpsLoading(false);
+    }
+  };
+
+  const handleSelectDumpItem = (item: any) => {
+    setInn(item.company_inn);
+    try {
+      localStorage.setItem('osint_last_inn', item.company_inn);
+    } catch {}
+
+    // Автовыбор типа по entity_type
+    if (item.entity_type === 'company') setEntityTypeFilter('company');
+    else if (item.entity_type === 'entrepreneur') setEntityTypeFilter('entrepreneur');
+    else if (item.entity_type === 'person') setEntityTypeFilter('person');
+    else setEntityTypeFilter('auto');
+
+    checkDump(item.company_inn);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    loadDumpsList();
+  }, []);
 
   const handleLaunch = async () => {
     try {
@@ -422,6 +457,7 @@ export const OSINTPage: React.FC = () => {
         );
         // Обновляем информацию о дампе (появятся даты, кнопка заблокируется)
         await checkDump(inn);
+        await loadDumpsList();
         setResult(null); // раскомментируйте, если хотите скрыть JSON после сохранения
       } else {
         setSaveMessage(`Ошибка: ${response.error}`);
@@ -482,6 +518,7 @@ export const OSINTPage: React.FC = () => {
           setResult(response.data);
         }
         await checkDump(inn.trim());
+        await loadDumpsList();
       } else {
         setSupplementMessage(`Ошибка: ${response.error}`);
       }
@@ -671,6 +708,70 @@ export const OSINTPage: React.FC = () => {
             </div>
           </div>
         </div>
+      </Panel>
+
+      <div className="app p-0" />
+
+      <Panel
+        className="shadow-5 mx-1"
+        header={`Сохранённые дампы${dumpsList.length ? ` (${dumpsList.length})` : ''}`}
+        toggleable
+        collapsed
+      >
+        <div className="flex justify-content-between align-items-center mb-2">
+          <small className="text-500">
+            Клик по записи подставит ИНН, выберет тип и обновит информацию о дампе.
+          </small>
+          <Button
+            label="Обновить"
+            icon="pi pi-refresh"
+            className="p-button-sm p-button-text"
+            onClick={loadDumpsList}
+            disabled={dumpsLoading}
+          />
+        </div>
+
+        {dumpsLoading ? (
+          <p>Загрузка...</p>
+        ) : dumpsList.length === 0 ? (
+          <p>Нет сохранённых дампов.</p>
+        ) : (
+          <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
+            {dumpsList.map((item) => {
+              const typeLabel =
+                item.entity_type === 'company' ? 'ЮЛ' :
+                item.entity_type === 'entrepreneur' ? 'ИП' :
+                item.entity_type === 'person' ? 'ФЛ' : '';
+              return (
+                <div
+                  key={`${item.company_inn}-${item.company_id_rusprofile}`}
+                  className="flex align-items-center gap-3 p-2 border-bottom-1 surface-border"
+                  onClick={() => handleSelectDumpItem(item)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <i className="pi pi-database" />
+                  <div className="flex-1">
+                    <div className="font-bold">
+                      {item.entity_name || `ИНН ${item.company_inn}`}
+                      {typeLabel && (
+                        <span className="ml-2 text-xs px-2 py-1 border-round surface-200">
+                          {typeLabel}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-sm text-500">
+                      ИНН: {item.company_inn}
+                      {' • обновлено '}
+                      {new Date(item.last_update).toLocaleString()}
+                      {item.dump_count > 1 && ` • дампов: ${item.dump_count}`}
+                    </div>
+                  </div>
+                  <i className="pi pi-arrow-right" />
+                </div>
+              );
+            })}
+          </div>
+        )}
       </Panel>
 
       <div className="app p-0" />

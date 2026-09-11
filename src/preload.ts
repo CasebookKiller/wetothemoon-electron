@@ -393,6 +393,7 @@ try {
     ) => ipcRenderer.invoke('osint:supplement-company', inn, onlySections, preferredType),
 
     checkDumpExists: (inn: string) => ipcRenderer.invoke('osint:check-dump-exists', inn),
+    listDumps: () => ipcRenderer.invoke('osint:list-dumps'),
     
   });
 

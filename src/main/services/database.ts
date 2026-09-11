@@ -423,3 +423,52 @@ export function hasRawDumpForInn(inn: string): boolean {
   return !!row;
 }
 
+export interface DumpListItem {
+  company_inn: string;
+  company_id_rusprofile: string | null;
+  entity_type: string | null;
+  entity_name: string | null;
+  last_update: string;
+  dump_count: number;
+}
+
+/**
+ * Возвращает список уникальных сущностей, для которых есть дампы.
+ * Группирует по (company_inn, company_id_rusprofile).
+ */
+export function listDumps(): DumpListItem[] {
+  const db = getDatabase();
+  const rows = db.prepare(`
+    SELECT
+      rd.company_inn,
+      rd.company_id_rusprofile,
+      MAX(rd.created_at) AS last_update,
+      COUNT(*) AS dump_count,
+      (
+        SELECT e.type FROM entities e
+        WHERE e.rusprofile_id = rd.company_id_rusprofile
+           OR EXISTS (
+             SELECT 1 FROM observations o
+             WHERE o.entity_id = e.id
+               AND o.attribute = 'inn'
+               AND o.value = rd.company_inn
+           )
+        LIMIT 1
+      ) AS entity_type,
+      (
+        SELECT e.label FROM entities e
+        WHERE e.rusprofile_id = rd.company_id_rusprofile
+           OR EXISTS (
+             SELECT 1 FROM observations o
+             WHERE o.entity_id = e.id
+               AND o.attribute = 'inn'
+               AND o.value = rd.company_inn
+           )
+        LIMIT 1
+      ) AS entity_name
+    FROM raw_dumps rd
+    GROUP BY rd.company_inn, rd.company_id_rusprofile
+    ORDER BY last_update DESC
+  `).all() as DumpListItem[];
+  return rows;
+}

@@ -10001,6 +10001,44 @@ function auditChange(table_name, record_id, action, old_value, new_value, reason
 function hasRawDumpForInn(inn) {
 	return !!getDatabase().prepare("SELECT id FROM raw_dumps WHERE company_inn = ? LIMIT 1").get(inn);
 }
+/**
+* Возвращает список уникальных сущностей, для которых есть дампы.
+* Группирует по (company_inn, company_id_rusprofile).
+*/
+function listDumps() {
+	return getDatabase().prepare(`
+    SELECT
+      rd.company_inn,
+      rd.company_id_rusprofile,
+      MAX(rd.created_at) AS last_update,
+      COUNT(*) AS dump_count,
+      (
+        SELECT e.type FROM entities e
+        WHERE e.rusprofile_id = rd.company_id_rusprofile
+           OR EXISTS (
+             SELECT 1 FROM observations o
+             WHERE o.entity_id = e.id
+               AND o.attribute = 'inn'
+               AND o.value = rd.company_inn
+           )
+        LIMIT 1
+      ) AS entity_type,
+      (
+        SELECT e.label FROM entities e
+        WHERE e.rusprofile_id = rd.company_id_rusprofile
+           OR EXISTS (
+             SELECT 1 FROM observations o
+             WHERE o.entity_id = e.id
+               AND o.attribute = 'inn'
+               AND o.value = rd.company_inn
+           )
+        LIMIT 1
+      ) AS entity_name
+    FROM raw_dumps rd
+    GROUP BY rd.company_inn, rd.company_id_rusprofile
+    ORDER BY last_update DESC
+  `).all();
+}
 //#endregion
 //#region src/main/services/rawStorage.ts
 function loadRawDumpSync(filePath) {
@@ -10569,6 +10607,19 @@ function registerOsintHandlers() {
 		} catch (error) {
 			return {
 				exists: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:list-dumps", async () => {
+		try {
+			return {
+				success: true,
+				items: listDumps()
+			};
+		} catch (error) {
+			return {
+				success: false,
 				error: error.message
 			};
 		}

@@ -8,10 +8,10 @@ import { scrapeKadArbitr } from '../services/osint/scrapers/kadArbitr';
 import { scrapeMosGorsud } from '../services/osint/scrapers/mosGorsud';
 import { getCredentials, setCredentials } from '../services/osint/credentials';
 import { createDatabaseWindow, getDatabaseWindow } from '../windows/databaseWindow';
-import { getDatabase, getDumpSectionsUpdatedAt, hasRawDumpForInn } from '../services/database';
 import { findLatestRawDump } from '../services/database';
 import { loadRawDumpSync } from '../services/rawStorage';
 import { mergeCompanyDumps, saveCompanyData, updateCompanyData } from '../services/osintStorage';
+import { getDatabase, getDumpSectionsUpdatedAt, hasRawDumpForInn, listDumps } from '../services/database';
 
 export function registerOsintHandlers() {
   // Открыть окно OSINT
@@ -220,4 +220,12 @@ export function registerOsintHandlers() {
     }
   });
 
+  ipcMain.handle('osint:list-dumps', async () => {
+    try {
+      const items = listDumps();
+      return { success: true, items };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
 }
