@@ -469,6 +469,6 @@ export function listDumps(): DumpListItem[] {
     FROM raw_dumps rd
     GROUP BY rd.company_inn, rd.company_id_rusprofile
     ORDER BY last_update DESC
-  `).all() as DumpListItem[];
+  `).all() as unknown as DumpListItem[];
   return rows;
 }
