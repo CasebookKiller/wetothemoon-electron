@@ -5033,13 +5033,6 @@ async function collectSummary(page) {
 				founder_count: getTextByXPath("//div[contains(@class,'tab-item') and contains(@class,'active')]//div[contains(@class,'company-info__title') and contains(.,'Учредитель')]/following-sibling::div[contains(@class,'company-info__text')][1]"),
 				ip_status: getTextByXPath("//div[contains(@class,'tab-item') and contains(@class,'active')]//div[contains(@class,'company-info__title') and contains(.,'ИП')]/following-sibling::div[contains(@class,'company-info__text')][1]")
 			};
-			document.querySelectorAll(".list-factors li").forEach((li) => {
-				const text = li.textContent?.trim() || "";
-				const isDanger = !!li.querySelector("i[data-ico=\"danger\"]");
-				const isSuccess = !!li.querySelector("i[data-ico=\"success\"]");
-				if (!text) return;
-				if (isSuccess || isDanger) {}
-			});
 			const riskColumns = [];
 			document.querySelectorAll(".company-row.alt .company-col").forEach((col) => {
 				const title = col.querySelector(".company-info__title")?.textContent?.trim() || "";
@@ -5055,6 +5048,49 @@ async function collectSummary(page) {
 				});
 			});
 			data.risk_factors = riskColumns;
+			data.ip = null;
+			const ipBlock = document.querySelector(".tiles__item[data-name=\"ip\"]");
+			if (ipBlock) {
+				const ipLink = ipBlock.querySelector("a.list-element__title");
+				if (ipLink && ipLink.href) {
+					const infoSpans = ipBlock.querySelectorAll(".list-element__row-info span");
+					let inn = "";
+					let ogrnip = "";
+					let regDate = "";
+					if (infoSpans.length >= 3) {
+						inn = infoSpans[0].textContent?.replace("ИНН:", "").trim() || "";
+						ogrnip = infoSpans[1].textContent?.replace("ОГРНИП:", "").trim() || "";
+						regDate = infoSpans[2].textContent?.replace("Дата регистрации:", "").trim() || "";
+					}
+					const activity = ipBlock.querySelector(".list-element__text")?.textContent?.trim() || "";
+					const address = ipBlock.querySelector(".list-element__address")?.textContent?.trim() || "";
+					data.ip = {
+						name: ipLink.textContent?.trim() || "",
+						url: ipLink.href,
+						inn,
+						ogrnip,
+						registration_date: regDate,
+						activity,
+						address
+					};
+				}
+			}
+			if (!data.ip) {
+				const activityCols = document.querySelectorAll(".tab-item[data-tab_name=\"activity_now\"] .company-col");
+				for (const col of activityCols) if ((col.querySelector(".company-info__title")?.textContent?.trim() || "") === "ИП") {
+					const link = col.querySelector(".company-info__text a");
+					if (link) data.ip = {
+						name: "",
+						url: link.href,
+						inn: data.inn || "",
+						ogrnip: "",
+						registration_date: "",
+						activity: link.textContent?.trim() || "",
+						address: ""
+					};
+					break;
+				}
+			}
 		}
 		return data;
 	});

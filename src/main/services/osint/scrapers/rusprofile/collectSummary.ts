@@ -101,7 +101,6 @@ export async function collectSummary(page: Page): Promise<any> {
       data.ogrn_date = getTextByXPath("//*[@id='clip_ogrn']/ancestor::dl/dd[contains(@class,'padding-top')]");
     } else if (isEntrepreneur) {
       data.ogrnip = getTextByCss('#clip_ogrnip');
-      // Дата ОГРНИП
       const ogrnipDate = getTextByXPath("//*[@id='clip_ogrnip']/ancestor::dl//dd[contains(@class,'company-info__text')][2]");
       data.ogrn_date = ogrnipDate.replace(/от\s*/i, '').trim();
     } else {
@@ -158,9 +157,7 @@ export async function collectSummary(page: Page): Promise<any> {
     if (isCompany) {
       data.main_activity = getTextByXPath("//span[contains(@class,'company-info__title') and contains(.,'Основной вид деятельности')]/following-sibling::span[1]");
     } else if (isEntrepreneur) {
-      // Из плитки ОКВЭД или реквизитов
       data.main_activity = getTextByXPath("//div[contains(@class,'okved-tile')]//div[contains(@class,'tile-item__text-title') and contains(.,'Основной')]/following-sibling::p[1]");
-      // Если не нашли, попробуем из краткой справки
       if (!data.main_activity) {
         const resumeText = getTextByXPath("//div[contains(@class,'resume-tile')]//p[1]");
         const match = resumeText.match(/Основным видом деятельности является «([^»]+)»/);
@@ -175,7 +172,6 @@ export async function collectSummary(page: Page): Promise<any> {
     if (isCompany) {
       data.tax_authority = getTextByXPath("//span[contains(@class,'company-info__title') and contains(.,'Налоговый орган')]/following-sibling::span[1]");
     } else if (isEntrepreneur) {
-      // Из реквизитов: dt "Наименование налогового органа"
       data.tax_authority = getTextByXPath("//div[contains(@class,'requisites-ip')]//dt[contains(.,'Наименование налогового органа')]/following-sibling::dd[1]");
     }
 
@@ -231,6 +227,7 @@ export async function collectSummary(page: Page): Promise<any> {
       data.msp_category = getTextByXPath("//div[contains(@class,'requisites-ip')]//dt[contains(.,'Категория субъекта')]/following-sibling::dd[1]");
     }
 
+    // ============ ФИЗЛИЦО ============
     if (isPerson) {
       data.name = getTextByCss('#clip_fullname') || getTextByCss('h1') || '';
       data.inn = getTextByCss('#req_inn') || '';
@@ -245,19 +242,6 @@ export async function collectSummary(page: Page): Promise<any> {
       };
 
       // Факторы риска
-      const personalFactors: string[] = [];
-      const relatedFactors: string[] = [];
-      document.querySelectorAll('.list-factors li').forEach((li) => {
-        const text = li.textContent?.trim() || '';
-        const isDanger = !!li.querySelector('i[data-ico="danger"]');
-        const isSuccess = !!li.querySelector('i[data-ico="success"]');
-        if (!text) return;
-        if (isSuccess || isDanger) {
-          // Первые два блока — персональные, остальные — связанных
-          // (по HTML: сначала Персональные, потом Риски связанных организаций)
-        }
-      });
-      // Проще: собираем как есть
       const riskColumns: any[] = [];
       document.querySelectorAll('.company-row.alt .company-col').forEach((col) => {
         const title = col.querySelector('.company-info__title')?.textContent?.trim() || '';
@@ -270,6 +254,66 @@ export async function collectSummary(page: Page): Promise<any> {
         if (title) riskColumns.push({ title, factors });
       });
       data.risk_factors = riskColumns;
+
+      // === Признак ИП у физлица ===
+      // 1. Пробуем взять из плитки .tiles__item[data-name="ip"]
+      data.ip = null;
+      const ipBlock = document.querySelector('.tiles__item[data-name="ip"]');
+      if (ipBlock) {
+        const ipLink = ipBlock.querySelector('a.list-element__title') as HTMLAnchorElement | null;
+        if (ipLink && ipLink.href) {
+          const infoSpans = ipBlock.querySelectorAll('.list-element__row-info span');
+          let inn = '';
+          let ogrnip = '';
+          let regDate = '';
+          if (infoSpans.length >= 3) {
+            inn = infoSpans[0].textContent?.replace('ИНН:', '').trim() || '';
+            ogrnip = infoSpans[1].textContent?.replace('ОГРНИП:', '').trim() || '';
+            regDate = infoSpans[2].textContent?.replace('Дата регистрации:', '').trim() || '';
+          }
+
+          const activityEl = ipBlock.querySelector('.list-element__text');
+          const activity = activityEl?.textContent?.trim() || '';
+
+          const addressEl = ipBlock.querySelector('.list-element__address');
+          const address = addressEl?.textContent?.trim() || '';
+
+          data.ip = {
+            name: ipLink.textContent?.trim() || '',
+            url: ipLink.href,
+            inn,
+            ogrnip,
+            registration_date: regDate,
+            activity,
+            address,
+          };
+        }
+      }
+
+      // 2. Если плитки нет — берём ссылку из блока "Деловая активность"
+      if (!data.ip) {
+        const activityCols = document.querySelectorAll(
+          '.tab-item[data-tab_name="activity_now"] .company-col'
+        );
+        for (const col of activityCols) {
+          const title = col.querySelector('.company-info__title')?.textContent?.trim() || '';
+          if (title === 'ИП') {
+            const link = col.querySelector('.company-info__text a') as HTMLAnchorElement | null;
+            if (link) {
+              data.ip = {
+                name: '',
+                url: link.href,
+                inn: data.inn || '',
+                ogrnip: '',
+                registration_date: '',
+                activity: link.textContent?.trim() || '',
+                address: '',
+              };
+            }
+            break;
+          }
+        }
+      }
     }
 
     return data;
