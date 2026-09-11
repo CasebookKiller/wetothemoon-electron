@@ -45,7 +45,10 @@ export function registerOsintHandlers() {
   });
 
   // Здесь позже добавятся scrape-обработчики
-  ipcMain.handle('osint:scrape-rusprofile', async (_event, inn: string, options?: any) => {
+  ipcMain.handle('osint:scrape-rusprofile', async (_event, inn: string, options?: {
+    preferredType?: 'company' | 'entrepreneur' | 'person';
+    [key: string]: any;
+  }) => {
     try {
       const data = await scrapeRusprofile(inn, options);
       return { success: true, data };
@@ -147,7 +150,12 @@ export function registerOsintHandlers() {
     return rows;
   });
 
-  ipcMain.handle('osint:supplement-company', async (_event, inn: string, onlySections: string[], preferredType?: string) => {
+  ipcMain.handle('osint:supplement-company', async (
+    _event,
+    inn: string,
+    onlySections: string[],
+    preferredType?: 'company' | 'entrepreneur' | 'person'
+  ) => {
     try {
       const newData = await scrapeRusprofile(inn, { onlySections, preferredType });
 

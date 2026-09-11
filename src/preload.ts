@@ -386,8 +386,11 @@ try {
     getObservations: (limit = 100, offset = 0) => ipcRenderer.invoke('osint:get-observations', limit, offset),
     getSources: (limit = 100, offset = 0) => ipcRenderer.invoke('osint:get-sources', limit, offset),
     openDatabaseWindow: () => ipcRenderer.invoke('open-database-window'),
-    supplementCompany: (inn: string, onlySections: string[], preferredType?: string) =>
-      ipcRenderer.invoke('osint:supplement-company', inn, onlySections, preferredType),
+    supplementCompany: (
+      inn: string,
+      onlySections: string[],
+      preferredType?: 'company' | 'entrepreneur' | 'person'
+    ) => ipcRenderer.invoke('osint:supplement-company', inn, onlySections, preferredType),
 
     checkDumpExists: (inn: string) => ipcRenderer.invoke('osint:check-dump-exists', inn),
     
