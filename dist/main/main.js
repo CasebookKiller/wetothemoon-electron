@@ -9066,9 +9066,10 @@ async function collectPersonReliabilityDetails(page, slug) {
 	console.log(`Сбор факторов риска для ФЛ ${slug}...`);
 	const url = `https://www.rusprofile.ru/person/${slug}/reliability`;
 	const data = {
+		title: "",
+		description: "",
 		personal: [],
-		related: [],
-		sanctions: []
+		related_companies: []
 	};
 	let response = null;
 	try {
@@ -9085,7 +9086,7 @@ async function collectPersonReliabilityDetails(page, slug) {
 		return data;
 	}
 	try {
-		await page.waitForSelector(".tiles-content, .content-frame, .list-factors", { timeout: 15e3 });
+		await page.waitForSelector(".content-frame__title, .list-factors, .company__list", { timeout: 15e3 });
 	} catch {
 		console.log("Структура страницы /reliability не найдена");
 		return data;
@@ -9093,37 +9094,77 @@ async function collectPersonReliabilityDetails(page, slug) {
 	await page.waitForTimeout(500);
 	const parsed = await page.evaluate(() => {
 		const result = {
+			title: "",
+			description: "",
 			personal: [],
-			related: [],
-			sanctions: []
+			related_companies: []
 		};
-		document.querySelectorAll(".list-factors li").forEach((li) => {
-			const text = li.textContent?.trim() || "";
+		result.title = document.querySelector(".content-frame__title")?.textContent?.trim() || "";
+		result.description = document.querySelector(".content-frame__description")?.textContent?.replace(/\s+/g, " ").trim() || "";
+		const personalList = document.querySelector("ul.list-factors.columns");
+		if (personalList) personalList.querySelectorAll("li").forEach((li) => {
+			const text = li.querySelector("div")?.textContent?.trim() || "";
 			if (!text) return;
 			const icon = li.querySelector("i")?.getAttribute("data-ico") || "";
 			const level = icon === "danger" ? "danger" : icon === "warning" ? "warning" : icon === "success" ? "success" : "info";
-			const sectionTitle = li.closest(".company-col")?.querySelector(".company-info__title")?.textContent?.trim() || "";
-			if (sectionTitle.toLowerCase().includes("персональн")) result.personal.push({
-				text,
-				level
-			});
-			else if (sectionTitle.toLowerCase().includes("связанн")) result.related.push({
-				text,
-				level
-			});
-			else result.personal.push({
+			result.personal.push({
 				text,
 				level
 			});
 		});
-		document.querySelectorAll(".sanctions-block li").forEach((li) => {
-			const text = li.textContent?.trim() || "";
-			if (text) result.sanctions.push(text);
+		const companyList = document.querySelector(".company__list");
+		if (companyList) companyList.querySelectorAll(".company-item").forEach((item) => {
+			const nameEl = item.querySelector(".company-item__title a");
+			const name = nameEl?.textContent?.trim() || "";
+			const href = nameEl?.href || "";
+			const status = item.querySelector(".company-item-status")?.textContent?.trim() || "";
+			const metrics = {};
+			item.querySelectorAll(".company-item-info.row.alt dl").forEach((dl) => {
+				const dt = dl.querySelector("dt")?.textContent?.trim() || "";
+				if (!dt) return;
+				if (dt === "Надёжность") {
+					const badge = dl.querySelector(".badge-status")?.textContent?.trim() || "";
+					if (badge) metrics["Надёжность"] = badge;
+				} else if (dt === "Роль") {
+					const dd = dl.querySelector("dd")?.textContent?.trim() || "";
+					if (dd) metrics["Роль"] = dd;
+				} else {
+					const num = dl.querySelector("dd.num span")?.textContent?.trim() || "";
+					if (num) metrics[dt] = num;
+				}
+			});
+			const factors = [];
+			item.querySelectorAll(".company-item-info.alt .company-info__list li").forEach((li) => {
+				const text = li.querySelector("div")?.textContent?.replace(/\s+/g, " ").trim() || "";
+				if (!text) return;
+				const icon = li.querySelector("i")?.getAttribute("data-ico") || "";
+				const level = icon === "danger" ? "danger" : icon === "warning" ? "warning" : icon === "success" ? "success" : "info";
+				factors.push({
+					text,
+					level
+				});
+			});
+			const allFactsLink = item.querySelector("a.see-details");
+			const allFactsText = allFactsLink?.textContent?.trim() || "";
+			const allFactsHref = allFactsLink?.href || "";
+			if (name || href) result.related_companies.push({
+				name,
+				href,
+				status,
+				metrics,
+				factors,
+				all_facts_text: allFactsText,
+				all_facts_href: allFactsHref
+			});
 		});
 		return result;
 	});
-	console.log(`Собрано факторов риска (ФЛ): персональных ${parsed.personal.length}, связанных ${parsed.related.length}`);
-	return parsed;
+	data.title = parsed.title;
+	data.description = parsed.description;
+	data.personal = parsed.personal;
+	data.related_companies = parsed.related_companies;
+	console.log(`Собрано факторов риска (ФЛ): персональных ${data.personal.length}, связанных организаций ${data.related_companies.length}`);
+	return data;
 }
 //#endregion
 //#region src/main/services/osint/scrapers/rusprofile/details/person/history.ts
