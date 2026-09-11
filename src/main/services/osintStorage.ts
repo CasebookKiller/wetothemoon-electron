@@ -197,6 +197,41 @@ function persistCompanyData(
     }
   }
 
+  // Если в данных ФЛ есть ip_details — сохраняем ИП отдельно
+  if (data.person_ip_details?.summary) {
+    const ipSummary = data.person_ip_details.summary;
+    const ipType = detectEntityTypeFromData(ipSummary); // 'entrepreneur'
+    const ipEntityId = upsertEntity({
+      type: ipType,
+      value: ipSummary.name || ipSummary.ogrnip,
+      label: ipSummary.name,
+      confidence: 90,
+      status: 'confirmed',
+      notes: 'ИП, связанный с физлицом',
+      raw_file_path: rawFilePath,
+    });
+
+    // Наблюдения по ИП (ИНН, ОГРНИП)
+    if (ipSummary.inn) {
+      addObservation({ entity_id: ipEntityId, attribute: 'inn', value: ipSummary.inn, source_id: sourceId, raw_file_path: rawFilePath });
+    }
+    if (ipSummary.ogrnip) {
+      addObservation({ entity_id: ipEntityId, attribute: 'ogrnip', value: ipSummary.ogrnip, source_id: sourceId, raw_file_path: rawFilePath });
+    }
+
+    // Связь ФЛ → ИП
+    addRelation({
+      subject_id: mainEntityId,           // ID физлица
+      predicate: 'individual_entrepreneur_of',
+      object_id: ipEntityId,
+      source_id: sourceId,
+      evidence_text: 'Физлицо является ИП',
+      confidence: 95,
+      status: 'confirmed',
+      raw_file_path: rawFilePath,
+    });
+  }
+
   // Аудит
   auditChange('entities', mainEntityId, 'update', null, JSON.stringify(mainSummary), 'Сохранение/обновление сущности из Rusprofile');
 

@@ -1,61 +1,70 @@
 // src/main/services/osint/scrapers/rusprofile/details/person/ip.ts
 import { Page } from 'playwright';
+import { collectSummary } from '../../collectSummary';
+import { collectConnections } from '../../collectTiles';
+import { collectConnectionsDetails } from '../connections';
+import { collectHistoryDetails } from '../history';
+import { collectFoundersDetails } from '../founders';
+import { collectOkvedDetails } from '../okved';
 
 export async function collectPersonIpDetails(page: Page, slug: string): Promise<any> {
   console.log(`Сбор ИП для ФЛ ${slug}...`);
-  const url = `https://www.rusprofile.ru/person/${slug}`;
 
-  const data: any = { ip: null };
+  // 1. Открываем карточку ФЛ и ищем ссылку на ИП
+  const personUrl = `https://www.rusprofile.ru/person/${slug}`;
+  await page.goto(personUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await page.waitForTimeout(1000);
 
-  let response: any = null;
-  try {
-    response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-  } catch (e) {
-    console.warn('Не удалось открыть карточку ФЛ для сбора ИП:', e);
-    return data;
-  }
-
-  if (!response || response.status() === 404) {
-    console.log(`Страница ФЛ недоступна (HTTP ${response?.status()})`);
-    return data;
-  }
-
-  try {
-    await page.waitForSelector('.tiles', { timeout: 15000 });
-  } catch {
-    console.log('Структура карточки ФЛ не найдена');
-    return data;
-  }
-  await page.waitForTimeout(500);
-
-  const parsed = await page.evaluate(() => {
-    const block = document.querySelector('.tiles__item[data-name="ip"]');
-    if (!block) return { ip: null };
-
-    const nameEl = block.querySelector('a.list-element__title');
-    const name = nameEl?.textContent?.trim() || '';
-    const href = (nameEl as HTMLAnchorElement | null)?.href || '';
-
-    const activity = block.querySelector('.list-element__text')?.textContent?.trim() || '';
-    const address = block.querySelector('.list-element__address')?.textContent?.trim() || '';
-
-    let inn = '';
-    let ogrnip = '';
-    let regDate = '';
-    const infoSpans = block.querySelectorAll('.list-element__row-info span');
-    if (infoSpans.length >= 3) {
-      inn = infoSpans[0].textContent?.replace('ИНН:', '').trim() || '';
-      ogrnip = infoSpans[1].textContent?.replace('ОГРНИП:', '').trim() || '';
-      regDate = infoSpans[2].textContent?.replace('Дата регистрации:', '').trim() || '';
-    }
-
-    if (!name && !inn) return { ip: null };
-
-    return {
-      ip: { name, href, activity, address, inn, ogrnip, registration_date: regDate },
-    };
+  const ipLink = await page.evaluate(() => {
+    const link = document.querySelector('.tiles__item[data-name="ip"] a.list-element__title') as HTMLAnchorElement | null;
+    return link ? link.href : '';
   });
 
-  console.log(`Собрано ИП (ФЛ): ${parsed.ip ? 'да' : 'нет'}`);
-  return parsed;
+  if (!ipLink) {
+    console.log('Ссылка на ИП не найдена');
+    return { ip: null };
+  }
+
+  console.log(`DEBUG person/ip: переход на страницу ИП ${ipLink}`);
+  await page.goto(ipLink, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await page.waitForTimeout(1500);
+
+  const ipIdMatch = ipLink.match(/\/ip\/(\d+)/);
+  const ipId = ipIdMatch ? parseInt(ipIdMatch[1]) : 0;
+
+  // 2. Собираем те же разделы, что и для обычного ИП
+  const data: any = {
+    ip_id: ipId,
+    ip_url: ipLink,
+    summary: await collectSummary(page),
+    connections: await collectConnections(page),
+  };
+
+  // 3. Детальные разделы (по аналогии с обычным ИП)
+  try {
+    data.connections_details = await collectConnectionsDetails(page, ipId);
+  } catch (e) {
+    console.warn('Не удалось собрать детальные связи ИП:', e);
+  }
+
+  try {
+    data.history_details = await collectHistoryDetails(page, ipId, { maxPages: 1, maxTotalCases: 100 });
+  } catch (e) {
+    console.warn('Не удалось собрать историю ИП:', e);
+  }
+
+  try {
+    data.founders_details = await collectFoundersDetails(page, ipId, { maxPages: 1, maxTotalCases: 100 });
+  } catch (e) {
+    console.warn('Не удалось собрать учредителей ИП:', e);
+  }
+
+  try {
+    data.okved_details = await collectOkvedDetails(page, ipId);
+  } catch (e) {
+    console.warn('Не удалось собрать ОКВЭД ИП:', e);
+  }
+
+  console.log(`Собрано ИП (ФЛ): ID ${ipId}, связей: ${data.connections_details?.connections?.length || 0}`);
+  return data;
 }
