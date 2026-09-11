@@ -19,6 +19,20 @@
   border-radius: 4px;
   padding: 4px;
 }
+
 .section-missing {
   opacity: 0.55;
+}
+
+.dumps-panel .p-panel-header-icon.p-panel-toggler,
+.dumps-panel .p-panel-header-icon.p-panel-toggler svg,
+.dumps-panel .p-panel-header-icon.p-panel-toggler .p-icon {
+  color: var(--accent-color, #6ab2f2) !important;
+  background-color: rgba(106, 178, 242, 0.36) !important;
+}
+
+.dumps-panel .p-panel-header-icon.p-panel-toggler:hover,
+.dumps-panel .p-panel-header-icon.p-panel-toggler:focus {
+  color: var(--accent-color, #6ab2f2) !important;
+  background-color: rgba(106, 178, 242, 0.64) !important;
 }

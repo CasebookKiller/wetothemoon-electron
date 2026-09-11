@@ -472,3 +472,47 @@ export function listDumps(): DumpListItem[] {
   `).all() as unknown as DumpListItem[];
   return rows;
 }
+
+/**
+ * Удаляет все дампы (записи и файлы) для конкретной сущности.
+ * Возвращает количество удалённых записей и список удалённых файлов.
+ */
+export function deleteDumpsByEntity(
+  companyInn: string,
+  companyIdRusprofile: string | null
+): { deletedRecords: number; deletedFiles: string[]; fileErrors: string[] } {
+  const db = getDatabase();
+
+  // 1. Собираем пути к файлам, которые нужно удалить
+  const rows = (companyIdRusprofile
+    ? db.prepare(`SELECT id, dump_file_path FROM raw_dumps WHERE company_inn = ? AND company_id_rusprofile = ?`).all(companyInn, companyIdRusprofile)
+    : db.prepare(`SELECT id, dump_file_path FROM raw_dumps WHERE company_inn = ?`).all(companyInn)
+  ) as { id: number; dump_file_path: string }[];
+
+  const deletedFiles: string[] = [];
+  const fileErrors: string[] = [];
+
+  // 2. Удаляем файлы (best-effort)
+  const fs = require('fs') as typeof import('fs');
+  for (const r of rows) {
+    try {
+      if (r.dump_file_path && fs.existsSync(r.dump_file_path)) {
+        fs.unlinkSync(r.dump_file_path);
+        deletedFiles.push(r.dump_file_path);
+      }
+    } catch (e) {
+      fileErrors.push(`${r.dump_file_path}: ${(e as Error).message}`);
+    }
+  }
+
+  // 3. Удаляем записи из БД
+  const result = companyIdRusprofile
+    ? db.prepare(`DELETE FROM raw_dumps WHERE company_inn = ? AND company_id_rusprofile = ?`).run(companyInn, companyIdRusprofile)
+    : db.prepare(`DELETE FROM raw_dumps WHERE company_inn = ?`).run(companyInn);
+
+  return {
+    deletedRecords: Number(result.changes ?? 0),
+    deletedFiles,
+    fileErrors,
+  };
+}

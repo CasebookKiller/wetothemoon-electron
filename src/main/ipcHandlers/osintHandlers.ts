@@ -8,7 +8,7 @@ import { scrapeKadArbitr } from '../services/osint/scrapers/kadArbitr';
 import { scrapeMosGorsud } from '../services/osint/scrapers/mosGorsud';
 import { getCredentials, setCredentials } from '../services/osint/credentials';
 import { createDatabaseWindow, getDatabaseWindow } from '../windows/databaseWindow';
-import { findLatestRawDump } from '../services/database';
+import { deleteDumpsByEntity, findLatestRawDump } from '../services/database';
 import { loadRawDumpSync } from '../services/rawStorage';
 import { mergeCompanyDumps, saveCompanyData, updateCompanyData } from '../services/osintStorage';
 import { getDatabase, getDumpSectionsUpdatedAt, hasRawDumpForInn, listDumps } from '../services/database';
@@ -224,6 +224,15 @@ export function registerOsintHandlers() {
     try {
       const items = listDumps();
       return { success: true, items };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('osint:delete-dump', async (_event, companyInn: string, companyIdRusprofile: string | null) => {
+    try {
+      const result = deleteDumpsByEntity(companyInn, companyIdRusprofile || null);
+      return { success: true, ...result };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }

@@ -175,6 +175,8 @@ export const OSINTPage: React.FC = () => {
   const [dumpsList, setDumpsList] = useState<any[]>([]);
   const [dumpsLoading, setDumpsLoading] = useState(false);
 
+  const [deletingDumpKey, setDeletingDumpKey] = useState<string | null>(null);
+
   const api = (window as any).electronAPI;
 
   const innDigits = inn.replace(/\D/g, '');
@@ -211,6 +213,43 @@ export const OSINTPage: React.FC = () => {
     } else {
       setDumpExists(false);
       setDumpInfo(null);
+    }
+  };
+
+  const handleDeleteDump = async (item: any, event: React.MouseEvent) => {
+    // Чтобы клик по кнопке не срабатывал как выбор строки
+    event.stopPropagation();
+
+    const key = `${item.company_inn}-${item.company_id_rusprofile}`;
+    setDeletingDumpKey(key);
+
+    try {
+      // Простое подтверждение — можно заменить на PrimeReact ConfirmDialog
+      const confirmed = window.confirm(
+        `Удалить все дампы для "${item.entity_name || item.company_inn}"?\n` +
+        `Записи raw_dumps и связанные .msgpack-файлы будут удалены безвозвратно.`
+      );
+      if (!confirmed) return;
+
+      const res = await api.deleteDump(item.company_inn, item.company_id_rusprofile);
+      if (res.success) {
+        console.log(`Удалено записей: ${res.deletedRecords}, файлов: ${res.deletedFiles?.length || 0}`);
+        await loadDumpsList();
+
+        // Если сейчас открыт именно этот дамп — сбросим состояние
+        if (inn === item.company_inn) {
+          setDumpExists(false);
+          setDumpInfo(null);
+          setAvailableSections(new Set());
+          setResult(null);
+        }
+      } else {
+        alert(`Ошибка удаления: ${res.error}`);
+      }
+    } catch (e) {
+      alert(`Ошибка: ${(e as Error).message}`);
+    } finally {
+      setDeletingDumpKey(null);
     }
   };
 
@@ -713,10 +752,23 @@ export const OSINTPage: React.FC = () => {
       <div className="app p-0" />
 
       <Panel
-        className="shadow-5 mx-1"
+        className="shadow-5 mx-1 dumps-panel"
         header={`Сохранённые дампы${dumpsList.length ? ` (${dumpsList.length})` : ''}`}
         toggleable
         collapsed
+        pt={{
+          toggler: {
+            style: {
+              color: 'var(--accent-color, #6ab2f2)',
+              backgroundColor: 'transparent',
+            },
+          },
+          togglerIcon: {
+            style: {
+              color: 'var(--accent-color, #6ab2f2)',
+            },
+          },
+        }}
       >
         <div className="flex justify-content-between align-items-center mb-2">
           <small className="text-500">
@@ -725,7 +777,7 @@ export const OSINTPage: React.FC = () => {
           <Button
             label="Обновить"
             icon="pi pi-refresh"
-            className="p-button-sm p-button-text"
+            className="p-button-lg p-button-raised p-button-accent"
             onClick={loadDumpsList}
             disabled={dumpsLoading}
           />
@@ -742,9 +794,13 @@ export const OSINTPage: React.FC = () => {
                 item.entity_type === 'company' ? 'ЮЛ' :
                 item.entity_type === 'entrepreneur' ? 'ИП' :
                 item.entity_type === 'person' ? 'ФЛ' : '';
+
+              const rowKey = `${item.company_inn}-${item.company_id_rusprofile}`;
+              const isDeleting = deletingDumpKey === rowKey;
+
               return (
                 <div
-                  key={`${item.company_inn}-${item.company_id_rusprofile}`}
+                  key={rowKey}
                   className="flex align-items-center gap-3 p-2 border-bottom-1 surface-border"
                   onClick={() => handleSelectDumpItem(item)}
                   style={{ cursor: 'pointer' }}
@@ -766,6 +822,17 @@ export const OSINTPage: React.FC = () => {
                       {item.dump_count > 1 && ` • дампов: ${item.dump_count}`}
                     </div>
                   </div>
+
+                  {/* Кнопка удаления */}
+                  <Button
+                    icon={isDeleting ? 'pi pi-spin pi-spinner' : 'pi pi-trash'}
+                    className="p-button-sm p-button-text p-button-danger"
+                    tooltip="Удалить все дампы этой сущности"
+                    tooltipOptions={{ position: 'left' }}
+                    onClick={(e) => handleDeleteDump(item, e)}
+                    disabled={isDeleting}
+                  />
+
                   <i className="pi pi-arrow-right" />
                 </div>
               );

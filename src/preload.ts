@@ -394,7 +394,9 @@ try {
 
     checkDumpExists: (inn: string) => ipcRenderer.invoke('osint:check-dump-exists', inn),
     listDumps: () => ipcRenderer.invoke('osint:list-dumps'),
-    
+
+    deleteDump: (companyInn: string, companyIdRusprofile: string | null) =>
+      ipcRenderer.invoke('osint:delete-dump', companyInn, companyIdRusprofile),
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

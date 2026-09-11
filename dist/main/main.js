@@ -10039,6 +10039,31 @@ function listDumps() {
     ORDER BY last_update DESC
   `).all();
 }
+/**
+* Удаляет все дампы (записи и файлы) для конкретной сущности.
+* Возвращает количество удалённых записей и список удалённых файлов.
+*/
+function deleteDumpsByEntity(companyInn, companyIdRusprofile) {
+	const db = getDatabase();
+	const rows = companyIdRusprofile ? db.prepare(`SELECT id, dump_file_path FROM raw_dumps WHERE company_inn = ? AND company_id_rusprofile = ?`).all(companyInn, companyIdRusprofile) : db.prepare(`SELECT id, dump_file_path FROM raw_dumps WHERE company_inn = ?`).all(companyInn);
+	const deletedFiles = [];
+	const fileErrors = [];
+	const fs$9 = require("fs");
+	for (const r of rows) try {
+		if (r.dump_file_path && fs$9.existsSync(r.dump_file_path)) {
+			fs$9.unlinkSync(r.dump_file_path);
+			deletedFiles.push(r.dump_file_path);
+		}
+	} catch (e) {
+		fileErrors.push(`${r.dump_file_path}: ${e.message}`);
+	}
+	const result = companyIdRusprofile ? db.prepare(`DELETE FROM raw_dumps WHERE company_inn = ? AND company_id_rusprofile = ?`).run(companyInn, companyIdRusprofile) : db.prepare(`DELETE FROM raw_dumps WHERE company_inn = ?`).run(companyInn);
+	return {
+		deletedRecords: Number(result.changes ?? 0),
+		deletedFiles,
+		fileErrors
+	};
+}
 //#endregion
 //#region src/main/services/rawStorage.ts
 function loadRawDumpSync(filePath) {
@@ -10616,6 +10641,19 @@ function registerOsintHandlers() {
 			return {
 				success: true,
 				items: listDumps()
+			};
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:delete-dump", async (_event, companyInn, companyIdRusprofile) => {
+		try {
+			return {
+				success: true,
+				...deleteDumpsByEntity(companyInn, companyIdRusprofile || null)
 			};
 		} catch (error) {
 			return {

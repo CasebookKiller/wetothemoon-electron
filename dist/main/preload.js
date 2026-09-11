@@ -279,7 +279,8 @@ try {
 		openDatabaseWindow: () => electron.ipcRenderer.invoke("open-database-window"),
 		supplementCompany: (inn, onlySections, preferredType) => electron.ipcRenderer.invoke("osint:supplement-company", inn, onlySections, preferredType),
 		checkDumpExists: (inn) => electron.ipcRenderer.invoke("osint:check-dump-exists", inn),
-		listDumps: () => electron.ipcRenderer.invoke("osint:list-dumps")
+		listDumps: () => electron.ipcRenderer.invoke("osint:list-dumps"),
+		deleteDump: (companyInn, companyIdRusprofile) => electron.ipcRenderer.invoke("osint:delete-dump", companyInn, companyIdRusprofile)
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {
