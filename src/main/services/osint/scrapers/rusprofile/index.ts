@@ -54,6 +54,15 @@ import { collectRequisitesDetails } from './details/requisites';
 import { collectOkvedDetails } from './details/okved';
 import { collectEgrulDetails } from './details/egrul';
 import { collectConnectionsDetails } from './details/connections';
+
+// === Сборщики для ФЛ ===
+import { collectPersonCeoDetails } from './details/person/ceo';
+import { collectPersonFounderDetails } from './details/person/founder';
+import { collectPersonIpDetails } from './details/person/ip';
+import { collectPersonConnectionsDetails } from './details/person/connections';
+import { collectPersonReliabilityDetails } from './details/person/reliability';
+import { collectPersonHistoryDetails } from './details/person/history';
+
 import { Page } from 'playwright';
 import { getEntityIdByInn } from './search';
 
@@ -63,10 +72,10 @@ export async function scrapeRusprofile(
     arbitrDetails?: boolean;
     maxPages?: number;
     maxTotalCases?: number;
-    filters?: any;        // фильтры арбитража
+    filters?: any;
     connectionsDetails?: boolean;
     souDetails?: boolean;
-    souFilters?: any;     // фильтры судов (включая лимиты)
+    souFilters?: any;
     trademarksDetails?: boolean;
     trademarksFilters?: any;
     leasingDetails?: boolean;
@@ -95,8 +104,16 @@ export async function scrapeRusprofile(
     requisitesDetails?: boolean;
     okvedDetails?: boolean;
     egrulDetails?: boolean;
-    onlySections?: string[];   // список разделов для дозагрузки
+    onlySections?: string[];
     preferredType?: 'company' | 'entrepreneur' | 'person';
+
+    // Разделы ФЛ
+    personCeoDetails?: boolean;
+    personFounderDetails?: boolean;
+    personIpDetails?: boolean;
+    personConnectionsDetails?: boolean;
+    personReliabilityDetails?: boolean;
+    personHistoryDetails?: boolean;
   }
 ): Promise<CompanyFullData | null> {
 
@@ -123,9 +140,10 @@ export async function scrapeRusprofile(
       return data;
     };
 
-    // === НОВОЕ: Автоматически включаем детальные флаги при onlySections ===
+    // === Автовключение флагов по onlySections ===
     if (options?.onlySections && options.onlySections.length > 0) {
       const detailFlagMap: Record<string, string> = {
+        // ЮЛ/ИП
         'arbitration_details': 'arbitrDetails',
         'connections_details': 'connectionsDetails',
         'sou_details': 'souDetails',
@@ -146,6 +164,13 @@ export async function scrapeRusprofile(
         'requisites_details': 'requisitesDetails',
         'okved_details': 'okvedDetails',
         'egrul_details': 'egrulDetails',
+        // ФЛ
+        'person_ceo_details': 'personCeoDetails',
+        'person_founder_details': 'personFounderDetails',
+        'person_ip_details': 'personIpDetails',
+        'person_connections_details': 'personConnectionsDetails',
+        'person_reliability_details': 'personReliabilityDetails',
+        'person_history_details': 'personHistoryDetails',
       };
 
       for (const section of options.onlySections) {
@@ -156,11 +181,10 @@ export async function scrapeRusprofile(
       }
     }
 
-    // Функция проверки, нужно ли собирать раздел
     const shouldCollect = (section: string) =>
       !options?.onlySections || options.onlySections.includes(section);
 
-    // Проверяем, авторизованы ли мы уже
+    // Проверяем, авторизованы ли мы
     const loginTrigger = page.locator('#menu-personal-trigger');
     await loginTrigger.waitFor({ state: 'visible', timeout: 15000 });
     const loginText = await loginTrigger.innerText().catch(() => '');
@@ -183,17 +207,16 @@ export async function scrapeRusprofile(
       console.log('Сессия восстановлена, вход не требуется.');
     }
 
-    // Найти ID компании (всегда нужно)
+    // Определяем ID/тип
     const entityInfo = await getEntityIdByInn(page, inn, options?.preferredType);
     const companyId = entityInfo.id;
     const entityType = entityInfo.type;
 
-    // Формируем правильный URL: id для ЮЛ, ip для ИП, person для ФЛ
     const urlPath = entityType === 'company' ? 'id' : entityType === 'entrepreneur' ? 'ip' : 'person';
     const companyUrl = `https://www.rusprofile.ru/${urlPath}/${companyId}`;
     console.log(`DEBUG index: переход на карточку ${companyUrl}`);
     await page.goto(companyUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    console.log('Перешли на карточку компании, запускаем наблюдатель модальных окон...');
+    console.log('Перешли на карточку, запускаем наблюдатель модальных окон...');
     startModalWatcher(page);
     await page.waitForTimeout(2000);
 
@@ -201,328 +224,378 @@ export async function scrapeRusprofile(
     result.company_id = companyId;
     result.entity_type = entityType;
 
-    // ============ БАЗОВЫЕ РАЗДЕЛЫ (сводка и плитки) ============
-
+    // ============ СВОДКА (для всех типов) ============
     if (shouldCollect('summary')) {
       console.log('Сбор сводки...');
       result.summary = await timed('summary', () => collectSummary(page));
     }
 
-    if (shouldCollect('fssp')) {
-      console.log('Сбор ФССП...');
-      result.fssp = await timed('fssp', () => collectFssp(page));
+    // ============ ПЛИТКИ И ДЕТАЛЬНЫЕ РАЗДЕЛЫ ЮЛ/ИП ============
+    if (entityType !== 'person') {
+
+      if (shouldCollect('fssp')) {
+        console.log('Сбор ФССП...');
+        result.fssp = await timed('fssp', () => collectFssp(page));
+      }
+
+      if (shouldCollect('trademarks')) {
+        console.log('Сбор товарных знаков...');
+        result.trademarks = await timed('trademarks', () => collectTrademarks(page));
+      }
+
+      if (shouldCollect('sou')) {
+        console.log('Сбор судов общей юрисдикции...');
+        result.sou = await timed('sou', () => collectSou(page));
+      }
+
+      if (shouldCollect('arbitration_tile')) {
+        console.log('Сбор арбитражных дел (сводка)...');
+        result.arbitration_tile = await timed('arbitration_tile', () => collectArbitrTile(page));
+      }
+
+      if (shouldCollect('fns_registries')) {
+        console.log('Сбор реестров ФНС...');
+        result.fns_registries = await timed('fns_registries', () => collectReesters(page));
+      }
+
+      if (shouldCollect('connections')) {
+        console.log('Сбор связей...');
+        result.connections = await timed('connections', () => collectConnections(page));
+      }
+
+      if (shouldCollect('facts')) {
+        console.log('Сбор сообщений о сущфактах...');
+        result.facts = await timed('facts', () => collectFacts(page));
+      }
+
+      if (shouldCollect('government_procurement')) {
+        console.log('Сбор госзакупок...');
+        result.government_procurement = await timed('government_procurement', () => collectGz(page));
+      }
+
+      if (shouldCollect('leasing')) {
+        console.log('Сбор лизинга...');
+        result.leasing = await timed('leasing', () => collectLeasing(page));
+      }
+
+      if (shouldCollect('pledges')) {
+        console.log('Сбор залогов...');
+        result.pledges = await timed('pledges', () => collectPledges(page));
+      }
+
+      if (shouldCollect('licenses')) {
+        console.log('Сбор лицензий...');
+        result.licenses = await timed('licenses', () => collectLicenses(page));
+      }
+
+      if (shouldCollect('competitors')) {
+        console.log('Сбор конкурентов...');
+        result.competitors = await timed('competitors', () => collectCompetitors(page));
+      }
+
+      if (shouldCollect('inspections')) {
+        console.log('Сбор проверок...');
+        result.inspections = await timed('inspections', () => collectInspections(page));
+      }
+
+      if (shouldCollect('finance')) {
+        console.log('Сбор финансов...');
+        result.finance = await timed('finance', () => collectFinance(page));
+      }
+
+      if (shouldCollect('risks')) {
+        console.log('Сбор рисков сотрудничества...');
+        result.risks = await timed('risks', () => collectRisks(page));
+      }
+
+      if (shouldCollect('founders')) {
+        console.log('Сбор учредителей...');
+        result.founders = await timed('founders', () => collectFounders(page));
+      }
+
+      if (shouldCollect('taxes')) {
+        console.log('Сбор налогов и сборов...');
+        result.taxes = await timed('taxes', () => collectTaxes(page));
+      }
+
+      if (shouldCollect('reliability')) {
+        console.log('Сбор надёжности...');
+        result.reliability = await timed('reliability', () => collectReliability(page));
+      }
+
+      if (shouldCollect('top_okved')) {
+        console.log('Сбор топа компаний отрасли...');
+        result.top_okved = await timed('top_okved', () => collectTopOkved(page));
+      }
+
+      if (shouldCollect('branches')) {
+        console.log('Сбор филиалов и представительств...');
+        result.branches = await timed('branches', () => collectBranches(page));
+      }
+
+      if (shouldCollect('similar')) {
+        console.log('Сбор похожих организаций...');
+        result.similar = await timed('similar', () => collectSimilar(page));
+      }
+
+      if (shouldCollect('reports')) {
+        console.log('Сбор отчётов и документов...');
+        result.reports = await timed('reports', () => collectReports(page));
+      }
+
+      if (shouldCollect('events')) {
+        console.log('Сбор событий...');
+        result.events = await timed('events', () => collectEvents(page));
+      }
+
+      if (shouldCollect('resume')) {
+        console.log('Сбор краткой справки...');
+        result.resume = await timed('resume', () => collectResume(page));
+      }
+
+      // ---------- Детальные ЮЛ/ИП ----------
+
+      if (options?.arbitrDetails && shouldCollect('arbitration_details')) {
+        console.log('Сбор детального арбитража...');
+        result.arbitration_details = await timed('arbitration_details', () =>
+          collectArbitrDetails(page, companyId as number, {
+            maxPages: options.maxPages,
+            maxTotalCases: options.maxTotalCases,
+            filters: options.filters,
+          })
+        );
+      }
+
+      if (options?.connectionsDetails && shouldCollect('connections_details')) {
+        console.log('Сбор детальных связей...');
+        result.connections_details = await timed('connections_details', () =>
+          collectConnectionsDetails(page, companyId as number)
+        );
+      }
+
+      if (options?.souDetails && shouldCollect('sou_details')) {
+        console.log('Сбор детальных судов общей юрисдикции...');
+        result.sou_details = await timed('sou_details', () =>
+          collectSouDetails(page, companyId as number, {
+            maxPages: options.souFilters?.maxPages || 1,
+            maxTotalCases: options.souFilters?.maxTotalCases || 100,
+            filters: options.souFilters,
+          })
+        );
+      }
+
+      if (options?.trademarksDetails && shouldCollect('trademarks_details')) {
+        console.log('Сбор детальных товарных знаков...');
+        result.trademarks_details = await timed('trademarks_details', () =>
+          collectTrademarksDetails(page, companyId as number, {
+            maxPages: options.trademarksFilters?.maxPages || 1,
+            maxTotalCases: options.trademarksFilters?.maxTotalCases || 100,
+            filters: options.trademarksFilters,
+          })
+        );
+      }
+
+      if (options?.leasingDetails && shouldCollect('leasing_details')) {
+        console.log('Сбор детального лизинга...');
+        result.leasing_details = await timed('leasing_details', () =>
+          collectLeasingDetails(page, companyId as number, {
+            maxPages: options.leasingFilters?.maxPages || 1,
+            maxTotalCases: options.leasingFilters?.maxTotalCases || 100,
+            filters: options.leasingFilters,
+          })
+        );
+      }
+
+      if (options?.pledgesDetails && shouldCollect('pledges_details')) {
+        console.log('Сбор детальных залогов...');
+        result.pledges_details = await timed('pledges_details', () =>
+          collectPledgesDetails(page, companyId as number, {
+            maxPages: options.pledgesFilters?.maxPages || 1,
+            maxTotalCases: options.pledgesFilters?.maxTotalCases || 100,
+            filters: options.pledgesFilters,
+          })
+        );
+      }
+
+      if (options?.factsDetails && shouldCollect('facts_details')) {
+        console.log('Сбор детальных существенных фактов...');
+        result.facts_details = await timed('facts_details', () =>
+          collectFactsDetails(page, companyId as number, {
+            maxPages: options.factsFilters?.maxPages || 1,
+            maxTotalCases: options.factsFilters?.maxTotalCases || 100,
+            filters: options.factsFilters,
+          })
+        );
+      }
+
+      if (options?.bankruptcyDetails && shouldCollect('bankruptcy_details')) {
+        console.log('Сбор детального банкротства...');
+        result.bankruptcy_details = await timed('bankruptcy_details', () =>
+          collectBankruptcyDetails(page, companyId as number, {
+            maxPages: options.bankruptcyFilters?.maxPages || 1,
+            maxTotalCases: options.bankruptcyFilters?.maxTotalCases || 100,
+            search: options.bankruptcyFilters?.search,
+          })
+        );
+      }
+
+      if (options?.foundersDetails && shouldCollect('founders_details')) {
+        console.log('Сбор детальных учредителей...');
+        result.founders_details = await timed('founders_details', () =>
+          collectFoundersDetails(page, companyId as number, {
+            maxPages: options.foundersFilters?.maxPages || 1,
+            maxTotalCases: options.foundersFilters?.maxTotalCases || 100,
+            filters: options.foundersFilters,
+          })
+        );
+      }
+
+      if (options?.reliabilityDetails && shouldCollect('reliability_details')) {
+        console.log('Сбор детальной надёжности...');
+        result.reliability_details = await timed('reliability_details', () =>
+          collectReliabilityDetails(page, companyId as number)
+        );
+      }
+
+      if (options?.sanctionsDetails && shouldCollect('sanctions_details')) {
+        console.log('Сбор детальных санкций...');
+        result.sanctions_details = await timed('sanctions_details', () =>
+          collectSanctionsDetails(page, companyId as number)
+        );
+      }
+
+      if (options?.gzDetails && shouldCollect('gz_details')) {
+        console.log('Сбор детальных госзакупок...');
+        result.gz_details = await timed('gz_details', () =>
+          collectGzDetails(page, companyId as number, {
+            maxPages: options.gzFilters?.maxPages || 1,
+            maxTotalCases: options.gzFilters?.maxTotalCases || 100,
+            filters: options.gzFilters,
+          })
+        );
+      }
+
+      if (options?.fsspDetails && shouldCollect('fssp_details')) {
+        console.log('Сбор детальных исполнительных производств...');
+        result.fssp_details = await timed('fssp_details', () =>
+          collectFsspDetails(page, companyId as number, {
+            maxPages: options.fsspFilters?.maxPages || 1,
+            maxTotalCases: options.fsspFilters?.maxTotalCases || 100,
+            filters: options.fsspFilters,
+          })
+        );
+      }
+
+      if (options?.inspectionsDetails && shouldCollect('inspections_details')) {
+        console.log('Сбор детальных проверок...');
+        result.inspections_details = await timed('inspections_details', () =>
+          collectInspectionsDetails(page, companyId as number, {
+            maxPages: options.inspectionsFilters?.maxPages || 1,
+            maxTotalCases: options.inspectionsFilters?.maxTotalCases || 100,
+            filters: options.inspectionsFilters,
+          })
+        );
+      }
+
+      if (options?.licensesDetails && shouldCollect('licenses_details')) {
+        console.log('Сбор детальных лицензий...');
+        result.licenses_details = await timed('licenses_details', () =>
+          collectLicensesDetails(page, companyId as number, {
+            maxPages: options.licensesFilters?.maxPages || 1,
+            maxTotalCases: options.licensesFilters?.maxTotalCases || 100,
+            filters: options.licensesFilters,
+          })
+        );
+      }
+
+      if (options?.branchesDetails && shouldCollect('branches_details')) {
+        console.log('Сбор детальных филиалов и представительств...');
+        result.branches_details = await timed('branches_details', () =>
+          collectBranchesDetails(page, companyId as number)
+        );
+      }
+
+      if (options?.historyDetails && shouldCollect('history_details')) {
+        console.log('Сбор детальной истории...');
+        result.history_details = await timed('history_details', () =>
+          collectHistoryDetails(page, companyId as number, {
+            maxPages: options.historyFilters?.maxPages || 1,
+            maxTotalCases: options.historyFilters?.maxTotalCases || 100,
+            filters: options.historyFilters,
+          })
+        );
+      }
+
+      if (options?.requisitesDetails && shouldCollect('requisites_details')) {
+        console.log('Сбор детальных реквизитов...');
+        result.requisites_details = await timed('requisites_details', () =>
+          collectRequisitesDetails(page, companyId as number)
+        );
+      }
+
+      if (options?.okvedDetails && shouldCollect('okved_details')) {
+        console.log('Сбор детальных видов деятельности...');
+        result.okved_details = await timed('okved_details', () =>
+          collectOkvedDetails(page, companyId as number)
+        );
+      }
+
+      if (options?.egrulDetails && shouldCollect('egrul_details')) {
+        console.log('Сбор выписки из ЕГРЮЛ/ЕГРИП...');
+        result.egrul_details = await timed('egrul_details', () =>
+          collectEgrulDetails(page, companyId as number, {
+            entityType,
+            ogrn: result.summary?.ogrnip || result.summary?.ogrn || '',
+          })
+        );
+      }
     }
 
-    if (shouldCollect('trademarks')) {
-      console.log('Сбор товарных знаков...');
-      result.trademarks = await timed('trademarks', () => collectTrademarks(page));
-    }
+    // ============ ДЕТАЛЬНЫЕ РАЗДЕЛЫ ФЛ ============
+    if (entityType === 'person') {
+      const slug = String(companyId);
 
-    if (shouldCollect('sou')) {
-      console.log('Сбор судов общей юрисдикции...');
-      result.sou = await timed('sou', () => collectSou(page));
-    }
+      if (options?.personCeoDetails && shouldCollect('person_ceo_details')) {
+        console.log('Сбор руководителя (ФЛ)...');
+        result.person_ceo_details = await timed('person_ceo_details', () =>
+          collectPersonCeoDetails(page, slug)
+        );
+      }
 
-    if (shouldCollect('arbitration_tile')) {
-      console.log('Сбор арбитражных дел (сводка)...');
-      result.arbitration_tile = await timed('arbitration_tile', () => collectArbitrTile(page));
-    }
+      if (options?.personFounderDetails && shouldCollect('person_founder_details')) {
+        console.log('Сбор учредителя (ФЛ)...');
+        result.person_founder_details = await timed('person_founder_details', () =>
+          collectPersonFounderDetails(page, slug)
+        );
+      }
 
-    if (shouldCollect('fns_registries')) {
-      console.log('Сбор реестров ФНС...');
-      result.fns_registries = await timed('fns_registries', () => collectReesters(page));
-    }
+      if (options?.personIpDetails && shouldCollect('person_ip_details')) {
+        console.log('Сбор ИП (ФЛ)...');
+        result.person_ip_details = await timed('person_ip_details', () =>
+          collectPersonIpDetails(page, slug)
+        );
+      }
 
-    if (shouldCollect('connections')) {
-      console.log('Сбор связей...');
-      result.connections = await timed('connections', () => collectConnections(page));
-    }
+      if (options?.personConnectionsDetails && shouldCollect('person_connections_details')) {
+        console.log('Сбор связей (ФЛ)...');
+        result.person_connections_details = await timed('person_connections_details', () =>
+          collectPersonConnectionsDetails(page, slug)
+        );
+      }
 
-    if (shouldCollect('facts')) {
-      console.log('Сбор сообщений о сущфактах...');
-      result.facts = await timed('facts', () => collectFacts(page));
-    }
+      if (options?.personReliabilityDetails && shouldCollect('person_reliability_details')) {
+        console.log('Сбор факторов риска (ФЛ)...');
+        result.person_reliability_details = await timed('person_reliability_details', () =>
+          collectPersonReliabilityDetails(page, slug)
+        );
+      }
 
-    if (shouldCollect('government_procurement')) {
-      console.log('Сбор госзакупок...');
-      result.government_procurement = await timed('government_procurement', () => collectGz(page));
-    }
-
-    if (shouldCollect('leasing')) {
-      console.log('Сбор лизинга...');
-      result.leasing = await timed('leasing', () => collectLeasing(page));
-    }
-
-    if (shouldCollect('pledges')) {
-      console.log('Сбор залогов...');
-      result.pledges = await timed('pledges', () => collectPledges(page));
-    }
-
-    if (shouldCollect('licenses')) {
-      console.log('Сбор лицензий...');
-      result.licenses = await timed('licenses', () => collectLicenses(page));
-    }
-
-    if (shouldCollect('competitors')) {
-      console.log('Сбор конкурентов...');
-      result.competitors = await timed('competitors', () => collectCompetitors(page));
-    }
-
-    if (shouldCollect('inspections')) {
-      console.log('Сбор проверок...');
-      result.inspections = await timed('inspections', () => collectInspections(page));
-    }
-
-    if (shouldCollect('finance')) {
-      console.log('Сбор финансов...');
-      result.finance = await timed('finance', () => collectFinance(page));
-    }
-
-    if (shouldCollect('risks')) {
-      console.log('Сбор рисков сотрудничества...');
-      result.risks = await timed('risks', () => collectRisks(page));
-    }
-
-    if (shouldCollect('founders')) {
-      console.log('Сбор учредителей...');
-      result.founders = await timed('founders', () => collectFounders(page));
-    }
-
-    if (shouldCollect('taxes')) {
-      console.log('Сбор налогов и сборов...');
-      result.taxes = await timed('taxes', () => collectTaxes(page));
-    }
-
-    if (shouldCollect('reliability')) {
-      console.log('Сбор надёжности...');
-      result.reliability = await timed('reliability', () => collectReliability(page));
-    }
-
-    if (shouldCollect('top_okved')) {
-      console.log('Сбор топа компаний отрасли...');
-      result.top_okved = await timed('top_okved', () => collectTopOkved(page));
-    }
-
-    if (shouldCollect('branches')) {
-      console.log('Сбор филиалов и представительств...');
-      result.branches = await timed('branches', () => collectBranches(page));
-    }
-
-    if (shouldCollect('similar')) {
-      console.log('Сбор похожих организаций...');
-      result.similar = await timed('similar', () => collectSimilar(page));
-    }
-
-    if (shouldCollect('reports')) {
-      console.log('Сбор отчётов и документов...');
-      result.reports = await timed('reports', () => collectReports(page));
-    }
-
-    if (shouldCollect('events')) {
-      console.log('Сбор событий...');
-      result.events = await timed('events', () => collectEvents(page));
-    }
-
-    if (shouldCollect('resume')) {
-      console.log('Сбор краткой справки...');
-      result.resume = await timed('resume', () => collectResume(page));
-    }
-
-    // ============ ДЕТАЛЬНЫЕ РАЗДЕЛЫ ============
-
-    if (options?.arbitrDetails && shouldCollect('arbitration_details')) {
-      console.log('Сбор детального арбитража...');
-      result.arbitration_details = await timed('arbitration_details', () =>
-        collectArbitrDetails(page, companyId, {
-          maxPages: options.maxPages,
-          maxTotalCases: options.maxTotalCases,
-          filters: options.filters,
-        })
-      );
-    }
-
-    if (options?.connectionsDetails && shouldCollect('connections_details')) {
-      console.log('Сбор детальных связей...');
-      result.connections_details = await timed('connections_details', () =>
-        collectConnectionsDetails(page, companyId)
-      );
-    }
-
-    if (options?.souDetails && shouldCollect('sou_details')) {
-      console.log('Сбор детальных судов общей юрисдикции...');
-      result.sou_details = await timed('sou_details', () =>
-        collectSouDetails(page, companyId, {
-          maxPages: options.souFilters?.maxPages || 1,
-          maxTotalCases: options.souFilters?.maxTotalCases || 100,
-          filters: options.souFilters,
-        })
-      );
-    }
-
-    if (options?.trademarksDetails && shouldCollect('trademarks_details')) {
-      console.log('Сбор детальных товарных знаков...');
-      result.trademarks_details = await timed('trademarks_details', () =>
-        collectTrademarksDetails(page, companyId, {
-          maxPages: options.trademarksFilters?.maxPages || 1,
-          maxTotalCases: options.trademarksFilters?.maxTotalCases || 100,
-          filters: options.trademarksFilters,
-        })
-      );
-    }
-
-    if (options?.leasingDetails && shouldCollect('leasing_details')) {
-      console.log('Сбор детального лизинга...');
-      result.leasing_details = await timed('leasing_details', () =>
-        collectLeasingDetails(page, companyId, {
-          maxPages: options.leasingFilters?.maxPages || 1,
-          maxTotalCases: options.leasingFilters?.maxTotalCases || 100,
-          filters: options.leasingFilters,
-        })
-      );
-    }
-
-    if (options?.pledgesDetails && shouldCollect('pledges_details')) {
-      console.log('Сбор детальных залогов...');
-      result.pledges_details = await timed('pledges_details', () =>
-        collectPledgesDetails(page, companyId, {
-          maxPages: options.pledgesFilters?.maxPages || 1,
-          maxTotalCases: options.pledgesFilters?.maxTotalCases || 100,
-          filters: options.pledgesFilters,
-        })
-      );
-    }
-
-    if (options?.factsDetails && shouldCollect('facts_details')) {
-      console.log('Сбор детальных существенных фактов...');
-      result.facts_details = await timed('facts_details', () =>
-        collectFactsDetails(page, companyId, {
-          maxPages: options.factsFilters?.maxPages || 1,
-          maxTotalCases: options.factsFilters?.maxTotalCases || 100,
-          filters: options.factsFilters,
-        })
-      );
-    }
-
-    if (options?.bankruptcyDetails && shouldCollect('bankruptcy_details')) {
-      console.log('Сбор детального банкротства...');
-      result.bankruptcy_details = await timed('bankruptcy_details', () =>
-        collectBankruptcyDetails(page, companyId, {
-          maxPages: options.bankruptcyFilters?.maxPages || 1,
-          maxTotalCases: options.bankruptcyFilters?.maxTotalCases || 100,
-          search: options.bankruptcyFilters?.search,
-        })
-      );
-    }
-
-    if (options?.foundersDetails && shouldCollect('founders_details')) {
-      console.log('Сбор детальных учредителей...');
-      result.founders_details = await timed('founders_details', () =>
-        collectFoundersDetails(page, companyId, {
-          maxPages: options.foundersFilters?.maxPages || 1,
-          maxTotalCases: options.foundersFilters?.maxTotalCases || 100,
-          filters: options.foundersFilters,
-        })
-      );
-    }
-
-    if (options?.reliabilityDetails && shouldCollect('reliability_details')) {
-      console.log('Сбор детальной надёжности...');
-      result.reliability_details = await timed('reliability_details', () =>
-        collectReliabilityDetails(page, companyId)
-      );
-    }
-
-    if (options?.sanctionsDetails && shouldCollect('sanctions_details')) {
-      console.log('Сбор детальных санкций...');
-      result.sanctions_details = await timed('sanctions_details', () =>
-        collectSanctionsDetails(page, companyId)
-      );
-    }
-
-    if (options?.gzDetails && shouldCollect('gz_details')) {
-      console.log('Сбор детальных госзакупок...');
-      result.gz_details = await timed('gz_details', () =>
-        collectGzDetails(page, companyId, {
-          maxPages: options.gzFilters?.maxPages || 1,
-          maxTotalCases: options.gzFilters?.maxTotalCases || 100,
-          filters: options.gzFilters,
-        })
-      );
-    }
-
-    if (options?.fsspDetails && shouldCollect('fssp_details')) {
-      console.log('Сбор детальных исполнительных производств...');
-      result.fssp_details = await timed('fssp_details', () =>
-        collectFsspDetails(page, companyId, {
-          maxPages: options.fsspFilters?.maxPages || 1,
-          maxTotalCases: options.fsspFilters?.maxTotalCases || 100,
-          filters: options.fsspFilters,
-        })
-      );
-    }
-
-    if (options?.inspectionsDetails && shouldCollect('inspections_details')) {
-      console.log('Сбор детальных проверок...');
-      result.inspections_details = await timed('inspections_details', () =>
-        collectInspectionsDetails(page, companyId, {
-          maxPages: options.inspectionsFilters?.maxPages || 1,
-          maxTotalCases: options.inspectionsFilters?.maxTotalCases || 100,
-          filters: options.inspectionsFilters,
-        })
-      );
-    }
-
-    if (options?.licensesDetails && shouldCollect('licenses_details')) {
-      console.log('Сбор детальных лицензий...');
-      result.licenses_details = await timed('licenses_details', () =>
-        collectLicensesDetails(page, companyId, {
-          maxPages: options.licensesFilters?.maxPages || 1,
-          maxTotalCases: options.licensesFilters?.maxTotalCases || 100,
-          filters: options.licensesFilters,
-        })
-      );
-    }
-
-    if (options?.branchesDetails && shouldCollect('branches_details')) {
-      console.log('Сбор детальных филиалов и представительств...');
-      result.branches_details = await timed('branches_details', () =>
-        collectBranchesDetails(page, companyId)
-      );
-    }
-
-    if (options?.historyDetails && shouldCollect('history_details')) {
-      console.log('Сбор детальной истории...');
-      result.history_details = await timed('history_details', () =>
-        collectHistoryDetails(page, companyId, {
-          maxPages: options.historyFilters?.maxPages || 1,
-          maxTotalCases: options.historyFilters?.maxTotalCases || 100,
-          filters: options.historyFilters,
-        })
-      );
-    }
-
-    if (options?.requisitesDetails && shouldCollect('requisites_details')) {
-      console.log('Сбор детальных реквизитов...');
-      result.requisites_details = await timed('requisites_details', () =>
-        collectRequisitesDetails(page, companyId)
-      );
-    }
-
-    if (options?.okvedDetails && shouldCollect('okved_details')) {
-      console.log('Сбор детальных видов деятельности...');
-      result.okved_details = await timed('okved_details', () =>
-        collectOkvedDetails(page, companyId)
-      );
-    }
-
-    if (options?.egrulDetails && shouldCollect('egrul_details')) {
-      console.log('Сбор выписки из ЕГРЮЛ/ЕГРИП...');
-      result.egrul_details = await timed('egrul_details', () =>
-        collectEgrulDetails(page, companyId, {
-          entityType,
-          ogrn: result.summary?.ogrnip || result.summary?.ogrn || '',
-        })
-      );
+      if (options?.personHistoryDetails && shouldCollect('person_history_details')) {
+        console.log('Сбор истории (ФЛ)...');
+        result.person_history_details = await timed('person_history_details', () =>
+          collectPersonHistoryDetails(page, slug)
+        );
+      }
     }
 
     result.startedAt = new Date(startTime).toISOString();

@@ -166,6 +166,13 @@ export const OSINTPage: React.FC = () => {
 
   const [availableSections, setAvailableSections] = useState<Set<string>>(new Set());
 
+  const [needPersonCeo, setNeedPersonCeo] = useState(false);
+  const [needPersonFounder, setNeedPersonFounder] = useState(false);
+  const [needPersonIp, setNeedPersonIp] = useState(false);
+  const [needPersonConnections, setNeedPersonConnections] = useState(false);
+  const [needPersonReliability, setNeedPersonReliability] = useState(false);
+  const [needPersonHistory, setNeedPersonHistory] = useState(false);
+
   const api = (window as any).electronAPI;
 
   const innDigits = inn.replace(/\D/g, '');
@@ -367,6 +374,12 @@ export const OSINTPage: React.FC = () => {
         egrulDetails: needEgrulDetails,
         preferredType: entityTypeFilter === 'auto' ? undefined : entityTypeFilter,
 
+        personCeoDetails: needPersonCeo,
+        personFounderDetails: needPersonFounder,
+        personIpDetails: needPersonIp,
+        personConnectionsDetails: needPersonConnections,
+        personReliabilityDetails: needPersonReliability,
+        personHistoryDetails: needPersonHistory,
       };
 
       if (needArbitrDetails) {
@@ -447,6 +460,13 @@ export const OSINTPage: React.FC = () => {
     if (needRequisitesDetails) sectionsToUpdate.push('requisites_details');
     if (needOkvedDetails) sectionsToUpdate.push('okved_details');
     if (needEgrulDetails) sectionsToUpdate.push('egrul_details');
+
+    if (needPersonCeo) sectionsToUpdate.push('person_ceo_details');
+    if (needPersonFounder) sectionsToUpdate.push('person_founder_details');
+    if (needPersonIp) sectionsToUpdate.push('person_ip_details');
+    if (needPersonConnections) sectionsToUpdate.push('person_connections_details');
+    if (needPersonReliability) sectionsToUpdate.push('person_reliability_details');
+    if (needPersonHistory) sectionsToUpdate.push('person_history_details');
 
     // Сводка всегда обновляется
     sectionsToUpdate.push('summary');
@@ -605,6 +625,15 @@ export const OSINTPage: React.FC = () => {
     { key: 'needEgrulDetails', label: '', section: 'egrul_details' },
   ];
 
+  const personSectionOptions = [
+    { key: 'needPersonCeo',         label: 'Руководитель',         section: 'person_ceo_details' },
+    { key: 'needPersonFounder',     label: 'Учредитель',           section: 'person_founder_details' },
+    { key: 'needPersonIp',          label: 'Предприниматель (ИП)', section: 'person_ip_details' },
+    { key: 'needPersonConnections', label: 'Связи',                section: 'person_connections_details' },
+    { key: 'needPersonReliability', label: 'Факторы риска',        section: 'person_reliability_details' },
+    { key: 'needPersonHistory',     label: 'История',              section: 'person_history_details' },
+  ];
+
   const formatDate = (iso?: string) => {
     if (!iso) return '—';
     return new Date(iso).toLocaleString();
@@ -732,6 +761,58 @@ export const OSINTPage: React.FC = () => {
               </label>
             </div>
 
+            {/* Чекбоксы ФЛ */}
+            {entityTypeFilter === 'person' && (
+              <div className="grid mt-2">
+                {personSectionOptions.map(({ key, label, section }) => {
+                  const checked =
+                    key === 'needPersonCeo' ? needPersonCeo :
+                    key === 'needPersonFounder' ? needPersonFounder :
+                    key === 'needPersonIp' ? needPersonIp :
+                    key === 'needPersonConnections' ? needPersonConnections :
+                    key === 'needPersonReliability' ? needPersonReliability :
+                    key === 'needPersonHistory' ? needPersonHistory : false;
+
+                  const onChange = (e: any) => {
+                    const val = e.checked;
+                    switch (key) {
+                      case 'needPersonCeo': setNeedPersonCeo(val); break;
+                      case 'needPersonFounder': setNeedPersonFounder(val); break;
+                      case 'needPersonIp': setNeedPersonIp(val); break;
+                      case 'needPersonConnections': setNeedPersonConnections(val); break;
+                      case 'needPersonReliability': setNeedPersonReliability(val); break;
+                      case 'needPersonHistory': setNeedPersonHistory(val); break;
+                    }
+                  };
+
+                  const isAvailable = availableSections.has(section);
+                  const containerClass = `col-12 md:col-6 lg:col-4 xl:col-3 ${
+                    dumpExists ? (isAvailable ? 'section-available' : 'section-missing') : ''
+                  }`;
+
+                  return (
+                    <div className={containerClass} key={key}>
+                      <div className="flex align-items-start">
+                        <Checkbox inputId={key} checked={checked} onChange={onChange} />
+                        <label htmlFor={key} className="ml-2">{label}</label>
+                      </div>
+                      {dumpExists && dumpInfo?.sectionUpdatedAt?.[section] ? (
+                        <div className="text-xs mt-1" style={{ fontSize: '0.75rem', color: 'gray', marginLeft: '1.75rem' }}>
+                          {formatDate(dumpInfo.sectionUpdatedAt[section])}
+                        </div>
+                      ) : (
+                        <div className="text-xs mt-1" style={{ fontSize: '0.75rem', color: 'gray', marginLeft: '1.75rem' }}>
+                          Нет данных
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Чекбоксы ЮЛ/ИП */}
+            {entityTypeFilter !== 'person' && (
             <div className="grid mt-2">
               {sectionOptions.map(({ key, label, section }) => {
                 const checked = 
@@ -816,6 +897,7 @@ export const OSINTPage: React.FC = () => {
                 );
               })}
             </div>
+            )}
           </div>
         </div>
 

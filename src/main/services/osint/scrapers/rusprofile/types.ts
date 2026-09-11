@@ -95,4 +95,11 @@ export interface CompanyFullData {
 
   company_id?: number | string;
   entity_type?: string;
+
+  person_ceo_details?: any;
+  person_founder_details?: any;
+  person_ip_details?: any;
+  person_connections_details?: any;
+  person_reliability_details?: any;
+  person_history_details?: any;
 }
