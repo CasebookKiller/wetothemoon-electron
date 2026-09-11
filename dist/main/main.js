@@ -8615,6 +8615,7 @@ async function collectConnectionsDetails(page, companyId) {
 //#endregion
 //#region src/main/services/osint/scrapers/rusprofile/search.ts
 async function getEntityIdByInn(page, inn, preferredType) {
+	console.log(`DEBUG search: ищем ИНН ${inn}, preferredType=${preferredType}`);
 	await page.goto("https://www.rusprofile.ru/", {
 		waitUntil: "domcontentloaded",
 		timeout: 6e4
@@ -8639,20 +8640,19 @@ async function getEntityIdByInn(page, inn, preferredType) {
 		entrepreneur: "ИП",
 		person: "Физлица"
 	};
-	let desiredTab = "";
-	if (preferredType && tabLabelMap[preferredType]) desiredTab = tabLabelMap[preferredType];
-	else desiredTab = "ИП";
+	const desiredTab = preferredType && tabLabelMap[preferredType] ? tabLabelMap[preferredType] : "ИП";
+	console.log(`DEBUG search: кликаем вкладку "${desiredTab}"`);
 	const tab = page.locator(`.head-drop-results__tab:has-text("${desiredTab}")`).first();
 	if (await tab.count() === 0) {
-		const fallbackTabs = [
+		const fallback = [
 			"ИП",
 			"Физлица",
 			"Юрлица"
 		].filter((t) => t !== desiredTab);
-		for (const label of fallbackTabs) {
-			const fallbackTab = page.locator(`.head-drop-results__tab:has-text("${label}")`).first();
-			if (await fallbackTab.count() > 0) {
-				await fallbackTab.click();
+		for (const label of fallback) {
+			const fbTab = page.locator(`.head-drop-results__tab:has-text("${label}")`).first();
+			if (await fbTab.count() > 0) {
+				await fbTab.click();
 				await page.waitForTimeout(500);
 				break;
 			}
@@ -8661,9 +8661,20 @@ async function getEntityIdByInn(page, inn, preferredType) {
 		await tab.click();
 		await page.waitForTimeout(500);
 	}
-	const link = page.locator(".head-drop-results__list a[href*=\"/ip/\"], .head-drop-results__list a[href*=\"/id/\"], .head-drop-results__list a[href*=\"/person/\"]").first();
+	let linkSelector;
+	if (preferredType === "person") linkSelector = ".head-drop-results__list a[href*=\"/person/\"]";
+	else if (preferredType === "entrepreneur") linkSelector = ".head-drop-results__list a[href*=\"/ip/\"]";
+	else if (preferredType === "company") linkSelector = ".head-drop-results__list a[href*=\"/id/\"]";
+	else linkSelector = ".head-drop-results__list a[href*=\"/person/\"], .head-drop-results__list a[href*=\"/ip/\"], .head-drop-results__list a[href*=\"/id/\"]";
+	try {
+		await page.waitForSelector(linkSelector, { timeout: 5e3 });
+	} catch {
+		console.warn(`DEBUG search: ссылка по селектору "${linkSelector}" не появилась`);
+	}
+	const link = page.locator(linkSelector).first();
 	if (await link.count() > 0) {
 		const href = await link.getAttribute("href");
+		console.log(`DEBUG search: найдена ссылка ${href}`);
 		if (href) {
 			const match = href.match(/\/(id|ip|person)\/([^/?]+)/);
 			if (match) return normalizeEntity(match[1], match[2]);
@@ -8671,14 +8682,6 @@ async function getEntityIdByInn(page, inn, preferredType) {
 	}
 	throw new Error(`Не удалось найти сущность по ИНН ${inn}`);
 }
-/**
-* Преобразует URL-сегмент (id/ip/person) и идентификатор в нормализованный тип.
-* Для физических лиц ID пока не числовой — возвращаем 0.
-*/
-/**
-* Преобразует URL-сегмент (id/ip/person) и идентификатор в нормализованный тип.
-* Для ФЛ id — это slug (строка), для ЮЛ и ИП — число.
-*/
 function normalizeEntity(segment, rawId) {
 	if (segment === "id") return {
 		id: parseInt(rawId),
@@ -9810,9 +9813,12 @@ function registerOsintHandlers() {
       LIMIT ? OFFSET ?
     `).all(limit, offset);
 	});
-	electron.ipcMain.handle("osint:supplement-company", async (_event, inn, onlySections) => {
+	electron.ipcMain.handle("osint:supplement-company", async (_event, inn, onlySections, preferredType) => {
 		try {
-			const newData = await scrapeRusprofile(inn, { onlySections });
+			const newData = await scrapeRusprofile(inn, {
+				onlySections,
+				preferredType
+			});
 			if (!newData) return {
 				success: false,
 				error: "Не удалось собрать данные с rusprofile"

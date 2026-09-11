@@ -6,24 +6,24 @@ export async function getEntityIdByInn(
   inn: string,
   preferredType?: 'company' | 'entrepreneur' | 'person'
 ): Promise<{ id: number | string; type: 'company' | 'entrepreneur' | 'person' }> {
+  console.log(`DEBUG search: ищем ИНН ${inn}, preferredType=${preferredType}`);
+
   await page.goto('https://www.rusprofile.ru/', { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.waitForSelector('input#autocomplete-main-search', { timeout: 15000 });
 
   await page.fill('input#autocomplete-main-search', inn);
 
-  // Ждём выпадающий список с вкладками
+  // Ждём появления вкладок
   try {
     await page.waitForSelector('.head-drop-results__tabs', { timeout: 5000 });
   } catch {
-    // Выпадающий список не появился — пробуем первую попавшуюся ссылку
+    // Если вкладок нет, пробуем первую попавшуюся ссылку
     const firstLink = page.locator("a[href*='/id/'], a[href*='/ip/'], a[href*='/person/']").first();
     if (await firstLink.count() > 0) {
       const href = await firstLink.getAttribute('href');
       if (href) {
         const match = href.match(/\/(id|ip|person)\/([^/?]+)/);
-        if (match) {
-          return normalizeEntity(match[1], match[2]);
-        }
+        if (match) return normalizeEntity(match[1], match[2]);
       }
     }
     throw new Error(`Не удалось найти сущность по ИНН ${inn}`);
@@ -35,21 +35,17 @@ export async function getEntityIdByInn(
     entrepreneur: 'ИП',
     person: 'Физлица',
   };
+  const desiredTab = preferredType && tabLabelMap[preferredType] ? tabLabelMap[preferredType] : 'ИП';
 
-  let desiredTab = '';
-  if (preferredType && tabLabelMap[preferredType]) {
-    desiredTab = tabLabelMap[preferredType];
-  } else {
-    desiredTab = 'ИП';
-  }
+  console.log(`DEBUG search: кликаем вкладку "${desiredTab}"`);
 
   const tab = page.locator(`.head-drop-results__tab:has-text("${desiredTab}")`).first();
   if (await tab.count() === 0) {
-    const fallbackTabs = ['ИП', 'Физлица', 'Юрлица'].filter(t => t !== desiredTab);
-    for (const label of fallbackTabs) {
-      const fallbackTab = page.locator(`.head-drop-results__tab:has-text("${label}")`).first();
-      if (await fallbackTab.count() > 0) {
-        await fallbackTab.click();
+    const fallback = ['ИП', 'Физлица', 'Юрлица'].filter(t => t !== desiredTab);
+    for (const label of fallback) {
+      const fbTab = page.locator(`.head-drop-results__tab:has-text("${label}")`).first();
+      if (await fbTab.count() > 0) {
+        await fbTab.click();
         await page.waitForTimeout(500);
         break;
       }
@@ -59,10 +55,32 @@ export async function getEntityIdByInn(
     await page.waitForTimeout(500);
   }
 
-  // Извлекаем ссылку из активного списка — БЕЗ перехода
-  const link = page.locator('.head-drop-results__list a[href*="/ip/"], .head-drop-results__list a[href*="/id/"], .head-drop-results__list a[href*="/person/"]').first();
+  // Определяем селектор ссылки в зависимости от preferredType
+  let linkSelector: string;
+  if (preferredType === 'person') {
+    linkSelector = '.head-drop-results__list a[href*="/person/"]';
+  } else if (preferredType === 'entrepreneur') {
+    linkSelector = '.head-drop-results__list a[href*="/ip/"]';
+  } else if (preferredType === 'company') {
+    linkSelector = '.head-drop-results__list a[href*="/id/"]';
+  } else {
+    // Если тип не задан, пробуем в порядке приоритета person → ip → id (для 12-значных ИНН)
+    linkSelector = '.head-drop-results__list a[href*="/person/"], ' +
+                   '.head-drop-results__list a[href*="/ip/"], ' +
+                   '.head-drop-results__list a[href*="/id/"]';
+  }
+
+  // Ждём появления нужной ссылки
+  try {
+    await page.waitForSelector(linkSelector, { timeout: 5000 });
+  } catch {
+    console.warn(`DEBUG search: ссылка по селектору "${linkSelector}" не появилась`);
+  }
+
+  const link = page.locator(linkSelector).first();
   if (await link.count() > 0) {
     const href = await link.getAttribute('href');
+    console.log(`DEBUG search: найдена ссылка ${href}`);
     if (href) {
       const match = href.match(/\/(id|ip|person)\/([^/?]+)/);
       if (match) {
@@ -74,14 +92,6 @@ export async function getEntityIdByInn(
   throw new Error(`Не удалось найти сущность по ИНН ${inn}`);
 }
 
-/**
- * Преобразует URL-сегмент (id/ip/person) и идентификатор в нормализованный тип.
- * Для физических лиц ID пока не числовой — возвращаем 0.
- */
-/**
- * Преобразует URL-сегмент (id/ip/person) и идентификатор в нормализованный тип.
- * Для ФЛ id — это slug (строка), для ЮЛ и ИП — число.
- */
 function normalizeEntity(
   segment: string,
   rawId: string

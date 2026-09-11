@@ -182,8 +182,9 @@ export const OSINTPage: React.FC = () => {
     if (isLegalEntityInn) {
       setEntityTypeFilter('company');
     } else if (isIndividualInn) {
+      // Для 12-значного ИНН по умолчанию выбираем ФЛ, если пользователь сам не переключил
       if (entityTypeFilter === 'company') {
-        setEntityTypeFilter('auto');
+        setEntityTypeFilter('person');
       }
     }
   }, [isLegalEntityInn, isIndividualInn]);
@@ -365,6 +366,7 @@ export const OSINTPage: React.FC = () => {
         okvedDetails: needOkvedDetails,
         egrulDetails: needEgrulDetails,
         preferredType: entityTypeFilter === 'auto' ? undefined : entityTypeFilter,
+
       };
 
       if (needArbitrDetails) {
@@ -453,7 +455,8 @@ export const OSINTPage: React.FC = () => {
     setSupplementMessage('');
     setError('');
     try {
-      const response = await api.supplementCompany(inn.trim(), sectionsToUpdate);
+      const preferred = entityTypeFilter === 'auto' ? undefined : entityTypeFilter;
+      const response = await api.supplementCompany(inn.trim(), sectionsToUpdate, preferred);
       if (response.success) {
         setSupplementMessage(
           `Дозагрузка завершена: сущностей ${response.savedEntities}, связей ${response.savedRelations}, наблюдений ${response.savedObservations}`

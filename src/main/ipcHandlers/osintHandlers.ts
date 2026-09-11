@@ -147,9 +147,10 @@ export function registerOsintHandlers() {
     return rows;
   });
 
-  ipcMain.handle('osint:supplement-company', async (_event, inn: string, onlySections: string[]) => {
+  ipcMain.handle('osint:supplement-company', async (_event, inn: string, onlySections: string[], preferredType?: string) => {
     try {
-      const newData = await scrapeRusprofile(inn, { onlySections });
+      const newData = await scrapeRusprofile(inn, { onlySections, preferredType });
+
       if (!newData) {
         return { success: false, error: 'Не удалось собрать данные с rusprofile' };
       }
@@ -210,5 +211,5 @@ export function registerOsintHandlers() {
       return { exists: false, error: (error as Error).message };
     }
   });
-  
+
 }
