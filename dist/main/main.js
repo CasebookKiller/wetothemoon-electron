@@ -8912,97 +8912,153 @@ async function collectPersonIpDetails(page, slug) {
 //#region src/main/services/osint/scrapers/rusprofile/details/person/connections.ts
 async function collectPersonConnectionsDetails(page, slug) {
 	console.log(`Сбор связей для ФЛ ${slug}...`);
-	const url = `https://www.rusprofile.ru/person/${slug}/connections`;
 	const data = {
 		total_organizations: "",
 		connections: []
 	};
+	const connectionsUrl = `https://www.rusprofile.ru/person/${slug}/connections`;
 	let response = null;
 	try {
-		response = await page.goto(url, {
+		response = await page.goto(connectionsUrl, {
 			waitUntil: "domcontentloaded",
 			timeout: 6e4
 		});
 	} catch (e) {
-		console.warn("Не удалось открыть /connections:", e);
+		console.warn("Не удалось открыть /person/.../connections:", e);
 		return data;
 	}
 	if (!response || response.status() === 404) {
-		console.log(`Страница /connections недоступна (HTTP ${response?.status()})`);
+		console.log(`Страница связей ФЛ недоступна (HTTP ${response?.status()})`);
 		return data;
 	}
-	try {
-		await page.waitForSelector(".filters-results, .content-frame, .tiles", { timeout: 15e3 });
-	} catch {
-		console.log("Структура страницы /connections не найдена");
-		return data;
+	await page.waitForTimeout(2e3);
+	const tableButton = page.locator("span[data-show=\"table\"]");
+	if (await tableButton.count() > 0) {
+		const container = page.locator("ul.similar-table-container");
+		if (!(await container.count() > 0 && await container.evaluate((el) => el.classList.contains("active")))) {
+			console.log("Переключаемся на табличный вид");
+			try {
+				await tableButton.first().click({ force: true });
+			} catch (e) {
+				console.warn("Обычный клик не удался, пробуем JavaScript-клик");
+				await page.evaluate(() => {
+					const btn = document.querySelector("span[data-show=\"table\"]");
+					if (btn instanceof HTMLElement) btn.click();
+				});
+			}
+			await page.waitForSelector("ul.similar-table-container.active", { timeout: 15e3 });
+			await page.waitForTimeout(1e3);
+		} else console.log("Табличный вид уже активен");
+	} else console.warn("Кнопка переключения на таблицу не найдена");
+	await page.waitForTimeout(2e3);
+	let attempts = 0;
+	const maxAttempts = 5;
+	while (attempts < maxAttempts) {
+		const buttons = page.locator("ul.similar-table-container.active .similar-more-btn:not(.hidden)");
+		const count = await buttons.count();
+		if (count === 0) break;
+		for (let i = 0; i < count; i++) {
+			const btn = buttons.nth(i);
+			try {
+				if (await btn.isVisible()) {
+					await btn.click();
+					console.log(`Нажата кнопка «Показать ещё» (попытка ${attempts + 1}, кнопка ${i + 1})`);
+					await page.waitForTimeout(1e3);
+				}
+			} catch (e) {
+				console.warn("Не удалось нажать «Показать ещё»:", e);
+			}
+		}
+		attempts++;
 	}
-	await page.waitForTimeout(1e3);
 	const parsed = await page.evaluate(() => {
-		const result = {
+		const getText = (el, selector) => {
+			const node = el ? el.querySelector(selector) : null;
+			return node ? node.textContent?.trim() || "" : "";
+		};
+		const cleanText = (text, prefix) => {
+			return text.startsWith(prefix) ? text.substring(prefix.length).trim() : text.trim();
+		};
+		const container = document.querySelector("ul.similar-table-container.active");
+		if (!container) return {
+			total_organizations: "",
+			connections: []
+		};
+		if (container.querySelectorAll("li.similar-item").length === 0 && container.querySelector("li.similar-item-empty")) return {
 			total_organizations: "",
 			connections: []
 		};
 		const totalEl = document.querySelector(".export-data__text span");
-		if (totalEl) result.total_organizations = totalEl.textContent?.trim() || "";
-		document.querySelectorAll(".similar-item").forEach((section) => {
-			const title = section.querySelector(".title-sub, .similar-item-sub-head .title-sub")?.textContent?.trim() || "";
-			const description = section.querySelector(".description")?.textContent?.replace(/\s+/g, " ").trim() || "";
-			const organizations = [];
-			section.querySelectorAll(".list-element").forEach((org) => {
-				const nameEl = org.querySelector("a.list-element__title");
-				const name = nameEl?.textContent?.trim() || "";
-				const href = nameEl?.href || "";
-				let status = "";
-				const statusEl = org.querySelector(".warning-text, .liquidated.danger, .reorganizing.warning");
-				if (statusEl) status = statusEl.textContent?.trim() || "";
-				const activity = org.querySelector(".list-element__text")?.textContent?.trim() || "";
-				const address = org.querySelector(".list-element__address")?.textContent?.trim() || "";
-				let inn = "";
-				let ogrn = "";
-				let regDate = "";
-				const infoSpans = org.querySelectorAll(".list-element__row-info span");
-				if (infoSpans.length >= 3) {
-					inn = infoSpans[0].textContent?.replace("ИНН:", "").trim() || "";
-					ogrn = infoSpans[1].textContent?.replace("ОГРН:", "").trim() || "";
-					regDate = infoSpans[2].textContent?.replace("Дата регистрации:", "").trim() || "";
-				}
-				const roles = [];
-				org.querySelectorAll(".list-element__info-box-item").forEach((item) => {
-					const roleEl = item.querySelector("span");
-					const participantEl = item.querySelector("mark");
-					const periodEl = item.querySelector(".time");
-					const role = roleEl?.textContent?.trim() || "";
-					const participant = participantEl?.textContent?.trim() || "";
-					const period = periodEl?.textContent?.trim() || "";
-					if (role || participant) roles.push({
-						role,
-						participant,
-						period
+		const totalText = totalEl ? totalEl.textContent?.trim() || "" : "";
+		const connections = [];
+		container.querySelectorAll("li.similar-item").forEach((similarItem) => {
+			similarItem.querySelectorAll(":scope > ul.similar-item-sub > li.similar-item-sub-item").forEach((subItem) => {
+				const titleEl = subItem.querySelector("div.similar-item-sub-head a.title-sub, div.similar-item-sub-head span.title-sub");
+				const title = titleEl ? titleEl.textContent?.trim() || "" : "";
+				const descEl = subItem.querySelector("div.similar-item-sub-head span.description");
+				const description = descEl ? descEl.textContent?.replace(/\s+/g, " ").trim() : "";
+				const organizations = [];
+				subItem.querySelectorAll("div.similar-item-sub-content ul.list-element__row > li.list-element").forEach((org) => {
+					const nameEl = org.querySelector("a.list-element__title");
+					const name = nameEl ? nameEl.textContent?.trim() || "" : "";
+					const href = nameEl ? nameEl.href || "" : "";
+					let status = "";
+					const statusEl = org.querySelector(".liquidated.danger, .liquidating.warning, .reorganizing.warning");
+					if (statusEl) status = statusEl.textContent?.trim() || "";
+					const activity = getText(org, ".list-element__text");
+					const address = getText(org, ".list-element__address");
+					const infoSpans = org.querySelectorAll(".list-element__row-info span");
+					let inn = "";
+					let ogrn = "";
+					let regDate = "";
+					if (infoSpans.length >= 3) {
+						inn = cleanText(infoSpans[0].textContent?.trim() || "", "ИНН:");
+						ogrn = cleanText(infoSpans[1].textContent?.trim() || "", "ОГРН:");
+						regDate = cleanText(infoSpans[2].textContent?.trim() || "", "Дата регистрации:");
+					}
+					const roles = [];
+					const infoBox = org.querySelector(".list-element__info-box");
+					if (infoBox) infoBox.querySelectorAll(".list-element__info-box-item").forEach((item) => {
+						const roleEl = item.querySelector("span");
+						const participantEl = item.querySelector("mark");
+						const periodEl = item.querySelector(".time");
+						const role = roleEl ? roleEl.textContent?.trim() || "" : "";
+						const participant = participantEl ? participantEl.textContent?.trim() || "" : "";
+						const period = periodEl ? periodEl.textContent?.trim() || "" : "";
+						if (role || participant) roles.push({
+							role,
+							participant,
+							period
+						});
+					});
+					if (name || inn) organizations.push({
+						name,
+						href,
+						status,
+						activity,
+						address,
+						inn,
+						ogrn,
+						registration_date: regDate,
+						roles
 					});
 				});
-				if (name || inn) organizations.push({
-					name,
-					href,
-					status,
-					activity,
-					address,
-					inn,
-					ogrn,
-					registration_date: regDate,
-					roles
+				if (title || organizations.length > 0) connections.push({
+					title,
+					description,
+					organizations
 				});
 			});
-			if (title || organizations.length > 0) result.connections.push({
-				title,
-				description,
-				organizations
-			});
 		});
-		return result;
+		return {
+			total_organizations: totalText,
+			connections
+		};
 	});
-	console.log(`Собрано связей (ФЛ): ${parsed.connections.length}, всего: ${parsed.total_organizations}`);
-	return parsed;
+	data.total_organizations = parsed.total_organizations;
+	data.connections = parsed.connections;
+	console.log(`Собрано связей (ФЛ): ${data.connections.length}, организаций всего: ${data.total_organizations}`);
+	return data;
 }
 //#endregion
 //#region src/main/services/osint/scrapers/rusprofile/details/person/reliability.ts
