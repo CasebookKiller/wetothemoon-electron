@@ -4,7 +4,7 @@ import { Page } from 'playwright';
 // Основная функция сбора для банкротства (детальный список)
 export async function collectBankruptcyDetails(
   page: Page,
-  companyId: number,
+  companyId: number | string,
   options: {
     maxPages?: number;
     maxTotalCases?: number;

@@ -5,7 +5,7 @@ export async function getEntityIdByInn(
   page: Page,
   inn: string,
   preferredType?: 'company' | 'entrepreneur' | 'person'
-): Promise<{ id: number; type: 'company' | 'entrepreneur' | 'person' }> {
+): Promise<{ id: number | string; type: 'company' | 'entrepreneur' | 'person' }> {
   await page.goto('https://www.rusprofile.ru/', { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.waitForSelector('input#autocomplete-main-search', { timeout: 15000 });
 
@@ -78,11 +78,15 @@ export async function getEntityIdByInn(
  * Преобразует URL-сегмент (id/ip/person) и идентификатор в нормализованный тип.
  * Для физических лиц ID пока не числовой — возвращаем 0.
  */
+/**
+ * Преобразует URL-сегмент (id/ip/person) и идентификатор в нормализованный тип.
+ * Для ФЛ id — это slug (строка), для ЮЛ и ИП — число.
+ */
 function normalizeEntity(
   segment: string,
   rawId: string
-): { id: number; type: 'company' | 'entrepreneur' | 'person' } {
+): { id: number | string; type: 'company' | 'entrepreneur' | 'person' } {
   if (segment === 'id') return { id: parseInt(rawId), type: 'company' };
   if (segment === 'ip') return { id: parseInt(rawId), type: 'entrepreneur' };
-  return { id: 0, type: 'person' };
+  return { id: rawId, type: 'person' };
 }

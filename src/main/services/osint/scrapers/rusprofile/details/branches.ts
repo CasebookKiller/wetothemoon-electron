@@ -4,7 +4,7 @@ import { Page } from 'playwright';
 // Основная функция сбора для филиалов (детальный список)
 export async function collectBranchesDetails(
   page: Page,
-  companyId: number,
+  companyId: number | string,
   options: { maxTotalCases?: number } = {}
 ): Promise<any> {
   console.log(`Сбор филиалов и представительств для компании ID ${companyId}...`);

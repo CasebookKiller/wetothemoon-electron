@@ -42,7 +42,7 @@ export async function applyInspectionsFilters(page: Page, filters?: any): Promis
 // Основная функция сбора для проверок (детальный список)
 export async function collectInspectionsDetails(
   page: Page,
-  companyId: number,
+  companyId: number | string,
   options: {
     maxPages?: number;
     maxTotalCases?: number;

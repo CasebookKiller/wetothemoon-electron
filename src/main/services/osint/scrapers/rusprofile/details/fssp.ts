@@ -52,7 +52,7 @@ export async function applyFsspFilters(page: Page, filters?: any): Promise<void>
 // Основная функция сбора для исполнительного производства (детальный список)
 export async function collectFsspDetails(
   page: Page,
-  companyId: number,
+  companyId: number | string,
   options: {
     maxPages?: number;
     maxTotalCases?: number;

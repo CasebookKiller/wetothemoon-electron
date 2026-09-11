@@ -4,7 +4,7 @@ import { Page } from 'playwright';
 // Основная функция сбора для санкций (детальный список)
 export async function collectSanctionsDetails(
   page: Page,
-  companyId: number,
+  companyId: number | string,
   options: { maxTotalCases?: number } = {}
 ): Promise<any> {
   console.log(`Сбор санкций для компании ID ${companyId}...`);

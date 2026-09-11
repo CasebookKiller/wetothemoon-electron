@@ -4,7 +4,7 @@ import { Page } from 'playwright';
 // Основная функция сбора для надежности (детальный список)
 export async function collectReliabilityDetails(
   page: Page,
-  companyId: number,
+  companyId: number | string,
   options: { maxTotalCases?: number } = {}
 ): Promise<any> {
   console.log(`Сбор надёжности для компании ID ${companyId}...`);

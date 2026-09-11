@@ -3,7 +3,7 @@ import { Page } from 'playwright';
 
 export async function collectRequisitesDetails(
   page: Page,
-  companyId: number,
+  companyId: number | string,
   options: { maxTotalCases?: number } = {}
 ): Promise<any> {
   console.log(`Сбор реквизитов для компании ID ${companyId}...`);

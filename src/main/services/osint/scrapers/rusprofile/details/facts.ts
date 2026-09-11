@@ -27,7 +27,7 @@ export async function applyFactsFilters(page: Page, filters?: any): Promise<void
 // Основная функция сбора для существенных фактов (детальный список) 
 export async function collectFactsDetails(
   page: Page,
-  companyId: number,
+  companyId: number | string,
   options: {
     maxPages?: number;
     maxTotalCases?: number;

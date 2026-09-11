@@ -4885,6 +4885,20 @@ async function collectTabs(page) {
 		if (sanctionsLink) addTab("sanctions", "Санкции", sanctionsLink.href);
 		const egrulLink = document.querySelector("a[href*=\"/egrul\"], a[href*=\"/egrip\"]");
 		if (egrulLink) addTab("egrul", "Выписка ЕГРЮЛ/ЕГРИП", egrulLink.href);
+		document.querySelectorAll("nav.company-menu a[data-key-item]").forEach((el) => {
+			const key = el.getAttribute("data-key-item") || "";
+			const href = el.href;
+			if (!key || !href || key === "more") return;
+			const mapped = {
+				"ceo": "person_ceo_details",
+				"founder": "person_founder_details",
+				"ip": "person_ip_details",
+				"connections": "person_connections_details",
+				"risks": "person_reliability_details",
+				"history": "person_history_details"
+			}[key];
+			if (mapped) addTab(mapped, el.textContent?.trim() || "", href);
+		});
 		return result;
 	});
 }
@@ -4912,6 +4926,7 @@ async function collectSummary(page) {
 		};
 		const isCompany = !!document.querySelector("#clip_ogrn");
 		const isEntrepreneur = !!document.querySelector("#clip_ogrnip");
+		const isPerson = !isCompany && !isEntrepreneur;
 		const entityType = isCompany ? "company" : isEntrepreneur ? "entrepreneur" : "person";
 		const data = {};
 		data.entity_type = entityType;
@@ -5007,6 +5022,39 @@ async function collectSummary(page) {
 			data.pension_authority = getRequisite("Наименование территориального органа");
 			data.special_tax_regime = getRequisite("Применяется");
 			data.msp_category = getTextByXPath("//div[contains(@class,'requisites-ip')]//dt[contains(.,'Категория субъекта')]/following-sibling::dd[1]");
+		}
+		if (isPerson) {
+			data.name = getTextByCss("#clip_fullname") || getTextByCss("h1") || "";
+			data.inn = getTextByCss("#req_inn") || "";
+			data.region = getTextByXPath("//div[contains(@class,'company-info__title') and contains(.,'Регион регистрации')]/following-sibling::div[contains(@class,'company-info__text')][1]");
+			data.activity_start = getTextByXPath("//div[contains(@class,'company-info__title') and contains(.,'Начало деятельности')]/following-sibling::div[contains(@class,'company-info__text')][1]");
+			data.business_activity = {
+				ceo_count: getTextByXPath("//div[contains(@class,'tab-item') and contains(@class,'active')]//div[contains(@class,'company-info__title') and contains(.,'Руководитель')]/following-sibling::div[contains(@class,'company-info__text')][1]"),
+				founder_count: getTextByXPath("//div[contains(@class,'tab-item') and contains(@class,'active')]//div[contains(@class,'company-info__title') and contains(.,'Учредитель')]/following-sibling::div[contains(@class,'company-info__text')][1]"),
+				ip_status: getTextByXPath("//div[contains(@class,'tab-item') and contains(@class,'active')]//div[contains(@class,'company-info__title') and contains(.,'ИП')]/following-sibling::div[contains(@class,'company-info__text')][1]")
+			};
+			document.querySelectorAll(".list-factors li").forEach((li) => {
+				const text = li.textContent?.trim() || "";
+				const isDanger = !!li.querySelector("i[data-ico=\"danger\"]");
+				const isSuccess = !!li.querySelector("i[data-ico=\"success\"]");
+				if (!text) return;
+				if (isSuccess || isDanger) {}
+			});
+			const riskColumns = [];
+			document.querySelectorAll(".company-row.alt .company-col").forEach((col) => {
+				const title = col.querySelector(".company-info__title")?.textContent?.trim() || "";
+				const factors = [];
+				col.querySelectorAll(".list-factors li").forEach((li) => {
+					const text = li.textContent?.trim() || "";
+					const icon = li.querySelector("i")?.getAttribute("data-ico") || "";
+					if (text) factors.push(`${icon === "danger" ? "⚠ " : icon === "success" ? "✓ " : ""}${text}`);
+				});
+				if (title) riskColumns.push({
+					title,
+					factors
+				});
+			});
+			data.risk_factors = riskColumns;
 		}
 		return data;
 	});
@@ -8627,6 +8675,10 @@ async function getEntityIdByInn(page, inn, preferredType) {
 * Преобразует URL-сегмент (id/ip/person) и идентификатор в нормализованный тип.
 * Для физических лиц ID пока не числовой — возвращаем 0.
 */
+/**
+* Преобразует URL-сегмент (id/ip/person) и идентификатор в нормализованный тип.
+* Для ФЛ id — это slug (строка), для ЮЛ и ИП — число.
+*/
 function normalizeEntity(segment, rawId) {
 	if (segment === "id") return {
 		id: parseInt(rawId),
@@ -8637,7 +8689,7 @@ function normalizeEntity(segment, rawId) {
 		type: "entrepreneur"
 	};
 	return {
-		id: 0,
+		id: rawId,
 		type: "person"
 	};
 }

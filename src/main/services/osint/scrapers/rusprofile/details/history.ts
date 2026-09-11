@@ -35,7 +35,7 @@ export async function applyHistoryFilters(page: Page, filters?: any): Promise<vo
 // Основная функция сбора для история (детальный список)
 export async function collectHistoryDetails(
   page: Page,
-  companyId: number,
+  companyId: number | string,
   options: {
     maxPages?: number;
     maxTotalCases?: number;

@@ -3,7 +3,7 @@ import { Page } from 'playwright';
 
 export async function collectEgrulDetails(
   page: Page,
-  companyId: number,
+  companyId: number | string,
   options: { maxTotalCases?: number; entityType?: string; ogrn?: string } = {}
 ): Promise<any> {
   const entityType = options.entityType || 'company';

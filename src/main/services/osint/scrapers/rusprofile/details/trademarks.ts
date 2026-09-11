@@ -32,7 +32,7 @@ export async function applyTrademarksFilters(page: Page, filters?: any): Promise
 
 export async function collectTrademarksDetails(
   page: Page,
-  companyId: number,
+  companyId: number | string,
   options: {
     maxPages?: number;
     maxTotalCases?: number;

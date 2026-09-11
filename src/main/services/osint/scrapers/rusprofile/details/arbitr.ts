@@ -93,7 +93,7 @@ export async function applyArbitrFilters(page: Page, filters?: any): Promise<voi
 // Основная функция сбора арбитражных дел (детальный список)
 export async function collectArbitrDetails(
   page: Page,
-  companyId: number,
+  companyId: number | string,
   options: {
     maxPages?: number;
     maxTotalCases?: number;

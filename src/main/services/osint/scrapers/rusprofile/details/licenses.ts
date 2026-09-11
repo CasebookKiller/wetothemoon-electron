@@ -31,7 +31,7 @@ export async function applyLicensesFilters(page: Page, filters?: any): Promise<v
 // Основная функция сбора для лицензий (детальный список)
 export async function collectLicensesDetails(
   page: Page,
-  companyId: number,
+  companyId: number | string,
   options: {
     maxPages?: number;
     maxTotalCases?: number;

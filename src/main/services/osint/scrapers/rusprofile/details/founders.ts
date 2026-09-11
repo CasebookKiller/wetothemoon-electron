@@ -31,7 +31,7 @@ export async function applyFoundersFilters(page: Page, filters?: any): Promise<v
 // Основная функция сбора для учредителей (детальный список)
 export async function collectFoundersDetails(
   page: Page,
-  companyId: number,
+  companyId: number | string,
   options: {
     maxPages?: number;
     maxTotalCases?: number;

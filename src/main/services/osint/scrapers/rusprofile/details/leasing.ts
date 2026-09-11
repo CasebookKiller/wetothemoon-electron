@@ -46,7 +46,7 @@ export async function applyLeasingFilters(page: Page, filters?: any): Promise<vo
 // Основая функция сбора для лизинга (детальный списрк)
 export async function collectLeasingDetails(
   page: Page,
-  companyId: number,
+  companyId: number | string,
   options: {
     maxPages?: number;
     maxTotalCases?: number;

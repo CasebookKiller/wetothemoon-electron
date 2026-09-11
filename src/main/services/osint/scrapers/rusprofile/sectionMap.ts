@@ -21,4 +21,10 @@ export const TAB_TO_SECTION: Record<string, string> = {
   'egrul': 'egrul_details',
   'branches': 'branches_details',
   'bankruptcy': 'bankruptcy_details',
+  'person_ceo_details': 'person_ceo_details',
+  'person_founder_details': 'person_founder_details',
+  'person_ip_details': 'person_ip_details',
+  'person_connections_details': 'person_connections_details',
+  'person_reliability_details': 'person_reliability_details',
+  'person_history_details': 'person_history_details',
 };

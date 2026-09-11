@@ -1,7 +1,7 @@
 // src/main/services/osint/scrapers/rusprofile/details/connections.ts
 import { Page } from 'playwright';
 
-export async function collectConnectionsDetails(page: Page, companyId: number): Promise<any> {
+export async function collectConnectionsDetails(page: Page, companyId: number | string): Promise<any> {
   console.log(`Сбор детальных связей для компании ID ${companyId}...`);
   const data: any = { total_organizations: '', connections: [] };
 

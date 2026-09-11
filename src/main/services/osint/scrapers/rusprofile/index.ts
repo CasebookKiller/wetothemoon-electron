@@ -197,7 +197,7 @@ export async function scrapeRusprofile(
     startModalWatcher(page);
     await page.waitForTimeout(2000);
 
-    const result = {} as CompanyFullData & { company_id?: number; entity_type?: string };
+    const result = {} as CompanyFullData & { company_id?: number | string; entity_type?: string };
     result.company_id = companyId;
     result.entity_type = entityType;
 

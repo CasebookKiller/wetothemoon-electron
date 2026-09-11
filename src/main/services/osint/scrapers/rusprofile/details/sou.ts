@@ -83,7 +83,7 @@ export async function applySouFilters(page: Page, filters?: any): Promise<void> 
 // Основная функция сбора для судов общей юрисдикции (детальный список)
 export async function collectSouDetails(
   page: Page,
-  companyId: number,
+  companyId: number | string,
   options: {
     maxPages?: number;
     maxTotalCases?: number;

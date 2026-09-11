@@ -33,7 +33,7 @@ export async function applyPledgeFilters(page: Page, filters?: any): Promise<voi
 // Основная функция сбора для залогов (детальный список)
 export async function collectPledgesDetails(
   page: Page,
-  companyId: number,
+  companyId: number | string,
   options: {
     maxPages?: number;
     maxTotalCases?: number;

@@ -64,7 +64,7 @@ export async function applyGzFilters(page: Page, filters?: any): Promise<void> {
 // Основная функция сбора для санкций (детальный список)
 export async function collectGzDetails(
   page: Page,
-  companyId: number,
+  companyId: number | string,
   options: {
     maxPages?: number;
     maxTotalCases?: number;

@@ -93,6 +93,6 @@ export interface CompanyFullData {
   okved_details?: any;
   egrul_details?: any;
 
-  company_id?: number;
+  company_id?: number | string;
   entity_type?: string;
 }

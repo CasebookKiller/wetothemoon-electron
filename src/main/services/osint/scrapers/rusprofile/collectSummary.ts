@@ -36,6 +36,23 @@ async function collectTabs(page: Page): Promise<Array<{ key: string; title: stri
       addTab('egrul', 'Выписка ЕГРЮЛ/ЕГРИП', egrulLink.href);
     }
 
+    // 4. Пункты меню карточки ФЛ
+    document.querySelectorAll('nav.company-menu a[data-key-item]').forEach((el) => {
+      const key = el.getAttribute('data-key-item') || '';
+      const href = (el as HTMLAnchorElement).href;
+      if (!key || !href || key === 'more') return;
+      const mapping: Record<string, string> = {
+        'ceo': 'person_ceo_details',
+        'founder': 'person_founder_details',
+        'ip': 'person_ip_details',
+        'connections': 'person_connections_details',
+        'risks': 'person_reliability_details',
+        'history': 'person_history_details',
+      };
+      const mapped = mapping[key];
+      if (mapped) addTab(mapped, el.textContent?.trim() || '', href);
+    });
+
     return result;
   });
 }
@@ -212,6 +229,47 @@ export async function collectSummary(page: Page): Promise<any> {
       data.pension_authority = getRequisite('Наименование территориального органа');
       data.special_tax_regime = getRequisite('Применяется');
       data.msp_category = getTextByXPath("//div[contains(@class,'requisites-ip')]//dt[contains(.,'Категория субъекта')]/following-sibling::dd[1]");
+    }
+
+    if (isPerson) {
+      data.name = getTextByCss('#clip_fullname') || getTextByCss('h1') || '';
+      data.inn = getTextByCss('#req_inn') || '';
+      data.region = getTextByXPath("//div[contains(@class,'company-info__title') and contains(.,'Регион регистрации')]/following-sibling::div[contains(@class,'company-info__text')][1]");
+      data.activity_start = getTextByXPath("//div[contains(@class,'company-info__title') and contains(.,'Начало деятельности')]/following-sibling::div[contains(@class,'company-info__text')][1]");
+
+      // Деловая активность (актуальная)
+      data.business_activity = {
+        ceo_count: getTextByXPath("//div[contains(@class,'tab-item') and contains(@class,'active')]//div[contains(@class,'company-info__title') and contains(.,'Руководитель')]/following-sibling::div[contains(@class,'company-info__text')][1]"),
+        founder_count: getTextByXPath("//div[contains(@class,'tab-item') and contains(@class,'active')]//div[contains(@class,'company-info__title') and contains(.,'Учредитель')]/following-sibling::div[contains(@class,'company-info__text')][1]"),
+        ip_status: getTextByXPath("//div[contains(@class,'tab-item') and contains(@class,'active')]//div[contains(@class,'company-info__title') and contains(.,'ИП')]/following-sibling::div[contains(@class,'company-info__text')][1]"),
+      };
+
+      // Факторы риска
+      const personalFactors: string[] = [];
+      const relatedFactors: string[] = [];
+      document.querySelectorAll('.list-factors li').forEach((li) => {
+        const text = li.textContent?.trim() || '';
+        const isDanger = !!li.querySelector('i[data-ico="danger"]');
+        const isSuccess = !!li.querySelector('i[data-ico="success"]');
+        if (!text) return;
+        if (isSuccess || isDanger) {
+          // Первые два блока — персональные, остальные — связанных
+          // (по HTML: сначала Персональные, потом Риски связанных организаций)
+        }
+      });
+      // Проще: собираем как есть
+      const riskColumns: any[] = [];
+      document.querySelectorAll('.company-row.alt .company-col').forEach((col) => {
+        const title = col.querySelector('.company-info__title')?.textContent?.trim() || '';
+        const factors: string[] = [];
+        col.querySelectorAll('.list-factors li').forEach((li) => {
+          const text = li.textContent?.trim() || '';
+          const icon = li.querySelector('i')?.getAttribute('data-ico') || '';
+          if (text) factors.push(`${icon === 'danger' ? '⚠ ' : icon === 'success' ? '✓ ' : ''}${text}`);
+        });
+        if (title) riskColumns.push({ title, factors });
+      });
+      data.risk_factors = riskColumns;
     }
 
     return data;

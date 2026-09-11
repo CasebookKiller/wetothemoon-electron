@@ -4,7 +4,7 @@ import { Page } from 'playwright';
 
 export async function collectOkvedDetails(
   page: Page,
-  companyId: number,
+  companyId: number | string,
   options: { maxTotalCases?: number } = {}
 ): Promise<any> {
   console.log(`Сбор видов деятельности для компании ID ${companyId}...`);
