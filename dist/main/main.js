@@ -8754,7 +8754,7 @@ async function collectPersonFounderDetails(page, slug) {
 		return data;
 	}
 	try {
-		await page.waitForSelector(".tiles-content, .content-frame, .filters-results", { timeout: 15e3 });
+		await page.waitForSelector(".content-frame__title, .company__list, .list-element", { timeout: 15e3 });
 	} catch {
 		console.log("Структура страницы /founder не найдена");
 		return data;
@@ -8765,59 +8765,90 @@ async function collectPersonFounderDetails(page, slug) {
 			current: [],
 			past: []
 		};
-		const collectList = (tabName) => {
-			const tab = document.querySelector(`.tab-item[data-tab_name="${tabName}"]`);
-			if (!tab) return [];
-			const items = [];
-			tab.querySelectorAll(".list-element").forEach((el) => {
-				const nameEl = el.querySelector("a.list-element__title");
-				const name = nameEl?.textContent?.trim() || "";
-				const href = nameEl?.href || "";
-				let status = "";
-				const statusEl = el.querySelector(".warning-text");
-				if (statusEl) status = statusEl.textContent?.trim() || "";
-				const activity = el.querySelector(".list-element__text")?.textContent?.trim() || "";
-				const address = el.querySelector(".list-element__address")?.textContent?.trim() || "";
-				let inn = "";
-				let ogrn = "";
-				let regDate = "";
-				const infoSpans = el.querySelectorAll(".list-element__row-info span");
-				if (infoSpans.length >= 3) {
-					inn = infoSpans[0].textContent?.replace("ИНН:", "").trim() || "";
-					ogrn = infoSpans[1].textContent?.replace("ОГРН:", "").trim() || "";
-					regDate = infoSpans[2].textContent?.replace("Дата регистрации:", "").trim() || "";
+		/**
+		* Парсит один `.list-element` — организацию, где человек учредитель.
+		*/
+		const parseListItem = (el) => {
+			const nameEl = el.querySelector("a.list-element__title");
+			const name = nameEl?.textContent?.trim() || "";
+			const href = nameEl?.href || "";
+			let status = "";
+			const statusEl = el.querySelector(".warning-text");
+			if (statusEl) status = statusEl.textContent?.trim() || "";
+			const activity = el.querySelectorAll(".list-element__text")[0]?.textContent?.trim() || "";
+			let period = "";
+			let share = "";
+			el.querySelectorAll(".list-element__info-box-item").forEach((item) => {
+				const spans = item.querySelectorAll("span");
+				if (spans.length === 0) return;
+				const label = spans[0]?.textContent?.trim() || "";
+				if (label.startsWith("Учредитель:")) {
+					const warning = item.querySelector(".warning");
+					if (warning) period = warning.textContent?.trim() || "";
+				} else if (label.startsWith("Доля:")) {
+					const valueSpan = spans[1];
+					if (valueSpan) share = valueSpan.textContent?.replace(/\s+/g, " ").trim() || "";
 				}
-				let share = "";
-				let period = "";
-				el.querySelectorAll(".list-element__info-box-item").forEach((item) => {
-					const text = item.textContent?.trim() || "";
-					if (text.startsWith("Учредитель:")) {
-						const periodMatch = text.match(/с\s+([\d.]+)\s+по\s+([\d.]+)/);
-						if (periodMatch) period = `с ${periodMatch[1]} по ${periodMatch[2]}`;
-					}
-					if (text.startsWith("Доля:")) share = text.replace("Доля:", "").trim();
-				});
-				if (name || inn) items.push({
-					name,
-					href,
-					status,
-					activity,
-					address,
-					inn,
-					ogrn,
-					registration_date: regDate,
-					share,
-					period
-				});
 			});
-			return items;
+			const address = el.querySelector(".list-element__address")?.textContent?.trim() || "";
+			let inn = "";
+			let ogrn = "";
+			let regDate = "";
+			const infoSpans = el.querySelectorAll(".list-element__row-info span");
+			if (infoSpans.length >= 3) {
+				inn = infoSpans[0].textContent?.replace("ИНН:", "").trim() || "";
+				ogrn = infoSpans[1].textContent?.replace("ОГРН:", "").trim() || "";
+				regDate = infoSpans[2].textContent?.replace("Дата регистрации:", "").trim() || "";
+			}
+			const financials = {};
+			el.querySelectorAll(".list-element__info-box dl").forEach((dl) => {
+				const dt = dl.querySelector("dt")?.textContent?.trim() || "";
+				if (!dt) return;
+				if (dt === "Надёжность") {
+					const badge = dl.querySelector(".badge-status")?.textContent?.trim() || "";
+					if (badge) financials[dt] = badge;
+				} else {
+					const dd = dl.querySelector("dd")?.textContent?.replace(/\s+/g, " ").trim() || "";
+					if (dd) financials[dt] = dd;
+				}
+			});
+			return {
+				name,
+				href,
+				status,
+				activity,
+				period,
+				share,
+				address,
+				inn,
+				ogrn,
+				registration_date: regDate,
+				financials
+			};
 		};
-		result.current = collectList("founder_now");
-		result.past = collectList("founder_past");
+		const container = document.querySelector(".company__list");
+		if (!container) return result;
+		const children = Array.from(container.children);
+		let currentSection = null;
+		for (const child of children) {
+			const el = child;
+			if (el.classList.contains("tile-item__subtitle")) {
+				const text = el.textContent?.trim() || "";
+				if (text.includes("в настоящее время")) currentSection = "current";
+				else if (text.includes("в прошлом")) currentSection = "past";
+				continue;
+			}
+			if (el.classList.contains("list-element__row") && currentSection) el.querySelectorAll(".list-element").forEach((item) => {
+				const parsed = parseListItem(item);
+				if (parsed.name || parsed.inn) result[currentSection].push(parsed);
+			});
+		}
 		return result;
 	});
-	console.log(`Собрано учредителя (ФЛ): текущих ${parsed.current.length}, прошлых ${parsed.past.length}`);
-	return parsed;
+	data.current = parsed.current;
+	data.past = parsed.past;
+	console.log(`Собрано учредителя (ФЛ): текущих ${data.current.length}, прошлых ${data.past.length}`);
+	return data;
 }
 //#endregion
 //#region src/main/services/osint/scrapers/rusprofile/details/person/ip.ts
