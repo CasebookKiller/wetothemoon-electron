@@ -168,7 +168,6 @@ export const OSINTPage: React.FC = () => {
 
   const [needPersonCeo, setNeedPersonCeo] = useState(false);
   const [needPersonFounder, setNeedPersonFounder] = useState(false);
-  const [needPersonIp, setNeedPersonIp] = useState(false);
   const [needPersonConnections, setNeedPersonConnections] = useState(false);
   const [needPersonReliability, setNeedPersonReliability] = useState(false);
   const [needPersonHistory, setNeedPersonHistory] = useState(false);
@@ -376,7 +375,6 @@ export const OSINTPage: React.FC = () => {
 
         personCeoDetails: needPersonCeo,
         personFounderDetails: needPersonFounder,
-        personIpDetails: needPersonIp,
         personConnectionsDetails: needPersonConnections,
         personReliabilityDetails: needPersonReliability,
         personHistoryDetails: needPersonHistory,
@@ -463,7 +461,6 @@ export const OSINTPage: React.FC = () => {
 
     if (needPersonCeo) sectionsToUpdate.push('person_ceo_details');
     if (needPersonFounder) sectionsToUpdate.push('person_founder_details');
-    if (needPersonIp) sectionsToUpdate.push('person_ip_details');
     if (needPersonConnections) sectionsToUpdate.push('person_connections_details');
     if (needPersonReliability) sectionsToUpdate.push('person_reliability_details');
     if (needPersonHistory) sectionsToUpdate.push('person_history_details');
@@ -628,7 +625,6 @@ export const OSINTPage: React.FC = () => {
   const personSectionOptions = [
     { key: 'needPersonCeo',         label: 'Руководитель',         section: 'person_ceo_details' },
     { key: 'needPersonFounder',     label: 'Учредитель',           section: 'person_founder_details' },
-    { key: 'needPersonIp',          label: 'Предприниматель (ИП)', section: 'person_ip_details' },
     { key: 'needPersonConnections', label: 'Связи',                section: 'person_connections_details' },
     { key: 'needPersonReliability', label: 'Факторы риска',        section: 'person_reliability_details' },
     { key: 'needPersonHistory',     label: 'История',              section: 'person_history_details' },
@@ -768,7 +764,6 @@ export const OSINTPage: React.FC = () => {
                   const checked =
                     key === 'needPersonCeo' ? needPersonCeo :
                     key === 'needPersonFounder' ? needPersonFounder :
-                    key === 'needPersonIp' ? needPersonIp :
                     key === 'needPersonConnections' ? needPersonConnections :
                     key === 'needPersonReliability' ? needPersonReliability :
                     key === 'needPersonHistory' ? needPersonHistory : false;
@@ -778,7 +773,6 @@ export const OSINTPage: React.FC = () => {
                     switch (key) {
                       case 'needPersonCeo': setNeedPersonCeo(val); break;
                       case 'needPersonFounder': setNeedPersonFounder(val); break;
-                      case 'needPersonIp': setNeedPersonIp(val); break;
                       case 'needPersonConnections': setNeedPersonConnections(val); break;
                       case 'needPersonReliability': setNeedPersonReliability(val); break;
                       case 'needPersonHistory': setNeedPersonHistory(val); break;

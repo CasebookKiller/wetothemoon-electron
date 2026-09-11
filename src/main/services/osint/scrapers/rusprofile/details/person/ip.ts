@@ -4,7 +4,6 @@ import { collectSummary } from '../../collectSummary';
 import { collectConnections } from '../../collectTiles';
 import { collectConnectionsDetails } from '../connections';
 import { collectHistoryDetails } from '../history';
-import { collectFoundersDetails } from '../founders';
 import { collectOkvedDetails } from '../okved';
 
 export async function collectPersonIpDetails(page: Page, slug: string): Promise<any> {
@@ -32,7 +31,7 @@ export async function collectPersonIpDetails(page: Page, slug: string): Promise<
   const ipIdMatch = ipLink.match(/\/ip\/(\d+)/);
   const ipId = ipIdMatch ? parseInt(ipIdMatch[1]) : 0;
 
-  // 2. Собираем те же разделы, что и для обычного ИП
+  // 2. Собираем доступные для ИП разделы
   const data: any = {
     ip_id: ipId,
     ip_url: ipLink,
@@ -40,7 +39,7 @@ export async function collectPersonIpDetails(page: Page, slug: string): Promise<
     connections: await collectConnections(page),
   };
 
-  // 3. Детальные разделы (по аналогии с обычным ИП)
+  // 3. Детальные разделы (только те, что применимы для ИП)
   try {
     data.connections_details = await collectConnectionsDetails(page, ipId);
   } catch (e) {
@@ -53,11 +52,7 @@ export async function collectPersonIpDetails(page: Page, slug: string): Promise<
     console.warn('Не удалось собрать историю ИП:', e);
   }
 
-  try {
-    data.founders_details = await collectFoundersDetails(page, ipId, { maxPages: 1, maxTotalCases: 100 });
-  } catch (e) {
-    console.warn('Не удалось собрать учредителей ИП:', e);
-  }
+  // Учредители у ИП не собираются — пропускаем
 
   try {
     data.okved_details = await collectOkvedDetails(page, ipId);

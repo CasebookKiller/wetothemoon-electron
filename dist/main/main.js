@@ -8851,67 +8851,6 @@ async function collectPersonFounderDetails(page, slug) {
 	return data;
 }
 //#endregion
-//#region src/main/services/osint/scrapers/rusprofile/details/person/ip.ts
-async function collectPersonIpDetails(page, slug) {
-	console.log(`Сбор ИП для ФЛ ${slug}...`);
-	const personUrl = `https://www.rusprofile.ru/person/${slug}`;
-	await page.goto(personUrl, {
-		waitUntil: "domcontentloaded",
-		timeout: 6e4
-	});
-	await page.waitForTimeout(1e3);
-	const ipLink = await page.evaluate(() => {
-		const link = document.querySelector(".tiles__item[data-name=\"ip\"] a.list-element__title");
-		return link ? link.href : "";
-	});
-	if (!ipLink) {
-		console.log("Ссылка на ИП не найдена");
-		return { ip: null };
-	}
-	console.log(`DEBUG person/ip: переход на страницу ИП ${ipLink}`);
-	await page.goto(ipLink, {
-		waitUntil: "domcontentloaded",
-		timeout: 6e4
-	});
-	await page.waitForTimeout(1500);
-	const ipIdMatch = ipLink.match(/\/ip\/(\d+)/);
-	const ipId = ipIdMatch ? parseInt(ipIdMatch[1]) : 0;
-	const data = {
-		ip_id: ipId,
-		ip_url: ipLink,
-		summary: await collectSummary(page),
-		connections: await collectConnections(page)
-	};
-	try {
-		data.connections_details = await collectConnectionsDetails(page, ipId);
-	} catch (e) {
-		console.warn("Не удалось собрать детальные связи ИП:", e);
-	}
-	try {
-		data.history_details = await collectHistoryDetails(page, ipId, {
-			maxPages: 1,
-			maxTotalCases: 100
-		});
-	} catch (e) {
-		console.warn("Не удалось собрать историю ИП:", e);
-	}
-	try {
-		data.founders_details = await collectFoundersDetails(page, ipId, {
-			maxPages: 1,
-			maxTotalCases: 100
-		});
-	} catch (e) {
-		console.warn("Не удалось собрать учредителей ИП:", e);
-	}
-	try {
-		data.okved_details = await collectOkvedDetails(page, ipId);
-	} catch (e) {
-		console.warn("Не удалось собрать ОКВЭД ИП:", e);
-	}
-	console.log(`Собрано ИП (ФЛ): ID ${ipId}, связей: ${data.connections_details?.connections?.length || 0}`);
-	return data;
-}
-//#endregion
 //#region src/main/services/osint/scrapers/rusprofile/details/person/connections.ts
 async function collectPersonConnectionsDetails(page, slug) {
 	console.log(`Сбор связей для ФЛ ${slug}...`);
@@ -9397,7 +9336,6 @@ async function scrapeRusprofile(inn, options) {
 				"egrul_details": "egrulDetails",
 				"person_ceo_details": "personCeoDetails",
 				"person_founder_details": "personFounderDetails",
-				"person_ip_details": "personIpDetails",
 				"person_connections_details": "personConnectionsDetails",
 				"person_reliability_details": "personReliabilityDetails",
 				"person_history_details": "personHistoryDetails"
@@ -9688,10 +9626,6 @@ async function scrapeRusprofile(inn, options) {
 			if (options?.personFounderDetails && shouldCollect("person_founder_details")) {
 				console.log("Сбор учредителя (ФЛ)...");
 				result.person_founder_details = await timed("person_founder_details", () => collectPersonFounderDetails(page, slug));
-			}
-			if (options?.personIpDetails && shouldCollect("person_ip_details")) {
-				console.log("Сбор ИП (ФЛ)...");
-				result.person_ip_details = await timed("person_ip_details", () => collectPersonIpDetails(page, slug));
 			}
 			if (options?.personConnectionsDetails && shouldCollect("person_connections_details")) {
 				console.log("Сбор связей (ФЛ)...");

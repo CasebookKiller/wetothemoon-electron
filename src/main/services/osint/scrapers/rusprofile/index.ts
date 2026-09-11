@@ -167,7 +167,6 @@ export async function scrapeRusprofile(
         // ФЛ
         'person_ceo_details': 'personCeoDetails',
         'person_founder_details': 'personFounderDetails',
-        'person_ip_details': 'personIpDetails',
         'person_connections_details': 'personConnectionsDetails',
         'person_reliability_details': 'personReliabilityDetails',
         'person_history_details': 'personHistoryDetails',
@@ -566,13 +565,6 @@ export async function scrapeRusprofile(
         console.log('Сбор учредителя (ФЛ)...');
         result.person_founder_details = await timed('person_founder_details', () =>
           collectPersonFounderDetails(page, slug)
-        );
-      }
-
-      if (options?.personIpDetails && shouldCollect('person_ip_details')) {
-        console.log('Сбор ИП (ФЛ)...');
-        result.person_ip_details = await timed('person_ip_details', () =>
-          collectPersonIpDetails(page, slug)
         );
       }
 
