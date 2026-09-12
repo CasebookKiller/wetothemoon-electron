@@ -4,7 +4,10 @@
 .p-paginator .p-paginator-prev,
 .p-paginator .p-paginator-first,
 .p-paginator .p-paginator-last {
-  color: var(--accent-color, #ec4899) !important;
+  color: var(--accent-color, #6ab2f2) !important;
+  background-color: transparent !important;
+  border-color: var(--accent-color, #6ab2f2) !important;
+  border-width: 1px !important;
 }
 
 .p-paginator .p-paginator-page:hover,
@@ -13,12 +16,68 @@
 .p-paginator .p-paginator-first:hover,
 .p-paginator .p-paginator-last:hover {
   background-color: rgba(236, 72, 153, 0.12) !important;
-  color: var(--accent-color, #ec4899) !important;
+  border-width: 1px !important;
+  color: var(--accent-color, #6ab2f2) !important;
 }
 
 .p-paginator .p-paginator-page.p-highlight,
 .p-paginator .p-paginator-page.p-paginator-page-selected {
-  background-color: var(--accent-color, #ec4899) !important;
-  border-color: var(--accent-color, #ec4899) !important;
+  background-color: var(--accent-color, #6ab2f2) !important;
+  border-color: var(--accent-color, #6ab2f2) !important;
+  border-width: 1px !important;
   color: #fff !important;
+}
+
+/* Отступ иконки от левой границы поля */
+.search-input-with-icon .p-input-icon-left,
+.search-input-with-icon > i.pi-search {
+  left: 1rem !important;       /* насколько иконка отстоит от границы */
+}
+
+/* Отступ текста в input, чтобы не наезжал на иконку */
+.search-input-with-icon .p-inputtext {
+  padding-left: 2.75rem !important;  /* должно быть больше left + ширина иконки */
+}
+
+.p-paginator .p-paginator-page,
+.p-paginator .p-paginator-next,
+.p-paginator .p-paginator-prev,
+.p-paginator .p-paginator-first,
+.p-paginator .p-paginator-last {
+  border: 1px solid var(--accent-color, #6ab2f2) !important;
+  border-radius: 6px;
+  min-width: 2.25rem;
+  height: 2.25rem;
+  margin: 0 2px;
+}
+
+.db-entities-table .p-paginator .p-dropdown {
+  height: 2.25rem !important;
+}
+
+/* Центрирование текста в dropdown rows-per-page */
+.p-paginator .p-dropdown .p-dropdown-label,
+.p-paginator .p-dropdown .p-inputtext {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;    /* если хотите по центру горизонтали */
+  height: 100% !important;
+  padding: 0 0.5rem !important;          /* убираем вертикальные паддинги */
+  line-height: 1 !important;
+  box-sizing: border-box;
+}
+
+/* Иконка-стрелка тоже по центру */
+.p-paginator .p-dropdown .p-dropdown-trigger {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 100% !important;
+  padding: 0 !important;
+}
+
+/* У самого p-dropdown убираем лишние margin/vertical padding */
+.p-paginator .p-dropdown {
+  padding: 0 !important;
+  box-sizing: border-box;
 }

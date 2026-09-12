@@ -13938,7 +13938,7 @@ var createDatabaseWindow = () => {
 	databaseWindow = new electron.BrowserWindow({
 		width: 1e3,
 		height: 700,
-		title: "База данных OSINT",
+		title: "Ситч",
 		webPreferences: {
 			preload: preloadPath,
 			contextIsolation: true,

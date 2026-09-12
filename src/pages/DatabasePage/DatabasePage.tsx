@@ -99,21 +99,20 @@ export const DatabasePage: React.FC = () => {
 
   return (
     <div className="p-4">
-      <h2>База данных OSINT</h2>
       {error && <p style={{ color: 'red' }}>{error}</p>}
 
       {/* Панель поиска */}
       <Panel className="shadow-5 mb-3" header="Поиск по сущностям">
-        <div className="flex flex-wrap align-items-center gap-3">
+        <div className="flex flex-wrap align-items-center gap-3 py-2">
           <div className="flex-1" style={{ minWidth: '240px' }}>
-            <span className="p-input-icon-left w-full">
+            <span className="p-input-icon-left w-full search-input-with-icon">
               <i className="pi pi-search" />
               <InputText
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={handleSearchKeyDown}
                 placeholder="Название, ИНН, ФИО и т.п."
-                className="w-full"
+                className="w-full text-base"
               />
             </span>
           </div>
@@ -156,73 +155,80 @@ export const DatabasePage: React.FC = () => {
         )}
       </Panel>
 
-      <TabView>
-        <TabPanel header={`Сущности (${displayEntities.length})`}>
-          <DataTable
-            value={displayEntities}
-            paginator
-            rows={20}
-            rowsPerPageOptions={[10, 20, 50, 100]}
-            responsiveLayout="scroll"
-            emptyMessage={searchActive ? 'Ничего не найдено' : 'Нет данных'}
-          >
-            <Column field="id" header="ID" sortable />
-            <Column field="type" header="Тип" sortable />
-            <Column field="label" header="Название" sortable />
-            <Column field="value" header="Значение" sortable />
-            <Column field="confidence" header="Уверенность" sortable />
-            <Column field="status" header="Статус" sortable />
-            <Column field="last_seen" header="Обновлено" sortable />
-          </DataTable>
-        </TabPanel>
+      {/* Панель таблиц */}
+      <Panel className="shadow-5 mb-3" header="Таблицы">
+        <TabView className="my-3">
+          <TabPanel header={`Сущности (${displayEntities.length})`}>
+            <DataTable
+              value={displayEntities}
+              paginator
+              rows={20}
+              rowsPerPageOptions={[10, 20, 50, 100]}
+              responsiveLayout="scroll"
+              className="db-entities-table"
+              emptyMessage={searchActive ? 'Ничего не найдено' : 'Нет данных'}
+            >
+              <Column field="id" header="ID" sortable />
+              <Column field="type" header="Тип" sortable />
+              <Column field="label" header="Название" sortable />
+              <Column field="value" header="Значение" sortable />
+              <Column field="confidence" header="Уверенность" sortable />
+              <Column field="status" header="Статус" sortable />
+              <Column field="last_seen" header="Обновлено" sortable />
+            </DataTable>
+          </TabPanel>
 
-        <TabPanel header={`Связи (${relations.length})`}>
-          <DataTable
-            value={relations}
-            paginator
-            rows={20}
-            rowsPerPageOptions={[10, 20, 50, 100]}
-            responsiveLayout="scroll"
-          >
-            <Column field="subject_label" header="Исходная сущность" sortable />
-            <Column field="predicate" header="Тип связи" sortable />
-            <Column field="object_label" header="Целевая сущность" sortable />
-            <Column field="confidence" header="Уверенность" sortable />
-            <Column field="status" header="Статус" sortable />
-          </DataTable>
-        </TabPanel>
+          <TabPanel header={`Связи (${relations.length})`}>
+            <DataTable
+              value={relations}
+              paginator
+              rows={20}
+              rowsPerPageOptions={[10, 20, 50, 100]}
+              className="db-entities-table"
+              responsiveLayout="scroll"
+            >
+              <Column field="subject_label" header="Исходная сущность" sortable />
+              <Column field="predicate" header="Тип связи" sortable />
+              <Column field="object_label" header="Целевая сущность" sortable />
+              <Column field="confidence" header="Уверенность" sortable />
+              <Column field="status" header="Статус" sortable />
+            </DataTable>
+          </TabPanel>
 
-        <TabPanel header={`Наблюдения (${observations.length})`}>
-          <DataTable
-            value={observations}
-            paginator
-            rows={20}
-            rowsPerPageOptions={[10, 20, 50, 100]}
-            responsiveLayout="scroll"
-          >
-            <Column field="entity_label" header="Сущность" sortable />
-            <Column field="attribute" header="Атрибут" sortable />
-            <Column field="value" header="Значение" sortable />
-            <Column field="observed_at" header="Дата" sortable />
-          </DataTable>
-        </TabPanel>
+          <TabPanel header={`Наблюдения (${observations.length})`}>
+            <DataTable
+              value={observations}
+              paginator
+              rows={20}
+              rowsPerPageOptions={[10, 20, 50, 100]}
+              className="db-entities-table"
+              responsiveLayout="scroll"
+            >
+              <Column field="entity_label" header="Сущность" sortable />
+              <Column field="attribute" header="Атрибут" sortable />
+              <Column field="value" header="Значение" sortable />
+              <Column field="observed_at" header="Дата" sortable />
+            </DataTable>
+          </TabPanel>
 
-        <TabPanel header={`Источники (${sources.length})`}>
-          <DataTable
-            value={sources}
-            paginator
-            rows={20}
-            rowsPerPageOptions={[10, 20, 50, 100]}
-            responsiveLayout="scroll"
-          >
-            <Column field="id" header="ID" sortable />
-            <Column field="url" header="URL" sortable />
-            <Column field="title" header="Название" sortable />
-            <Column field="source_type" header="Тип" sortable />
-            <Column field="retrieved_at" header="Дата получения" sortable />
-          </DataTable>
-        </TabPanel>
-      </TabView>
+          <TabPanel header={`Источники (${sources.length})`}>
+            <DataTable
+              value={sources}
+              paginator
+              rows={20}
+              rowsPerPageOptions={[10, 20, 50, 100]}
+              className="db-entities-table"
+              responsiveLayout="scroll"
+            >
+              <Column field="id" header="ID" sortable />
+              <Column field="url" header="URL" sortable />
+              <Column field="title" header="Название" sortable />
+              <Column field="source_type" header="Тип" sortable />
+              <Column field="retrieved_at" header="Дата получения" sortable />
+            </DataTable>
+          </TabPanel>
+        </TabView>
+      </Panel>
     </div>
   );
 };

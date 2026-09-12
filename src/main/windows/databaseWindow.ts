@@ -18,7 +18,7 @@ export const createDatabaseWindow = (): BrowserWindow => {
   databaseWindow = new BrowserWindow({
     width: 1000,
     height: 700,
-    title: 'База данных OSINT',
+    title: 'Ситч',
     webPreferences: {
       preload: preloadPath,
       contextIsolation: true,
