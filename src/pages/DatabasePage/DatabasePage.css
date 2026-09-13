@@ -81,3 +81,60 @@
   padding: 0 !important;
   box-sizing: border-box;
 }
+
+.p-dialog .p-dialog-header {
+  background: #17212b !important;
+  border-bottom: 1px solid var(--surface-border, #dee2e6);
+  padding: 0.75rem 1rem !important;
+}
+
+.p-dialog .p-dialog-header .p-panel-title {
+  font-size: 1.125rem !important;
+  font-weight: 600 !important;
+  color: var(--text-color, #495057) !important;
+  line-height: 1.2 !important;
+}
+
+/* Диалог — как панель: единая рамка по контуру */
+.p-dialog {
+  background: var(--tg-theme-section-bg-color) !important;
+  border: 1px solid var(--tg-theme-hint-color) !important;
+  border-radius: 6px !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15) !important;
+  overflow: hidden;
+}
+
+/* Заголовок диалога — БЕЗ боковых и верхней рамок */
+.p-dialog .p-dialog-header {
+  border: none !important;
+  border-bottom: 1px solid var(--tg-theme-hint-color) !important;
+  padding: 1.25rem !important;
+  background: var(--tg-theme-section-bg-color) !important;
+  color: var(--tg-theme-accent-text-color) !important;
+  border-top-right-radius: 6px !important;
+  border-top-left-radius: 6px !important;
+  font-weight: var(--app-font-weight-header) !important;
+  font-size: var(--app-font-size) !important;
+}
+
+/* Остальное без изменений */
+.p-dialog .p-dialog-header .p-dialog-title,
+.p-dialog .p-dialog-header .p-panel-title {
+  color: var(--tg-theme-accent-text-color) !important;
+  font-weight: var(--app-font-weight-header) !important;
+  font-size: var(--app-font-size) !important;
+}
+
+.p-dialog .p-dialog-header .p-dialog-header-icon {
+  color: var(--tg-theme-accent-text-color) !important;
+}
+.p-dialog .p-dialog-header .p-dialog-header-icon:hover {
+  color: var(--tg-theme-accent-text-color) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+.p-dialog .p-dialog-content {
+  background: var(--tg-theme-section-bg-color) !important;
+  padding: 1.25rem !important;
+  color: var(--tg-theme-text-color, inherit) !important;
+}

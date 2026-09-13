@@ -121,6 +121,7 @@ export const DatabasePage: React.FC = () => {
     <div className="p-4">
       {error && <p style={{ color: 'red' }}>{error}</p>}
 
+
       {/* Панель поиска */}
       <Panel className="shadow-5 mb-3" header="Поиск по сущностям">
         <div className="flex flex-wrap align-items-center gap-3 py-2">
@@ -254,11 +255,15 @@ export const DatabasePage: React.FC = () => {
       </Panel>
 
       <Dialog
-        header={relationDetails ? `Связь #${relationDetails.id}` : 'Загрузка...'}
         visible={relationDialog}
         style={{ width: '700px' }}
         modal
         onHide={() => setRelationDialog(false)}
+        header={
+          <span className="p-panel-title">
+            {relationDetails ? `Связь #${relationDetails.id}` : 'Загрузка...'}
+          </span>
+        }
       >
         {relationLoading && <p>Загрузка...</p>}
         {!relationLoading && relationDetails && (
