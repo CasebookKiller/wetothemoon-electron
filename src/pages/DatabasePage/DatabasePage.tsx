@@ -311,7 +311,7 @@ export const DatabasePage: React.FC = () => {
             <Button
               label="Пометить как ложную"
               icon="pi pi-exclamation-triangle"
-              className="p-button-raised p-button-warning"
+              className="osint-destructive"
               onClick={openMarkFalseDialog}
               disabled={relationDetails?.status === 'false'}
             />

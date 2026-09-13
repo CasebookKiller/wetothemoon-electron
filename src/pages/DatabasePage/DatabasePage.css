@@ -197,17 +197,6 @@ span.osint {
   color: var(--tg-theme-accent-text-color);
 }
 
-/* Кнопка «Закрыть» в футере диалога — как .osint */
-.osint.p-button {
-  color: var(--tg-theme-accent-text-color);
-  background: var(--tg-theme-bg-color);
-  border: 1px solid var(--tg-theme-accent-text-color);
-  padding: 0.75rem 1.25rem;
-  font-size: 0.75rem;
-  transition: background-color 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s;
-  border-radius: 6px;
-}
-
 .osint.p-button:hover {
   background: var(--tg-theme-accent-text-color);
   color: var(--tg-theme-bg-color);
@@ -217,4 +206,35 @@ span.osint {
 .osint.p-button:focus {
   outline: none;
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.15);
+}
+
+/* Кнопка «Пометить как ложную» — как .osint, но destructive */
+.osint-destructive.p-button {
+  color: var(--tg-theme-destructive-text-color, #ec3942);
+  background: var(--tg-theme-bg-color);
+  border: 1px solid var(--tg-theme-destructive-text-color, #ec3942);
+  padding: 0.75rem 1.25rem;
+  font-size: 0.75rem;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s;
+  border-radius: 6px;
+}
+
+.osint-destructive.p-button:hover {
+  background: var(--tg-theme-destructive-text-color, #ec3942);
+  color: var(--tg-theme-bg-color);
+  border-color: var(--tg-theme-destructive-text-color, #ec3942);
+}
+
+.osint-destructive.p-button:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(236, 57, 66, 0.25);
+}
+
+.osint-destructive.p-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+span.osint-destructive {
+  color: var(--tg-theme-destructive-text-color, #ec3942);
 }
