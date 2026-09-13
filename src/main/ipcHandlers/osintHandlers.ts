@@ -11,7 +11,8 @@ import { createDatabaseWindow, getDatabaseWindow } from '../windows/databaseWind
 import { deleteDumpsByEntity, findLatestRawDump, searchEntities } from '../services/database';
 import { loadRawDumpSync } from '../services/rawStorage';
 import { mergeCompanyDumps, saveCompanyData, updateCompanyData } from '../services/osintStorage';
-import { getDatabase, getDumpSectionsUpdatedAt, hasRawDumpForInn, listDumps } from '../services/database';
+import { getDatabase, getDumpSectionsUpdatedAt, hasRawDumpForInn, listDumps, getRelationDetails } from '../services/database';
+
 
 export function registerOsintHandlers() {
   // Открыть окно OSINT
@@ -242,6 +243,15 @@ export function registerOsintHandlers() {
     try {
       const rows = searchEntities(query, type, limit, offset);
       return { success: true, items: rows };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('osint:get-relation-details', async (_event, relationId: number) => {
+    try {
+      const details = getRelationDetails(relationId);
+      return { success: true, data: details };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }

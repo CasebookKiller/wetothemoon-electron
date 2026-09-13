@@ -550,3 +550,44 @@ export function searchEntities(
     LIMIT ? OFFSET ?
   `).all(rawQuery, rawQuery, normalizedQuery, limit, offset) as unknown as any[];
 }
+
+/**
+ * Возвращает полную информацию о связи, включая subject/object и источник.
+ */
+export function getRelationDetails(relationId: number): any | null {
+  const db = getDatabase();
+  const row = db.prepare(`
+    SELECT
+      r.id,
+      r.predicate,
+      r.confidence,
+      r.status,
+      r.valid_from,
+      r.valid_to,
+      r.evidence_text,
+      r.notes,
+      r.raw_file_path,
+      r.subject_id,
+      r.object_id,
+      r.source_id,
+      s.label AS subject_label,
+      s.type  AS subject_type,
+      s.value AS subject_value,
+      o.label AS object_label,
+      o.type  AS object_type,
+      o.value AS object_value,
+      src.url         AS source_url,
+      src.title       AS source_title,
+      src.source_type AS source_type,
+      src.provider    AS source_provider,
+      src.access_level AS source_access_level,
+      src.retrieved_at AS source_retrieved_at
+    FROM relations r
+    JOIN entities s ON s.id = r.subject_id
+    JOIN entities o ON o.id = r.object_id
+    LEFT JOIN sources src ON src.id = r.source_id
+    WHERE r.id = ?
+  `).get(relationId) as any;
+
+  return row ?? null;
+}

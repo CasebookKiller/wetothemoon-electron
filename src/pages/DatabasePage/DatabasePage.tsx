@@ -6,6 +6,7 @@ import { Button } from 'primereact/button';
 import { TabView, TabPanel } from 'primereact/tabview';
 import { InputText } from 'primereact/inputtext';
 import { Dropdown } from 'primereact/dropdown';
+import { Dialog } from 'primereact/dialog';
 
 import './DatabasePage.css';
 
@@ -22,6 +23,10 @@ export const DatabasePage: React.FC = () => {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchActive, setSearchActive] = useState(false);
+
+  const [relationDialog, setRelationDialog] = useState(false);
+  const [relationDetails, setRelationDetails] = useState<any>(null);
+  const [relationLoading, setRelationLoading] = useState(false);
 
   const api = (window as any).electronAPI;
 
@@ -88,6 +93,21 @@ export const DatabasePage: React.FC = () => {
   const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       handleSearch();
+    }
+  };
+
+  const openRelationDetails = async (relationId: number) => {
+    setRelationLoading(true);
+    setRelationDetails(null);
+    setRelationDialog(true);
+    try {
+      const res = await api.getRelationDetails(relationId);
+      if (res.success) setRelationDetails(res.data);
+      else setError(res.error || 'Ошибка загрузки деталей связи');
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setRelationLoading(false);
     }
   };
 
@@ -184,9 +204,12 @@ export const DatabasePage: React.FC = () => {
               paginator
               rows={20}
               rowsPerPageOptions={[10, 20, 50, 100]}
-              className="db-entities-table"
               responsiveLayout="scroll"
+              selectionMode="single"
+              onRowClick={(e) => openRelationDetails(e.data.id)}
+              rowHover
             >
+              <Column field="id" header="ID" sortable />
               <Column field="subject_label" header="Исходная сущность" sortable />
               <Column field="predicate" header="Тип связи" sortable />
               <Column field="object_label" header="Целевая сущность" sortable />
@@ -229,6 +252,96 @@ export const DatabasePage: React.FC = () => {
           </TabPanel>
         </TabView>
       </Panel>
+
+      <Dialog
+        header={relationDetails ? `Связь #${relationDetails.id}` : 'Загрузка...'}
+        visible={relationDialog}
+        style={{ width: '700px' }}
+        modal
+        onHide={() => setRelationDialog(false)}
+      >
+        {relationLoading && <p>Загрузка...</p>}
+        {!relationLoading && relationDetails && (
+          <div className="p-fluid">
+            <div className="field">
+              <label className="font-bold">Исходная сущность</label>
+              <div>
+                [{relationDetails.subject_id}] {relationDetails.subject_label} — <i>{relationDetails.subject_type}</i>
+                <div className="text-sm text-500">{relationDetails.subject_value}</div>
+              </div>
+            </div>
+
+            <div className="field">
+              <label className="font-bold">Связь</label>
+              <div><b>{relationDetails.predicate}</b></div>
+            </div>
+
+            <div className="field">
+              <label className="font-bold">Целевая сущность</label>
+              <div>
+                [{relationDetails.object_id}] {relationDetails.object_label} — <i>{relationDetails.object_type}</i>
+                <div className="text-sm text-500">{relationDetails.object_value}</div>
+              </div>
+            </div>
+
+            <div className="field">
+              <label className="font-bold">Источник</label>
+              {relationDetails.source_url ? (
+                <div>
+                  [{relationDetails.source_id}] {relationDetails.source_title || 'Источник'}
+                  <div className="text-sm">
+                    <a href={relationDetails.source_url} target="_blank" rel="noreferrer">
+                      {relationDetails.source_url}
+                    </a>
+                  </div>
+                  <div className="text-sm text-500">
+                    {relationDetails.source_type} • {relationDetails.source_provider} • {relationDetails.source_access_level}
+                    {relationDetails.source_retrieved_at ? ` • получено ${new Date(relationDetails.source_retrieved_at).toLocaleString()}` : ''}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-500">Источник не указан</div>
+              )}
+            </div>
+
+            <div className="field">
+              <label className="font-bold">Подтверждение (evidence)</label>
+              <div>{relationDetails.evidence_text || <span className="text-500">—</span>}</div>
+            </div>
+
+            <div className="grid">
+              <div className="col-6">
+                <label className="font-bold">Уверенность</label>
+                <div>{relationDetails.confidence ?? '—'}</div>
+              </div>
+              <div className="col-6">
+                <label className="font-bold">Статус</label>
+                <div>{relationDetails.status}</div>
+              </div>
+              <div className="col-6">
+                <label className="font-bold">Действует с</label>
+                <div>{relationDetails.valid_from || '—'}</div>
+              </div>
+              <div className="col-6">
+                <label className="font-bold">Действует до</label>
+                <div>{relationDetails.valid_to || '—'}</div>
+              </div>
+            </div>
+
+            <div className="field">
+              <label className="font-bold">Заметки</label>
+              <div>{relationDetails.notes || <span className="text-500">—</span>}</div>
+            </div>
+
+            <div className="field">
+              <label className="font-bold">Файл дампа</label>
+              <div className="text-sm text-500" style={{ wordBreak: 'break-all' }}>
+                {relationDetails.raw_file_path || '—'}
+              </div>
+            </div>
+          </div>
+        )}
+      </Dialog>
     </div>
   );
 };
