@@ -404,6 +404,9 @@ try {
     getRelationDetails: (relationId: number) =>
       ipcRenderer.invoke('osint:get-relation-details', relationId),
 
+    markFalse: (table: 'entities' | 'relations' | 'observations', recordId: number, reason: string) =>
+      ipcRenderer.invoke('osint:mark-false', table, recordId, reason),
+
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

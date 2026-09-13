@@ -7,6 +7,7 @@ import { TabView, TabPanel } from 'primereact/tabview';
 import { InputText } from 'primereact/inputtext';
 import { Dropdown } from 'primereact/dropdown';
 import { Dialog } from 'primereact/dialog';
+import { InputTextarea } from 'primereact/inputtextarea';
 
 import './DatabasePage.css';
 
@@ -27,6 +28,11 @@ export const DatabasePage: React.FC = () => {
   const [relationDialog, setRelationDialog] = useState(false);
   const [relationDetails, setRelationDetails] = useState<any>(null);
   const [relationLoading, setRelationLoading] = useState(false);
+
+  const [falseDialog, setFalseDialog] = useState(false);
+  const [falseReason, setFalseReason] = useState('');
+  const [falseLoading, setFalseLoading] = useState(false);
+  const [falseMessage, setFalseMessage] = useState('');
 
   const api = (window as any).electronAPI;
 
@@ -111,6 +117,40 @@ export const DatabasePage: React.FC = () => {
     }
   };
 
+  const openMarkFalseDialog = () => {
+    setFalseReason('');
+    setFalseMessage('');
+    setFalseDialog(true);
+  };
+
+  const handleMarkFalseSubmit = async () => {
+    if (!relationDetails?.id) return;
+    if (!falseReason.trim()) {
+      setFalseMessage('Укажите причину');
+      return;
+    }
+
+    setFalseLoading(true);
+    setFalseMessage('');
+    try {
+      const res = await api.markFalse('relations', relationDetails.id, falseReason.trim());
+      if (res.success) {
+        setFalseMessage('Запись помечена как ложная');
+        // Обновляем список связей и детали
+        await loadData();
+        const detailsRes = await api.getRelationDetails(relationDetails.id);
+        if (detailsRes.success) setRelationDetails(detailsRes.data);
+        setTimeout(() => setFalseDialog(false), 800);
+      } else {
+        setFalseMessage(`Ошибка: ${res.error}`);
+      }
+    } catch (e) {
+      setFalseMessage((e as Error).message);
+    } finally {
+      setFalseLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadData();
   }, []);
@@ -125,7 +165,6 @@ export const DatabasePage: React.FC = () => {
       {/* Панель поиска */}
       <Panel className="shadow-5 mb-3" 
         header="Поиск по сущностям"
-        footer="тест"
       >
         <div className="flex flex-wrap align-items-center gap-3 py-2">
           <div className="flex-1" style={{ minWidth: '240px' }}>
@@ -268,11 +307,18 @@ export const DatabasePage: React.FC = () => {
           </span>
         }
         footer={
-          <div className="p-panel-footer flex justify-content-end">
+          <div className="p-panel-footer flex justify-content-end gap-2">
+            <Button
+              label="Пометить как ложную"
+              icon="pi pi-exclamation-triangle"
+              className="p-button-raised p-button-warning"
+              onClick={openMarkFalseDialog}
+              disabled={relationDetails?.status === 'false'}
+            />
             <Button
               label="Закрыть"
               icon="pi pi-times"
-              className="profile"
+              className="osint"
               onClick={() => setRelationDialog(false)}
             />
           </div>
@@ -359,6 +405,58 @@ export const DatabasePage: React.FC = () => {
             </div>
           </div>
         )}
+      </Dialog>
+
+      <Dialog
+        visible={falseDialog}
+        style={{ width: '500px' }}
+        modal
+        onHide={() => setFalseDialog(false)}
+        header={
+          <span className="p-panel-title">Пометить связь как ложную</span>
+        }
+      >
+        <div className="p-fluid">
+          <p className="text-sm text-500">
+            Связь <b>#{relationDetails?.id}</b> будет помечена как <code>false</code>.
+            Причина сохранится в поле <code>notes</code> и в журнале изменений.
+          </p>
+          <div className="field mt-3">
+            <label htmlFor="falseReason" className="font-bold">Причина *</label>
+            <InputTextarea
+              id="falseReason"
+              value={falseReason}
+              onChange={(e) => setFalseReason(e.target.value)}
+              rows={3}
+              autoResize
+              placeholder="Например: ошибочно сопоставлено с другой организацией"
+              className="w-full"
+            />
+          </div>
+          {falseMessage && (
+            <p className={falseMessage.startsWith('Ошибка') ? 'p-error' : 'p-success'}>
+              {falseMessage}
+            </p>
+          )}
+        </div>
+
+        {/* Футер диалога mark-false — просто кнопки, без p-panel-footer */}
+        <div className="p-dialog-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+          <Button
+            label="Отмена"
+            icon="pi pi-times"
+            className="p-button-text"
+            onClick={() => setFalseDialog(false)}
+            disabled={falseLoading}
+          />
+          <Button
+            label={falseLoading ? 'Отправка...' : 'Пометить'}
+            icon={falseLoading ? 'pi pi-spin pi-spinner' : 'pi pi-check'}
+            className="p-button-warning p-button-raised"
+            onClick={handleMarkFalseSubmit}
+            disabled={falseLoading || !falseReason.trim()}
+          />
+        </div>
       </Dialog>
     </div>
   );

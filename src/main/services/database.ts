@@ -591,3 +591,42 @@ export function getRelationDetails(relationId: number): any | null {
 
   return row ?? null;
 }
+
+/**
+ * Помечает запись в указанной таблице как status='false'.
+ * Записывает причину в notes (как в Python-скрипте).
+ * Логирует изменение в audit_log.
+ */
+export function markRecordAsFalse(
+  table: 'entities' | 'relations' | 'observations',
+  recordId: number,
+  reason: string
+): { success: boolean; error?: string } {
+  const db = getDatabase();
+
+  if (!['entities', 'relations', 'observations'].includes(table)) {
+    return { success: false, error: `Недопустимая таблица: ${table}` };
+  }
+
+  // Получаем старую запись
+  const old = db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(recordId);
+  if (!old) {
+    return { success: false, error: `Запись с id=${recordId} не найдена в таблице ${table}` };
+  }
+
+  // Обновляем: status='false', notes=причина
+  db.prepare(`UPDATE ${table} SET status = 'false', notes = ? WHERE id = ?`)
+    .run(reason, recordId);
+
+  // Аудит
+  auditChange(
+    table,
+    recordId,
+    'mark_false',
+    JSON.stringify(old),
+    `status=false; reason=${reason}`,
+    reason
+  );
+
+  return { success: true };
+}

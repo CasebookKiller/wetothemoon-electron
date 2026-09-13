@@ -10125,6 +10125,30 @@ function getRelationDetails(relationId) {
     WHERE r.id = ?
   `).get(relationId) ?? null;
 }
+/**
+* Помечает запись в указанной таблице как status='false'.
+* Записывает причину в notes (как в Python-скрипте).
+* Логирует изменение в audit_log.
+*/
+function markRecordAsFalse(table, recordId, reason) {
+	const db = getDatabase();
+	if (![
+		"entities",
+		"relations",
+		"observations"
+	].includes(table)) return {
+		success: false,
+		error: `Недопустимая таблица: ${table}`
+	};
+	const old = db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(recordId);
+	if (!old) return {
+		success: false,
+		error: `Запись с id=${recordId} не найдена в таблице ${table}`
+	};
+	db.prepare(`UPDATE ${table} SET status = 'false', notes = ? WHERE id = ?`).run(reason, recordId);
+	auditChange(table, recordId, "mark_false", JSON.stringify(old), `status=false; reason=${reason}`, reason);
+	return { success: true };
+}
 //#endregion
 //#region src/main/services/rawStorage.ts
 function loadRawDumpSync(filePath) {
@@ -10742,6 +10766,16 @@ function registerOsintHandlers() {
 				success: true,
 				data: getRelationDetails(relationId)
 			};
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:mark-false", async (_event, table, recordId, reason) => {
+		try {
+			return markRecordAsFalse(table, recordId, reason);
 		} catch (error) {
 			return {
 				success: false,

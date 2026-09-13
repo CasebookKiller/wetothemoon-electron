@@ -282,7 +282,8 @@ try {
 		listDumps: () => electron.ipcRenderer.invoke("osint:list-dumps"),
 		deleteDump: (companyInn, companyIdRusprofile) => electron.ipcRenderer.invoke("osint:delete-dump", companyInn, companyIdRusprofile),
 		searchEntities: (query, type, limit = 100, offset = 0) => electron.ipcRenderer.invoke("osint:search-entities", query, type, limit, offset),
-		getRelationDetails: (relationId) => electron.ipcRenderer.invoke("osint:get-relation-details", relationId)
+		getRelationDetails: (relationId) => electron.ipcRenderer.invoke("osint:get-relation-details", relationId),
+		markFalse: (table, recordId, reason) => electron.ipcRenderer.invoke("osint:mark-false", table, recordId, reason)
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {
