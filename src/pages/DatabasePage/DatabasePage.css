@@ -1,4 +1,8 @@
-/* Стиль кнопок пагинации в акцентном цвете */
+/* ============================================================
+   DatabasePage.css
+   ============================================================ */
+
+/* ---------- Пагинация в акцентном цвете ---------- */
 .p-paginator .p-paginator-page,
 .p-paginator .p-paginator-next,
 .p-paginator .p-paginator-prev,
@@ -6,8 +10,11 @@
 .p-paginator .p-paginator-last {
   color: var(--accent-color, #6ab2f2) !important;
   background-color: transparent !important;
-  border-color: var(--accent-color, #6ab2f2) !important;
-  border-width: 1px !important;
+  border: 1px solid var(--accent-color, #6ab2f2) !important;
+  border-radius: 6px;
+  min-width: 2.25rem;
+  height: 2.25rem;
+  margin: 0 2px;
 }
 
 .p-paginator .p-paginator-page:hover,
@@ -16,7 +23,6 @@
 .p-paginator .p-paginator-first:hover,
 .p-paginator .p-paginator-last:hover {
   background-color: rgba(236, 72, 153, 0.12) !important;
-  border-width: 1px !important;
   color: var(--accent-color, #6ab2f2) !important;
 }
 
@@ -24,50 +30,38 @@
 .p-paginator .p-paginator-page.p-paginator-page-selected {
   background-color: var(--accent-color, #6ab2f2) !important;
   border-color: var(--accent-color, #6ab2f2) !important;
-  border-width: 1px !important;
   color: #fff !important;
 }
 
-/* Отступ иконки от левой границы поля */
+/* ---------- Поле поиска с иконкой ---------- */
 .search-input-with-icon .p-input-icon-left,
 .search-input-with-icon > i.pi-search {
-  left: 1rem !important;       /* насколько иконка отстоит от границы */
+  left: 1rem !important;
 }
 
-/* Отступ текста в input, чтобы не наезжал на иконку */
 .search-input-with-icon .p-inputtext {
-  padding-left: 2.75rem !important;  /* должно быть больше left + ширина иконки */
+  padding-left: 2.75rem !important;
 }
 
-.p-paginator .p-paginator-page,
-.p-paginator .p-paginator-next,
-.p-paginator .p-paginator-prev,
-.p-paginator .p-paginator-first,
-.p-paginator .p-paginator-last {
-  border: 1px solid var(--accent-color, #6ab2f2) !important;
-  border-radius: 6px;
-  min-width: 2.25rem;
-  height: 2.25rem;
-  margin: 0 2px;
-}
-
-.db-entities-table .p-paginator .p-dropdown {
+/* ---------- Dropdown в пагинаторе (rows per page) ---------- */
+.db-entities-table .p-paginator .p-dropdown,
+.p-paginator .p-dropdown {
   height: 2.25rem !important;
+  padding: 0 !important;
+  box-sizing: border-box;
 }
 
-/* Центрирование текста в dropdown rows-per-page */
 .p-paginator .p-dropdown .p-dropdown-label,
 .p-paginator .p-dropdown .p-inputtext {
   display: flex !important;
   align-items: center !important;
-  justify-content: center !important;    /* если хотите по центру горизонтали */
+  justify-content: center !important;
   height: 100% !important;
-  padding: 0 0.5rem !important;          /* убираем вертикальные паддинги */
+  padding: 0 0.5rem !important;
   line-height: 1 !important;
   box-sizing: border-box;
 }
 
-/* Иконка-стрелка тоже по центру */
 .p-paginator .p-dropdown .p-dropdown-trigger {
   display: flex !important;
   align-items: center !important;
@@ -76,26 +70,11 @@
   padding: 0 !important;
 }
 
-/* У самого p-dropdown убираем лишние margin/vertical padding */
-.p-paginator .p-dropdown {
-  padding: 0 !important;
-  box-sizing: border-box;
-}
+/* ============================================================
+   Диалог — визуально как Panel
+   ============================================================ */
 
-.p-dialog .p-dialog-header {
-  background: #17212b !important;
-  border-bottom: 1px solid var(--surface-border, #dee2e6);
-  padding: 0.75rem 1rem !important;
-}
-
-.p-dialog .p-dialog-header .p-panel-title {
-  font-size: 1.125rem !important;
-  font-weight: 600 !important;
-  color: var(--text-color, #495057) !important;
-  line-height: 1.2 !important;
-}
-
-/* Диалог — как панель: единая рамка по контуру */
+/* Корень диалога — единая внешняя рамка */
 .p-dialog {
   background: var(--tg-theme-section-bg-color) !important;
   border: 1px solid var(--tg-theme-hint-color) !important;
@@ -104,7 +83,7 @@
   overflow: hidden;
 }
 
-/* Заголовок диалога — БЕЗ боковых и верхней рамок */
+/* Заголовок диалога — как .p-panel-header */
 .p-dialog .p-dialog-header {
   border: none !important;
   border-bottom: 1px solid var(--tg-theme-hint-color) !important;
@@ -117,24 +96,72 @@
   font-size: var(--app-font-size) !important;
 }
 
-/* Остальное без изменений */
 .p-dialog .p-dialog-header .p-dialog-title,
 .p-dialog .p-dialog-header .p-panel-title {
   color: var(--tg-theme-accent-text-color) !important;
   font-weight: var(--app-font-weight-header) !important;
   font-size: var(--app-font-size) !important;
+  line-height: 1.2 !important;
 }
 
+/* Иконка закрытия — цвет фона заголовка, проявляется при наведении */
 .p-dialog .p-dialog-header .p-dialog-header-icon {
-  color: var(--tg-theme-accent-text-color) !important;
+  color: var(--tg-theme-section-bg-color) !important;
+  background: transparent !important;
 }
 .p-dialog .p-dialog-header .p-dialog-header-icon:hover {
   color: var(--tg-theme-accent-text-color) !important;
   background: rgba(255, 255, 255, 0.08) !important;
 }
 
+/* Контент диалога — как .p-panel-content */
 .p-dialog .p-dialog-content {
+  padding: 4px 22px !important;
+  border: none !important;
   background: var(--tg-theme-section-bg-color) !important;
-  padding: 1.25rem !important;
-  color: var(--tg-theme-text-color, inherit) !important;
+  color: var(--tg-theme-accent-text-color) !important;
+  border-top: 0 none !important;
+  border-bottom: 1px solid var(--tg-theme-hint-color) !important;  /* разделитель перед футером */
+  font-weight: var(--app-font-weight-content) !important;
+  font-size: var(--app-font-size) !important;
 }
+
+/* Футер диалога — как .p-panel-footer */
+.p-dialog .p-dialog-footer {
+  padding: 1rem 1.25rem !important;
+  border: none !important;
+  background: var(--tg-theme-secondary-bg-color) !important;
+  color: var(--tg-theme-accent-text-color) !important;
+  border-top: 0 none !important;
+  font-weight: var(--app-font-weight-content) !important;
+  font-size: var(--app-font-size) !important;
+  border-bottom-right-radius: 6px !important;
+  border-bottom-left-radius: 6px !important;
+}
+
+/* Внутренний .p-panel-footer внутри диалога — без своих отступов */
+.p-dialog .p-dialog-footer .p-panel-footer {
+  padding: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  color: inherit !important;
+  font: inherit !important;
+}
+
+/* Кнопка закрытия: видимая иконка + лёгкий фон */
+.p-dialog .p-dialog-header .p-dialog-header-icon {
+  color: var(--tg-theme-accent-text-color) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  width: 2rem !important;
+  height: 2rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.p-dialog .p-dialog-header .p-dialog-header-icon:hover {
+  color: #fff !important;
+  background: rgba(255, 255, 255, 0.18) !important;
+}
+

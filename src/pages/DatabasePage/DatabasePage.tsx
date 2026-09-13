@@ -123,7 +123,10 @@ export const DatabasePage: React.FC = () => {
 
 
       {/* Панель поиска */}
-      <Panel className="shadow-5 mb-3" header="Поиск по сущностям">
+      <Panel className="shadow-5 mb-3" 
+        header="Поиск по сущностям"
+        footer="тест"
+      >
         <div className="flex flex-wrap align-items-center gap-3 py-2">
           <div className="flex-1" style={{ minWidth: '240px' }}>
             <span className="p-input-icon-left w-full search-input-with-icon">
@@ -263,6 +266,16 @@ export const DatabasePage: React.FC = () => {
           <span className="p-panel-title">
             {relationDetails ? `Связь #${relationDetails.id}` : 'Загрузка...'}
           </span>
+        }
+        footer={
+          <div className="p-panel-footer flex justify-content-end">
+            <Button
+              label="Закрыть"
+              icon="pi pi-times"
+              className="profile"
+              onClick={() => setRelationDialog(false)}
+            />
+          </div>
         }
       >
         {relationLoading && <p>Загрузка...</p>}
