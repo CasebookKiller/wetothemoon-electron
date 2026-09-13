@@ -44,7 +44,6 @@
 }
 
 /* ---------- Dropdown в пагинаторе (rows per page) ---------- */
-.db-entities-table .p-paginator .p-dropdown,
 .p-paginator .p-dropdown {
   height: 2.25rem !important;
   padding: 0 !important;
@@ -74,7 +73,6 @@
    Диалог — визуально как Panel
    ============================================================ */
 
-/* Корень диалога — единая внешняя рамка */
 .p-dialog {
   background: var(--tg-theme-section-bg-color) !important;
   border: 1px solid var(--tg-theme-hint-color) !important;
@@ -83,7 +81,6 @@
   overflow: hidden;
 }
 
-/* Заголовок диалога — как .p-panel-header */
 .p-dialog .p-dialog-header {
   border: none !important;
   border-bottom: 1px solid var(--tg-theme-hint-color) !important;
@@ -104,51 +101,7 @@
   line-height: 1.2 !important;
 }
 
-/* Иконка закрытия — цвет фона заголовка, проявляется при наведении */
-.p-dialog .p-dialog-header .p-dialog-header-icon {
-  color: var(--tg-theme-section-bg-color) !important;
-  background: transparent !important;
-}
-.p-dialog .p-dialog-header .p-dialog-header-icon:hover {
-  color: var(--tg-theme-accent-text-color) !important;
-  background: rgba(255, 255, 255, 0.08) !important;
-}
-
-/* Контент диалога — как .p-panel-content */
-.p-dialog .p-dialog-content {
-  padding: 4px 22px !important;
-  border: none !important;
-  background: var(--tg-theme-section-bg-color) !important;
-  color: var(--tg-theme-accent-text-color) !important;
-  border-top: 0 none !important;
-  border-bottom: 1px solid var(--tg-theme-hint-color) !important;  /* разделитель перед футером */
-  font-weight: var(--app-font-weight-content) !important;
-  font-size: var(--app-font-size) !important;
-}
-
-/* Футер диалога — как .p-panel-footer */
-.p-dialog .p-dialog-footer {
-  padding: 1rem 1.25rem !important;
-  border: none !important;
-  background: var(--tg-theme-secondary-bg-color) !important;
-  color: var(--tg-theme-accent-text-color) !important;
-  border-top: 0 none !important;
-  font-weight: var(--app-font-weight-content) !important;
-  font-size: var(--app-font-size) !important;
-  border-bottom-right-radius: 6px !important;
-  border-bottom-left-radius: 6px !important;
-}
-
-/* Внутренний .p-panel-footer внутри диалога — без своих отступов */
-.p-dialog .p-dialog-footer .p-panel-footer {
-  padding: 0 !important;
-  border: none !important;
-  background: transparent !important;
-  color: inherit !important;
-  font: inherit !important;
-}
-
-/* Кнопка закрытия: видимая иконка + лёгкий фон */
+/* Иконка закрытия */
 .p-dialog .p-dialog-header .p-dialog-header-icon {
   color: var(--tg-theme-accent-text-color) !important;
   background: rgba(255, 255, 255, 0.08) !important;
@@ -166,8 +119,42 @@
   background: rgba(255, 255, 255, 0.18) !important;
 }
 
+.p-dialog .p-dialog-content {
+  padding: 4px 22px !important;
+  border: none !important;
+  background: var(--tg-theme-section-bg-color) !important;
+  color: var(--tg-theme-accent-text-color) !important;
+  border-top: 0 none !important;
+  border-bottom: 1px solid var(--tg-theme-hint-color) !important;
+  font-weight: var(--app-font-weight-content) !important;
+  font-size: var(--app-font-size) !important;
+}
 
-/** osint */
+.p-dialog .p-dialog-footer {
+  padding: 1rem 1.25rem !important;
+  border: none !important;
+  background: var(--tg-theme-secondary-bg-color) !important;
+  color: var(--tg-theme-accent-text-color) !important;
+  border-top: 0 none !important;
+  font-weight: var(--app-font-weight-content) !important;
+  font-size: var(--app-font-size) !important;
+  border-bottom-right-radius: 6px !important;
+  border-bottom-left-radius: 6px !important;
+}
+
+.p-dialog .p-dialog-footer .p-panel-footer {
+  padding: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  color: inherit !important;
+  font: inherit !important;
+}
+
+/* ============================================================
+   Кнопки .osint / .osint-soft / .osint-destructive / .osint-destructive-soft
+   ============================================================ */
+
+/* --- базовый .osint --- */
 .osint.p-button {
   color: var(--tg-theme-accent-text-color);
   background: var(--tg-theme-bg-color);
@@ -178,8 +165,15 @@
   border-radius: 6px;
 }
 
+.osint.p-button:hover {
+  background: var(--tg-theme-accent-text-color);
+  color: var(--tg-theme-bg-color);
+  border-color: var(--tg-theme-accent-text-color);
+}
+
 .osint.p-button:focus {
-  box-shadow: 0 0 0 0 #000, 0 0 0 0 rgba(0, 0, 0, 0), 0 0 0 0 rgba(0, 0, 0, 0);
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.15);
 }
 
 .osint.p-inputtext:enabled:focus {
@@ -197,18 +191,24 @@ span.osint {
   color: var(--tg-theme-accent-text-color);
 }
 
-.osint.p-button:hover {
-  background: var(--tg-theme-accent-text-color);
-  color: var(--tg-theme-bg-color);
+/* --- мягкий вариант --- */
+.osint-soft.p-button {
+  color: var(--tg-theme-accent-text-color);
+  background: var(--tg-theme-bg-color);
+  border: 1px solid var(--tg-theme-accent-text-color);
+  padding: 0.75rem 1.25rem;
+  font-size: 0.75rem;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s;
+  border-radius: 6px;
+}
+
+.osint-soft.p-button:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--tg-theme-accent-text-color);
   border-color: var(--tg-theme-accent-text-color);
 }
 
-.osint.p-button:focus {
-  outline: none;
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.15);
-}
-
-/* Кнопка «Пометить как ложную» — как .osint, но destructive */
+/* --- destructive --- */
 .osint-destructive.p-button {
   color: var(--tg-theme-destructive-text-color, #ec3942);
   background: var(--tg-theme-bg-color);
@@ -230,11 +230,47 @@ span.osint {
   box-shadow: 0 0 0 2px rgba(236, 57, 66, 0.25);
 }
 
-.osint-destructive.p-button:disabled {
+span.osint-destructive {
+  color: var(--tg-theme-destructive-text-color, #ec3942);
+}
+
+/* --- destructive soft --- */
+.osint-destructive-soft.p-button {
+  color: var(--tg-theme-destructive-text-color, #ec3942);
+  background: var(--tg-theme-bg-color);
+  border: 1px solid var(--tg-theme-destructive-text-color, #ec3942);
+  padding: 0.75rem 1.25rem;
+  font-size: 0.75rem;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s;
+  border-radius: 6px;
+}
+
+.osint-destructive-soft.p-button:hover {
+  background: rgba(236, 57, 66, 0.12);
+  color: var(--tg-theme-destructive-text-color, #ec3942);
+  border-color: var(--tg-theme-destructive-text-color, #ec3942);
+}
+
+/* --- disabled для destructive --- */
+.osint-destructive.p-button:disabled,
+.osint-destructive.p-button.p-disabled {
+  color: var(--tg-theme-destructive-text-color, #ec3942) !important;
+  background: var(--tg-theme-bg-color) !important;
+  border: 1px solid var(--tg-theme-destructive-text-color, #ec3942) !important;
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-span.osint-destructive {
-  color: var(--tg-theme-destructive-text-color, #ec3942);
+.osint-destructive.p-button:disabled .p-button-icon,
+.osint-destructive.p-button:disabled .p-button-label,
+.osint-destructive.p-button.p-disabled .p-button-icon,
+.osint-destructive.p-button.p-disabled .p-button-label {
+  color: var(--tg-theme-destructive-text-color, #ec3942) !important;
+}
+
+.osint-destructive.p-button:disabled:hover,
+.osint-destructive.p-button.p-disabled:hover {
+  background: var(--tg-theme-bg-color) !important;
+  color: var(--tg-theme-destructive-text-color, #ec3942) !important;
+  border-color: var(--tg-theme-destructive-text-color, #ec3942) !important;
 }

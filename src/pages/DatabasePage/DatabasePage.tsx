@@ -415,6 +415,25 @@ export const DatabasePage: React.FC = () => {
         header={
           <span className="p-panel-title">Пометить связь как ложную</span>
         }
+        footer={
+          <>
+            {/* Футер диалога mark-false — просто кнопки, без p-panel-footer */}
+            <Button
+              label="Отмена"
+              icon="pi pi-times"
+              className="osint"
+              onClick={() => setFalseDialog(false)}
+              disabled={falseLoading}
+            />
+            <Button
+              label={falseLoading ? 'Отправка...' : 'Пометить'}
+              icon={falseLoading ? 'pi pi-spin pi-spinner' : 'pi pi-check'}
+              className="osint-destructive"
+              onClick={handleMarkFalseSubmit}
+              disabled={falseLoading || !falseReason.trim()}
+            />
+          </>
+        }
       >
         <div className="p-fluid">
           <p className="text-sm text-500">
@@ -440,23 +459,7 @@ export const DatabasePage: React.FC = () => {
           )}
         </div>
 
-        {/* Футер диалога mark-false — просто кнопки, без p-panel-footer */}
-        <div className="p-dialog-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-          <Button
-            label="Отмена"
-            icon="pi pi-times"
-            className="p-button-text"
-            onClick={() => setFalseDialog(false)}
-            disabled={falseLoading}
-          />
-          <Button
-            label={falseLoading ? 'Отправка...' : 'Пометить'}
-            icon={falseLoading ? 'pi pi-spin pi-spinner' : 'pi pi-check'}
-            className="p-button-warning p-button-raised"
-            onClick={handleMarkFalseSubmit}
-            disabled={falseLoading || !falseReason.trim()}
-          />
-        </div>
+        
       </Dialog>
     </div>
   );
