@@ -700,3 +700,38 @@ export function getEntityDetails(entityId: number): any | null {
   };
 }
 
+/**
+ * Возвращает полную информацию о наблюдении, включая связанную сущность и источник.
+ */
+export function getObservationDetails(observationId: number): any | null {
+  const db = getDatabase();
+
+  const row = db.prepare(`
+    SELECT
+      o.id,
+      o.entity_id,
+      o.attribute,
+      o.value,
+      o.source_id,
+      o.observed_at,
+      o.confidence,
+      o.notes,
+      o.raw_file_path,
+      e.type  AS entity_type,
+      e.label AS entity_label,
+      e.value AS entity_value,
+      s.url           AS source_url,
+      s.title         AS source_title,
+      s.source_type   AS source_type,
+      s.source_kind   AS source_kind,
+      s.provider      AS source_provider,
+      s.access_level  AS source_access_level,
+      s.retrieved_at  AS source_retrieved_at
+    FROM observations o
+    JOIN entities e ON e.id = o.entity_id
+    LEFT JOIN sources s ON s.id = o.source_id
+    WHERE o.id = ?
+  `).get(observationId) as any;
+
+  return row ?? null;
+}

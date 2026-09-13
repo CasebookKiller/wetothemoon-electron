@@ -41,6 +41,10 @@ export const DatabasePage: React.FC = () => {
 
   const [markTarget, setMarkTarget] = useState<{ table: 'entities' | 'relations' | 'observations'; id: number } | null>(null);
 
+  const [observationDialog, setObservationDialog] = useState(false);
+  const [observationDetails, setObservationDetails] = useState<any>(null);
+  const [observationLoading, setObservationLoading] = useState(false);
+
   const api = (window as any).electronAPI;
 
   const entityTypeOptions = [
@@ -146,6 +150,21 @@ export const DatabasePage: React.FC = () => {
     }
   };
 
+  const openObservationDetails = async (observationId: number) => {
+    setObservationLoading(true);
+    setObservationDetails(null);
+    setObservationDialog(true);
+    try {
+      const res = await api.getObservationDetails(observationId);
+      if (res.success) setObservationDetails(res.data);
+      else setError(res.error || 'Ошибка загрузки деталей наблюдения');
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setObservationLoading(false);
+    }
+  };
+
   const handleMarkFalseSubmit = async () => {
     if (!markTarget) return;
     if (!falseReason.trim()) {
@@ -167,6 +186,10 @@ export const DatabasePage: React.FC = () => {
         if (markTarget.table === 'entities' && entityDetails?.entity?.id === markTarget.id) {
           const detailsRes = await api.getEntityDetails(markTarget.id);
           if (detailsRes.success) setEntityDetails(detailsRes.data);
+        }
+        if (markTarget.table === 'observations' && observationDetails?.id === markTarget.id) {
+          const detailsRes = await api.getObservationDetails(markTarget.id);
+          if (detailsRes.success) setObservationDetails(detailsRes.data);
         }
         setTimeout(() => setFalseDialog(false), 800);
       } else {
@@ -297,9 +320,12 @@ export const DatabasePage: React.FC = () => {
               paginator
               rows={20}
               rowsPerPageOptions={[10, 20, 50, 100]}
-              className="db-entities-table"
               responsiveLayout="scroll"
+              selectionMode="single"
+              onRowClick={(e) => openObservationDetails(e.data.id)}
+              rowHover
             >
+              <Column field="id" header="ID" sortable />
               <Column field="entity_label" header="Сущность" sortable />
               <Column field="attribute" header="Атрибут" sortable />
               <Column field="value" header="Значение" sortable />
@@ -518,7 +544,7 @@ export const DatabasePage: React.FC = () => {
             <Button
               label="Закрыть"
               icon="pi pi-times"
-              className="osint-soft"
+              className="osint"
               onClick={() => setEntityDialog(false)}
             />
           </div>
@@ -645,6 +671,109 @@ export const DatabasePage: React.FC = () => {
               )}
             </TabPanel>
           </TabView>
+        )}
+      </Dialog>
+
+      <Dialog
+        visible={observationDialog}
+        style={{ width: '700px' }}
+        modal
+        onHide={() => setObservationDialog(false)}
+        header={
+          <span className="p-panel-title">
+            {observationDetails ? `Наблюдение #${observationDetails.id}` : 'Загрузка...'}
+          </span>
+        }
+        footer={
+          <div className="p-panel-footer flex justify-content-end gap-2">
+            <Button
+              label="Пометить как ложную"
+              icon="pi pi-exclamation-triangle"
+              className="osint-destructive"
+              onClick={() => {
+                if (observationDetails?.id) {
+                  openMarkFalseDialog({ table: 'observations', id: observationDetails.id });
+                }
+              }}
+              disabled={!observationDetails}
+            />
+            <Button
+              label="Закрыть"
+              icon="pi pi-times"
+              className="osint-soft"
+              onClick={() => setObservationDialog(false)}
+            />
+          </div>
+        }
+      >
+        {observationLoading && <p>Загрузка...</p>}
+        {!observationLoading && observationDetails && (
+          <div className="p-fluid">
+            <div className="field">
+              <label className="font-bold">Сущность</label>
+              <div>
+                [{observationDetails.entity_id}] {observationDetails.entity_label} — <i>{observationDetails.entity_type}</i>
+                <div className="text-sm text-500">{observationDetails.entity_value}</div>
+              </div>
+            </div>
+
+            <div className="grid">
+              <div className="col-12 md:col-6 field">
+                <label className="font-bold">Атрибут</label>
+                <div>{observationDetails.attribute}</div>
+              </div>
+              <div className="col-12 md:col-6 field">
+                <label className="font-bold">Значение</label>
+                <div style={{ wordBreak: 'break-all' }}>{observationDetails.value}</div>
+              </div>
+              <div className="col-12 md:col-6 field">
+                <label className="font-bold">Уверенность</label>
+                <div>{observationDetails.confidence ?? '—'}</div>
+              </div>
+              <div className="col-12 md:col-6 field">
+                <label className="font-bold">Дата наблюдения</label>
+                <div>
+                  {observationDetails.observed_at
+                    ? new Date(observationDetails.observed_at).toLocaleString()
+                    : '—'}
+                </div>
+              </div>
+            </div>
+
+            <div className="field">
+              <label className="font-bold">Источник</label>
+              {observationDetails.source_url ? (
+                <div>
+                  [{observationDetails.source_id}] {observationDetails.source_title || 'Источник'}
+                  <div className="text-sm">
+                    <a href={observationDetails.source_url} target="_blank" rel="noreferrer">
+                      {observationDetails.source_url}
+                    </a>
+                  </div>
+                  <div className="text-sm text-500">
+                    {observationDetails.source_type} • {observationDetails.source_provider} • {observationDetails.source_access_level}
+                    {observationDetails.source_retrieved_at
+                      ? ` • получено ${new Date(observationDetails.source_retrieved_at).toLocaleString()}`
+                      : ''}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-500">Источник не указан</div>
+              )}
+            </div>
+
+            <div className="field">
+              <label className="font-bold">Заметки</label>
+              <div>{observationDetails.notes || <span className="text-500">—</span>}</div>
+            </div>
+
+            <div className="field">
+              <label className="font-bold">Файл дампа</label>
+              <div className="text-sm text-500" style={{ wordBreak: 'break-all' }}>
+                {observationDetails.raw_file_path || '—'}
+              </div>
+            </div>
+          </div>
         )}
       </Dialog>
 

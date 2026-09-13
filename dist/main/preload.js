@@ -284,7 +284,8 @@ try {
 		searchEntities: (query, type, limit = 100, offset = 0) => electron.ipcRenderer.invoke("osint:search-entities", query, type, limit, offset),
 		getRelationDetails: (relationId) => electron.ipcRenderer.invoke("osint:get-relation-details", relationId),
 		markFalse: (table, recordId, reason) => electron.ipcRenderer.invoke("osint:mark-false", table, recordId, reason),
-		getEntityDetails: (entityId) => electron.ipcRenderer.invoke("osint:get-entity-details", entityId)
+		getEntityDetails: (entityId) => electron.ipcRenderer.invoke("osint:get-entity-details", entityId),
+		getObservationDetails: (observationId) => electron.ipcRenderer.invoke("osint:get-observation-details", observationId)
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {

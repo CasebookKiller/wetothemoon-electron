@@ -10206,6 +10206,37 @@ function getEntityDetails(entityId) {
   `).all(entityId, entityId, entityId)
 	};
 }
+/**
+* Возвращает полную информацию о наблюдении, включая связанную сущность и источник.
+*/
+function getObservationDetails(observationId) {
+	return getDatabase().prepare(`
+    SELECT
+      o.id,
+      o.entity_id,
+      o.attribute,
+      o.value,
+      o.source_id,
+      o.observed_at,
+      o.confidence,
+      o.notes,
+      o.raw_file_path,
+      e.type  AS entity_type,
+      e.label AS entity_label,
+      e.value AS entity_value,
+      s.url           AS source_url,
+      s.title         AS source_title,
+      s.source_type   AS source_type,
+      s.source_kind   AS source_kind,
+      s.provider      AS source_provider,
+      s.access_level  AS source_access_level,
+      s.retrieved_at  AS source_retrieved_at
+    FROM observations o
+    JOIN entities e ON e.id = o.entity_id
+    LEFT JOIN sources s ON s.id = o.source_id
+    WHERE o.id = ?
+  `).get(observationId) ?? null;
+}
 //#endregion
 //#region src/main/services/rawStorage.ts
 function loadRawDumpSync(filePath) {
@@ -10845,6 +10876,19 @@ function registerOsintHandlers() {
 			return {
 				success: true,
 				data: getEntityDetails(entityId)
+			};
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:get-observation-details", async (_event, observationId) => {
+		try {
+			return {
+				success: true,
+				data: getObservationDetails(observationId)
 			};
 		} catch (error) {
 			return {

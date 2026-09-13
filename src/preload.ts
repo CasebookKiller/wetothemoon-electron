@@ -410,6 +410,9 @@ try {
     getEntityDetails: (entityId: number) =>
       ipcRenderer.invoke('osint:get-entity-details', entityId),
 
+    getObservationDetails: (observationId: number) =>
+      ipcRenderer.invoke('osint:get-observation-details', observationId),
+
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)
