@@ -413,6 +413,9 @@ try {
     getObservationDetails: (observationId: number) =>
       ipcRenderer.invoke('osint:get-observation-details', observationId),
 
+    getSourceDetails: (sourceId: number) =>
+      ipcRenderer.invoke('osint:get-source-details', sourceId),
+
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

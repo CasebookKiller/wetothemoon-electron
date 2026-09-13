@@ -735,3 +735,61 @@ export function getObservationDetails(observationId: number): any | null {
 
   return row ?? null;
 }
+
+/**
+ * Возвращает полную информацию об источнике: поля + связанные наблюдения, связи и сущности.
+ */
+export function getSourceDetails(sourceId: number): any | null {
+  const db = getDatabase();
+
+  const source = db.prepare(`
+    SELECT id, url, title, source_type, source_kind, provider, collection_method,
+           authority_basis, reliability, access_level, retrieved_at,
+           local_path, sha256, notes
+    FROM sources
+    WHERE id = ?
+  `).get(sourceId) as any;
+
+  if (!source) return null;
+
+  const observations = db.prepare(`
+    SELECT o.id, o.attribute, o.value, o.confidence, o.observed_at,
+           e.id AS entity_id, e.label AS entity_label, e.type AS entity_type
+    FROM observations o
+    JOIN entities e ON e.id = o.entity_id
+    WHERE o.source_id = ?
+    ORDER BY o.id DESC
+  `).all(sourceId) as any[];
+
+  const relations = db.prepare(`
+    SELECT r.id, r.predicate, r.confidence, r.status, r.evidence_text,
+           r.valid_from, r.valid_to,
+           s.id AS subject_id, s.label AS subject_label, s.type AS subject_type,
+           o.id AS object_id,  o.label AS object_label,  o.type AS object_type
+    FROM relations r
+    JOIN entities s ON s.id = r.subject_id
+    JOIN entities o ON o.id = r.object_id
+    WHERE r.source_id = ?
+    ORDER BY r.id DESC
+  `).all(sourceId) as any[];
+
+  const entities = db.prepare(`
+    SELECT DISTINCT e.id, e.type, e.label, e.value
+    FROM entities e
+    WHERE e.id IN (
+      SELECT entity_id FROM observations WHERE source_id = ?
+      UNION
+      SELECT subject_id FROM relations WHERE source_id = ?
+      UNION
+      SELECT object_id FROM relations WHERE source_id = ?
+    )
+    ORDER BY e.id DESC
+  `).all(sourceId, sourceId, sourceId) as any[];
+
+  return {
+    source,
+    observations,
+    relations,
+    entities,
+  };
+}

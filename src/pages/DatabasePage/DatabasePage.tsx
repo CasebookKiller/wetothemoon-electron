@@ -45,6 +45,10 @@ export const DatabasePage: React.FC = () => {
   const [observationDetails, setObservationDetails] = useState<any>(null);
   const [observationLoading, setObservationLoading] = useState(false);
 
+  const [sourceDialog, setSourceDialog] = useState(false);
+  const [sourceDetails, setSourceDetails] = useState<any>(null);
+  const [sourceLoading, setSourceLoading] = useState(false);
+
   const api = (window as any).electronAPI;
 
   const entityTypeOptions = [
@@ -162,6 +166,21 @@ export const DatabasePage: React.FC = () => {
       setError((e as Error).message);
     } finally {
       setObservationLoading(false);
+    }
+  };
+
+  const openSourceDetails = async (sourceId: number) => {
+    setSourceLoading(true);
+    setSourceDetails(null);
+    setSourceDialog(true);
+    try {
+      const res = await api.getSourceDetails(sourceId);
+      if (res.success) setSourceDetails(res.data);
+      else setError(res.error || 'Ошибка загрузки деталей источника');
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSourceLoading(false);
     }
   };
 
@@ -339,8 +358,10 @@ export const DatabasePage: React.FC = () => {
               paginator
               rows={20}
               rowsPerPageOptions={[10, 20, 50, 100]}
-              className="db-entities-table"
               responsiveLayout="scroll"
+              selectionMode="single"
+              onRowClick={(e) => openSourceDetails(e.data.id)}
+              rowHover
             >
               <Column field="id" header="ID" sortable />
               <Column field="url" header="URL" sortable />
@@ -774,6 +795,155 @@ export const DatabasePage: React.FC = () => {
               </div>
             </div>
           </div>
+        )}
+      </Dialog>
+
+      <Dialog
+        visible={sourceDialog}
+        style={{ width: '900px' }}
+        modal
+        onHide={() => setSourceDialog(false)}
+        header={
+          <span className="p-panel-title">
+            {sourceDetails
+              ? `Источник #${sourceDetails.source.id}`
+              : 'Загрузка...'}
+          </span>
+        }
+        footer={
+          <div className="p-panel-footer flex justify-content-end gap-2">
+            <Button
+              label="Закрыть"
+              icon="pi pi-times"
+              className="osint-soft"
+              onClick={() => setSourceDialog(false)}
+            />
+          </div>
+        }
+      >
+        {sourceLoading && <p>Загрузка...</p>}
+        {!sourceLoading && sourceDetails && (
+          <TabView>
+            <TabPanel header="Общие сведения">
+              <div className="grid">
+                <div className="col-12 md:col-6 field">
+                  <label className="font-bold">ID</label>
+                  <div>{sourceDetails.source.id}</div>
+                </div>
+                <div className="col-12 md:col-6 field">
+                  <label className="font-bold">Тип</label>
+                  <div>{sourceDetails.source.source_type || '—'}</div>
+                </div>
+                <div className="col-12 field">
+                  <label className="font-bold">URL</label>
+                  <div style={{ wordBreak: 'break-all' }}>
+                    {sourceDetails.source.url ? (
+                      <a href={sourceDetails.source.url} target="_blank" rel="noreferrer">
+                        {sourceDetails.source.url}
+                      </a>
+                    ) : (
+                      '—'
+                    )}
+                  </div>
+                </div>
+                <div className="col-12 field">
+                  <label className="font-bold">Название</label>
+                  <div>{sourceDetails.source.title || '—'}</div>
+                </div>
+                <div className="col-12 md:col-6 field">
+                  <label className="font-bold">Происхождение</label>
+                  <div>{sourceDetails.source.source_kind || '—'}</div>
+                </div>
+                <div className="col-12 md:col-6 field">
+                  <label className="font-bold">Провайдер</label>
+                  <div>{sourceDetails.source.provider || '—'}</div>
+                </div>
+                <div className="col-12 md:col-6 field">
+                  <label className="font-bold">Метод получения</label>
+                  <div>{sourceDetails.source.collection_method || '—'}</div>
+                </div>
+                <div className="col-12 md:col-6 field">
+                  <label className="font-bold">Надёжность</label>
+                  <div>{sourceDetails.source.reliability ?? '—'}</div>
+                </div>
+                <div className="col-12 md:col-6 field">
+                  <label className="font-bold">Уровень доступа</label>
+                  <div>{sourceDetails.source.access_level || '—'}</div>
+                </div>
+                <div className="col-12 md:col-6 field">
+                  <label className="font-bold">Дата получения</label>
+                  <div>
+                    {sourceDetails.source.retrieved_at
+                      ? new Date(sourceDetails.source.retrieved_at).toLocaleString()
+                      : '—'}
+                  </div>
+                </div>
+                <div className="col-12 field">
+                  <label className="font-bold">Основание доступа</label>
+                  <div>{sourceDetails.source.authority_basis || '—'}</div>
+                </div>
+                <div className="col-12 field">
+                  <label className="font-bold">Локальный путь</label>
+                  <div className="text-sm text-500" style={{ wordBreak: 'break-all' }}>
+                    {sourceDetails.source.local_path || '—'}
+                  </div>
+                </div>
+                <div className="col-12 field">
+                  <label className="font-bold">SHA-256</label>
+                  <div className="text-sm text-500" style={{ wordBreak: 'break-all' }}>
+                    {sourceDetails.source.sha256 || '—'}
+                  </div>
+                </div>
+                <div className="col-12 field">
+                  <label className="font-bold">Заметки</label>
+                  <div>{sourceDetails.source.notes || '—'}</div>
+                </div>
+              </div>
+            </TabPanel>
+
+            <TabPanel header={`Наблюдения (${sourceDetails.observations.length})`}>
+              {sourceDetails.observations.length === 0 ? (
+                <p className="text-500">Наблюдений нет.</p>
+              ) : (
+                <DataTable value={sourceDetails.observations} responsiveLayout="scroll">
+                  <Column field="id" header="ID" />
+                  <Column field="entity_label" header="Сущность" body={(row) => `[${row.entity_id}] ${row.entity_label} (${row.entity_type})`} />
+                  <Column field="attribute" header="Атрибут" />
+                  <Column field="value" header="Значение" />
+                  <Column field="confidence" header="Уверенность" />
+                  <Column field="observed_at" header="Дата" body={(row) => row.observed_at ? new Date(row.observed_at).toLocaleString() : '—'} />
+                </DataTable>
+              )}
+            </TabPanel>
+
+            <TabPanel header={`Связи (${sourceDetails.relations.length})`}>
+              {sourceDetails.relations.length === 0 ? (
+                <p className="text-500">Связей нет.</p>
+              ) : (
+                <DataTable value={sourceDetails.relations} responsiveLayout="scroll">
+                  <Column field="id" header="ID" />
+                  <Column field="subject_label" header="Исходная" body={(row) => `[${row.subject_id}] ${row.subject_label} (${row.subject_type})`} />
+                  <Column field="predicate" header="Предикат" />
+                  <Column field="object_label" header="Целевая" body={(row) => `[${row.object_id}] ${row.object_label} (${row.object_type})`} />
+                  <Column field="confidence" header="Уверенность" />
+                  <Column field="status" header="Статус" />
+                </DataTable>
+              )}
+            </TabPanel>
+
+            <TabPanel header={`Сущности (${sourceDetails.entities.length})`}>
+              {sourceDetails.entities.length === 0 ? (
+                <p className="text-500">Связанных сущностей нет.</p>
+              ) : (
+                <DataTable value={sourceDetails.entities} responsiveLayout="scroll">
+                  <Column field="id" header="ID" />
+                  <Column field="type" header="Тип" />
+                  <Column field="label" header="Название" />
+                  <Column field="value" header="Значение" />
+                </DataTable>
+              )}
+            </TabPanel>
+          </TabView>
         )}
       </Dialog>
 
