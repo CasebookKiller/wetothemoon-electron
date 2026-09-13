@@ -630,3 +630,73 @@ export function markRecordAsFalse(
 
   return { success: true };
 }
+
+/**
+ * Возвращает полную информацию о сущности: поля, наблюдения, связи (в обе стороны), источники.
+ */
+export function getEntityDetails(entityId: number): any | null {
+  const db = getDatabase();
+
+  const entity = db.prepare(`
+    SELECT id, type, value, normalized_value, label, confidence, status,
+           first_seen, last_seen, notes, rusprofile_id, raw_file_path
+    FROM entities
+    WHERE id = ?
+  `).get(entityId) as any;
+
+  if (!entity) return null;
+
+  const observations = db.prepare(`
+    SELECT o.id, o.attribute, o.value, o.confidence, o.observed_at, o.notes,
+           o.source_id,
+           s.url AS source_url, s.title AS source_title, s.provider AS source_provider
+    FROM observations o
+    LEFT JOIN sources s ON s.id = o.source_id
+    WHERE o.entity_id = ?
+    ORDER BY o.id DESC
+  `).all(entityId) as any[];
+
+  const relationsOut = db.prepare(`
+    SELECT r.id, r.predicate, r.confidence, r.status, r.evidence_text,
+           r.valid_from, r.valid_to, r.source_id,
+           e.id AS object_id, e.label AS object_label, e.type AS object_type,
+           s.url AS source_url, s.title AS source_title
+    FROM relations r
+    JOIN entities e ON e.id = r.object_id
+    LEFT JOIN sources s ON s.id = r.source_id
+    WHERE r.subject_id = ?
+    ORDER BY r.id DESC
+  `).all(entityId) as any[];
+
+  const relationsIn = db.prepare(`
+    SELECT r.id, r.predicate, r.confidence, r.status, r.evidence_text,
+           r.valid_from, r.valid_to, r.source_id,
+           e.id AS subject_id, e.label AS subject_label, e.type AS subject_type,
+           s.url AS source_url, s.title AS source_title
+    FROM relations r
+    JOIN entities e ON e.id = r.subject_id
+    LEFT JOIN sources s ON s.id = r.source_id
+    WHERE r.object_id = ?
+    ORDER BY r.id DESC
+  `).all(entityId) as any[];
+
+  const sources = db.prepare(`
+    SELECT DISTINCT s.id, s.url, s.title, s.source_type, s.provider, s.access_level, s.retrieved_at
+    FROM sources s
+    WHERE s.id IN (
+      SELECT source_id FROM observations WHERE entity_id = ? AND source_id IS NOT NULL
+      UNION
+      SELECT source_id FROM relations WHERE (subject_id = ? OR object_id = ?) AND source_id IS NOT NULL
+    )
+    ORDER BY s.id DESC
+  `).all(entityId, entityId, entityId) as any[];
+
+  return {
+    entity,
+    observations,
+    relations_out: relationsOut,
+    relations_in: relationsIn,
+    sources,
+  };
+}
+

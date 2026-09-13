@@ -8,6 +8,7 @@ import { InputText } from 'primereact/inputtext';
 import { Dropdown } from 'primereact/dropdown';
 import { Dialog } from 'primereact/dialog';
 import { InputTextarea } from 'primereact/inputtextarea';
+import { Tag } from 'primereact/tag';
 
 import './DatabasePage.css';
 
@@ -33,6 +34,12 @@ export const DatabasePage: React.FC = () => {
   const [falseReason, setFalseReason] = useState('');
   const [falseLoading, setFalseLoading] = useState(false);
   const [falseMessage, setFalseMessage] = useState('');
+
+  const [entityDialog, setEntityDialog] = useState(false);
+  const [entityDetails, setEntityDetails] = useState<any>(null);
+  const [entityLoading, setEntityLoading] = useState(false);
+
+  const [markTarget, setMarkTarget] = useState<{ table: 'entities' | 'relations' | 'observations'; id: number } | null>(null);
 
   const api = (window as any).electronAPI;
 
@@ -117,14 +124,30 @@ export const DatabasePage: React.FC = () => {
     }
   };
 
-  const openMarkFalseDialog = () => {
+  const openMarkFalseDialog = (target?: { table: 'entities' | 'relations' | 'observations'; id: number }) => {
+    if (target) setMarkTarget(target);
     setFalseReason('');
     setFalseMessage('');
     setFalseDialog(true);
   };
 
+  const openEntityDetails = async (entityId: number) => {
+    setEntityLoading(true);
+    setEntityDetails(null);
+    setEntityDialog(true);
+    try {
+      const res = await api.getEntityDetails(entityId);
+      if (res.success) setEntityDetails(res.data);
+      else setError(res.error || 'Ошибка загрузки деталей сущности');
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setEntityLoading(false);
+    }
+  };
+
   const handleMarkFalseSubmit = async () => {
-    if (!relationDetails?.id) return;
+    if (!markTarget) return;
     if (!falseReason.trim()) {
       setFalseMessage('Укажите причину');
       return;
@@ -133,13 +156,18 @@ export const DatabasePage: React.FC = () => {
     setFalseLoading(true);
     setFalseMessage('');
     try {
-      const res = await api.markFalse('relations', relationDetails.id, falseReason.trim());
+      const res = await api.markFalse(markTarget.table, markTarget.id, falseReason.trim());
       if (res.success) {
         setFalseMessage('Запись помечена как ложная');
-        // Обновляем список связей и детали
         await loadData();
-        const detailsRes = await api.getRelationDetails(relationDetails.id);
-        if (detailsRes.success) setRelationDetails(detailsRes.data);
+        if (markTarget.table === 'relations' && relationDetails?.id === markTarget.id) {
+          const detailsRes = await api.getRelationDetails(markTarget.id);
+          if (detailsRes.success) setRelationDetails(detailsRes.data);
+        }
+        if (markTarget.table === 'entities' && entityDetails?.entity?.id === markTarget.id) {
+          const detailsRes = await api.getEntityDetails(markTarget.id);
+          if (detailsRes.success) setEntityDetails(detailsRes.data);
+        }
         setTimeout(() => setFalseDialog(false), 800);
       } else {
         setFalseMessage(`Ошибка: ${res.error}`);
@@ -228,8 +256,10 @@ export const DatabasePage: React.FC = () => {
               rows={20}
               rowsPerPageOptions={[10, 20, 50, 100]}
               responsiveLayout="scroll"
-              className="db-entities-table"
               emptyMessage={searchActive ? 'Ничего не найдено' : 'Нет данных'}
+              selectionMode="single"
+              onRowClick={(e) => openEntityDetails(e.data.id)}
+              rowHover
             >
               <Column field="id" header="ID" sortable />
               <Column field="type" header="Тип" sortable />
@@ -312,7 +342,7 @@ export const DatabasePage: React.FC = () => {
               label="Пометить как ложную"
               icon="pi pi-exclamation-triangle"
               className="osint-destructive"
-              onClick={openMarkFalseDialog}
+              onClick={() => openMarkFalseDialog({ table: 'relations', id: relationDetails?.id })}
               disabled={relationDetails?.status === 'false'}
             />
             <Button
@@ -458,9 +488,166 @@ export const DatabasePage: React.FC = () => {
             </p>
           )}
         </div>
-
-        
       </Dialog>
+
+      <Dialog
+        visible={entityDialog}
+        style={{ width: '900px' }}
+        modal
+        onHide={() => setEntityDialog(false)}
+        header={
+          <span className="p-panel-title">
+            {entityDetails?.entity
+              ? `${entityDetails.entity.label || entityDetails.entity.value}`
+              : 'Загрузка...'}
+          </span>
+        }
+        footer={
+          <div className="p-panel-footer flex justify-content-end gap-2">
+            <Button
+              label="Пометить как ложную"
+              icon="pi pi-exclamation-triangle"
+              className="osint-destructive"
+              onClick={() => {
+                // Открыть mark_false для текущей сущности
+                setMarkTarget({ table: 'entities', id: entityDetails?.entity?.id });
+                openMarkFalseDialog();
+              }}
+              disabled={!entityDetails?.entity || entityDetails.entity.status === 'false'}
+            />
+            <Button
+              label="Закрыть"
+              icon="pi pi-times"
+              className="osint-soft"
+              onClick={() => setEntityDialog(false)}
+            />
+          </div>
+        }
+      >
+        {entityLoading && <p>Загрузка...</p>}
+        {!entityLoading && entityDetails && (
+          <TabView>
+            <TabPanel header="Общие сведения">
+              <div className="grid">
+                <div className="col-12 md:col-6 field">
+                  <label className="font-bold">ID</label>
+                  <div>{entityDetails.entity.id}</div>
+                </div>
+                <div className="col-12 md:col-6 field">
+                  <label className="font-bold">Тип</label>
+                  <div><Tag value={entityDetails.entity.type} /></div>
+                </div>
+                <div className="col-12 md:col-6 field">
+                  <label className="font-bold">Значение (value)</label>
+                  <div>{entityDetails.entity.value}</div>
+                </div>
+                <div className="col-12 md:col-6 field">
+                  <label className="font-bold">Название (label)</label>
+                  <div>{entityDetails.entity.label || '—'}</div>
+                </div>
+                <div className="col-12 md:col-6 field">
+                  <label className="font-bold">Нормализованное</label>
+                  <div className="text-sm text-500">{entityDetails.entity.normalized_value}</div>
+                </div>
+                <div className="col-12 md:col-6 field">
+                  <label className="font-bold">Уверенность</label>
+                  <div>{entityDetails.entity.confidence ?? '—'}</div>
+                </div>
+                <div className="col-12 md:col-6 field">
+                  <label className="font-bold">Статус</label>
+                  <div>{entityDetails.entity.status}</div>
+                </div>
+                <div className="col-12 md:col-6 field">
+                  <label className="font-bold">rusprofile_id</label>
+                  <div>{entityDetails.entity.rusprofile_id || '—'}</div>
+                </div>
+                <div className="col-12 md:col-6 field">
+                  <label className="font-bold">Первое появление</label>
+                  <div>{entityDetails.entity.first_seen ? new Date(entityDetails.entity.first_seen).toLocaleString() : '—'}</div>
+                </div>
+                <div className="col-12 md:col-6 field">
+                  <label className="font-bold">Последнее обновление</label>
+                  <div>{entityDetails.entity.last_seen ? new Date(entityDetails.entity.last_seen).toLocaleString() : '—'}</div>
+                </div>
+                <div className="col-12 field">
+                  <label className="font-bold">Заметки</label>
+                  <div>{entityDetails.entity.notes || '—'}</div>
+                </div>
+                <div className="col-12 field">
+                  <label className="font-bold">Файл дампа</label>
+                  <div className="text-sm text-500" style={{ wordBreak: 'break-all' }}>
+                    {entityDetails.entity.raw_file_path || '—'}
+                  </div>
+                </div>
+              </div>
+            </TabPanel>
+
+            <TabPanel header={`Наблюдения (${entityDetails.observations.length})`}>
+              {entityDetails.observations.length === 0 ? (
+                <p className="text-500">Наблюдений нет.</p>
+              ) : (
+                <DataTable value={entityDetails.observations} responsiveLayout="scroll">
+                  <Column field="id" header="ID" />
+                  <Column field="attribute" header="Атрибут" />
+                  <Column field="value" header="Значение" />
+                  <Column field="confidence" header="Уверенность" />
+                  <Column field="observed_at" header="Дата" body={(row) => row.observed_at ? new Date(row.observed_at).toLocaleString() : '—'} />
+                  <Column field="source_title" header="Источник" body={(row) => row.source_url ? <a href={row.source_url} target="_blank" rel="noreferrer">{row.source_title || row.source_url}</a> : '—'} />
+                </DataTable>
+              )}
+            </TabPanel>
+
+            <TabPanel header={`Исходящие связи (${entityDetails.relations_out.length})`}>
+              {entityDetails.relations_out.length === 0 ? (
+                <p className="text-500">Нет исходящих связей.</p>
+              ) : (
+                <DataTable value={entityDetails.relations_out} responsiveLayout="scroll">
+                  <Column field="id" header="ID" />
+                  <Column field="predicate" header="Предикат" />
+                  <Column field="object_label" header="Целевая сущность" body={(row) => `[${row.object_id}] ${row.object_label} (${row.object_type})`} />
+                  <Column field="confidence" header="Уверенность" />
+                  <Column field="status" header="Статус" />
+                  <Column field="valid_from" header="С" />
+                  <Column field="valid_to" header="По" />
+                </DataTable>
+              )}
+            </TabPanel>
+
+            <TabPanel header={`Входящие связи (${entityDetails.relations_in.length})`}>
+              {entityDetails.relations_in.length === 0 ? (
+                <p className="text-500">Нет входящих связей.</p>
+              ) : (
+                <DataTable value={entityDetails.relations_in} responsiveLayout="scroll">
+                  <Column field="id" header="ID" />
+                  <Column field="subject_label" header="Исходная сущность" body={(row) => `[${row.subject_id}] ${row.subject_label} (${row.subject_type})`} />
+                  <Column field="predicate" header="Предикат" />
+                  <Column field="confidence" header="Уверенность" />
+                  <Column field="status" header="Статус" />
+                  <Column field="valid_from" header="С" />
+                  <Column field="valid_to" header="По" />
+                </DataTable>
+              )}
+            </TabPanel>
+
+            <TabPanel header={`Источники (${entityDetails.sources.length})`}>
+              {entityDetails.sources.length === 0 ? (
+                <p className="text-500">Источников нет.</p>
+              ) : (
+                <DataTable value={entityDetails.sources} responsiveLayout="scroll">
+                  <Column field="id" header="ID" />
+                  <Column field="title" header="Название" />
+                  <Column field="url" header="URL" body={(row) => <a href={row.url} target="_blank" rel="noreferrer">{row.url}</a>} />
+                  <Column field="source_type" header="Тип" />
+                  <Column field="provider" header="Провайдер" />
+                  <Column field="access_level" header="Доступ" />
+                  <Column field="retrieved_at" header="Получено" body={(row) => row.retrieved_at ? new Date(row.retrieved_at).toLocaleString() : '—'} />
+                </DataTable>
+              )}
+            </TabPanel>
+          </TabView>
+        )}
+      </Dialog>
+
     </div>
   );
 };

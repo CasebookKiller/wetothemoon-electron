@@ -10149,6 +10149,63 @@ function markRecordAsFalse(table, recordId, reason) {
 	auditChange(table, recordId, "mark_false", JSON.stringify(old), `status=false; reason=${reason}`, reason);
 	return { success: true };
 }
+/**
+* Возвращает полную информацию о сущности: поля, наблюдения, связи (в обе стороны), источники.
+*/
+function getEntityDetails(entityId) {
+	const db = getDatabase();
+	const entity = db.prepare(`
+    SELECT id, type, value, normalized_value, label, confidence, status,
+           first_seen, last_seen, notes, rusprofile_id, raw_file_path
+    FROM entities
+    WHERE id = ?
+  `).get(entityId);
+	if (!entity) return null;
+	return {
+		entity,
+		observations: db.prepare(`
+    SELECT o.id, o.attribute, o.value, o.confidence, o.observed_at, o.notes,
+           o.source_id,
+           s.url AS source_url, s.title AS source_title, s.provider AS source_provider
+    FROM observations o
+    LEFT JOIN sources s ON s.id = o.source_id
+    WHERE o.entity_id = ?
+    ORDER BY o.id DESC
+  `).all(entityId),
+		relations_out: db.prepare(`
+    SELECT r.id, r.predicate, r.confidence, r.status, r.evidence_text,
+           r.valid_from, r.valid_to, r.source_id,
+           e.id AS object_id, e.label AS object_label, e.type AS object_type,
+           s.url AS source_url, s.title AS source_title
+    FROM relations r
+    JOIN entities e ON e.id = r.object_id
+    LEFT JOIN sources s ON s.id = r.source_id
+    WHERE r.subject_id = ?
+    ORDER BY r.id DESC
+  `).all(entityId),
+		relations_in: db.prepare(`
+    SELECT r.id, r.predicate, r.confidence, r.status, r.evidence_text,
+           r.valid_from, r.valid_to, r.source_id,
+           e.id AS subject_id, e.label AS subject_label, e.type AS subject_type,
+           s.url AS source_url, s.title AS source_title
+    FROM relations r
+    JOIN entities e ON e.id = r.subject_id
+    LEFT JOIN sources s ON s.id = r.source_id
+    WHERE r.object_id = ?
+    ORDER BY r.id DESC
+  `).all(entityId),
+		sources: db.prepare(`
+    SELECT DISTINCT s.id, s.url, s.title, s.source_type, s.provider, s.access_level, s.retrieved_at
+    FROM sources s
+    WHERE s.id IN (
+      SELECT source_id FROM observations WHERE entity_id = ? AND source_id IS NOT NULL
+      UNION
+      SELECT source_id FROM relations WHERE (subject_id = ? OR object_id = ?) AND source_id IS NOT NULL
+    )
+    ORDER BY s.id DESC
+  `).all(entityId, entityId, entityId)
+	};
+}
 //#endregion
 //#region src/main/services/rawStorage.ts
 function loadRawDumpSync(filePath) {
@@ -10776,6 +10833,19 @@ function registerOsintHandlers() {
 	electron.ipcMain.handle("osint:mark-false", async (_event, table, recordId, reason) => {
 		try {
 			return markRecordAsFalse(table, recordId, reason);
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:get-entity-details", async (_event, entityId) => {
+		try {
+			return {
+				success: true,
+				data: getEntityDetails(entityId)
+			};
 		} catch (error) {
 			return {
 				success: false,
