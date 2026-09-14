@@ -6,7 +6,7 @@ import { Column } from 'primereact/column';
 import { Button } from 'primereact/button';
 
 export interface RelationRow {
-  id: number;
+  id: number;              // ← было id?: number
   predicate: string;
   confidence?: number | null;
   status?: string | null;
@@ -15,16 +15,15 @@ export interface RelationRow {
   evidence_text?: string | null;
   notes?: string | null;
 
-  // Стороны связи (могут называться по-разному в зависимости от выборки):
-  subject_id?: number;
+  // Стороны связи — тоже обязательные, они всегда приходят из БД
+  subject_id: number;      // ← было subject_id?: number
   subject_label?: string | null;
   subject_type?: string | null;
 
-  object_id?: number;
+  object_id: number;       // ← было object_id?: number
   object_label?: string | null;
   object_type?: string | null;
 
-  // Источник
   source_id?: number | null;
   source_url?: string | null;
   source_title?: string | null;
