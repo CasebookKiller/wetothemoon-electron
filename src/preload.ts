@@ -419,6 +419,9 @@ try {
     getRelatedIds: (filterType: 'entity' | 'relation' | 'observation' | 'source', filterId: number) =>
       ipcRenderer.invoke('osint:get-related-ids', filterType, filterId),
 
+    updateEntity: (entityId: number, patch: any) =>
+      ipcRenderer.invoke('osint:update-entity', entityId, patch),
+
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

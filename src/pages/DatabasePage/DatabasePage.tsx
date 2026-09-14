@@ -59,6 +59,11 @@ export const DatabasePage: React.FC = () => {
   } | null>(null);
   const [activeTab, setActiveTab] = useState<number>(0);
 
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState<any>(null);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editMessage, setEditMessage] = useState('');
+
   const api = (window as any).electronAPI;
 
   const cacheKey = (type: DialogType, id: number) => `${type}:${id}`;
@@ -73,6 +78,8 @@ export const DatabasePage: React.FC = () => {
   };
 
   const openDialog = async (type: DialogType, id: number) => {
+    setEditing(false);
+    setEditForm(null);
     const existingIdx = dialogStack.findIndex((it) => it.type === type && it.id === id);
     if (existingIdx >= 0) {
       setDialogStack((prev) => prev.slice(0, existingIdx + 1));
@@ -133,23 +140,9 @@ export const DatabasePage: React.FC = () => {
     setRelatedIds(null);
   };
 
-  const filteredEntities = relatedIds
-    ? displayEntities.filter((r) => relatedIds.entityIds.has(r.id))
-    : displayEntities;
-
-  const filteredRelations = relatedIds
-    ? relations.filter((r) => relatedIds.relationIds.has(r.id))
-    : relations;
-
-  const filteredObservations = relatedIds
-    ? observations.filter((r) => relatedIds.observationIds.has(r.id))
-    : observations;
-
-  const filteredSources = relatedIds
-    ? sources.filter((r) => relatedIds.sourceIds.has(r.id))
-    : sources;
-
   const popDialog = () => {
+    setEditing(false);
+    setEditForm(null);
     setDialogStack((prev) => prev.slice(0, -1));
   };
 
@@ -271,11 +264,72 @@ export const DatabasePage: React.FC = () => {
     }
   };
 
+  const startEditing = (data: any) => {
+    setEditForm({
+      type: data.entity.type,
+      value: data.entity.value,
+      label: data.entity.label || '',
+      confidence: data.entity.confidence ?? 50,
+      status: data.entity.status,
+      notes: data.entity.notes || '',
+    });
+    setEditMessage('');
+    setEditing(true);
+  };
+
+  const cancelEditing = () => {
+    setEditing(false);
+    setEditForm(null);
+    setEditMessage('');
+  };
+
+  const saveEditing = async () => {
+    if (!editForm) return;
+    setEditSaving(true);
+    setEditMessage('');
+    try {
+      const top = dialogStack[dialogStack.length - 1];
+      const res = await api.updateEntity(top.id, editForm);
+      if (res.success) {
+        setEditMessage('Сохранено');
+        await loadData();
+        await refreshTopDialog();
+        setTimeout(() => {
+          setEditing(false);
+          setEditForm(null);
+          setEditMessage('');
+        }, 600);
+      } else {
+        setEditMessage(`Ошибка: ${res.error}`);
+      }
+    } catch (e) {
+      setEditMessage((e as Error).message);
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
   useEffect(() => {
     loadData();
   }, []);
 
   const displayEntities = searchActive ? searchResults : entities;
+
+    const filteredEntities = relatedIds
+    ? displayEntities.filter((r) => relatedIds.entityIds.has(r.id))
+    : displayEntities;
+
+  const filteredRelations = relatedIds
+    ? relations.filter((r) => relatedIds.relationIds.has(r.id))
+    : relations;
+
+  const filteredObservations = relatedIds
+    ? observations.filter((r) => relatedIds.observationIds.has(r.id))
+    : observations;
+
+  const filteredSources = relatedIds
+    ? sources.filter((r) => relatedIds.sourceIds.has(r.id))
+    : sources;
 
   const getDialogLabel = (item: DialogStackItem): string => {
     const data = dialogCache[cacheKey(item.type, item.id)];
@@ -324,30 +378,120 @@ export const DatabasePage: React.FC = () => {
 
   const renderEntityContent = (data: any) => (
     <>
-      <DetailFields
-        fields={[
-          { label: 'ID', value: data.entity.id },
-          { label: 'Тип', value: <Tag value={data.entity.type} /> },
-          { label: 'Значение (value)', value: data.entity.value },
-          { label: 'Название (label)', value: data.entity.label || '—' },
-          { label: 'Нормализованное', value: <span className="text-sm text-500">{data.entity.normalized_value}</span> },
-          { label: 'Уверенность', value: data.entity.confidence ?? '—' },
-          { label: 'Статус', value: data.entity.status },
-          { label: 'rusprofile_id', value: data.entity.rusprofile_id || '—' },
-          { label: 'Первое появление', value: data.entity.first_seen ? new Date(data.entity.first_seen).toLocaleString() : '—' },
-          { label: 'Последнее обновление', value: data.entity.last_seen ? new Date(data.entity.last_seen).toLocaleString() : '—' },
-          { label: 'Заметки', span: 2, value: data.entity.notes || '—' },
-          {
-            label: 'Файл дампа',
-            span: 2,
-            value: (
-              <span className="text-sm text-500" style={{ wordBreak: 'break-all' }}>
-                {data.entity.raw_file_path || '—'}
-              </span>
-            ),
-          },
-        ]}
-      />
+      {editing && editForm ? (
+        <div className="p-fluid">
+          <div className="grid">
+            <div className="col-12 md:col-6 field">
+              <label className="font-bold">Тип</label>
+              <Dropdown
+                value={editForm.type}
+                options={[
+                  { label: 'Юрлицо', value: 'company' },
+                  { label: 'ИП', value: 'entrepreneur' },
+                  { label: 'Физлицо', value: 'person' },
+                  { label: 'Домен', value: 'domain' },
+                  { label: 'Email', value: 'email' },
+                  { label: 'Телефон', value: 'phone' },
+                  { label: 'Адрес', value: 'address' },
+                  { label: 'Документ', value: 'document' },
+                  { label: 'Прочее', value: 'other' },
+                ]}
+                onChange={(e) => setEditForm({ ...editForm, type: e.value })}
+              />
+            </div>
+
+            <div className="col-12 md:col-6 field">
+              <label className="font-bold">Статус</label>
+              <Dropdown
+                value={editForm.status}
+                options={[
+                  { label: 'unverified', value: 'unverified' },
+                  { label: 'hypothesis', value: 'hypothesis' },
+                  { label: 'confirmed', value: 'confirmed' },
+                  { label: 'false', value: 'false' },
+                  { label: 'archived', value: 'archived' },
+                ]}
+                onChange={(e) => setEditForm({ ...editForm, status: e.value })}
+              />
+            </div>
+
+            <div className="col-12 field">
+              <label className="font-bold">Значение (value)</label>
+              <InputText
+                value={editForm.value}
+                onChange={(e) => setEditForm({ ...editForm, value: e.target.value })}
+              />
+            </div>
+
+            <div className="col-12 field">
+              <label className="font-bold">Название (label)</label>
+              <InputText
+                value={editForm.label}
+                onChange={(e) => setEditForm({ ...editForm, label: e.target.value })}
+              />
+            </div>
+
+            <div className="col-12 md:col-6 field">
+              <label className="font-bold">Уверенность (0–100)</label>
+              <InputText
+                type="number"
+                min={0}
+                max={100}
+                value={String(editForm.confidence ?? 0)}
+                onChange={(e) =>
+                  setEditForm({
+                    ...editForm,
+                    confidence: Math.max(0, Math.min(100, parseInt(e.target.value) || 0)),
+                  })
+                }
+              />
+            </div>
+
+            <div className="col-12 field">
+              <label className="font-bold">Заметки</label>
+              <InputTextarea
+                value={editForm.notes}
+                onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                rows={3}
+                autoResize
+              />
+            </div>
+
+            {editMessage && (
+              <div className="col-12">
+                <p className={editMessage.startsWith('Ошибка') ? 'p-error' : 'p-success'}>
+                  {editMessage}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <DetailFields
+          fields={[
+            { label: 'ID', value: data.entity.id },
+            { label: 'Тип', value: <Tag value={data.entity.type} /> },
+            { label: 'Значение (value)', value: data.entity.value },
+            { label: 'Название (label)', value: data.entity.label || '—' },
+            { label: 'Нормализованное', value: <span className="text-sm text-500">{data.entity.normalized_value}</span> },
+            { label: 'Уверенность', value: data.entity.confidence ?? '—' },
+            { label: 'Статус', value: data.entity.status },
+            { label: 'rusprofile_id', value: data.entity.rusprofile_id || '—' },
+            { label: 'Первое появление', value: data.entity.first_seen ? new Date(data.entity.first_seen).toLocaleString() : '—' },
+            { label: 'Последнее обновление', value: data.entity.last_seen ? new Date(data.entity.last_seen).toLocaleString() : '—' },
+            { label: 'Заметки', span: 2, value: data.entity.notes || '—' },
+            {
+              label: 'Файл дампа',
+              span: 2,
+              value: (
+                <span className="text-sm text-500" style={{ wordBreak: 'break-all' }}>
+                  {data.entity.raw_file_path || '—'}
+                </span>
+              ),
+            },
+          ]}
+        />
+      )}
       <TabView className="mt-3">
         <TabPanel header={`Наблюдения (${data.observations.length})`}>
           <ObservationsTable
@@ -842,35 +986,69 @@ export const DatabasePage: React.FC = () => {
         footer={
           dialogStack.length > 0 ? (
             <div className="p-panel-footer flex justify-content-end gap-2">
-              <Button
-                label="Открыть в главном окне"
-                icon="pi pi-external-link"
-                className="osint-soft"
-                onClick={() => {
-                  const top = dialogStack[dialogStack.length - 1];
-                  openInMainWindow(top.type, top.id, typeToTabIndex[top.type]);
-                }}
-              />
-              {['entity', 'relation', 'observation'].includes(dialogStack[dialogStack.length - 1].type) && (
-                <Button
-                  label="Пометить как ложную"
-                  icon="pi pi-exclamation-triangle"
-                  className="osint-destructive"
-                  onClick={() => {
-                    const top = dialogStack[dialogStack.length - 1];
-                    openMarkFalseDialog({
-                      table: top.type === 'entity' ? 'entities' : top.type === 'relation' ? 'relations' : 'observations',
-                      id: top.id,
-                    });
-                  }}
-                />
+              {editing ? (
+                <>
+                  <Button
+                    label="Отмена"
+                    icon="pi pi-times"
+                    className="osint"
+                    onClick={cancelEditing}
+                    disabled={editSaving}
+                  />
+                  <Button
+                    label={editSaving ? 'Сохранение...' : 'Сохранить'}
+                    icon={editSaving ? 'pi pi-spin pi-spinner' : 'pi pi-check'}
+                    className="osint"
+                    onClick={saveEditing}
+                    disabled={editSaving}
+                  />
+                </>
+              ) : (
+                <>
+                  {/* Кнопка «Редактировать» — только для сущностей на этом шаге */}
+                  {dialogStack[dialogStack.length - 1].type === 'entity' && (
+                    <Button
+                      label="Редактировать"
+                      icon="pi pi-pencil"
+                      className="osint-soft"
+                      onClick={() => {
+                        const top = dialogStack[dialogStack.length - 1];
+                        const data = dialogCache[cacheKey(top.type, top.id)];
+                        if (data) startEditing(data);
+                      }}
+                    />
+                  )}
+                  <Button
+                    label="Открыть в главном окне"
+                    icon="pi pi-external-link"
+                    className="osint-soft"
+                    onClick={() => {
+                      const top = dialogStack[dialogStack.length - 1];
+                      openInMainWindow(top.type, top.id, typeToTabIndex[top.type]);
+                    }}
+                  />
+                  {['entity', 'relation', 'observation'].includes(dialogStack[dialogStack.length - 1].type) && (
+                    <Button
+                      label="Пометить как ложную"
+                      icon="pi pi-exclamation-triangle"
+                      className="osint-destructive"
+                      onClick={() => {
+                        const top = dialogStack[dialogStack.length - 1];
+                        openMarkFalseDialog({
+                          table: top.type === 'entity' ? 'entities' : top.type === 'relation' ? 'relations' : 'observations',
+                          id: top.id,
+                        });
+                      }}
+                    />
+                  )}
+                  <Button
+                    label="Закрыть"
+                    icon="pi pi-times"
+                    className="osint-soft"
+                    onClick={closeAllDialogs}
+                  />
+                </>
               )}
-              <Button
-                label="Закрыть"
-                icon="pi pi-times"
-                className="osint-soft"
-                onClick={closeAllDialogs}
-              />
             </div>
           ) : null
         }

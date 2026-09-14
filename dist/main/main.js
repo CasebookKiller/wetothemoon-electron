@@ -11053,6 +11053,19 @@ function registerOsintHandlers() {
 			};
 		}
 	});
+	electron.ipcMain.handle("osint:update-entity", async (_event, entityId, patch) => {
+		try {
+			return updateEntity(entityId, patch);
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+}
+function updateEntity(entityId, patch) {
+	throw new Error("Function not implemented.");
 }
 //#endregion
 //#region src/shared/types/promptgenerator.ts

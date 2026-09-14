@@ -304,4 +304,17 @@ export function registerOsintHandlers() {
     }
   });
 
+  ipcMain.handle('osint:update-entity', async (_event, entityId: number, patch: any) => {
+    try {
+      const result = updateEntity(entityId, patch);
+      return result;
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+}
+
+function updateEntity(entityId: number, patch: any) {
+  throw new Error('Function not implemented.');
 }
