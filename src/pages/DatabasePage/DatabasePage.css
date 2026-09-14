@@ -274,3 +274,27 @@ span.osint-destructive {
   color: var(--tg-theme-destructive-text-color, #ec3942) !important;
   border-color: var(--tg-theme-destructive-text-color, #ec3942) !important;
 }
+
+/* Активный таб — акцентный цвет */
+.p-tabview .p-tabview-nav li.p-highlight .p-tabview-nav-link {
+  background: transparent !important;
+  border-color: var(--tg-theme-accent-text-color) !important;
+  color: var(--tg-theme-accent-text-color) !important;
+}
+
+/* Иконка-подчёркивание тоже акцентная */
+.p-tabview .p-tabview-nav li.p-highlight .p-tabview-nav-link:focus {
+  box-shadow: none !important;
+}
+
+/* Неактивные табы — приглушённый цвет */
+.p-tabview .p-tabview-nav li .p-tabview-nav-link {
+  color: var(--tg-theme-hint-color, #999) !important;
+  background: transparent !important;
+}
+
+/* Наведение на неактивный таб — акцентный */
+.p-tabview .p-tabview-nav li:not(.p-highlight) .p-tabview-nav-link:hover {
+  color: var(--tg-theme-accent-text-color) !important;
+  border-color: var(--tg-theme-accent-text-color) !important;
+}
