@@ -364,55 +364,47 @@ export const DatabasePage: React.FC = () => {
       >
         {entityLoading && <p>Загрузка...</p>}
         {!entityLoading && entityDetails && (
-          <TabView>
-            <TabPanel header="Общие сведения">
-              <DetailFields
-                fields={[
-                  { label: 'ID', value: entityDetails.entity.id },
-                  { label: 'Тип', value: <Tag value={entityDetails.entity.type} /> },
-                  { label: 'Значение (value)', value: entityDetails.entity.value },
-                  { label: 'Название (label)', value: entityDetails.entity.label || '—' },
-                  {
-                    label: 'Нормализованное',
-                    value: <span className="text-sm text-500">{entityDetails.entity.normalized_value}</span>,
-                  },
-                  { label: 'Уверенность', value: entityDetails.entity.confidence ?? '—' },
-                  { label: 'Статус', value: entityDetails.entity.status },
-                  { label: 'rusprofile_id', value: entityDetails.entity.rusprofile_id || '—' },
-                  {
-                    label: 'Первое появление',
-                    value: entityDetails.entity.first_seen
-                      ? new Date(entityDetails.entity.first_seen).toLocaleString()
-                      : '—',
-                  },
-                  {
-                    label: 'Последнее обновление',
-                    value: entityDetails.entity.last_seen
-                      ? new Date(entityDetails.entity.last_seen).toLocaleString()
-                      : '—',
-                  },
-                  {
-                    label: 'Заметки',
-                    span: 2,
-                    value: entityDetails.entity.notes || '—',
-                  },
-                  {
-                    label: 'Файл дампа',
-                    span: 2,
-                    value: (
-                      <span className="text-sm text-500" style={{ wordBreak: 'break-all' }}>
-                        {entityDetails.entity.raw_file_path || '—'}
-                      </span>
-                    ),
-                  },
-                ]}
-              />
-            </TabPanel>
+          <>
+            <DetailFields
+              fields={[
+                { label: 'ID', value: entityDetails.entity.id },
+                { label: 'Тип', value: <Tag value={entityDetails.entity.type} /> },
+                { label: 'Значение (value)', value: entityDetails.entity.value },
+                { label: 'Название (label)', value: entityDetails.entity.label || '—' },
+                {
+                  label: 'Нормализованное',
+                  value: <span className="text-sm text-500">{entityDetails.entity.normalized_value}</span>,
+                },
+                { label: 'Уверенность', value: entityDetails.entity.confidence ?? '—' },
+                { label: 'Статус', value: entityDetails.entity.status },
+                { label: 'rusprofile_id', value: entityDetails.entity.rusprofile_id || '—' },
+                {
+                  label: 'Первое появление',
+                  value: entityDetails.entity.first_seen
+                    ? new Date(entityDetails.entity.first_seen).toLocaleString()
+                    : '—',
+                },
+                {
+                  label: 'Последнее обновление',
+                  value: entityDetails.entity.last_seen
+                    ? new Date(entityDetails.entity.last_seen).toLocaleString()
+                    : '—',
+                },
+                { label: 'Заметки', span: 2, value: entityDetails.entity.notes || '—' },
+                {
+                  label: 'Файл дампа',
+                  span: 2,
+                  value: (
+                    <span className="text-sm text-500" style={{ wordBreak: 'break-all' }}>
+                      {entityDetails.entity.raw_file_path || '—'}
+                    </span>
+                  ),
+                },
+              ]}
+            />
 
-            <TabPanel header={`Наблюдения (${entityDetails.observations.length})`}>
-              {entityDetails.observations.length === 0 ? (
-                <p className="text-500">Наблюдений нет.</p>
-              ) : (
+            <TabView className="mt-3">
+              <TabPanel header={`Наблюдения (${entityDetails.observations.length})`}>
                 <ObservationsTable
                   value={entityDetails.observations}
                   showEntity={false}
@@ -421,13 +413,9 @@ export const DatabasePage: React.FC = () => {
                   compact
                   emptyMessage="Наблюдений нет"
                 />
-              )}
-            </TabPanel>
+              </TabPanel>
 
-            <TabPanel header={`Исходящие связи (${entityDetails.relations_out.length})`}>
-              {entityDetails.relations_out.length === 0 ? (
-                <p className="text-500">Нет исходящих связей.</p>
-              ) : (
+              <TabPanel header={`Исходящие связи (${entityDetails.relations_out.length})`}>
                 <RelationsTable
                   value={entityDetails.relations_out}
                   side="outgoing"
@@ -436,13 +424,9 @@ export const DatabasePage: React.FC = () => {
                   compact
                   emptyMessage="Нет исходящих связей"
                 />
-              )}
-            </TabPanel>
+              </TabPanel>
 
-            <TabPanel header={`Входящие связи (${entityDetails.relations_in.length})`}>
-              {entityDetails.relations_in.length === 0 ? (
-                <p className="text-500">Нет входящих связей.</p>
-              ) : (
+              <TabPanel header={`Входящие связи (${entityDetails.relations_in.length})`}>
                 <RelationsTable
                   value={entityDetails.relations_in}
                   side="incoming"
@@ -451,22 +435,18 @@ export const DatabasePage: React.FC = () => {
                   compact
                   emptyMessage="Нет входящих связей"
                 />
-              )}
-            </TabPanel>
+              </TabPanel>
 
-            <TabPanel header={`Источники (${entityDetails.sources.length})`}>
-              {entityDetails.sources.length === 0 ? (
-                <p className="text-500">Источников нет.</p>
-              ) : (
+              <TabPanel header={`Источники (${entityDetails.sources.length})`}>
                 <SourcesTable
                   value={entityDetails.sources}
                   onRowClick={(row) => openSourceDetails(row.id)}
                   compact
                   emptyMessage="Источников нет"
                 />
-              )}
-            </TabPanel>
-          </TabView>
+              </TabPanel>
+            </TabView>
+          </>
         )}
       </Dialog>
 
@@ -764,63 +744,64 @@ export const DatabasePage: React.FC = () => {
       >
         {sourceLoading && <p>Загрузка...</p>}
         {!sourceLoading && sourceDetails && (
-          <TabView>
-            <TabPanel header="Общие сведения">
-              <DetailFields
-                fields={[
-                  { label: 'ID', value: sourceDetails.source.id },
-                  { label: 'Тип', value: sourceDetails.source.source_type || '—' },
-                  {
-                    label: 'URL',
-                    span: 2,
-                    value: sourceDetails.source.url ? (
-                      <a href={sourceDetails.source.url} target="_blank" rel="noreferrer" style={{ wordBreak: 'break-all' }}>
-                        {sourceDetails.source.url}
-                      </a>
-                    ) : (
-                      '—'
-                    ),
-                  },
-                  { label: 'Название', span: 2, value: sourceDetails.source.title || '—' },
-                  { label: 'Происхождение', value: sourceDetails.source.source_kind || '—' },
-                  { label: 'Провайдер', value: sourceDetails.source.provider || '—' },
-                  { label: 'Метод получения', value: sourceDetails.source.collection_method || '—' },
-                  { label: 'Надёжность', value: sourceDetails.source.reliability ?? '—' },
-                  { label: 'Уровень доступа', value: sourceDetails.source.access_level || '—' },
-                  {
-                    label: 'Дата получения',
-                    value: sourceDetails.source.retrieved_at
-                      ? new Date(sourceDetails.source.retrieved_at).toLocaleString()
-                      : '—',
-                  },
-                  { label: 'Основание доступа', span: 2, value: sourceDetails.source.authority_basis || '—' },
-                  {
-                    label: 'Локальный путь',
-                    span: 2,
-                    value: (
-                      <span className="text-sm text-500" style={{ wordBreak: 'break-all' }}>
-                        {sourceDetails.source.local_path || '—'}
-                      </span>
-                    ),
-                  },
-                  {
-                    label: 'SHA-256',
-                    span: 2,
-                    value: (
-                      <span className="text-sm text-500" style={{ wordBreak: 'break-all' }}>
-                        {sourceDetails.source.sha256 || '—'}
-                      </span>
-                    ),
-                  },
-                  { label: 'Заметки', span: 2, value: sourceDetails.source.notes || '—' },
-                ]}
-              />
-            </TabPanel>
+          <>
+            <DetailFields
+              fields={[
+                { label: 'ID', value: sourceDetails.source.id },
+                { label: 'Тип', value: sourceDetails.source.source_type || '—' },
+                {
+                  label: 'URL',
+                  span: 2,
+                  value: sourceDetails.source.url ? (
+                    <a
+                      href={sourceDetails.source.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ wordBreak: 'break-all' }}
+                    >
+                      {sourceDetails.source.url}
+                    </a>
+                  ) : (
+                    '—'
+                  ),
+                },
+                { label: 'Название', span: 2, value: sourceDetails.source.title || '—' },
+                { label: 'Происхождение', value: sourceDetails.source.source_kind || '—' },
+                { label: 'Провайдер', value: sourceDetails.source.provider || '—' },
+                { label: 'Метод получения', value: sourceDetails.source.collection_method || '—' },
+                { label: 'Надёжность', value: sourceDetails.source.reliability ?? '—' },
+                { label: 'Уровень доступа', value: sourceDetails.source.access_level || '—' },
+                {
+                  label: 'Дата получения',
+                  value: sourceDetails.source.retrieved_at
+                    ? new Date(sourceDetails.source.retrieved_at).toLocaleString()
+                    : '—',
+                },
+                { label: 'Основание доступа', span: 2, value: sourceDetails.source.authority_basis || '—' },
+                {
+                  label: 'Локальный путь',
+                  span: 2,
+                  value: (
+                    <span className="text-sm text-500" style={{ wordBreak: 'break-all' }}>
+                      {sourceDetails.source.local_path || '—'}
+                    </span>
+                  ),
+                },
+                {
+                  label: 'SHA-256',
+                  span: 2,
+                  value: (
+                    <span className="text-sm text-500" style={{ wordBreak: 'break-all' }}>
+                      {sourceDetails.source.sha256 || '—'}
+                    </span>
+                  ),
+                },
+                { label: 'Заметки', span: 2, value: sourceDetails.source.notes || '—' },
+              ]}
+            />
 
-            <TabPanel header={`Наблюдения (${sourceDetails.observations.length})`}>
-              {sourceDetails.observations.length === 0 ? (
-                <p className="text-500">Наблюдений нет.</p>
-              ) : (
+            <TabView className="mt-3">
+              <TabPanel header={`Наблюдения (${sourceDetails.observations.length})`}>
                 <ObservationsTable
                   value={sourceDetails.observations}
                   showEntity
@@ -829,13 +810,9 @@ export const DatabasePage: React.FC = () => {
                   compact
                   emptyMessage="Наблюдений нет"
                 />
-              )}
-            </TabPanel>
+              </TabPanel>
 
-            <TabPanel header={`Связи (${sourceDetails.relations.length})`}>
-              {sourceDetails.relations.length === 0 ? (
-                <p className="text-500">Связей нет.</p>
-              ) : (
+              <TabPanel header={`Связи (${sourceDetails.relations.length})`}>
                 <RelationsTable
                   value={sourceDetails.relations}
                   side="both"
@@ -845,22 +822,18 @@ export const DatabasePage: React.FC = () => {
                   compact
                   emptyMessage="Связей нет"
                 />
-              )}
-            </TabPanel>
+              </TabPanel>
 
-            <TabPanel header={`Сущности (${sourceDetails.entities.length})`}>
-              {sourceDetails.entities.length === 0 ? (
-                <p className="text-500">Связанных сущностей нет.</p>
-              ) : (
+              <TabPanel header={`Сущности (${sourceDetails.entities.length})`}>
                 <EntitiesTable
                   value={sourceDetails.entities}
                   onRowClick={(row) => openEntityDetails(row.id)}
                   compact
                   emptyMessage="Связанных сущностей нет"
                 />
-              )}
-            </TabPanel>
-          </TabView>
+              </TabPanel>
+            </TabView>
+          </>
         )}
       </Dialog>
 
