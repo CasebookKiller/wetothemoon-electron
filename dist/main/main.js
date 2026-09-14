@@ -9898,6 +9898,15 @@ function initializeSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_raw_dumps_inn ON raw_dumps(company_inn);
     CREATE INDEX IF NOT EXISTS idx_shards_status ON shards(status);
   `);
+	for (const table of [
+		"entities",
+		"relations",
+		"observations",
+		"sources"
+	]) if (!db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === "origin")) {
+		db.exec(`ALTER TABLE ${table} ADD COLUMN origin TEXT NOT NULL DEFAULT 'scraper';`);
+		console.log(`Добавлена колонка origin в ${table}`);
+	}
 	const rawDumpColumns = db.prepare(`PRAGMA table_info(raw_dumps)`).all();
 	if (!rawDumpColumns.some((col) => col.name === "collected_sections")) db.exec(`ALTER TABLE raw_dumps ADD COLUMN collected_sections TEXT;`);
 	if (!rawDumpColumns.some((col) => col.name === "section_updated_at")) db.exec(`ALTER TABLE raw_dumps ADD COLUMN section_updated_at TEXT;`);
@@ -9948,8 +9957,13 @@ function upsertEntity(entity) {
 	const db = getDatabase();
 	const now = (/* @__PURE__ */ new Date()).toISOString();
 	const normalized = normalize(entity.value);
-	const existing = db.prepare("SELECT id FROM entities WHERE type = ? AND normalized_value = ?").get(entity.type, normalized);
+	const origin = entity.origin || "scraper";
+	const existing = db.prepare("SELECT id, origin FROM entities WHERE type = ? AND normalized_value = ?").get(entity.type, normalized);
 	if (existing) {
+		if (existing.origin === "manual" && !entity.overwriteManual) {
+			console.log(`[upsertEntity] Пропущена ручная сущность #${existing.id} (${entity.value})`);
+			return existing.id;
+		}
 		db.prepare(`
       UPDATE entities SET
         rusprofile_id = COALESCE(?, rusprofile_id),
@@ -9963,13 +9977,14 @@ function upsertEntity(entity) {
       WHERE id = ?
     `).run(entity.rusprofile_id || null, entity.value, entity.label || entity.value, now, entity.confidence ?? 50, entity.status || "unverified", entity.status || "unverified", entity.notes || null, entity.raw_file_path || null, existing.id);
 		return existing.id;
-	} else {
-		const info = db.prepare(`
-      INSERT INTO entities (rusprofile_id, type, value, normalized_value, label, first_seen, last_seen, confidence, status, notes, raw_file_path)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(entity.rusprofile_id || null, entity.type, entity.value, normalized, entity.label || entity.value, now, now, entity.confidence ?? 50, entity.status || "unverified", entity.notes || null, entity.raw_file_path || null);
-		return Number(info.lastInsertRowid);
 	}
+	const info = db.prepare(`
+    INSERT INTO entities
+      (rusprofile_id, type, value, normalized_value, label, first_seen, last_seen,
+       confidence, status, notes, raw_file_path, origin)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(entity.rusprofile_id || null, entity.type, entity.value, normalized, entity.label || entity.value, now, now, entity.confidence ?? 50, entity.status || "unverified", entity.notes || null, entity.raw_file_path || null, origin);
+	return Number(info.lastInsertRowid);
 }
 function addSource(source) {
 	const info = getDatabase().prepare(`
@@ -10103,6 +10118,7 @@ function getRelationDetails(relationId) {
       r.evidence_text,
       r.notes,
       r.raw_file_path,
+      r.origin,
       r.subject_id,
       r.object_id,
       r.source_id,
@@ -10112,10 +10128,10 @@ function getRelationDetails(relationId) {
       o.label AS object_label,
       o.type  AS object_type,
       o.value AS object_value,
-      src.url         AS source_url,
-      src.title       AS source_title,
-      src.source_type AS source_type,
-      src.provider    AS source_provider,
+      src.url          AS source_url,
+      src.title        AS source_title,
+      src.source_type  AS source_type,
+      src.provider     AS source_provider,
       src.access_level AS source_access_level,
       src.retrieved_at AS source_retrieved_at
     FROM relations r
@@ -10128,6 +10144,7 @@ function getRelationDetails(relationId) {
 /**
 * Помечает запись в указанной таблице как status='false'.
 * Записывает причину в notes (как в Python-скрипте).
+* Переводит origin в 'manual' (чтобы скрапер не перезаписал).
 * Логирует изменение в audit_log.
 */
 function markRecordAsFalse(table, recordId, reason) {
@@ -10145,8 +10162,15 @@ function markRecordAsFalse(table, recordId, reason) {
 		success: false,
 		error: `Запись с id=${recordId} не найдена в таблице ${table}`
 	};
-	db.prepare(`UPDATE ${table} SET status = 'false', notes = ? WHERE id = ?`).run(reason, recordId);
-	auditChange(table, recordId, "mark_false", JSON.stringify(old), `status=false; reason=${reason}`, reason);
+	const oldOrigin = old.origin || "scraper";
+	db.prepare(`
+    UPDATE ${table}
+    SET status = 'false',
+        notes = ?,
+        origin = 'manual'
+    WHERE id = ?
+  `).run(reason, recordId);
+	auditChange(table, recordId, "mark_false", JSON.stringify(old), `status=false; reason=${reason}; origin=${oldOrigin}→manual`, reason);
 	return { success: true };
 }
 /**
@@ -10156,7 +10180,7 @@ function getEntityDetails(entityId) {
 	const db = getDatabase();
 	const entity = db.prepare(`
     SELECT id, type, value, normalized_value, label, confidence, status,
-           first_seen, last_seen, notes, rusprofile_id, raw_file_path
+           first_seen, last_seen, notes, rusprofile_id, raw_file_path, origin
     FROM entities
     WHERE id = ?
   `).get(entityId);
@@ -10165,7 +10189,7 @@ function getEntityDetails(entityId) {
 		entity,
 		observations: db.prepare(`
     SELECT o.id, o.attribute, o.value, o.confidence, o.observed_at, o.notes,
-           o.source_id,
+           o.source_id, o.origin,
            s.url AS source_url, s.title AS source_title, s.provider AS source_provider
     FROM observations o
     LEFT JOIN sources s ON s.id = o.source_id
@@ -10174,7 +10198,7 @@ function getEntityDetails(entityId) {
   `).all(entityId),
 		relations_out: db.prepare(`
     SELECT r.id, r.predicate, r.confidence, r.status, r.evidence_text,
-           r.valid_from, r.valid_to, r.source_id,
+           r.valid_from, r.valid_to, r.source_id, r.origin,
            e.id AS object_id, e.label AS object_label, e.type AS object_type,
            s.url AS source_url, s.title AS source_title
     FROM relations r
@@ -10185,7 +10209,7 @@ function getEntityDetails(entityId) {
   `).all(entityId),
 		relations_in: db.prepare(`
     SELECT r.id, r.predicate, r.confidence, r.status, r.evidence_text,
-           r.valid_from, r.valid_to, r.source_id,
+           r.valid_from, r.valid_to, r.source_id, r.origin,
            e.id AS subject_id, e.label AS subject_label, e.type AS subject_type,
            s.url AS source_url, s.title AS source_title
     FROM relations r
@@ -10195,7 +10219,8 @@ function getEntityDetails(entityId) {
     ORDER BY r.id DESC
   `).all(entityId),
 		sources: db.prepare(`
-    SELECT DISTINCT s.id, s.url, s.title, s.source_type, s.provider, s.access_level, s.retrieved_at
+    SELECT DISTINCT s.id, s.url, s.title, s.source_type, s.provider,
+           s.access_level, s.retrieved_at, s.origin
     FROM sources s
     WHERE s.id IN (
       SELECT source_id FROM observations WHERE entity_id = ? AND source_id IS NOT NULL
@@ -10221,6 +10246,7 @@ function getObservationDetails(observationId) {
       o.confidence,
       o.notes,
       o.raw_file_path,
+      o.origin,
       e.type  AS entity_type,
       e.label AS entity_label,
       e.value AS entity_value,
@@ -10245,7 +10271,7 @@ function getSourceDetails(sourceId) {
 	const source = db.prepare(`
     SELECT id, url, title, source_type, source_kind, provider, collection_method,
            authority_basis, reliability, access_level, retrieved_at,
-           local_path, sha256, notes
+           local_path, sha256, notes, origin
     FROM sources
     WHERE id = ?
   `).get(sourceId);
@@ -10253,7 +10279,7 @@ function getSourceDetails(sourceId) {
 	return {
 		source,
 		observations: db.prepare(`
-    SELECT o.id, o.attribute, o.value, o.confidence, o.observed_at,
+    SELECT o.id, o.attribute, o.value, o.confidence, o.observed_at, o.origin,
            e.id AS entity_id, e.label AS entity_label, e.type AS entity_type
     FROM observations o
     JOIN entities e ON e.id = o.entity_id
@@ -10262,7 +10288,7 @@ function getSourceDetails(sourceId) {
   `).all(sourceId),
 		relations: db.prepare(`
     SELECT r.id, r.predicate, r.confidence, r.status, r.evidence_text,
-           r.valid_from, r.valid_to,
+           r.valid_from, r.valid_to, r.origin,
            s.id AS subject_id, s.label AS subject_label, s.type AS subject_type,
            o.id AS object_id,  o.label AS object_label,  o.type AS object_type
     FROM relations r
@@ -10272,7 +10298,7 @@ function getSourceDetails(sourceId) {
     ORDER BY r.id DESC
   `).all(sourceId),
 		entities: db.prepare(`
-    SELECT DISTINCT e.id, e.type, e.label, e.value
+    SELECT DISTINCT e.id, e.type, e.label, e.value, e.origin
     FROM entities e
     WHERE e.id IN (
       SELECT entity_id FROM observations WHERE source_id = ?

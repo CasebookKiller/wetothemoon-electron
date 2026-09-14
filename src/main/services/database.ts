@@ -142,6 +142,16 @@ function initializeSchema(db: DatabaseSync) {
     CREATE INDEX IF NOT EXISTS idx_shards_status ON shards(status);
   `);
 
+  // Миграция: добавляем поле origin во все таблицы с данными
+  const tablesWithOrigin = ['entities', 'relations', 'observations', 'sources'];
+  for (const table of tablesWithOrigin) {
+    const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+    if (!cols.some((c) => c.name === 'origin')) {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN origin TEXT NOT NULL DEFAULT 'scraper';`);
+      console.log(`Добавлена колонка origin в ${table}`);
+    }
+  }
+
   // Проверяем наличие колонки collected_sections в raw_dumps
   const rawDumpColumns = db.prepare(`PRAGMA table_info(raw_dumps)`).all() as { name: string }[];
   if (!rawDumpColumns.some(col => col.name === 'collected_sections')) {
@@ -245,18 +255,24 @@ export function upsertEntity(entity: {
   status?: string;
   notes?: string;
   raw_file_path?: string;
+  origin?: 'scraper' | 'manual' | 'import';
+  overwriteManual?: boolean;
 }): number {
   const db = getDatabase();
   const now = new Date().toISOString();
   const normalized = normalize(entity.value);
+  const origin = entity.origin || 'scraper';
 
-  // Сначала ищем существующую запись
   const existing = db.prepare(
-    'SELECT id FROM entities WHERE type = ? AND normalized_value = ?'
-  ).get(entity.type, normalized) as { id: number } | undefined;
+    'SELECT id, origin FROM entities WHERE type = ? AND normalized_value = ?'
+  ).get(entity.type, normalized) as { id: number; origin: string } | undefined;
 
   if (existing) {
-    // Обновляем существующую
+    if (existing.origin === 'manual' && !entity.overwriteManual) {
+      console.log(`[upsertEntity] Пропущена ручная сущность #${existing.id} (${entity.value})`);
+      return existing.id;
+    }
+
     db.prepare(`
       UPDATE entities SET
         rusprofile_id = COALESCE(?, rusprofile_id),
@@ -281,26 +297,98 @@ export function upsertEntity(entity: {
       existing.id
     );
     return existing.id;
-  } else {
-    // Вставляем новую
-    const info = db.prepare(`
-      INSERT INTO entities (rusprofile_id, type, value, normalized_value, label, first_seen, last_seen, confidence, status, notes, raw_file_path)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      entity.rusprofile_id || null,
-      entity.type,
-      entity.value,
-      normalized,
-      entity.label || entity.value,
-      now,
-      now,
-      entity.confidence ?? 50,
-      entity.status || 'unverified',
-      entity.notes || null,
-      entity.raw_file_path || null
-    );
-    return Number(info.lastInsertRowid);
   }
+
+  const info = db.prepare(`
+    INSERT INTO entities
+      (rusprofile_id, type, value, normalized_value, label, first_seen, last_seen,
+       confidence, status, notes, raw_file_path, origin)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    entity.rusprofile_id || null,
+    entity.type,
+    entity.value,
+    normalized,
+    entity.label || entity.value,
+    now,
+    now,
+    entity.confidence ?? 50,
+    entity.status || 'unverified',
+    entity.notes || null,
+    entity.raw_file_path || null,
+    origin
+  );
+  return Number(info.lastInsertRowid);
+}
+
+export function updateEntity(
+  entityId: number,
+  patch: {
+    type?: string;
+    value?: string;
+    label?: string | null;
+    confidence?: number | null;
+    status?: string | null;
+    notes?: string | null;
+  }
+): { success: boolean; error?: string } {
+  const db = getDatabase();
+
+  const old = db.prepare('SELECT * FROM entities WHERE id = ?').get(entityId) as any;
+  if (!old) {
+    return { success: false, error: `Сущность #${entityId} не найдена` };
+  }
+
+  const type = patch.type ?? old.type;
+  const value = patch.value ?? old.value;
+  const label = patch.label !== undefined ? patch.label : old.label;
+  const confidence = patch.confidence !== undefined ? patch.confidence : old.confidence;
+  const status = patch.status !== undefined ? patch.status : old.status;
+  const notes = patch.notes !== undefined ? patch.notes : old.notes;
+
+  const normalized = normalize(value);
+  const oldOrigin = old.origin || 'scraper';
+  const newOrigin = 'manual';
+
+  try {
+    db.prepare(`
+      UPDATE entities
+      SET type = ?,
+          value = ?,
+          normalized_value = ?,
+          label = ?,
+          last_seen = ?,
+          confidence = ?,
+          status = ?,
+          notes = ?,
+          origin = ?
+      WHERE id = ?
+    `).run(
+      type,
+      value,
+      normalized,
+      label,
+      new Date().toISOString(),
+      confidence,
+      status,
+      notes,
+      newOrigin,
+      entityId
+    );
+  } catch (e) {
+    return { success: false, error: (e as Error).message };
+  }
+
+  auditChange(
+    'entities',
+    entityId,
+    'update',
+    JSON.stringify(old),
+    `type=${type}; value=${value}; status=${status}; confidence=${confidence}; origin=${oldOrigin}→${newOrigin}`,
+    'Редактирование сущности через UI'
+  );
+
+  return { success: true };
 }
 
 export function addSource(source: {
@@ -567,6 +655,7 @@ export function getRelationDetails(relationId: number): any | null {
       r.evidence_text,
       r.notes,
       r.raw_file_path,
+      r.origin,
       r.subject_id,
       r.object_id,
       r.source_id,
@@ -576,10 +665,10 @@ export function getRelationDetails(relationId: number): any | null {
       o.label AS object_label,
       o.type  AS object_type,
       o.value AS object_value,
-      src.url         AS source_url,
-      src.title       AS source_title,
-      src.source_type AS source_type,
-      src.provider    AS source_provider,
+      src.url          AS source_url,
+      src.title        AS source_title,
+      src.source_type  AS source_type,
+      src.provider     AS source_provider,
       src.access_level AS source_access_level,
       src.retrieved_at AS source_retrieved_at
     FROM relations r
@@ -595,6 +684,7 @@ export function getRelationDetails(relationId: number): any | null {
 /**
  * Помечает запись в указанной таблице как status='false'.
  * Записывает причину в notes (как в Python-скрипте).
+ * Переводит origin в 'manual' (чтобы скрапер не перезаписал).
  * Логирует изменение в audit_log.
  */
 export function markRecordAsFalse(
@@ -608,23 +698,27 @@ export function markRecordAsFalse(
     return { success: false, error: `Недопустимая таблица: ${table}` };
   }
 
-  // Получаем старую запись
-  const old = db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(recordId);
+  const old = db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(recordId) as any;
   if (!old) {
     return { success: false, error: `Запись с id=${recordId} не найдена в таблице ${table}` };
   }
 
-  // Обновляем: status='false', notes=причина
-  db.prepare(`UPDATE ${table} SET status = 'false', notes = ? WHERE id = ?`)
-    .run(reason, recordId);
+  const oldOrigin = old.origin || 'scraper';
 
-  // Аудит
+  db.prepare(`
+    UPDATE ${table}
+    SET status = 'false',
+        notes = ?,
+        origin = 'manual'
+    WHERE id = ?
+  `).run(reason, recordId);
+
   auditChange(
     table,
     recordId,
     'mark_false',
     JSON.stringify(old),
-    `status=false; reason=${reason}`,
+    `status=false; reason=${reason}; origin=${oldOrigin}→manual`,
     reason
   );
 
@@ -639,7 +733,7 @@ export function getEntityDetails(entityId: number): any | null {
 
   const entity = db.prepare(`
     SELECT id, type, value, normalized_value, label, confidence, status,
-           first_seen, last_seen, notes, rusprofile_id, raw_file_path
+           first_seen, last_seen, notes, rusprofile_id, raw_file_path, origin
     FROM entities
     WHERE id = ?
   `).get(entityId) as any;
@@ -648,7 +742,7 @@ export function getEntityDetails(entityId: number): any | null {
 
   const observations = db.prepare(`
     SELECT o.id, o.attribute, o.value, o.confidence, o.observed_at, o.notes,
-           o.source_id,
+           o.source_id, o.origin,
            s.url AS source_url, s.title AS source_title, s.provider AS source_provider
     FROM observations o
     LEFT JOIN sources s ON s.id = o.source_id
@@ -658,7 +752,7 @@ export function getEntityDetails(entityId: number): any | null {
 
   const relationsOut = db.prepare(`
     SELECT r.id, r.predicate, r.confidence, r.status, r.evidence_text,
-           r.valid_from, r.valid_to, r.source_id,
+           r.valid_from, r.valid_to, r.source_id, r.origin,
            e.id AS object_id, e.label AS object_label, e.type AS object_type,
            s.url AS source_url, s.title AS source_title
     FROM relations r
@@ -670,7 +764,7 @@ export function getEntityDetails(entityId: number): any | null {
 
   const relationsIn = db.prepare(`
     SELECT r.id, r.predicate, r.confidence, r.status, r.evidence_text,
-           r.valid_from, r.valid_to, r.source_id,
+           r.valid_from, r.valid_to, r.source_id, r.origin,
            e.id AS subject_id, e.label AS subject_label, e.type AS subject_type,
            s.url AS source_url, s.title AS source_title
     FROM relations r
@@ -681,7 +775,8 @@ export function getEntityDetails(entityId: number): any | null {
   `).all(entityId) as any[];
 
   const sources = db.prepare(`
-    SELECT DISTINCT s.id, s.url, s.title, s.source_type, s.provider, s.access_level, s.retrieved_at
+    SELECT DISTINCT s.id, s.url, s.title, s.source_type, s.provider,
+           s.access_level, s.retrieved_at, s.origin
     FROM sources s
     WHERE s.id IN (
       SELECT source_id FROM observations WHERE entity_id = ? AND source_id IS NOT NULL
@@ -717,6 +812,7 @@ export function getObservationDetails(observationId: number): any | null {
       o.confidence,
       o.notes,
       o.raw_file_path,
+      o.origin,
       e.type  AS entity_type,
       e.label AS entity_label,
       e.value AS entity_value,
@@ -745,7 +841,7 @@ export function getSourceDetails(sourceId: number): any | null {
   const source = db.prepare(`
     SELECT id, url, title, source_type, source_kind, provider, collection_method,
            authority_basis, reliability, access_level, retrieved_at,
-           local_path, sha256, notes
+           local_path, sha256, notes, origin
     FROM sources
     WHERE id = ?
   `).get(sourceId) as any;
@@ -753,7 +849,7 @@ export function getSourceDetails(sourceId: number): any | null {
   if (!source) return null;
 
   const observations = db.prepare(`
-    SELECT o.id, o.attribute, o.value, o.confidence, o.observed_at,
+    SELECT o.id, o.attribute, o.value, o.confidence, o.observed_at, o.origin,
            e.id AS entity_id, e.label AS entity_label, e.type AS entity_type
     FROM observations o
     JOIN entities e ON e.id = o.entity_id
@@ -763,7 +859,7 @@ export function getSourceDetails(sourceId: number): any | null {
 
   const relations = db.prepare(`
     SELECT r.id, r.predicate, r.confidence, r.status, r.evidence_text,
-           r.valid_from, r.valid_to,
+           r.valid_from, r.valid_to, r.origin,
            s.id AS subject_id, s.label AS subject_label, s.type AS subject_type,
            o.id AS object_id,  o.label AS object_label,  o.type AS object_type
     FROM relations r
@@ -774,7 +870,7 @@ export function getSourceDetails(sourceId: number): any | null {
   `).all(sourceId) as any[];
 
   const entities = db.prepare(`
-    SELECT DISTINCT e.id, e.type, e.label, e.value
+    SELECT DISTINCT e.id, e.type, e.label, e.value, e.origin
     FROM entities e
     WHERE e.id IN (
       SELECT entity_id FROM observations WHERE source_id = ?
@@ -902,4 +998,9 @@ export function getRelatedIds(
     observationIds: [...observationIds],
     sourceIds: [...sourceIds],
   };
+}
+
+export function markEntityAsManual(entityId: number): void {
+  const db = getDatabase();
+  db.prepare(`UPDATE entities SET origin = 'manual' WHERE id = ?`).run(entityId);
 }
