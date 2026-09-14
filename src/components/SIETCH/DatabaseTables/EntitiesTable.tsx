@@ -4,6 +4,7 @@ import React from 'react';
 import { DataTable } from 'primereact/datatable';
 import { Column } from 'primereact/column';
 import { Button } from 'primereact/button';
+import { Tag } from 'primereact/tag';
 
 export interface EntityRow {
   id: number;
@@ -16,6 +17,7 @@ export interface EntityRow {
   first_seen?: string | null;
   last_seen?: string | null;
   notes?: string | null;
+  origin?: string | null;
 }
 
 export interface EntitiesTableProps {
@@ -112,6 +114,18 @@ export const EntitiesTable: React.FC<EntitiesTableProps> = ({
       <Column field="confidence" header="Уверенность" sortable style={{ width: '7rem' }} body={(row: EntityRow) => row.confidence ?? '—'} />
       <Column field="status" header="Статус" sortable style={{ width: '8rem' }} body={renderStatus} />
       <Column field="last_seen" header="Обновлено" sortable body={renderDate} />
+      <Column
+        field="origin"
+        header="Источник"
+        sortable
+        style={{ width: '8rem' }}
+        body={(row: EntityRow) => {
+          const value = row.origin || 'scraper';
+          const severity = value === 'manual' ? 'warning' : value === 'import' ? 'success' : 'info';
+          const label = value === 'manual' ? 'вручную' : value === 'import' ? 'импорт' : 'авто';
+          return <Tag value={label} severity={severity as any} />;
+        }}
+      />
       {actionsVisible && (
         <Column
           header=""

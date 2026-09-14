@@ -477,6 +477,7 @@ export const DatabasePage: React.FC = () => {
             { label: 'Уверенность', value: data.entity.confidence ?? '—' },
             { label: 'Статус', value: data.entity.status },
             { label: 'rusprofile_id', value: data.entity.rusprofile_id || '—' },
+            { label: 'Источник записи', value: renderOrigin(data.entity.origin) },
             { label: 'Первое появление', value: data.entity.first_seen ? new Date(data.entity.first_seen).toLocaleString() : '—' },
             { label: 'Последнее обновление', value: data.entity.last_seen ? new Date(data.entity.last_seen).toLocaleString() : '—' },
             { label: 'Заметки', span: 2, value: data.entity.notes || '—' },
@@ -565,6 +566,7 @@ export const DatabasePage: React.FC = () => {
         },
         { label: 'Уверенность', value: data.confidence ?? '—' },
         { label: 'Статус', value: data.status },
+        { label: 'Источник записи', value: renderOrigin(data.origin) },
         { label: 'Действует с', value: data.valid_from || '—' },
         { label: 'Действует до', value: data.valid_to || '—' },
         { label: 'Подтверждение (evidence)', span: 2, value: data.evidence_text || <span className="text-500">—</span> },
@@ -622,6 +624,7 @@ export const DatabasePage: React.FC = () => {
           value: <span style={{ wordBreak: 'break-all' }}>{data.value}</span>,
         },
         { label: 'Уверенность', value: data.confidence ?? '—' },
+        { label: 'Источник записи', value: renderOrigin(data.origin) },
         {
           label: 'Дата наблюдения',
           value: data.observed_at
@@ -705,6 +708,7 @@ export const DatabasePage: React.FC = () => {
           { label: 'Метод получения', value: data.source.collection_method || '—' },
           { label: 'Надёжность', value: data.source.reliability ?? '—' },
           { label: 'Уровень доступа', value: data.source.access_level || '—' },
+          { label: 'Источник записи', value: renderOrigin(data.source.origin) },
           {
             label: 'Дата получения',
             value: data.source.retrieved_at
@@ -792,6 +796,19 @@ export const DatabasePage: React.FC = () => {
       case 'source':
         return renderSourceContent(data);
     }
+  };
+
+  const renderOrigin = (origin?: string) => {
+    const value = origin || 'scraper';
+    const severity =
+      value === 'manual' ? 'warning'
+      : value === 'import' ? 'success'
+      : 'info';
+    const label =
+      value === 'manual' ? 'вручную'
+      : value === 'import' ? 'импорт'
+      : 'автоматически';
+    return <Tag value={label} severity={severity as any} />;
   };
 
   // Заголовок mark-false зависит от типа

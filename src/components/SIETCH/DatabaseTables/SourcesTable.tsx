@@ -21,6 +21,8 @@ export interface SourceRow {
   local_path?: string | null;
   sha256?: string | null;
   notes?: string | null;
+
+  origin?: string | null;
 }
 
 export interface SourcesTableProps {

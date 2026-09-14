@@ -23,6 +23,8 @@ export interface ObservationRow {
   source_url?: string | null;
   source_title?: string | null;
   source_provider?: string | null;
+
+  origin?: string | null;
 }
 
 export interface ObservationsTableProps {

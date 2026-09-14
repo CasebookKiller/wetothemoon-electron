@@ -27,6 +27,8 @@ export interface RelationRow {
   source_id?: number | null;
   source_url?: string | null;
   source_title?: string | null;
+
+  origin?: string | null;
 }
 
 export interface RelationsTableProps {
