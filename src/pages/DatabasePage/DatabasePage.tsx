@@ -14,6 +14,7 @@ import './DatabasePage.css';
 import { EntitiesTable } from '@/components/SIETCH/DatabaseTables/EntitiesTable';
 import { RelationsTable } from '@/components/SIETCH/DatabaseTables/RelationsTable';
 import { ObservationsTable } from '@/components/SIETCH/DatabaseTables/ObservationsTable';
+import { SourcesTable } from '@/components/SIETCH/DatabaseTables/SourcesTable';
 
 export const DatabasePage: React.FC = () => {
   const [entities, setEntities] = useState<any[]>([]);
@@ -317,22 +318,10 @@ export const DatabasePage: React.FC = () => {
           </TabPanel>
 
           <TabPanel header={`Источники (${sources.length})`}>
-            <DataTable
+            <SourcesTable
               value={sources}
-              paginator
-              rows={20}
-              rowsPerPageOptions={[10, 20, 50, 100]}
-              responsiveLayout="scroll"
-              selectionMode="single"
-              onRowClick={(e) => openSourceDetails(e.data.id)}
-              rowHover
-            >
-              <Column field="id" header="ID" sortable />
-              <Column field="url" header="URL" sortable />
-              <Column field="title" header="Название" sortable />
-              <Column field="source_type" header="Тип" sortable />
-              <Column field="retrieved_at" header="Дата получения" sortable />
-            </DataTable>
+              onRowClick={(row) => openSourceDetails(row.id)}
+            />
           </TabPanel>
         </TabView>
       </Panel>
@@ -479,15 +468,12 @@ export const DatabasePage: React.FC = () => {
               {entityDetails.sources.length === 0 ? (
                 <p className="text-500">Источников нет.</p>
               ) : (
-                <DataTable value={entityDetails.sources} responsiveLayout="scroll">
-                  <Column field="id" header="ID" />
-                  <Column field="title" header="Название" />
-                  <Column field="url" header="URL" body={(row) => <a href={row.url} target="_blank" rel="noreferrer">{row.url}</a>} />
-                  <Column field="source_type" header="Тип" />
-                  <Column field="provider" header="Провайдер" />
-                  <Column field="access_level" header="Доступ" />
-                  <Column field="retrieved_at" header="Получено" body={(row) => row.retrieved_at ? new Date(row.retrieved_at).toLocaleString() : '—'} />
-                </DataTable>
+                <SourcesTable
+                  value={entityDetails.sources}
+                  onRowClick={(row) => openSourceDetails(row.id)}
+                  compact
+                  emptyMessage="Источников нет"
+                />
               )}
             </TabPanel>
           </TabView>
