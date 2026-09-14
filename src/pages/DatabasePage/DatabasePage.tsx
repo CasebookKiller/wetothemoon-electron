@@ -13,6 +13,7 @@ import { Tag } from 'primereact/tag';
 import './DatabasePage.css';
 import { EntitiesTable } from '@/components/SIETCH/DatabaseTables/EntitiesTable';
 import { RelationsTable } from '@/components/SIETCH/DatabaseTables/RelationsTable';
+import { ObservationsTable } from '@/components/SIETCH/DatabaseTables/ObservationsTable';
 
 export const DatabasePage: React.FC = () => {
   const [entities, setEntities] = useState<any[]>([]);
@@ -294,49 +295,25 @@ export const DatabasePage: React.FC = () => {
       <Panel className="shadow-5 mb-3" header="Таблицы">
         <TabView className="my-3">
           <TabPanel header={`Сущности (${displayEntities.length})`}>
+            <EntitiesTable
+              value={displayEntities}
+              onRowClick={(row) => openEntityDetails(row.id)}
+              emptyMessage={searchActive ? 'Ничего не найдено' : 'Нет данных'}
+            />
+          </TabPanel>
+
+          <TabPanel header={`Связи (${relations.length})`}>
             <RelationsTable
               value={relations}
               onRowClick={(row) => openRelationDetails(row.id)}
             />
           </TabPanel>
 
-          <TabPanel header={`Связи (${relations.length})`}>
-            <DataTable
-              value={relations}
-              paginator
-              rows={20}
-              rowsPerPageOptions={[10, 20, 50, 100]}
-              responsiveLayout="scroll"
-              selectionMode="single"
-              onRowClick={(e) => openRelationDetails(e.data.id)}
-              rowHover
-            >
-              <Column field="id" header="ID" sortable />
-              <Column field="subject_label" header="Исходная сущность" sortable />
-              <Column field="predicate" header="Тип связи" sortable />
-              <Column field="object_label" header="Целевая сущность" sortable />
-              <Column field="confidence" header="Уверенность" sortable />
-              <Column field="status" header="Статус" sortable />
-            </DataTable>
-          </TabPanel>
-
           <TabPanel header={`Наблюдения (${observations.length})`}>
-            <DataTable
+            <ObservationsTable
               value={observations}
-              paginator
-              rows={20}
-              rowsPerPageOptions={[10, 20, 50, 100]}
-              responsiveLayout="scroll"
-              selectionMode="single"
-              onRowClick={(e) => openObservationDetails(e.data.id)}
-              rowHover
-            >
-              <Column field="id" header="ID" sortable />
-              <Column field="entity_label" header="Сущность" sortable />
-              <Column field="attribute" header="Атрибут" sortable />
-              <Column field="value" header="Значение" sortable />
-              <Column field="observed_at" header="Дата" sortable />
-            </DataTable>
+              onRowClick={(row) => openObservationDetails(row.id)}
+            />
           </TabPanel>
 
           <TabPanel header={`Источники (${sources.length})`}>
@@ -457,14 +434,14 @@ export const DatabasePage: React.FC = () => {
               {entityDetails.observations.length === 0 ? (
                 <p className="text-500">Наблюдений нет.</p>
               ) : (
-                <DataTable value={entityDetails.observations} responsiveLayout="scroll">
-                  <Column field="id" header="ID" />
-                  <Column field="attribute" header="Атрибут" />
-                  <Column field="value" header="Значение" />
-                  <Column field="confidence" header="Уверенность" />
-                  <Column field="observed_at" header="Дата" body={(row) => row.observed_at ? new Date(row.observed_at).toLocaleString() : '—'} />
-                  <Column field="source_title" header="Источник" body={(row) => row.source_url ? <a href={row.source_url} target="_blank" rel="noreferrer">{row.source_title || row.source_url}</a> : '—'} />
-                </DataTable>
+                <ObservationsTable
+                  value={entityDetails.observations}
+                  showEntity={false}
+                  onRowClick={(row) => openObservationDetails(row.id)}
+                  onSourceClick={(row) => row.source_id && openSourceDetails(row.source_id)}
+                  compact
+                  emptyMessage="Наблюдений нет"
+                />
               )}
             </TabPanel>
 
@@ -895,14 +872,14 @@ export const DatabasePage: React.FC = () => {
               {sourceDetails.observations.length === 0 ? (
                 <p className="text-500">Наблюдений нет.</p>
               ) : (
-                <DataTable value={sourceDetails.observations} responsiveLayout="scroll">
-                  <Column field="id" header="ID" />
-                  <Column field="entity_label" header="Сущность" body={(row) => `[${row.entity_id}] ${row.entity_label} (${row.entity_type})`} />
-                  <Column field="attribute" header="Атрибут" />
-                  <Column field="value" header="Значение" />
-                  <Column field="confidence" header="Уверенность" />
-                  <Column field="observed_at" header="Дата" body={(row) => row.observed_at ? new Date(row.observed_at).toLocaleString() : '—'} />
-                </DataTable>
+                <ObservationsTable
+                  value={sourceDetails.observations}
+                  showEntity
+                  onRowClick={(row) => openObservationDetails(row.id)}
+                  onEntityClick={(row) => openEntityDetails(row.entity_id)}
+                  compact
+                  emptyMessage="Наблюдений нет"
+                />
               )}
             </TabPanel>
 
