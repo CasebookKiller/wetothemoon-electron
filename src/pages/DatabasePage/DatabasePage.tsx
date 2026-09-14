@@ -50,6 +50,9 @@ export const DatabasePage: React.FC = () => {
   const [dialogCache, setDialogCache] = useState<Record<string, any>>({});
   const [dialogLoading, setDialogLoading] = useState(false);
 
+  const [activeFilter, setActiveFilter] = useState<{ type: DialogType; id: number } | null>(null);
+  const [activeTab, setActiveTab] = useState<number>(0);
+
   const api = (window as any).electronAPI;
 
   const cacheKey = (type: DialogType, id: number) => `${type}:${id}`;
@@ -91,6 +94,37 @@ export const DatabasePage: React.FC = () => {
       setDialogLoading(false);
     }
   };
+
+  const typeToTabIndex: Record<DialogType, number> = {
+    entity: 0,
+    relation: 1,
+    observation: 2,
+    source: 3,
+  };
+
+  const openInMainWindow = (type: DialogType, id: number, tabIndex: number) => {
+    // Закрыть диалоги, но сохранить кэш, чтобы при возврате данные были мгновенно
+    setDialogStack([]);
+    setActiveFilter({ type, id });
+    setActiveTab(tabIndex);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const entityFilterFn = activeFilter?.type === 'entity'
+    ? (row: any) => row.id === activeFilter.id
+    : undefined;
+
+  const relationFilterFn = activeFilter?.type === 'relation'
+    ? (row: any) => row.id === activeFilter.id
+    : undefined;
+
+  const observationFilterFn = activeFilter?.type === 'observation'
+    ? (row: any) => row.id === activeFilter.id
+    : undefined;
+
+  const sourceFilterFn = activeFilter?.type === 'source'
+    ? (row: any) => row.id === activeFilter.id
+    : undefined;
 
   const popDialog = () => {
     setDialogStack((prev) => prev.slice(0, -1));
@@ -663,10 +697,40 @@ export const DatabasePage: React.FC = () => {
 
       {/* Панель таблиц */}
       <Panel className="shadow-5 mb-3" header="Таблицы">
-        <TabView className="my-3">
+        {activeFilter && (
+          <div className="flex align-items-center gap-2 mb-2">
+            <span className="text-sm text-500">Фильтр:</span>
+            <div
+              className="flex align-items-center gap-2 px-3 py-1 border-round"
+              style={{
+                background: 'var(--tg-theme-secondary-bg-color)',
+                border: '1px solid var(--tg-theme-hint-color)',
+              }}
+            >
+              <span style={{ color: 'var(--tg-theme-accent-text-color)' }}>
+                {activeFilter.type === 'entity' ? 'Сущность' :
+                activeFilter.type === 'relation' ? 'Связь' :
+                activeFilter.type === 'observation' ? 'Наблюдение' : 'Источник'}
+                : #{activeFilter.id}
+              </span>
+              <i
+                className="pi pi-times"
+                style={{ cursor: 'pointer' }}
+                onClick={() => setActiveFilter(null)}
+                title="Снять фильтр"
+              />
+            </div>
+          </div>
+        )}
+        <TabView
+          className="my-3"
+          activeIndex={activeTab}
+          onTabChange={(e) => setActiveTab(e.index)}
+        >
           <TabPanel header={`Сущности (${displayEntities.length})`}>
             <EntitiesTable
               value={displayEntities}
+              filterFn={entityFilterFn}
               onRowClick={(row) => openDialog('entity', row.id)}
               emptyMessage={searchActive ? 'Ничего не найдено' : 'Нет данных'}
             />
@@ -675,6 +739,7 @@ export const DatabasePage: React.FC = () => {
           <TabPanel header={`Связи (${relations.length})`}>
             <RelationsTable
               value={relations}
+              filterFn={relationFilterFn}
               onRowClick={(row) => openDialog('relation', row.id)}
             />
           </TabPanel>
@@ -682,6 +747,7 @@ export const DatabasePage: React.FC = () => {
           <TabPanel header={`Наблюдения (${observations.length})`}>
             <ObservationsTable
               value={observations}
+              filterFn={observationFilterFn}
               onRowClick={(row) => openDialog('observation', row.id)}
             />
           </TabPanel>
@@ -689,6 +755,7 @@ export const DatabasePage: React.FC = () => {
           <TabPanel header={`Источники (${sources.length})`}>
             <SourcesTable
               value={sources}
+              filterFn={sourceFilterFn}
               onRowClick={(row) => openDialog('source', row.id)}
             />
           </TabPanel>
@@ -756,6 +823,15 @@ export const DatabasePage: React.FC = () => {
         footer={
           dialogStack.length > 0 ? (
             <div className="p-panel-footer flex justify-content-end gap-2">
+              <Button
+                label="Открыть в главном окне"
+                icon="pi pi-external-link"
+                className="osint-soft"
+                onClick={() => {
+                  const top = dialogStack[dialogStack.length - 1];
+                  openInMainWindow(top.type, top.id, typeToTabIndex[top.type]);
+                }}
+              />
               {['entity', 'relation', 'observation'].includes(dialogStack[dialogStack.length - 1].type) && (
                 <Button
                   label="Пометить как ложную"
