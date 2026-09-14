@@ -11,6 +11,8 @@ import { InputTextarea } from 'primereact/inputtextarea';
 import { Tag } from 'primereact/tag';
 
 import './DatabasePage.css';
+import { EntitiesTable } from '@/components/SIETCH/DatabaseTables/EntitiesTable';
+import { RelationsTable } from '@/components/SIETCH/DatabaseTables/RelationsTable';
 
 export const DatabasePage: React.FC = () => {
   const [entities, setEntities] = useState<any[]>([]);
@@ -292,25 +294,10 @@ export const DatabasePage: React.FC = () => {
       <Panel className="shadow-5 mb-3" header="Таблицы">
         <TabView className="my-3">
           <TabPanel header={`Сущности (${displayEntities.length})`}>
-            <DataTable
-              value={displayEntities}
-              paginator
-              rows={20}
-              rowsPerPageOptions={[10, 20, 50, 100]}
-              responsiveLayout="scroll"
-              emptyMessage={searchActive ? 'Ничего не найдено' : 'Нет данных'}
-              selectionMode="single"
-              onRowClick={(e) => openEntityDetails(e.data.id)}
-              rowHover
-            >
-              <Column field="id" header="ID" sortable />
-              <Column field="type" header="Тип" sortable />
-              <Column field="label" header="Название" sortable />
-              <Column field="value" header="Значение" sortable />
-              <Column field="confidence" header="Уверенность" sortable />
-              <Column field="status" header="Статус" sortable />
-              <Column field="last_seen" header="Обновлено" sortable />
-            </DataTable>
+            <RelationsTable
+              value={relations}
+              onRowClick={(row) => openRelationDetails(row.id)}
+            />
           </TabPanel>
 
           <TabPanel header={`Связи (${relations.length})`}>
@@ -373,170 +360,7 @@ export const DatabasePage: React.FC = () => {
         </TabView>
       </Panel>
 
-      <Dialog
-        visible={relationDialog}
-        style={{ width: '700px' }}
-        modal
-        onHide={() => setRelationDialog(false)}
-        header={
-          <span className="p-panel-title">
-            {relationDetails ? `Связь #${relationDetails.id}` : 'Загрузка...'}
-          </span>
-        }
-        footer={
-          <div className="p-panel-footer flex justify-content-end gap-2">
-            <Button
-              label="Пометить как ложную"
-              icon="pi pi-exclamation-triangle"
-              className="osint-destructive"
-              onClick={() => openMarkFalseDialog({ table: 'relations', id: relationDetails?.id })}
-              disabled={relationDetails?.status === 'false'}
-            />
-            <Button
-              label="Закрыть"
-              icon="pi pi-times"
-              className="osint"
-              onClick={() => setRelationDialog(false)}
-            />
-          </div>
-        }
-      >
-        {relationLoading && <p>Загрузка...</p>}
-        {!relationLoading && relationDetails && (
-          <div className="p-fluid">
-            <div className="field">
-              <label className="font-bold">Исходная сущность</label>
-              <div>
-                [{relationDetails.subject_id}] {relationDetails.subject_label} — <i>{relationDetails.subject_type}</i>
-                <div className="text-sm text-500">{relationDetails.subject_value}</div>
-              </div>
-            </div>
-
-            <div className="field">
-              <label className="font-bold">Связь</label>
-              <div><b>{relationDetails.predicate}</b></div>
-            </div>
-
-            <div className="field">
-              <label className="font-bold">Целевая сущность</label>
-              <div>
-                [{relationDetails.object_id}] {relationDetails.object_label} — <i>{relationDetails.object_type}</i>
-                <div className="text-sm text-500">{relationDetails.object_value}</div>
-              </div>
-            </div>
-
-            <div className="field">
-              <label className="font-bold">Источник</label>
-              {relationDetails.source_url ? (
-                <div>
-                  [{relationDetails.source_id}] {relationDetails.source_title || 'Источник'}
-                  <div className="text-sm">
-                    <a href={relationDetails.source_url} target="_blank" rel="noreferrer">
-                      {relationDetails.source_url}
-                    </a>
-                  </div>
-                  <div className="text-sm text-500">
-                    {relationDetails.source_type} • {relationDetails.source_provider} • {relationDetails.source_access_level}
-                    {relationDetails.source_retrieved_at ? ` • получено ${new Date(relationDetails.source_retrieved_at).toLocaleString()}` : ''}
-                  </div>
-                </div>
-              ) : (
-                <div className="text-500">Источник не указан</div>
-              )}
-            </div>
-
-            <div className="field">
-              <label className="font-bold">Подтверждение (evidence)</label>
-              <div>{relationDetails.evidence_text || <span className="text-500">—</span>}</div>
-            </div>
-
-            <div className="grid">
-              <div className="col-6">
-                <label className="font-bold">Уверенность</label>
-                <div>{relationDetails.confidence ?? '—'}</div>
-              </div>
-              <div className="col-6">
-                <label className="font-bold">Статус</label>
-                <div>{relationDetails.status}</div>
-              </div>
-              <div className="col-6">
-                <label className="font-bold">Действует с</label>
-                <div>{relationDetails.valid_from || '—'}</div>
-              </div>
-              <div className="col-6">
-                <label className="font-bold">Действует до</label>
-                <div>{relationDetails.valid_to || '—'}</div>
-              </div>
-            </div>
-
-            <div className="field">
-              <label className="font-bold">Заметки</label>
-              <div>{relationDetails.notes || <span className="text-500">—</span>}</div>
-            </div>
-
-            <div className="field">
-              <label className="font-bold">Файл дампа</label>
-              <div className="text-sm text-500" style={{ wordBreak: 'break-all' }}>
-                {relationDetails.raw_file_path || '—'}
-              </div>
-            </div>
-          </div>
-        )}
-      </Dialog>
-
-      <Dialog
-        visible={falseDialog}
-        style={{ width: '500px' }}
-        modal
-        onHide={() => setFalseDialog(false)}
-        header={
-          <span className="p-panel-title">Пометить связь как ложную</span>
-        }
-        footer={
-          <>
-            {/* Футер диалога mark-false — просто кнопки, без p-panel-footer */}
-            <Button
-              label="Отмена"
-              icon="pi pi-times"
-              className="osint"
-              onClick={() => setFalseDialog(false)}
-              disabled={falseLoading}
-            />
-            <Button
-              label={falseLoading ? 'Отправка...' : 'Пометить'}
-              icon={falseLoading ? 'pi pi-spin pi-spinner' : 'pi pi-check'}
-              className="osint-destructive"
-              onClick={handleMarkFalseSubmit}
-              disabled={falseLoading || !falseReason.trim()}
-            />
-          </>
-        }
-      >
-        <div className="p-fluid">
-          <p className="text-sm text-500">
-            Связь <b>#{relationDetails?.id}</b> будет помечена как <code>false</code>.
-            Причина сохранится в поле <code>notes</code> и в журнале изменений.
-          </p>
-          <div className="field mt-3">
-            <label htmlFor="falseReason" className="font-bold">Причина *</label>
-            <InputTextarea
-              id="falseReason"
-              value={falseReason}
-              onChange={(e) => setFalseReason(e.target.value)}
-              rows={3}
-              autoResize
-              placeholder="Например: ошибочно сопоставлено с другой организацией"
-              className="w-full"
-            />
-          </div>
-          {falseMessage && (
-            <p className={falseMessage.startsWith('Ошибка') ? 'p-error' : 'p-success'}>
-              {falseMessage}
-            </p>
-          )}
-        </div>
-      </Dialog>
-
+      {/* Диалог сущности */} 
       <Dialog
         visible={entityDialog}
         style={{ width: '900px' }}
@@ -648,15 +472,14 @@ export const DatabasePage: React.FC = () => {
               {entityDetails.relations_out.length === 0 ? (
                 <p className="text-500">Нет исходящих связей.</p>
               ) : (
-                <DataTable value={entityDetails.relations_out} responsiveLayout="scroll">
-                  <Column field="id" header="ID" />
-                  <Column field="predicate" header="Предикат" />
-                  <Column field="object_label" header="Целевая сущность" body={(row) => `[${row.object_id}] ${row.object_label} (${row.object_type})`} />
-                  <Column field="confidence" header="Уверенность" />
-                  <Column field="status" header="Статус" />
-                  <Column field="valid_from" header="С" />
-                  <Column field="valid_to" header="По" />
-                </DataTable>
+                <RelationsTable
+                  value={entityDetails.relations_out}
+                  side="outgoing"
+                  onRowClick={(row) => openRelationDetails(row.id)}
+                  onObjectClick={(row) => openEntityDetails(row.object_id)}
+                  compact
+                  emptyMessage="Нет исходящих связей"
+                />
               )}
             </TabPanel>
 
@@ -664,15 +487,14 @@ export const DatabasePage: React.FC = () => {
               {entityDetails.relations_in.length === 0 ? (
                 <p className="text-500">Нет входящих связей.</p>
               ) : (
-                <DataTable value={entityDetails.relations_in} responsiveLayout="scroll">
-                  <Column field="id" header="ID" />
-                  <Column field="subject_label" header="Исходная сущность" body={(row) => `[${row.subject_id}] ${row.subject_label} (${row.subject_type})`} />
-                  <Column field="predicate" header="Предикат" />
-                  <Column field="confidence" header="Уверенность" />
-                  <Column field="status" header="Статус" />
-                  <Column field="valid_from" header="С" />
-                  <Column field="valid_to" header="По" />
-                </DataTable>
+                <RelationsTable
+                  value={entityDetails.relations_in}
+                  side="incoming"
+                  onRowClick={(row) => openRelationDetails(row.id)}
+                  onSubjectClick={(row) => openEntityDetails(row.subject_id)}
+                  compact
+                  emptyMessage="Нет входящих связей"
+                />
               )}
             </TabPanel>
 
@@ -695,6 +517,173 @@ export const DatabasePage: React.FC = () => {
         )}
       </Dialog>
 
+      {/* Диалог связи */}
+      <Dialog
+        visible={relationDialog}
+        style={{ width: '700px' }}
+        modal
+        onHide={() => setRelationDialog(false)}
+        header={
+          <span className="p-panel-title">
+            {relationDetails ? `Связь #${relationDetails.id}` : 'Загрузка...'}
+          </span>
+        }
+        footer={
+          <div className="p-panel-footer flex justify-content-end gap-2">
+            <Button
+              label="Пометить как ложную"
+              icon="pi pi-exclamation-triangle"
+              className="osint-destructive"
+              onClick={() => openMarkFalseDialog({ table: 'relations', id: relationDetails?.id })}
+              disabled={relationDetails?.status === 'false'}
+            />
+            <Button
+              label="Закрыть"
+              icon="pi pi-times"
+              className="osint"
+              onClick={() => setRelationDialog(false)}
+            />
+          </div>
+        }
+      >
+        {relationLoading && <p>Загрузка...</p>}
+        {!relationLoading && relationDetails && (
+          <div className="p-fluid">
+            <div className="field">
+              <label className="font-bold">Исходная сущность</label>
+              <div>
+                [{relationDetails.subject_id}] {relationDetails.subject_label} — <i>{relationDetails.subject_type}</i>
+                <div className="text-sm text-500">{relationDetails.subject_value}</div>
+              </div>
+            </div>
+
+            <div className="field">
+              <label className="font-bold">Связь</label>
+              <div><b>{relationDetails.predicate}</b></div>
+            </div>
+
+            <div className="field">
+              <label className="font-bold">Целевая сущность</label>
+              <div>
+                [{relationDetails.object_id}] {relationDetails.object_label} — <i>{relationDetails.object_type}</i>
+                <div className="text-sm text-500">{relationDetails.object_value}</div>
+              </div>
+            </div>
+
+            <div className="field">
+              <label className="font-bold">Источник</label>
+              {relationDetails.source_url ? (
+                <div>
+                  [{relationDetails.source_id}] {relationDetails.source_title || 'Источник'}
+                  <div className="text-sm">
+                    <a href={relationDetails.source_url} target="_blank" rel="noreferrer">
+                      {relationDetails.source_url}
+                    </a>
+                  </div>
+                  <div className="text-sm text-500">
+                    {relationDetails.source_type} • {relationDetails.source_provider} • {relationDetails.source_access_level}
+                    {relationDetails.source_retrieved_at ? ` • получено ${new Date(relationDetails.source_retrieved_at).toLocaleString()}` : ''}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-500">Источник не указан</div>
+              )}
+            </div>
+
+            <div className="field">
+              <label className="font-bold">Подтверждение (evidence)</label>
+              <div>{relationDetails.evidence_text || <span className="text-500">—</span>}</div>
+            </div>
+
+            <div className="grid">
+              <div className="col-6">
+                <label className="font-bold">Уверенность</label>
+                <div>{relationDetails.confidence ?? '—'}</div>
+              </div>
+              <div className="col-6">
+                <label className="font-bold">Статус</label>
+                <div>{relationDetails.status}</div>
+              </div>
+              <div className="col-6">
+                <label className="font-bold">Действует с</label>
+                <div>{relationDetails.valid_from || '—'}</div>
+              </div>
+              <div className="col-6">
+                <label className="font-bold">Действует до</label>
+                <div>{relationDetails.valid_to || '—'}</div>
+              </div>
+            </div>
+
+            <div className="field">
+              <label className="font-bold">Заметки</label>
+              <div>{relationDetails.notes || <span className="text-500">—</span>}</div>
+            </div>
+
+            <div className="field">
+              <label className="font-bold">Файл дампа</label>
+              <div className="text-sm text-500" style={{ wordBreak: 'break-all' }}>
+                {relationDetails.raw_file_path || '—'}
+              </div>
+            </div>
+          </div>
+        )}
+      </Dialog>
+
+      {/* Диалог пометки связи как ложной */}
+      <Dialog
+        visible={falseDialog}
+        style={{ width: '500px' }}
+        modal
+        onHide={() => setFalseDialog(false)}
+        header={
+          <span className="p-panel-title">Пометить связь как ложную</span>
+        }
+        footer={
+          <>
+            {/* Футер диалога mark-false — просто кнопки, без p-panel-footer */}
+            <Button
+              label="Отмена"
+              icon="pi pi-times"
+              className="osint"
+              onClick={() => setFalseDialog(false)}
+              disabled={falseLoading}
+            />
+            <Button
+              label={falseLoading ? 'Отправка...' : 'Пометить'}
+              icon={falseLoading ? 'pi pi-spin pi-spinner' : 'pi pi-check'}
+              className="osint-destructive"
+              onClick={handleMarkFalseSubmit}
+              disabled={falseLoading || !falseReason.trim()}
+            />
+          </>
+        }
+      >
+        <div className="p-fluid">
+          <p className="text-sm text-500">
+            Связь <b>#{relationDetails?.id}</b> будет помечена как <code>false</code>.
+            Причина сохранится в поле <code>notes</code> и в журнале изменений.
+          </p>
+          <div className="field mt-3">
+            <label htmlFor="falseReason" className="font-bold">Причина *</label>
+            <InputTextarea
+              id="falseReason"
+              value={falseReason}
+              onChange={(e) => setFalseReason(e.target.value)}
+              rows={3}
+              autoResize
+              placeholder="Например: ошибочно сопоставлено с другой организацией"
+              className="w-full"
+            />
+          </div>
+          {falseMessage && (
+            <p className={falseMessage.startsWith('Ошибка') ? 'p-error' : 'p-success'}>
+              {falseMessage}
+            </p>
+          )}
+        </div>
+      </Dialog>
+
+      {/* Диалог наблюдения */}
       <Dialog
         visible={observationDialog}
         style={{ width: '700px' }}
@@ -798,6 +787,7 @@ export const DatabasePage: React.FC = () => {
         )}
       </Dialog>
 
+      {/* Диалог источника */}
       <Dialog
         visible={sourceDialog}
         style={{ width: '900px' }}
@@ -920,14 +910,15 @@ export const DatabasePage: React.FC = () => {
               {sourceDetails.relations.length === 0 ? (
                 <p className="text-500">Связей нет.</p>
               ) : (
-                <DataTable value={sourceDetails.relations} responsiveLayout="scroll">
-                  <Column field="id" header="ID" />
-                  <Column field="subject_label" header="Исходная" body={(row) => `[${row.subject_id}] ${row.subject_label} (${row.subject_type})`} />
-                  <Column field="predicate" header="Предикат" />
-                  <Column field="object_label" header="Целевая" body={(row) => `[${row.object_id}] ${row.object_label} (${row.object_type})`} />
-                  <Column field="confidence" header="Уверенность" />
-                  <Column field="status" header="Статус" />
-                </DataTable>
+                <RelationsTable
+                  value={sourceDetails.relations}
+                  side="both"
+                  onRowClick={(row) => openRelationDetails(row.id)}
+                  onSubjectClick={(row) => openEntityDetails(row.subject_id)}
+                  onObjectClick={(row) => openEntityDetails(row.object_id)}
+                  compact
+                  emptyMessage="Связей нет"
+                />
               )}
             </TabPanel>
 
@@ -935,12 +926,12 @@ export const DatabasePage: React.FC = () => {
               {sourceDetails.entities.length === 0 ? (
                 <p className="text-500">Связанных сущностей нет.</p>
               ) : (
-                <DataTable value={sourceDetails.entities} responsiveLayout="scroll">
-                  <Column field="id" header="ID" />
-                  <Column field="type" header="Тип" />
-                  <Column field="label" header="Название" />
-                  <Column field="value" header="Значение" />
-                </DataTable>
+                <EntitiesTable
+                  value={sourceDetails.entities}
+                  onRowClick={(row) => openEntityDetails(row.id)}
+                  compact
+                  emptyMessage="Связанных сущностей нет"
+                />
               )}
             </TabPanel>
           </TabView>
