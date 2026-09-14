@@ -10285,6 +10285,88 @@ function getSourceDetails(sourceId) {
   `).all(sourceId, sourceId, sourceId)
 	};
 }
+/**
+* Возвращает ID связанных записей для каскадного фильтра.
+* Например, если filterType='entity' и filterId=69, то вернёт:
+* - entityIds: [69] + все сущности, с которыми #69 связана через relations
+* - relationIds: все связи, где #69 — subject или object
+* - observationIds: все наблюдения сущности #69
+* - sourceIds: все источники, упомянутые в этих связях и наблюдениях
+*/
+function getRelatedIds(filterType, filterId) {
+	const db = getDatabase();
+	const entityIds = /* @__PURE__ */ new Set();
+	const relationIds = /* @__PURE__ */ new Set();
+	const observationIds = /* @__PURE__ */ new Set();
+	const sourceIds = /* @__PURE__ */ new Set();
+	const loadObservationsByEntities = (ids) => {
+		if (ids.length === 0) return;
+		const placeholders = ids.map(() => "?").join(",");
+		db.prepare(`SELECT id, source_id FROM observations WHERE entity_id IN (${placeholders})`).all(...ids).forEach((o) => {
+			observationIds.add(o.id);
+			if (o.source_id) sourceIds.add(o.source_id);
+		});
+	};
+	const loadRelationsByEntities = (ids) => {
+		if (ids.length === 0) return;
+		const placeholders = ids.map(() => "?").join(",");
+		db.prepare(`SELECT id, subject_id, object_id, source_id FROM relations
+                WHERE subject_id IN (${placeholders}) OR object_id IN (${placeholders})`).all(...ids, ...ids).forEach((r) => {
+			relationIds.add(r.id);
+			entityIds.add(r.subject_id);
+			entityIds.add(r.object_id);
+			if (r.source_id) sourceIds.add(r.source_id);
+		});
+	};
+	const loadRelationsBySource = (sourceId) => {
+		db.prepare(`SELECT id, subject_id, object_id FROM relations WHERE source_id = ?`).all(sourceId).forEach((r) => {
+			relationIds.add(r.id);
+			entityIds.add(r.subject_id);
+			entityIds.add(r.object_id);
+		});
+	};
+	if (filterType === "entity") {
+		entityIds.add(filterId);
+		loadRelationsByEntities([filterId]);
+		loadObservationsByEntities([filterId]);
+	}
+	if (filterType === "relation") {
+		relationIds.add(filterId);
+		const rel = db.prepare(`SELECT subject_id, object_id, source_id FROM relations WHERE id = ?`).get(filterId);
+		if (rel) {
+			entityIds.add(rel.subject_id);
+			entityIds.add(rel.object_id);
+			loadRelationsByEntities([rel.subject_id, rel.object_id]);
+			loadObservationsByEntities([rel.subject_id, rel.object_id]);
+			if (rel.source_id) sourceIds.add(rel.source_id);
+		}
+	}
+	if (filterType === "observation") {
+		observationIds.add(filterId);
+		const obs = db.prepare(`SELECT entity_id, source_id FROM observations WHERE id = ?`).get(filterId);
+		if (obs) {
+			entityIds.add(obs.entity_id);
+			loadRelationsByEntities([obs.entity_id]);
+			loadObservationsByEntities([obs.entity_id]);
+			if (obs.source_id) sourceIds.add(obs.source_id);
+		}
+	}
+	if (filterType === "source") {
+		sourceIds.add(filterId);
+		db.prepare(`SELECT id, entity_id FROM observations WHERE source_id = ?`).all(filterId).forEach((o) => {
+			observationIds.add(o.id);
+			entityIds.add(o.entity_id);
+		});
+		loadRelationsBySource(filterId);
+		loadObservationsByEntities([...entityIds]);
+	}
+	return {
+		entityIds: [...entityIds],
+		relationIds: [...relationIds],
+		observationIds: [...observationIds],
+		sourceIds: [...sourceIds]
+	};
+}
 //#endregion
 //#region src/main/services/rawStorage.ts
 function loadRawDumpSync(filePath) {
@@ -10950,6 +11032,19 @@ function registerOsintHandlers() {
 			return {
 				success: true,
 				data: getSourceDetails(sourceId)
+			};
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:get-related-ids", async (_event, filterType, filterId) => {
+		try {
+			return {
+				success: true,
+				data: getRelatedIds(filterType, filterId)
 			};
 		} catch (error) {
 			return {

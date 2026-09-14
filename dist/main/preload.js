@@ -286,7 +286,8 @@ try {
 		markFalse: (table, recordId, reason) => electron.ipcRenderer.invoke("osint:mark-false", table, recordId, reason),
 		getEntityDetails: (entityId) => electron.ipcRenderer.invoke("osint:get-entity-details", entityId),
 		getObservationDetails: (observationId) => electron.ipcRenderer.invoke("osint:get-observation-details", observationId),
-		getSourceDetails: (sourceId) => electron.ipcRenderer.invoke("osint:get-source-details", sourceId)
+		getSourceDetails: (sourceId) => electron.ipcRenderer.invoke("osint:get-source-details", sourceId),
+		getRelatedIds: (filterType, filterId) => electron.ipcRenderer.invoke("osint:get-related-ids", filterType, filterId)
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {

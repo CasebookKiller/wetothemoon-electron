@@ -793,3 +793,113 @@ export function getSourceDetails(sourceId: number): any | null {
     entities,
   };
 }
+
+export interface RelatedIds {
+  entityIds: number[];
+  relationIds: number[];
+  observationIds: number[];
+  sourceIds: number[];
+}
+
+/**
+ * Возвращает ID связанных записей для каскадного фильтра.
+ * Например, если filterType='entity' и filterId=69, то вернёт:
+ * - entityIds: [69] + все сущности, с которыми #69 связана через relations
+ * - relationIds: все связи, где #69 — subject или object
+ * - observationIds: все наблюдения сущности #69
+ * - sourceIds: все источники, упомянутые в этих связях и наблюдениях
+ */
+export function getRelatedIds(
+  filterType: 'entity' | 'relation' | 'observation' | 'source',
+  filterId: number
+): RelatedIds {
+  const db = getDatabase();
+  const entityIds = new Set<number>();
+  const relationIds = new Set<number>();
+  const observationIds = new Set<number>();
+  const sourceIds = new Set<number>();
+
+  const loadObservationsByEntities = (ids: number[]) => {
+    if (ids.length === 0) return;
+    const placeholders = ids.map(() => '?').join(',');
+    db.prepare(`SELECT id, source_id FROM observations WHERE entity_id IN (${placeholders})`)
+      .all(...ids)
+      .forEach((o: any) => {
+        observationIds.add(o.id);
+        if (o.source_id) sourceIds.add(o.source_id);
+      });
+  };
+
+  const loadRelationsByEntities = (ids: number[]) => {
+    if (ids.length === 0) return;
+    const placeholders = ids.map(() => '?').join(',');
+    db.prepare(`SELECT id, subject_id, object_id, source_id FROM relations
+                WHERE subject_id IN (${placeholders}) OR object_id IN (${placeholders})`)
+      .all(...ids, ...ids)
+      .forEach((r: any) => {
+        relationIds.add(r.id);
+        entityIds.add(r.subject_id);
+        entityIds.add(r.object_id);
+        if (r.source_id) sourceIds.add(r.source_id);
+      });
+  };
+
+  const loadRelationsBySource = (sourceId: number) => {
+    db.prepare(`SELECT id, subject_id, object_id FROM relations WHERE source_id = ?`)
+      .all(sourceId)
+      .forEach((r: any) => {
+        relationIds.add(r.id);
+        entityIds.add(r.subject_id);
+        entityIds.add(r.object_id);
+      });
+  };
+
+  if (filterType === 'entity') {
+    entityIds.add(filterId);
+    loadRelationsByEntities([filterId]);
+    loadObservationsByEntities([filterId]);
+  }
+
+  if (filterType === 'relation') {
+    relationIds.add(filterId);
+    const rel = db.prepare(`SELECT subject_id, object_id, source_id FROM relations WHERE id = ?`).get(filterId) as any;
+    if (rel) {
+      entityIds.add(rel.subject_id);
+      entityIds.add(rel.object_id);
+      loadRelationsByEntities([rel.subject_id, rel.object_id]);
+      loadObservationsByEntities([rel.subject_id, rel.object_id]);
+      if (rel.source_id) sourceIds.add(rel.source_id);
+    }
+  }
+
+  if (filterType === 'observation') {
+    observationIds.add(filterId);
+    const obs = db.prepare(`SELECT entity_id, source_id FROM observations WHERE id = ?`).get(filterId) as any;
+    if (obs) {
+      entityIds.add(obs.entity_id);
+      loadRelationsByEntities([obs.entity_id]);
+      loadObservationsByEntities([obs.entity_id]);
+      if (obs.source_id) sourceIds.add(obs.source_id);
+    }
+  }
+
+  if (filterType === 'source') {
+    sourceIds.add(filterId);
+    db.prepare(`SELECT id, entity_id FROM observations WHERE source_id = ?`)
+      .all(filterId)
+      .forEach((o: any) => {
+        observationIds.add(o.id);
+        entityIds.add(o.entity_id);
+      });
+    loadRelationsBySource(filterId);
+    // Подтянем также наблюдения связанных сущностей, чтобы картина была полной
+    loadObservationsByEntities([...entityIds]);
+  }
+
+  return {
+    entityIds: [...entityIds],
+    relationIds: [...relationIds],
+    observationIds: [...observationIds],
+    sourceIds: [...sourceIds],
+  };
+}

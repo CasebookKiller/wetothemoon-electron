@@ -416,6 +416,9 @@ try {
     getSourceDetails: (sourceId: number) =>
       ipcRenderer.invoke('osint:get-source-details', sourceId),
 
+    getRelatedIds: (filterType: 'entity' | 'relation' | 'observation' | 'source', filterId: number) =>
+      ipcRenderer.invoke('osint:get-related-ids', filterType, filterId),
+
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

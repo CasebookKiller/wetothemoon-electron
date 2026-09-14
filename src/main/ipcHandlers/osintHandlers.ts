@@ -8,7 +8,7 @@ import { scrapeKadArbitr } from '../services/osint/scrapers/kadArbitr';
 import { scrapeMosGorsud } from '../services/osint/scrapers/mosGorsud';
 import { getCredentials, setCredentials } from '../services/osint/credentials';
 import { createDatabaseWindow, getDatabaseWindow } from '../windows/databaseWindow';
-import { deleteDumpsByEntity, findLatestRawDump, searchEntities } from '../services/database';
+import { deleteDumpsByEntity, findLatestRawDump, getRelatedIds, searchEntities } from '../services/database';
 import { loadRawDumpSync } from '../services/rawStorage';
 import { mergeCompanyDumps, saveCompanyData, updateCompanyData } from '../services/osintStorage';
 import { getDatabase, getDumpSectionsUpdatedAt, hasRawDumpForInn, listDumps, getRelationDetails, markRecordAsFalse, getEntityDetails, getObservationDetails, getSourceDetails } from '../services/database';
@@ -290,6 +290,15 @@ export function registerOsintHandlers() {
     try {
       const details = getSourceDetails(sourceId);
       return { success: true, data: details };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('osint:get-related-ids', async (_event, filterType: string, filterId: number) => {
+    try {
+      const data = getRelatedIds(filterType as any, filterId);
+      return { success: true, data };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }

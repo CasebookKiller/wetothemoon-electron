@@ -51,6 +51,12 @@ export const DatabasePage: React.FC = () => {
   const [dialogLoading, setDialogLoading] = useState(false);
 
   const [activeFilter, setActiveFilter] = useState<{ type: DialogType; id: number } | null>(null);
+  const [relatedIds, setRelatedIds] = useState<{
+    entityIds: Set<number>;
+    relationIds: Set<number>;
+    observationIds: Set<number>;
+    sourceIds: Set<number>;
+  } | null>(null);
   const [activeTab, setActiveTab] = useState<number>(0);
 
   const api = (window as any).electronAPI;
@@ -102,29 +108,46 @@ export const DatabasePage: React.FC = () => {
     source: 3,
   };
 
-  const openInMainWindow = (type: DialogType, id: number, tabIndex: number) => {
-    // Закрыть диалоги, но сохранить кэш, чтобы при возврате данные были мгновенно
+  const openInMainWindow = async (type: DialogType, id: number, tabIndex: number) => {
     setDialogStack([]);
     setActiveFilter({ type, id });
     setActiveTab(tabIndex);
+    try {
+      const res = await api.getRelatedIds(type, id);
+      if (res.success && res.data) {
+        setRelatedIds({
+          entityIds: new Set(res.data.entityIds),
+          relationIds: new Set(res.data.relationIds),
+          observationIds: new Set(res.data.observationIds),
+          sourceIds: new Set(res.data.sourceIds),
+        });
+      }
+    } catch (e) {
+      setError((e as Error).message);
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const entityFilterFn = activeFilter?.type === 'entity'
-    ? (row: any) => row.id === activeFilter.id
-    : undefined;
+  const clearFilter = () => {
+    setActiveFilter(null);
+    setRelatedIds(null);
+  };
 
-  const relationFilterFn = activeFilter?.type === 'relation'
-    ? (row: any) => row.id === activeFilter.id
-    : undefined;
+  const filteredEntities = relatedIds
+    ? displayEntities.filter((r) => relatedIds.entityIds.has(r.id))
+    : displayEntities;
 
-  const observationFilterFn = activeFilter?.type === 'observation'
-    ? (row: any) => row.id === activeFilter.id
-    : undefined;
+  const filteredRelations = relatedIds
+    ? relations.filter((r) => relatedIds.relationIds.has(r.id))
+    : relations;
 
-  const sourceFilterFn = activeFilter?.type === 'source'
-    ? (row: any) => row.id === activeFilter.id
-    : undefined;
+  const filteredObservations = relatedIds
+    ? observations.filter((r) => relatedIds.observationIds.has(r.id))
+    : observations;
+
+  const filteredSources = relatedIds
+    ? sources.filter((r) => relatedIds.sourceIds.has(r.id))
+    : sources;
 
   const popDialog = () => {
     setDialogStack((prev) => prev.slice(0, -1));
@@ -716,7 +739,7 @@ export const DatabasePage: React.FC = () => {
               <i
                 className="pi pi-times"
                 style={{ cursor: 'pointer' }}
-                onClick={() => setActiveFilter(null)}
+                onClick={clearFilter}
                 title="Снять фильтр"
               />
             </div>
@@ -727,35 +750,31 @@ export const DatabasePage: React.FC = () => {
           activeIndex={activeTab}
           onTabChange={(e) => setActiveTab(e.index)}
         >
-          <TabPanel header={`Сущности (${displayEntities.length})`}>
+          <TabPanel header={`Сущности (${filteredEntities.length})`}>
             <EntitiesTable
-              value={displayEntities}
-              filterFn={entityFilterFn}
+              value={filteredEntities}
               onRowClick={(row) => openDialog('entity', row.id)}
               emptyMessage={searchActive ? 'Ничего не найдено' : 'Нет данных'}
             />
           </TabPanel>
 
-          <TabPanel header={`Связи (${relations.length})`}>
+          <TabPanel header={`Связи (${filteredRelations.length})`}>
             <RelationsTable
-              value={relations}
-              filterFn={relationFilterFn}
+              value={filteredRelations}
               onRowClick={(row) => openDialog('relation', row.id)}
             />
           </TabPanel>
 
-          <TabPanel header={`Наблюдения (${observations.length})`}>
+          <TabPanel header={`Наблюдения (${filteredObservations.length})`}>
             <ObservationsTable
-              value={observations}
-              filterFn={observationFilterFn}
+              value={filteredObservations}
               onRowClick={(row) => openDialog('observation', row.id)}
             />
           </TabPanel>
 
-          <TabPanel header={`Источники (${sources.length})`}>
+          <TabPanel header={`Источники (${filteredSources.length})`}>
             <SourcesTable
-              value={sources}
-              filterFn={sourceFilterFn}
+              value={filteredSources}
               onRowClick={(row) => openDialog('source', row.id)}
             />
           </TabPanel>
