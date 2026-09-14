@@ -144,13 +144,13 @@ __________________________________________________________________
 
 #### Шаги реализации
 
-- [ ] **Шаг 1. Вынести табличные компоненты.**
-  - [ ] `src/components/DatabaseTables/EntitiesTable.tsx`
-  - [ ] `src/components/DatabaseTables/RelationsTable.tsx`
-  - [ ] `src/components/DatabaseTables/ObservationsTable.tsx`
-  - [ ] `src/components/DatabaseTables/SourcesTable.tsx`
-  - [ ] Пропсы: `value`, `onRowClick`, `onOpenInMain`, `compact`, `filterFn`.
-  - [ ] Главное окно и диалоги используют эти компоненты.
+- [x] **Шаг 1. Вынести табличные компоненты.**
+  - [x] `src/components/DatabaseTables/EntitiesTable.tsx`
+  - [x] `src/components/DatabaseTables/RelationsTable.tsx`
+  - [x] `src/components/DatabaseTables/ObservationsTable.tsx`
+  - [x] `src/components/DatabaseTables/SourcesTable.tsx`
+  - [x] Пропсы: `value`, `onRowClick`, `onOpenInMain`, `compact`, `filterFn`.
+  - [x] Главное окно и диалоги используют эти компоненты.
 
 - [ ] **Шаг 2. «Общие сведения» — единый field-value.**
   - [ ] Диалог сущности: заменить DataTable на field-value.

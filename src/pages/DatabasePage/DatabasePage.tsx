@@ -15,6 +15,7 @@ import { EntitiesTable } from '@/components/SIETCH/DatabaseTables/EntitiesTable'
 import { RelationsTable } from '@/components/SIETCH/DatabaseTables/RelationsTable';
 import { ObservationsTable } from '@/components/SIETCH/DatabaseTables/ObservationsTable';
 import { SourcesTable } from '@/components/SIETCH/DatabaseTables/SourcesTable';
+import { DetailFields } from '@/components/SIETCH/DetailFields';
 
 export const DatabasePage: React.FC = () => {
   const [entities, setEntities] = useState<any[]>([]);
@@ -365,58 +366,47 @@ export const DatabasePage: React.FC = () => {
         {!entityLoading && entityDetails && (
           <TabView>
             <TabPanel header="Общие сведения">
-              <div className="grid">
-                <div className="col-12 md:col-6 field">
-                  <label className="font-bold">ID</label>
-                  <div>{entityDetails.entity.id}</div>
-                </div>
-                <div className="col-12 md:col-6 field">
-                  <label className="font-bold">Тип</label>
-                  <div><Tag value={entityDetails.entity.type} /></div>
-                </div>
-                <div className="col-12 md:col-6 field">
-                  <label className="font-bold">Значение (value)</label>
-                  <div>{entityDetails.entity.value}</div>
-                </div>
-                <div className="col-12 md:col-6 field">
-                  <label className="font-bold">Название (label)</label>
-                  <div>{entityDetails.entity.label || '—'}</div>
-                </div>
-                <div className="col-12 md:col-6 field">
-                  <label className="font-bold">Нормализованное</label>
-                  <div className="text-sm text-500">{entityDetails.entity.normalized_value}</div>
-                </div>
-                <div className="col-12 md:col-6 field">
-                  <label className="font-bold">Уверенность</label>
-                  <div>{entityDetails.entity.confidence ?? '—'}</div>
-                </div>
-                <div className="col-12 md:col-6 field">
-                  <label className="font-bold">Статус</label>
-                  <div>{entityDetails.entity.status}</div>
-                </div>
-                <div className="col-12 md:col-6 field">
-                  <label className="font-bold">rusprofile_id</label>
-                  <div>{entityDetails.entity.rusprofile_id || '—'}</div>
-                </div>
-                <div className="col-12 md:col-6 field">
-                  <label className="font-bold">Первое появление</label>
-                  <div>{entityDetails.entity.first_seen ? new Date(entityDetails.entity.first_seen).toLocaleString() : '—'}</div>
-                </div>
-                <div className="col-12 md:col-6 field">
-                  <label className="font-bold">Последнее обновление</label>
-                  <div>{entityDetails.entity.last_seen ? new Date(entityDetails.entity.last_seen).toLocaleString() : '—'}</div>
-                </div>
-                <div className="col-12 field">
-                  <label className="font-bold">Заметки</label>
-                  <div>{entityDetails.entity.notes || '—'}</div>
-                </div>
-                <div className="col-12 field">
-                  <label className="font-bold">Файл дампа</label>
-                  <div className="text-sm text-500" style={{ wordBreak: 'break-all' }}>
-                    {entityDetails.entity.raw_file_path || '—'}
-                  </div>
-                </div>
-              </div>
+              <DetailFields
+                fields={[
+                  { label: 'ID', value: entityDetails.entity.id },
+                  { label: 'Тип', value: <Tag value={entityDetails.entity.type} /> },
+                  { label: 'Значение (value)', value: entityDetails.entity.value },
+                  { label: 'Название (label)', value: entityDetails.entity.label || '—' },
+                  {
+                    label: 'Нормализованное',
+                    value: <span className="text-sm text-500">{entityDetails.entity.normalized_value}</span>,
+                  },
+                  { label: 'Уверенность', value: entityDetails.entity.confidence ?? '—' },
+                  { label: 'Статус', value: entityDetails.entity.status },
+                  { label: 'rusprofile_id', value: entityDetails.entity.rusprofile_id || '—' },
+                  {
+                    label: 'Первое появление',
+                    value: entityDetails.entity.first_seen
+                      ? new Date(entityDetails.entity.first_seen).toLocaleString()
+                      : '—',
+                  },
+                  {
+                    label: 'Последнее обновление',
+                    value: entityDetails.entity.last_seen
+                      ? new Date(entityDetails.entity.last_seen).toLocaleString()
+                      : '—',
+                  },
+                  {
+                    label: 'Заметки',
+                    span: 2,
+                    value: entityDetails.entity.notes || '—',
+                  },
+                  {
+                    label: 'Файл дампа',
+                    span: 2,
+                    value: (
+                      <span className="text-sm text-500" style={{ wordBreak: 'break-all' }}>
+                        {entityDetails.entity.raw_file_path || '—'}
+                      </span>
+                    ),
+                  },
+                ]}
+              />
             </TabPanel>
 
             <TabPanel header={`Наблюдения (${entityDetails.observations.length})`}>
@@ -511,84 +501,92 @@ export const DatabasePage: React.FC = () => {
       >
         {relationLoading && <p>Загрузка...</p>}
         {!relationLoading && relationDetails && (
-          <div className="p-fluid">
-            <div className="field">
-              <label className="font-bold">Исходная сущность</label>
-              <div>
-                [{relationDetails.subject_id}] {relationDetails.subject_label} — <i>{relationDetails.subject_type}</i>
-                <div className="text-sm text-500">{relationDetails.subject_value}</div>
-              </div>
-            </div>
-
-            <div className="field">
-              <label className="font-bold">Связь</label>
-              <div><b>{relationDetails.predicate}</b></div>
-            </div>
-
-            <div className="field">
-              <label className="font-bold">Целевая сущность</label>
-              <div>
-                [{relationDetails.object_id}] {relationDetails.object_label} — <i>{relationDetails.object_type}</i>
-                <div className="text-sm text-500">{relationDetails.object_value}</div>
-              </div>
-            </div>
-
-            <div className="field">
-              <label className="font-bold">Источник</label>
-              {relationDetails.source_url ? (
-                <div>
-                  [{relationDetails.source_id}] {relationDetails.source_title || 'Источник'}
-                  <div className="text-sm">
-                    <a href={relationDetails.source_url} target="_blank" rel="noreferrer">
-                      {relationDetails.source_url}
-                    </a>
+          <DetailFields
+            fields={[
+              {
+                label: 'Исходная сущность',
+                span: 1,
+                value: (
+                  <div>
+                    [{relationDetails.subject_id}] {relationDetails.subject_label} — <i>{relationDetails.subject_type}</i>
+                    <div className="text-sm text-500">{relationDetails.subject_value}</div>
                   </div>
-                  <div className="text-sm text-500">
-                    {relationDetails.source_type} • {relationDetails.source_provider} • {relationDetails.source_access_level}
-                    {relationDetails.source_retrieved_at ? ` • получено ${new Date(relationDetails.source_retrieved_at).toLocaleString()}` : ''}
+                ),
+              },
+              {
+                label: 'Связь',
+                span: 1,
+                value: <b>{relationDetails.predicate}</b>,
+              },
+              {
+                label: 'Целевая сущность',
+                span: 1,
+                value: (
+                  <div>
+                    [{relationDetails.object_id}] {relationDetails.object_label} — <i>{relationDetails.object_type}</i>
+                    <div className="text-sm text-500">{relationDetails.object_value}</div>
                   </div>
-                </div>
-              ) : (
-                <div className="text-500">Источник не указан</div>
-              )}
-            </div>
-
-            <div className="field">
-              <label className="font-bold">Подтверждение (evidence)</label>
-              <div>{relationDetails.evidence_text || <span className="text-500">—</span>}</div>
-            </div>
-
-            <div className="grid">
-              <div className="col-6">
-                <label className="font-bold">Уверенность</label>
-                <div>{relationDetails.confidence ?? '—'}</div>
-              </div>
-              <div className="col-6">
-                <label className="font-bold">Статус</label>
-                <div>{relationDetails.status}</div>
-              </div>
-              <div className="col-6">
-                <label className="font-bold">Действует с</label>
-                <div>{relationDetails.valid_from || '—'}</div>
-              </div>
-              <div className="col-6">
-                <label className="font-bold">Действует до</label>
-                <div>{relationDetails.valid_to || '—'}</div>
-              </div>
-            </div>
-
-            <div className="field">
-              <label className="font-bold">Заметки</label>
-              <div>{relationDetails.notes || <span className="text-500">—</span>}</div>
-            </div>
-
-            <div className="field">
-              <label className="font-bold">Файл дампа</label>
-              <div className="text-sm text-500" style={{ wordBreak: 'break-all' }}>
-                {relationDetails.raw_file_path || '—'}
-              </div>
-            </div>
-          </div>
+                ),
+              },
+              {
+                label: 'Уверенность',
+                value: relationDetails.confidence ?? '—',
+              },
+              {
+                label: 'Статус',
+                value: relationDetails.status,
+              },
+              {
+                label: 'Действует с',
+                value: relationDetails.valid_from || '—',
+              },
+              {
+                label: 'Действует до',
+                value: relationDetails.valid_to || '—',
+              },
+              {
+                label: 'Подтверждение (evidence)',
+                span: 2,
+                value: relationDetails.evidence_text || <span className="text-500">—</span>,
+              },
+              {
+                label: 'Заметки',
+                span: 2,
+                value: relationDetails.notes || <span className="text-500">—</span>,
+              },
+              {
+                label: 'Источник',
+                span: 2,
+                value: relationDetails.source_url ? (
+                  <div>
+                    [{relationDetails.source_id}] {relationDetails.source_title || 'Источник'}
+                    <div className="text-sm">
+                      <a href={relationDetails.source_url} target="_blank" rel="noreferrer">
+                        {relationDetails.source_url}
+                      </a>
+                    </div>
+                    <div className="text-sm text-500">
+                      {relationDetails.source_type} • {relationDetails.source_provider} • {relationDetails.source_access_level}
+                      {relationDetails.source_retrieved_at
+                        ? ` • получено ${new Date(relationDetails.source_retrieved_at).toLocaleString()}`
+                        : ''}
+                    </div>
+                  </div>
+                ) : (
+                  <span className="text-500">Источник не указан</span>
+                ),
+              },
+              {
+                label: 'Файл дампа',
+                span: 2,
+                value: (
+                  <span className="text-sm text-500" style={{ wordBreak: 'break-all' }}>
+                    {relationDetails.raw_file_path || '—'}
+                  </span>
+                ),
+              },
+            ]}
+          />
         )}
       </Dialog>
 
@@ -681,72 +679,62 @@ export const DatabasePage: React.FC = () => {
       >
         {observationLoading && <p>Загрузка...</p>}
         {!observationLoading && observationDetails && (
-          <div className="p-fluid">
-            <div className="field">
-              <label className="font-bold">Сущность</label>
-              <div>
-                [{observationDetails.entity_id}] {observationDetails.entity_label} — <i>{observationDetails.entity_type}</i>
-                <div className="text-sm text-500">{observationDetails.entity_value}</div>
-              </div>
-            </div>
-
-            <div className="grid">
-              <div className="col-12 md:col-6 field">
-                <label className="font-bold">Атрибут</label>
-                <div>{observationDetails.attribute}</div>
-              </div>
-              <div className="col-12 md:col-6 field">
-                <label className="font-bold">Значение</label>
-                <div style={{ wordBreak: 'break-all' }}>{observationDetails.value}</div>
-              </div>
-              <div className="col-12 md:col-6 field">
-                <label className="font-bold">Уверенность</label>
-                <div>{observationDetails.confidence ?? '—'}</div>
-              </div>
-              <div className="col-12 md:col-6 field">
-                <label className="font-bold">Дата наблюдения</label>
-                <div>
-                  {observationDetails.observed_at
-                    ? new Date(observationDetails.observed_at).toLocaleString()
-                    : '—'}
-                </div>
-              </div>
-            </div>
-
-            <div className="field">
-              <label className="font-bold">Источник</label>
-              {observationDetails.source_url ? (
-                <div>
-                  [{observationDetails.source_id}] {observationDetails.source_title || 'Источник'}
-                  <div className="text-sm">
-                    <a href={observationDetails.source_url} target="_blank" rel="noreferrer">
-                      {observationDetails.source_url}
-                    </a>
+          <DetailFields
+            fields={[
+              {
+                label: 'Сущность',
+                span: 2,
+                value: (
+                  <div>
+                    [{observationDetails.entity_id}] {observationDetails.entity_label} — <i>{observationDetails.entity_type}</i>
+                    <div className="text-sm text-500">{observationDetails.entity_value}</div>
                   </div>
-                  <div className="text-sm text-500">
-                    {observationDetails.source_type} • {observationDetails.source_provider} • {observationDetails.source_access_level}
-                    {observationDetails.source_retrieved_at
-                      ? ` • получено ${new Date(observationDetails.source_retrieved_at).toLocaleString()}`
-                      : ''}
+                ),
+              },
+              { label: 'Атрибут', value: observationDetails.attribute },
+              { label: 'Значение', value: <span style={{ wordBreak: 'break-all' }}>{observationDetails.value}</span> },
+              { label: 'Уверенность', value: observationDetails.confidence ?? '—' },
+              {
+                label: 'Дата наблюдения',
+                value: observationDetails.observed_at
+                  ? new Date(observationDetails.observed_at).toLocaleString()
+                  : '—',
+              },
+              {
+                label: 'Источник',
+                span: 2,
+                value: observationDetails.source_url ? (
+                  <div>
+                    [{observationDetails.source_id}] {observationDetails.source_title || 'Источник'}
+                    <div className="text-sm">
+                      <a href={observationDetails.source_url} target="_blank" rel="noreferrer">
+                        {observationDetails.source_url}
+                      </a>
+                    </div>
+                    <div className="text-sm text-500">
+                      {observationDetails.source_type} • {observationDetails.source_provider} • {observationDetails.source_access_level}
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <div className="text-500">Источник не указан</div>
-              )}
-            </div>
-
-            <div className="field">
-              <label className="font-bold">Заметки</label>
-              <div>{observationDetails.notes || <span className="text-500">—</span>}</div>
-            </div>
-
-            <div className="field">
-              <label className="font-bold">Файл дампа</label>
-              <div className="text-sm text-500" style={{ wordBreak: 'break-all' }}>
-                {observationDetails.raw_file_path || '—'}
-              </div>
-            </div>
-          </div>
+                ) : (
+                  <span className="text-500">Источник не указан</span>
+                ),
+              },
+              {
+                label: 'Заметки',
+                span: 2,
+                value: observationDetails.notes || <span className="text-500">—</span>,
+              },
+              {
+                label: 'Файл дампа',
+                span: 2,
+                value: (
+                  <span className="text-sm text-500" style={{ wordBreak: 'break-all' }}>
+                    {observationDetails.raw_file_path || '—'}
+                  </span>
+                ),
+              },
+            ]}
+          />
         )}
       </Dialog>
 
@@ -778,80 +766,55 @@ export const DatabasePage: React.FC = () => {
         {!sourceLoading && sourceDetails && (
           <TabView>
             <TabPanel header="Общие сведения">
-              <div className="grid">
-                <div className="col-12 md:col-6 field">
-                  <label className="font-bold">ID</label>
-                  <div>{sourceDetails.source.id}</div>
-                </div>
-                <div className="col-12 md:col-6 field">
-                  <label className="font-bold">Тип</label>
-                  <div>{sourceDetails.source.source_type || '—'}</div>
-                </div>
-                <div className="col-12 field">
-                  <label className="font-bold">URL</label>
-                  <div style={{ wordBreak: 'break-all' }}>
-                    {sourceDetails.source.url ? (
-                      <a href={sourceDetails.source.url} target="_blank" rel="noreferrer">
+              <DetailFields
+                fields={[
+                  { label: 'ID', value: sourceDetails.source.id },
+                  { label: 'Тип', value: sourceDetails.source.source_type || '—' },
+                  {
+                    label: 'URL',
+                    span: 2,
+                    value: sourceDetails.source.url ? (
+                      <a href={sourceDetails.source.url} target="_blank" rel="noreferrer" style={{ wordBreak: 'break-all' }}>
                         {sourceDetails.source.url}
                       </a>
                     ) : (
                       '—'
-                    )}
-                  </div>
-                </div>
-                <div className="col-12 field">
-                  <label className="font-bold">Название</label>
-                  <div>{sourceDetails.source.title || '—'}</div>
-                </div>
-                <div className="col-12 md:col-6 field">
-                  <label className="font-bold">Происхождение</label>
-                  <div>{sourceDetails.source.source_kind || '—'}</div>
-                </div>
-                <div className="col-12 md:col-6 field">
-                  <label className="font-bold">Провайдер</label>
-                  <div>{sourceDetails.source.provider || '—'}</div>
-                </div>
-                <div className="col-12 md:col-6 field">
-                  <label className="font-bold">Метод получения</label>
-                  <div>{sourceDetails.source.collection_method || '—'}</div>
-                </div>
-                <div className="col-12 md:col-6 field">
-                  <label className="font-bold">Надёжность</label>
-                  <div>{sourceDetails.source.reliability ?? '—'}</div>
-                </div>
-                <div className="col-12 md:col-6 field">
-                  <label className="font-bold">Уровень доступа</label>
-                  <div>{sourceDetails.source.access_level || '—'}</div>
-                </div>
-                <div className="col-12 md:col-6 field">
-                  <label className="font-bold">Дата получения</label>
-                  <div>
-                    {sourceDetails.source.retrieved_at
+                    ),
+                  },
+                  { label: 'Название', span: 2, value: sourceDetails.source.title || '—' },
+                  { label: 'Происхождение', value: sourceDetails.source.source_kind || '—' },
+                  { label: 'Провайдер', value: sourceDetails.source.provider || '—' },
+                  { label: 'Метод получения', value: sourceDetails.source.collection_method || '—' },
+                  { label: 'Надёжность', value: sourceDetails.source.reliability ?? '—' },
+                  { label: 'Уровень доступа', value: sourceDetails.source.access_level || '—' },
+                  {
+                    label: 'Дата получения',
+                    value: sourceDetails.source.retrieved_at
                       ? new Date(sourceDetails.source.retrieved_at).toLocaleString()
-                      : '—'}
-                  </div>
-                </div>
-                <div className="col-12 field">
-                  <label className="font-bold">Основание доступа</label>
-                  <div>{sourceDetails.source.authority_basis || '—'}</div>
-                </div>
-                <div className="col-12 field">
-                  <label className="font-bold">Локальный путь</label>
-                  <div className="text-sm text-500" style={{ wordBreak: 'break-all' }}>
-                    {sourceDetails.source.local_path || '—'}
-                  </div>
-                </div>
-                <div className="col-12 field">
-                  <label className="font-bold">SHA-256</label>
-                  <div className="text-sm text-500" style={{ wordBreak: 'break-all' }}>
-                    {sourceDetails.source.sha256 || '—'}
-                  </div>
-                </div>
-                <div className="col-12 field">
-                  <label className="font-bold">Заметки</label>
-                  <div>{sourceDetails.source.notes || '—'}</div>
-                </div>
-              </div>
+                      : '—',
+                  },
+                  { label: 'Основание доступа', span: 2, value: sourceDetails.source.authority_basis || '—' },
+                  {
+                    label: 'Локальный путь',
+                    span: 2,
+                    value: (
+                      <span className="text-sm text-500" style={{ wordBreak: 'break-all' }}>
+                        {sourceDetails.source.local_path || '—'}
+                      </span>
+                    ),
+                  },
+                  {
+                    label: 'SHA-256',
+                    span: 2,
+                    value: (
+                      <span className="text-sm text-500" style={{ wordBreak: 'break-all' }}>
+                        {sourceDetails.source.sha256 || '—'}
+                      </span>
+                    ),
+                  },
+                  { label: 'Заметки', span: 2, value: sourceDetails.source.notes || '—' },
+                ]}
+              />
             </TabPanel>
 
             <TabPanel header={`Наблюдения (${sourceDetails.observations.length})`}>
