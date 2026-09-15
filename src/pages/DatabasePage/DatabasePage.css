@@ -319,3 +319,25 @@ span.osint-destructive {
 .detail-field__content .p-dropdown {
   width: 100%;
 }
+
+/* Фиксируем заголовок и футер, прокручиваем только контент */
+.p-dialog {
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+}
+
+.p-dialog .p-dialog-header,
+.p-dialog .p-dialog-footer {
+  flex-shrink: 0;
+}
+
+.p-dialog .p-dialog-content {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  max-height: none;
+}
+
+body.p-overflow-hidden {
+  overflow: hidden !important;
+}
