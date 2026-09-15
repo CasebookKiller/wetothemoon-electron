@@ -4,6 +4,7 @@ import React from 'react';
 import { DataTable } from 'primereact/datatable';
 import { Column } from 'primereact/column';
 import { Button } from 'primereact/button';
+import { Tag } from 'primereact/tag';
 
 export interface RelationRow {
   id: number;              // ← было id?: number
@@ -144,6 +145,13 @@ export const RelationsTable: React.FC<RelationsTableProps> = ({
   const renderObject = (row: RelationRow) =>
     renderEntityLink(row.object_id, row.object_label, row.object_type, onObjectClick ? () => onObjectClick(row) : undefined);
 
+  const renderOrigin = (row: RelationRow) => {
+    const value = row.origin || 'scraper';
+    const severity = value === 'manual' ? 'warning' : value === 'import' ? 'success' : 'info';
+    const label = value === 'manual' ? 'вручную' : value === 'import' ? 'импорт' : 'авто';
+    return <Tag value={label} severity={severity as any} />;
+  };
+
   const actionsVisible = showActions ?? !!onOpenInMain;
 
   // Какие колонки показывать в зависимости от side
@@ -229,6 +237,14 @@ export const RelationsTable: React.FC<RelationsTableProps> = ({
           />
         </>
       )}
+
+      <Column
+        field="origin"
+        header="Источник"
+        sortable
+        style={{ width: '7rem' }}
+        body={renderOrigin}
+      />
 
       {actionsVisible && (
         <Column

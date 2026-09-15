@@ -4,6 +4,7 @@ import React from 'react';
 import { DataTable } from 'primereact/datatable';
 import { Column } from 'primereact/column';
 import { Button } from 'primereact/button';
+import { Tag } from 'primereact/tag';
 
 export interface ObservationRow {
   id: number;
@@ -154,6 +155,13 @@ export const ObservationsTable: React.FC<ObservationsTableProps> = ({
     return row.observed_at ? new Date(row.observed_at).toLocaleString() : '—';
   };
 
+  const renderOrigin = (row: ObservationRow) => {
+    const value = row.origin || 'scraper';
+    const severity = value === 'manual' ? 'warning' : value === 'import' ? 'success' : 'info';
+    const label = value === 'manual' ? 'вручную' : value === 'import' ? 'импорт' : 'авто';
+    return <Tag value={label} severity={severity as any} />;
+  };
+
   const actionsVisible = showActions ?? !!onOpenInMain;
 
   // В compact-режиме скрываем notes и часть колонок
@@ -235,6 +243,14 @@ export const ObservationsTable: React.FC<ObservationsTableProps> = ({
           body={(row: ObservationRow) => row.notes || <span className="text-500">—</span>}
         />
       )}
+
+      <Column
+        field="origin"
+        header="Источник"
+        sortable
+        style={{ width: '7rem' }}
+        body={renderOrigin}
+      />
 
       {actionsVisible && (
         <Column

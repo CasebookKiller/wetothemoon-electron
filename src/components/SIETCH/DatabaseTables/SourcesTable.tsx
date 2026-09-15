@@ -128,6 +128,13 @@ export const SourcesTable: React.FC<SourcesTableProps> = ({
     return row.retrieved_at ? new Date(row.retrieved_at).toLocaleString() : '—';
   };
 
+  const renderOrigin = (row: SourceRow) => {
+    const value = row.origin || 'scraper';
+    const severity = value === 'manual' ? 'warning' : value === 'import' ? 'success' : 'info';
+    const label = value === 'manual' ? 'вручную' : value === 'import' ? 'импорт' : 'авто';
+    return <Tag value={label} severity={severity as any} />;
+  };
+
   const actionsVisible = showActions ?? !!onOpenInMain;
 
   // В compact режиме скрываем часть колонок
@@ -209,6 +216,14 @@ export const SourcesTable: React.FC<SourcesTableProps> = ({
         sortable
         style={{ width: '11rem' }}
         body={renderDate}
+      />
+
+      <Column
+        field="origin"
+        header="Источник"
+        sortable
+        style={{ width: '7rem' }}
+        body={renderOrigin}
       />
 
       {actionsVisible && (
