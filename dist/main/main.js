@@ -10066,6 +10066,55 @@ function addSource(source) {
   `).run(source.url, source.title || null, source.source_type || null, source.source_kind || null, source.provider || null, source.collection_method || null, source.authority_basis || null, source.reliability ?? 50, source.access_level || "public", source.retrieved_at || (/* @__PURE__ */ new Date()).toISOString(), source.local_path || null, source.sha256 || null, source.notes || null);
 	return Number(info.lastInsertRowid);
 }
+/**
+* Создаёт связь вручную (origin='manual').
+*/
+function createRelation(patch) {
+	const db = getDatabase();
+	if (!patch.subject_id || !patch.object_id) return {
+		success: false,
+		error: "Не выбраны участники связи"
+	};
+	if (patch.subject_id === patch.object_id) return {
+		success: false,
+		error: "Исходная и целевая сущности не могут совпадать"
+	};
+	if (!patch.predicate?.trim()) return {
+		success: false,
+		error: "Укажите тип связи (predicate)"
+	};
+	try {
+		const info = db.prepare(`
+      INSERT INTO relations
+        (subject_id, predicate, object_id, source_id,
+         valid_from, valid_to, evidence_text,
+         confidence, status, notes, origin)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual')
+    `).run(patch.subject_id, patch.predicate.trim(), patch.object_id, patch.source_id || null, patch.valid_from || null, patch.valid_to || null, patch.evidence_text || null, patch.confidence ?? 50, patch.status || "unverified", patch.notes || null);
+		const id = Number(info.lastInsertRowid);
+		auditChange("relations", id, "create", null, `subject=${patch.subject_id}; predicate=${patch.predicate}; object=${patch.object_id}; origin=manual`, "Ручное создание связи через UI");
+		return {
+			success: true,
+			id
+		};
+	} catch (e) {
+		return {
+			success: false,
+			error: e.message
+		};
+	}
+}
+/**
+* Возвращает плоский список сущностей для dropdown'ов:
+* [{ id, type, label, value }]
+*/
+function listEntitiesForDropdown() {
+	return getDatabase().prepare(`
+    SELECT id, type, COALESCE(label, value) AS label
+    FROM entities
+    ORDER BY label COLLATE NOCASE ASC
+  `).all();
+}
 function addRelation(relation) {
 	getDatabase().prepare(`
     INSERT OR IGNORE INTO relations (subject_id, predicate, object_id, source_id, valid_from,
@@ -11308,6 +11357,29 @@ function registerOsintHandlers() {
 	electron.ipcMain.handle("osint:update-source", async (_event, sourceId, patch) => {
 		try {
 			return updateSource(sourceId, patch);
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:create-relation", async (_event, patch) => {
+		try {
+			return createRelation(patch);
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:list-entities-dropdown", async () => {
+		try {
+			return {
+				success: true,
+				items: listEntitiesForDropdown()
+			};
 		} catch (error) {
 			return {
 				success: false,

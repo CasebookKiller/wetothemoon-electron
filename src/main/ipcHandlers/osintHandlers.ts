@@ -26,6 +26,8 @@ import {
   updateRelation,
   updateObservation,
   updateSource,
+  createRelation,
+  listEntitiesForDropdown,
 } from '../services/database';
 
 export function registerOsintHandlers() {
@@ -355,6 +357,23 @@ export function registerOsintHandlers() {
   ipcMain.handle('osint:update-source', async (_event, sourceId: number, patch: any) => {
     try {
       return updateSource(sourceId, patch);
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('osint:create-relation', async (_event, patch: any) => {
+    try {
+      return createRelation(patch);
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('osint:list-entities-dropdown', async () => {
+    try {
+      const items = listEntitiesForDropdown();
+      return { success: true, items };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }

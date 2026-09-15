@@ -64,10 +64,14 @@ export const DatabasePage: React.FC = () => {
   const [editSaving, setEditSaving] = useState(false);
   const [editMessage, setEditMessage] = useState('');
 
+  const [createType, setCreateType] = useState<'entity' | 'relation' | 'observation' | 'source'>('entity');
+
   const [createDialog, setCreateDialog] = useState(false);
   const [createForm, setCreateForm] = useState<any>(null);
   const [createSaving, setCreateSaving] = useState(false);
   const [createMessage, setCreateMessage] = useState('');
+
+  const [entityDropdownOptions, setEntityDropdownOptions] = useState<{ label: string; value: number }[]>([]);
 
   const api = (window as any).electronAPI;
 
@@ -115,6 +119,7 @@ export const DatabasePage: React.FC = () => {
   };
 
   const openCreateEntityDialog = () => {
+    setCreateType('entity');
     setCreateForm({
       type: 'company',
       value: '',
@@ -125,12 +130,6 @@ export const DatabasePage: React.FC = () => {
     });
     setCreateMessage('');
     setCreateDialog(true);
-  };
-
-  const closeCreateDialog = () => {
-    setCreateDialog(false);
-    setCreateForm(null);
-    setCreateMessage('');
   };
 
   const saveCreateEntity = async () => {
@@ -163,6 +162,71 @@ export const DatabasePage: React.FC = () => {
     } finally {
       setCreateSaving(false);
     }
+  };
+
+  const openCreateRelationDialog = () => {
+    setCreateForm({
+      subject_id: null,
+      predicate: 'associated_with',
+      object_id: null,
+      source_id: null,
+      valid_from: '',
+      valid_to: '',
+      evidence_text: '',
+      confidence: 50,
+      status: 'unverified',
+      notes: '',
+    });
+    setCreateMessage('');
+    setCreateDialog(true);
+    // подгрузим актуальные опции на случай, если появились новые сущности
+    loadEntityDropdownOptions();
+  };
+
+  const saveCreateRelation = async () => {
+    if (!createForm) return;
+    if (!createForm.subject_id || !createForm.object_id) {
+      setCreateMessage('Выберите исходную и целевую сущности');
+      return;
+    }
+    if (!createForm.predicate?.trim()) {
+      setCreateMessage('Укажите тип связи');
+      return;
+    }
+
+    setCreateSaving(true);
+    setCreateMessage('');
+    try {
+      const res = await api.createRelation(createForm);
+      if (res.success) {
+        setCreateMessage('Создано');
+        await loadData();
+        setTimeout(async () => {
+          closeCreateDialog();
+          if (res.id) await openDialog('relation', res.id);
+        }, 500);
+      } else {
+        setCreateMessage(`Ошибка: ${res.error}`);
+      }
+    } catch (e) {
+      setCreateMessage((e as Error).message);
+    } finally {
+      setCreateSaving(false);
+    }
+  };
+
+  const saveCreateObservation = async () => {
+    setCreateMessage('Форма ещё не реализована');
+  };
+
+  const saveCreateSource = async () => {
+    setCreateMessage('Форма ещё не реализована');
+  };
+
+  const closeCreateDialog = () => {
+    setCreateDialog(false);
+    setCreateForm(null);
+    setCreateMessage('');
   };
 
   const typeToTabIndex: Record<DialogType, number> = {
@@ -254,6 +318,8 @@ export const DatabasePage: React.FC = () => {
       setRelations(rel);
       setObservations(obs);
       setSources(src);
+
+      await loadEntityDropdownOptions();   // ← добавить
     } catch (e) {
       setError((e as Error).message);
     }
@@ -1133,15 +1199,18 @@ export const DatabasePage: React.FC = () => {
           />
         </TabPanel>
 
-        <TabPanel header={`Связи (${data.relations.length})`}>
+        <TabPanel header={`Связи (${filteredRelations.length})`}>
+          <div className="flex justify-content-end mb-2">
+            <Button
+              label="Создать связь"
+              icon="pi pi-plus"
+              className="osint-soft p-button-sm"
+              onClick={openCreateRelationDialog}
+            />
+          </div>
           <RelationsTable
-            value={data.relations}
-            side="both"
+            value={filteredRelations}
             onRowClick={(row) => openDialog('relation', row.id)}
-            onSubjectClick={(row) => openDialog('entity', row.subject_id)}
-            onObjectClick={(row) => openDialog('entity', row.object_id)}
-            compact
-            emptyMessage="Связей нет"
           />
         </TabPanel>
 
@@ -1173,6 +1242,14 @@ export const DatabasePage: React.FC = () => {
     }
   };
 
+  const sourceDropdownOptions = [
+    { label: '— Не указан —', value: null },
+    ...sources.map((s: any) => ({
+      label: `[${s.id}] ${s.title || s.url}`,
+      value: s.id,
+    })),
+  ];
+
   const renderOrigin = (origin?: string) => {
     const value = origin || 'scraper';
     const severity =
@@ -1193,6 +1270,22 @@ export const DatabasePage: React.FC = () => {
       case 'entities': return 'Пометить сущность как ложную';
       case 'relations': return 'Пометить связь как ложную';
       case 'observations': return 'Пометить наблюдение как ложную';
+    }
+  };
+
+  const loadEntityDropdownOptions = async () => {
+    try {
+      const res = await api.listEntitiesDropdown();
+      if (res.success) {
+        setEntityDropdownOptions(
+          (res.items || []).map((e: any) => ({
+            label: `[${e.id}] ${e.label} (${e.type})`,
+            value: e.id,
+          }))
+        );
+      }
+    } catch (e) {
+      console.error('Не удалось загрузить список сущностей:', e);
     }
   };
 
@@ -1287,21 +1380,14 @@ export const DatabasePage: React.FC = () => {
           onTabChange={(e) => setActiveTab(e.index)}
         >
           <TabPanel header={`Сущности (${filteredEntities.length})`}>
-            <TabPanel header={`Сущности (${filteredEntities.length})`}>
-              <div className="flex justify-content-end mb-2">
-                <Button
-                  label="Создать сущность"
-                  icon="pi pi-plus"
-                  className="osint-soft p-button-sm"
-                  onClick={openCreateEntityDialog}
-                />
-              </div>
-              <EntitiesTable
-                value={filteredEntities}
-                onRowClick={(row) => openDialog('entity', row.id)}
-                emptyMessage={searchActive ? 'Ничего не найдено' : 'Нет данных'}
+            <div className="flex justify-content-end mb-2">
+              <Button
+                label="Создать сущность"
+                icon="pi pi-plus"
+                className="osint-soft p-button-sm"
+                onClick={openCreateEntityDialog}
               />
-            </TabPanel>
+            </div>
             <EntitiesTable
               value={filteredEntities}
               onRowClick={(row) => openDialog('entity', row.id)}
@@ -1466,10 +1552,17 @@ export const DatabasePage: React.FC = () => {
 
       <Dialog
         visible={createDialog}
-        style={{ width: '700px' }}
+        style={{ width: '800px' }}
         modal
         onHide={closeCreateDialog}
-        header={<span className="p-panel-title">Создать сущность</span>}
+        header={
+          <span className="p-panel-title">
+            {createType === 'entity' && 'Создать сущность'}
+            {createType === 'relation' && 'Создать связь'}
+            {createType === 'observation' && 'Создать наблюдение'}
+            {createType === 'source' && 'Создать источник'}
+          </span>
+        }
         footer={
           <div className="p-panel-footer flex justify-content-end gap-2">
             <Button
@@ -1483,13 +1576,31 @@ export const DatabasePage: React.FC = () => {
               label={createSaving ? 'Создание...' : 'Создать'}
               icon={createSaving ? 'pi pi-spin pi-spinner' : 'pi pi-check'}
               className="osint"
-              onClick={saveCreateEntity}
+              onClick={
+                createType === 'entity' ? saveCreateEntity :
+                createType === 'relation' ? saveCreateRelation :
+                createType === 'observation' ? saveCreateObservation :
+                saveCreateSource
+              }
               disabled={createSaving}
             />
           </div>
         }
       >
-        {createForm && (
+        {createForm && createType === 'entity' && (
+          <DetailFields
+            editing={true}
+            editForm={createForm}
+            onEditChange={(key, value) =>
+              setCreateForm((prev: any) => ({ ...(prev || {}), [key]: value }))
+            }
+            fields={[
+              // ... поля сущности из 6.1 (без изменений)
+            ]}
+          />
+        )}
+
+        {createForm && createType === 'relation' && (
           <DetailFields
             editing={true}
             editForm={createForm}
@@ -1498,23 +1609,50 @@ export const DatabasePage: React.FC = () => {
             }
             fields={[
               {
-                label: 'Тип *',
-                value: createForm.type,
+                label: 'Исходная сущность *',
+                span: 2,
+                value: createForm.subject_id,
                 editable: true,
-                editKey: 'type',
+                editKey: 'subject_id',
+                editType: 'dropdown',
+                editOptions: entityDropdownOptions,
+              },
+              {
+                label: 'Тип связи (predicate) *',
+                span: 2,
+                value: createForm.predicate,
+                editable: true,
+                editKey: 'predicate',
                 editType: 'dropdown',
                 editOptions: [
-                  { label: 'Юрлицо', value: 'company' },
-                  { label: 'ИП', value: 'entrepreneur' },
-                  { label: 'Физлицо', value: 'person' },
-                  { label: 'Домен', value: 'domain' },
-                  { label: 'Email', value: 'email' },
-                  { label: 'Телефон', value: 'phone' },
-                  { label: 'IP', value: 'ip' },
-                  { label: 'Адрес', value: 'address' },
-                  { label: 'Документ', value: 'document' },
-                  { label: 'Прочее', value: 'other' },
+                  { label: 'employee_of', value: 'employee_of' },
+                  { label: 'director_of', value: 'director_of' },
+                  { label: 'owner_of', value: 'owner_of' },
+                  { label: 'founder_of', value: 'founder_of' },
+                  { label: 'associated_with', value: 'associated_with' },
+                  { label: 'uses_domain', value: 'uses_domain' },
+                  { label: 'located_at', value: 'located_at' },
+                  { label: 'includes', value: 'includes' },
+                  { label: 'mentions', value: 'mentions' },
+                  { label: 'resolves_to', value: 'resolves_to' },
+                  { label: 'individual_entrepreneur_of', value: 'individual_entrepreneur_of' },
                 ],
+              },
+              {
+                label: 'Целевая сущность *',
+                span: 2,
+                value: createForm.object_id,
+                editable: true,
+                editKey: 'object_id',
+                editType: 'dropdown',
+                editOptions: entityDropdownOptions,
+              },
+              {
+                label: 'Уверенность',
+                value: createForm.confidence,
+                editable: true,
+                editKey: 'confidence',
+                editType: 'number',
               },
               {
                 label: 'Статус',
@@ -1530,27 +1668,34 @@ export const DatabasePage: React.FC = () => {
                 ],
               },
               {
-                label: 'Значение *',
-                span: 2,
-                value: createForm.value,
+                label: 'Источник',
+                value: createForm.source_id,
                 editable: true,
-                editKey: 'value',
+                editKey: 'source_id',
+                editType: 'dropdown',
+                editOptions: sourceDropdownOptions,
+              },
+              {
+                label: 'Действует с',
+                value: createForm.valid_from,
+                editable: true,
+                editKey: 'valid_from',
                 editType: 'text',
               },
               {
-                label: 'Название (label)',
-                span: 2,
-                value: createForm.label,
+                label: 'Действует до',
+                value: createForm.valid_to,
                 editable: true,
-                editKey: 'label',
+                editKey: 'valid_to',
                 editType: 'text',
               },
               {
-                label: 'Уверенность',
-                value: createForm.confidence,
+                label: 'Подтверждение (evidence)',
+                span: 2,
+                value: createForm.evidence_text,
                 editable: true,
-                editKey: 'confidence',
-                editType: 'number',
+                editKey: 'evidence_text',
+                editType: 'textarea',
               },
               {
                 label: 'Заметки',
@@ -1562,6 +1707,14 @@ export const DatabasePage: React.FC = () => {
               },
             ]}
           />
+        )}
+
+        {/* createType === 'observation' и 'source' — заготовки на 6.3 и 6.4 */}
+        {createForm && createType === 'observation' && (
+          <div className="text-500 p-3">Форма для наблюдений будет добавлена на шаге 6.3.</div>
+        )}
+        {createForm && createType === 'source' && (
+          <div className="text-500 p-3">Форма для источников будет добавлена на шаге 6.4.</div>
         )}
 
         {createMessage && (

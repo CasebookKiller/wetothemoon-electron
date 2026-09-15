@@ -434,6 +434,11 @@ try {
     updateSource: (sourceId: number, patch: any) =>
       ipcRenderer.invoke('osint:update-source', sourceId, patch),
 
+    createRelation: (patch: any) =>
+      ipcRenderer.invoke('osint:create-relation', patch),
+
+    listEntitiesDropdown: () =>
+      ipcRenderer.invoke('osint:list-entities-dropdown'),
 
   });
 

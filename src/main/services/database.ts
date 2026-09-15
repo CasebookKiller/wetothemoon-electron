@@ -490,6 +490,88 @@ export function addSource(source: {
   return Number(info.lastInsertRowid);
 }
 
+/**
+ * Создаёт связь вручную (origin='manual').
+ */
+export function createRelation(patch: {
+  subject_id: number;
+  predicate: string;
+  object_id: number;
+  source_id?: number | null;
+  valid_from?: string | null;
+  valid_to?: string | null;
+  evidence_text?: string | null;
+  confidence?: number | null;
+  status?: string | null;
+  notes?: string | null;
+}): { success: boolean; id?: number; error?: string } {
+  const db = getDatabase();
+
+  if (!patch.subject_id || !patch.object_id) {
+    return { success: false, error: 'Не выбраны участники связи' };
+  }
+  if (patch.subject_id === patch.object_id) {
+    return { success: false, error: 'Исходная и целевая сущности не могут совпадать' };
+  }
+  if (!patch.predicate?.trim()) {
+    return { success: false, error: 'Укажите тип связи (predicate)' };
+  }
+
+  try {
+    const info = db.prepare(`
+      INSERT INTO relations
+        (subject_id, predicate, object_id, source_id,
+         valid_from, valid_to, evidence_text,
+         confidence, status, notes, origin)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual')
+    `).run(
+      patch.subject_id,
+      patch.predicate.trim(),
+      patch.object_id,
+      patch.source_id || null,
+      patch.valid_from || null,
+      patch.valid_to || null,
+      patch.evidence_text || null,
+      patch.confidence ?? 50,
+      patch.status || 'unverified',
+      patch.notes || null
+    );
+
+    const id = Number(info.lastInsertRowid);
+
+    auditChange(
+      'relations',
+      id,
+      'create',
+      null,
+      `subject=${patch.subject_id}; predicate=${patch.predicate}; object=${patch.object_id}; origin=manual`,
+      'Ручное создание связи через UI'
+    );
+
+    return { success: true, id };
+  } catch (e) {
+    return { success: false, error: (e as Error).message };
+  }
+}
+
+/**
+ * Возвращает плоский список сущностей для dropdown'ов:
+ * [{ id, type, label, value }]
+ */
+export function listEntitiesForDropdown(): Array<{
+  id: number;
+  type: string;
+  label: string;
+}> {
+  const db = getDatabase();
+  const rows = db.prepare(`
+    SELECT id, type, COALESCE(label, value) AS label
+    FROM entities
+    ORDER BY label COLLATE NOCASE ASC
+  `).all() as Array<{ id: number; type: string; label: string }>;
+  return rows;
+}
+
 export function addRelation(relation: {
   subject_id: number;
   predicate: string;

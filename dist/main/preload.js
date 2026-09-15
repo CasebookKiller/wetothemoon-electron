@@ -292,7 +292,9 @@ try {
 		updateEntity: (entityId, patch) => electron.ipcRenderer.invoke("osint:update-entity", entityId, patch),
 		updateRelation: (relationId, patch) => electron.ipcRenderer.invoke("osint:update-relation", relationId, patch),
 		updateObservation: (observationId, patch) => electron.ipcRenderer.invoke("osint:update-observation", observationId, patch),
-		updateSource: (sourceId, patch) => electron.ipcRenderer.invoke("osint:update-source", sourceId, patch)
+		updateSource: (sourceId, patch) => electron.ipcRenderer.invoke("osint:update-source", sourceId, patch),
+		createRelation: (patch) => electron.ipcRenderer.invoke("osint:create-relation", patch),
+		listEntitiesDropdown: () => electron.ipcRenderer.invoke("osint:list-entities-dropdown")
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {
