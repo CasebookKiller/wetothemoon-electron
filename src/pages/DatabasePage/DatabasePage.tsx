@@ -1595,7 +1595,69 @@ export const DatabasePage: React.FC = () => {
               setCreateForm((prev: any) => ({ ...(prev || {}), [key]: value }))
             }
             fields={[
-              // ... поля сущности из 6.1 (без изменений)
+              {
+                label: 'Тип *',
+                value: createForm.type,
+                editable: true,
+                editKey: 'type',
+                editType: 'dropdown',
+                editOptions: [
+                  { label: 'Юрлицо', value: 'company' },
+                  { label: 'ИП', value: 'entrepreneur' },
+                  { label: 'Физлицо', value: 'person' },
+                  { label: 'Домен', value: 'domain' },
+                  { label: 'Email', value: 'email' },
+                  { label: 'Телефон', value: 'phone' },
+                  { label: 'IP', value: 'ip' },
+                  { label: 'Адрес', value: 'address' },
+                  { label: 'Документ', value: 'document' },
+                  { label: 'Прочее', value: 'other' },
+                ],
+              },
+              {
+                label: 'Статус',
+                value: createForm.status,
+                editable: true,
+                editKey: 'status',
+                editType: 'dropdown',
+                editOptions: [
+                  { label: 'unverified', value: 'unverified' },
+                  { label: 'hypothesis', value: 'hypothesis' },
+                  { label: 'confirmed', value: 'confirmed' },
+                  { label: 'archived', value: 'archived' },
+                ],
+              },
+              {
+                label: 'Значение *',
+                span: 2,
+                value: createForm.value,
+                editable: true,
+                editKey: 'value',
+                editType: 'text',
+              },
+              {
+                label: 'Название (label)',
+                span: 2,
+                value: createForm.label,
+                editable: true,
+                editKey: 'label',
+                editType: 'text',
+              },
+              {
+                label: 'Уверенность',
+                value: createForm.confidence,
+                editable: true,
+                editKey: 'confidence',
+                editType: 'number',
+              },
+              {
+                label: 'Заметки',
+                span: 2,
+                value: createForm.notes,
+                editable: true,
+                editKey: 'notes',
+                editType: 'textarea',
+              },
             ]}
           />
         )}
