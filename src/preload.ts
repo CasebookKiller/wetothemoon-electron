@@ -422,6 +422,15 @@ try {
     updateEntity: (entityId: number, patch: any) =>
       ipcRenderer.invoke('osint:update-entity', entityId, patch),
 
+    updateRelation: (relationId: number, patch: any) =>
+      ipcRenderer.invoke('osint:update-relation', relationId, patch),
+
+    updateObservation: (observationId: number, patch: any) =>
+      ipcRenderer.invoke('osint:update-observation', observationId, patch),
+
+    updateSource: (sourceId: number, patch: any) =>
+      ipcRenderer.invoke('osint:update-source', sourceId, patch),
+
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

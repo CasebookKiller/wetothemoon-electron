@@ -11,7 +11,21 @@ import { createDatabaseWindow, getDatabaseWindow } from '../windows/databaseWind
 import { deleteDumpsByEntity, findLatestRawDump, getRelatedIds, searchEntities } from '../services/database';
 import { loadRawDumpSync } from '../services/rawStorage';
 import { mergeCompanyDumps, saveCompanyData, updateCompanyData } from '../services/osintStorage';
-import { getDatabase, getDumpSectionsUpdatedAt, hasRawDumpForInn, listDumps, getRelationDetails, markRecordAsFalse, getEntityDetails, getObservationDetails, getSourceDetails } from '../services/database';
+import { 
+  getDatabase,
+  getDumpSectionsUpdatedAt,
+  hasRawDumpForInn,
+  listDumps,
+  getRelationDetails,
+  markRecordAsFalse,
+  getEntityDetails,
+  getObservationDetails,
+  getSourceDetails,
+  updateEntity,
+  updateRelation,
+  updateObservation,
+  updateSource,
+} from '../services/database';
 
 export function registerOsintHandlers() {
   // Открыть окно OSINT
@@ -313,8 +327,28 @@ export function registerOsintHandlers() {
     }
   });
 
-}
+  ipcMain.handle('osint:update-relation', async (_event, relationId: number, patch: any) => {
+    try {
+      return updateRelation(relationId, patch);
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
 
-function updateEntity(entityId: number, patch: any) {
-  throw new Error('Function not implemented.');
+  ipcMain.handle('osint:update-observation', async (_event, observationId: number, patch: any) => {
+    try {
+      return updateObservation(observationId, patch);
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('osint:update-source', async (_event, sourceId: number, patch: any) => {
+    try {
+      return updateSource(sourceId, patch);
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
 }

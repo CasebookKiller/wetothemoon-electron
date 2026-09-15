@@ -9986,6 +9986,45 @@ function upsertEntity(entity) {
   `).run(entity.rusprofile_id || null, entity.type, entity.value, normalized, entity.label || entity.value, now, now, entity.confidence ?? 50, entity.status || "unverified", entity.notes || null, entity.raw_file_path || null, origin);
 	return Number(info.lastInsertRowid);
 }
+function updateEntity(entityId, patch) {
+	const db = getDatabase();
+	const old = db.prepare("SELECT * FROM entities WHERE id = ?").get(entityId);
+	if (!old) return {
+		success: false,
+		error: `Сущность #${entityId} не найдена`
+	};
+	const type = patch.type ?? old.type;
+	const value = patch.value ?? old.value;
+	const label = patch.label !== void 0 ? patch.label : old.label;
+	const confidence = patch.confidence !== void 0 ? patch.confidence : old.confidence;
+	const status = patch.status !== void 0 ? patch.status : old.status;
+	const notes = patch.notes !== void 0 ? patch.notes : old.notes;
+	const normalized = normalize(value);
+	const oldOrigin = old.origin || "scraper";
+	const newOrigin = "manual";
+	try {
+		db.prepare(`
+      UPDATE entities
+      SET type = ?,
+          value = ?,
+          normalized_value = ?,
+          label = ?,
+          last_seen = ?,
+          confidence = ?,
+          status = ?,
+          notes = ?,
+          origin = ?
+      WHERE id = ?
+    `).run(type, value, normalized, label, (/* @__PURE__ */ new Date()).toISOString(), confidence, status, notes, newOrigin, entityId);
+	} catch (e) {
+		return {
+			success: false,
+			error: e.message
+		};
+	}
+	auditChange("entities", entityId, "update", JSON.stringify(old), `type=${type}; value=${value}; status=${status}; confidence=${confidence}; origin=${oldOrigin}→${newOrigin}`, "Редактирование сущности через UI");
+	return { success: true };
+}
 function addSource(source) {
 	const info = getDatabase().prepare(`
     INSERT INTO sources (url, title, source_type, source_kind, provider, collection_method,
@@ -10392,6 +10431,120 @@ function getRelatedIds(filterType, filterId) {
 		observationIds: [...observationIds],
 		sourceIds: [...sourceIds]
 	};
+}
+function updateRelation(relationId, patch) {
+	const db = getDatabase();
+	const old = db.prepare("SELECT * FROM relations WHERE id = ?").get(relationId);
+	if (!old) return {
+		success: false,
+		error: `Связь #${relationId} не найдена`
+	};
+	const predicate = patch.predicate ?? old.predicate;
+	const confidence = patch.confidence !== void 0 ? patch.confidence : old.confidence;
+	const status = patch.status !== void 0 ? patch.status : old.status;
+	const valid_from = patch.valid_from !== void 0 ? patch.valid_from : old.valid_from;
+	const valid_to = patch.valid_to !== void 0 ? patch.valid_to : old.valid_to;
+	const evidence_text = patch.evidence_text !== void 0 ? patch.evidence_text : old.evidence_text;
+	const notes = patch.notes !== void 0 ? patch.notes : old.notes;
+	const oldOrigin = old.origin || "scraper";
+	const newOrigin = "manual";
+	try {
+		db.prepare(`
+      UPDATE relations
+      SET predicate = ?,
+          confidence = ?,
+          status = ?,
+          valid_from = ?,
+          valid_to = ?,
+          evidence_text = ?,
+          notes = ?,
+          origin = ?
+      WHERE id = ?
+    `).run(predicate, confidence, status, valid_from, valid_to, evidence_text, notes, newOrigin, relationId);
+	} catch (e) {
+		return {
+			success: false,
+			error: e.message
+		};
+	}
+	auditChange("relations", relationId, "update", JSON.stringify(old), `predicate=${predicate}; status=${status}; confidence=${confidence}; origin=${oldOrigin}→${newOrigin}`, "Редактирование связи через UI");
+	return { success: true };
+}
+function updateObservation(observationId, patch) {
+	const db = getDatabase();
+	const old = db.prepare("SELECT * FROM observations WHERE id = ?").get(observationId);
+	if (!old) return {
+		success: false,
+		error: `Наблюдение #${observationId} не найдено`
+	};
+	const attribute = patch.attribute ?? old.attribute;
+	const value = patch.value ?? old.value;
+	const confidence = patch.confidence !== void 0 ? patch.confidence : old.confidence;
+	const notes = patch.notes !== void 0 ? patch.notes : old.notes;
+	const oldOrigin = old.origin || "scraper";
+	const newOrigin = "manual";
+	try {
+		db.prepare(`
+      UPDATE observations
+      SET attribute = ?,
+          value = ?,
+          confidence = ?,
+          notes = ?,
+          origin = ?
+      WHERE id = ?
+    `).run(attribute, value, confidence, notes, newOrigin, observationId);
+	} catch (e) {
+		return {
+			success: false,
+			error: e.message
+		};
+	}
+	auditChange("observations", observationId, "update", JSON.stringify(old), `attribute=${attribute}; value=${value}; confidence=${confidence}; origin=${oldOrigin}→${newOrigin}`, "Редактирование наблюдения через UI");
+	return { success: true };
+}
+function updateSource(sourceId, patch) {
+	const db = getDatabase();
+	const old = db.prepare("SELECT * FROM sources WHERE id = ?").get(sourceId);
+	if (!old) return {
+		success: false,
+		error: `Источник #${sourceId} не найден`
+	};
+	const url = patch.url ?? old.url;
+	const title = patch.title !== void 0 ? patch.title : old.title;
+	const source_type = patch.source_type !== void 0 ? patch.source_type : old.source_type;
+	const source_kind = patch.source_kind !== void 0 ? patch.source_kind : old.source_kind;
+	const provider = patch.provider !== void 0 ? patch.provider : old.provider;
+	const collection_method = patch.collection_method !== void 0 ? patch.collection_method : old.collection_method;
+	const authority_basis = patch.authority_basis !== void 0 ? patch.authority_basis : old.authority_basis;
+	const reliability = patch.reliability !== void 0 ? patch.reliability : old.reliability;
+	const access_level = patch.access_level !== void 0 ? patch.access_level : old.access_level;
+	const notes = patch.notes !== void 0 ? patch.notes : old.notes;
+	const oldOrigin = old.origin || "scraper";
+	const newOrigin = "manual";
+	try {
+		db.prepare(`
+      UPDATE sources
+      SET url = ?,
+          title = ?,
+          source_type = ?,
+          source_kind = ?,
+          provider = ?,
+          collection_method = ?,
+          authority_basis = ?,
+          reliability = ?,
+          access_level = ?,
+          notes = ?,
+          origin = ?
+      WHERE id = ?
+    `).run(url, title, source_type, source_kind, provider, collection_method, authority_basis, reliability, access_level, notes, newOrigin, sourceId);
+	} catch (e) {
+		return {
+			success: false,
+			error: e.message
+		};
+	}
+	auditChange("sources", sourceId, "update", JSON.stringify(old), `url=${url}; reliability=${reliability}; access_level=${access_level}; origin=${oldOrigin}→${newOrigin}`, "Редактирование источника через UI");
+	return { success: true };
 }
 //#endregion
 //#region src/main/services/rawStorage.ts
@@ -11089,9 +11242,36 @@ function registerOsintHandlers() {
 			};
 		}
 	});
-}
-function updateEntity(entityId, patch) {
-	throw new Error("Function not implemented.");
+	electron.ipcMain.handle("osint:update-relation", async (_event, relationId, patch) => {
+		try {
+			return updateRelation(relationId, patch);
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:update-observation", async (_event, observationId, patch) => {
+		try {
+			return updateObservation(observationId, patch);
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:update-source", async (_event, sourceId, patch) => {
+		try {
+			return updateSource(sourceId, patch);
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
 }
 //#endregion
 //#region src/shared/types/promptgenerator.ts

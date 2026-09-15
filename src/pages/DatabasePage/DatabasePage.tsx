@@ -80,6 +80,7 @@ export const DatabasePage: React.FC = () => {
   const openDialog = async (type: DialogType, id: number) => {
     setEditing(false);
     setEditForm(null);
+    setEditMessage('');
     const existingIdx = dialogStack.findIndex((it) => it.type === type && it.id === id);
     if (existingIdx >= 0) {
       setDialogStack((prev) => prev.slice(0, existingIdx + 1));
@@ -143,14 +144,21 @@ export const DatabasePage: React.FC = () => {
   const popDialog = () => {
     setEditing(false);
     setEditForm(null);
+    setEditMessage('');
     setDialogStack((prev) => prev.slice(0, -1));
   };
 
   const popToIndex = (index: number) => {
+    setEditing(false);
+    setEditForm(null);
+    setEditMessage('');
     setDialogStack((prev) => prev.slice(0, index + 1));
   };
 
   const closeAllDialogs = () => {
+    setEditing(false);
+    setEditForm(null);
+    setEditMessage('');
     setDialogStack([]);
     setDialogCache({});
   };
@@ -264,15 +272,47 @@ export const DatabasePage: React.FC = () => {
     }
   };
 
-  const startEditing = (data: any) => {
-    setEditForm({
-      type: data.entity.type,
-      value: data.entity.value,
-      label: data.entity.label || '',
-      confidence: data.entity.confidence ?? 50,
-      status: data.entity.status,
-      notes: data.entity.notes || '',
-    });
+  const startEditing = (type: DialogType, data: any) => {
+    if (type === 'entity') {
+      setEditForm({
+        type: data.entity.type,
+        value: data.entity.value,
+        label: data.entity.label || '',
+        confidence: data.entity.confidence ?? 50,
+        status: data.entity.status,
+        notes: data.entity.notes || '',
+      });
+    } else if (type === 'relation') {
+      setEditForm({
+        predicate: data.predicate,
+        confidence: data.confidence ?? 50,
+        status: data.status,
+        valid_from: data.valid_from || '',
+        valid_to: data.valid_to || '',
+        evidence_text: data.evidence_text || '',
+        notes: data.notes || '',
+      });
+    } else if (type === 'observation') {
+      setEditForm({
+        attribute: data.attribute,
+        value: data.value,
+        confidence: data.confidence ?? 50,
+        notes: data.notes || '',
+      });
+    } else if (type === 'source') {
+      setEditForm({
+        url: data.source.url,
+        title: data.source.title || '',
+        source_type: data.source.source_type || '',
+        source_kind: data.source.source_kind || '',
+        provider: data.source.provider || '',
+        collection_method: data.source.collection_method || '',
+        authority_basis: data.source.authority_basis || '',
+        reliability: data.source.reliability ?? 50,
+        access_level: data.source.access_level || 'public',
+        notes: data.source.notes || '',
+      });
+    }
     setEditMessage('');
     setEditing(true);
   };
@@ -284,13 +324,23 @@ export const DatabasePage: React.FC = () => {
   };
 
   const saveEditing = async () => {
-    if (!editForm) return;
+    if (!editForm || dialogStack.length === 0) return;
+    const top = dialogStack[dialogStack.length - 1];
     setEditSaving(true);
     setEditMessage('');
     try {
-      const top = dialogStack[dialogStack.length - 1];
-      const res = await api.updateEntity(top.id, editForm);
-      if (res.success) {
+      let res: any;
+      if (top.type === 'entity') {
+        res = await api.updateEntity(top.id, editForm);
+      } else if (top.type === 'relation') {
+        res = await api.updateRelation(top.id, editForm);
+      } else if (top.type === 'observation') {
+        res = await api.updateObservation(top.id, editForm);
+      } else if (top.type === 'source') {
+        res = await api.updateSource(top.id, editForm);
+      }
+
+      if (res?.success) {
         setEditMessage('Сохранено');
         await loadData();
         await refreshTopDialog();
@@ -300,7 +350,7 @@ export const DatabasePage: React.FC = () => {
           setEditMessage('');
         }, 600);
       } else {
-        setEditMessage(`Ошибка: ${res.error}`);
+        setEditMessage(`Ошибка: ${res?.error || 'неизвестная'}`);
       }
     } catch (e) {
       setEditMessage((e as Error).message);
@@ -546,65 +596,155 @@ export const DatabasePage: React.FC = () => {
   );
 
   const renderRelationContent = (data: any) => (
-    <DetailFields
-      fields={[
-        {
-          label: 'Исходная сущность',
-          value: (
-            <a
-              href="#"
-              style={{ color: 'inherit', textDecoration: 'underline dotted' }}
-              onClick={(e) => { e.preventDefault(); openDialog('entity', data.subject_id); }}
-            >
-              [{data.subject_id}] {data.subject_label} — <i>{data.subject_type}</i>
-            </a>
-          ),
-        },
-        { label: 'Связь', value: <b>{data.predicate}</b> },
-        {
-          label: 'Целевая сущность',
-          value: (
-            <a
-              href="#"
-              style={{ color: 'inherit', textDecoration: 'underline dotted' }}
-              onClick={(e) => { e.preventDefault(); openDialog('entity', data.object_id); }}
-            >
-              [{data.object_id}] {data.object_label} — <i>{data.object_type}</i>
-            </a>
-          ),
-        },
-        { label: 'Уверенность', value: data.confidence ?? '—' },
-        { label: 'Статус', value: data.status },
-        { label: 'Источник записи', value: renderOrigin(data.origin) },
-        { label: 'Действует с', value: data.valid_from || '—' },
-        { label: 'Действует до', value: data.valid_to || '—' },
-        { label: 'Подтверждение (evidence)', span: 2, value: data.evidence_text || <span className="text-500">—</span> },
-        { label: 'Заметки', span: 2, value: data.notes || <span className="text-500">—</span> },
-        {
-          label: 'Источник',
-          span: 2,
-          value: data.source_url ? (
-            <div>
+    <>
+      {editing && (
+        <div
+          className="mb-3 p-2 border-round flex align-items-start gap-2"
+          style={{
+            background: 'rgba(236, 156, 66, 0.08)',
+            border: '1px solid rgba(236, 156, 66, 0.4)',
+          }}
+        >
+          <i className="pi pi-exclamation-triangle mt-1" style={{ color: '#ec9c42' }} />
+          <div className="text-sm">
+            {data.origin === 'manual' ? (
+              <>
+                <b>Ручная запись.</b> Изменения сохраняются, скрапер её не перезапишет.
+              </>
+            ) : (
+              <>
+                <b>Запись собрана автоматически.</b> После сохранения она станет{' '}
+                <code>manual</code> и скрапер её не тронет.
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      <DetailFields
+        editing={editing}
+        editForm={editForm}
+        onEditChange={(key, value) =>
+          setEditForm((prev: any) => ({ ...(prev || {}), [key]: value }))
+        }
+        fields={[
+          {
+            label: 'Исходная сущность',
+            value: (
               <a
                 href="#"
                 style={{ color: 'inherit', textDecoration: 'underline dotted' }}
-                onClick={(e) => { e.preventDefault(); if (data.source_id) openDialog('source', data.source_id); }}
+                onClick={(e) => { e.preventDefault(); openDialog('entity', data.subject_id); }}
               >
-                [{data.source_id}] {data.source_title || 'Источник'}
+                [{data.subject_id}] {data.subject_label} — <i>{data.subject_type}</i>
               </a>
-              <div className="text-sm"><a href={data.source_url} target="_blank" rel="noreferrer">{data.source_url}</a></div>
-              <div className="text-sm text-500">
-                {data.source_type} • {data.source_provider} • {data.source_access_level}
-                {data.source_retrieved_at ? ` • получено ${new Date(data.source_retrieved_at).toLocaleString()}` : ''}
+            ),
+          },
+          {
+            label: 'Связь',
+            value: <b>{data.predicate}</b>,
+            editable: true,
+            editKey: 'predicate',
+            editType: 'text',
+          },
+          {
+            label: 'Целевая сущность',
+            value: (
+              <a
+                href="#"
+                style={{ color: 'inherit', textDecoration: 'underline dotted' }}
+                onClick={(e) => { e.preventDefault(); openDialog('entity', data.object_id); }}
+              >
+                [{data.object_id}] {data.object_label} — <i>{data.object_type}</i>
+              </a>
+            ),
+          },
+          {
+            label: 'Уверенность',
+            value: data.confidence ?? '—',
+            editable: true,
+            editKey: 'confidence',
+            editType: 'number',
+          },
+          {
+            label: 'Статус',
+            value: data.status,
+            editable: true,
+            editKey: 'status',
+            editType: 'dropdown',
+            editOptions: [
+              { label: 'unverified', value: 'unverified' },
+              { label: 'hypothesis', value: 'hypothesis' },
+              { label: 'confirmed', value: 'confirmed' },
+              { label: 'false', value: 'false' },
+              { label: 'archived', value: 'archived' },
+            ],
+          },
+          { label: 'Источник записи', value: renderOrigin(data.origin) },
+          {
+            label: 'Действует с',
+            value: data.valid_from || '—',
+            editable: true,
+            editKey: 'valid_from',
+            editType: 'text',
+          },
+          {
+            label: 'Действует до',
+            value: data.valid_to || '—',
+            editable: true,
+            editKey: 'valid_to',
+            editType: 'text',
+          },
+          {
+            label: 'Подтверждение (evidence)',
+            span: 2,
+            value: data.evidence_text || <span className="text-500">—</span>,
+            editable: true,
+            editKey: 'evidence_text',
+            editType: 'textarea',
+          },
+          {
+            label: 'Заметки',
+            span: 2,
+            value: data.notes || <span className="text-500">—</span>,
+            editable: true,
+            editKey: 'notes',
+            editType: 'textarea',
+          },
+          {
+            label: 'Источник',
+            span: 2,
+            value: data.source_url ? (
+              <div>
+                <a
+                  href="#"
+                  style={{ color: 'inherit', textDecoration: 'underline dotted' }}
+                  onClick={(e) => { e.preventDefault(); if (data.source_id) openDialog('source', data.source_id); }}
+                >
+                  [{data.source_id}] {data.source_title || 'Источник'}
+                </a>
+                <div className="text-sm"><a href={data.source_url} target="_blank" rel="noreferrer">{data.source_url}</a></div>
+                <div className="text-sm text-500">
+                  {data.source_type} • {data.source_provider} • {data.source_access_level}
+                  {data.source_retrieved_at ? ` • получено ${new Date(data.source_retrieved_at).toLocaleString()}` : ''}
+                </div>
               </div>
-            </div>
-          ) : (
-            <span className="text-500">Источник не указан</span>
-          ),
-        },
-        { label: 'Файл дампа', span: 2, value: <span className="text-sm text-500" style={{ wordBreak: 'break-all' }}>{data.raw_file_path || '—'}</span> },
-      ]}
-    />
+            ) : (
+              <span className="text-500">Источник не указан</span>
+            ),
+          },
+          {
+            label: 'Файл дампа',
+            span: 2,
+            value: (
+              <span className="text-sm text-500" style={{ wordBreak: 'break-all' }}>
+                {data.raw_file_path || '—'}
+              </span>
+            ),
+          },
+        ]}
+      />
+    </>
   );
 
   const renderObservationContent = (data: any) => (
@@ -1031,8 +1171,8 @@ export const DatabasePage: React.FC = () => {
                 </>
               ) : (
                 <>
-                  {/* Кнопка «Редактировать» — только для сущностей на этом шаге */}
-                  {dialogStack[dialogStack.length - 1].type === 'entity' && (
+                  {/* Кнопка «Редактировать» */}
+                  {!editing && (
                     <Button
                       label="Редактировать"
                       icon="pi pi-pencil"
@@ -1040,7 +1180,7 @@ export const DatabasePage: React.FC = () => {
                       onClick={() => {
                         const top = dialogStack[dialogStack.length - 1];
                         const data = dialogCache[cacheKey(top.type, top.id)];
-                        if (data) startEditing(data);
+                        if (data) startEditing(top.type, data);
                       }}
                     />
                   )}

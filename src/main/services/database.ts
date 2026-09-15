@@ -1004,3 +1004,194 @@ export function markEntityAsManual(entityId: number): void {
   const db = getDatabase();
   db.prepare(`UPDATE entities SET origin = 'manual' WHERE id = ?`).run(entityId);
 }
+
+export function updateRelation(
+  relationId: number,
+  patch: {
+    predicate?: string;
+    confidence?: number | null;
+    status?: string | null;
+    valid_from?: string | null;
+    valid_to?: string | null;
+    evidence_text?: string | null;
+    notes?: string | null;
+  }
+): { success: boolean; error?: string } {
+  const db = getDatabase();
+
+  const old = db.prepare('SELECT * FROM relations WHERE id = ?').get(relationId) as any;
+  if (!old) {
+    return { success: false, error: `Связь #${relationId} не найдена` };
+  }
+
+  const predicate = patch.predicate ?? old.predicate;
+  const confidence = patch.confidence !== undefined ? patch.confidence : old.confidence;
+  const status = patch.status !== undefined ? patch.status : old.status;
+  const valid_from = patch.valid_from !== undefined ? patch.valid_from : old.valid_from;
+  const valid_to = patch.valid_to !== undefined ? patch.valid_to : old.valid_to;
+  const evidence_text = patch.evidence_text !== undefined ? patch.evidence_text : old.evidence_text;
+  const notes = patch.notes !== undefined ? patch.notes : old.notes;
+
+  const oldOrigin = old.origin || 'scraper';
+  const newOrigin = 'manual';
+
+  try {
+    db.prepare(`
+      UPDATE relations
+      SET predicate = ?,
+          confidence = ?,
+          status = ?,
+          valid_from = ?,
+          valid_to = ?,
+          evidence_text = ?,
+          notes = ?,
+          origin = ?
+      WHERE id = ?
+    `).run(
+      predicate,
+      confidence,
+      status,
+      valid_from,
+      valid_to,
+      evidence_text,
+      notes,
+      newOrigin,
+      relationId
+    );
+  } catch (e) {
+    return { success: false, error: (e as Error).message };
+  }
+
+  auditChange(
+    'relations',
+    relationId,
+    'update',
+    JSON.stringify(old),
+    `predicate=${predicate}; status=${status}; confidence=${confidence}; origin=${oldOrigin}→${newOrigin}`,
+    'Редактирование связи через UI'
+  );
+
+  return { success: true };
+}
+
+export function updateObservation(
+  observationId: number,
+  patch: {
+    attribute?: string;
+    value?: string;
+    confidence?: number | null;
+    notes?: string | null;
+  }
+): { success: boolean; error?: string } {
+  const db = getDatabase();
+
+  const old = db.prepare('SELECT * FROM observations WHERE id = ?').get(observationId) as any;
+  if (!old) {
+    return { success: false, error: `Наблюдение #${observationId} не найдено` };
+  }
+
+  const attribute = patch.attribute ?? old.attribute;
+  const value = patch.value ?? old.value;
+  const confidence = patch.confidence !== undefined ? patch.confidence : old.confidence;
+  const notes = patch.notes !== undefined ? patch.notes : old.notes;
+
+  const oldOrigin = old.origin || 'scraper';
+  const newOrigin = 'manual';
+
+  try {
+    db.prepare(`
+      UPDATE observations
+      SET attribute = ?,
+          value = ?,
+          confidence = ?,
+          notes = ?,
+          origin = ?
+      WHERE id = ?
+    `).run(attribute, value, confidence, notes, newOrigin, observationId);
+  } catch (e) {
+    return { success: false, error: (e as Error).message };
+  }
+
+  auditChange(
+    'observations',
+    observationId,
+    'update',
+    JSON.stringify(old),
+    `attribute=${attribute}; value=${value}; confidence=${confidence}; origin=${oldOrigin}→${newOrigin}`,
+    'Редактирование наблюдения через UI'
+  );
+
+  return { success: true };
+}
+
+export function updateSource(
+  sourceId: number,
+  patch: {
+    url?: string;
+    title?: string | null;
+    source_type?: string | null;
+    source_kind?: string | null;
+    provider?: string | null;
+    collection_method?: string | null;
+    authority_basis?: string | null;
+    reliability?: number | null;
+    access_level?: string | null;
+    notes?: string | null;
+  }
+): { success: boolean; error?: string } {
+  const db = getDatabase();
+
+  const old = db.prepare('SELECT * FROM sources WHERE id = ?').get(sourceId) as any;
+  if (!old) {
+    return { success: false, error: `Источник #${sourceId} не найден` };
+  }
+
+  const url = patch.url ?? old.url;
+  const title = patch.title !== undefined ? patch.title : old.title;
+  const source_type = patch.source_type !== undefined ? patch.source_type : old.source_type;
+  const source_kind = patch.source_kind !== undefined ? patch.source_kind : old.source_kind;
+  const provider = patch.provider !== undefined ? patch.provider : old.provider;
+  const collection_method = patch.collection_method !== undefined ? patch.collection_method : old.collection_method;
+  const authority_basis = patch.authority_basis !== undefined ? patch.authority_basis : old.authority_basis;
+  const reliability = patch.reliability !== undefined ? patch.reliability : old.reliability;
+  const access_level = patch.access_level !== undefined ? patch.access_level : old.access_level;
+  const notes = patch.notes !== undefined ? patch.notes : old.notes;
+
+  const oldOrigin = old.origin || 'scraper';
+  const newOrigin = 'manual';
+
+  try {
+    db.prepare(`
+      UPDATE sources
+      SET url = ?,
+          title = ?,
+          source_type = ?,
+          source_kind = ?,
+          provider = ?,
+          collection_method = ?,
+          authority_basis = ?,
+          reliability = ?,
+          access_level = ?,
+          notes = ?,
+          origin = ?
+      WHERE id = ?
+    `).run(
+      url, title, source_type, source_kind, provider,
+      collection_method, authority_basis, reliability, access_level,
+      notes, newOrigin, sourceId
+    );
+  } catch (e) {
+    return { success: false, error: (e as Error).message };
+  }
+
+  auditChange(
+    'sources',
+    sourceId,
+    'update',
+    JSON.stringify(old),
+    `url=${url}; reliability=${reliability}; access_level=${access_level}; origin=${oldOrigin}→${newOrigin}`,
+    'Редактирование источника через UI'
+  );
+
+  return { success: true };
+}
