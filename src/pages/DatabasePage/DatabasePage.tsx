@@ -880,10 +880,57 @@ export const DatabasePage: React.FC = () => {
 
   const renderSourceContent = (data: any) => (
     <>
+      {editing && (
+        <div
+          className="mb-3 p-2 border-round flex align-items-start gap-2"
+          style={{
+            background: 'rgba(236, 156, 66, 0.08)',
+            border: '1px solid rgba(236, 156, 66, 0.4)',
+          }}
+        >
+          <i className="pi pi-exclamation-triangle mt-1" style={{ color: '#ec9c42' }} />
+          <div className="text-sm">
+            {data.source.origin === 'manual' ? (
+              <>
+                <b>Ручная запись.</b> Изменения сохраняются, скрапер её не перезапишет.
+              </>
+            ) : (
+              <>
+                <b>Запись собрана автоматически.</b> После сохранения она станет{' '}
+                <code>manual</code> и скрапер её не тронет.
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       <DetailFields
+        editing={editing}
+        editForm={editForm}
+        onEditChange={(key, value) =>
+          setEditForm((prev: any) => ({ ...(prev || {}), [key]: value }))
+        }
         fields={[
           { label: 'ID', value: data.source.id },
-          { label: 'Тип', value: data.source.source_type || '—' },
+          {
+            label: 'Тип',
+            value: data.source.source_type || '—',
+            editable: true,
+            editKey: 'source_type',
+            editType: 'dropdown',
+            editOptions: [
+              { label: 'website', value: 'website' },
+              { label: 'social', value: 'social' },
+              { label: 'registry', value: 'registry' },
+              { label: 'document', value: 'document' },
+              { label: 'cli', value: 'cli' },
+              { label: 'search', value: 'search' },
+              { label: 'screenshot', value: 'screenshot' },
+              { label: 'company_system', value: 'company_system' },
+              { label: 'court', value: 'court' },
+              { label: 'other', value: 'other' },
+            ],
+          },
           {
             label: 'URL',
             span: 2,
@@ -899,13 +946,81 @@ export const DatabasePage: React.FC = () => {
             ) : (
               '—'
             ),
+            editable: true,
+            editKey: 'url',
+            editType: 'text',
           },
-          { label: 'Название', span: 2, value: data.source.title || '—' },
-          { label: 'Происхождение', value: data.source.source_kind || '—' },
-          { label: 'Провайдер', value: data.source.provider || '—' },
-          { label: 'Метод получения', value: data.source.collection_method || '—' },
-          { label: 'Надёжность', value: data.source.reliability ?? '—' },
-          { label: 'Уровень доступа', value: data.source.access_level || '—' },
+          {
+            label: 'Название',
+            span: 2,
+            value: data.source.title || '—',
+            editable: true,
+            editKey: 'title',
+            editType: 'text',
+          },
+          {
+            label: 'Происхождение',
+            value: data.source.source_kind || '—',
+            editable: true,
+            editKey: 'source_kind',
+            editType: 'dropdown',
+            editOptions: [
+              { label: 'public_web', value: 'public_web' },
+              { label: 'internal_person', value: 'internal_person' },
+              { label: 'internal_document', value: 'internal_document' },
+              { label: 'official_registry', value: 'official_registry' },
+              { label: 'company_system', value: 'company_system' },
+              { label: 'cli_tool', value: 'cli_tool' },
+              { label: 'personal_observation', value: 'personal_observation' },
+            ],
+          },
+          {
+            label: 'Провайдер',
+            value: data.source.provider || '—',
+            editable: true,
+            editKey: 'provider',
+            editType: 'text',
+          },
+          {
+            label: 'Метод получения',
+            value: data.source.collection_method || '—',
+            editable: true,
+            editKey: 'collection_method',
+            editType: 'dropdown',
+            editOptions: [
+              { label: 'browser', value: 'browser' },
+              { label: 'api', value: 'api' },
+              { label: 'export', value: 'export' },
+              { label: 'official_export', value: 'official_export' },
+              { label: 'interview', value: 'interview' },
+              { label: 'email', value: 'email' },
+              { label: 'internal_chat', value: 'internal_chat' },
+              { label: 'theharvester', value: 'theharvester' },
+              { label: 'whois', value: 'whois' },
+              { label: 'dig', value: 'dig' },
+              { label: 'manual', value: 'manual' },
+            ],
+          },
+          {
+            label: 'Надёжность',
+            value: data.source.reliability ?? '—',
+            editable: true,
+            editKey: 'reliability',
+            editType: 'number',
+          },
+          {
+            label: 'Уровень доступа',
+            value: data.source.access_level || '—',
+            editable: true,
+            editKey: 'access_level',
+            editType: 'dropdown',
+            editOptions: [
+              { label: 'public', value: 'public' },
+              { label: 'internal', value: 'internal' },
+              { label: 'confidential', value: 'confidential' },
+              { label: 'restricted', value: 'restricted' },
+            ],
+          },
           { label: 'Источник записи', value: renderOrigin(data.source.origin) },
           {
             label: 'Дата получения',
@@ -917,6 +1032,9 @@ export const DatabasePage: React.FC = () => {
             label: 'Основание доступа',
             span: 2,
             value: data.source.authority_basis || '—',
+            editable: true,
+            editKey: 'authority_basis',
+            editType: 'textarea',
           },
           {
             label: 'Локальный путь',
@@ -940,6 +1058,9 @@ export const DatabasePage: React.FC = () => {
             label: 'Заметки',
             span: 2,
             value: data.source.notes || '—',
+            editable: true,
+            editKey: 'notes',
+            editType: 'textarea',
           },
         ]}
       />
