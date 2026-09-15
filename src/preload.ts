@@ -443,6 +443,9 @@ try {
     createObservation: (patch: any) =>
       ipcRenderer.invoke('osint:create-observation', patch),
 
+    createSource: (patch: any) =>
+      ipcRenderer.invoke('osint:create-source', patch),
+
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

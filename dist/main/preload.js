@@ -295,7 +295,8 @@ try {
 		updateSource: (sourceId, patch) => electron.ipcRenderer.invoke("osint:update-source", sourceId, patch),
 		createRelation: (patch) => electron.ipcRenderer.invoke("osint:create-relation", patch),
 		listEntitiesDropdown: () => electron.ipcRenderer.invoke("osint:list-entities-dropdown"),
-		createObservation: (patch) => electron.ipcRenderer.invoke("osint:create-observation", patch)
+		createObservation: (patch) => electron.ipcRenderer.invoke("osint:create-observation", patch),
+		createSource: (patch) => electron.ipcRenderer.invoke("osint:create-source", patch)
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {

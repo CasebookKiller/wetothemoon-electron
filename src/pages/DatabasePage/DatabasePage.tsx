@@ -266,7 +266,49 @@ export const DatabasePage: React.FC = () => {
   };
 
   const saveCreateSource = async () => {
-    setCreateMessage('Форма ещё не реализована');
+    if (!createForm) return;
+    if (!createForm.url?.trim()) {
+      setCreateMessage('Укажите URL или локальный путь');
+      return;
+    }
+
+    setCreateSaving(true);
+    setCreateMessage('');
+    try {
+      const res = await api.createSource(createForm);
+      if (res.success) {
+        setCreateMessage('Создано');
+        await loadData();
+        setTimeout(async () => {
+          closeCreateDialog();
+          if (res.id) await openDialog('source', res.id);
+        }, 500);
+      } else {
+        setCreateMessage(`Ошибка: ${res.error}`);
+      }
+    } catch (e) {
+      setCreateMessage((e as Error).message);
+    } finally {
+      setCreateSaving(false);
+    }
+  };
+
+  const openCreateSourceDialog = () => {
+    setCreateType('source');
+    setCreateForm({
+      url: '',
+      title: '',
+      source_type: 'website',
+      source_kind: 'public_web',
+      provider: '',
+      collection_method: 'manual',
+      authority_basis: '',
+      reliability: 50,
+      access_level: 'public',
+      notes: '',
+    });
+    setCreateMessage('');
+    setCreateDialog(true);
   };
 
   const closeCreateDialog = () => {
@@ -1464,6 +1506,14 @@ export const DatabasePage: React.FC = () => {
           </TabPanel>
 
           <TabPanel header={`Источники (${filteredSources.length})`}>
+            <div className="flex justify-content-end mb-2">
+              <Button
+                label="Создать источник"
+                icon="pi pi-plus"
+                className="osint-soft p-button-sm"
+                onClick={openCreateSourceDialog}
+              />
+            </div>
             <SourcesTable
               value={filteredSources}
               onRowClick={(row) => openDialog('source', row.id)}
@@ -1885,9 +1935,131 @@ export const DatabasePage: React.FC = () => {
           />
         )}
 
-        {/* createType === 'source' — заготовка на 6.4 */}
         {createForm && createType === 'source' && (
-          <div className="text-500 p-3">Форма для источников будет добавлена на шаге 6.4.</div>
+          <DetailFields
+            editing={true}
+            editForm={createForm}
+            onEditChange={(key, value) =>
+              setCreateForm((prev: any) => ({ ...(prev || {}), [key]: value }))
+            }
+            fields={[
+              {
+                label: 'URL или локальный путь *',
+                span: 2,
+                value: createForm.url,
+                editable: true,
+                editKey: 'url',
+                editType: 'text',
+              },
+              {
+                label: 'Название',
+                span: 2,
+                value: createForm.title,
+                editable: true,
+                editKey: 'title',
+                editType: 'text',
+              },
+              {
+                label: 'Тип источника',
+                value: createForm.source_type,
+                editable: true,
+                editKey: 'source_type',
+                editType: 'dropdown',
+                editOptions: [
+                  { label: 'website', value: 'website' },
+                  { label: 'social', value: 'social' },
+                  { label: 'registry', value: 'registry' },
+                  { label: 'document', value: 'document' },
+                  { label: 'cli', value: 'cli' },
+                  { label: 'search', value: 'search' },
+                  { label: 'screenshot', value: 'screenshot' },
+                  { label: 'company_system', value: 'company_system' },
+                  { label: 'court', value: 'court' },
+                  { label: 'other', value: 'other' },
+                ],
+              },
+              {
+                label: 'Происхождение',
+                value: createForm.source_kind,
+                editable: true,
+                editKey: 'source_kind',
+                editType: 'dropdown',
+                editOptions: [
+                  { label: 'public_web', value: 'public_web' },
+                  { label: 'internal_person', value: 'internal_person' },
+                  { label: 'internal_document', value: 'internal_document' },
+                  { label: 'official_registry', value: 'official_registry' },
+                  { label: 'company_system', value: 'company_system' },
+                  { label: 'cli_tool', value: 'cli_tool' },
+                  { label: 'personal_observation', value: 'personal_observation' },
+                ],
+              },
+              {
+                label: 'Провайдер',
+                span: 2,
+                value: createForm.provider,
+                editable: true,
+                editKey: 'provider',
+                editType: 'text',
+              },
+              {
+                label: 'Метод получения',
+                value: createForm.collection_method,
+                editable: true,
+                editKey: 'collection_method',
+                editType: 'dropdown',
+                editOptions: [
+                  { label: 'browser', value: 'browser' },
+                  { label: 'api', value: 'api' },
+                  { label: 'export', value: 'export' },
+                  { label: 'official_export', value: 'official_export' },
+                  { label: 'interview', value: 'interview' },
+                  { label: 'email', value: 'email' },
+                  { label: 'internal_chat', value: 'internal_chat' },
+                  { label: 'theharvester', value: 'theharvester' },
+                  { label: 'whois', value: 'whois' },
+                  { label: 'dig', value: 'dig' },
+                  { label: 'manual', value: 'manual' },
+                ],
+              },
+              {
+                label: 'Надёжность',
+                value: createForm.reliability,
+                editable: true,
+                editKey: 'reliability',
+                editType: 'number',
+              },
+              {
+                label: 'Уровень доступа',
+                value: createForm.access_level,
+                editable: true,
+                editKey: 'access_level',
+                editType: 'dropdown',
+                editOptions: [
+                  { label: 'public', value: 'public' },
+                  { label: 'internal', value: 'internal' },
+                  { label: 'confidential', value: 'confidential' },
+                  { label: 'restricted', value: 'restricted' },
+                ],
+              },
+              {
+                label: 'Основание доступа',
+                span: 2,
+                value: createForm.authority_basis,
+                editable: true,
+                editKey: 'authority_basis',
+                editType: 'textarea',
+              },
+              {
+                label: 'Заметки',
+                span: 2,
+                value: createForm.notes,
+                editable: true,
+                editKey: 'notes',
+                editType: 'textarea',
+              },
+            ]}
+          />
         )}
 
         {createMessage && (

@@ -10058,6 +10058,37 @@ function updateEntity(entityId, patch) {
 	auditChange("entities", entityId, "update", JSON.stringify(old), `type=${type}; value=${value}; status=${status}; confidence=${confidence}; origin=${oldOrigin}→${newOrigin}`, "Редактирование сущности через UI");
 	return { success: true };
 }
+/**
+* Создаёт источник вручную (origin='manual').
+*/
+function createSource(patch) {
+	const db = getDatabase();
+	if (!patch.url?.trim()) return {
+		success: false,
+		error: "Укажите URL или локальный путь"
+	};
+	try {
+		const now = (/* @__PURE__ */ new Date()).toISOString();
+		const info = db.prepare(`
+      INSERT INTO sources
+        (url, title, source_type, source_kind, provider,
+         collection_method, authority_basis, reliability,
+         access_level, retrieved_at, notes, origin)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual')
+    `).run(patch.url.trim(), patch.title || null, patch.source_type || null, patch.source_kind || null, patch.provider || null, patch.collection_method || null, patch.authority_basis || null, patch.reliability ?? 50, patch.access_level || "public", now, patch.notes || null);
+		const id = Number(info.lastInsertRowid);
+		auditChange("sources", id, "create", null, `url=${patch.url}; origin=manual`, "Ручное создание источника через UI");
+		return {
+			success: true,
+			id
+		};
+	} catch (e) {
+		return {
+			success: false,
+			error: e.message
+		};
+	}
+}
 function addSource(source) {
 	const info = getDatabase().prepare(`
     INSERT INTO sources (url, title, source_type, source_kind, provider, collection_method,
@@ -11428,6 +11459,16 @@ function registerOsintHandlers() {
 	electron.ipcMain.handle("osint:create-observation", async (_event, patch) => {
 		try {
 			return createObservation(patch);
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:create-source", async (_event, patch) => {
+		try {
+			return createSource(patch);
 		} catch (error) {
 			return {
 				success: false,

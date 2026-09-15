@@ -449,6 +449,67 @@ export function updateEntity(
   return { success: true };
 }
 
+
+/**
+ * Создаёт источник вручную (origin='manual').
+ */
+export function createSource(patch: {
+  url: string;
+  title?: string | null;
+  source_type?: string | null;
+  source_kind?: string | null;
+  provider?: string | null;
+  collection_method?: string | null;
+  authority_basis?: string | null;
+  reliability?: number | null;
+  access_level?: string | null;
+  notes?: string | null;
+}): { success: boolean; id?: number; error?: string } {
+  const db = getDatabase();
+
+  if (!patch.url?.trim()) {
+    return { success: false, error: 'Укажите URL или локальный путь' };
+  }
+
+  try {
+    const now = new Date().toISOString();
+    const info = db.prepare(`
+      INSERT INTO sources
+        (url, title, source_type, source_kind, provider,
+         collection_method, authority_basis, reliability,
+         access_level, retrieved_at, notes, origin)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual')
+    `).run(
+      patch.url.trim(),
+      patch.title || null,
+      patch.source_type || null,
+      patch.source_kind || null,
+      patch.provider || null,
+      patch.collection_method || null,
+      patch.authority_basis || null,
+      patch.reliability ?? 50,
+      patch.access_level || 'public',
+      now,
+      patch.notes || null
+    );
+
+    const id = Number(info.lastInsertRowid);
+
+    auditChange(
+      'sources',
+      id,
+      'create',
+      null,
+      `url=${patch.url}; origin=manual`,
+      'Ручное создание источника через UI'
+    );
+
+    return { success: true, id };
+  } catch (e) {
+    return { success: false, error: (e as Error).message };
+  }
+}
+
 export function addSource(source: {
   url: string;
   title?: string;
