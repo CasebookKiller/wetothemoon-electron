@@ -298,3 +298,24 @@ span.osint-destructive {
   color: var(--tg-theme-accent-text-color) !important;
   border-color: var(--tg-theme-accent-text-color) !important;
 }
+
+/* Фиксированная высота полей, чтобы при переключении режима ничего не смещалось */
+.detail-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.detail-field__content {
+  display: flex;
+  align-items: center;
+  min-height: 2.5rem;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+}
+
+/* Input внутри редактируемого поля — во всю ширину контейнера */
+.detail-field__content .p-inputtext,
+.detail-field__content .p-inputtextarea,
+.detail-field__content .p-dropdown {
+  width: 100%;
+}

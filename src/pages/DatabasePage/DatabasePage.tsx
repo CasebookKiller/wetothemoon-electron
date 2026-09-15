@@ -378,121 +378,130 @@ export const DatabasePage: React.FC = () => {
 
   const renderEntityContent = (data: any) => (
     <>
-      {editing && editForm ? (
-        <div className="p-fluid">
-          <div className="grid">
-            <div className="col-12 md:col-6 field">
-              <label className="font-bold">Тип</label>
-              <Dropdown
-                value={editForm.type}
-                options={[
-                  { label: 'Юрлицо', value: 'company' },
-                  { label: 'ИП', value: 'entrepreneur' },
-                  { label: 'Физлицо', value: 'person' },
-                  { label: 'Домен', value: 'domain' },
-                  { label: 'Email', value: 'email' },
-                  { label: 'Телефон', value: 'phone' },
-                  { label: 'Адрес', value: 'address' },
-                  { label: 'Документ', value: 'document' },
-                  { label: 'Прочее', value: 'other' },
-                ]}
-                onChange={(e) => setEditForm({ ...editForm, type: e.value })}
-              />
-            </div>
-
-            <div className="col-12 md:col-6 field">
-              <label className="font-bold">Статус</label>
-              <Dropdown
-                value={editForm.status}
-                options={[
-                  { label: 'unverified', value: 'unverified' },
-                  { label: 'hypothesis', value: 'hypothesis' },
-                  { label: 'confirmed', value: 'confirmed' },
-                  { label: 'false', value: 'false' },
-                  { label: 'archived', value: 'archived' },
-                ]}
-                onChange={(e) => setEditForm({ ...editForm, status: e.value })}
-              />
-            </div>
-
-            <div className="col-12 field">
-              <label className="font-bold">Значение (value)</label>
-              <InputText
-                value={editForm.value}
-                onChange={(e) => setEditForm({ ...editForm, value: e.target.value })}
-              />
-            </div>
-
-            <div className="col-12 field">
-              <label className="font-bold">Название (label)</label>
-              <InputText
-                value={editForm.label}
-                onChange={(e) => setEditForm({ ...editForm, label: e.target.value })}
-              />
-            </div>
-
-            <div className="col-12 md:col-6 field">
-              <label className="font-bold">Уверенность (0–100)</label>
-              <InputText
-                type="number"
-                min={0}
-                max={100}
-                value={String(editForm.confidence ?? 0)}
-                onChange={(e) =>
-                  setEditForm({
-                    ...editForm,
-                    confidence: Math.max(0, Math.min(100, parseInt(e.target.value) || 0)),
-                  })
-                }
-              />
-            </div>
-
-            <div className="col-12 field">
-              <label className="font-bold">Заметки</label>
-              <InputTextarea
-                value={editForm.notes}
-                onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
-                rows={3}
-                autoResize
-              />
-            </div>
-
-            {editMessage && (
-              <div className="col-12">
-                <p className={editMessage.startsWith('Ошибка') ? 'p-error' : 'p-success'}>
-                  {editMessage}
-                </p>
-              </div>
+      {editing && (
+        <div
+          className="mb-3 p-2 border-round flex align-items-start gap-2"
+          style={{
+            background: 'rgba(236, 156, 66, 0.08)',
+            border: '1px solid rgba(236, 156, 66, 0.4)',
+          }}
+        >
+          <i className="pi pi-exclamation-triangle mt-1" style={{ color: '#ec9c42' }} />
+          <div className="text-sm">
+            {data.entity.origin === 'manual' ? (
+              <>
+                <b>Ручная запись.</b> Изменения сохраняются, скрапер её не перезапишет.
+              </>
+            ) : (
+              <>
+                <b>Запись собрана автоматически</b> (источник: rusprofile).
+                При следующей дозагрузке полей <code>value</code>, <code>label</code> и др.
+                они могут быть обновлены. После сохранения эта запись станет{' '}
+                <code>manual</code> и скрапер её не тронет.
+              </>
             )}
           </div>
         </div>
-      ) : (
-        <DetailFields
-          fields={[
-            { label: 'ID', value: data.entity.id },
-            { label: 'Тип', value: <Tag value={data.entity.type} /> },
-            { label: 'Значение (value)', value: data.entity.value },
-            { label: 'Название (label)', value: data.entity.label || '—' },
-            { label: 'Нормализованное', value: <span className="text-sm text-500">{data.entity.normalized_value}</span> },
-            { label: 'Уверенность', value: data.entity.confidence ?? '—' },
-            { label: 'Статус', value: data.entity.status },
-            { label: 'rusprofile_id', value: data.entity.rusprofile_id || '—' },
-            { label: 'Источник записи', value: renderOrigin(data.entity.origin) },
-            { label: 'Первое появление', value: data.entity.first_seen ? new Date(data.entity.first_seen).toLocaleString() : '—' },
-            { label: 'Последнее обновление', value: data.entity.last_seen ? new Date(data.entity.last_seen).toLocaleString() : '—' },
-            { label: 'Заметки', span: 2, value: data.entity.notes || '—' },
-            {
-              label: 'Файл дампа',
-              span: 2,
-              value: (
-                <span className="text-sm text-500" style={{ wordBreak: 'break-all' }}>
-                  {data.entity.raw_file_path || '—'}
-                </span>
-              ),
-            },
-          ]}
-        />
-      )}
+      )}  
+      <DetailFields
+        editing={editing}
+        editForm={editForm}
+        onEditChange={(key, value) =>
+          setEditForm((prev: any) => ({ ...(prev || {}), [key]: value }))
+        }
+        fields={[
+          { label: 'ID', value: data.entity.id },
+          {
+            label: 'Тип',
+            value: <Tag value={data.entity.type} />,
+            editable: true,
+            editKey: 'type',
+            editType: 'dropdown',
+            editOptions: [
+              { label: 'Юрлицо', value: 'company' },
+              { label: 'ИП', value: 'entrepreneur' },
+              { label: 'Физлицо', value: 'person' },
+              { label: 'Домен', value: 'domain' },
+              { label: 'Email', value: 'email' },
+              { label: 'Телефон', value: 'phone' },
+              { label: 'Адрес', value: 'address' },
+              { label: 'Документ', value: 'document' },
+              { label: 'Прочее', value: 'other' },
+            ],
+          },
+          {
+            label: 'Значение (value)',
+            value: data.entity.value,
+            editable: true,
+            editKey: 'value',
+            editType: 'text',
+          },
+          {
+            label: 'Название (label)',
+            value: data.entity.label || '—',
+            editable: true,
+            editKey: 'label',
+            editType: 'text',
+          },
+          {
+            label: 'Нормализованное',
+            value: <span className="text-sm text-500">{data.entity.normalized_value}</span>,
+          },
+          {
+            label: 'Уверенность',
+            value: data.entity.confidence ?? '—',
+            editable: true,
+            editKey: 'confidence',
+            editType: 'number',
+          },
+          {
+            label: 'Статус',
+            value: data.entity.status,
+            editable: true,
+            editKey: 'status',
+            editType: 'dropdown',
+            editOptions: [
+              { label: 'unverified', value: 'unverified' },
+              { label: 'hypothesis', value: 'hypothesis' },
+              { label: 'confirmed', value: 'confirmed' },
+              { label: 'false', value: 'false' },
+              { label: 'archived', value: 'archived' },
+            ],
+          },
+          { label: 'rusprofile_id', value: data.entity.rusprofile_id || '—' },
+          { label: 'Источник записи', value: renderOrigin(data.entity.origin) },
+          {
+            label: 'Первое появление',
+            value: data.entity.first_seen
+              ? new Date(data.entity.first_seen).toLocaleString()
+              : '—',
+          },
+          {
+            label: 'Последнее обновление',
+            value: data.entity.last_seen
+              ? new Date(data.entity.last_seen).toLocaleString()
+              : '—',
+          },
+          {
+            label: 'Заметки',
+            span: 2,
+            value: data.entity.notes || '—',
+            editable: true,
+            editKey: 'notes',
+            editType: 'textarea',
+          },
+          {
+            label: 'Файл дампа',
+            span: 2,
+            value: (
+              <span className="text-sm text-500" style={{ wordBreak: 'break-all' }}>
+                {data.entity.raw_file_path || '—'}
+              </span>
+            ),
+          },
+        ]}
+      />
+      
       <TabView className="mt-3">
         <TabPanel header={`Наблюдения (${data.observations.length})`}>
           <ObservationsTable
