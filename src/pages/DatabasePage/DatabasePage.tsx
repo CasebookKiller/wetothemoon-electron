@@ -17,6 +17,9 @@ import { ObservationsTable } from '@/components/SIETCH/DatabaseTables/Observatio
 import { SourcesTable } from '@/components/SIETCH/DatabaseTables/SourcesTable';
 import { DetailFields } from '@/components/SIETCH/DetailFields';
 
+import { DatabaseHelp } from '@/components/SIETCH/DatabaseHelp';
+
+
 type DialogType = 'entity' | 'relation' | 'observation' | 'source';
 
 interface DialogStackItem {
@@ -70,6 +73,8 @@ export const DatabasePage: React.FC = () => {
   const [createSaving, setCreateSaving] = useState(false);
   const [createMessage, setCreateMessage] = useState('');
   const [entityDropdownOptions, setEntityDropdownOptions] = useState<{ label: string; value: number }[]>([]);
+
+  const [helpVisible, setHelpVisible] = useState(false);
 
   const api = (window as any).electronAPI;
 
@@ -1418,6 +1423,14 @@ export const DatabasePage: React.FC = () => {
             className="p-button-raised p-button-accent"
             onClick={loadData}
           />
+          <Button
+            label="Справка"
+            icon="pi pi-question-circle"
+            className="p-button-raised p-button-accent"
+            onClick={() => setHelpVisible(true)}
+            tooltip="Как работать с базой данных"
+            tooltipOptions={{ position: 'bottom' }}
+          />
         </div>
 
         {searchActive && (
@@ -2068,6 +2081,8 @@ export const DatabasePage: React.FC = () => {
           </p>
         )}
       </Dialog>
+
+      <DatabaseHelp visible={helpVisible} onHide={() => setHelpVisible(false)} />
     </div>
   );
 };
