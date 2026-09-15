@@ -748,85 +748,134 @@ export const DatabasePage: React.FC = () => {
   );
 
   const renderObservationContent = (data: any) => (
-    <DetailFields
-      fields={[
-        {
-          label: 'Сущность',
-          span: 2,
-          value: (
-            <a
-              href="#"
-              style={{ color: 'inherit', textDecoration: 'underline dotted' }}
-              onClick={(e) => {
-                e.preventDefault();
-                openDialog('entity', data.entity_id);
-              }}
-            >
-              [{data.entity_id}] {data.entity_label} — <i>{data.entity_type}</i>
-              <div className="text-sm text-500">{data.entity_value}</div>
-            </a>
-          ),
-        },
-        { label: 'Атрибут', value: data.attribute },
-        {
-          label: 'Значение',
-          value: <span style={{ wordBreak: 'break-all' }}>{data.value}</span>,
-        },
-        { label: 'Уверенность', value: data.confidence ?? '—' },
-        { label: 'Источник записи', value: renderOrigin(data.origin) },
-        {
-          label: 'Дата наблюдения',
-          value: data.observed_at
-            ? new Date(data.observed_at).toLocaleString()
-            : '—',
-        },
-        {
-          label: 'Источник',
-          span: 2,
-          value: data.source_url ? (
-            <div>
+    <>
+      {editing && (
+        <div
+          className="mb-3 p-2 border-round flex align-items-start gap-2"
+          style={{
+            background: 'rgba(236, 156, 66, 0.08)',
+            border: '1px solid rgba(236, 156, 66, 0.4)',
+          }}
+        >
+          <i className="pi pi-exclamation-triangle mt-1" style={{ color: '#ec9c42' }} />
+          <div className="text-sm">
+            {data.origin === 'manual' ? (
+              <>
+                <b>Ручная запись.</b> Изменения сохраняются, скрапер её не перезапишет.
+              </>
+            ) : (
+              <>
+                <b>Запись собрана автоматически.</b> После сохранения она станет{' '}
+                <code>manual</code> и скрапер её не тронет.
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      <DetailFields
+        editing={editing}
+        editForm={editForm}
+        onEditChange={(key, value) =>
+          setEditForm((prev: any) => ({ ...(prev || {}), [key]: value }))
+        }
+        fields={[
+          {
+            label: 'Сущность',
+            span: 2,
+            value: (
               <a
                 href="#"
                 style={{ color: 'inherit', textDecoration: 'underline dotted' }}
                 onClick={(e) => {
                   e.preventDefault();
-                  if (data.source_id) openDialog('source', data.source_id);
+                  openDialog('entity', data.entity_id);
                 }}
               >
-                [{data.source_id}] {data.source_title || 'Источник'}
+                [{data.entity_id}] {data.entity_label} — <i>{data.entity_type}</i>
+                <div className="text-sm text-500">{data.entity_value}</div>
               </a>
-              <div className="text-sm">
-                <a href={data.source_url} target="_blank" rel="noreferrer">
-                  {data.source_url}
+            ),
+          },
+          {
+            label: 'Атрибут',
+            value: data.attribute,
+            editable: true,
+            editKey: 'attribute',
+            editType: 'text',
+          },
+          {
+            label: 'Значение',
+            value: <span style={{ wordBreak: 'break-all' }}>{data.value}</span>,
+            editable: true,
+            editKey: 'value',
+            editType: 'text',
+          },
+          {
+            label: 'Уверенность',
+            value: data.confidence ?? '—',
+            editable: true,
+            editKey: 'confidence',
+            editType: 'number',
+          },
+          { label: 'Источник записи', value: renderOrigin(data.origin) },
+          {
+            label: 'Дата наблюдения',
+            value: data.observed_at
+              ? new Date(data.observed_at).toLocaleString()
+              : '—',
+          },
+          {
+            label: 'Заметки',
+            span: 2,
+            value: data.notes || <span className="text-500">—</span>,
+            editable: true,
+            editKey: 'notes',
+            editType: 'textarea',
+          },
+          {
+            label: 'Источник',
+            span: 2,
+            value: data.source_url ? (
+              <div>
+                <a
+                  href="#"
+                  style={{ color: 'inherit', textDecoration: 'underline dotted' }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (data.source_id) openDialog('source', data.source_id);
+                  }}
+                >
+                  [{data.source_id}] {data.source_title || 'Источник'}
                 </a>
+                <div className="text-sm">
+                  <a href={data.source_url} target="_blank" rel="noreferrer">
+                    {data.source_url}
+                  </a>
+                </div>
+                <div className="text-sm text-500">
+                  {data.source_type} • {data.source_provider} • {data.source_access_level}
+                  {data.source_retrieved_at
+                    ? ` • получено ${new Date(data.source_retrieved_at).toLocaleString()}`
+                    : ''}
+                </div>
               </div>
-              <div className="text-sm text-500">
-                {data.source_type} • {data.source_provider} • {data.source_access_level}
-                {data.source_retrieved_at
-                  ? ` • получено ${new Date(data.source_retrieved_at).toLocaleString()}`
-                  : ''}
-              </div>
-            </div>
-          ) : (
-            <span className="text-500">Источник не указан</span>
-          ),
-        },
-        {
-          label: 'Заметки',
-          span: 2,
-          value: data.notes || <span className="text-500">—</span>,
-        },
-        {
-          label: 'Файл дампа',
-          span: 2,
-          value: (
-            <span className="text-sm text-500" style={{ wordBreak: 'break-all' }}>
-              {data.raw_file_path || '—'}
-            </span>
-          ),
-        },
-      ]}
-    />
+            ) : (
+              <span className="text-500">Источник не указан</span>
+            ),
+          },
+          {
+            label: 'Файл дампа',
+            span: 2,
+            value: (
+              <span className="text-sm text-500" style={{ wordBreak: 'break-all' }}>
+                {data.raw_file_path || '—'}
+              </span>
+            ),
+          },
+        ]}
+      />
+    </>
   );
 
   const renderSourceContent = (data: any) => (
