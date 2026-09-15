@@ -288,6 +288,7 @@ try {
 		getObservationDetails: (observationId) => electron.ipcRenderer.invoke("osint:get-observation-details", observationId),
 		getSourceDetails: (sourceId) => electron.ipcRenderer.invoke("osint:get-source-details", sourceId),
 		getRelatedIds: (filterType, filterId) => electron.ipcRenderer.invoke("osint:get-related-ids", filterType, filterId),
+		createEntity: (patch) => electron.ipcRenderer.invoke("osint:create-entity", patch),
 		updateEntity: (entityId, patch) => electron.ipcRenderer.invoke("osint:update-entity", entityId, patch),
 		updateRelation: (relationId, patch) => electron.ipcRenderer.invoke("osint:update-relation", relationId, patch),
 		updateObservation: (observationId, patch) => electron.ipcRenderer.invoke("osint:update-observation", observationId, patch),

@@ -9953,6 +9953,39 @@ function getDumpSectionsUpdatedAt(dumpId) {
 function normalize(value) {
 	return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
+/**
+* Создаёт сущность вручную (origin='manual').
+* Возвращает id или ошибку (в частности, если такая сущность уже есть).
+*/
+function createEntity(patch) {
+	const db = getDatabase();
+	const now = (/* @__PURE__ */ new Date()).toISOString();
+	const normalized = normalize(patch.value);
+	try {
+		const info = db.prepare(`
+      INSERT INTO entities
+        (type, value, normalized_value, label, first_seen, last_seen,
+         confidence, status, notes, origin)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual')
+    `).run(patch.type, patch.value, normalized, patch.label || patch.value, now, now, patch.confidence ?? 50, patch.status || "unverified", patch.notes || null);
+		const id = Number(info.lastInsertRowid);
+		auditChange("entities", id, "create", null, `type=${patch.type}; value=${patch.value}; origin=manual`, "Ручное создание сущности через UI");
+		return {
+			success: true,
+			id
+		};
+	} catch (e) {
+		const msg = e.message || "";
+		if (msg.includes("UNIQUE") || msg.includes("constraint")) return {
+			success: false,
+			error: "Сущность с таким типом и значением уже существует"
+		};
+		return {
+			success: false,
+			error: msg
+		};
+	}
+}
 function upsertEntity(entity) {
 	const db = getDatabase();
 	const now = (/* @__PURE__ */ new Date()).toISOString();
@@ -11225,6 +11258,16 @@ function registerOsintHandlers() {
 				success: true,
 				data: getRelatedIds(filterType, filterId)
 			};
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:create-entity", async (_event, patch) => {
+		try {
+			return createEntity(patch);
 		} catch (error) {
 			return {
 				success: false,

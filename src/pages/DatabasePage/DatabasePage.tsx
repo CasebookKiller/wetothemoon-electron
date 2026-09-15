@@ -64,6 +64,11 @@ export const DatabasePage: React.FC = () => {
   const [editSaving, setEditSaving] = useState(false);
   const [editMessage, setEditMessage] = useState('');
 
+  const [createDialog, setCreateDialog] = useState(false);
+  const [createForm, setCreateForm] = useState<any>(null);
+  const [createSaving, setCreateSaving] = useState(false);
+  const [createMessage, setCreateMessage] = useState('');
+
   const api = (window as any).electronAPI;
 
   const cacheKey = (type: DialogType, id: number) => `${type}:${id}`;
@@ -106,6 +111,57 @@ export const DatabasePage: React.FC = () => {
       setError((e as Error).message);
     } finally {
       setDialogLoading(false);
+    }
+  };
+
+  const openCreateEntityDialog = () => {
+    setCreateForm({
+      type: 'company',
+      value: '',
+      label: '',
+      confidence: 50,
+      status: 'unverified',
+      notes: '',
+    });
+    setCreateMessage('');
+    setCreateDialog(true);
+  };
+
+  const closeCreateDialog = () => {
+    setCreateDialog(false);
+    setCreateForm(null);
+    setCreateMessage('');
+  };
+
+  const saveCreateEntity = async () => {
+    if (!createForm) return;
+    if (!createForm.value?.trim()) {
+      setCreateMessage('Поле «Значение» обязательно');
+      return;
+    }
+    if (!createForm.type) {
+      setCreateMessage('Выберите тип');
+      return;
+    }
+
+    setCreateSaving(true);
+    setCreateMessage('');
+    try {
+      const res = await api.createEntity(createForm);
+      if (res.success) {
+        setCreateMessage('Создано');
+        await loadData();
+        setTimeout(async () => {
+          closeCreateDialog();
+          if (res.id) await openDialog('entity', res.id);
+        }, 500);
+      } else {
+        setCreateMessage(`Ошибка: ${res.error}`);
+      }
+    } catch (e) {
+      setCreateMessage((e as Error).message);
+    } finally {
+      setCreateSaving(false);
     }
   };
 
@@ -1231,6 +1287,21 @@ export const DatabasePage: React.FC = () => {
           onTabChange={(e) => setActiveTab(e.index)}
         >
           <TabPanel header={`Сущности (${filteredEntities.length})`}>
+            <TabPanel header={`Сущности (${filteredEntities.length})`}>
+              <div className="flex justify-content-end mb-2">
+                <Button
+                  label="Создать сущность"
+                  icon="pi pi-plus"
+                  className="osint-soft p-button-sm"
+                  onClick={openCreateEntityDialog}
+                />
+              </div>
+              <EntitiesTable
+                value={filteredEntities}
+                onRowClick={(row) => openDialog('entity', row.id)}
+                emptyMessage={searchActive ? 'Ничего не найдено' : 'Нет данных'}
+              />
+            </TabPanel>
             <EntitiesTable
               value={filteredEntities}
               onRowClick={(row) => openDialog('entity', row.id)}
@@ -1391,6 +1462,113 @@ export const DatabasePage: React.FC = () => {
       >
         {dialogLoading && <p>Загрузка...</p>}
         {!dialogLoading && dialogStack.length > 0 && renderDialogContent(dialogStack[dialogStack.length - 1])}
+      </Dialog>
+
+      <Dialog
+        visible={createDialog}
+        style={{ width: '700px' }}
+        modal
+        onHide={closeCreateDialog}
+        header={<span className="p-panel-title">Создать сущность</span>}
+        footer={
+          <div className="p-panel-footer flex justify-content-end gap-2">
+            <Button
+              label="Отмена"
+              icon="pi pi-times"
+              className="osint"
+              onClick={closeCreateDialog}
+              disabled={createSaving}
+            />
+            <Button
+              label={createSaving ? 'Создание...' : 'Создать'}
+              icon={createSaving ? 'pi pi-spin pi-spinner' : 'pi pi-check'}
+              className="osint"
+              onClick={saveCreateEntity}
+              disabled={createSaving}
+            />
+          </div>
+        }
+      >
+        {createForm && (
+          <DetailFields
+            editing={true}
+            editForm={createForm}
+            onEditChange={(key, value) =>
+              setCreateForm((prev: any) => ({ ...(prev || {}), [key]: value }))
+            }
+            fields={[
+              {
+                label: 'Тип *',
+                value: createForm.type,
+                editable: true,
+                editKey: 'type',
+                editType: 'dropdown',
+                editOptions: [
+                  { label: 'Юрлицо', value: 'company' },
+                  { label: 'ИП', value: 'entrepreneur' },
+                  { label: 'Физлицо', value: 'person' },
+                  { label: 'Домен', value: 'domain' },
+                  { label: 'Email', value: 'email' },
+                  { label: 'Телефон', value: 'phone' },
+                  { label: 'IP', value: 'ip' },
+                  { label: 'Адрес', value: 'address' },
+                  { label: 'Документ', value: 'document' },
+                  { label: 'Прочее', value: 'other' },
+                ],
+              },
+              {
+                label: 'Статус',
+                value: createForm.status,
+                editable: true,
+                editKey: 'status',
+                editType: 'dropdown',
+                editOptions: [
+                  { label: 'unverified', value: 'unverified' },
+                  { label: 'hypothesis', value: 'hypothesis' },
+                  { label: 'confirmed', value: 'confirmed' },
+                  { label: 'archived', value: 'archived' },
+                ],
+              },
+              {
+                label: 'Значение *',
+                span: 2,
+                value: createForm.value,
+                editable: true,
+                editKey: 'value',
+                editType: 'text',
+              },
+              {
+                label: 'Название (label)',
+                span: 2,
+                value: createForm.label,
+                editable: true,
+                editKey: 'label',
+                editType: 'text',
+              },
+              {
+                label: 'Уверенность',
+                value: createForm.confidence,
+                editable: true,
+                editKey: 'confidence',
+                editType: 'number',
+              },
+              {
+                label: 'Заметки',
+                span: 2,
+                value: createForm.notes,
+                editable: true,
+                editKey: 'notes',
+                editType: 'textarea',
+              },
+            ]}
+          />
+        )}
+
+        {createMessage && (
+          <p className={createMessage.startsWith('Ошибка') ? 'p-error mt-2' : 'p-success mt-2'}>
+            {createMessage}
+          </p>
+        )}
       </Dialog>
     </div>
   );

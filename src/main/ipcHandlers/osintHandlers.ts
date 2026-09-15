@@ -21,6 +21,7 @@ import {
   getEntityDetails,
   getObservationDetails,
   getSourceDetails,
+  createEntity,
   updateEntity,
   updateRelation,
   updateObservation,
@@ -313,6 +314,14 @@ export function registerOsintHandlers() {
     try {
       const data = getRelatedIds(filterType as any, filterId);
       return { success: true, data };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('osint:create-entity', async (_event, patch: any) => {
+    try {
+      return createEntity(patch);
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }

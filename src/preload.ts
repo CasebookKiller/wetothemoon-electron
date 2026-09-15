@@ -419,6 +419,9 @@ try {
     getRelatedIds: (filterType: 'entity' | 'relation' | 'observation' | 'source', filterId: number) =>
       ipcRenderer.invoke('osint:get-related-ids', filterType, filterId),
 
+    createEntity: (patch: any) =>
+      ipcRenderer.invoke('osint:create-entity', patch),
+
     updateEntity: (entityId: number, patch: any) =>
       ipcRenderer.invoke('osint:update-entity', entityId, patch),
 
@@ -430,6 +433,7 @@ try {
 
     updateSource: (sourceId: number, patch: any) =>
       ipcRenderer.invoke('osint:update-source', sourceId, patch),
+
 
   });
 

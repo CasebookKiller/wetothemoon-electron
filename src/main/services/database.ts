@@ -246,6 +246,64 @@ export function normalize(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
+/**
+ * Создаёт сущность вручную (origin='manual').
+ * Возвращает id или ошибку (в частности, если такая сущность уже есть).
+ */
+export function createEntity(patch: {
+  type: string;
+  value: string;
+  label?: string | null;
+  confidence?: number | null;
+  status?: string | null;
+  notes?: string | null;
+}): { success: boolean; id?: number; error?: string } {
+  const db = getDatabase();
+  const now = new Date().toISOString();
+  const normalized = normalize(patch.value);
+
+  try {
+    const info = db.prepare(`
+      INSERT INTO entities
+        (type, value, normalized_value, label, first_seen, last_seen,
+         confidence, status, notes, origin)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual')
+    `).run(
+      patch.type,
+      patch.value,
+      normalized,
+      patch.label || patch.value,
+      now,
+      now,
+      patch.confidence ?? 50,
+      patch.status || 'unverified',
+      patch.notes || null
+    );
+
+    const id = Number(info.lastInsertRowid);
+
+    auditChange(
+      'entities',
+      id,
+      'create',
+      null,
+      `type=${patch.type}; value=${patch.value}; origin=manual`,
+      'Ручное создание сущности через UI'
+    );
+
+    return { success: true, id };
+  } catch (e) {
+    const msg = (e as Error).message || '';
+    if (msg.includes('UNIQUE') || msg.includes('constraint')) {
+      return {
+        success: false,
+        error: 'Сущность с таким типом и значением уже существует',
+      };
+    }
+    return { success: false, error: msg };
+  }
+}
+
 export function upsertEntity(entity: {
   rusprofile_id?: string;
   type: string;
