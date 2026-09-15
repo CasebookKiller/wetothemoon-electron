@@ -10122,6 +10122,44 @@ function addRelation(relation) {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(relation.subject_id, relation.predicate, relation.object_id, relation.source_id || null, relation.valid_from || null, relation.valid_to || null, relation.evidence_text || null, relation.confidence ?? 50, relation.status || "unverified", relation.notes || null, relation.raw_file_path || null);
 }
+/**
+* Создаёт наблюдение вручную (origin='manual').
+*/
+function createObservation(patch) {
+	const db = getDatabase();
+	if (!patch.entity_id) return {
+		success: false,
+		error: "Не выбрана сущность"
+	};
+	if (!patch.attribute?.trim()) return {
+		success: false,
+		error: "Укажите атрибут"
+	};
+	if (!patch.value?.trim()) return {
+		success: false,
+		error: "Укажите значение"
+	};
+	try {
+		const now = (/* @__PURE__ */ new Date()).toISOString();
+		const info = db.prepare(`
+      INSERT INTO observations
+        (entity_id, attribute, value, source_id,
+         observed_at, confidence, notes, origin)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'manual')
+    `).run(patch.entity_id, patch.attribute.trim(), patch.value.trim(), patch.source_id || null, now, patch.confidence ?? 50, patch.notes || null);
+		const id = Number(info.lastInsertRowid);
+		auditChange("observations", id, "create", null, `entity=${patch.entity_id}; attribute=${patch.attribute}; value=${patch.value}; origin=manual`, "Ручное создание наблюдения через UI");
+		return {
+			success: true,
+			id
+		};
+	} catch (e) {
+		return {
+			success: false,
+			error: e.message
+		};
+	}
+}
 function addObservation(observation) {
 	getDatabase().prepare(`
     INSERT INTO observations (entity_id, attribute, value, source_id, observed_at, confidence, notes, raw_file_path)
@@ -11380,6 +11418,16 @@ function registerOsintHandlers() {
 				success: true,
 				items: listEntitiesForDropdown()
 			};
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:create-observation", async (_event, patch) => {
+		try {
+			return createObservation(patch);
 		} catch (error) {
 			return {
 				success: false,

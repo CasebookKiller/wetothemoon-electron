@@ -605,6 +605,63 @@ export function addRelation(relation: {
   );
 }
 
+/**
+ * Создаёт наблюдение вручную (origin='manual').
+ */
+export function createObservation(patch: {
+  entity_id: number;
+  attribute: string;
+  value: string;
+  source_id?: number | null;
+  confidence?: number | null;
+  notes?: string | null;
+}): { success: boolean; id?: number; error?: string } {
+  const db = getDatabase();
+
+  if (!patch.entity_id) {
+    return { success: false, error: 'Не выбрана сущность' };
+  }
+  if (!patch.attribute?.trim()) {
+    return { success: false, error: 'Укажите атрибут' };
+  }
+  if (!patch.value?.trim()) {
+    return { success: false, error: 'Укажите значение' };
+  }
+
+  try {
+    const now = new Date().toISOString();
+    const info = db.prepare(`
+      INSERT INTO observations
+        (entity_id, attribute, value, source_id,
+         observed_at, confidence, notes, origin)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'manual')
+    `).run(
+      patch.entity_id,
+      patch.attribute.trim(),
+      patch.value.trim(),
+      patch.source_id || null,
+      now,
+      patch.confidence ?? 50,
+      patch.notes || null
+    );
+
+    const id = Number(info.lastInsertRowid);
+
+    auditChange(
+      'observations',
+      id,
+      'create',
+      null,
+      `entity=${patch.entity_id}; attribute=${patch.attribute}; value=${patch.value}; origin=manual`,
+      'Ручное создание наблюдения через UI'
+    );
+
+    return { success: true, id };
+  } catch (e) {
+    return { success: false, error: (e as Error).message };
+  }
+}
+
 export function addObservation(observation: {
   entity_id: number;
   attribute: string;

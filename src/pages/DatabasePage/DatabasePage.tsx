@@ -64,13 +64,11 @@ export const DatabasePage: React.FC = () => {
   const [editSaving, setEditSaving] = useState(false);
   const [editMessage, setEditMessage] = useState('');
 
-  const [createType, setCreateType] = useState<'entity' | 'relation' | 'observation' | 'source'>('entity');
-
   const [createDialog, setCreateDialog] = useState(false);
+  const [createType, setCreateType] = useState<'entity' | 'relation' | 'observation' | 'source'>('entity');
   const [createForm, setCreateForm] = useState<any>(null);
   const [createSaving, setCreateSaving] = useState(false);
   const [createMessage, setCreateMessage] = useState('');
-
   const [entityDropdownOptions, setEntityDropdownOptions] = useState<{ label: string; value: number }[]>([]);
 
   const api = (window as any).electronAPI;
@@ -177,6 +175,7 @@ export const DatabasePage: React.FC = () => {
       status: 'unverified',
       notes: '',
     });
+    setCreateType('relation');
     setCreateMessage('');
     setCreateDialog(true);
     // подгрузим актуальные опции на случай, если появились новые сущности
@@ -215,8 +214,55 @@ export const DatabasePage: React.FC = () => {
     }
   };
 
+  const openCreateObservationDialog = () => {
+    setCreateType('observation');
+    setCreateForm({
+      entity_id: null,
+      attribute: '',
+      value: '',
+      source_id: null,
+      confidence: 50,
+      notes: '',
+    });
+    setCreateMessage('');
+    setCreateDialog(true);
+    loadEntityDropdownOptions();
+  };
+
   const saveCreateObservation = async () => {
-    setCreateMessage('Форма ещё не реализована');
+    if (!createForm) return;
+    if (!createForm.entity_id) {
+      setCreateMessage('Выберите сущность');
+      return;
+    }
+    if (!createForm.attribute?.trim()) {
+      setCreateMessage('Укажите атрибут');
+      return;
+    }
+    if (!createForm.value?.trim()) {
+      setCreateMessage('Укажите значение');
+      return;
+    }
+
+    setCreateSaving(true);
+    setCreateMessage('');
+    try {
+      const res = await api.createObservation(createForm);
+      if (res.success) {
+        setCreateMessage('Создано');
+        await loadData();
+        setTimeout(async () => {
+          closeCreateDialog();
+          if (res.id) await openDialog('observation', res.id);
+        }, 500);
+      } else {
+        setCreateMessage(`Ошибка: ${res.error}`);
+      }
+    } catch (e) {
+      setCreateMessage((e as Error).message);
+    } finally {
+      setCreateSaving(false);
+    }
   };
 
   const saveCreateSource = async () => {
@@ -1200,14 +1246,6 @@ export const DatabasePage: React.FC = () => {
         </TabPanel>
 
         <TabPanel header={`Связи (${filteredRelations.length})`}>
-          <div className="flex justify-content-end mb-2">
-            <Button
-              label="Создать связь"
-              icon="pi pi-plus"
-              className="osint-soft p-button-sm"
-              onClick={openCreateRelationDialog}
-            />
-          </div>
           <RelationsTable
             value={filteredRelations}
             onRowClick={(row) => openDialog('relation', row.id)}
@@ -1396,6 +1434,14 @@ export const DatabasePage: React.FC = () => {
           </TabPanel>
 
           <TabPanel header={`Связи (${filteredRelations.length})`}>
+            <div className="flex justify-content-end mb-2">
+              <Button
+                label="Создать связь"
+                icon="pi pi-plus"
+                className="osint-soft p-button-sm"
+                onClick={openCreateRelationDialog}
+              />
+            </div>
             <RelationsTable
               value={filteredRelations}
               onRowClick={(row) => openDialog('relation', row.id)}
@@ -1403,6 +1449,14 @@ export const DatabasePage: React.FC = () => {
           </TabPanel>
 
           <TabPanel header={`Наблюдения (${filteredObservations.length})`}>
+            <div className="flex justify-content-end mb-2">
+              <Button
+                label="Создать наблюдение"
+                icon="pi pi-plus"
+                className="osint-soft p-button-sm"
+                onClick={openCreateObservationDialog}
+              />
+            </div>
             <ObservationsTable
               value={filteredObservations}
               onRowClick={(row) => openDialog('observation', row.id)}
@@ -1771,10 +1825,67 @@ export const DatabasePage: React.FC = () => {
           />
         )}
 
-        {/* createType === 'observation' и 'source' — заготовки на 6.3 и 6.4 */}
         {createForm && createType === 'observation' && (
-          <div className="text-500 p-3">Форма для наблюдений будет добавлена на шаге 6.3.</div>
+          <DetailFields
+            editing={true}
+            editForm={createForm}
+            onEditChange={(key, value) =>
+              setCreateForm((prev: any) => ({ ...(prev || {}), [key]: value }))
+            }
+            fields={[
+              {
+                label: 'Сущность *',
+                span: 2,
+                value: createForm.entity_id,
+                editable: true,
+                editKey: 'entity_id',
+                editType: 'dropdown',
+                editOptions: entityDropdownOptions,
+              },
+              {
+                label: 'Атрибут *',
+                span: 2,
+                value: createForm.attribute,
+                editable: true,
+                editKey: 'attribute',
+                editType: 'text',
+              },
+              {
+                label: 'Значение *',
+                span: 2,
+                value: createForm.value,
+                editable: true,
+                editKey: 'value',
+                editType: 'textarea',
+              },
+              {
+                label: 'Уверенность',
+                value: createForm.confidence,
+                editable: true,
+                editKey: 'confidence',
+                editType: 'number',
+              },
+              {
+                label: 'Источник',
+                value: createForm.source_id,
+                editable: true,
+                editKey: 'source_id',
+                editType: 'dropdown',
+                editOptions: sourceDropdownOptions,
+              },
+              {
+                label: 'Заметки',
+                span: 2,
+                value: createForm.notes,
+                editable: true,
+                editKey: 'notes',
+                editType: 'textarea',
+              },
+            ]}
+          />
         )}
+
+        {/* createType === 'source' — заготовка на 6.4 */}
         {createForm && createType === 'source' && (
           <div className="text-500 p-3">Форма для источников будет добавлена на шаге 6.4.</div>
         )}

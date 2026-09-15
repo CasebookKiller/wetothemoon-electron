@@ -440,6 +440,9 @@ try {
     listEntitiesDropdown: () =>
       ipcRenderer.invoke('osint:list-entities-dropdown'),
 
+    createObservation: (patch: any) =>
+      ipcRenderer.invoke('osint:create-observation', patch),
+
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)
