@@ -1,20 +1,10 @@
 // wetothemoon-electron/src/pages/DatabasePage/DatabasePage.tsx
 
 import React, { useEffect, useState } from 'react';
-import { Panel } from 'primereact/panel';
 import { Button } from 'primereact/button';
-import { TabView, TabPanel } from 'primereact/tabview';
-import { InputText } from 'primereact/inputtext';
-import { Dropdown } from 'primereact/dropdown';
 import { Dialog } from 'primereact/dialog';
-import { Tag } from 'primereact/tag';
 
 import './DatabasePage.css';
-import { EntitiesTable } from '@/components/SIETCH/DatabaseTables/EntitiesTable';
-import { RelationsTable } from '@/components/SIETCH/DatabaseTables/RelationsTable';
-import { ObservationsTable } from '@/components/SIETCH/DatabaseTables/ObservationsTable';
-import { SourcesTable } from '@/components/SIETCH/DatabaseTables/SourcesTable';
-import { DetailFields } from '@/components/SIETCH/DetailFields';
 
 import { DatabaseHelp } from '@/components/SIETCH/DatabaseHelp';
 
@@ -24,12 +14,17 @@ import { MarkFalseDialog, type MarkFalseTable } from '@/components/SIETCH/MarkFa
 import { DeleteDialog, type DeleteTarget } from '@/components/SIETCH/DeleteDialog';
 import { DangerZoneDialog } from '@/components/SIETCH/DangerZoneDialog';
 
-import { CreateDialog, type CreateType } from '@/components/SIETCH/CreateDialog';
+import { CreateDialog } from '@/components/SIETCH/CreateDialog';
 
-import { EntityDetailsContent, type DialogType } from '@/components/SIETCH/content/EntityDetailsContent';
+import { EntityDetailsContent } from '@/components/SIETCH/content/EntityDetailsContent';
+import type { DialogType } from '@/components/SIETCH/TablesPanel';
 import { RelationDetailsContent } from '@/components/SIETCH/content/RelationDetailsContent';
 import { ObservationDetailsContent } from '@/components/SIETCH/content/ObservationDetailsContent';
 import { SourceDetailsContent } from '@/components/SIETCH/content/SourceDetailsContent';
+
+import { useCascadingFilter } from '@/components/SIETCH/useCascadingFilter';
+import { SearchPanel } from '@/components/SIETCH/SearchPanel';
+import { TablesPanel } from '@/components/SIETCH/TablesPanel';
 
 interface DialogStackItem {
   type: DialogType;
@@ -55,13 +50,6 @@ export const DatabasePage: React.FC = () => {
   const [dialogCache, setDialogCache] = useState<Record<string, any>>({});
   const [dialogLoading, setDialogLoading] = useState(false);
 
-  const [activeFilter, setActiveFilter] = useState<{ type: DialogType; id: number } | null>(null);
-  const [relatedIds, setRelatedIds] = useState<{
-    entityIds: Set<number>;
-    relationIds: Set<number>;
-    observationIds: Set<number>;
-    sourceIds: Set<number>;
-  } | null>(null);
   const [activeTab, setActiveTab] = useState<number>(0);
 
   const [editing, setEditing] = useState(false);
@@ -86,7 +74,6 @@ export const DatabasePage: React.FC = () => {
   const [deleteVisible, setDeleteVisible] = useState(false);
 
   const [dangerVisible, setDangerVisible] = useState(false);
-
 
   const api = (window as any).electronAPI;
 
@@ -133,11 +120,6 @@ export const DatabasePage: React.FC = () => {
     }
   };
 
-  const openCreateDialog = (type: CreateType) => {
-    setCreateType(type);
-    setCreateDialog(true);
-  };
-
   const typeToTabIndex: Record<DialogType, number> = {
     entity: 0,
     relation: 1,
@@ -145,29 +127,15 @@ export const DatabasePage: React.FC = () => {
     source: 3,
   };
 
-  const openInMainWindow = async (type: DialogType, id: number, tabIndex: number) => {
-    setDialogStack([]);
-    setActiveFilter({ type, id });
-    setActiveTab(tabIndex);
-    try {
-      const res = await api.getRelatedIds(type, id);
-      if (res.success && res.data) {
-        setRelatedIds({
-          entityIds: new Set(res.data.entityIds),
-          relationIds: new Set(res.data.relationIds),
-          observationIds: new Set(res.data.observationIds),
-          sourceIds: new Set(res.data.sourceIds),
-        });
-      }
-    } catch (e) {
-      setError((e as Error).message);
-    }
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  const handleRowClick = (type: DialogType, id: number) => {
+    openDialog(type, id);
   };
 
-  const clearFilter = () => {
-    setActiveFilter(null);
-    setRelatedIds(null);
+  const openInMainWindow = async (type: DialogType, id: number, tabIndex: number) => {
+    closeAllDialogs();
+    setActiveTab(tabIndex);
+    await applyFilter(type, id);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const popDialog = () => {
@@ -368,21 +336,20 @@ export const DatabasePage: React.FC = () => {
 
   const displayEntities = searchActive ? searchResults : entities;
 
-    const filteredEntities = relatedIds
-    ? displayEntities.filter((r) => relatedIds.entityIds.has(r.id))
-    : displayEntities;
-
-  const filteredRelations = relatedIds
-    ? relations.filter((r) => relatedIds.relationIds.has(r.id))
-    : relations;
-
-  const filteredObservations = relatedIds
-    ? observations.filter((r) => relatedIds.observationIds.has(r.id))
-    : observations;
-
-  const filteredSources = relatedIds
-    ? sources.filter((r) => relatedIds.sourceIds.has(r.id))
-    : sources;
+  const {
+    activeFilter,
+    applyFilter,
+    clearFilter,
+    filteredEntities,
+    filteredRelations,
+    filteredObservations,
+    filteredSources,
+  } = useCascadingFilter({
+    displayEntities,
+    relations,
+    observations,
+    sources,
+  });
 
   const getDialogLabel = (item: DialogStackItem): string => {
     const data = dialogCache[cacheKey(item.type, item.id)];
@@ -480,14 +447,6 @@ export const DatabasePage: React.FC = () => {
     }
   };
 
-  const sourceDropdownOptions = [
-    { label: '— Не указан —', value: null },
-    ...sources.map((s: any) => ({
-      label: `[${s.id}] ${s.title || s.url}`,
-      value: s.id,
-    })),
-  ];
-
   const loadEntityDropdownOptions = async () => {
     try {
       const res = await api.listEntitiesDropdown();
@@ -509,176 +468,39 @@ export const DatabasePage: React.FC = () => {
       {error && <p style={{ color: 'red' }}>{error}</p>}
 
       {/* Панель поиска */}
-      <Panel className="shadow-5 mb-3" header="Поиск по сущностям">
-        <div className="flex flex-wrap align-items-center gap-3 py-2">
-          <div className="flex-1" style={{ minWidth: '240px' }}>
-            <span className="p-input-icon-left w-full search-input-with-icon">
-              <i className="pi pi-search" />
-              <InputText
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={handleSearchKeyDown}
-                placeholder="Название, ИНН, ФИО и т.п."
-                className="w-full text-base"
-              />
-            </span>
-          </div>
-          <div style={{ minWidth: '180px' }}>
-            <Dropdown
-              value={searchType}
-              options={entityTypeOptions}
-              onChange={(e) => setSearchType(e.value)}
-              placeholder="Тип сущности"
-              className="w-full"
-            />
-          </div>
-          <Button
-            label={searchLoading ? 'Поиск...' : 'Найти'}
-            icon={searchLoading ? 'pi pi-spin pi-spinner' : 'pi pi-search'}
-            className="p-button-raised p-button-accent"
-            onClick={handleSearch}
-            disabled={searchLoading}
-          />
-          {(searchActive || searchQuery) && (
-            <Button
-              label="Сбросить"
-              icon="pi pi-times"
-              className="p-button-raised p-button-outlined"
-              onClick={handleResetSearch}
-            />
-          )}
-          <Button
-            label="Обновить всё"
-            icon="pi pi-refresh"
-            className="p-button-raised p-button-accent"
-            onClick={loadData}
-          />
-          <Button
-            label="Справка"
-            icon="pi pi-question-circle"
-            className="p-button-raised p-button-accent"
-            onClick={() => setHelpVisible(true)}
-            tooltip="Как работать с базой данных"
-            tooltipOptions={{ position: 'bottom' }}
-          />
-        </div>
+      <SearchPanel
+        query={searchQuery}
+        onQueryChange={setSearchQuery}
+        onKeyDown={handleSearchKeyDown}
+        type={searchType}
+        onTypeChange={setSearchType}
+        typeOptions={entityTypeOptions}
+        loading={searchLoading}
+        searchActive={searchActive}
+        resultCount={searchResults.length}
+        onSearch={handleSearch}
+        onReset={handleResetSearch}
+        onRefreshAll={loadData}
+        onHelp={() => setHelpVisible(true)}
+      />
 
-        {searchActive && (
-          <div className="mt-2 text-sm">
-            Найдено: <b>{searchResults.length}</b> записей
-          </div>
-        )}
-      </Panel>
-
-      {/* Панель таблиц */}
-      <Panel
-        className="shadow-5 mb-3"
-        header="Таблицы"
-        footer={
-          <div className="flex justify-content-end mb-2">
-            <Button
-              label="Опасная зона"
-              icon="pi pi-exclamation-octagon"
-              className="osint-destructive-soft p-button-sm"
-              onClick={() => setDangerVisible(true)}
-              tooltip="Полная очистка базы или удаление всех дампов"
-              tooltipOptions={{ position: 'left' }}
-            />
-          </div>
-        }
-      >
-        {activeFilter && (
-          <div className="flex align-items-center gap-2 mb-2">
-            <span className="text-sm text-500">Фильтр:</span>
-            <div
-              className="flex align-items-center gap-2 px-3 py-1 border-round"
-              style={{
-                background: 'var(--tg-theme-secondary-bg-color)',
-                border: '1px solid var(--tg-theme-hint-color)',
-              }}
-            >
-              <span style={{ color: 'var(--tg-theme-accent-text-color)' }}>
-                {activeFilter.type === 'entity' ? 'Сущность' :
-                activeFilter.type === 'relation' ? 'Связь' :
-                activeFilter.type === 'observation' ? 'Наблюдение' : 'Источник'}
-                : #{activeFilter.id}
-              </span>
-              <i
-                className="pi pi-times"
-                style={{ cursor: 'pointer' }}
-                onClick={clearFilter}
-                title="Снять фильтр"
-              />
-            </div>
-          </div>
-        )}
-        <TabView
-          className="my-3"
-          activeIndex={activeTab}
-          onTabChange={(e) => setActiveTab(e.index)}
-        >
-          <TabPanel header={`Сущности (${filteredEntities.length})`}>
-            <div className="flex justify-content-end mb-2">
-              <Button
-                label="Создать сущность"
-                icon="pi pi-plus"
-                className="osint-soft p-button-sm"
-                onClick={() => openCreateDialog('entity')}
-              />
-            </div>
-            <EntitiesTable
-              value={filteredEntities}
-              onRowClick={(row) => openDialog('entity', row.id)}
-              emptyMessage={searchActive ? 'Ничего не найдено' : 'Нет данных'}
-            />
-          </TabPanel>
-
-          <TabPanel header={`Связи (${filteredRelations.length})`}>
-            <div className="flex justify-content-end mb-2">
-              <Button
-                label="Создать связь"
-                icon="pi pi-plus"
-                className="osint-soft p-button-sm"
-                onClick={() => openCreateDialog('relation')}
-              />
-            </div>
-            <RelationsTable
-              value={filteredRelations}
-              onRowClick={(row) => openDialog('relation', row.id)}
-            />
-          </TabPanel>
-
-          <TabPanel header={`Наблюдения (${filteredObservations.length})`}>
-            <div className="flex justify-content-end mb-2">
-              <Button
-                label="Создать наблюдение"
-                icon="pi pi-plus"
-                className="osint-soft p-button-sm"
-                onClick={() => openCreateDialog('observation')}
-              />
-            </div>
-            <ObservationsTable
-              value={filteredObservations}
-              onRowClick={(row) => openDialog('observation', row.id)}
-            />
-          </TabPanel>
-
-          <TabPanel header={`Источники (${filteredSources.length})`}>
-            <div className="flex justify-content-end mb-2">
-              <Button
-                label="Создать источник"
-                icon="pi pi-plus"
-                className="osint-soft p-button-sm"
-                onClick={() => openCreateDialog('source')}
-              />
-            </div>
-            <SourcesTable
-              value={filteredSources}
-              onRowClick={(row) => openDialog('source', row.id)}
-            />
-          </TabPanel>
-        </TabView>
-      </Panel>
+      <TablesPanel
+        filteredEntities={filteredEntities}
+        filteredRelations={filteredRelations}
+        filteredObservations={filteredObservations}
+        filteredSources={filteredSources}
+        activeFilter={activeFilter}
+        onClearFilter={clearFilter}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        onRowClick={handleRowClick}
+        onCreate={(type) => {
+          setCreateType(type);
+          setCreateDialog(true);
+        }}
+        onOpenDangerZone={() => setDangerVisible(true)}
+        searchActive={searchActive}
+      />
 
       {/* Единый диалог деталей со стеком */}
       <Dialog
