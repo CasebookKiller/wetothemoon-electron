@@ -1726,69 +1726,106 @@ export const DatabasePage: React.FC = () => {
         header={dialogStack.length > 0 ? renderBreadcrumb() : null}
         footer={
           dialogStack.length > 0 ? (
-            <div className="p-panel-footer flex justify-content-end gap-2">
-              {dialogStack[dialogStack.length - 1].type === 'entity' && (
-                <Button
-                  label="Чувствительные данные"
-                  icon="pi pi-shield"
-                  className="osint-soft"
-                  onClick={() => {
-                    const top = dialogStack[dialogStack.length - 1];
-                    const data = dialogCache[cacheKey(top.type, top.id)];
-                    setSensitiveEntityId(top.id);
-                    setSensitiveEntityLabel(data?.entity?.label || data?.entity?.value || `#${top.id}`);
-                    setSensitiveDialogVisible(true);
-                  }}
-                />
-              )}
-              {!editing && (
-                <Button
-                  label="Редактировать"
-                  icon="pi pi-pencil"
-                  className="osint-soft"
-                  onClick={() => {
-                    const top = dialogStack[dialogStack.length - 1];
-                    const data = dialogCache[cacheKey(top.type, top.id)];
-                    if (data) startEditing(top.type, data);
-                  }}
-                />
-              )}
-              <Button
-                label="Открыть в главном окне"
-                icon="pi pi-external-link"
-                className="osint-soft"
-                onClick={() => {
-                  const top = dialogStack[dialogStack.length - 1];
-                  openInMainWindow(top.type, top.id, typeToTabIndex[top.type]);
-                }}
-              />
-              {['entity', 'relation', 'observation'].includes(dialogStack[dialogStack.length - 1].type) && (
-                <Button
-                  label="Пометить как ложную"
-                  icon="pi pi-exclamation-triangle"
-                  className="osint-destructive-soft"
-                  onClick={() => {
-                    const top = dialogStack[dialogStack.length - 1];
-                    openMarkFalseDialog({
-                      table: top.type === 'entity' ? 'entities' : top.type === 'relation' ? 'relations' : 'observations',
-                      id: top.id,
-                    });
-                  }}
-                />
-              )}
-              <Button
-                label="Удалить"
-                icon="pi pi-trash"
-                className="osint-destructive"
-                onClick={openDeleteDialog}
-              />
-              <Button
-                label="Закрыть"
-                icon="pi pi-times"
-                className="osint-soft"
-                onClick={closeAllDialogs}
-              />
-            </div>
+            (() => {
+              const top = dialogStack[dialogStack.length - 1];
+              const isEntity = top.type === 'entity';
+              const canMarkFalse = ['entity', 'relation', 'observation'].includes(top.type);
+
+              return (
+                <div className="p-panel-footer flex justify-content-between align-items-center gap-2 flex-wrap">
+                  {/* Левая группа: вспомогательные действия (иконки) */}
+                  <div className="flex align-items-center gap-2">
+                    {isEntity && (
+                      <Button
+                        icon="pi pi-shield"
+                        className="osint-soft p-button-sm"
+                        tooltip="Чувствительные данные"
+                        tooltipOptions={{ position: 'top' }}
+                        onClick={() => {
+                          const data = dialogCache[cacheKey(top.type, top.id)];
+                          setSensitiveEntityId(top.id);
+                          setSensitiveEntityLabel(data?.entity?.label || data?.entity?.value || `#${top.id}`);
+                          setSensitiveDialogVisible(true);
+                        }}
+                      />
+                    )}
+
+                    <Button
+                      icon="pi pi-external-link"
+                      className="osint-soft p-button-sm"
+                      tooltip="Открыть в главном окне"
+                      tooltipOptions={{ position: 'top' }}
+                      onClick={() => openInMainWindow(top.type, top.id, typeToTabIndex[top.type])}
+                    />
+
+                    {canMarkFalse && !editing && (
+                      <Button
+                        icon="pi pi-exclamation-triangle"
+                        className="osint-destructive-soft p-button-sm"
+                        tooltip="Пометить как ложную"
+                        tooltipOptions={{ position: 'top' }}
+                        onClick={() => {
+                          openMarkFalseDialog({
+                            table: top.type === 'entity' ? 'entities' : top.type === 'relation' ? 'relations' : 'observations',
+                            id: top.id,
+                          });
+                        }}
+                      />
+                    )}
+
+                    {canMarkFalse && !editing && (
+                      <Button
+                        icon="pi pi-trash"
+                        className="osint-destructive-soft p-button-sm"
+                        tooltip="Удалить"
+                        tooltipOptions={{ position: 'top' }}
+                        onClick={openDeleteDialog}
+                      />
+                    )}
+                  </div>
+
+                  {/* Правая группа: основные действия (с текстом) */}
+                  <div className="flex align-items-center gap-2">
+                    {editing ? (
+                      <>
+                        <Button
+                          label="Отмена"
+                          icon="pi pi-times"
+                          className="osint-soft p-button-sm"
+                          onClick={cancelEditing}
+                          disabled={editSaving}
+                        />
+                        <Button
+                          label={editSaving ? 'Сохранение...' : 'Сохранить'}
+                          icon={editSaving ? 'pi pi-spin pi-spinner' : 'pi pi-check'}
+                          className="osint p-button-sm"
+                          onClick={saveEditing}
+                          disabled={editSaving}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <Button
+                          label="Редактировать"
+                          icon="pi pi-pencil"
+                          className="osint-soft p-button-sm"
+                          onClick={() => {
+                            const data = dialogCache[cacheKey(top.type, top.id)];
+                            if (data) startEditing(top.type, data);
+                          }}
+                        />
+                        <Button
+                          label="Закрыть"
+                          icon="pi pi-times"
+                          className="osint p-button-sm"
+                          onClick={closeAllDialogs}
+                        />
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })()
           ) : null
         }
       >
@@ -1796,6 +1833,7 @@ export const DatabasePage: React.FC = () => {
         {!dialogLoading && dialogStack.length > 0 && renderDialogContent(dialogStack[dialogStack.length - 1])}
       </Dialog>
 
+      {/* Диалог создания */}
       <Dialog
         visible={createDialog}
         style={{ width: '800px' }}
@@ -2211,6 +2249,7 @@ export const DatabasePage: React.FC = () => {
         )}
       </Dialog>
 
+      {/* Удаление */}
       <Dialog
         visible={deleteDialog}
         style={{ width: '520px' }}
@@ -2314,6 +2353,7 @@ export const DatabasePage: React.FC = () => {
         })()}
       </Dialog>
 
+      {/** Опасная зона */}
       <Dialog
         visible={dangerDialog}
         style={{ width: '560px' }}
@@ -2441,6 +2481,7 @@ export const DatabasePage: React.FC = () => {
         </div>
       </Dialog>
 
+      { /* Чувствительные данные */ }
       <SensitiveVaultDialog
         visible={sensitiveDialogVisible}
         entityId={sensitiveEntityId}
@@ -2448,6 +2489,7 @@ export const DatabasePage: React.FC = () => {
         onHide={() => setSensitiveDialogVisible(false)}
       />
 
+      { /* Помощь */ }
       <DatabaseHelp visible={helpVisible} onHide={() => setHelpVisible(false)} />
     </div>
   );
