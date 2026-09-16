@@ -82,6 +82,12 @@ export const DatabasePage: React.FC = () => {
   const [deleteMessage, setDeleteMessage] = useState('');
   const [deleteStats, setDeleteStats] = useState<{ observations?: number; relations?: number } | null>(null);
 
+  const [dangerDialog, setDangerDialog] = useState(false);
+  const [dangerMode, setDangerMode] = useState<'tables' | 'dumps' | 'both'>('tables');
+  const [dangerConfirmText, setDangerConfirmText] = useState('');
+  const [dangerSaving, setDangerSaving] = useState(false);
+  const [dangerMessage, setDangerMessage] = useState('');
+
   const api = (window as any).electronAPI;
 
   const cacheKey = (type: DialogType, id: number) => `${type}:${id}`;
@@ -1427,6 +1433,57 @@ export const DatabasePage: React.FC = () => {
     }
   };
 
+  const openDangerDialog = () => {
+    setDangerMode('tables');
+    setDangerConfirmText('');
+    setDangerMessage('');
+    setDangerDialog(true);
+  };
+
+  const closeDangerDialog = () => {
+    if (dangerSaving) return;
+    setDangerDialog(false);
+    setDangerConfirmText('');
+    setDangerMessage('');
+  };
+
+  const performDangerAction = async () => {
+    if (dangerConfirmText.trim() !== 'УДАЛИТЬ') {
+      setDangerMessage('Введите слово УДАЛИТЬ заглавными буквами');
+      return;
+    }
+    setDangerSaving(true);
+    setDangerMessage('');
+    try {
+      if (dangerMode === 'tables' || dangerMode === 'both') {
+        const res = await api.clearAllTables();
+        if (!res.success) {
+          setDangerMessage(`Ошибка очистки таблиц: ${res.error}`);
+          return;
+        }
+      }
+      if (dangerMode === 'dumps' || dangerMode === 'both') {
+        const res = await api.deleteAllDumps();
+        if (!res.success) {
+          setDangerMessage(`Ошибка удаления дампов: ${res.error}`);
+          return;
+        }
+        if (res.errors?.length) {
+          console.warn('Ошибки удаления некоторых дампов:', res.errors);
+        }
+      }
+
+      setDangerMessage('Готово');
+      closeAllDialogs();
+      await loadData();
+      setTimeout(() => closeDangerDialog(), 800);
+    } catch (e) {
+      setDangerMessage((e as Error).message);
+    } finally {
+      setDangerSaving(false);
+    }
+  };
+
   return (
     <div className="p-4">
       {error && <p style={{ color: 'red' }}>{error}</p>}
@@ -1520,6 +1577,16 @@ export const DatabasePage: React.FC = () => {
             </div>
           </div>
         )}
+        <div className="flex justify-content-end mb-2">
+          <Button
+            label="Опасная зона"
+            icon="pi pi-exclamation-octagon"
+            className="osint-destructive-soft p-button-sm"
+            onClick={openDangerDialog}
+            tooltip="Полная очистка базы или удаление всех дампов"
+            tooltipOptions={{ position: 'left' }}
+          />
+        </div>
         <TabView
           className="my-3"
           activeIndex={activeTab}
@@ -2220,6 +2287,133 @@ export const DatabasePage: React.FC = () => {
             </div>
           );
         })()}
+      </Dialog>
+
+      <Dialog
+        visible={dangerDialog}
+        style={{ width: '560px' }}
+        modal
+        onHide={closeDangerDialog}
+        header={
+          <span className="p-panel-title" style={{ color: 'var(--tg-theme-destructive-text-color, #ec3942)' }}>
+            <i className="pi pi-exclamation-octagon mr-2" />
+            Опасная зона
+          </span>
+        }
+        footer={
+          <div className="p-panel-footer flex justify-content-end gap-2">
+            <Button
+              label="Отмена"
+              icon="pi pi-times"
+              className="osint-soft"
+              onClick={closeDangerDialog}
+              disabled={dangerSaving}
+            />
+            <Button
+              label={dangerSaving ? 'Выполняется...' : 'Выполнить'}
+              icon={dangerSaving ? 'pi pi-spin pi-spinner' : 'pi pi-trash'}
+              className="osint-destructive"
+              onClick={performDangerAction}
+              disabled={dangerSaving || dangerConfirmText.trim() !== 'УДАЛИТЬ'}
+            />
+          </div>
+        }
+      >
+        <div className="p-fluid">
+          <div
+            className="p-3 border-round mb-3 flex align-items-start gap-2"
+            style={{
+              background: 'rgba(236, 57, 66, 0.08)',
+              border: '1px solid rgba(236, 57, 66, 0.4)',
+            }}
+          >
+            <i className="pi pi-exclamation-triangle mt-1" style={{ color: '#ec3942' }} />
+            <div className="text-sm">
+              <b>Операция необратима.</b> Отмены и восстановления не будет.
+              Перед выполнением убедитесь, что сделали резервную копию базы
+              (функция появится в следующих шагах) или сохранили нужные дампы.
+            </div>
+          </div>
+
+          <div className="field">
+            <label className="font-bold mb-2">Что очистить:</label>
+            <div className="flex flex-column gap-2">
+              <label className="flex align-items-center gap-2">
+                <input
+                  type="radio"
+                  name="dangerMode"
+                  value="tables"
+                  checked={dangerMode === 'tables'}
+                  onChange={() => setDangerMode('tables')}
+                  disabled={dangerSaving}
+                />
+                <span>
+                  <b>Только таблицы БД</b>
+                  <div className="text-sm text-500">
+                    Удалятся все записи из entities, relations, observations, sources,
+                    raw_dumps, audit_log, shards. Файлы дампов останутся на диске.
+                  </div>
+                </span>
+              </label>
+
+              <label className="flex align-items-center gap-2">
+                <input
+                  type="radio"
+                  name="dangerMode"
+                  value="dumps"
+                  checked={dangerMode === 'dumps'}
+                  onChange={() => setDangerMode('dumps')}
+                  disabled={dangerSaving}
+                />
+                <span>
+                  <b>Только файлы дампов</b>
+                  <div className="text-sm text-500">
+                    Удалятся все .msgpack-файлы из raw_dumps. Записи в таблицах БД
+                    сохранятся (но ссылки на файлы будут битыми).
+                  </div>
+                </span>
+              </label>
+
+              <label className="flex align-items-center gap-2">
+                <input
+                  type="radio"
+                  name="dangerMode"
+                  value="both"
+                  checked={dangerMode === 'both'}
+                  onChange={() => setDangerMode('both')}
+                  disabled={dangerSaving}
+                />
+                <span>
+                  <b>И таблицы, и дампы</b>
+                  <div className="text-sm text-500">
+                    Полная очистка. Приложение вернётся в исходное состояние, как
+                    после первого запуска.
+                  </div>
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <div className="field mt-3">
+            <label htmlFor="dangerConfirm" className="font-bold">
+              Для подтверждения введите <code>УДАЛИТЬ</code>:
+            </label>
+            <InputText
+              id="dangerConfirm"
+              value={dangerConfirmText}
+              onChange={(e) => setDangerConfirmText(e.target.value)}
+              placeholder="УДАЛИТЬ"
+              disabled={dangerSaving}
+              className="w-full"
+            />
+          </div>
+
+          {dangerMessage && (
+            <p className={dangerMessage.startsWith('Ошибка') ? 'p-error' : 'p-success'}>
+              {dangerMessage}
+            </p>
+          )}
+        </div>
       </Dialog>
 
       <DatabaseHelp visible={helpVisible} onHide={() => setHelpVisible(false)} />
