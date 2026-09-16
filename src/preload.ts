@@ -519,6 +519,15 @@ try {
     sensitiveValidatePhrase: (phrase: string, lang: 'en' | 'ru') =>
       ipcRenderer.invoke('osint:sensitive-validate-phrase', phrase, lang),
 
+    getAuditLog: (filters?: any, limit = 200, offset = 0) =>
+      ipcRenderer.invoke('osint:get-audit-log', filters || {}, limit, offset),
+
+    getAuditLogTables: () =>
+      ipcRenderer.invoke('osint:get-audit-log-tables'),
+
+    getAuditLogActions: () =>
+      ipcRenderer.invoke('osint:get-audit-log-actions'),
+
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

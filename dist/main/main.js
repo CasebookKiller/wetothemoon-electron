@@ -10839,6 +10839,53 @@ function clearAllTables() {
 	auditChange("case_info", 1, "clear_all", null, "Все таблицы данных очищены", "Полная очистка базы через UI");
 	return { success: true };
 }
+function getAuditLog(filters = {}, limit = 200, offset = 0) {
+	const db = getDatabase();
+	const conditions = [];
+	const params = [];
+	if (filters.table_name) {
+		conditions.push("table_name = ?");
+		params.push(filters.table_name);
+	}
+	if (filters.action) {
+		conditions.push("action = ?");
+		params.push(filters.action);
+	}
+	if (filters.date_from) {
+		conditions.push("changed_at >= ?");
+		params.push(`${filters.date_from}T00:00:00.000Z`);
+	}
+	if (filters.date_to) {
+		conditions.push("changed_at <= ?");
+		params.push(`${filters.date_to}T23:59:59.999Z`);
+	}
+	if (filters.search) {
+		conditions.push("(reason LIKE ? OR new_value LIKE ? OR old_value LIKE ?)");
+		const q = `%${filters.search}%`;
+		params.push(q, q, q);
+	}
+	const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+	const total = db.prepare(`SELECT COUNT(*) AS c FROM audit_log ${where}`).get(...params).c;
+	return {
+		items: db.prepare(`
+    SELECT id, table_name, record_id, action, old_value, new_value,
+           changed_at, changed_by, reason
+    FROM audit_log
+    ${where}
+    ORDER BY id DESC
+    LIMIT ? OFFSET ?
+  `).all(...params, limit, offset),
+		total
+	};
+}
+/** Список уникальных table_name для dropdown-фильтра. */
+function listAuditLogTables() {
+	return getDatabase().prepare("SELECT DISTINCT table_name FROM audit_log ORDER BY table_name ASC").all().map((r) => r.table_name);
+}
+/** Список уникальных action для dropdown-фильтра. */
+function listAuditLogActions() {
+	return getDatabase().prepare("SELECT DISTINCT action FROM audit_log ORDER BY action ASC").all().map((r) => r.action);
+}
 //#endregion
 //#region src/main/services/rawStorage.ts
 function loadRawDumpSync(filePath) {
@@ -14409,6 +14456,45 @@ function registerOsintHandlers() {
 			return {
 				success: true,
 				...validatePhrase(phrase, lang)
+			};
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:get-audit-log", async (_event, filters = {}, limit = 200, offset = 0) => {
+		try {
+			return {
+				success: true,
+				...getAuditLog(filters, limit, offset)
+			};
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:get-audit-log-tables", async () => {
+		try {
+			return {
+				success: true,
+				items: listAuditLogTables()
+			};
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:get-audit-log-actions", async () => {
+		try {
+			return {
+				success: true,
+				items: listAuditLogActions()
 			};
 		} catch (error) {
 			return {

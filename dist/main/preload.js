@@ -316,7 +316,10 @@ try {
 		sensitiveFieldNames: () => electron.ipcRenderer.invoke("osint:sensitive-field-names"),
 		sensitiveWordlistReady: (lang) => electron.ipcRenderer.invoke("osint:sensitive-wordlist-ready", lang),
 		sensitiveGeneratePhrase: (lang, wordCount = 12) => electron.ipcRenderer.invoke("osint:sensitive-generate-phrase", lang, wordCount),
-		sensitiveValidatePhrase: (phrase, lang) => electron.ipcRenderer.invoke("osint:sensitive-validate-phrase", phrase, lang)
+		sensitiveValidatePhrase: (phrase, lang) => electron.ipcRenderer.invoke("osint:sensitive-validate-phrase", phrase, lang),
+		getAuditLog: (filters, limit = 200, offset = 0) => electron.ipcRenderer.invoke("osint:get-audit-log", filters || {}, limit, offset),
+		getAuditLogTables: () => electron.ipcRenderer.invoke("osint:get-audit-log-tables"),
+		getAuditLogActions: () => electron.ipcRenderer.invoke("osint:get-audit-log-actions")
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {

@@ -42,6 +42,7 @@ const typeToTabIndex: Record<DialogType, number> = {
   relation: 1,
   observation: 2,
   source: 3,
+  // журнал недоступен из диалогов — индекс 4 не используется
 };
 
 export const DatabasePage: React.FC = () => {

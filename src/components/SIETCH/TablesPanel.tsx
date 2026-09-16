@@ -10,6 +10,8 @@ import { RelationsTable } from '@/components/SIETCH/DatabaseTables/RelationsTabl
 import { ObservationsTable } from '@/components/SIETCH/DatabaseTables/ObservationsTable';
 import { SourcesTable } from '@/components/SIETCH/DatabaseTables/SourcesTable';
 
+import { AuditLogTab } from './AuditLogTab';
+
 import type { ActiveFilter } from './useCascadingFilter';
 import type { CreateType } from './CreateDialog';
 
@@ -167,6 +169,10 @@ export const TablesPanel: React.FC<TablesPanelProps> = ({
             value={filteredSources}
             onRowClick={(row) => onRowClick('source', row.id)}
           />
+        </TabPanel>
+
+        <TabPanel header="Журнал изменений">
+          <AuditLogTab />
         </TabPanel>
       </TabView>
     </Panel>

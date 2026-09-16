@@ -35,6 +35,9 @@ import {
   deleteObservation,
   deleteSource,
   clearAllTables,
+  getAuditLog,
+  listAuditLogTables,
+  listAuditLogActions,
 } from '../services/database';
 
 import {
@@ -585,6 +588,36 @@ export function registerOsintHandlers() {
   ipcMain.handle('osint:sensitive-validate-phrase', async (_event, phrase: string, lang: WordlistLang) => {
     try {
       return { success: true, ...validatePhrase(phrase, lang) };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('osint:get-audit-log', async (
+    _event,
+    filters: any = {},
+    limit = 200,
+    offset = 0
+  ) => {
+    try {
+      const result = getAuditLog(filters, limit, offset);
+      return { success: true, ...result };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('osint:get-audit-log-tables', async () => {
+    try {
+      return { success: true, items: listAuditLogTables() };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('osint:get-audit-log-actions', async () => {
+    try {
+      return { success: true, items: listAuditLogActions() };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
