@@ -13,7 +13,8 @@
     "build": "electron-forge make",
     "lint": "eslint src/",
     "check:arch": "ts-node scripts/check-architecture.ts",
-    "cache:clean": "rm -rf node_modules/.vite dist .cache"
+    "cache:clean": "rm -rf node_modules/.vite dist .cache",
+    "fetch-bip39-en": "curl -s https://raw.githubusercontent.com/bitcoin/bips/master/bip-0039/english.txt -o /tmp/bip39-en.txt && node -e \"const fs=require('fs');const words=fs.readFileSync('/tmp/bip39-en.txt','utf8').split(/\\r?\\n/).map(s=>s.trim()).filter(Boolean);if(words.length!==2048){console.error('Ожидалось 2048 слов, получено',words.length);process.exit(1)}const out='// Auto-generated from BIP39 official repository\\n// Do not edit manually. Regenerate with: npm run fetch-bip39-en\\n\\nexport const BIP39_EN: string[] = '+JSON.stringify(words)+';\\n';fs.writeFileSync('src/shared/sensitive/wordlists/bip39-en.ts',out);console.log('OK: '+words.length+' words')\""
   },
   "devDependencies": {
     "@electron-forge/cli": "^7.11.2",
