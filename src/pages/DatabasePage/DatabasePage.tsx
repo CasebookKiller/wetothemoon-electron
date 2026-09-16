@@ -1551,7 +1551,22 @@ export const DatabasePage: React.FC = () => {
       </Panel>
 
       {/* Панель таблиц */}
-      <Panel className="shadow-5 mb-3" header="Таблицы">
+      <Panel
+        className="shadow-5 mb-3"
+        header="Таблицы"
+        footer={
+          <div className="flex justify-content-end mb-2">
+            <Button
+              label="Опасная зона"
+              icon="pi pi-exclamation-octagon"
+              className="osint-destructive-soft p-button-sm"
+              onClick={openDangerDialog}
+              tooltip="Полная очистка базы или удаление всех дампов"
+              tooltipOptions={{ position: 'left' }}
+            />
+          </div>
+        }
+      >
         {activeFilter && (
           <div className="flex align-items-center gap-2 mb-2">
             <span className="text-sm text-500">Фильтр:</span>
@@ -1577,16 +1592,6 @@ export const DatabasePage: React.FC = () => {
             </div>
           </div>
         )}
-        <div className="flex justify-content-end mb-2">
-          <Button
-            label="Опасная зона"
-            icon="pi pi-exclamation-octagon"
-            className="osint-destructive-soft p-button-sm"
-            onClick={openDangerDialog}
-            tooltip="Полная очистка базы или удаление всех дампов"
-            tooltipOptions={{ position: 'left' }}
-          />
-        </div>
         <TabView
           className="my-3"
           activeIndex={activeTab}
