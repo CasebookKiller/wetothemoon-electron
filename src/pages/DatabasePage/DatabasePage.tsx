@@ -76,6 +76,12 @@ export const DatabasePage: React.FC = () => {
 
   const [helpVisible, setHelpVisible] = useState(false);
 
+  const [deleteDialog, setDeleteDialog] = useState(false);
+  const [deleteForce, setDeleteForce] = useState(false);
+  const [deleteSaving, setDeleteSaving] = useState(false);
+  const [deleteMessage, setDeleteMessage] = useState('');
+  const [deleteStats, setDeleteStats] = useState<{ observations?: number; relations?: number } | null>(null);
+
   const api = (window as any).electronAPI;
 
   const cacheKey = (type: DialogType, id: number) => `${type}:${id}`;
@@ -369,11 +375,11 @@ export const DatabasePage: React.FC = () => {
   };
 
   const closeAllDialogs = () => {
+    setDialogStack([]);
+    setDialogCache({});
     setEditing(false);
     setEditForm(null);
     setEditMessage('');
-    setDialogStack([]);
-    setDialogCache({});
   };
 
   const refreshTopDialog = async () => {
@@ -1374,6 +1380,55 @@ export const DatabasePage: React.FC = () => {
     }
   };
 
+  const openDeleteDialog = () => {
+    setDeleteForce(false);
+    setDeleteMessage('');
+    setDeleteStats(null);
+    setDeleteDialog(true);
+  };
+
+  const closeDeleteDialog = () => {
+    setDeleteDialog(false);
+    setDeleteMessage('');
+    setDeleteStats(null);
+    setDeleteForce(false);
+  };
+
+  const performDelete = async () => {
+    if (dialogStack.length === 0) return;
+    const top = dialogStack[dialogStack.length - 1];
+    setDeleteSaving(true);
+    setDeleteMessage('');
+    try {
+      let res: any;
+      if (top.type === 'entity') {
+        res = await api.deleteEntity(top.id, deleteForce);
+      } else if (top.type === 'relation') {
+        res = await api.deleteRelation(top.id);
+      } else if (top.type === 'observation') {
+        res = await api.deleteObservation(top.id);
+      } else if (top.type === 'source') {
+        res = await api.deleteSource(top.id, deleteForce);
+      }
+
+      if (res?.success) {
+        setDeleteMessage('Удалено');
+        // Закрыть диалог деталей и удаления
+        closeAllDialogs();
+        closeDeleteDialog();
+        await loadData();
+        await loadDumpsList();
+      } else {
+        setDeleteMessage(`Ошибка: ${res?.error || 'неизвестная'}`);
+        if (res?.stats) setDeleteStats(res.stats);
+      }
+    } catch (e) {
+      setDeleteMessage((e as Error).message);
+    } finally {
+      setDeleteSaving(false);
+    }
+  };
+
   return (
     <div className="p-4">
       {error && <p style={{ color: 'red' }}>{error}</p>}
@@ -1596,69 +1651,53 @@ export const DatabasePage: React.FC = () => {
         footer={
           dialogStack.length > 0 ? (
             <div className="p-panel-footer flex justify-content-end gap-2">
-              {editing ? (
-                <>
-                  <Button
-                    label="Отмена"
-                    icon="pi pi-times"
-                    className="osint"
-                    onClick={cancelEditing}
-                    disabled={editSaving}
-                  />
-                  <Button
-                    label={editSaving ? 'Сохранение...' : 'Сохранить'}
-                    icon={editSaving ? 'pi pi-spin pi-spinner' : 'pi pi-check'}
-                    className="osint"
-                    onClick={saveEditing}
-                    disabled={editSaving}
-                  />
-                </>
-              ) : (
-                <>
-                  {/* Кнопка «Редактировать» */}
-                  {!editing && (
-                    <Button
-                      label="Редактировать"
-                      icon="pi pi-pencil"
-                      className="osint-soft"
-                      onClick={() => {
-                        const top = dialogStack[dialogStack.length - 1];
-                        const data = dialogCache[cacheKey(top.type, top.id)];
-                        if (data) startEditing(top.type, data);
-                      }}
-                    />
-                  )}
-                  <Button
-                    label="Открыть в главном окне"
-                    icon="pi pi-external-link"
-                    className="osint-soft"
-                    onClick={() => {
-                      const top = dialogStack[dialogStack.length - 1];
-                      openInMainWindow(top.type, top.id, typeToTabIndex[top.type]);
-                    }}
-                  />
-                  {['entity', 'relation', 'observation'].includes(dialogStack[dialogStack.length - 1].type) && (
-                    <Button
-                      label="Пометить как ложную"
-                      icon="pi pi-exclamation-triangle"
-                      className="osint-destructive"
-                      onClick={() => {
-                        const top = dialogStack[dialogStack.length - 1];
-                        openMarkFalseDialog({
-                          table: top.type === 'entity' ? 'entities' : top.type === 'relation' ? 'relations' : 'observations',
-                          id: top.id,
-                        });
-                      }}
-                    />
-                  )}
-                  <Button
-                    label="Закрыть"
-                    icon="pi pi-times"
-                    className="osint-soft"
-                    onClick={closeAllDialogs}
-                  />
-                </>
+              {!editing && (
+                <Button
+                  label="Редактировать"
+                  icon="pi pi-pencil"
+                  className="osint-soft"
+                  onClick={() => {
+                    const top = dialogStack[dialogStack.length - 1];
+                    const data = dialogCache[cacheKey(top.type, top.id)];
+                    if (data) startEditing(top.type, data);
+                  }}
+                />
               )}
+              <Button
+                label="Открыть в главном окне"
+                icon="pi pi-external-link"
+                className="osint-soft"
+                onClick={() => {
+                  const top = dialogStack[dialogStack.length - 1];
+                  openInMainWindow(top.type, top.id, typeToTabIndex[top.type]);
+                }}
+              />
+              {['entity', 'relation', 'observation'].includes(dialogStack[dialogStack.length - 1].type) && (
+                <Button
+                  label="Пометить как ложную"
+                  icon="pi pi-exclamation-triangle"
+                  className="osint-destructive-soft"
+                  onClick={() => {
+                    const top = dialogStack[dialogStack.length - 1];
+                    openMarkFalseDialog({
+                      table: top.type === 'entity' ? 'entities' : top.type === 'relation' ? 'relations' : 'observations',
+                      id: top.id,
+                    });
+                  }}
+                />
+              )}
+              <Button
+                label="Удалить"
+                icon="pi pi-trash"
+                className="osint-destructive"
+                onClick={openDeleteDialog}
+              />
+              <Button
+                label="Закрыть"
+                icon="pi pi-times"
+                className="osint-soft"
+                onClick={closeAllDialogs}
+              />
             </div>
           ) : null
         }
@@ -2080,6 +2119,109 @@ export const DatabasePage: React.FC = () => {
             {createMessage}
           </p>
         )}
+      </Dialog>
+
+      <Dialog
+        visible={deleteDialog}
+        style={{ width: '520px' }}
+        modal
+        onHide={closeDeleteDialog}
+        header={<span className="p-panel-title">Удалить запись</span>}
+        footer={
+          <div className="p-panel-footer flex justify-content-end gap-2">
+            <Button
+              label="Отмена"
+              icon="pi pi-times"
+              className="osint-soft"
+              onClick={closeDeleteDialog}
+              disabled={deleteSaving}
+            />
+            <Button
+              label={deleteSaving ? 'Удаление...' : 'Удалить'}
+              icon={deleteSaving ? 'pi pi-spin pi-spinner' : 'pi pi-trash'}
+              className="osint-destructive"
+              onClick={performDelete}
+              disabled={deleteSaving}
+            />
+          </div>
+        }
+      >
+        {dialogStack.length > 0 && (() => {
+          const top = dialogStack[dialogStack.length - 1];
+          const typeLabel =
+            top.type === 'entity' ? 'сущность' :
+            top.type === 'relation' ? 'связь' :
+            top.type === 'observation' ? 'наблюдение' : 'источник';
+          return (
+            <div className="p-fluid">
+              <p>
+                Вы собираетесь <b>безвозвратно удалить</b> {typeLabel}{' '}
+                <b>#{top.id}</b>.
+              </p>
+
+              {(top.type === 'entity' || top.type === 'source') && (
+                <div
+                  className="p-2 border-round mb-3 flex align-items-start gap-2"
+                  style={{
+                    background: 'rgba(236, 57, 66, 0.08)',
+                    border: '1px solid rgba(236, 57, 66, 0.4)',
+                  }}
+                >
+                  <i className="pi pi-exclamation-triangle mt-1" style={{ color: '#ec3942' }} />
+                  <div className="text-sm">
+                    {top.type === 'entity' && (
+                      <>
+                        Связанные наблюдения и связи <b>не будут</b> удалены, пока вы
+                        не поставите галочку ниже. Иначе удаление будет заблокировано
+                        при наличии зависимостей.
+                      </>
+                    )}
+                    {top.type === 'source' && (
+                      <>
+                        Наблюдения и связи, ссылающиеся на этот источник, <b>не будут</b>{' '}
+                        удалены — у них будет обнулён <code>source_id</code>, только если
+                        вы поставите галочку ниже. Иначе удаление будет заблокировано.
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {(top.type === 'entity' || top.type === 'source') && (
+                <div className="field-checkbox mb-3">
+                  <input
+                    type="checkbox"
+                    id="deleteForce"
+                    checked={deleteForce}
+                    onChange={(e) => setDeleteForce(e.target.checked)}
+                    disabled={deleteSaving}
+                  />
+                  <label htmlFor="deleteForce" className="ml-2">
+                    {top.type === 'entity'
+                      ? 'Каскадно удалить все наблюдения и связи этой сущности'
+                      : 'Отвязать наблюдения и связи, затем удалить источник'}
+                  </label>
+                </div>
+              )}
+
+              {deleteStats && (deleteStats.observations || deleteStats.relations) && (
+                <p className="text-sm text-500">
+                  На запись ссылаются:{' '}
+                  {deleteStats.observations ? `${deleteStats.observations} наблюдений` : ''}
+                  {deleteStats.observations && deleteStats.relations ? ', ' : ''}
+                  {deleteStats.relations ? `${deleteStats.relations} связей` : ''}.
+                  Поставьте галочку, чтобы удалить каскадно, и повторите.
+                </p>
+              )}
+
+              {deleteMessage && (
+                <p className={deleteMessage.startsWith('Ошибка') ? 'p-error' : 'p-success'}>
+                  {deleteMessage}
+                </p>
+              )}
+            </div>
+          );
+        })()}
       </Dialog>
 
       <DatabaseHelp visible={helpVisible} onHide={() => setHelpVisible(false)} />
