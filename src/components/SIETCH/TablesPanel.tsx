@@ -56,7 +56,23 @@ export const TablesPanel: React.FC<TablesPanelProps> = ({
   searchActive,
 }) => {
   return (
-    <Panel className="shadow-5 mb-3" header="Таблицы">
+    <Panel 
+      className="shadow-5 mb-3" 
+      header="Таблицы"
+      footer={
+        <>
+          {/* Опасная зона — справа */}
+          <Button
+            label="Опасная зона"
+            icon="pi pi-exclamation-octagon"
+            className="osint-destructive-soft p-button-sm"
+            onClick={onOpenDangerZone}
+            tooltip="Полная очистка базы или удаление всех дампов"
+            tooltipOptions={{ position: 'left' }}
+          />
+        </>
+      }
+    >
       <div className="flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
         {/* Чип активного фильтра — слева */}
         <div className="flex align-items-center gap-2 flex-wrap">
@@ -84,15 +100,7 @@ export const TablesPanel: React.FC<TablesPanelProps> = ({
           )}
         </div>
 
-        {/* Опасная зона — справа */}
-        <Button
-          label="Опасная зона"
-          icon="pi pi-exclamation-octagon"
-          className="osint-destructive-soft p-button-sm"
-          onClick={onOpenDangerZone}
-          tooltip="Полная очистка базы или удаление всех дампов"
-          tooltipOptions={{ position: 'left' }}
-        />
+        
       </div>
 
       <TabView
