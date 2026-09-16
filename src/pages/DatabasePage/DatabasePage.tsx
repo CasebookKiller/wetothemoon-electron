@@ -7,7 +7,6 @@ import { TabView, TabPanel } from 'primereact/tabview';
 import { InputText } from 'primereact/inputtext';
 import { Dropdown } from 'primereact/dropdown';
 import { Dialog } from 'primereact/dialog';
-import { InputTextarea } from 'primereact/inputtextarea';
 import { Tag } from 'primereact/tag';
 
 import './DatabasePage.css';
@@ -21,6 +20,11 @@ import { DatabaseHelp } from '@/components/SIETCH/DatabaseHelp';
 
 import { SensitiveVaultDialog } from '@/components/SIETCH/SensitiveVaultDialog';
 
+import { MarkFalseDialog, type MarkFalseTable } from '@/components/SIETCH/MarkFalseDialog';
+import { DeleteDialog, type DeleteTarget } from '@/components/SIETCH/DeleteDialog';
+import { DangerZoneDialog } from '@/components/SIETCH/DangerZoneDialog';
+
+import { CreateDialog, type CreateType } from '@/components/SIETCH/CreateDialog';
 
 type DialogType = 'entity' | 'relation' | 'observation' | 'source';
 
@@ -44,11 +48,11 @@ export const DatabasePage: React.FC = () => {
   const [searchActive, setSearchActive] = useState(false);
 
   // mark_false
-  const [falseDialog, setFalseDialog] = useState(false);
-  const [falseReason, setFalseReason] = useState('');
-  const [falseLoading, setFalseLoading] = useState(false);
-  const [falseMessage, setFalseMessage] = useState('');
-  const [markTarget, setMarkTarget] = useState<{ table: 'entities' | 'relations' | 'observations'; id: number } | null>(null);
+  //const [falseDialog, setFalseDialog] = useState(false);
+  //const [falseReason, setFalseReason] = useState('');
+  //const [falseLoading, setFalseLoading] = useState(false);
+  //const [falseMessage, setFalseMessage] = useState('');
+  //const [markTarget, setMarkTarget] = useState<{ table: 'entities' | 'relations' | 'observations'; id: number } | null>(null);
 
   // Стек диалогов деталей
   const [dialogStack, setDialogStack] = useState<DialogStackItem[]>([]);
@@ -71,28 +75,37 @@ export const DatabasePage: React.FC = () => {
 
   const [createDialog, setCreateDialog] = useState(false);
   const [createType, setCreateType] = useState<'entity' | 'relation' | 'observation' | 'source'>('entity');
-  const [createForm, setCreateForm] = useState<any>(null);
-  const [createSaving, setCreateSaving] = useState(false);
-  const [createMessage, setCreateMessage] = useState('');
+  //const [createForm, setCreateForm] = useState<any>(null);
+  //const [createSaving, setCreateSaving] = useState(false);
+  //const [createMessage, setCreateMessage] = useState('');
   const [entityDropdownOptions, setEntityDropdownOptions] = useState<{ label: string; value: number }[]>([]);
 
   const [helpVisible, setHelpVisible] = useState(false);
 
-  const [deleteDialog, setDeleteDialog] = useState(false);
-  const [deleteForce, setDeleteForce] = useState(false);
-  const [deleteSaving, setDeleteSaving] = useState(false);
-  const [deleteMessage, setDeleteMessage] = useState('');
-  const [deleteStats, setDeleteStats] = useState<{ observations?: number; relations?: number } | null>(null);
+  //const [deleteDialog, setDeleteDialog] = useState(false);
+  //const [deleteForce, setDeleteForce] = useState(false);
+  //const [deleteSaving, setDeleteSaving] = useState(false);
+  //const [deleteMessage, setDeleteMessage] = useState('');
+  //const [deleteStats, setDeleteStats] = useState<{ observations?: number; relations?: number } | null>(null);
 
-  const [dangerDialog, setDangerDialog] = useState(false);
-  const [dangerMode, setDangerMode] = useState<'tables' | 'dumps' | 'both'>('tables');
-  const [dangerConfirmText, setDangerConfirmText] = useState('');
-  const [dangerSaving, setDangerSaving] = useState(false);
-  const [dangerMessage, setDangerMessage] = useState('');
+  //const [dangerDialog, setDangerDialog] = useState(false);
+  //const [dangerMode, setDangerMode] = useState<'tables' | 'dumps' | 'both'>('tables');
+  //const [dangerConfirmText, setDangerConfirmText] = useState('');
+  //const [dangerSaving, setDangerSaving] = useState(false);
+  //const [dangerMessage, setDangerMessage] = useState('');
 
   const [sensitiveDialogVisible, setSensitiveDialogVisible] = useState(false);
   const [sensitiveEntityId, setSensitiveEntityId] = useState<number | null>(null);
   const [sensitiveEntityLabel, setSensitiveEntityLabel] = useState<string>('');
+
+  const [markFalseTarget, setMarkFalseTarget] = useState<{ table: MarkFalseTable; id: number } | null>(null);
+  const [markFalseVisible, setMarkFalseVisible] = useState(false);
+
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [deleteVisible, setDeleteVisible] = useState(false);
+
+  const [dangerVisible, setDangerVisible] = useState(false);
+
 
   const api = (window as any).electronAPI;
 
@@ -139,7 +152,7 @@ export const DatabasePage: React.FC = () => {
     }
   };
 
-  const openCreateEntityDialog = () => {
+  /*const openCreateEntityDialog = () => {
     setCreateType('entity');
     setCreateForm({
       type: 'company',
@@ -151,9 +164,14 @@ export const DatabasePage: React.FC = () => {
     });
     setCreateMessage('');
     setCreateDialog(true);
+  };*/
+
+  const openCreateDialog = (type: CreateType) => {
+    setCreateType(type);
+    setCreateDialog(true);
   };
 
-  const saveCreateEntity = async () => {
+  /*const saveCreateEntity = async () => {
     if (!createForm) return;
     if (!createForm.value?.trim()) {
       setCreateMessage('Поле «Значение» обязательно');
@@ -183,9 +201,9 @@ export const DatabasePage: React.FC = () => {
     } finally {
       setCreateSaving(false);
     }
-  };
+  };*/
 
-  const openCreateRelationDialog = () => {
+  /*const openCreateRelationDialog = () => {
     setCreateForm({
       subject_id: null,
       predicate: 'associated_with',
@@ -203,9 +221,9 @@ export const DatabasePage: React.FC = () => {
     setCreateDialog(true);
     // подгрузим актуальные опции на случай, если появились новые сущности
     loadEntityDropdownOptions();
-  };
+  };*/
 
-  const saveCreateRelation = async () => {
+  /*const saveCreateRelation = async () => {
     if (!createForm) return;
     if (!createForm.subject_id || !createForm.object_id) {
       setCreateMessage('Выберите исходную и целевую сущности');
@@ -235,9 +253,9 @@ export const DatabasePage: React.FC = () => {
     } finally {
       setCreateSaving(false);
     }
-  };
+  };*/
 
-  const openCreateObservationDialog = () => {
+  /*const openCreateObservationDialog = () => {
     setCreateType('observation');
     setCreateForm({
       entity_id: null,
@@ -250,9 +268,9 @@ export const DatabasePage: React.FC = () => {
     setCreateMessage('');
     setCreateDialog(true);
     loadEntityDropdownOptions();
-  };
+  };*/
 
-  const saveCreateObservation = async () => {
+  /*const saveCreateObservation = async () => {
     if (!createForm) return;
     if (!createForm.entity_id) {
       setCreateMessage('Выберите сущность');
@@ -286,9 +304,9 @@ export const DatabasePage: React.FC = () => {
     } finally {
       setCreateSaving(false);
     }
-  };
+  };*/
 
-  const saveCreateSource = async () => {
+  /*const saveCreateSource = async () => {
     if (!createForm) return;
     if (!createForm.url?.trim()) {
       setCreateMessage('Укажите URL или локальный путь');
@@ -314,9 +332,9 @@ export const DatabasePage: React.FC = () => {
     } finally {
       setCreateSaving(false);
     }
-  };
+  };*/
 
-  const openCreateSourceDialog = () => {
+  /*const openCreateSourceDialog = () => {
     setCreateType('source');
     setCreateForm({
       url: '',
@@ -332,13 +350,13 @@ export const DatabasePage: React.FC = () => {
     });
     setCreateMessage('');
     setCreateDialog(true);
-  };
+  };*/
 
-  const closeCreateDialog = () => {
+  /*const closeCreateDialog = () => {
     setCreateDialog(false);
     setCreateForm(null);
     setCreateMessage('');
-  };
+  };*/
 
   const typeToTabIndex: Record<DialogType, number> = {
     entity: 0,
@@ -472,14 +490,12 @@ export const DatabasePage: React.FC = () => {
     }
   };
 
-  const openMarkFalseDialog = (target?: { table: 'entities' | 'relations' | 'observations'; id: number }) => {
-    if (target) setMarkTarget(target);
-    setFalseReason('');
-    setFalseMessage('');
-    setFalseDialog(true);
+  const openMarkFalseDialog = (target: { table: MarkFalseTable; id: number }) => {
+    setMarkFalseTarget(target);
+    setMarkFalseVisible(true);
   };
 
-  const handleMarkFalseSubmit = async () => {
+  /*const handleMarkFalseSubmit = async () => {
     if (!markTarget) return;
     if (!falseReason.trim()) {
       setFalseMessage('Укажите причину');
@@ -503,7 +519,7 @@ export const DatabasePage: React.FC = () => {
     } finally {
       setFalseLoading(false);
     }
-  };
+  };*/
 
   const startEditing = (type: DialogType, data: any) => {
     if (type === 'entity') {
@@ -1367,14 +1383,14 @@ export const DatabasePage: React.FC = () => {
   };
 
   // Заголовок mark-false зависит от типа
-  const getMarkFalseLabel = (): string => {
+  /*const getMarkFalseLabel = (): string => {
     if (!markTarget) return 'Пометить как ложную';
     switch (markTarget.table) {
       case 'entities': return 'Пометить сущность как ложную';
       case 'relations': return 'Пометить связь как ложную';
       case 'observations': return 'Пометить наблюдение как ложную';
     }
-  };
+  };*/
 
   const loadEntityDropdownOptions = async () => {
     try {
@@ -1392,21 +1408,21 @@ export const DatabasePage: React.FC = () => {
     }
   };
 
-  const openDeleteDialog = () => {
+  /*const openDeleteDialog = () => {
     setDeleteForce(false);
     setDeleteMessage('');
     setDeleteStats(null);
     setDeleteDialog(true);
-  };
+  };*/
 
-  const closeDeleteDialog = () => {
+  /*const closeDeleteDialog = () => {
     setDeleteDialog(false);
     setDeleteMessage('');
     setDeleteStats(null);
     setDeleteForce(false);
-  };
+  };*/
 
-  const performDelete = async () => {
+  /*const performDelete = async () => {
     if (dialogStack.length === 0) return;
     const top = dialogStack[dialogStack.length - 1];
     setDeleteSaving(true);
@@ -1437,23 +1453,23 @@ export const DatabasePage: React.FC = () => {
     } finally {
       setDeleteSaving(false);
     }
-  };
+  };*/
 
-  const openDangerDialog = () => {
+  /*const openDangerDialog = () => {
     setDangerMode('tables');
     setDangerConfirmText('');
     setDangerMessage('');
     setDangerDialog(true);
-  };
+  };*/
 
-  const closeDangerDialog = () => {
+  /*const closeDangerDialog = () => {
     if (dangerSaving) return;
     setDangerDialog(false);
     setDangerConfirmText('');
     setDangerMessage('');
-  };
+  };*/
 
-  const performDangerAction = async () => {
+  /*const performDangerAction = async () => {
     if (dangerConfirmText.trim() !== 'УДАЛИТЬ') {
       setDangerMessage('Введите слово УДАЛИТЬ заглавными буквами');
       return;
@@ -1488,7 +1504,7 @@ export const DatabasePage: React.FC = () => {
     } finally {
       setDangerSaving(false);
     }
-  };
+  };*/
 
   return (
     <div className="p-4">
@@ -1566,7 +1582,7 @@ export const DatabasePage: React.FC = () => {
               label="Опасная зона"
               icon="pi pi-exclamation-octagon"
               className="osint-destructive-soft p-button-sm"
-              onClick={openDangerDialog}
+              onClick={() => setDangerVisible(true)}
               tooltip="Полная очистка базы или удаление всех дампов"
               tooltipOptions={{ position: 'left' }}
             />
@@ -1609,7 +1625,7 @@ export const DatabasePage: React.FC = () => {
                 label="Создать сущность"
                 icon="pi pi-plus"
                 className="osint-soft p-button-sm"
-                onClick={openCreateEntityDialog}
+                onClick={() => openCreateDialog('entity')}
               />
             </div>
             <EntitiesTable
@@ -1625,7 +1641,7 @@ export const DatabasePage: React.FC = () => {
                 label="Создать связь"
                 icon="pi pi-plus"
                 className="osint-soft p-button-sm"
-                onClick={openCreateRelationDialog}
+                onClick={() => openCreateDialog('relation')}
               />
             </div>
             <RelationsTable
@@ -1640,7 +1656,7 @@ export const DatabasePage: React.FC = () => {
                 label="Создать наблюдение"
                 icon="pi pi-plus"
                 className="osint-soft p-button-sm"
-                onClick={openCreateObservationDialog}
+                onClick={() => openCreateDialog('observation')}
               />
             </div>
             <ObservationsTable
@@ -1655,7 +1671,7 @@ export const DatabasePage: React.FC = () => {
                 label="Создать источник"
                 icon="pi pi-plus"
                 className="osint-soft p-button-sm"
-                onClick={openCreateSourceDialog}
+                onClick={() => openCreateDialog('source')}
               />
             </div>
             <SourcesTable
@@ -1665,57 +1681,6 @@ export const DatabasePage: React.FC = () => {
           </TabPanel>
         </TabView>
       </Panel>
-
-      {/* Диалог пометки как ложной */}
-      <Dialog
-        visible={falseDialog}
-        style={{ width: '500px' }}
-        modal
-        onHide={() => setFalseDialog(false)}
-        header={<span className="p-panel-title">{getMarkFalseLabel()}</span>}
-        footer={
-          <>
-            <Button
-              label="Отмена"
-              icon="pi pi-times"
-              className="osint"
-              onClick={() => setFalseDialog(false)}
-              disabled={falseLoading}
-            />
-            <Button
-              label={falseLoading ? 'Отправка...' : 'Пометить'}
-              icon={falseLoading ? 'pi pi-spin pi-spinner' : 'pi pi-check'}
-              className="osint-destructive"
-              onClick={handleMarkFalseSubmit}
-              disabled={falseLoading || !falseReason.trim()}
-            />
-          </>
-        }
-      >
-        <div className="p-fluid">
-          <p className="text-sm text-500">
-            Запись <b>#{markTarget?.id}</b> будет помечена как <code>false</code>.
-            Причина сохранится в поле <code>notes</code> и в журнале изменений.
-          </p>
-          <div className="field mt-3">
-            <label htmlFor="falseReason" className="font-bold">Причина *</label>
-            <InputTextarea
-              id="falseReason"
-              value={falseReason}
-              onChange={(e) => setFalseReason(e.target.value)}
-              rows={3}
-              autoResize
-              placeholder="Например: ошибочно сопоставлено с другой организацией"
-              className="w-full"
-            />
-          </div>
-          {falseMessage && (
-            <p className={falseMessage.startsWith('Ошибка') ? 'p-error' : 'p-success'}>
-              {falseMessage}
-            </p>
-          )}
-        </div>
-      </Dialog>
 
       {/* Единый диалог деталей со стеком */}
       <Dialog
@@ -1765,6 +1730,7 @@ export const DatabasePage: React.FC = () => {
                         tooltip="Пометить как ложную"
                         tooltipOptions={{ position: 'top' }}
                         onClick={() => {
+                          const top = dialogStack[dialogStack.length - 1];
                           openMarkFalseDialog({
                             table: top.type === 'entity' ? 'entities' : top.type === 'relation' ? 'relations' : 'observations',
                             id: top.id,
@@ -1779,7 +1745,11 @@ export const DatabasePage: React.FC = () => {
                         className="osint-destructive-soft p-button-sm"
                         tooltip="Удалить"
                         tooltipOptions={{ position: 'top' }}
-                        onClick={openDeleteDialog}
+                        onClick={() => {
+                          const top = dialogStack[dialogStack.length - 1];
+                          setDeleteTarget({ type: top.type, id: top.id });
+                          setDeleteVisible(true);
+                        }}
                       />
                     )}
                   </div>
@@ -1834,652 +1804,49 @@ export const DatabasePage: React.FC = () => {
       </Dialog>
 
       {/* Диалог создания */}
-      <Dialog
+      <CreateDialog
         visible={createDialog}
-        style={{ width: '800px' }}
-        modal
-        onHide={closeCreateDialog}
-        header={
-          <span className="p-panel-title">
-            {createType === 'entity' && 'Создать сущность'}
-            {createType === 'relation' && 'Создать связь'}
-            {createType === 'observation' && 'Создать наблюдение'}
-            {createType === 'source' && 'Создать источник'}
-          </span>
-        }
-        footer={
-          <div className="p-panel-footer flex justify-content-end gap-2">
-            <Button
-              label="Отмена"
-              icon="pi pi-times"
-              className="osint"
-              onClick={closeCreateDialog}
-              disabled={createSaving}
-            />
-            <Button
-              label={createSaving ? 'Создание...' : 'Создать'}
-              icon={createSaving ? 'pi pi-spin pi-spinner' : 'pi pi-check'}
-              className="osint"
-              onClick={
-                createType === 'entity' ? saveCreateEntity :
-                createType === 'relation' ? saveCreateRelation :
-                createType === 'observation' ? saveCreateObservation :
-                saveCreateSource
-              }
-              disabled={createSaving}
-            />
-          </div>
-        }
-      >
-        {createForm && createType === 'entity' && (
-          <DetailFields
-            editing={true}
-            editForm={createForm}
-            onEditChange={(key, value) =>
-              setCreateForm((prev: any) => ({ ...(prev || {}), [key]: value }))
-            }
-            fields={[
-              {
-                label: 'Тип *',
-                value: createForm.type,
-                editable: true,
-                editKey: 'type',
-                editType: 'dropdown',
-                editOptions: [
-                  { label: 'Юрлицо', value: 'company' },
-                  { label: 'ИП', value: 'entrepreneur' },
-                  { label: 'Физлицо', value: 'person' },
-                  { label: 'Домен', value: 'domain' },
-                  { label: 'Email', value: 'email' },
-                  { label: 'Телефон', value: 'phone' },
-                  { label: 'IP', value: 'ip' },
-                  { label: 'Адрес', value: 'address' },
-                  { label: 'Документ', value: 'document' },
-                  { label: 'Прочее', value: 'other' },
-                ],
-              },
-              {
-                label: 'Статус',
-                value: createForm.status,
-                editable: true,
-                editKey: 'status',
-                editType: 'dropdown',
-                editOptions: [
-                  { label: 'unverified', value: 'unverified' },
-                  { label: 'hypothesis', value: 'hypothesis' },
-                  { label: 'confirmed', value: 'confirmed' },
-                  { label: 'archived', value: 'archived' },
-                ],
-              },
-              {
-                label: 'Значение *',
-                span: 2,
-                value: createForm.value,
-                editable: true,
-                editKey: 'value',
-                editType: 'text',
-              },
-              {
-                label: 'Название (label)',
-                span: 2,
-                value: createForm.label,
-                editable: true,
-                editKey: 'label',
-                editType: 'text',
-              },
-              {
-                label: 'Уверенность',
-                value: createForm.confidence,
-                editable: true,
-                editKey: 'confidence',
-                editType: 'number',
-              },
-              {
-                label: 'Заметки',
-                span: 2,
-                value: createForm.notes,
-                editable: true,
-                editKey: 'notes',
-                editType: 'textarea',
-              },
-            ]}
-          />
-        )}
+        createType={createType}
+        onHide={() => setCreateDialog(false)}
+        onSuccess={async (type, id) => {
+          await loadData();
+          // Открыть созданный объект в стеке
+          const dialogType =
+            type === 'entity' ? 'entity' :
+            type === 'relation' ? 'relation' :
+            type === 'observation' ? 'observation' : 'source';
+          await openDialog(dialogType, id);
+        }}
+      />
 
-        {createForm && createType === 'relation' && (
-          <DetailFields
-            editing={true}
-            editForm={createForm}
-            onEditChange={(key, value) =>
-              setCreateForm((prev: any) => ({ ...(prev || {}), [key]: value }))
-            }
-            fields={[
-              {
-                label: 'Исходная сущность *',
-                span: 2,
-                value: createForm.subject_id,
-                editable: true,
-                editKey: 'subject_id',
-                editType: 'dropdown',
-                editOptions: entityDropdownOptions,
-              },
-              {
-                label: 'Тип связи (predicate) *',
-                span: 2,
-                value: createForm.predicate,
-                editable: true,
-                editKey: 'predicate',
-                editType: 'dropdown',
-                editOptions: [
-                  { label: 'employee_of', value: 'employee_of' },
-                  { label: 'director_of', value: 'director_of' },
-                  { label: 'owner_of', value: 'owner_of' },
-                  { label: 'founder_of', value: 'founder_of' },
-                  { label: 'associated_with', value: 'associated_with' },
-                  { label: 'uses_domain', value: 'uses_domain' },
-                  { label: 'located_at', value: 'located_at' },
-                  { label: 'includes', value: 'includes' },
-                  { label: 'mentions', value: 'mentions' },
-                  { label: 'resolves_to', value: 'resolves_to' },
-                  { label: 'individual_entrepreneur_of', value: 'individual_entrepreneur_of' },
-                ],
-              },
-              {
-                label: 'Целевая сущность *',
-                span: 2,
-                value: createForm.object_id,
-                editable: true,
-                editKey: 'object_id',
-                editType: 'dropdown',
-                editOptions: entityDropdownOptions,
-              },
-              {
-                label: 'Уверенность',
-                value: createForm.confidence,
-                editable: true,
-                editKey: 'confidence',
-                editType: 'number',
-              },
-              {
-                label: 'Статус',
-                value: createForm.status,
-                editable: true,
-                editKey: 'status',
-                editType: 'dropdown',
-                editOptions: [
-                  { label: 'unverified', value: 'unverified' },
-                  { label: 'hypothesis', value: 'hypothesis' },
-                  { label: 'confirmed', value: 'confirmed' },
-                  { label: 'archived', value: 'archived' },
-                ],
-              },
-              {
-                label: 'Источник',
-                value: createForm.source_id,
-                editable: true,
-                editKey: 'source_id',
-                editType: 'dropdown',
-                editOptions: sourceDropdownOptions,
-              },
-              {
-                label: 'Действует с',
-                value: createForm.valid_from,
-                editable: true,
-                editKey: 'valid_from',
-                editType: 'text',
-              },
-              {
-                label: 'Действует до',
-                value: createForm.valid_to,
-                editable: true,
-                editKey: 'valid_to',
-                editType: 'text',
-              },
-              {
-                label: 'Подтверждение (evidence)',
-                span: 2,
-                value: createForm.evidence_text,
-                editable: true,
-                editKey: 'evidence_text',
-                editType: 'textarea',
-              },
-              {
-                label: 'Заметки',
-                span: 2,
-                value: createForm.notes,
-                editable: true,
-                editKey: 'notes',
-                editType: 'textarea',
-              },
-            ]}
-          />
-        )}
+      <MarkFalseDialog
+        visible={markFalseVisible}
+        target={markFalseTarget}
+        onHide={() => setMarkFalseVisible(false)}
+        onSuccess={async () => {
+          await loadData();
+          await refreshTopDialog();
+        }}
+      />
 
-        {createForm && createType === 'observation' && (
-          <DetailFields
-            editing={true}
-            editForm={createForm}
-            onEditChange={(key, value) =>
-              setCreateForm((prev: any) => ({ ...(prev || {}), [key]: value }))
-            }
-            fields={[
-              {
-                label: 'Сущность *',
-                span: 2,
-                value: createForm.entity_id,
-                editable: true,
-                editKey: 'entity_id',
-                editType: 'dropdown',
-                editOptions: entityDropdownOptions,
-              },
-              {
-                label: 'Атрибут *',
-                span: 2,
-                value: createForm.attribute,
-                editable: true,
-                editKey: 'attribute',
-                editType: 'text',
-              },
-              {
-                label: 'Значение *',
-                span: 2,
-                value: createForm.value,
-                editable: true,
-                editKey: 'value',
-                editType: 'textarea',
-              },
-              {
-                label: 'Уверенность',
-                value: createForm.confidence,
-                editable: true,
-                editKey: 'confidence',
-                editType: 'number',
-              },
-              {
-                label: 'Источник',
-                value: createForm.source_id,
-                editable: true,
-                editKey: 'source_id',
-                editType: 'dropdown',
-                editOptions: sourceDropdownOptions,
-              },
-              {
-                label: 'Заметки',
-                span: 2,
-                value: createForm.notes,
-                editable: true,
-                editKey: 'notes',
-                editType: 'textarea',
-              },
-            ]}
-          />
-        )}
+      <DeleteDialog
+        visible={deleteVisible}
+        target={deleteTarget}
+        onHide={() => setDeleteVisible(false)}
+        onSuccess={async () => {
+          closeAllDialogs();
+          await loadData();
+        }}
+      />
 
-        {createForm && createType === 'source' && (
-          <DetailFields
-            editing={true}
-            editForm={createForm}
-            onEditChange={(key, value) =>
-              setCreateForm((prev: any) => ({ ...(prev || {}), [key]: value }))
-            }
-            fields={[
-              {
-                label: 'URL или локальный путь *',
-                span: 2,
-                value: createForm.url,
-                editable: true,
-                editKey: 'url',
-                editType: 'text',
-              },
-              {
-                label: 'Название',
-                span: 2,
-                value: createForm.title,
-                editable: true,
-                editKey: 'title',
-                editType: 'text',
-              },
-              {
-                label: 'Тип источника',
-                value: createForm.source_type,
-                editable: true,
-                editKey: 'source_type',
-                editType: 'dropdown',
-                editOptions: [
-                  { label: 'website', value: 'website' },
-                  { label: 'social', value: 'social' },
-                  { label: 'registry', value: 'registry' },
-                  { label: 'document', value: 'document' },
-                  { label: 'cli', value: 'cli' },
-                  { label: 'search', value: 'search' },
-                  { label: 'screenshot', value: 'screenshot' },
-                  { label: 'company_system', value: 'company_system' },
-                  { label: 'court', value: 'court' },
-                  { label: 'other', value: 'other' },
-                ],
-              },
-              {
-                label: 'Происхождение',
-                value: createForm.source_kind,
-                editable: true,
-                editKey: 'source_kind',
-                editType: 'dropdown',
-                editOptions: [
-                  { label: 'public_web', value: 'public_web' },
-                  { label: 'internal_person', value: 'internal_person' },
-                  { label: 'internal_document', value: 'internal_document' },
-                  { label: 'official_registry', value: 'official_registry' },
-                  { label: 'company_system', value: 'company_system' },
-                  { label: 'cli_tool', value: 'cli_tool' },
-                  { label: 'personal_observation', value: 'personal_observation' },
-                ],
-              },
-              {
-                label: 'Провайдер',
-                span: 2,
-                value: createForm.provider,
-                editable: true,
-                editKey: 'provider',
-                editType: 'text',
-              },
-              {
-                label: 'Метод получения',
-                value: createForm.collection_method,
-                editable: true,
-                editKey: 'collection_method',
-                editType: 'dropdown',
-                editOptions: [
-                  { label: 'browser', value: 'browser' },
-                  { label: 'api', value: 'api' },
-                  { label: 'export', value: 'export' },
-                  { label: 'official_export', value: 'official_export' },
-                  { label: 'interview', value: 'interview' },
-                  { label: 'email', value: 'email' },
-                  { label: 'internal_chat', value: 'internal_chat' },
-                  { label: 'theharvester', value: 'theharvester' },
-                  { label: 'whois', value: 'whois' },
-                  { label: 'dig', value: 'dig' },
-                  { label: 'manual', value: 'manual' },
-                ],
-              },
-              {
-                label: 'Надёжность',
-                value: createForm.reliability,
-                editable: true,
-                editKey: 'reliability',
-                editType: 'number',
-              },
-              {
-                label: 'Уровень доступа',
-                value: createForm.access_level,
-                editable: true,
-                editKey: 'access_level',
-                editType: 'dropdown',
-                editOptions: [
-                  { label: 'public', value: 'public' },
-                  { label: 'internal', value: 'internal' },
-                  { label: 'confidential', value: 'confidential' },
-                  { label: 'restricted', value: 'restricted' },
-                ],
-              },
-              {
-                label: 'Основание доступа',
-                span: 2,
-                value: createForm.authority_basis,
-                editable: true,
-                editKey: 'authority_basis',
-                editType: 'textarea',
-              },
-              {
-                label: 'Заметки',
-                span: 2,
-                value: createForm.notes,
-                editable: true,
-                editKey: 'notes',
-                editType: 'textarea',
-              },
-            ]}
-          />
-        )}
-
-        {createMessage && (
-          <p className={createMessage.startsWith('Ошибка') ? 'p-error mt-2' : 'p-success mt-2'}>
-            {createMessage}
-          </p>
-        )}
-      </Dialog>
-
-      {/* Удаление */}
-      <Dialog
-        visible={deleteDialog}
-        style={{ width: '520px' }}
-        modal
-        onHide={closeDeleteDialog}
-        header={<span className="p-panel-title">Удалить запись</span>}
-        footer={
-          <div className="p-panel-footer flex justify-content-end gap-2">
-            <Button
-              label="Отмена"
-              icon="pi pi-times"
-              className="osint-soft"
-              onClick={closeDeleteDialog}
-              disabled={deleteSaving}
-            />
-            <Button
-              label={deleteSaving ? 'Удаление...' : 'Удалить'}
-              icon={deleteSaving ? 'pi pi-spin pi-spinner' : 'pi pi-trash'}
-              className="osint-destructive"
-              onClick={performDelete}
-              disabled={deleteSaving}
-            />
-          </div>
-        }
-      >
-        {dialogStack.length > 0 && (() => {
-          const top = dialogStack[dialogStack.length - 1];
-          const typeLabel =
-            top.type === 'entity' ? 'сущность' :
-            top.type === 'relation' ? 'связь' :
-            top.type === 'observation' ? 'наблюдение' : 'источник';
-          return (
-            <div className="p-fluid">
-              <p>
-                Вы собираетесь <b>безвозвратно удалить</b> {typeLabel}{' '}
-                <b>#{top.id}</b>.
-              </p>
-
-              {(top.type === 'entity' || top.type === 'source') && (
-                <div
-                  className="p-2 border-round mb-3 flex align-items-start gap-2"
-                  style={{
-                    background: 'rgba(236, 57, 66, 0.08)',
-                    border: '1px solid rgba(236, 57, 66, 0.4)',
-                  }}
-                >
-                  <i className="pi pi-exclamation-triangle mt-1" style={{ color: '#ec3942' }} />
-                  <div className="text-sm">
-                    {top.type === 'entity' && (
-                      <>
-                        Связанные наблюдения и связи <b>не будут</b> удалены, пока вы
-                        не поставите галочку ниже. Иначе удаление будет заблокировано
-                        при наличии зависимостей.
-                      </>
-                    )}
-                    {top.type === 'source' && (
-                      <>
-                        Наблюдения и связи, ссылающиеся на этот источник, <b>не будут</b>{' '}
-                        удалены — у них будет обнулён <code>source_id</code>, только если
-                        вы поставите галочку ниже. Иначе удаление будет заблокировано.
-                      </>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {(top.type === 'entity' || top.type === 'source') && (
-                <div className="field-checkbox mb-3">
-                  <input
-                    type="checkbox"
-                    id="deleteForce"
-                    checked={deleteForce}
-                    onChange={(e) => setDeleteForce(e.target.checked)}
-                    disabled={deleteSaving}
-                  />
-                  <label htmlFor="deleteForce" className="ml-2">
-                    {top.type === 'entity'
-                      ? 'Каскадно удалить все наблюдения и связи этой сущности'
-                      : 'Отвязать наблюдения и связи, затем удалить источник'}
-                  </label>
-                </div>
-              )}
-
-              {deleteStats && (deleteStats.observations || deleteStats.relations) && (
-                <p className="text-sm text-500">
-                  На запись ссылаются:{' '}
-                  {deleteStats.observations ? `${deleteStats.observations} наблюдений` : ''}
-                  {deleteStats.observations && deleteStats.relations ? ', ' : ''}
-                  {deleteStats.relations ? `${deleteStats.relations} связей` : ''}.
-                  Поставьте галочку, чтобы удалить каскадно, и повторите.
-                </p>
-              )}
-
-              {deleteMessage && (
-                <p className={deleteMessage.startsWith('Ошибка') ? 'p-error' : 'p-success'}>
-                  {deleteMessage}
-                </p>
-              )}
-            </div>
-          );
-        })()}
-      </Dialog>
-
-      {/** Опасная зона */}
-      <Dialog
-        visible={dangerDialog}
-        style={{ width: '560px' }}
-        modal
-        onHide={closeDangerDialog}
-        header={
-          <span className="p-panel-title" style={{ color: 'var(--tg-theme-destructive-text-color, #ec3942)' }}>
-            <i className="pi pi-exclamation-octagon mr-2" />
-            Опасная зона
-          </span>
-        }
-        footer={
-          <div className="p-panel-footer flex justify-content-end gap-2">
-            <Button
-              label="Отмена"
-              icon="pi pi-times"
-              className="osint-soft"
-              onClick={closeDangerDialog}
-              disabled={dangerSaving}
-            />
-            <Button
-              label={dangerSaving ? 'Выполняется...' : 'Выполнить'}
-              icon={dangerSaving ? 'pi pi-spin pi-spinner' : 'pi pi-trash'}
-              className="osint-destructive"
-              onClick={performDangerAction}
-              disabled={dangerSaving || dangerConfirmText.trim() !== 'УДАЛИТЬ'}
-            />
-          </div>
-        }
-      >
-        <div className="p-fluid">
-          <div
-            className="p-3 border-round mb-3 flex align-items-start gap-2"
-            style={{
-              background: 'rgba(236, 57, 66, 0.08)',
-              border: '1px solid rgba(236, 57, 66, 0.4)',
-            }}
-          >
-            <i className="pi pi-exclamation-triangle mt-1" style={{ color: '#ec3942' }} />
-            <div className="text-sm">
-              <b>Операция необратима.</b> Отмены и восстановления не будет.
-              Перед выполнением убедитесь, что сделали резервную копию базы
-              (функция появится в следующих шагах) или сохранили нужные дампы.
-            </div>
-          </div>
-
-          <div className="field">
-            <label className="font-bold mb-2">Что очистить:</label>
-            <div className="flex flex-column gap-2">
-              <label className="flex align-items-center gap-2">
-                <input
-                  type="radio"
-                  name="dangerMode"
-                  value="tables"
-                  checked={dangerMode === 'tables'}
-                  onChange={() => setDangerMode('tables')}
-                  disabled={dangerSaving}
-                />
-                <span>
-                  <b>Только таблицы БД</b>
-                  <div className="text-sm text-500">
-                    Удалятся все записи из entities, relations, observations, sources,
-                    raw_dumps, audit_log, shards. Файлы дампов останутся на диске.
-                  </div>
-                </span>
-              </label>
-
-              <label className="flex align-items-center gap-2">
-                <input
-                  type="radio"
-                  name="dangerMode"
-                  value="dumps"
-                  checked={dangerMode === 'dumps'}
-                  onChange={() => setDangerMode('dumps')}
-                  disabled={dangerSaving}
-                />
-                <span>
-                  <b>Только файлы дампов</b>
-                  <div className="text-sm text-500">
-                    Удалятся все .msgpack-файлы из raw_dumps. Записи в таблицах БД
-                    сохранятся (но ссылки на файлы будут битыми).
-                  </div>
-                </span>
-              </label>
-
-              <label className="flex align-items-center gap-2">
-                <input
-                  type="radio"
-                  name="dangerMode"
-                  value="both"
-                  checked={dangerMode === 'both'}
-                  onChange={() => setDangerMode('both')}
-                  disabled={dangerSaving}
-                />
-                <span>
-                  <b>И таблицы, и дампы</b>
-                  <div className="text-sm text-500">
-                    Полная очистка. Приложение вернётся в исходное состояние, как
-                    после первого запуска.
-                  </div>
-                </span>
-              </label>
-            </div>
-          </div>
-
-          <div className="field mt-3">
-            <label htmlFor="dangerConfirm" className="font-bold">
-              Для подтверждения введите <code>УДАЛИТЬ</code>:
-            </label>
-            <InputText
-              id="dangerConfirm"
-              value={dangerConfirmText}
-              onChange={(e) => setDangerConfirmText(e.target.value)}
-              placeholder="УДАЛИТЬ"
-              disabled={dangerSaving}
-              className="w-full"
-            />
-          </div>
-
-          {dangerMessage && (
-            <p className={dangerMessage.startsWith('Ошибка') ? 'p-error' : 'p-success'}>
-              {dangerMessage}
-            </p>
-          )}
-        </div>
-      </Dialog>
+      <DangerZoneDialog
+        visible={dangerVisible}
+        onHide={() => setDangerVisible(false)}
+        onSuccess={async () => {
+          closeAllDialogs();
+          await loadData();
+        }}
+      />
 
       { /* Чувствительные данные */ }
       <SensitiveVaultDialog
