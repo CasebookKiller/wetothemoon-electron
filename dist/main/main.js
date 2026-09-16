@@ -40,6 +40,7 @@ let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_
 let node_sqlite = require("node:sqlite");
 let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules__msgpack_msgpack_dist_esm_index_mjs = require("/home/ll/Документы/GitHub/wetothemoon-project/wetothemoon-electron/node_modules/@msgpack/msgpack/dist.esm/index.mjs");
 let crypto$1 = require("crypto");
+crypto$1 = __toESM(crypto$1);
 let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_uuid_dist_node_index_js = require("/home/ll/Документы/GitHub/wetothemoon-project/wetothemoon-electron/node_modules/uuid/dist-node/index.js");
 let _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_node_cron_dist_node_cron_js = require("/home/ll/Документы/GitHub/wetothemoon-project/wetothemoon-electron/node_modules/node-cron/dist/node-cron.js");
 _home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_node_cron_dist_node_cron_js = __toESM(_home_ll_Документы_GitHub_wetothemoon_project_wetothemoon_electron_node_modules_node_cron_dist_node_cron_js);
@@ -9770,7 +9771,7 @@ function getDatabase() {
 		db.exec("PRAGMA journal_mode = WAL;");
 		db.exec("PRAGMA foreign_keys = ON;");
 		try {
-			initializeSchema(db);
+			initializeSchema$1(db);
 			console.log("Схема инициализирована");
 		} catch (e) {
 			console.error("Ошибка инициализации схемы:", e);
@@ -9779,7 +9780,7 @@ function getDatabase() {
 	}
 	return db;
 }
-function initializeSchema(db) {
+function initializeSchema$1(db) {
 	db.exec(`
     CREATE TABLE IF NOT EXISTS case_info (
       id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -10253,10 +10254,10 @@ function deleteDumpsByEntity(companyInn, companyIdRusprofile) {
 	const rows = companyIdRusprofile ? db.prepare(`SELECT id, dump_file_path FROM raw_dumps WHERE company_inn = ? AND company_id_rusprofile = ?`).all(companyInn, companyIdRusprofile) : db.prepare(`SELECT id, dump_file_path FROM raw_dumps WHERE company_inn = ?`).all(companyInn);
 	const deletedFiles = [];
 	const fileErrors = [];
-	const fs$9 = require("fs");
+	const fs$11 = require("fs");
 	for (const r of rows) try {
-		if (r.dump_file_path && fs$9.existsSync(r.dump_file_path)) {
-			fs$9.unlinkSync(r.dump_file_path);
+		if (r.dump_file_path && fs$11.existsSync(r.dump_file_path)) {
+			fs$11.unlinkSync(r.dump_file_path);
 			deletedFiles.push(r.dump_file_path);
 		}
 	} catch (e) {
@@ -11252,6 +11253,2544 @@ function mergeCompanyDumps(existingData, newData) {
 	return merged;
 }
 //#endregion
+//#region src/main/services/osint/sensitive/sensitiveCrypto.ts
+var SENTINEL_PLAINTEXT = "fremen-eye-sensitive-v1";
+var KEY_LENGTH = 32;
+var SALT_LENGTH = 32;
+var IV_LENGTH = 12;
+var DEFAULT_ITERATIONS = 6e5;
+var DEFAULT_DIGEST = "sha256";
+var cachedKey = null;
+function isUnlocked() {
+	return cachedKey !== null;
+}
+function lockKey() {
+	if (cachedKey) {
+		cachedKey.fill(0);
+		cachedKey = null;
+	}
+}
+function createKdfConfig() {
+	return {
+		salt: crypto$1.default.randomBytes(SALT_LENGTH).toString("base64"),
+		iterations: DEFAULT_ITERATIONS,
+		digest: DEFAULT_DIGEST
+	};
+}
+function deriveKey(passphrase, kdf) {
+	const salt = Buffer.from(kdf.salt, "base64");
+	const normalized = passphrase.normalize("NFKD");
+	return crypto$1.default.pbkdf2Sync(normalized, salt, kdf.iterations, KEY_LENGTH, kdf.digest);
+}
+function encryptWithKey(key, plaintext) {
+	const iv = crypto$1.default.randomBytes(IV_LENGTH);
+	const cipher = crypto$1.default.createCipheriv("aes-256-gcm", key, iv);
+	const ct = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
+	const tag = cipher.getAuthTag();
+	return {
+		iv: iv.toString("base64"),
+		ct: ct.toString("base64"),
+		tag: tag.toString("base64")
+	};
+}
+function decryptWithKey(key, blob) {
+	const iv = Buffer.from(blob.iv, "base64");
+	const ct = Buffer.from(blob.ct, "base64");
+	const tag = Buffer.from(blob.tag, "base64");
+	const decipher = crypto$1.default.createDecipheriv("aes-256-gcm", key, iv);
+	decipher.setAuthTag(tag);
+	return Buffer.concat([decipher.update(ct), decipher.final()]).toString("utf8");
+}
+function createSentinel(key) {
+	return encryptWithKey(key, SENTINEL_PLAINTEXT);
+}
+function verifySentinel(key, sentinel) {
+	try {
+		return decryptWithKey(key, sentinel) === SENTINEL_PLAINTEXT;
+	} catch {
+		return false;
+	}
+}
+function unlockWithPassphrase(passphrase, kdf, sentinel) {
+	const key = deriveKey(passphrase, kdf);
+	if (!verifySentinel(key, sentinel)) {
+		key.fill(0);
+		return {
+			success: false,
+			error: "Неверная фраза восстановления"
+		};
+	}
+	if (cachedKey) cachedKey.fill(0);
+	cachedKey = key;
+	return { success: true };
+}
+function unlockWithRawKey(key) {
+	if (key.length !== KEY_LENGTH) throw new Error(`Ожидался ключ ${KEY_LENGTH} байт, получено ${key.length}`);
+	if (cachedKey) cachedKey.fill(0);
+	cachedKey = key;
+}
+function encryptCurrent(plaintext) {
+	if (!cachedKey) throw new Error("Sensitive-хранилище заблокировано");
+	return encryptWithKey(cachedKey, plaintext);
+}
+function decryptCurrent(blob) {
+	if (!cachedKey) throw new Error("Sensitive-хранилище заблокировано");
+	return decryptWithKey(cachedKey, blob);
+}
+function generateRandomKey() {
+	return crypto$1.default.randomBytes(KEY_LENGTH);
+}
+//#endregion
+//#region src/main/services/osint/sensitive/sensitivePassphraseStorage.ts
+var FILE_NAME = "sensitive_passphrase.dat";
+function getFilePath() {
+	return path.default.join(electron.app.getPath("userData"), FILE_NAME);
+}
+function isAutoUnlockAvailable() {
+	try {
+		return electron.safeStorage.isEncryptionAvailable();
+	} catch {
+		return false;
+	}
+}
+function getStorageProviderName() {
+	switch (process.platform) {
+		case "win32": return "Windows DPAPI";
+		case "darwin": return "macOS Keychain";
+		case "linux": return "Linux keyring (libsecret)";
+		default: return "системное хранилище";
+	}
+}
+function hasStoredPassphrase() {
+	return fs.default.existsSync(getFilePath());
+}
+function savePassphrase(passphrase) {
+	if (!isAutoUnlockAvailable()) return {
+		success: false,
+		error: `Авторазблокировка недоступна: ${getStorageProviderName()} не отвечает`
+	};
+	try {
+		const encrypted = electron.safeStorage.encryptString(passphrase);
+		const filePath = getFilePath();
+		fs.default.writeFileSync(filePath, encrypted);
+		try {
+			fs.default.chmodSync(filePath, 384);
+		} catch {}
+		return { success: true };
+	} catch (e) {
+		return {
+			success: false,
+			error: e.message
+		};
+	}
+}
+function loadPassphrase() {
+	if (!isAutoUnlockAvailable()) return null;
+	const filePath = getFilePath();
+	if (!fs.default.existsSync(filePath)) return null;
+	try {
+		const buf = fs.default.readFileSync(filePath);
+		return electron.safeStorage.decryptString(buf);
+	} catch {
+		return null;
+	}
+}
+function clearStoredPassphrase() {
+	const filePath = getFilePath();
+	if (fs.default.existsSync(filePath)) try {
+		fs.default.unlinkSync(filePath);
+	} catch {}
+}
+//#endregion
+//#region src/main/services/osint/sensitive/sensitiveDatabase.ts
+var sdb = null;
+function getSensitiveDbPath() {
+	return path.default.join(electron.app.getPath("userData"), "sensitive_data.db");
+}
+function getSensitiveDatabase() {
+	if (!sdb) {
+		const dbPath = getSensitiveDbPath();
+		sdb = new node_sqlite.DatabaseSync(dbPath);
+		sdb.exec("PRAGMA journal_mode = WAL;");
+		sdb.exec("PRAGMA foreign_keys = ON;");
+		initializeSchema(sdb);
+		try {
+			fs.default.chmodSync(dbPath, 384);
+			for (const suffix of ["-wal", "-shm"]) {
+				const p = dbPath + suffix;
+				if (fs.default.existsSync(p)) fs.default.chmodSync(p, 384);
+			}
+		} catch {}
+	}
+	return sdb;
+}
+function initializeSchema(db) {
+	db.exec(`
+    CREATE TABLE IF NOT EXISTS sensitive_config (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      mode TEXT NOT NULL,
+      kdf_salt TEXT,
+      kdf_iterations INTEGER,
+      kdf_digest TEXT,
+      sentinel_iv TEXT NOT NULL,
+      sentinel_ct TEXT NOT NULL,
+      sentinel_tag TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS sensitive_data (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      entity_id INTEGER NOT NULL,
+      field_name TEXT NOT NULL,
+      iv TEXT NOT NULL,
+      ciphertext TEXT NOT NULL,
+      auth_tag TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      legal_basis TEXT NOT NULL,
+      retention_until TEXT,
+      notes TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_sensitive_entity ON sensitive_data(entity_id);
+    CREATE INDEX IF NOT EXISTS idx_sensitive_field ON sensitive_data(field_name);
+  `);
+}
+function getSensitiveStatus() {
+	const cfg = getSensitiveDatabase().prepare("SELECT id, mode FROM sensitive_config WHERE id = 1").get();
+	return {
+		initialized: !!cfg,
+		mode: cfg?.mode ?? null,
+		unlocked: isUnlocked(),
+		autoUnlockAvailable: isAutoUnlockAvailable(),
+		hasStoredPassphrase: hasStoredPassphrase()
+	};
+}
+function initializeSensitiveVault(input) {
+	const db = getSensitiveDatabase();
+	if (db.prepare("SELECT id FROM sensitive_config WHERE id = 1").get()) return {
+		success: false,
+		error: "Хранилище уже инициализировано"
+	};
+	let key;
+	let kdf = null;
+	let materialToSave = null;
+	try {
+		if (input.mode === "passphrase") {
+			if (!input.passphrase?.trim()) return {
+				success: false,
+				error: "Пустая фраза восстановления"
+			};
+			kdf = createKdfConfig();
+			key = deriveKey(input.passphrase, kdf);
+			materialToSave = input.passphrase;
+		} else {
+			key = generateRandomKey();
+			materialToSave = key.toString("base64");
+		}
+		const sentinel = createSentinel(key);
+		const now = (/* @__PURE__ */ new Date()).toISOString();
+		db.prepare(`
+      INSERT INTO sensitive_config
+        (id, mode, kdf_salt, kdf_iterations, kdf_digest,
+         sentinel_iv, sentinel_ct, sentinel_tag, created_at, updated_at)
+      VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(input.mode, kdf?.salt ?? null, kdf?.iterations ?? null, kdf?.digest ?? null, sentinel.iv, sentinel.ct, sentinel.tag, now, now);
+		unlockWithRawKey(key);
+		if (input.saveAutoUnlock && materialToSave) {
+			const saveResult = savePassphrase(materialToSave);
+			if (!saveResult.success) console.warn("Авторазблокировка не сохранена:", saveResult.error);
+		}
+		return { success: true };
+	} catch (e) {
+		if (key) key.fill(0);
+		return {
+			success: false,
+			error: e.message
+		};
+	}
+}
+function loadConfig() {
+	const cfg = getSensitiveDatabase().prepare("SELECT * FROM sensitive_config WHERE id = 1").get();
+	if (!cfg) return null;
+	return {
+		mode: cfg.mode,
+		kdf: cfg.kdf_salt ? {
+			salt: cfg.kdf_salt,
+			iterations: cfg.kdf_iterations,
+			digest: cfg.kdf_digest
+		} : null,
+		sentinel: {
+			iv: cfg.sentinel_iv,
+			ct: cfg.sentinel_ct,
+			tag: cfg.sentinel_tag
+		}
+	};
+}
+function tryAutoUnlock() {
+	const cfg = loadConfig();
+	if (!cfg) return {
+		success: false,
+		error: "Хранилище не инициализировано"
+	};
+	if (!hasStoredPassphrase()) return {
+		success: false,
+		error: "Фраза не сохранена для авторазблокировки"
+	};
+	const material = loadPassphrase();
+	if (!material) return {
+		success: false,
+		error: "Не удалось прочитать сохранённую фразу"
+	};
+	if (cfg.mode === "passphrase") {
+		if (!cfg.kdf) return {
+			success: false,
+			error: "Повреждён конфиг KDF"
+		};
+		return unlockWithPassphrase(material, cfg.kdf, cfg.sentinel);
+	} else try {
+		const key = Buffer.from(material, "base64");
+		if (!verifySentinel(key, cfg.sentinel)) {
+			key.fill(0);
+			return {
+				success: false,
+				error: "Сохранённый ключ повреждён"
+			};
+		}
+		unlockWithRawKey(key);
+		return { success: true };
+	} catch (e) {
+		return {
+			success: false,
+			error: e.message
+		};
+	}
+}
+function unlockWithPassphraseInput(passphrase, saveAutoUnlock = false) {
+	const cfg = loadConfig();
+	if (!cfg) return {
+		success: false,
+		error: "Хранилище не инициализировано"
+	};
+	if (cfg.mode !== "passphrase" || !cfg.kdf) return {
+		success: false,
+		error: "Хранилище не использует фразу восстановления"
+	};
+	const res = unlockWithPassphrase(passphrase, cfg.kdf, cfg.sentinel);
+	if (res.success && saveAutoUnlock && isAutoUnlockAvailable()) savePassphrase(passphrase);
+	return res;
+}
+function lockSensitiveVault() {
+	lockKey();
+}
+function forgetAutoUnlock() {
+	clearStoredPassphrase();
+}
+function addSensitiveRecord(input) {
+	if (!isUnlocked()) return {
+		success: false,
+		error: "Хранилище заблокировано"
+	};
+	if (!input.entity_id) return {
+		success: false,
+		error: "Не указана сущность"
+	};
+	if (!input.field_name?.trim()) return {
+		success: false,
+		error: "Не указано поле"
+	};
+	if (!input.field_value?.trim()) return {
+		success: false,
+		error: "Не указано значение"
+	};
+	if (!input.legal_basis?.trim()) return {
+		success: false,
+		error: "Не указано основание хранения"
+	};
+	try {
+		const db = getSensitiveDatabase();
+		const blob = encryptCurrent(input.field_value);
+		const info = db.prepare(`
+      INSERT INTO sensitive_data
+        (entity_id, field_name, iv, ciphertext, auth_tag, created_at,
+         legal_basis, retention_until, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(input.entity_id, input.field_name.trim(), blob.iv, blob.ct, blob.tag, (/* @__PURE__ */ new Date()).toISOString(), input.legal_basis.trim(), input.retention_until || null, input.notes || null);
+		return {
+			success: true,
+			id: Number(info.lastInsertRowid)
+		};
+	} catch (e) {
+		return {
+			success: false,
+			error: e.message
+		};
+	}
+}
+function listSensitiveForEntity(entityId) {
+	return getSensitiveDatabase().prepare(`
+    SELECT id, entity_id, field_name, created_at, legal_basis, retention_until, notes
+    FROM sensitive_data
+    WHERE entity_id = ?
+    ORDER BY created_at DESC
+  `).all(entityId);
+}
+function revealSensitiveRecord(id) {
+	if (!isUnlocked()) return {
+		success: false,
+		error: "Хранилище заблокировано"
+	};
+	const r = getSensitiveDatabase().prepare(`
+    SELECT iv, ciphertext, auth_tag FROM sensitive_data WHERE id = ?
+  `).get(id);
+	if (!r) return {
+		success: false,
+		error: "Запись не найдена"
+	};
+	try {
+		return {
+			success: true,
+			value: decryptCurrent({
+				iv: r.iv,
+				ct: r.ciphertext,
+				tag: r.auth_tag
+			})
+		};
+	} catch (e) {
+		return {
+			success: false,
+			error: e.message
+		};
+	}
+}
+function deleteSensitiveRecord(id) {
+	const db = getSensitiveDatabase();
+	if (!db.prepare("SELECT id FROM sensitive_data WHERE id = ?").get(id)) return {
+		success: false,
+		error: `Запись #${id} не найдена`
+	};
+	try {
+		db.prepare("DELETE FROM sensitive_data WHERE id = ?").run(id);
+		return { success: true };
+	} catch (e) {
+		return {
+			success: false,
+			error: e.message
+		};
+	}
+}
+function listSensitiveFieldNames() {
+	return [
+		"passport",
+		"passport_series_number",
+		"dob",
+		"private_phone",
+		"private_email",
+		"personal_id",
+		"snils",
+		"inn",
+		"driver_license",
+		"address_registration",
+		"address_residential",
+		"bank_account",
+		"other"
+	];
+}
+//#endregion
+//#region src/shared/sensitive/wordlists/index.ts
+var WORDLISTS = {
+	en: [
+		"abandon",
+		"ability",
+		"able",
+		"about",
+		"above",
+		"absent",
+		"absorb",
+		"abstract",
+		"absurd",
+		"abuse",
+		"access",
+		"accident",
+		"account",
+		"accuse",
+		"achieve",
+		"acid",
+		"acoustic",
+		"acquire",
+		"across",
+		"act",
+		"action",
+		"actor",
+		"actress",
+		"actual",
+		"adapt",
+		"add",
+		"addict",
+		"address",
+		"adjust",
+		"admit",
+		"adult",
+		"advance",
+		"advice",
+		"aerobic",
+		"affair",
+		"afford",
+		"afraid",
+		"again",
+		"age",
+		"agent",
+		"agree",
+		"ahead",
+		"aim",
+		"air",
+		"airport",
+		"aisle",
+		"alarm",
+		"album",
+		"alcohol",
+		"alert",
+		"alien",
+		"all",
+		"alley",
+		"allow",
+		"almost",
+		"alone",
+		"alpha",
+		"already",
+		"also",
+		"alter",
+		"always",
+		"amateur",
+		"amazing",
+		"among",
+		"amount",
+		"amused",
+		"analyst",
+		"anchor",
+		"ancient",
+		"anger",
+		"angle",
+		"angry",
+		"animal",
+		"ankle",
+		"announce",
+		"annual",
+		"another",
+		"answer",
+		"antenna",
+		"antique",
+		"anxiety",
+		"any",
+		"apart",
+		"apology",
+		"appear",
+		"apple",
+		"approve",
+		"april",
+		"arch",
+		"arctic",
+		"area",
+		"arena",
+		"argue",
+		"arm",
+		"armed",
+		"armor",
+		"army",
+		"around",
+		"arrange",
+		"arrest",
+		"arrive",
+		"arrow",
+		"art",
+		"artefact",
+		"artist",
+		"artwork",
+		"ask",
+		"aspect",
+		"assault",
+		"asset",
+		"assist",
+		"assume",
+		"asthma",
+		"athlete",
+		"atom",
+		"attack",
+		"attend",
+		"attitude",
+		"attract",
+		"auction",
+		"audit",
+		"august",
+		"aunt",
+		"author",
+		"auto",
+		"autumn",
+		"average",
+		"avocado",
+		"avoid",
+		"awake",
+		"aware",
+		"away",
+		"awesome",
+		"awful",
+		"awkward",
+		"axis",
+		"baby",
+		"bachelor",
+		"bacon",
+		"badge",
+		"bag",
+		"balance",
+		"balcony",
+		"ball",
+		"bamboo",
+		"banana",
+		"banner",
+		"bar",
+		"barely",
+		"bargain",
+		"barrel",
+		"base",
+		"basic",
+		"basket",
+		"battle",
+		"beach",
+		"bean",
+		"beauty",
+		"because",
+		"become",
+		"beef",
+		"before",
+		"begin",
+		"behave",
+		"behind",
+		"believe",
+		"below",
+		"belt",
+		"bench",
+		"benefit",
+		"best",
+		"betray",
+		"better",
+		"between",
+		"beyond",
+		"bicycle",
+		"bid",
+		"bike",
+		"bind",
+		"biology",
+		"bird",
+		"birth",
+		"bitter",
+		"black",
+		"blade",
+		"blame",
+		"blanket",
+		"blast",
+		"bleak",
+		"bless",
+		"blind",
+		"blood",
+		"blossom",
+		"blouse",
+		"blue",
+		"blur",
+		"blush",
+		"board",
+		"boat",
+		"body",
+		"boil",
+		"bomb",
+		"bone",
+		"bonus",
+		"book",
+		"boost",
+		"border",
+		"boring",
+		"borrow",
+		"boss",
+		"bottom",
+		"bounce",
+		"box",
+		"boy",
+		"bracket",
+		"brain",
+		"brand",
+		"brass",
+		"brave",
+		"bread",
+		"breeze",
+		"brick",
+		"bridge",
+		"brief",
+		"bright",
+		"bring",
+		"brisk",
+		"broccoli",
+		"broken",
+		"bronze",
+		"broom",
+		"brother",
+		"brown",
+		"brush",
+		"bubble",
+		"buddy",
+		"budget",
+		"buffalo",
+		"build",
+		"bulb",
+		"bulk",
+		"bullet",
+		"bundle",
+		"bunker",
+		"burden",
+		"burger",
+		"burst",
+		"bus",
+		"business",
+		"busy",
+		"butter",
+		"buyer",
+		"buzz",
+		"cabbage",
+		"cabin",
+		"cable",
+		"cactus",
+		"cage",
+		"cake",
+		"call",
+		"calm",
+		"camera",
+		"camp",
+		"can",
+		"canal",
+		"cancel",
+		"candy",
+		"cannon",
+		"canoe",
+		"canvas",
+		"canyon",
+		"capable",
+		"capital",
+		"captain",
+		"car",
+		"carbon",
+		"card",
+		"cargo",
+		"carpet",
+		"carry",
+		"cart",
+		"case",
+		"cash",
+		"casino",
+		"castle",
+		"casual",
+		"cat",
+		"catalog",
+		"catch",
+		"category",
+		"cattle",
+		"caught",
+		"cause",
+		"caution",
+		"cave",
+		"ceiling",
+		"celery",
+		"cement",
+		"census",
+		"century",
+		"cereal",
+		"certain",
+		"chair",
+		"chalk",
+		"champion",
+		"change",
+		"chaos",
+		"chapter",
+		"charge",
+		"chase",
+		"chat",
+		"cheap",
+		"check",
+		"cheese",
+		"chef",
+		"cherry",
+		"chest",
+		"chicken",
+		"chief",
+		"child",
+		"chimney",
+		"choice",
+		"choose",
+		"chronic",
+		"chuckle",
+		"chunk",
+		"churn",
+		"cigar",
+		"cinnamon",
+		"circle",
+		"citizen",
+		"city",
+		"civil",
+		"claim",
+		"clap",
+		"clarify",
+		"claw",
+		"clay",
+		"clean",
+		"clerk",
+		"clever",
+		"click",
+		"client",
+		"cliff",
+		"climb",
+		"clinic",
+		"clip",
+		"clock",
+		"clog",
+		"close",
+		"cloth",
+		"cloud",
+		"clown",
+		"club",
+		"clump",
+		"cluster",
+		"clutch",
+		"coach",
+		"coast",
+		"coconut",
+		"code",
+		"coffee",
+		"coil",
+		"coin",
+		"collect",
+		"color",
+		"column",
+		"combine",
+		"come",
+		"comfort",
+		"comic",
+		"common",
+		"company",
+		"concert",
+		"conduct",
+		"confirm",
+		"congress",
+		"connect",
+		"consider",
+		"control",
+		"convince",
+		"cook",
+		"cool",
+		"copper",
+		"copy",
+		"coral",
+		"core",
+		"corn",
+		"correct",
+		"cost",
+		"cotton",
+		"couch",
+		"country",
+		"couple",
+		"course",
+		"cousin",
+		"cover",
+		"coyote",
+		"crack",
+		"cradle",
+		"craft",
+		"cram",
+		"crane",
+		"crash",
+		"crater",
+		"crawl",
+		"crazy",
+		"cream",
+		"credit",
+		"creek",
+		"crew",
+		"cricket",
+		"crime",
+		"crisp",
+		"critic",
+		"crop",
+		"cross",
+		"crouch",
+		"crowd",
+		"crucial",
+		"cruel",
+		"cruise",
+		"crumble",
+		"crunch",
+		"crush",
+		"cry",
+		"crystal",
+		"cube",
+		"culture",
+		"cup",
+		"cupboard",
+		"curious",
+		"current",
+		"curtain",
+		"curve",
+		"cushion",
+		"custom",
+		"cute",
+		"cycle",
+		"dad",
+		"damage",
+		"damp",
+		"dance",
+		"danger",
+		"daring",
+		"dash",
+		"daughter",
+		"dawn",
+		"day",
+		"deal",
+		"debate",
+		"debris",
+		"decade",
+		"december",
+		"decide",
+		"decline",
+		"decorate",
+		"decrease",
+		"deer",
+		"defense",
+		"define",
+		"defy",
+		"degree",
+		"delay",
+		"deliver",
+		"demand",
+		"demise",
+		"denial",
+		"dentist",
+		"deny",
+		"depart",
+		"depend",
+		"deposit",
+		"depth",
+		"deputy",
+		"derive",
+		"describe",
+		"desert",
+		"design",
+		"desk",
+		"despair",
+		"destroy",
+		"detail",
+		"detect",
+		"develop",
+		"device",
+		"devote",
+		"diagram",
+		"dial",
+		"diamond",
+		"diary",
+		"dice",
+		"diesel",
+		"diet",
+		"differ",
+		"digital",
+		"dignity",
+		"dilemma",
+		"dinner",
+		"dinosaur",
+		"direct",
+		"dirt",
+		"disagree",
+		"discover",
+		"disease",
+		"dish",
+		"dismiss",
+		"disorder",
+		"display",
+		"distance",
+		"divert",
+		"divide",
+		"divorce",
+		"dizzy",
+		"doctor",
+		"document",
+		"dog",
+		"doll",
+		"dolphin",
+		"domain",
+		"donate",
+		"donkey",
+		"donor",
+		"door",
+		"dose",
+		"double",
+		"dove",
+		"draft",
+		"dragon",
+		"drama",
+		"drastic",
+		"draw",
+		"dream",
+		"dress",
+		"drift",
+		"drill",
+		"drink",
+		"drip",
+		"drive",
+		"drop",
+		"drum",
+		"dry",
+		"duck",
+		"dumb",
+		"dune",
+		"during",
+		"dust",
+		"dutch",
+		"duty",
+		"dwarf",
+		"dynamic",
+		"eager",
+		"eagle",
+		"early",
+		"earn",
+		"earth",
+		"easily",
+		"east",
+		"easy",
+		"echo",
+		"ecology",
+		"economy",
+		"edge",
+		"edit",
+		"educate",
+		"effort",
+		"egg",
+		"eight",
+		"either",
+		"elbow",
+		"elder",
+		"electric",
+		"elegant",
+		"element",
+		"elephant",
+		"elevator",
+		"elite",
+		"else",
+		"embark",
+		"embody",
+		"embrace",
+		"emerge",
+		"emotion",
+		"employ",
+		"empower",
+		"empty",
+		"enable",
+		"enact",
+		"end",
+		"endless",
+		"endorse",
+		"enemy",
+		"energy",
+		"enforce",
+		"engage",
+		"engine",
+		"enhance",
+		"enjoy",
+		"enlist",
+		"enough",
+		"enrich",
+		"enroll",
+		"ensure",
+		"enter",
+		"entire",
+		"entry",
+		"envelope",
+		"episode",
+		"equal",
+		"equip",
+		"era",
+		"erase",
+		"erode",
+		"erosion",
+		"error",
+		"erupt",
+		"escape",
+		"essay",
+		"essence",
+		"estate",
+		"eternal",
+		"ethics",
+		"evidence",
+		"evil",
+		"evoke",
+		"evolve",
+		"exact",
+		"example",
+		"excess",
+		"exchange",
+		"excite",
+		"exclude",
+		"excuse",
+		"execute",
+		"exercise",
+		"exhaust",
+		"exhibit",
+		"exile",
+		"exist",
+		"exit",
+		"exotic",
+		"expand",
+		"expect",
+		"expire",
+		"explain",
+		"expose",
+		"express",
+		"extend",
+		"extra",
+		"eye",
+		"eyebrow",
+		"fabric",
+		"face",
+		"faculty",
+		"fade",
+		"faint",
+		"faith",
+		"fall",
+		"false",
+		"fame",
+		"family",
+		"famous",
+		"fan",
+		"fancy",
+		"fantasy",
+		"farm",
+		"fashion",
+		"fat",
+		"fatal",
+		"father",
+		"fatigue",
+		"fault",
+		"favorite",
+		"feature",
+		"february",
+		"federal",
+		"fee",
+		"feed",
+		"feel",
+		"female",
+		"fence",
+		"festival",
+		"fetch",
+		"fever",
+		"few",
+		"fiber",
+		"fiction",
+		"field",
+		"figure",
+		"file",
+		"film",
+		"filter",
+		"final",
+		"find",
+		"fine",
+		"finger",
+		"finish",
+		"fire",
+		"firm",
+		"first",
+		"fiscal",
+		"fish",
+		"fit",
+		"fitness",
+		"fix",
+		"flag",
+		"flame",
+		"flash",
+		"flat",
+		"flavor",
+		"flee",
+		"flight",
+		"flip",
+		"float",
+		"flock",
+		"floor",
+		"flower",
+		"fluid",
+		"flush",
+		"fly",
+		"foam",
+		"focus",
+		"fog",
+		"foil",
+		"fold",
+		"follow",
+		"food",
+		"foot",
+		"force",
+		"forest",
+		"forget",
+		"fork",
+		"fortune",
+		"forum",
+		"forward",
+		"fossil",
+		"foster",
+		"found",
+		"fox",
+		"fragile",
+		"frame",
+		"frequent",
+		"fresh",
+		"friend",
+		"fringe",
+		"frog",
+		"front",
+		"frost",
+		"frown",
+		"frozen",
+		"fruit",
+		"fuel",
+		"fun",
+		"funny",
+		"furnace",
+		"fury",
+		"future",
+		"gadget",
+		"gain",
+		"galaxy",
+		"gallery",
+		"game",
+		"gap",
+		"garage",
+		"garbage",
+		"garden",
+		"garlic",
+		"garment",
+		"gas",
+		"gasp",
+		"gate",
+		"gather",
+		"gauge",
+		"gaze",
+		"general",
+		"genius",
+		"genre",
+		"gentle",
+		"genuine",
+		"gesture",
+		"ghost",
+		"giant",
+		"gift",
+		"giggle",
+		"ginger",
+		"giraffe",
+		"girl",
+		"give",
+		"glad",
+		"glance",
+		"glare",
+		"glass",
+		"glide",
+		"glimpse",
+		"globe",
+		"gloom",
+		"glory",
+		"glove",
+		"glow",
+		"glue",
+		"goat",
+		"goddess",
+		"gold",
+		"good",
+		"goose",
+		"gorilla",
+		"gospel",
+		"gossip",
+		"govern",
+		"gown",
+		"grab",
+		"grace",
+		"grain",
+		"grant",
+		"grape",
+		"grass",
+		"gravity",
+		"great",
+		"green",
+		"grid",
+		"grief",
+		"grit",
+		"grocery",
+		"group",
+		"grow",
+		"grunt",
+		"guard",
+		"guess",
+		"guide",
+		"guilt",
+		"guitar",
+		"gun",
+		"gym",
+		"habit",
+		"hair",
+		"half",
+		"hammer",
+		"hamster",
+		"hand",
+		"happy",
+		"harbor",
+		"hard",
+		"harsh",
+		"harvest",
+		"hat",
+		"have",
+		"hawk",
+		"hazard",
+		"head",
+		"health",
+		"heart",
+		"heavy",
+		"hedgehog",
+		"height",
+		"hello",
+		"helmet",
+		"help",
+		"hen",
+		"hero",
+		"hidden",
+		"high",
+		"hill",
+		"hint",
+		"hip",
+		"hire",
+		"history",
+		"hobby",
+		"hockey",
+		"hold",
+		"hole",
+		"holiday",
+		"hollow",
+		"home",
+		"honey",
+		"hood",
+		"hope",
+		"horn",
+		"horror",
+		"horse",
+		"hospital",
+		"host",
+		"hotel",
+		"hour",
+		"hover",
+		"hub",
+		"huge",
+		"human",
+		"humble",
+		"humor",
+		"hundred",
+		"hungry",
+		"hunt",
+		"hurdle",
+		"hurry",
+		"hurt",
+		"husband",
+		"hybrid",
+		"ice",
+		"icon",
+		"idea",
+		"identify",
+		"idle",
+		"ignore",
+		"ill",
+		"illegal",
+		"illness",
+		"image",
+		"imitate",
+		"immense",
+		"immune",
+		"impact",
+		"impose",
+		"improve",
+		"impulse",
+		"inch",
+		"include",
+		"income",
+		"increase",
+		"index",
+		"indicate",
+		"indoor",
+		"industry",
+		"infant",
+		"inflict",
+		"inform",
+		"inhale",
+		"inherit",
+		"initial",
+		"inject",
+		"injury",
+		"inmate",
+		"inner",
+		"innocent",
+		"input",
+		"inquiry",
+		"insane",
+		"insect",
+		"inside",
+		"inspire",
+		"install",
+		"intact",
+		"interest",
+		"into",
+		"invest",
+		"invite",
+		"involve",
+		"iron",
+		"island",
+		"isolate",
+		"issue",
+		"item",
+		"ivory",
+		"jacket",
+		"jaguar",
+		"jar",
+		"jazz",
+		"jealous",
+		"jeans",
+		"jelly",
+		"jewel",
+		"job",
+		"join",
+		"joke",
+		"journey",
+		"joy",
+		"judge",
+		"juice",
+		"jump",
+		"jungle",
+		"junior",
+		"junk",
+		"just",
+		"kangaroo",
+		"keen",
+		"keep",
+		"ketchup",
+		"key",
+		"kick",
+		"kid",
+		"kidney",
+		"kind",
+		"kingdom",
+		"kiss",
+		"kit",
+		"kitchen",
+		"kite",
+		"kitten",
+		"kiwi",
+		"knee",
+		"knife",
+		"knock",
+		"know",
+		"lab",
+		"label",
+		"labor",
+		"ladder",
+		"lady",
+		"lake",
+		"lamp",
+		"language",
+		"laptop",
+		"large",
+		"later",
+		"latin",
+		"laugh",
+		"laundry",
+		"lava",
+		"law",
+		"lawn",
+		"lawsuit",
+		"layer",
+		"lazy",
+		"leader",
+		"leaf",
+		"learn",
+		"leave",
+		"lecture",
+		"left",
+		"leg",
+		"legal",
+		"legend",
+		"leisure",
+		"lemon",
+		"lend",
+		"length",
+		"lens",
+		"leopard",
+		"lesson",
+		"letter",
+		"level",
+		"liar",
+		"liberty",
+		"library",
+		"license",
+		"life",
+		"lift",
+		"light",
+		"like",
+		"limb",
+		"limit",
+		"link",
+		"lion",
+		"liquid",
+		"list",
+		"little",
+		"live",
+		"lizard",
+		"load",
+		"loan",
+		"lobster",
+		"local",
+		"lock",
+		"logic",
+		"lonely",
+		"long",
+		"loop",
+		"lottery",
+		"loud",
+		"lounge",
+		"love",
+		"loyal",
+		"lucky",
+		"luggage",
+		"lumber",
+		"lunar",
+		"lunch",
+		"luxury",
+		"lyrics",
+		"machine",
+		"mad",
+		"magic",
+		"magnet",
+		"maid",
+		"mail",
+		"main",
+		"major",
+		"make",
+		"mammal",
+		"man",
+		"manage",
+		"mandate",
+		"mango",
+		"mansion",
+		"manual",
+		"maple",
+		"marble",
+		"march",
+		"margin",
+		"marine",
+		"market",
+		"marriage",
+		"mask",
+		"mass",
+		"master",
+		"match",
+		"material",
+		"math",
+		"matrix",
+		"matter",
+		"maximum",
+		"maze",
+		"meadow",
+		"mean",
+		"measure",
+		"meat",
+		"mechanic",
+		"medal",
+		"media",
+		"melody",
+		"melt",
+		"member",
+		"memory",
+		"mention",
+		"menu",
+		"mercy",
+		"merge",
+		"merit",
+		"merry",
+		"mesh",
+		"message",
+		"metal",
+		"method",
+		"middle",
+		"midnight",
+		"milk",
+		"million",
+		"mimic",
+		"mind",
+		"minimum",
+		"minor",
+		"minute",
+		"miracle",
+		"mirror",
+		"misery",
+		"miss",
+		"mistake",
+		"mix",
+		"mixed",
+		"mixture",
+		"mobile",
+		"model",
+		"modify",
+		"mom",
+		"moment",
+		"monitor",
+		"monkey",
+		"monster",
+		"month",
+		"moon",
+		"moral",
+		"more",
+		"morning",
+		"mosquito",
+		"mother",
+		"motion",
+		"motor",
+		"mountain",
+		"mouse",
+		"move",
+		"movie",
+		"much",
+		"muffin",
+		"mule",
+		"multiply",
+		"muscle",
+		"museum",
+		"mushroom",
+		"music",
+		"must",
+		"mutual",
+		"myself",
+		"mystery",
+		"myth",
+		"naive",
+		"name",
+		"napkin",
+		"narrow",
+		"nasty",
+		"nation",
+		"nature",
+		"near",
+		"neck",
+		"need",
+		"negative",
+		"neglect",
+		"neither",
+		"nephew",
+		"nerve",
+		"nest",
+		"net",
+		"network",
+		"neutral",
+		"never",
+		"news",
+		"next",
+		"nice",
+		"night",
+		"noble",
+		"noise",
+		"nominee",
+		"noodle",
+		"normal",
+		"north",
+		"nose",
+		"notable",
+		"note",
+		"nothing",
+		"notice",
+		"novel",
+		"now",
+		"nuclear",
+		"number",
+		"nurse",
+		"nut",
+		"oak",
+		"obey",
+		"object",
+		"oblige",
+		"obscure",
+		"observe",
+		"obtain",
+		"obvious",
+		"occur",
+		"ocean",
+		"october",
+		"odor",
+		"off",
+		"offer",
+		"office",
+		"often",
+		"oil",
+		"okay",
+		"old",
+		"olive",
+		"olympic",
+		"omit",
+		"once",
+		"one",
+		"onion",
+		"online",
+		"only",
+		"open",
+		"opera",
+		"opinion",
+		"oppose",
+		"option",
+		"orange",
+		"orbit",
+		"orchard",
+		"order",
+		"ordinary",
+		"organ",
+		"orient",
+		"original",
+		"orphan",
+		"ostrich",
+		"other",
+		"outdoor",
+		"outer",
+		"output",
+		"outside",
+		"oval",
+		"oven",
+		"over",
+		"own",
+		"owner",
+		"oxygen",
+		"oyster",
+		"ozone",
+		"pact",
+		"paddle",
+		"page",
+		"pair",
+		"palace",
+		"palm",
+		"panda",
+		"panel",
+		"panic",
+		"panther",
+		"paper",
+		"parade",
+		"parent",
+		"park",
+		"parrot",
+		"party",
+		"pass",
+		"patch",
+		"path",
+		"patient",
+		"patrol",
+		"pattern",
+		"pause",
+		"pave",
+		"payment",
+		"peace",
+		"peanut",
+		"pear",
+		"peasant",
+		"pelican",
+		"pen",
+		"penalty",
+		"pencil",
+		"people",
+		"pepper",
+		"perfect",
+		"permit",
+		"person",
+		"pet",
+		"phone",
+		"photo",
+		"phrase",
+		"physical",
+		"piano",
+		"picnic",
+		"picture",
+		"piece",
+		"pig",
+		"pigeon",
+		"pill",
+		"pilot",
+		"pink",
+		"pioneer",
+		"pipe",
+		"pistol",
+		"pitch",
+		"pizza",
+		"place",
+		"planet",
+		"plastic",
+		"plate",
+		"play",
+		"please",
+		"pledge",
+		"pluck",
+		"plug",
+		"plunge",
+		"poem",
+		"poet",
+		"point",
+		"polar",
+		"pole",
+		"police",
+		"pond",
+		"pony",
+		"pool",
+		"popular",
+		"portion",
+		"position",
+		"possible",
+		"post",
+		"potato",
+		"pottery",
+		"poverty",
+		"powder",
+		"power",
+		"practice",
+		"praise",
+		"predict",
+		"prefer",
+		"prepare",
+		"present",
+		"pretty",
+		"prevent",
+		"price",
+		"pride",
+		"primary",
+		"print",
+		"priority",
+		"prison",
+		"private",
+		"prize",
+		"problem",
+		"process",
+		"produce",
+		"profit",
+		"program",
+		"project",
+		"promote",
+		"proof",
+		"property",
+		"prosper",
+		"protect",
+		"proud",
+		"provide",
+		"public",
+		"pudding",
+		"pull",
+		"pulp",
+		"pulse",
+		"pumpkin",
+		"punch",
+		"pupil",
+		"puppy",
+		"purchase",
+		"purity",
+		"purpose",
+		"purse",
+		"push",
+		"put",
+		"puzzle",
+		"pyramid",
+		"quality",
+		"quantum",
+		"quarter",
+		"question",
+		"quick",
+		"quit",
+		"quiz",
+		"quote",
+		"rabbit",
+		"raccoon",
+		"race",
+		"rack",
+		"radar",
+		"radio",
+		"rail",
+		"rain",
+		"raise",
+		"rally",
+		"ramp",
+		"ranch",
+		"random",
+		"range",
+		"rapid",
+		"rare",
+		"rate",
+		"rather",
+		"raven",
+		"raw",
+		"razor",
+		"ready",
+		"real",
+		"reason",
+		"rebel",
+		"rebuild",
+		"recall",
+		"receive",
+		"recipe",
+		"record",
+		"recycle",
+		"reduce",
+		"reflect",
+		"reform",
+		"refuse",
+		"region",
+		"regret",
+		"regular",
+		"reject",
+		"relax",
+		"release",
+		"relief",
+		"rely",
+		"remain",
+		"remember",
+		"remind",
+		"remove",
+		"render",
+		"renew",
+		"rent",
+		"reopen",
+		"repair",
+		"repeat",
+		"replace",
+		"report",
+		"require",
+		"rescue",
+		"resemble",
+		"resist",
+		"resource",
+		"response",
+		"result",
+		"retire",
+		"retreat",
+		"return",
+		"reunion",
+		"reveal",
+		"review",
+		"reward",
+		"rhythm",
+		"rib",
+		"ribbon",
+		"rice",
+		"rich",
+		"ride",
+		"ridge",
+		"rifle",
+		"right",
+		"rigid",
+		"ring",
+		"riot",
+		"ripple",
+		"risk",
+		"ritual",
+		"rival",
+		"river",
+		"road",
+		"roast",
+		"robot",
+		"robust",
+		"rocket",
+		"romance",
+		"roof",
+		"rookie",
+		"room",
+		"rose",
+		"rotate",
+		"rough",
+		"round",
+		"route",
+		"royal",
+		"rubber",
+		"rude",
+		"rug",
+		"rule",
+		"run",
+		"runway",
+		"rural",
+		"sad",
+		"saddle",
+		"sadness",
+		"safe",
+		"sail",
+		"salad",
+		"salmon",
+		"salon",
+		"salt",
+		"salute",
+		"same",
+		"sample",
+		"sand",
+		"satisfy",
+		"satoshi",
+		"sauce",
+		"sausage",
+		"save",
+		"say",
+		"scale",
+		"scan",
+		"scare",
+		"scatter",
+		"scene",
+		"scheme",
+		"school",
+		"science",
+		"scissors",
+		"scorpion",
+		"scout",
+		"scrap",
+		"screen",
+		"script",
+		"scrub",
+		"sea",
+		"search",
+		"season",
+		"seat",
+		"second",
+		"secret",
+		"section",
+		"security",
+		"seed",
+		"seek",
+		"segment",
+		"select",
+		"sell",
+		"seminar",
+		"senior",
+		"sense",
+		"sentence",
+		"series",
+		"service",
+		"session",
+		"settle",
+		"setup",
+		"seven",
+		"shadow",
+		"shaft",
+		"shallow",
+		"share",
+		"shed",
+		"shell",
+		"sheriff",
+		"shield",
+		"shift",
+		"shine",
+		"ship",
+		"shiver",
+		"shock",
+		"shoe",
+		"shoot",
+		"shop",
+		"short",
+		"shoulder",
+		"shove",
+		"shrimp",
+		"shrug",
+		"shuffle",
+		"shy",
+		"sibling",
+		"sick",
+		"side",
+		"siege",
+		"sight",
+		"sign",
+		"silent",
+		"silk",
+		"silly",
+		"silver",
+		"similar",
+		"simple",
+		"since",
+		"sing",
+		"siren",
+		"sister",
+		"situate",
+		"six",
+		"size",
+		"skate",
+		"sketch",
+		"ski",
+		"skill",
+		"skin",
+		"skirt",
+		"skull",
+		"slab",
+		"slam",
+		"sleep",
+		"slender",
+		"slice",
+		"slide",
+		"slight",
+		"slim",
+		"slogan",
+		"slot",
+		"slow",
+		"slush",
+		"small",
+		"smart",
+		"smile",
+		"smoke",
+		"smooth",
+		"snack",
+		"snake",
+		"snap",
+		"sniff",
+		"snow",
+		"soap",
+		"soccer",
+		"social",
+		"sock",
+		"soda",
+		"soft",
+		"solar",
+		"soldier",
+		"solid",
+		"solution",
+		"solve",
+		"someone",
+		"song",
+		"soon",
+		"sorry",
+		"sort",
+		"soul",
+		"sound",
+		"soup",
+		"source",
+		"south",
+		"space",
+		"spare",
+		"spatial",
+		"spawn",
+		"speak",
+		"special",
+		"speed",
+		"spell",
+		"spend",
+		"sphere",
+		"spice",
+		"spider",
+		"spike",
+		"spin",
+		"spirit",
+		"split",
+		"spoil",
+		"sponsor",
+		"spoon",
+		"sport",
+		"spot",
+		"spray",
+		"spread",
+		"spring",
+		"spy",
+		"square",
+		"squeeze",
+		"squirrel",
+		"stable",
+		"stadium",
+		"staff",
+		"stage",
+		"stairs",
+		"stamp",
+		"stand",
+		"start",
+		"state",
+		"stay",
+		"steak",
+		"steel",
+		"stem",
+		"step",
+		"stereo",
+		"stick",
+		"still",
+		"sting",
+		"stock",
+		"stomach",
+		"stone",
+		"stool",
+		"story",
+		"stove",
+		"strategy",
+		"street",
+		"strike",
+		"strong",
+		"struggle",
+		"student",
+		"stuff",
+		"stumble",
+		"style",
+		"subject",
+		"submit",
+		"subway",
+		"success",
+		"such",
+		"sudden",
+		"suffer",
+		"sugar",
+		"suggest",
+		"suit",
+		"summer",
+		"sun",
+		"sunny",
+		"sunset",
+		"super",
+		"supply",
+		"supreme",
+		"sure",
+		"surface",
+		"surge",
+		"surprise",
+		"surround",
+		"survey",
+		"suspect",
+		"sustain",
+		"swallow",
+		"swamp",
+		"swap",
+		"swarm",
+		"swear",
+		"sweet",
+		"swift",
+		"swim",
+		"swing",
+		"switch",
+		"sword",
+		"symbol",
+		"symptom",
+		"syrup",
+		"system",
+		"table",
+		"tackle",
+		"tag",
+		"tail",
+		"talent",
+		"talk",
+		"tank",
+		"tape",
+		"target",
+		"task",
+		"taste",
+		"tattoo",
+		"taxi",
+		"teach",
+		"team",
+		"tell",
+		"ten",
+		"tenant",
+		"tennis",
+		"tent",
+		"term",
+		"test",
+		"text",
+		"thank",
+		"that",
+		"theme",
+		"then",
+		"theory",
+		"there",
+		"they",
+		"thing",
+		"this",
+		"thought",
+		"three",
+		"thrive",
+		"throw",
+		"thumb",
+		"thunder",
+		"ticket",
+		"tide",
+		"tiger",
+		"tilt",
+		"timber",
+		"time",
+		"tiny",
+		"tip",
+		"tired",
+		"tissue",
+		"title",
+		"toast",
+		"tobacco",
+		"today",
+		"toddler",
+		"toe",
+		"together",
+		"toilet",
+		"token",
+		"tomato",
+		"tomorrow",
+		"tone",
+		"tongue",
+		"tonight",
+		"tool",
+		"tooth",
+		"top",
+		"topic",
+		"topple",
+		"torch",
+		"tornado",
+		"tortoise",
+		"toss",
+		"total",
+		"tourist",
+		"toward",
+		"tower",
+		"town",
+		"toy",
+		"track",
+		"trade",
+		"traffic",
+		"tragic",
+		"train",
+		"transfer",
+		"trap",
+		"trash",
+		"travel",
+		"tray",
+		"treat",
+		"tree",
+		"trend",
+		"trial",
+		"tribe",
+		"trick",
+		"trigger",
+		"trim",
+		"trip",
+		"trophy",
+		"trouble",
+		"truck",
+		"true",
+		"truly",
+		"trumpet",
+		"trust",
+		"truth",
+		"try",
+		"tube",
+		"tuition",
+		"tumble",
+		"tuna",
+		"tunnel",
+		"turkey",
+		"turn",
+		"turtle",
+		"twelve",
+		"twenty",
+		"twice",
+		"twin",
+		"twist",
+		"two",
+		"type",
+		"typical",
+		"ugly",
+		"umbrella",
+		"unable",
+		"unaware",
+		"uncle",
+		"uncover",
+		"under",
+		"undo",
+		"unfair",
+		"unfold",
+		"unhappy",
+		"uniform",
+		"unique",
+		"unit",
+		"universe",
+		"unknown",
+		"unlock",
+		"until",
+		"unusual",
+		"unveil",
+		"update",
+		"upgrade",
+		"uphold",
+		"upon",
+		"upper",
+		"upset",
+		"urban",
+		"urge",
+		"usage",
+		"use",
+		"used",
+		"useful",
+		"useless",
+		"usual",
+		"utility",
+		"vacant",
+		"vacuum",
+		"vague",
+		"valid",
+		"valley",
+		"valve",
+		"van",
+		"vanish",
+		"vapor",
+		"various",
+		"vast",
+		"vault",
+		"vehicle",
+		"velvet",
+		"vendor",
+		"venture",
+		"venue",
+		"verb",
+		"verify",
+		"version",
+		"very",
+		"vessel",
+		"veteran",
+		"viable",
+		"vibrant",
+		"vicious",
+		"victory",
+		"video",
+		"view",
+		"village",
+		"vintage",
+		"violin",
+		"virtual",
+		"virus",
+		"visa",
+		"visit",
+		"visual",
+		"vital",
+		"vivid",
+		"vocal",
+		"voice",
+		"void",
+		"volcano",
+		"volume",
+		"vote",
+		"voyage",
+		"wage",
+		"wagon",
+		"wait",
+		"walk",
+		"wall",
+		"walnut",
+		"want",
+		"warfare",
+		"warm",
+		"warrior",
+		"wash",
+		"wasp",
+		"waste",
+		"water",
+		"wave",
+		"way",
+		"wealth",
+		"weapon",
+		"wear",
+		"weasel",
+		"weather",
+		"web",
+		"wedding",
+		"weekend",
+		"weird",
+		"welcome",
+		"west",
+		"wet",
+		"whale",
+		"what",
+		"wheat",
+		"wheel",
+		"when",
+		"where",
+		"whip",
+		"whisper",
+		"wide",
+		"width",
+		"wife",
+		"wild",
+		"will",
+		"win",
+		"window",
+		"wine",
+		"wing",
+		"wink",
+		"winner",
+		"winter",
+		"wire",
+		"wisdom",
+		"wise",
+		"wish",
+		"witness",
+		"wolf",
+		"woman",
+		"wonder",
+		"wood",
+		"wool",
+		"word",
+		"work",
+		"world",
+		"worry",
+		"worth",
+		"wrap",
+		"wreck",
+		"wrestle",
+		"wrist",
+		"write",
+		"wrong",
+		"yard",
+		"year",
+		"yellow",
+		"you",
+		"young",
+		"youth",
+		"zebra",
+		"zero",
+		"zone",
+		"zoo"
+	],
+	ru: []
+};
+var MIN_WORDLIST_SIZE = 256;
+function isWordlistReady(lang) {
+	return (WORDLISTS[lang]?.length ?? 0) >= MIN_WORDLIST_SIZE;
+}
+function getWordlist(lang) {
+	const list = WORDLISTS[lang];
+	if (!list || list.length < MIN_WORDLIST_SIZE) throw new Error(`Словник "${lang}" не загружен или слишком короткий (${list?.length ?? 0}). Минимум ${MIN_WORDLIST_SIZE} слов.`);
+	return list;
+}
+function generatePhrase(lang, wordCount = 12) {
+	const list = getWordlist(lang);
+	const listSize = list.length;
+	const limit = Math.floor(4294967295 / listSize) * listSize;
+	const words = [];
+	while (words.length < wordCount) {
+		const n = crypto$1.default.randomBytes(4).readUInt32BE(0);
+		if (n < limit) words.push(list[n % listSize]);
+	}
+	return words.join(" ");
+}
+function validatePhrase(phrase, lang, minWords = 10, maxWords = 24) {
+	const words = phrase.trim().toLowerCase().split(/\s+/).filter(Boolean);
+	if (words.length < minWords) return {
+		valid: false,
+		error: `Минимум ${minWords} слов`
+	};
+	if (words.length > maxWords) return {
+		valid: false,
+		error: `Максимум ${maxWords} слов`
+	};
+	if (!isWordlistReady(lang)) return { valid: true };
+	const set = new Set(getWordlist(lang));
+	const invalid = words.filter((w) => !set.has(w));
+	if (invalid.length > 0) return {
+		valid: false,
+		error: `Неизвестные слова: ${invalid.slice(0, 3).join(", ")}`
+	};
+	return { valid: true };
+}
+//#endregion
 //#region src/main/ipcHandlers/osintHandlers.ts
 function registerOsintHandlers() {
 	electron.ipcMain.handle("osint:open-window", () => {
@@ -11710,6 +14249,166 @@ function registerOsintHandlers() {
 			return {
 				success: true,
 				...deleteAllRawDumps()
+			};
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:sensitive-status", async () => {
+		try {
+			return {
+				success: true,
+				data: getSensitiveStatus()
+			};
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:sensitive-init", async (_event, input) => {
+		try {
+			return initializeSensitiveVault(input);
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:sensitive-try-auto-unlock", async () => {
+		try {
+			return tryAutoUnlock();
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:sensitive-unlock", async (_event, passphrase, saveAutoUnlock = false) => {
+		try {
+			return unlockWithPassphraseInput(passphrase, saveAutoUnlock);
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:sensitive-lock", async () => {
+		try {
+			lockSensitiveVault();
+			return { success: true };
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:sensitive-forget-auto", async () => {
+		try {
+			forgetAutoUnlock();
+			return { success: true };
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:sensitive-add", async (_event, input) => {
+		try {
+			return addSensitiveRecord(input);
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:sensitive-list", async (_event, entityId) => {
+		try {
+			return {
+				success: true,
+				items: listSensitiveForEntity(entityId)
+			};
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:sensitive-reveal", async (_event, id) => {
+		try {
+			return revealSensitiveRecord(id);
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:sensitive-delete", async (_event, id) => {
+		try {
+			return deleteSensitiveRecord(id);
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:sensitive-field-names", async () => {
+		try {
+			return {
+				success: true,
+				items: listSensitiveFieldNames()
+			};
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:sensitive-wordlist-ready", async (_event, lang) => {
+		try {
+			return {
+				success: true,
+				ready: isWordlistReady(lang)
+			};
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:sensitive-generate-phrase", async (_event, lang, wordCount = 12) => {
+		try {
+			return {
+				success: true,
+				phrase: generatePhrase(lang, wordCount)
+			};
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:sensitive-validate-phrase", async (_event, phrase, lang) => {
+		try {
+			return {
+				success: true,
+				...validatePhrase(phrase, lang)
 			};
 		} catch (error) {
 			return {

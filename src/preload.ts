@@ -464,6 +464,61 @@ try {
     deleteAllDumps: () =>
       ipcRenderer.invoke('osint:delete-all-dumps'),
 
+    // ==================== SENSITIVE VAULT ====================
+    sensitiveStatus: () =>
+      ipcRenderer.invoke('osint:sensitive-status'),
+
+    sensitiveInit: (input: {
+      mode: 'passphrase' | 'system-key';
+      passphrase?: string;
+      saveAutoUnlock: boolean;
+    }) =>
+      ipcRenderer.invoke('osint:sensitive-init', input),
+
+    sensitiveTryAutoUnlock: () =>
+      ipcRenderer.invoke('osint:sensitive-try-auto-unlock'),
+
+    sensitiveUnlock: (passphrase: string, saveAutoUnlock = false) =>
+      ipcRenderer.invoke('osint:sensitive-unlock', passphrase, saveAutoUnlock),
+
+    sensitiveLock: () =>
+      ipcRenderer.invoke('osint:sensitive-lock'),
+
+    sensitiveForgetAuto: () =>
+      ipcRenderer.invoke('osint:sensitive-forget-auto'),
+
+    sensitiveAdd: (input: {
+      entity_id: number;
+      field_name: string;
+      field_value: string;
+      legal_basis: string;
+      retention_until?: string | null;
+      notes?: string | null;
+    }) =>
+      ipcRenderer.invoke('osint:sensitive-add', input),
+
+    sensitiveList: (entityId: number) =>
+      ipcRenderer.invoke('osint:sensitive-list', entityId),
+
+    sensitiveReveal: (id: number) =>
+      ipcRenderer.invoke('osint:sensitive-reveal', id),
+
+    sensitiveDelete: (id: number) =>
+      ipcRenderer.invoke('osint:sensitive-delete', id),
+
+    sensitiveFieldNames: () =>
+      ipcRenderer.invoke('osint:sensitive-field-names'),
+
+    // Wordlists
+    sensitiveWordlistReady: (lang: 'en' | 'ru') =>
+      ipcRenderer.invoke('osint:sensitive-wordlist-ready', lang),
+
+    sensitiveGeneratePhrase: (lang: 'en' | 'ru', wordCount = 12) =>
+      ipcRenderer.invoke('osint:sensitive-generate-phrase', lang, wordCount),
+
+    sensitiveValidatePhrase: (phrase: string, lang: 'en' | 'ru') =>
+      ipcRenderer.invoke('osint:sensitive-validate-phrase', phrase, lang),
+
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

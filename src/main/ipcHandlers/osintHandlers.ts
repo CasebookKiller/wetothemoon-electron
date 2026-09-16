@@ -37,6 +37,27 @@ import {
   clearAllTables,
 } from '../services/database';
 
+import {
+  getSensitiveStatus,
+  initializeSensitiveVault,
+  tryAutoUnlock,
+  unlockWithPassphraseInput,
+  lockSensitiveVault,
+  forgetAutoUnlock,
+  addSensitiveRecord,
+  listSensitiveForEntity,
+  revealSensitiveRecord,
+  deleteSensitiveRecord,
+  listSensitiveFieldNames,
+} from '../services/osint/sensitive/sensitiveDatabase';
+
+import {
+  generatePhrase,
+  validatePhrase,
+  isWordlistReady,
+  type WordlistLang,
+} from '../../shared/sensitive/wordlists';
+
 export function registerOsintHandlers() {
   // Открыть окно OSINT
   ipcMain.handle('osint:open-window', () => {
@@ -446,6 +467,124 @@ export function registerOsintHandlers() {
     try {
       const result = deleteAllRawDumps();
       return { success: true, ...result };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  // ==================== SENSITIVE VAULT ====================
+  ipcMain.handle('osint:sensitive-status', async () => {
+    try {
+      return { success: true, data: getSensitiveStatus() };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('osint:sensitive-init', async (_event, input: any) => {
+    try {
+      return initializeSensitiveVault(input);
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('osint:sensitive-try-auto-unlock', async () => {
+    try {
+      return tryAutoUnlock();
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('osint:sensitive-unlock', async (_event, passphrase: string, saveAutoUnlock = false) => {
+    try {
+      return unlockWithPassphraseInput(passphrase, saveAutoUnlock);
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('osint:sensitive-lock', async () => {
+    try {
+      lockSensitiveVault();
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('osint:sensitive-forget-auto', async () => {
+    try {
+      forgetAutoUnlock();
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('osint:sensitive-add', async (_event, input: any) => {
+    try {
+      return addSensitiveRecord(input);
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('osint:sensitive-list', async (_event, entityId: number) => {
+    try {
+      const items = listSensitiveForEntity(entityId);
+      return { success: true, items };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('osint:sensitive-reveal', async (_event, id: number) => {
+    try {
+      return revealSensitiveRecord(id);
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('osint:sensitive-delete', async (_event, id: number) => {
+    try {
+      return deleteSensitiveRecord(id);
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('osint:sensitive-field-names', async () => {
+    try {
+      return { success: true, items: listSensitiveFieldNames() };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  // ==================== SENSITIVE WORDLISTS ====================
+
+  ipcMain.handle('osint:sensitive-wordlist-ready', async (_event, lang: WordlistLang) => {
+    try {
+      return { success: true, ready: isWordlistReady(lang) };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('osint:sensitive-generate-phrase', async (_event, lang: WordlistLang, wordCount = 12) => {
+    try {
+      return { success: true, phrase: generatePhrase(lang, wordCount) };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('osint:sensitive-validate-phrase', async (_event, phrase: string, lang: WordlistLang) => {
+    try {
+      return { success: true, ...validatePhrase(phrase, lang) };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }

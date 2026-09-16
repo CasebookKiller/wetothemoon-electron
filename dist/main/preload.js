@@ -302,7 +302,21 @@ try {
 		deleteObservation: (observationId) => electron.ipcRenderer.invoke("osint:delete-observation", observationId),
 		deleteSource: (sourceId, force = false) => electron.ipcRenderer.invoke("osint:delete-source", sourceId, force),
 		clearAllTables: () => electron.ipcRenderer.invoke("osint:clear-all-tables"),
-		deleteAllDumps: () => electron.ipcRenderer.invoke("osint:delete-all-dumps")
+		deleteAllDumps: () => electron.ipcRenderer.invoke("osint:delete-all-dumps"),
+		sensitiveStatus: () => electron.ipcRenderer.invoke("osint:sensitive-status"),
+		sensitiveInit: (input) => electron.ipcRenderer.invoke("osint:sensitive-init", input),
+		sensitiveTryAutoUnlock: () => electron.ipcRenderer.invoke("osint:sensitive-try-auto-unlock"),
+		sensitiveUnlock: (passphrase, saveAutoUnlock = false) => electron.ipcRenderer.invoke("osint:sensitive-unlock", passphrase, saveAutoUnlock),
+		sensitiveLock: () => electron.ipcRenderer.invoke("osint:sensitive-lock"),
+		sensitiveForgetAuto: () => electron.ipcRenderer.invoke("osint:sensitive-forget-auto"),
+		sensitiveAdd: (input) => electron.ipcRenderer.invoke("osint:sensitive-add", input),
+		sensitiveList: (entityId) => electron.ipcRenderer.invoke("osint:sensitive-list", entityId),
+		sensitiveReveal: (id) => electron.ipcRenderer.invoke("osint:sensitive-reveal", id),
+		sensitiveDelete: (id) => electron.ipcRenderer.invoke("osint:sensitive-delete", id),
+		sensitiveFieldNames: () => electron.ipcRenderer.invoke("osint:sensitive-field-names"),
+		sensitiveWordlistReady: (lang) => electron.ipcRenderer.invoke("osint:sensitive-wordlist-ready", lang),
+		sensitiveGeneratePhrase: (lang, wordCount = 12) => electron.ipcRenderer.invoke("osint:sensitive-generate-phrase", lang, wordCount),
+		sensitiveValidatePhrase: (phrase, lang) => electron.ipcRenderer.invoke("osint:sensitive-validate-phrase", phrase, lang)
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {
