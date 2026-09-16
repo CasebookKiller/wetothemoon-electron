@@ -1413,11 +1413,9 @@ export const DatabasePage: React.FC = () => {
 
       if (res?.success) {
         setDeleteMessage('Удалено');
-        // Закрыть диалог деталей и удаления
         closeAllDialogs();
         closeDeleteDialog();
         await loadData();
-        await loadDumpsList();
       } else {
         setDeleteMessage(`Ошибка: ${res?.error || 'неизвестная'}`);
         if (res?.stats) setDeleteStats(res.stats);
