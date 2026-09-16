@@ -296,7 +296,13 @@ try {
 		createRelation: (patch) => electron.ipcRenderer.invoke("osint:create-relation", patch),
 		listEntitiesDropdown: () => electron.ipcRenderer.invoke("osint:list-entities-dropdown"),
 		createObservation: (patch) => electron.ipcRenderer.invoke("osint:create-observation", patch),
-		createSource: (patch) => electron.ipcRenderer.invoke("osint:create-source", patch)
+		createSource: (patch) => electron.ipcRenderer.invoke("osint:create-source", patch),
+		deleteEntity: (entityId, force = false) => electron.ipcRenderer.invoke("osint:delete-entity", entityId, force),
+		deleteRelation: (relationId) => electron.ipcRenderer.invoke("osint:delete-relation", relationId),
+		deleteObservation: (observationId) => electron.ipcRenderer.invoke("osint:delete-observation", observationId),
+		deleteSource: (sourceId, force = false) => electron.ipcRenderer.invoke("osint:delete-source", sourceId, force),
+		clearAllTables: () => electron.ipcRenderer.invoke("osint:clear-all-tables"),
+		deleteAllDumps: () => electron.ipcRenderer.invoke("osint:delete-all-dumps")
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {

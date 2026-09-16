@@ -10697,6 +10697,147 @@ function updateSource(sourceId, patch) {
 	auditChange("sources", sourceId, "update", JSON.stringify(old), `url=${url}; reliability=${reliability}; access_level=${access_level}; origin=${oldOrigin}→${newOrigin}`, "Редактирование источника через UI");
 	return { success: true };
 }
+/**
+* Удаляет наблюдение. Никаких зависимостей, кроме самого наблюдения.
+*/
+function deleteObservation(observationId) {
+	const db = getDatabase();
+	const old = db.prepare("SELECT * FROM observations WHERE id = ?").get(observationId);
+	if (!old) return {
+		success: false,
+		error: `Наблюдение #${observationId} не найдено`
+	};
+	try {
+		db.prepare("DELETE FROM observations WHERE id = ?").run(observationId);
+	} catch (e) {
+		return {
+			success: false,
+			error: e.message
+		};
+	}
+	auditChange("observations", observationId, "delete", JSON.stringify(old), null, "Удаление наблюдения через UI");
+	return { success: true };
+}
+/**
+* Удаляет связь.
+*/
+function deleteRelation(relationId) {
+	const db = getDatabase();
+	const old = db.prepare("SELECT * FROM relations WHERE id = ?").get(relationId);
+	if (!old) return {
+		success: false,
+		error: `Связь #${relationId} не найдена`
+	};
+	try {
+		db.prepare("DELETE FROM relations WHERE id = ?").run(relationId);
+	} catch (e) {
+		return {
+			success: false,
+			error: e.message
+		};
+	}
+	auditChange("relations", relationId, "delete", JSON.stringify(old), null, "Удаление связи через UI");
+	return { success: true };
+}
+/**
+* Удаляет источник. Если на него ссылаются наблюдения/связи — по умолчанию
+* операция блокируется (чтобы не терять данные).
+* Если force=true — ссылки обнуляются (source_id = NULL), затем источник удаляется.
+*/
+function deleteSource(sourceId, force = false) {
+	const db = getDatabase();
+	const old = db.prepare("SELECT * FROM sources WHERE id = ?").get(sourceId);
+	if (!old) return {
+		success: false,
+		error: `Источник #${sourceId} не найден`
+	};
+	const obsCount = db.prepare("SELECT COUNT(*) AS c FROM observations WHERE source_id = ?").get(sourceId).c;
+	const relCount = db.prepare("SELECT COUNT(*) AS c FROM relations WHERE source_id = ?").get(sourceId).c;
+	if ((obsCount > 0 || relCount > 0) && !force) return {
+		success: false,
+		error: `Источник используется: ${obsCount} наблюдений, ${relCount} связей. Используйте force=true или сначала отвяжите записи.`
+	};
+	try {
+		if (force) {
+			db.prepare("UPDATE observations SET source_id = NULL WHERE source_id = ?").run(sourceId);
+			db.prepare("UPDATE relations SET source_id = NULL WHERE source_id = ?").run(sourceId);
+		}
+		db.prepare("DELETE FROM sources WHERE id = ?").run(sourceId);
+	} catch (e) {
+		return {
+			success: false,
+			error: e.message
+		};
+	}
+	auditChange("sources", sourceId, "delete", JSON.stringify(old), force ? `force=true; отвязано наблюдений=${obsCount}, связей=${relCount}` : null, "Удаление источника через UI");
+	return { success: true };
+}
+/**
+* Удаляет сущность. По умолчанию — только если на неё нет ссылок.
+* Если force=true — каскадно удаляет её наблюдения и все связи, где она участвует,
+* затем саму сущность.
+*/
+function deleteEntity(entityId, force = false) {
+	const db = getDatabase();
+	const old = db.prepare("SELECT * FROM entities WHERE id = ?").get(entityId);
+	if (!old) return {
+		success: false,
+		error: `Сущность #${entityId} не найдена`
+	};
+	const obsCount = db.prepare("SELECT COUNT(*) AS c FROM observations WHERE entity_id = ?").get(entityId).c;
+	const relCount = db.prepare("SELECT COUNT(*) AS c FROM relations WHERE subject_id = ? OR object_id = ?").get(entityId, entityId).c;
+	if ((obsCount > 0 || relCount > 0) && !force) return {
+		success: false,
+		error: `На сущность ссылаются: ${obsCount} наблюдений, ${relCount} связей. Используйте force=true для каскадного удаления.`,
+		stats: {
+			observations: obsCount,
+			relations: relCount
+		}
+	};
+	try {
+		if (force) {
+			db.prepare("DELETE FROM observations WHERE entity_id = ?").run(entityId);
+			db.prepare("DELETE FROM relations WHERE subject_id = ? OR object_id = ?").run(entityId, entityId);
+		}
+		db.prepare("DELETE FROM entities WHERE id = ?").run(entityId);
+	} catch (e) {
+		return {
+			success: false,
+			error: e.message
+		};
+	}
+	auditChange("entities", entityId, "delete", JSON.stringify(old), force ? `force=true; удалено наблюдений=${obsCount}, связей=${relCount}` : null, "Удаление сущности через UI");
+	return {
+		success: true,
+		stats: {
+			observations: obsCount,
+			relations: relCount
+		}
+	};
+}
+/**
+* Полная очистка всех таблиц с данными (кроме case_info).
+* Порядок удаления важен из-за FK.
+*/
+function clearAllTables() {
+	const db = getDatabase();
+	try {
+		db.exec("DELETE FROM relations;");
+		db.exec("DELETE FROM observations;");
+		db.exec("DELETE FROM entities;");
+		db.exec("DELETE FROM sources;");
+		db.exec("DELETE FROM raw_dumps;");
+		db.exec("DELETE FROM audit_log;");
+		db.exec("DELETE FROM shards;");
+	} catch (e) {
+		return {
+			success: false,
+			error: e.message
+		};
+	}
+	auditChange("case_info", 1, "clear_all", null, "Все таблицы данных очищены", "Полная очистка базы через UI");
+	return { success: true };
+}
 //#endregion
 //#region src/main/services/rawStorage.ts
 function loadRawDumpSync(filePath) {
@@ -10739,6 +10880,44 @@ function saveRawDumpSync(companyInn, data) {
 		sizeBytes: fs.default.statSync(filePath).size,
 		entityType,
 		regionPrefix: prefix
+	};
+}
+/**
+* Удаляет все .msgpack-файлы из raw_dumps.
+* Возвращает количество удалённых файлов и ошибки.
+*/
+function deleteAllRawDumps() {
+	const baseDir = path.default.join(electron.app.getPath("userData"), "raw_dumps");
+	const errors = [];
+	let deletedFiles = 0;
+	if (!fs.default.existsSync(baseDir)) return {
+		deletedFiles: 0,
+		errors: []
+	};
+	const walk = (dir) => {
+		const entries = fs.default.readdirSync(dir, { withFileTypes: true });
+		for (const entry of entries) {
+			const fullPath = path.default.join(dir, entry.name);
+			if (entry.isDirectory()) walk(fullPath);
+			else if (entry.isFile()) try {
+				fs.default.unlinkSync(fullPath);
+				deletedFiles++;
+			} catch (e) {
+				errors.push(`${fullPath}: ${e.message}`);
+			}
+		}
+		try {
+			if (fs.default.readdirSync(dir).length === 0) fs.default.rmdirSync(dir);
+		} catch {}
+	};
+	try {
+		walk(baseDir);
+	} catch (e) {
+		errors.push(`${baseDir}: ${e.message}`);
+	}
+	return {
+		deletedFiles,
+		errors
 	};
 }
 //#endregion
@@ -11469,6 +11648,69 @@ function registerOsintHandlers() {
 	electron.ipcMain.handle("osint:create-source", async (_event, patch) => {
 		try {
 			return createSource(patch);
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:delete-entity", async (_event, entityId, force = false) => {
+		try {
+			return deleteEntity(entityId, force);
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:delete-relation", async (_event, relationId) => {
+		try {
+			return deleteRelation(relationId);
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:delete-observation", async (_event, observationId) => {
+		try {
+			return deleteObservation(observationId);
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:delete-source", async (_event, sourceId, force = false) => {
+		try {
+			return deleteSource(sourceId, force);
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:clear-all-tables", async () => {
+		try {
+			return clearAllTables();
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:delete-all-dumps", async () => {
+		try {
+			return {
+				success: true,
+				...deleteAllRawDumps()
+			};
 		} catch (error) {
 			return {
 				success: false,

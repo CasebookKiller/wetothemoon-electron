@@ -68,3 +68,49 @@ export function saveRawDumpSync(companyInn: string, data: any): SavedRawDump {
     regionPrefix: prefix,
   };
 }
+
+/**
+ * Удаляет все .msgpack-файлы из raw_dumps.
+ * Возвращает количество удалённых файлов и ошибки.
+ */
+export function deleteAllRawDumps(): { deletedFiles: number; errors: string[] } {
+  const baseDir = path.join(app.getPath('userData'), 'raw_dumps');
+  const errors: string[] = [];
+  let deletedFiles = 0;
+
+  if (!fs.existsSync(baseDir)) {
+    return { deletedFiles: 0, errors: [] };
+  }
+
+  const walk = (dir: string) => {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(fullPath);
+      } else if (entry.isFile()) {
+        try {
+          fs.unlinkSync(fullPath);
+          deletedFiles++;
+        } catch (e) {
+          errors.push(`${fullPath}: ${(e as Error).message}`);
+        }
+      }
+    }
+    // Пытаемся удалить пустой каталог (не критично, если не получится)
+    try {
+      const remaining = fs.readdirSync(dir);
+      if (remaining.length === 0) fs.rmdirSync(dir);
+    } catch {
+      // ignore
+    }
+  };
+
+  try {
+    walk(baseDir);
+  } catch (e) {
+    errors.push(`${baseDir}: ${(e as Error).message}`);
+  }
+
+  return { deletedFiles, errors };
+}

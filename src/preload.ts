@@ -446,6 +446,24 @@ try {
     createSource: (patch: any) =>
       ipcRenderer.invoke('osint:create-source', patch),
 
+    deleteEntity: (entityId: number, force = false) =>
+      ipcRenderer.invoke('osint:delete-entity', entityId, force),
+
+    deleteRelation: (relationId: number) =>
+      ipcRenderer.invoke('osint:delete-relation', relationId),
+
+    deleteObservation: (observationId: number) =>
+      ipcRenderer.invoke('osint:delete-observation', observationId),
+
+    deleteSource: (sourceId: number, force = false) =>
+      ipcRenderer.invoke('osint:delete-source', sourceId, force),
+
+    clearAllTables: () =>
+      ipcRenderer.invoke('osint:clear-all-tables'),
+
+    deleteAllDumps: () =>
+      ipcRenderer.invoke('osint:delete-all-dumps'),
+
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

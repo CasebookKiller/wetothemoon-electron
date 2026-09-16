@@ -1453,3 +1453,190 @@ export function updateSource(
 
   return { success: true };
 }
+
+/**
+ * Удаляет наблюдение. Никаких зависимостей, кроме самого наблюдения.
+ */
+export function deleteObservation(observationId: number): { success: boolean; error?: string } {
+  const db = getDatabase();
+
+  const old = db.prepare('SELECT * FROM observations WHERE id = ?').get(observationId) as any;
+  if (!old) {
+    return { success: false, error: `Наблюдение #${observationId} не найдено` };
+  }
+
+  try {
+    db.prepare('DELETE FROM observations WHERE id = ?').run(observationId);
+  } catch (e) {
+    return { success: false, error: (e as Error).message };
+  }
+
+  auditChange(
+    'observations',
+    observationId,
+    'delete',
+    JSON.stringify(old),
+    null,
+    'Удаление наблюдения через UI'
+  );
+
+  return { success: true };
+}
+
+/**
+ * Удаляет связь.
+ */
+export function deleteRelation(relationId: number): { success: boolean; error?: string } {
+  const db = getDatabase();
+
+  const old = db.prepare('SELECT * FROM relations WHERE id = ?').get(relationId) as any;
+  if (!old) {
+    return { success: false, error: `Связь #${relationId} не найдена` };
+  }
+
+  try {
+    db.prepare('DELETE FROM relations WHERE id = ?').run(relationId);
+  } catch (e) {
+    return { success: false, error: (e as Error).message };
+  }
+
+  auditChange(
+    'relations',
+    relationId,
+    'delete',
+    JSON.stringify(old),
+    null,
+    'Удаление связи через UI'
+  );
+
+  return { success: true };
+}
+
+/**
+ * Удаляет источник. Если на него ссылаются наблюдения/связи — по умолчанию
+ * операция блокируется (чтобы не терять данные).
+ * Если force=true — ссылки обнуляются (source_id = NULL), затем источник удаляется.
+ */
+export function deleteSource(
+  sourceId: number,
+  force = false
+): { success: boolean; error?: string } {
+  const db = getDatabase();
+
+  const old = db.prepare('SELECT * FROM sources WHERE id = ?').get(sourceId) as any;
+  if (!old) {
+    return { success: false, error: `Источник #${sourceId} не найден` };
+  }
+
+  const obsCount = (db.prepare('SELECT COUNT(*) AS c FROM observations WHERE source_id = ?').get(sourceId) as any).c;
+  const relCount = (db.prepare('SELECT COUNT(*) AS c FROM relations WHERE source_id = ?').get(sourceId) as any).c;
+
+  if ((obsCount > 0 || relCount > 0) && !force) {
+    return {
+      success: false,
+      error: `Источник используется: ${obsCount} наблюдений, ${relCount} связей. Используйте force=true или сначала отвяжите записи.`,
+    };
+  }
+
+  try {
+    if (force) {
+      db.prepare('UPDATE observations SET source_id = NULL WHERE source_id = ?').run(sourceId);
+      db.prepare('UPDATE relations SET source_id = NULL WHERE source_id = ?').run(sourceId);
+    }
+    db.prepare('DELETE FROM sources WHERE id = ?').run(sourceId);
+  } catch (e) {
+    return { success: false, error: (e as Error).message };
+  }
+
+  auditChange(
+    'sources',
+    sourceId,
+    'delete',
+    JSON.stringify(old),
+    force ? `force=true; отвязано наблюдений=${obsCount}, связей=${relCount}` : null,
+    'Удаление источника через UI'
+  );
+
+  return { success: true };
+}
+
+/**
+ * Удаляет сущность. По умолчанию — только если на неё нет ссылок.
+ * Если force=true — каскадно удаляет её наблюдения и все связи, где она участвует,
+ * затем саму сущность.
+ */
+export function deleteEntity(
+  entityId: number,
+  force = false
+): { success: boolean; error?: string; stats?: { observations: number; relations: number } } {
+  const db = getDatabase();
+
+  const old = db.prepare('SELECT * FROM entities WHERE id = ?').get(entityId) as any;
+  if (!old) {
+    return { success: false, error: `Сущность #${entityId} не найдена` };
+  }
+
+  const obsCount = (db.prepare('SELECT COUNT(*) AS c FROM observations WHERE entity_id = ?').get(entityId) as any).c;
+  const relCount = (db.prepare('SELECT COUNT(*) AS c FROM relations WHERE subject_id = ? OR object_id = ?').get(entityId, entityId) as any).c;
+
+  if ((obsCount > 0 || relCount > 0) && !force) {
+    return {
+      success: false,
+      error: `На сущность ссылаются: ${obsCount} наблюдений, ${relCount} связей. Используйте force=true для каскадного удаления.`,
+      stats: { observations: obsCount, relations: relCount },
+    };
+  }
+
+  try {
+    if (force) {
+      db.prepare('DELETE FROM observations WHERE entity_id = ?').run(entityId);
+      db.prepare('DELETE FROM relations WHERE subject_id = ? OR object_id = ?').run(entityId, entityId);
+    }
+    db.prepare('DELETE FROM entities WHERE id = ?').run(entityId);
+  } catch (e) {
+    return { success: false, error: (e as Error).message };
+  }
+
+  auditChange(
+    'entities',
+    entityId,
+    'delete',
+    JSON.stringify(old),
+    force ? `force=true; удалено наблюдений=${obsCount}, связей=${relCount}` : null,
+    'Удаление сущности через UI'
+  );
+
+  return { success: true, stats: { observations: obsCount, relations: relCount } };
+}
+
+/**
+ * Полная очистка всех таблиц с данными (кроме case_info).
+ * Порядок удаления важен из-за FK.
+ */
+export function clearAllTables(): { success: boolean; error?: string } {
+  const db = getDatabase();
+
+  try {
+    // Удаляем в правильном порядке (сначала зависимые)
+    db.exec('DELETE FROM relations;');
+    db.exec('DELETE FROM observations;');
+    db.exec('DELETE FROM entities;');
+    db.exec('DELETE FROM sources;');
+    db.exec('DELETE FROM raw_dumps;');
+    db.exec('DELETE FROM audit_log;');
+    db.exec('DELETE FROM shards;');
+  } catch (e) {
+    return { success: false, error: (e as Error).message };
+  }
+
+  auditChange(
+    'case_info',
+    1,
+    'clear_all',
+    null,
+    'Все таблицы данных очищены',
+    'Полная очистка базы через UI'
+  );
+
+  return { success: true };
+}

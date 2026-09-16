@@ -9,7 +9,7 @@ import { scrapeMosGorsud } from '../services/osint/scrapers/mosGorsud';
 import { getCredentials, setCredentials } from '../services/osint/credentials';
 import { createDatabaseWindow, getDatabaseWindow } from '../windows/databaseWindow';
 import { deleteDumpsByEntity, findLatestRawDump, getRelatedIds, searchEntities } from '../services/database';
-import { loadRawDumpSync } from '../services/rawStorage';
+import { deleteAllRawDumps, loadRawDumpSync } from '../services/rawStorage';
 import { mergeCompanyDumps, saveCompanyData, updateCompanyData } from '../services/osintStorage';
 import { 
   getDatabase,
@@ -30,6 +30,11 @@ import {
   createSource,
   updateSource,
   listEntitiesForDropdown,
+  deleteEntity,
+  deleteRelation,
+  deleteObservation,
+  deleteSource,
+  clearAllTables,
 } from '../services/database';
 
 export function registerOsintHandlers() {
@@ -392,6 +397,55 @@ export function registerOsintHandlers() {
   ipcMain.handle('osint:create-source', async (_event, patch: any) => {
     try {
       return createSource(patch);
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('osint:delete-entity', async (_event, entityId: number, force = false) => {
+    try {
+      return deleteEntity(entityId, force);
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('osint:delete-relation', async (_event, relationId: number) => {
+    try {
+      return deleteRelation(relationId);
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('osint:delete-observation', async (_event, observationId: number) => {
+    try {
+      return deleteObservation(observationId);
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('osint:delete-source', async (_event, sourceId: number, force = false) => {
+    try {
+      return deleteSource(sourceId, force);
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('osint:clear-all-tables', async () => {
+    try {
+      return clearAllTables();
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('osint:delete-all-dumps', async () => {
+    try {
+      const result = deleteAllRawDumps();
+      return { success: true, ...result };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
