@@ -19,6 +19,8 @@ import { DetailFields } from '@/components/SIETCH/DetailFields';
 
 import { DatabaseHelp } from '@/components/SIETCH/DatabaseHelp';
 
+import { SensitiveVaultDialog } from '@/components/SIETCH/SensitiveVaultDialog';
+
 
 type DialogType = 'entity' | 'relation' | 'observation' | 'source';
 
@@ -87,6 +89,10 @@ export const DatabasePage: React.FC = () => {
   const [dangerConfirmText, setDangerConfirmText] = useState('');
   const [dangerSaving, setDangerSaving] = useState(false);
   const [dangerMessage, setDangerMessage] = useState('');
+
+  const [sensitiveDialogVisible, setSensitiveDialogVisible] = useState(false);
+  const [sensitiveEntityId, setSensitiveEntityId] = useState<number | null>(null);
+  const [sensitiveEntityLabel, setSensitiveEntityLabel] = useState<string>('');
 
   const api = (window as any).electronAPI;
 
@@ -1721,6 +1727,20 @@ export const DatabasePage: React.FC = () => {
         footer={
           dialogStack.length > 0 ? (
             <div className="p-panel-footer flex justify-content-end gap-2">
+              {dialogStack[dialogStack.length - 1].type === 'entity' && (
+                <Button
+                  label="Чувствительные данные"
+                  icon="pi pi-shield"
+                  className="osint-soft"
+                  onClick={() => {
+                    const top = dialogStack[dialogStack.length - 1];
+                    const data = dialogCache[cacheKey(top.type, top.id)];
+                    setSensitiveEntityId(top.id);
+                    setSensitiveEntityLabel(data?.entity?.label || data?.entity?.value || `#${top.id}`);
+                    setSensitiveDialogVisible(true);
+                  }}
+                />
+              )}
               {!editing && (
                 <Button
                   label="Редактировать"
@@ -2420,6 +2440,13 @@ export const DatabasePage: React.FC = () => {
           )}
         </div>
       </Dialog>
+
+      <SensitiveVaultDialog
+        visible={sensitiveDialogVisible}
+        entityId={sensitiveEntityId}
+        entityLabel={sensitiveEntityLabel}
+        onHide={() => setSensitiveDialogVisible(false)}
+      />
 
       <DatabaseHelp visible={helpVisible} onHide={() => setHelpVisible(false)} />
     </div>
