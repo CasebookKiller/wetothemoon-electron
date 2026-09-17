@@ -650,19 +650,20 @@ export const SensitiveVaultDialog: React.FC<SensitiveVaultDialogProps> = ({
     // phase === 'unlocked'
     return (
       <div className="p-fluid">
-        <div className="flex justify-content-between align-items-center mb-3">
-          <div>
+        <div className="flex justify-content-between align-items-center mb-3 gap-2 sensitive-header-row">
+          <div className="sensitive-entity-label">
             <span className="text-sm text-500">Сущность: </span>
-            <b>{entityLabel || `#${entityId}`}</b>
+            <b title={entityLabel || `#${entityId}`}>
+              {entityLabel || `#${entityId}`}
+            </b>
           </div>
-          <div className="flex gap-2">
-            <Button
-              label="Добавить"
-              icon="pi pi-plus"
-              className="osint-soft p-button-sm"
-              onClick={() => setShowAddForm((v) => !v)}
-            />
-          </div>
+          <Button
+            icon="pi pi-plus"
+            className="osint-soft p-button-sm sensitive-add-button"
+            tooltip="Добавить чувствительную запись"
+            tooltipOptions={{ position: 'left' }}
+            onClick={() => setShowAddForm((v) => !v)}
+          />
         </div>
 
         {showAddForm && (

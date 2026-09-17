@@ -488,3 +488,37 @@ body.p-overflow-hidden {
 .p-datepicker .p-datepicker-header button svg path {
   fill: currentColor !important;
 }
+
+/* Строка с сущностью и кнопкой «Добавить» */
+.sensitive-header-row {
+  min-width: 0;
+}
+
+.sensitive-entity-label {
+  flex: 1 1 auto;
+  min-width: 0;                 /* ключ: позволяет flex-ребёнку сжиматься */
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.sensitive-entity-label b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Кнопка «+» — квадратная, компактная, не сжимается */
+.sensitive-add-button.p-button {
+  flex-shrink: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sensitive-add-button.p-button .p-button-icon {
+  font-size: 1rem;
+}
