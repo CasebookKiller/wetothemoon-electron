@@ -323,7 +323,9 @@ try {
 		sensitiveReset: () => electron.ipcRenderer.invoke("osint:sensitive-reset"),
 		exportEntitiesCsv: () => electron.ipcRenderer.invoke("osint:export-entities-csv"),
 		exportRelationsCsv: () => electron.ipcRenderer.invoke("osint:export-relations-csv"),
-		exportObservationsCsv: () => electron.ipcRenderer.invoke("osint:export-observations-csv")
+		exportObservationsCsv: () => electron.ipcRenderer.invoke("osint:export-observations-csv"),
+		backupCreate: (options) => electron.ipcRenderer.invoke("osint:backup-create", options || {}),
+		backupRestore: () => electron.ipcRenderer.invoke("osint:backup-restore")
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {

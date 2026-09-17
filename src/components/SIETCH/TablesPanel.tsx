@@ -68,12 +68,8 @@ export const TablesPanel: React.FC<TablesPanelProps> = ({
       command: async () => {
         const api = (window as any).electronAPI;
         const res = await api.exportEntitiesCsv();
-        if (res?.success) {
-          // Можно показать toast, но он не всегда подключён — просто лог
-          console.log('CSV сохранён:', res.filePath);
-        } else if (!res?.canceled) {
-          console.error('Ошибка экспорта:', res?.error);
-        }
+        if (res?.success) console.log('CSV сохранён:', res.filePath);
+        else if (!res?.canceled) console.error('Ошибка экспорта:', res?.error);
       },
     },
     {
@@ -94,6 +90,38 @@ export const TablesPanel: React.FC<TablesPanelProps> = ({
         const res = await api.exportObservationsCsv();
         if (res?.success) console.log('CSV сохранён:', res.filePath);
         else if (!res?.canceled) console.error('Ошибка экспорта:', res?.error);
+      },
+    },
+    { separator: true },
+    {
+      label: 'Backup БД',
+      icon: 'pi pi-save',
+      command: async () => {
+        const api = (window as any).electronAPI;
+        // По умолчанию — только основная БД.
+        // Для расширенного backup можно сделать отдельный диалог с чекбоксами.
+        const res = await api.backupCreate({ includeSensitive: false, includeRawDumps: false });
+        if (res?.success) {
+          console.log('Backup сохранён:', res.backupDir);
+          console.log('Файлы:', res.files);
+        } else if (!res?.canceled) {
+          console.error('Ошибка backup:', res?.error);
+        }
+      },
+    },
+    { separator: true },
+    {
+      label: 'Восстановить из backup…',
+      icon: 'pi pi-upload',
+      command: async () => {
+        const api = (window as any).electronAPI;
+        if (!window.confirm('Восстановление заменит текущую базу. Продолжить?')) return;
+        const res = await api.backupRestore();
+        if (res?.success) {
+          alert('База восстановлена. Закройте и перезапустите приложение, чтобы изменения вступили в силу.');
+        } else if (!res?.canceled) {
+          alert(`Ошибка: ${res?.error}`);
+        }
       },
     },
   ];

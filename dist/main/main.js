@@ -10254,10 +10254,10 @@ function deleteDumpsByEntity(companyInn, companyIdRusprofile) {
 	const rows = companyIdRusprofile ? db.prepare(`SELECT id, dump_file_path FROM raw_dumps WHERE company_inn = ? AND company_id_rusprofile = ?`).all(companyInn, companyIdRusprofile) : db.prepare(`SELECT id, dump_file_path FROM raw_dumps WHERE company_inn = ?`).all(companyInn);
 	const deletedFiles = [];
 	const fileErrors = [];
-	const fs$12 = require("fs");
+	const fs$13 = require("fs");
 	for (const r of rows) try {
-		if (r.dump_file_path && fs$12.existsSync(r.dump_file_path)) {
-			fs$12.unlinkSync(r.dump_file_path);
+		if (r.dump_file_path && fs$13.existsSync(r.dump_file_path)) {
+			fs$13.unlinkSync(r.dump_file_path);
 			deletedFiles.push(r.dump_file_path);
 		}
 	} catch (e) {
@@ -15573,6 +15573,147 @@ async function exportObservationsCsv(parentWindow) {
 	return saveCsvWithDialog(parentWindow, `osint-observations-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.csv`, csv);
 }
 //#endregion
+//#region src/main/services/osint/backupService.ts
+/**
+* Экранирует путь для SQLite-литерала (VACUUM INTO).
+*/
+function sqlQuotePath(p) {
+	return `'${p.replace(/'/g, "''")}'`;
+}
+/**
+* Рекурсивное копирование каталога.
+*/
+function copyDirRecursive(src, dest) {
+	let copied = 0;
+	if (!fs.default.existsSync(src)) return copied;
+	fs.default.mkdirSync(dest, { recursive: true });
+	for (const entry of fs.default.readdirSync(src, { withFileTypes: true })) {
+		const s = path.default.join(src, entry.name);
+		const d = path.default.join(dest, entry.name);
+		if (entry.isDirectory()) copied += copyDirRecursive(s, d);
+		else if (entry.isFile()) {
+			fs.default.copyFileSync(s, d);
+			copied++;
+		}
+	}
+	return copied;
+}
+async function createBackup(parentWindow, options = {}) {
+	try {
+		const dialogOptions = {
+			title: "Выберите папку для backup",
+			properties: ["openDirectory", "createDirectory"],
+			defaultPath: electron.app.getPath("documents")
+		};
+		const picked = parentWindow ? await electron.dialog.showOpenDialog(parentWindow, dialogOptions) : await electron.dialog.showOpenDialog(dialogOptions);
+		if (picked.canceled || picked.filePaths.length === 0) return {
+			success: false,
+			canceled: true
+		};
+		const timestamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-").replace("T", "_").slice(0, 19);
+		const backupDir = path.default.join(picked.filePaths[0], `fremen-eye-backup-${timestamp}`);
+		fs.default.mkdirSync(backupDir, { recursive: true });
+		const result = {
+			success: true,
+			backupDir,
+			files: {
+				osintDb: false,
+				sensitiveDb: false,
+				rawDumpsCount: 0
+			}
+		};
+		const osintDbPath = path.default.join(electron.app.getPath("userData"), "osint_data.db");
+		const backupOsintDb = path.default.join(backupDir, "osint_data.db");
+		if (fs.default.existsSync(osintDbPath)) {
+			const db = getDatabase();
+			if (fs.default.existsSync(backupOsintDb)) fs.default.unlinkSync(backupOsintDb);
+			try {
+				db.exec(`VACUUM INTO ${sqlQuotePath(backupOsintDb)}`);
+				result.files.osintDb = true;
+			} catch (e) {
+				console.warn("VACUUM INTO не сработал, использую копирование файла:", e);
+				fs.default.copyFileSync(osintDbPath, backupOsintDb);
+				result.files.osintDb = true;
+			}
+		}
+		if (options.includeSensitive) {
+			const sensPath = path.default.join(electron.app.getPath("userData"), "sensitive_data.db");
+			if (fs.default.existsSync(sensPath)) {
+				fs.default.copyFileSync(sensPath, path.default.join(backupDir, "sensitive_data.db"));
+				result.files.sensitiveDb = true;
+			}
+		}
+		if (options.includeRawDumps) {
+			const copied = copyDirRecursive(path.default.join(electron.app.getPath("userData"), "raw_dumps"), path.default.join(backupDir, "raw_dumps"));
+			result.files.rawDumpsCount = copied;
+		}
+		const meta = {
+			version: 1,
+			createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+			appVersion: electron.app.getVersion(),
+			platform: process.platform,
+			includes: {
+				osintDb: result.files.osintDb,
+				sensitiveDb: result.files.sensitiveDb,
+				rawDumps: options.includeRawDumps || false,
+				rawDumpsCount: result.files.rawDumpsCount
+			}
+		};
+		fs.default.writeFileSync(path.default.join(backupDir, "backup_meta.json"), JSON.stringify(meta, null, 2), "utf-8");
+		return result;
+	} catch (e) {
+		return {
+			success: false,
+			error: e.message
+		};
+	}
+}
+/**
+* Восстанавливает osint_data.db и sensitive_data.db из каталога backup.
+* Приложение нужно перезапустить после восстановления.
+*/
+async function restoreFromBackup(parentWindow) {
+	try {
+		const dialogOptions = {
+			title: "Выберите папку backup",
+			properties: ["openDirectory"],
+			defaultPath: electron.app.getPath("documents")
+		};
+		const picked = parentWindow ? await electron.dialog.showOpenDialog(parentWindow, dialogOptions) : await electron.dialog.showOpenDialog(dialogOptions);
+		if (picked.canceled || picked.filePaths.length === 0) return {
+			success: false,
+			canceled: true
+		};
+		const sourceDir = picked.filePaths[0];
+		const metaPath = path.default.join(sourceDir, "backup_meta.json");
+		if (!fs.default.existsSync(metaPath)) return {
+			success: false,
+			error: "В выбранной папке нет backup_meta.json"
+		};
+		const osintSrc = path.default.join(sourceDir, "osint_data.db");
+		if (!fs.default.existsSync(osintSrc)) return {
+			success: false,
+			error: "В backup нет osint_data.db"
+		};
+		const userData = electron.app.getPath("userData");
+		const osintDst = path.default.join(userData, "osint_data.db");
+		const sensSrc = path.default.join(sourceDir, "sensitive_data.db");
+		const sensDst = path.default.join(userData, "sensitive_data.db");
+		for (const f of ["osint_data.db", "sensitive_data.db"]) for (const suffix of ["-wal", "-shm"]) {
+			const p = path.default.join(userData, f + suffix);
+			if (fs.default.existsSync(p)) fs.default.unlinkSync(p);
+		}
+		fs.default.copyFileSync(osintSrc, osintDst);
+		if (fs.default.existsSync(sensSrc)) fs.default.copyFileSync(sensSrc, sensDst);
+		return { success: true };
+	} catch (e) {
+		return {
+			success: false,
+			error: e.message
+		};
+	}
+}
+//#endregion
 //#region src/main/ipcHandlers/osintHandlers.ts
 function registerOsintHandlers() {
 	electron.ipcMain.handle("osint:open-window", () => {
@@ -16271,6 +16412,26 @@ function registerOsintHandlers() {
 	electron.ipcMain.handle("osint:export-observations-csv", async (event) => {
 		try {
 			return await exportObservationsCsv(electron.BrowserWindow.fromWebContents(event.sender));
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:backup-create", async (event, options) => {
+		try {
+			return await createBackup(electron.BrowserWindow.fromWebContents(event.sender), options || {});
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:backup-restore", async (event) => {
+		try {
+			return await restoreFromBackup(electron.BrowserWindow.fromWebContents(event.sender));
 		} catch (error) {
 			return {
 				success: false,

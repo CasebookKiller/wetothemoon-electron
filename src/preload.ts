@@ -534,6 +534,12 @@ try {
     exportRelationsCsv: () => ipcRenderer.invoke('osint:export-relations-csv'),
     exportObservationsCsv: () => ipcRenderer.invoke('osint:export-observations-csv'),
 
+    backupCreate: (options?: { includeSensitive?: boolean; includeRawDumps?: boolean }) =>
+      ipcRenderer.invoke('osint:backup-create', options || {}),
+
+    backupRestore: () =>
+      ipcRenderer.invoke('osint:backup-restore'),
+
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)
