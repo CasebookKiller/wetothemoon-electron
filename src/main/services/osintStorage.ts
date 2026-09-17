@@ -10,6 +10,7 @@ import {
   getDumpSectionsUpdatedAt,
   updateRawDumpSections,
   upsertEntity,
+  getDatabase,
 } from './database';
 import { saveRawDumpSync } from './rawStorage';
 import { findLatestRawDump } from './database';
@@ -45,6 +46,25 @@ function extractRusprofileId(href?: string): string | undefined {
   if (!href) return undefined;
   const match = href.match(/\/(id|ip|person)\/([^/?]+)/);
   return match ? `${match[1]}:${match[2]}` : undefined;
+}
+
+/**
+ * Ищет сущность типа 'entrepreneur' по ОГРНИП через таблицу observations.
+ * Возвращает id сущности или null.
+ */
+function findEntrepreneurByOgrnip(ogrnip: string): number | null {
+  if (!ogrnip) return null;
+  const db = getDatabase();
+  const row = db.prepare(`
+    SELECT e.id
+    FROM entities e
+    JOIN observations o ON o.entity_id = e.id
+    WHERE e.type = 'entrepreneur'
+      AND o.attribute = 'ogrnip'
+      AND o.value = ?
+    LIMIT 1
+  `).get(ogrnip) as { id: number } | undefined;
+  return row?.id ?? null;
 }
 
 function persistCompanyData(
@@ -96,6 +116,56 @@ function persistCompanyData(
 
   let savedEntities = 1;
   let savedRelations = 0;
+
+  // === Автоматическая связь ФЛ ↔ ИП ===
+  // Если это физлицо и у него есть признак ИП в summary.ip — попытаемся
+  // связать его с существующей сущностью entrepreneur (по ОГРНИП).
+  // Если сущности ИП нет — не создаём «висячую» связь.
+  if (mainType === 'person') {
+    const ipInfo = mainSummary.ip;
+    const ogrnip = ipInfo?.ogrnip;
+
+    if (ogrnip) {
+      const ipEntityId = findEntrepreneurByOgrnip(ogrnip);
+
+      if (ipEntityId && ipEntityId !== mainEntityId) {
+        // Проверяем, не создана ли уже такая связь
+        const db = getDatabase();
+        const existing = db.prepare(`
+          SELECT id FROM relations
+          WHERE subject_id = ?
+            AND predicate = 'individual_entrepreneur_of'
+            AND object_id = ?
+          LIMIT 1
+        `).get(mainEntityId, ipEntityId) as { id: number } | undefined;
+
+        if (!existing) {
+          addRelation({
+            subject_id: mainEntityId,
+            predicate: 'individual_entrepreneur_of',
+            object_id: ipEntityId,
+            source_id: sourceId,
+            evidence_text: `ОГРНИП ${ogrnip} — совпадение с профилем ФЛ`,
+            confidence: 95,
+            status: 'confirmed',
+            raw_file_path: rawFilePath,
+          });
+          savedRelations++;
+          console.log(
+            `[persistCompanyData] Автосвязь ФЛ #${mainEntityId} ↔ ИП #${ipEntityId} (ОГРНИП ${ogrnip}) создана`
+          );
+        } else {
+          console.log(
+            `[persistCompanyData] Связь ФЛ #${mainEntityId} ↔ ИП #${ipEntityId} уже существует (id=${existing.id})`
+          );
+        }
+      } else if (!ipEntityId) {
+        console.log(
+          `[persistCompanyData] ИП с ОГРНИП ${ogrnip} ещё не собран — автосвязь не создана`
+        );
+      }
+    }
+  }
 
   // Обработка учредителей (как раньше)
   if (data.founders_details?.founders) {
@@ -195,41 +265,6 @@ function persistCompanyData(
         }
       }
     }
-  }
-
-  // Если в данных ФЛ есть ip_details — сохраняем ИП отдельно
-  if (data.person_ip_details?.summary) {
-    const ipSummary = data.person_ip_details.summary;
-    const ipType = detectEntityTypeFromData(ipSummary); // 'entrepreneur'
-    const ipEntityId = upsertEntity({
-      type: ipType,
-      value: ipSummary.name || ipSummary.ogrnip,
-      label: ipSummary.name,
-      confidence: 90,
-      status: 'confirmed',
-      notes: 'ИП, связанный с физлицом',
-      raw_file_path: rawFilePath,
-    });
-
-    // Наблюдения по ИП (ИНН, ОГРНИП)
-    if (ipSummary.inn) {
-      addObservation({ entity_id: ipEntityId, attribute: 'inn', value: ipSummary.inn, source_id: sourceId, raw_file_path: rawFilePath });
-    }
-    if (ipSummary.ogrnip) {
-      addObservation({ entity_id: ipEntityId, attribute: 'ogrnip', value: ipSummary.ogrnip, source_id: sourceId, raw_file_path: rawFilePath });
-    }
-
-    // Связь ФЛ → ИП
-    addRelation({
-      subject_id: mainEntityId,           // ID физлица
-      predicate: 'individual_entrepreneur_of',
-      object_id: ipEntityId,
-      source_id: sourceId,
-      evidence_text: 'Физлицо является ИП',
-      confidence: 95,
-      status: 'confirmed',
-      raw_file_path: rawFilePath,
-    });
   }
 
   // Аудит

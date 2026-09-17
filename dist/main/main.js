@@ -10999,10 +10999,27 @@ function extractRusprofileId(href) {
 	const match = href.match(/\/(id|ip|person)\/([^/?]+)/);
 	return match ? `${match[1]}:${match[2]}` : void 0;
 }
+/**
+* Ищет сущность типа 'entrepreneur' по ОГРНИП через таблицу observations.
+* Возвращает id сущности или null.
+*/
+function findEntrepreneurByOgrnip(ogrnip) {
+	if (!ogrnip) return null;
+	return getDatabase().prepare(`
+    SELECT e.id
+    FROM entities e
+    JOIN observations o ON o.entity_id = e.id
+    WHERE e.type = 'entrepreneur'
+      AND o.attribute = 'ogrnip'
+      AND o.value = ?
+    LIMIT 1
+  `).get(ogrnip)?.id ?? null;
+}
 function persistCompanyData(companyId, companyInn, data, rawFilePath, sourceId) {
 	const mainSummary = data.summary || {};
+	const mainType = detectEntityTypeFromData(mainSummary);
 	const mainEntityId = upsertEntity({
-		type: detectEntityTypeFromData(mainSummary),
+		type: mainType,
 		value: mainSummary.name || `Сущность ${companyInn}`,
 		label: mainSummary.name,
 		confidence: 90,
@@ -11054,6 +11071,35 @@ function persistCompanyData(companyId, companyInn, data, rawFilePath, sourceId) 
 	}
 	let savedEntities = 1;
 	let savedRelations = 0;
+	if (mainType === "person") {
+		const ogrnip = mainSummary.ip?.ogrnip;
+		if (ogrnip) {
+			const ipEntityId = findEntrepreneurByOgrnip(ogrnip);
+			if (ipEntityId && ipEntityId !== mainEntityId) {
+				const existing = getDatabase().prepare(`
+          SELECT id FROM relations
+          WHERE subject_id = ?
+            AND predicate = 'individual_entrepreneur_of'
+            AND object_id = ?
+          LIMIT 1
+        `).get(mainEntityId, ipEntityId);
+				if (!existing) {
+					addRelation({
+						subject_id: mainEntityId,
+						predicate: "individual_entrepreneur_of",
+						object_id: ipEntityId,
+						source_id: sourceId,
+						evidence_text: `ОГРНИП ${ogrnip} — совпадение с профилем ФЛ`,
+						confidence: 95,
+						status: "confirmed",
+						raw_file_path: rawFilePath
+					});
+					savedRelations++;
+					console.log(`[persistCompanyData] Автосвязь ФЛ #${mainEntityId} ↔ ИП #${ipEntityId} (ОГРНИП ${ogrnip}) создана`);
+				} else console.log(`[persistCompanyData] Связь ФЛ #${mainEntityId} ↔ ИП #${ipEntityId} уже существует (id=${existing.id})`);
+			} else if (!ipEntityId) console.log(`[persistCompanyData] ИП с ОГРНИП ${ogrnip} ещё не собран — автосвязь не создана`);
+		}
+	}
 	if (data.founders_details?.founders) for (const founder of data.founders_details.founders) {
 		const founderType = detectEntityTypeFromHref(founder.href) || detectEntityTypeFromData(founder);
 		const founderId = upsertEntity({
@@ -11173,42 +11219,6 @@ function persistCompanyData(companyId, companyInn, data, rawFilePath, sourceId) 
 			savedEntities++;
 			savedRelations++;
 		}
-	}
-	if (data.person_ip_details?.summary) {
-		const ipSummary = data.person_ip_details.summary;
-		const ipEntityId = upsertEntity({
-			type: detectEntityTypeFromData(ipSummary),
-			value: ipSummary.name || ipSummary.ogrnip,
-			label: ipSummary.name,
-			confidence: 90,
-			status: "confirmed",
-			notes: "ИП, связанный с физлицом",
-			raw_file_path: rawFilePath
-		});
-		if (ipSummary.inn) addObservation({
-			entity_id: ipEntityId,
-			attribute: "inn",
-			value: ipSummary.inn,
-			source_id: sourceId,
-			raw_file_path: rawFilePath
-		});
-		if (ipSummary.ogrnip) addObservation({
-			entity_id: ipEntityId,
-			attribute: "ogrnip",
-			value: ipSummary.ogrnip,
-			source_id: sourceId,
-			raw_file_path: rawFilePath
-		});
-		addRelation({
-			subject_id: mainEntityId,
-			predicate: "individual_entrepreneur_of",
-			object_id: ipEntityId,
-			source_id: sourceId,
-			evidence_text: "Физлицо является ИП",
-			confidence: 95,
-			status: "confirmed",
-			raw_file_path: rawFilePath
-		});
 	}
 	auditChange("entities", mainEntityId, "update", null, JSON.stringify(mainSummary), "Сохранение/обновление сущности из Rusprofile");
 	return {
