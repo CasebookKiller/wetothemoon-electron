@@ -100,7 +100,7 @@ export const AuditLogTab: React.FC = () => {
   return (
     <div>
       {/* Панель фильтров */}
-      <div className="flex flex-wrap align-items-center gap-2 mb-3">
+      <div className="flex flex-wrap align-items-center gap-2 mb-3 audit-log-filters">
         <div style={{ minWidth: '180px' }}>
           <Dropdown
             value={filterTable}
