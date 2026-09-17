@@ -442,46 +442,49 @@ body.p-overflow-hidden {
   fill: currentColor !important;
 }
 
-/* Кнопки навигации месяца в календаре — accent-цвет, стрелки видны */
-.audit-log-filters .p-datepicker-header .p-datepicker-prev,
-.audit-log-filters .p-datepicker-header .p-datepicker-next {
-  color: var(--accent-color, #6ab2f2) !important;
+/* DatabasePage.css */
+
+/* Все кнопки внутри датапикера — полный override */
+.p-datepicker .p-datepicker-header button,
+.p-datepicker .p-datepicker-header .p-datepicker-prev,
+.p-datepicker .p-datepicker-header .p-datepicker-next,
+.p-datepicker .p-datepicker-header .p-datepicker-month,
+.p-datepicker .p-datepicker-header .p-datepicker-year,
+.p-datepicker .p-datepicker-buttonbar button {
+  padding: 0 !important;
   background: transparent !important;
-  border: 1px solid var(--accent-color, #6ab2f2) !important;
+  color: var(--accent-color, #6ab2f2) !important;
+  border: none !important;
   border-radius: 6px !important;
-  width: 2rem !important;
+  cursor: pointer !important;
+  font-size: 0.95rem !important;
+  min-width: 2rem !important;
   height: 2rem !important;
-  display: flex !important;
+  display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
 }
 
-.audit-log-filters .p-datepicker-header .p-datepicker-prev:hover,
-.audit-log-filters .p-datepicker-header .p-datepicker-next:hover {
-  background: var(--accent-color, #6ab2f2) !important;
-  color: var(--tg-theme-bg-color, #fff) !important;
-  border-color: var(--accent-color, #6ab2f2) !important;
+.p-datepicker .p-datepicker-header .p-datepicker-prev,
+.p-datepicker .p-datepicker-header .p-datepicker-next {
+  border: 1px solid var(--accent-color, #6ab2f2) !important;
 }
 
-/* Иконки стрелок — наследуют цвет кнопки */
-.audit-log-filters .p-datepicker-header .p-datepicker-prev .p-icon,
-.audit-log-filters .p-datepicker-header .p-datepicker-next .p-icon,
-.audit-log-filters .p-datepicker-header .p-datepicker-prev svg,
-.audit-log-filters .p-datepicker-header .p-datepicker-next svg {
-  color: inherit !important;
+.p-datepicker .p-datepicker-header .p-datepicker-prev:hover,
+.p-datepicker .p-datepicker-header .p-datepicker-next:hover,
+.p-datepicker .p-datepicker-header .p-datepicker-month:hover,
+.p-datepicker .p-datepicker-header .p-datepicker-year:hover {
+  background: var(--accent-color, #6ab2f2) !important;
+  color: var(--tg-theme-bg-color, #1a1a1a) !important;
+}
+
+/* Кнопка "Сегодня" / "Очистить" в buttonbar */
+.p-datepicker .p-datepicker-buttonbar button {
+  padding: 0.5rem 1rem !important;
+  border: 1px solid var(--accent-color, #6ab2f2) !important;
+}
+
+/* SVG-стрелки: fill="none" на svg, задаём на path */
+.p-datepicker .p-datepicker-header button svg path {
   fill: currentColor !important;
-  width: 14px !important;
-  height: 14px !important;
-}
-
-/* Заголовок с месяцем/годом — тоже в accent, чтобы не сливался */
-.audit-log-filters .p-datepicker-header .p-datepicker-title .p-datepicker-month,
-.audit-log-filters .p-datepicker-header .p-datepicker-title .p-datepicker-year {
-  color: var(--accent-color, #6ab2f2) !important;
-}
-.audit-log-filters .p-datepicker-header .p-datepicker-title .p-datepicker-month:hover,
-.audit-log-filters .p-datepicker-header .p-datepicker-title .p-datepicker-year:hover {
-  color: var(--tg-theme-bg-color, #fff) !important;
-  background: var(--accent-color, #6ab2f2) !important;
-  border-radius: 4px;
 }

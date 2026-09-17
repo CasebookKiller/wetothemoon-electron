@@ -156,13 +156,13 @@ __________________________________________________________________
 
 Осталось несколько подпунктов:
 
-- [ ] **Шаг 9. Журнал изменений (`audit_log`) — отдельная вкладка.**
-  - [ ] Табличный компонент `AuditLogTable`.
-  - [ ] IPC `osint:get-audit-log` с фильтрами (по таблице, по action, по дате).
-  - [ ] Вкладка «Журнал» в `TabView` главного окна.
-  - [ ] Клик по строке → диалог с `old_value` / `new_value`.
-  - [ ] Фильтр по `table_name` (entities / relations / observations / sources / case_info).
-  - [ ] Фильтр по `action` (create / update / delete / mark_false / clear_all).
+- [x] **Шаг 9. Журнал изменений (`audit_log`) — отдельная вкладка.**
+  - [x] Табличный компонент `AuditLogTable`.
+  - [x] IPC `osint:get-audit-log` с фильтрами (по таблице, по action, по дате).
+  - [x] Вкладка «Журнал» в `TabView` главного окна.
+  - [x] Клик по строке → диалог с `old_value` / `new_value`.
+  - [x] Фильтр по `table_name` (entities / relations / observations / sources / case_info).
+  - [x] Фильтр по `action` (create / update / delete / mark_false / clear_all).
 
 - [ ] **Шаг 10. Экспорт и резервное копирование.**
   - [ ] Экспорт сущностей в CSV.

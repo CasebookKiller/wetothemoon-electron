@@ -95,7 +95,7 @@
 
 button {
   padding: 12px 24px;
-  background: #4caf50;
+  background: var(--tg-theme-accent-text-color);
   color: white;
   border: none;
   border-radius: 6px;
