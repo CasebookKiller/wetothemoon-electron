@@ -13,8 +13,6 @@ import {
   getDatabase,
 } from './database';
 import { saveRawDumpSync } from './rawStorage';
-import { findLatestRawDump } from './database';
-import { loadRawDumpSync } from './rawStorage';
 
 /**
  * Определяет тип сущности по ссылке на профиль Rusprofile.
@@ -32,9 +30,16 @@ function detectEntityTypeFromHref(href?: string): string | null {
  * Определяет тип сущности по данным (если нет ссылки).
  */
 function detectEntityTypeFromData(data: any): string {
-  if (data.ogrn && data.inn) return 'company';
-  if (data.ogrnip && data.inn) return 'entrepreneur';
-  if (data.inn && !data.ogrn) return 'entrepreneur';
+  // 1. Явный тип из collectSummary имеет высший приоритет
+  if (data.entity_type === 'person') return 'person';
+  if (data.entity_type === 'entrepreneur') return 'entrepreneur';
+  if (data.entity_type === 'company') return 'company';
+
+  // 2. По реквизитам
+  if (data.ogrn) return 'company';
+  if (data.ogrnip) return 'entrepreneur';
+
+  // 3. Всё остальное — физлицо (в т.ч. с ИНН без ОГРН/ОГРНИП)
   return 'person';
 }
 
@@ -129,40 +134,26 @@ function persistCompanyData(
       const ipEntityId = findEntrepreneurByOgrnip(ogrnip);
 
       if (ipEntityId && ipEntityId !== mainEntityId) {
-        // Проверяем, не создана ли уже такая связь
-        const db = getDatabase();
-        const existing = db.prepare(`
-          SELECT id FROM relations
-          WHERE subject_id = ?
-            AND predicate = 'individual_entrepreneur_of'
-            AND object_id = ?
-          LIMIT 1
-        `).get(mainEntityId, ipEntityId) as { id: number } | undefined;
-
-        if (!existing) {
-          addRelation({
-            subject_id: mainEntityId,
-            predicate: 'individual_entrepreneur_of',
-            object_id: ipEntityId,
-            source_id: sourceId,
-            evidence_text: `ОГРНИП ${ogrnip} — совпадение с профилем ФЛ`,
-            confidence: 95,
-            status: 'confirmed',
-            raw_file_path: rawFilePath,
-          });
+        const { inserted, id } = addRelation({
+          subject_id: mainEntityId,
+          predicate: 'individual_entrepreneur_of',
+          object_id: ipEntityId,
+          source_id: sourceId,
+          evidence_text: `ОГРНИП ${ogrnip} — совпадение с профилем ФЛ`,
+          confidence: 95,
+          status: 'confirmed',
+          raw_file_path: rawFilePath,
+        });
+        if (inserted) {
           savedRelations++;
           console.log(
-            `[persistCompanyData] Автосвязь ФЛ #${mainEntityId} ↔ ИП #${ipEntityId} (ОГРНИП ${ogrnip}) создана`
+            `[persistCompanyData] Автосвязь ФЛ #${mainEntityId} ↔ ИП #${ipEntityId} (ОГРНИП ${ogrnip}) создана (id=${id})`
           );
         } else {
           console.log(
-            `[persistCompanyData] Связь ФЛ #${mainEntityId} ↔ ИП #${ipEntityId} уже существует (id=${existing.id})`
+            `[persistCompanyData] Связь ФЛ #${mainEntityId} ↔ ИП #${ipEntityId} уже существует (id=${id})`
           );
         }
-      } else if (!ipEntityId) {
-        console.log(
-          `[persistCompanyData] ИП с ОГРНИП ${ogrnip} ещё не собран — автосвязь не создана`
-        );
       }
     }
   }
@@ -202,7 +193,7 @@ function persistCompanyData(
         savedObservations++;
       }
 
-      addRelation({
+      const { inserted } = addRelation({
         subject_id: founderId,
         predicate: 'founder_of',
         object_id: mainEntityId,
@@ -212,8 +203,8 @@ function persistCompanyData(
         status: 'unverified',
         raw_file_path: rawFilePath,
       });
+      if (inserted) savedRelations++;
       savedEntities++;
-      savedRelations++;
     }
   }
 
@@ -250,7 +241,7 @@ function persistCompanyData(
             savedObservations++;
           }
 
-          addRelation({
+          const { inserted } = addRelation({
             subject_id: mainEntityId,
             predicate: 'associated_with',
             object_id: orgId,
@@ -260,8 +251,8 @@ function persistCompanyData(
             status: 'unverified',
             raw_file_path: rawFilePath,
           });
+          if (inserted) savedRelations++;
           savedEntities++;
-          savedRelations++;
         }
       }
     }
@@ -272,6 +263,7 @@ function persistCompanyData(
 
   return { savedEntities, savedRelations, savedObservations };
 }
+
 
 export function saveCompanyData(
   companyId: string,

@@ -10148,11 +10148,42 @@ function listEntitiesForDropdown() {
   `).all();
 }
 function addRelation(relation) {
-	getDatabase().prepare(`
-    INSERT OR IGNORE INTO relations (subject_id, predicate, object_id, source_id, valid_from,
-      valid_to, evidence_text, confidence, status, notes, raw_file_path)
+	const db = getDatabase();
+	if (relation.subject_id === relation.object_id) {
+		console.warn(`[addRelation] Пропущена самосвязь: entity #${relation.subject_id} --${relation.predicate}--> сама себя`);
+		return { inserted: false };
+	}
+	const existing = db.prepare(`
+    SELECT id FROM relations
+    WHERE subject_id = ?
+      AND predicate = ?
+      AND object_id = ?
+    LIMIT 1
+  `).get(relation.subject_id, relation.predicate, relation.object_id);
+	if (existing) {
+		db.prepare(`
+      UPDATE relations
+      SET source_id = COALESCE(source_id, ?),
+          evidence_text = COALESCE(evidence_text, ?),
+          confidence = CASE WHEN confidence IS NULL THEN ? ELSE confidence END,
+          raw_file_path = COALESCE(raw_file_path, ?)
+      WHERE id = ?
+    `).run(relation.source_id || null, relation.evidence_text || null, relation.confidence ?? 50, relation.raw_file_path || null, existing.id);
+		return {
+			inserted: false,
+			id: existing.id
+		};
+	}
+	const info = db.prepare(`
+    INSERT INTO relations
+      (subject_id, predicate, object_id, source_id, valid_from, valid_to,
+       evidence_text, confidence, status, notes, raw_file_path)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(relation.subject_id, relation.predicate, relation.object_id, relation.source_id || null, relation.valid_from || null, relation.valid_to || null, relation.evidence_text || null, relation.confidence ?? 50, relation.status || "unverified", relation.notes || null, relation.raw_file_path || null);
+	return {
+		inserted: true,
+		id: Number(info.lastInsertRowid)
+	};
 }
 /**
 * Создаёт наблюдение вручную (origin='manual').
@@ -10985,9 +11016,11 @@ function detectEntityTypeFromHref(href) {
 * Определяет тип сущности по данным (если нет ссылки).
 */
 function detectEntityTypeFromData(data) {
-	if (data.ogrn && data.inn) return "company";
-	if (data.ogrnip && data.inn) return "entrepreneur";
-	if (data.inn && !data.ogrn) return "entrepreneur";
+	if (data.entity_type === "person") return "person";
+	if (data.entity_type === "entrepreneur") return "entrepreneur";
+	if (data.entity_type === "company") return "company";
+	if (data.ogrn) return "company";
+	if (data.ogrnip) return "entrepreneur";
 	return "person";
 }
 /**
@@ -11076,28 +11109,21 @@ function persistCompanyData(companyId, companyInn, data, rawFilePath, sourceId) 
 		if (ogrnip) {
 			const ipEntityId = findEntrepreneurByOgrnip(ogrnip);
 			if (ipEntityId && ipEntityId !== mainEntityId) {
-				const existing = getDatabase().prepare(`
-          SELECT id FROM relations
-          WHERE subject_id = ?
-            AND predicate = 'individual_entrepreneur_of'
-            AND object_id = ?
-          LIMIT 1
-        `).get(mainEntityId, ipEntityId);
-				if (!existing) {
-					addRelation({
-						subject_id: mainEntityId,
-						predicate: "individual_entrepreneur_of",
-						object_id: ipEntityId,
-						source_id: sourceId,
-						evidence_text: `ОГРНИП ${ogrnip} — совпадение с профилем ФЛ`,
-						confidence: 95,
-						status: "confirmed",
-						raw_file_path: rawFilePath
-					});
+				const { inserted, id } = addRelation({
+					subject_id: mainEntityId,
+					predicate: "individual_entrepreneur_of",
+					object_id: ipEntityId,
+					source_id: sourceId,
+					evidence_text: `ОГРНИП ${ogrnip} — совпадение с профилем ФЛ`,
+					confidence: 95,
+					status: "confirmed",
+					raw_file_path: rawFilePath
+				});
+				if (inserted) {
 					savedRelations++;
-					console.log(`[persistCompanyData] Автосвязь ФЛ #${mainEntityId} ↔ ИП #${ipEntityId} (ОГРНИП ${ogrnip}) создана`);
-				} else console.log(`[persistCompanyData] Связь ФЛ #${mainEntityId} ↔ ИП #${ipEntityId} уже существует (id=${existing.id})`);
-			} else if (!ipEntityId) console.log(`[persistCompanyData] ИП с ОГРНИП ${ogrnip} ещё не собран — автосвязь не создана`);
+					console.log(`[persistCompanyData] Автосвязь ФЛ #${mainEntityId} ↔ ИП #${ipEntityId} (ОГРНИП ${ogrnip}) создана (id=${id})`);
+				} else console.log(`[persistCompanyData] Связь ФЛ #${mainEntityId} ↔ ИП #${ipEntityId} уже существует (id=${id})`);
+			}
 		}
 	}
 	if (data.founders_details?.founders) for (const founder of data.founders_details.founders) {
@@ -11151,7 +11177,7 @@ function persistCompanyData(companyId, companyInn, data, rawFilePath, sourceId) 
 			});
 			savedObservations++;
 		}
-		addRelation({
+		const { inserted } = addRelation({
 			subject_id: founderId,
 			predicate: "founder_of",
 			object_id: mainEntityId,
@@ -11161,8 +11187,8 @@ function persistCompanyData(companyId, companyInn, data, rawFilePath, sourceId) 
 			status: "unverified",
 			raw_file_path: rawFilePath
 		});
+		if (inserted) savedRelations++;
 		savedEntities++;
-		savedRelations++;
 	}
 	if (data.connections_details?.connections) {
 		for (const group of data.connections_details.connections) if (group.organizations) for (const org of group.organizations) {
@@ -11206,7 +11232,7 @@ function persistCompanyData(companyId, companyInn, data, rawFilePath, sourceId) 
 				});
 				savedObservations++;
 			}
-			addRelation({
+			const { inserted } = addRelation({
 				subject_id: mainEntityId,
 				predicate: "associated_with",
 				object_id: orgId,
@@ -11216,8 +11242,8 @@ function persistCompanyData(companyId, companyInn, data, rawFilePath, sourceId) 
 				status: "unverified",
 				raw_file_path: rawFilePath
 			});
+			if (inserted) savedRelations++;
 			savedEntities++;
-			savedRelations++;
 		}
 	}
 	auditChange("entities", mainEntityId, "update", null, JSON.stringify(mainSummary), "Сохранение/обновление сущности из Rusprofile");

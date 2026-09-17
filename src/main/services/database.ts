@@ -645,11 +645,50 @@ export function addRelation(relation: {
   status?: string;
   notes?: string;
   raw_file_path?: string;
-}): void {
+}): { inserted: boolean; id?: number } {
   const db = getDatabase();
-  db.prepare(`
-    INSERT OR IGNORE INTO relations (subject_id, predicate, object_id, source_id, valid_from,
-      valid_to, evidence_text, confidence, status, notes, raw_file_path)
+
+  // 1. Не создавать self-loop
+  if (relation.subject_id === relation.object_id) {
+    console.warn(
+      `[addRelation] Пропущена самосвязь: entity #${relation.subject_id} --${relation.predicate}--> сама себя`
+    );
+    return { inserted: false };
+  }
+
+  // 2. Проверить дубликат
+  const existing = db.prepare(`
+    SELECT id FROM relations
+    WHERE subject_id = ?
+      AND predicate = ?
+      AND object_id = ?
+    LIMIT 1
+  `).get(relation.subject_id, relation.predicate, relation.object_id) as { id: number } | undefined;
+
+  if (existing) {
+    // Обновить confidence/source, если они не заданы у существующей
+    db.prepare(`
+      UPDATE relations
+      SET source_id = COALESCE(source_id, ?),
+          evidence_text = COALESCE(evidence_text, ?),
+          confidence = CASE WHEN confidence IS NULL THEN ? ELSE confidence END,
+          raw_file_path = COALESCE(raw_file_path, ?)
+      WHERE id = ?
+    `).run(
+      relation.source_id || null,
+      relation.evidence_text || null,
+      relation.confidence ?? 50,
+      relation.raw_file_path || null,
+      existing.id
+    );
+    return { inserted: false, id: existing.id };
+  }
+
+  // 3. Вставить новую
+  const info = db.prepare(`
+    INSERT INTO relations
+      (subject_id, predicate, object_id, source_id, valid_from, valid_to,
+       evidence_text, confidence, status, notes, raw_file_path)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     relation.subject_id,
@@ -664,6 +703,8 @@ export function addRelation(relation: {
     relation.notes || null,
     relation.raw_file_path || null
   );
+
+  return { inserted: true, id: Number(info.lastInsertRowid) };
 }
 
 /**
