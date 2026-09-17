@@ -10254,10 +10254,10 @@ function deleteDumpsByEntity(companyInn, companyIdRusprofile) {
 	const rows = companyIdRusprofile ? db.prepare(`SELECT id, dump_file_path FROM raw_dumps WHERE company_inn = ? AND company_id_rusprofile = ?`).all(companyInn, companyIdRusprofile) : db.prepare(`SELECT id, dump_file_path FROM raw_dumps WHERE company_inn = ?`).all(companyInn);
 	const deletedFiles = [];
 	const fileErrors = [];
-	const fs$11 = require("fs");
+	const fs$12 = require("fs");
 	for (const r of rows) try {
-		if (r.dump_file_path && fs$11.existsSync(r.dump_file_path)) {
-			fs$11.unlinkSync(r.dump_file_path);
+		if (r.dump_file_path && fs$12.existsSync(r.dump_file_path)) {
+			fs$12.unlinkSync(r.dump_file_path);
 			deletedFiles.push(r.dump_file_path);
 		}
 	} catch (e) {
@@ -15345,6 +15345,234 @@ function validatePhrase(phrase, lang, minWords = 10, maxWords = 24) {
 	return { valid: true };
 }
 //#endregion
+//#region src/main/services/osint/exportService.ts
+/**
+* Экранирует значение для CSV по RFC 4180.
+* Оборачивает в кавычки, если содержит разделитель, кавычку или перевод строки.
+*/
+function csvEscape(value) {
+	if (value === null || value === void 0) return "";
+	const s = String(value);
+	if (s.includes("\"") || s.includes(",") || s.includes("\n") || s.includes("\r")) return "\"" + s.replace(/"/g, "\"\"") + "\"";
+	return s;
+}
+function csvRow(values) {
+	return values.map(csvEscape).join(",");
+}
+function buildEntitiesCsv() {
+	const rows = getDatabase().prepare(`
+    SELECT id, type, value, normalized_value, label,
+           first_seen, last_seen, confidence, status, notes,
+           origin, rusprofile_id, raw_file_path
+    FROM entities
+    ORDER BY id ASC
+  `).all();
+	const lines = [];
+	lines.push(csvRow([
+		"id",
+		"type",
+		"value",
+		"normalized_value",
+		"label",
+		"first_seen",
+		"last_seen",
+		"confidence",
+		"status",
+		"notes",
+		"origin",
+		"rusprofile_id",
+		"raw_file_path"
+	]));
+	for (const r of rows) lines.push(csvRow([
+		r.id,
+		r.type,
+		r.value,
+		r.normalized_value,
+		r.label,
+		r.first_seen,
+		r.last_seen,
+		r.confidence,
+		r.status,
+		r.notes,
+		r.origin,
+		r.rusprofile_id,
+		r.raw_file_path
+	]));
+	return "﻿" + lines.join("\r\n") + "\r\n";
+}
+function buildRelationsCsv() {
+	const rows = getDatabase().prepare(`
+    SELECT
+      r.id,
+      r.subject_id,
+      s.type  AS subject_type,
+      s.label AS subject_label,
+      s.value AS subject_value,
+      r.predicate,
+      r.object_id,
+      o.type  AS object_type,
+      o.label AS object_label,
+      o.value AS object_value,
+      r.confidence,
+      r.status,
+      r.valid_from,
+      r.valid_to,
+      r.evidence_text,
+      r.notes,
+      r.origin,
+      r.source_id,
+      src.url   AS source_url,
+      src.title AS source_title
+    FROM relations r
+    JOIN entities s ON s.id = r.subject_id
+    JOIN entities o ON o.id = r.object_id
+    LEFT JOIN sources src ON src.id = r.source_id
+    ORDER BY r.id ASC
+  `).all();
+	const lines = [];
+	lines.push(csvRow([
+		"id",
+		"subject_id",
+		"subject_type",
+		"subject_label",
+		"subject_value",
+		"predicate",
+		"object_id",
+		"object_type",
+		"object_label",
+		"object_value",
+		"confidence",
+		"status",
+		"valid_from",
+		"valid_to",
+		"evidence_text",
+		"notes",
+		"origin",
+		"source_id",
+		"source_url",
+		"source_title"
+	]));
+	for (const r of rows) lines.push(csvRow([
+		r.id,
+		r.subject_id,
+		r.subject_type,
+		r.subject_label,
+		r.subject_value,
+		r.predicate,
+		r.object_id,
+		r.object_type,
+		r.object_label,
+		r.object_value,
+		r.confidence,
+		r.status,
+		r.valid_from,
+		r.valid_to,
+		r.evidence_text,
+		r.notes,
+		r.origin,
+		r.source_id,
+		r.source_url,
+		r.source_title
+	]));
+	return "﻿" + lines.join("\r\n") + "\r\n";
+}
+function buildObservationsCsv() {
+	const rows = getDatabase().prepare(`
+    SELECT
+      o.id,
+      o.entity_id,
+      e.type  AS entity_type,
+      e.label AS entity_label,
+      o.attribute,
+      o.value,
+      o.confidence,
+      o.observed_at,
+      o.notes,
+      o.origin,
+      o.source_id,
+      src.url   AS source_url,
+      src.title AS source_title
+    FROM observations o
+    JOIN entities e ON e.id = o.entity_id
+    LEFT JOIN sources src ON src.id = o.source_id
+    ORDER BY o.id ASC
+  `).all();
+	const lines = [];
+	lines.push(csvRow([
+		"id",
+		"entity_id",
+		"entity_type",
+		"entity_label",
+		"attribute",
+		"value",
+		"confidence",
+		"observed_at",
+		"notes",
+		"origin",
+		"source_id",
+		"source_url",
+		"source_title"
+	]));
+	for (const r of rows) lines.push(csvRow([
+		r.id,
+		r.entity_id,
+		r.entity_type,
+		r.entity_label,
+		r.attribute,
+		r.value,
+		r.confidence,
+		r.observed_at,
+		r.notes,
+		r.origin,
+		r.source_id,
+		r.source_url,
+		r.source_title
+	]));
+	return "﻿" + lines.join("\r\n") + "\r\n";
+}
+async function saveCsvWithDialog(parentWindow, defaultFileName, content) {
+	try {
+		const dialogOptions = {
+			title: "Сохранить CSV",
+			defaultPath: path.default.join(electron.app.getPath("documents"), defaultFileName),
+			filters: [{
+				name: "CSV",
+				extensions: ["csv"]
+			}, {
+				name: "Все файлы",
+				extensions: ["*"]
+			}]
+		};
+		const result = parentWindow ? await electron.dialog.showSaveDialog(parentWindow, dialogOptions) : await electron.dialog.showSaveDialog(dialogOptions);
+		if (result.canceled || !result.filePath) return {
+			success: false,
+			canceled: true
+		};
+		fs.default.writeFileSync(result.filePath, content, "utf-8");
+		return {
+			success: true,
+			filePath: result.filePath
+		};
+	} catch (e) {
+		return {
+			success: false,
+			error: e.message
+		};
+	}
+}
+async function exportEntitiesCsv(parentWindow) {
+	const csv = buildEntitiesCsv();
+	return saveCsvWithDialog(parentWindow, `osint-entities-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.csv`, csv);
+}
+async function exportRelationsCsv(parentWindow) {
+	const csv = buildRelationsCsv();
+	return saveCsvWithDialog(parentWindow, `osint-relations-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.csv`, csv);
+}
+async function exportObservationsCsv(parentWindow) {
+	const csv = buildObservationsCsv();
+	return saveCsvWithDialog(parentWindow, `osint-observations-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.csv`, csv);
+}
+//#endregion
 //#region src/main/ipcHandlers/osintHandlers.ts
 function registerOsintHandlers() {
 	electron.ipcMain.handle("osint:open-window", () => {
@@ -16013,6 +16241,36 @@ function registerOsintHandlers() {
 	electron.ipcMain.handle("osint:sensitive-reset", async () => {
 		try {
 			return resetSensitiveVault();
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:export-entities-csv", async (event) => {
+		try {
+			return await exportEntitiesCsv(electron.BrowserWindow.fromWebContents(event.sender));
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:export-relations-csv", async (event) => {
+		try {
+			return await exportRelationsCsv(electron.BrowserWindow.fromWebContents(event.sender));
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:export-observations-csv", async (event) => {
+		try {
+			return await exportObservationsCsv(electron.BrowserWindow.fromWebContents(event.sender));
 		} catch (error) {
 			return {
 				success: false,

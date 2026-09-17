@@ -320,7 +320,10 @@ try {
 		getAuditLog: (filters, limit = 200, offset = 0) => electron.ipcRenderer.invoke("osint:get-audit-log", filters || {}, limit, offset),
 		getAuditLogTables: () => electron.ipcRenderer.invoke("osint:get-audit-log-tables"),
 		getAuditLogActions: () => electron.ipcRenderer.invoke("osint:get-audit-log-actions"),
-		sensitiveReset: () => electron.ipcRenderer.invoke("osint:sensitive-reset")
+		sensitiveReset: () => electron.ipcRenderer.invoke("osint:sensitive-reset"),
+		exportEntitiesCsv: () => electron.ipcRenderer.invoke("osint:export-entities-csv"),
+		exportRelationsCsv: () => electron.ipcRenderer.invoke("osint:export-relations-csv"),
+		exportObservationsCsv: () => electron.ipcRenderer.invoke("osint:export-observations-csv")
 	});
 	electron.contextBridge.exposeInMainWorld("fileAPI", {});
 } catch (e) {

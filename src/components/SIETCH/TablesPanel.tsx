@@ -4,6 +4,8 @@ import React from 'react';
 import { Panel } from 'primereact/panel';
 import { Button } from 'primereact/button';
 import { TabView, TabPanel } from 'primereact/tabview';
+import { Menu } from 'primereact/menu';
+import type { MenuItem } from 'primereact/menuitem';
 
 import { EntitiesTable } from '@/components/SIETCH/DatabaseTables/EntitiesTable';
 import { RelationsTable } from '@/components/SIETCH/DatabaseTables/RelationsTable';
@@ -57,21 +59,72 @@ export const TablesPanel: React.FC<TablesPanelProps> = ({
   onOpenDangerZone,
   searchActive,
 }) => {
+  const exportMenuRef = React.useRef<Menu>(null);
+
+  const exportItems: MenuItem[] = [
+    {
+      label: 'Сущности → CSV',
+      icon: 'pi pi-download',
+      command: async () => {
+        const api = (window as any).electronAPI;
+        const res = await api.exportEntitiesCsv();
+        if (res?.success) {
+          // Можно показать toast, но он не всегда подключён — просто лог
+          console.log('CSV сохранён:', res.filePath);
+        } else if (!res?.canceled) {
+          console.error('Ошибка экспорта:', res?.error);
+        }
+      },
+    },
+    {
+      label: 'Связи → CSV',
+      icon: 'pi pi-download',
+      command: async () => {
+        const api = (window as any).electronAPI;
+        const res = await api.exportRelationsCsv();
+        if (res?.success) console.log('CSV сохранён:', res.filePath);
+        else if (!res?.canceled) console.error('Ошибка экспорта:', res?.error);
+      },
+    },
+    {
+      label: 'Наблюдения → CSV',
+      icon: 'pi pi-download',
+      command: async () => {
+        const api = (window as any).electronAPI;
+        const res = await api.exportObservationsCsv();
+        if (res?.success) console.log('CSV сохранён:', res.filePath);
+        else if (!res?.canceled) console.error('Ошибка экспорта:', res?.error);
+      },
+    },
+  ];
+
   return (
     <Panel 
       className="shadow-5 mb-3" 
       header="Таблицы"
       footer={
         <>
-          {/* Опасная зона — справа */}
-          <Button
-            label="Опасная зона"
-            icon="pi pi-exclamation-octagon"
-            className="osint-destructive-soft p-button-sm"
-            onClick={onOpenDangerZone}
-            tooltip="Полная очистка базы или удаление всех дампов"
-            tooltipOptions={{ position: 'left' }}
-          />
+          <div className="flex align-items-center gap-2">
+            <Menu model={exportItems} popup ref={exportMenuRef} id="export_menu" />
+            <Button
+              label="Экспорт"
+              icon="pi pi-download"
+              className="osint-soft p-button-sm"
+              onClick={(e) => exportMenuRef.current?.toggle(e)}
+              aria-controls="export_menu"
+              aria-haspopup
+              tooltip="Выгрузить таблицы в CSV"
+              tooltipOptions={{ position: 'left' }}
+            />
+            <Button
+              label="Опасная зона"
+              icon="pi pi-exclamation-octagon"
+              className="osint-destructive-soft p-button-sm"
+              onClick={onOpenDangerZone}
+              tooltip="Полная очистка базы или удаление всех дампов"
+              tooltipOptions={{ position: 'left' }}
+            />
+          </div>
         </>
       }
     >

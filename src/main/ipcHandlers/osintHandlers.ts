@@ -1,6 +1,6 @@
 // src/main/ipcHandlers/osintHandlers.ts
 
-import { ipcMain } from 'electron';
+import { BrowserWindow, ipcMain } from 'electron';
 import { createOsintWindow, getOsintWindow } from '@/main/windows/osintWindow';
 import { launchBrowser, closeBrowser } from '../services/osint/playwrightService'; // будет создан позже
 import { scrapeRusprofile } from '../services/osint/scrapers/rusprofile/index';
@@ -61,6 +61,12 @@ import {
   isWordlistReady,
   type WordlistLang,
 } from '../../shared/sensitive/wordlists';
+
+import {
+  exportEntitiesCsv,
+  exportRelationsCsv,
+  exportObservationsCsv,
+} from '../services/osint/exportService';
 
 export function registerOsintHandlers() {
   // Открыть окно OSINT
@@ -627,6 +633,36 @@ export function registerOsintHandlers() {
   ipcMain.handle('osint:sensitive-reset', async () => {
     try {
       return resetSensitiveVault();
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('osint:export-entities-csv', async (event) => {
+    try {
+      const win = BrowserWindow.fromWebContents(event.sender);
+      const res = await exportEntitiesCsv(win);
+      return res;
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('osint:export-relations-csv', async (event) => {
+    try {
+      const win = BrowserWindow.fromWebContents(event.sender);
+      const res = await exportRelationsCsv(win);
+      return res;
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('osint:export-observations-csv', async (event) => {
+    try {
+      const win = BrowserWindow.fromWebContents(event.sender);
+      const res = await exportObservationsCsv(win);
+      return res;
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }

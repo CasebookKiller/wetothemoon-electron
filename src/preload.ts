@@ -530,6 +530,10 @@ try {
 
     sensitiveReset: () => ipcRenderer.invoke('osint:sensitive-reset'),
 
+    exportEntitiesCsv: () => ipcRenderer.invoke('osint:export-entities-csv'),
+    exportRelationsCsv: () => ipcRenderer.invoke('osint:export-relations-csv'),
+    exportObservationsCsv: () => ipcRenderer.invoke('osint:export-observations-csv'),
+
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)
