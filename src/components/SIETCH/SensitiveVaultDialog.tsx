@@ -94,6 +94,16 @@ export const SensitiveVaultDialog: React.FC<SensitiveVaultDialogProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, entityId]);
 
+  // Проверка словников
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      import('@/shared/sensitive/wordlists').then(({ diagnoseWordlist }) => {
+        console.log('[wordlist:ru]', diagnoseWordlist('ru'));
+        console.log('[wordlist:en]', diagnoseWordlist('en'));
+      });
+    }
+  }, []);
+
   // Сброс раскрытых значений при закрытии диалога
   useEffect(() => {
     if (!visible) {

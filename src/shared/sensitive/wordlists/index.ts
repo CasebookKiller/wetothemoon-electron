@@ -6,25 +6,66 @@ import { BIP39_RU } from './bip39-ru';
 
 export type WordlistLang = 'en' | 'ru';
 
-export const WORDLISTS: Record<WordlistLang, string[]> = {
-  en: BIP39_EN,
-  ru: BIP39_RU,
-};
-
 export const MIN_PHRASE_WORDS = 10;
 export const MAX_PHRASE_WORDS = 24;
 export const DEFAULT_PHRASE_WORDS = 12;
 const MIN_WORDLIST_SIZE = 256;
+const MIN_WORD_LENGTH = 3;
+const MAX_WORD_LENGTH = 8;
+const PREFIX_LENGTH = 4;
+
+/**
+ * Очищает словарь: удаляет дубликаты, коллизии префиксов и слова
+ * неправильной длины. Возвращает уже готовый к использованию массив.
+ */
+function dedupeWordlist(raw: string[]): string[] {
+  const cleaned: string[] = [];
+  const seenWords = new Set<string>();
+  const seenPrefixes = new Set<string>();
+
+  for (const word of raw) {
+    if (!word) continue;
+
+    // 1. Длина
+    if (word.length < MIN_WORD_LENGTH || word.length > MAX_WORD_LENGTH) continue;
+
+    // 2. Дубликат
+    if (seenWords.has(word)) continue;
+
+    // 3. Коллизия по первым 4 символам
+    const prefix = word.slice(0, PREFIX_LENGTH);
+    if (seenPrefixes.has(prefix)) continue;
+
+    seenWords.add(word);
+    seenPrefixes.add(prefix);
+    cleaned.push(word);
+  }
+
+  return cleaned;
+}
+
+let cleanedEnCache: string[] | null = null;
+let cleanedRuCache: string[] | null = null;
+
+function getCleanedList(lang: WordlistLang): string[] {
+  if (lang === 'en') {
+    if (cleanedEnCache === null) cleanedEnCache = dedupeWordlist(BIP39_EN);
+    return cleanedEnCache;
+  } else {
+    if (cleanedRuCache === null) cleanedRuCache = dedupeWordlist(BIP39_RU);
+    return cleanedRuCache;
+  }
+}
 
 export function isWordlistReady(lang: WordlistLang): boolean {
-  return (WORDLISTS[lang]?.length ?? 0) >= MIN_WORDLIST_SIZE;
+  return getCleanedList(lang).length >= MIN_WORDLIST_SIZE;
 }
 
 export function getWordlist(lang: WordlistLang): string[] {
-  const list = WORDLISTS[lang];
-  if (!list || list.length < MIN_WORDLIST_SIZE) {
+  const list = getCleanedList(lang);
+  if (list.length < MIN_WORDLIST_SIZE) {
     throw new Error(
-      `Словник "${lang}" не загружен или слишком короткий (${list?.length ?? 0}). ` +
+      `Словник "${lang}" слишком короткий после очистки (${list.length}). ` +
       `Минимум ${MIN_WORDLIST_SIZE} слов.`
     );
   }
@@ -72,4 +113,24 @@ export function validatePhrase(
   }
 
   return { valid: true };
+}
+
+/**
+ * Диагностика: возвращает список проблем и итоговое количество.
+ * Вызывайте вручную в DevTools при подозрениях.
+ */
+export function diagnoseWordlist(lang: WordlistLang): {
+  rawCount: number;
+  cleanedCount: number;
+  removedCount: number;
+  ready: boolean;
+} {
+  const raw = lang === 'en' ? BIP39_EN : BIP39_RU;
+  const cleaned = getCleanedList(lang);
+  return {
+    rawCount: raw.length,
+    cleanedCount: cleaned.length,
+    removedCount: raw.length - cleaned.length,
+    ready: cleaned.length >= MIN_WORDLIST_SIZE,
+  };
 }
