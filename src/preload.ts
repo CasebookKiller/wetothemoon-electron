@@ -528,6 +528,8 @@ try {
     getAuditLogActions: () =>
       ipcRenderer.invoke('osint:get-audit-log-actions'),
 
+    sensitiveReset: () => ipcRenderer.invoke('osint:sensitive-reset'),
+
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

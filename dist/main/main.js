@@ -11743,6 +11743,42 @@ function listSensitiveFieldNames() {
 		"other"
 	];
 }
+/**
+* Полностью стирает sensitive-хранилище: закрывает соединение,
+* удаляет БД, WAL/SHM и сохранённую в keyring фразу.
+* После вызова диалог вернётся в фазу setup.
+*/
+function resetSensitiveVault() {
+	try {
+		if (sdb) {
+			try {
+				sdb.close();
+			} catch {}
+			sdb = null;
+		}
+		lockKey();
+		const dbPath = getSensitiveDbPath();
+		for (const suffix of [
+			"",
+			"-wal",
+			"-shm"
+		]) {
+			const p = dbPath + suffix;
+			if (fs.default.existsSync(p)) try {
+				fs.default.unlinkSync(p);
+			} catch (e) {
+				console.warn(`Не удалось удалить ${p}:`, e);
+			}
+		}
+		clearStoredPassphrase();
+		return { success: true };
+	} catch (e) {
+		return {
+			success: false,
+			error: e.message
+		};
+	}
+}
 //#endregion
 //#region src/shared/sensitive/wordlists/index.ts
 var WORDLISTS = {
@@ -14496,6 +14532,16 @@ function registerOsintHandlers() {
 				success: true,
 				items: listAuditLogActions()
 			};
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:sensitive-reset", async () => {
+		try {
+			return resetSensitiveVault();
 		} catch (error) {
 			return {
 				success: false,

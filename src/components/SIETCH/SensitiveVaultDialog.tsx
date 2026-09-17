@@ -11,6 +11,7 @@ import { Column } from 'primereact/column';
 import { Checkbox } from 'primereact/checkbox';
 import { Tag } from 'primereact/tag';
 
+
 export interface SensitiveVaultDialogProps {
   visible: boolean;
   entityId: number | null;
@@ -81,6 +82,10 @@ export const SensitiveVaultDialog: React.FC<SensitiveVaultDialogProps> = ({
     retention_until: '',
     notes: '',
   });
+
+  const [resetConfirmVisible, setResetConfirmVisible] = useState(false);
+  const [resetConfirmText, setResetConfirmText] = useState('');
+  const [resetBusy, setResetBusy] = useState(false);
 
   // ============ Инициализация ============
   useEffect(() => {
@@ -299,6 +304,28 @@ export const SensitiveVaultDialog: React.FC<SensitiveVaultDialogProps> = ({
     }
   };
 
+  const performReset = async () => {
+    if (resetConfirmText.trim() !== 'СБРОСИТЬ') {
+      setMessage('Введите слово СБРОСИТЬ заглавными буквами');
+      return;
+    }
+    setResetBusy(true);
+    try {
+      const res = await api.sensitiveReset();
+      if (res.success) {
+        setResetConfirmVisible(false);
+        setResetConfirmText('');
+        setMessage('');
+        // Возврат в фазу setup
+        await refresh();
+      } else {
+        setMessage(`Ошибка: ${res.error}`);
+      }
+    } finally {
+      setResetBusy(false);
+    }
+  };
+
   // ============ Рендер помощники ============
   const fieldOptions = fieldNames.map((n) => ({ label: n, value: n }));
 
@@ -342,28 +369,45 @@ export const SensitiveVaultDialog: React.FC<SensitiveVaultDialogProps> = ({
     }
     if (phase === 'locked') {
       return (
-        <div className="p-panel-footer flex justify-content-end gap-2">
-          <Button label="Закрыть" icon="pi pi-times" className="osint-soft" onClick={onHide} disabled={busy} />
+        <div className="p-panel-footer flex justify-content-between align-items-center gap-2 flex-wrap">
           <Button
-            label={busy ? 'Разблокировка...' : 'Разблокировать'}
-            icon={busy ? 'pi pi-spin pi-spinner' : 'pi pi-lock-open'}
-            className="osint"
-            onClick={handleUnlock}
+            label="Сбросить хранилище"
+            icon="pi pi-trash"
+            className="osint-destructive-soft p-button-sm"
+            onClick={() => { setResetConfirmText(''); setResetConfirmVisible(true); }}
             disabled={busy}
           />
+          <div className="flex gap-2">
+            <Button label="Закрыть" icon="pi pi-times" className="osint-soft" onClick={onHide} disabled={busy} />
+            <Button
+              label={busy ? 'Разблокировка...' : 'Разблокировать'}
+              icon={busy ? 'pi pi-spin pi-spinner' : 'pi pi-lock-open'}
+              className="osint"
+              onClick={handleUnlock}
+              disabled={busy}
+            />
+          </div>
         </div>
       );
     }
     if (phase === 'unlocked') {
       return (
-        <div className="p-panel-footer flex justify-content-end gap-2">
+        <div className="p-panel-footer flex justify-content-between align-items-center gap-2 flex-wrap">
           <Button
-            label="Заблокировать"
-            icon="pi pi-lock"
-            className="osint-soft"
-            onClick={async () => { await api.sensitiveLock(); await refresh(); }}
+            label="Сбросить хранилище"
+            icon="pi pi-trash"
+            className="osint-destructive-soft p-button-sm"
+            onClick={() => { setResetConfirmText(''); setResetConfirmVisible(true); }}
           />
-          <Button label="Закрыть" icon="pi pi-times" className="osint-soft" onClick={onHide} />
+          <div className="flex gap-2">
+            <Button
+              label="Заблокировать"
+              icon="pi pi-lock"
+              className="osint-soft"
+              onClick={async () => { await api.sensitiveLock(); await refresh(); }}
+            />
+            <Button label="Закрыть" icon="pi pi-times" className="osint-soft" onClick={onHide} />
+          </div>
         </div>
       );
     }
@@ -756,6 +800,75 @@ export const SensitiveVaultDialog: React.FC<SensitiveVaultDialogProps> = ({
       footer={renderFooter()}
     >
       {renderContent()}
+      <Dialog
+        visible={resetConfirmVisible}
+        style={{ width: '520px', maxWidth: '95vw' }}
+        modal
+        onHide={() => { if (!resetBusy) setResetConfirmVisible(false); }}
+        header={
+          <span className="p-panel-title" style={{ color: 'var(--tg-theme-destructive-text-color, #ec3942)' }}>
+            <i className="pi pi-exclamation-triangle mr-2" />
+            Сбросить хранилище
+          </span>
+        }
+        footer={
+          <div className="p-panel-footer flex justify-content-end gap-2">
+            <Button
+              label="Отмена"
+              icon="pi pi-times"
+              className="osint-soft"
+              onClick={() => setResetConfirmVisible(false)}
+              disabled={resetBusy}
+            />
+            <Button
+              label={resetBusy ? 'Сброс...' : 'Сбросить'}
+              icon={resetBusy ? 'pi pi-spin pi-spinner' : 'pi pi-trash'}
+              className="osint-destructive"
+              onClick={performReset}
+              disabled={resetBusy || resetConfirmText.trim() !== 'СБРОСИТЬ'}
+            />
+          </div>
+        }
+      >
+        <div className="p-fluid">
+          <div
+            className="p-3 border-round mb-3 flex align-items-start gap-2"
+            style={{
+              background: 'rgba(236, 57, 66, 0.08)',
+              border: '1px solid rgba(236, 57, 66, 0.4)',
+            }}
+          >
+            <i className="pi pi-exclamation-triangle mt-1" style={{ color: '#ec3942' }} />
+            <div className="text-sm">
+              <b>Все sensitive-данные будут безвозвратно удалены.</b> Файл
+              <code> sensitive_data.db</code>, WAL/SHM и сохранённая в keyring фраза
+              будут стёрты. После сброса хранилище вернётся в режим настройки —
+              нужно будет задать новую фразу.
+            </div>
+          </div>
+
+          <p className="text-sm">
+            Если вы хотите сохранить текущие данные — сначала сделайте внешний
+            backup <code>sensitive_data.db</code> и запишите текущую фразу.
+          </p>
+
+          <div className="field mt-3">
+            <label htmlFor="resetConfirm" className="font-bold">
+              Для подтверждения введите <code>СБРОСИТЬ</code>:
+            </label>
+            <InputText
+              id="resetConfirm"
+              value={resetConfirmText}
+              onChange={(e) => setResetConfirmText(e.target.value)}
+              placeholder="СБРОСИТЬ"
+              disabled={resetBusy}
+              className="w-full"
+            />
+          </div>
+
+          {message && <p className="p-error mt-2">{message}</p>}
+        </div>
+      </Dialog>
     </Dialog>
   );
 };

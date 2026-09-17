@@ -52,6 +52,7 @@ import {
   revealSensitiveRecord,
   deleteSensitiveRecord,
   listSensitiveFieldNames,
+  resetSensitiveVault,
 } from '../services/osint/sensitive/sensitiveDatabase';
 
 import {
@@ -618,6 +619,14 @@ export function registerOsintHandlers() {
   ipcMain.handle('osint:get-audit-log-actions', async () => {
     try {
       return { success: true, items: listAuditLogActions() };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('osint:sensitive-reset', async () => {
+    try {
+      return resetSensitiveVault();
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }

@@ -381,3 +381,39 @@ export function listSensitiveFieldNames(): string[] {
     'other',
   ];
 }
+
+/**
+ * Полностью стирает sensitive-хранилище: закрывает соединение,
+ * удаляет БД, WAL/SHM и сохранённую в keyring фразу.
+ * После вызова диалог вернётся в фазу setup.
+ */
+export function resetSensitiveVault(): { success: boolean; error?: string } {
+  try {
+    // 1. Закрыть соединение с БД
+    if (sdb) {
+      try { sdb.close(); } catch { /* ignore */ }
+      sdb = null;
+    }
+
+    // 2. Обнулить сессионный ключ
+    lockKey();
+
+    // 3. Удалить файлы БД
+    const dbPath = getSensitiveDbPath();
+    for (const suffix of ['', '-wal', '-shm']) {
+      const p = dbPath + suffix;
+      if (fs.existsSync(p)) {
+        try { fs.unlinkSync(p); } catch (e) {
+          console.warn(`Не удалось удалить ${p}:`, e);
+        }
+      }
+    }
+
+    // 4. Удалить сохранённую фразу из keyring
+    clearStoredPassphrase();
+
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: (e as Error).message };
+  }
+}
