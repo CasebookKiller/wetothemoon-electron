@@ -92,6 +92,16 @@ export const TablesPanel: React.FC<TablesPanelProps> = ({
         else if (!res?.canceled) console.error('Ошибка экспорта:', res?.error);
       },
     },
+    {
+      label: 'Источники → CSV',
+      icon: 'pi pi-download',
+      command: async () => {
+        const api = (window as any).electronAPI;
+        const res = await api.exportSourcesCsv();
+        if (res?.success) console.log('CSV сохранён:', res.filePath);
+        else if (!res?.canceled) console.error('Ошибка экспорта:', res?.error);
+      },
+    },
     { separator: true },
     {
       label: 'Backup БД',

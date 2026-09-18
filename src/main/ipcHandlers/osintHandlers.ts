@@ -66,6 +66,7 @@ import {
   exportEntitiesCsv,
   exportRelationsCsv,
   exportObservationsCsv,
+  exportSourcesCsv,
 } from '../services/osint/exportService';
 
 import {
@@ -667,6 +668,16 @@ export function registerOsintHandlers() {
     try {
       const win = BrowserWindow.fromWebContents(event.sender);
       const res = await exportObservationsCsv(win);
+      return res;
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('osint:export-sources-csv', async (event) => {
+    try {
+      const win = BrowserWindow.fromWebContents(event.sender);
+      const res = await exportSourcesCsv(win);
       return res;
     } catch (error) {
       return { success: false, error: (error as Error).message };

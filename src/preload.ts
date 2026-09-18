@@ -533,6 +533,7 @@ try {
     exportEntitiesCsv: () => ipcRenderer.invoke('osint:export-entities-csv'),
     exportRelationsCsv: () => ipcRenderer.invoke('osint:export-relations-csv'),
     exportObservationsCsv: () => ipcRenderer.invoke('osint:export-observations-csv'),
+    exportSourcesCsv: () => ipcRenderer.invoke('osint:export-sources-csv'),
 
     backupCreate: (options?: { includeSensitive?: boolean; includeRawDumps?: boolean }) =>
       ipcRenderer.invoke('osint:backup-create', options || {}),

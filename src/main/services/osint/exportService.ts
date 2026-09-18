@@ -155,6 +155,43 @@ export function buildObservationsCsv(): string {
   return '\uFEFF' + lines.join('\r\n') + '\r\n';
 }
 
+// ============ Экспорт источников ============
+
+export function buildSourcesCsv(): string {
+  const db = getDatabase();
+  const rows = db.prepare(`
+    SELECT
+      id, url, title,
+      source_type, source_kind, provider,
+      collection_method, authority_basis, reliability,
+      access_level, retrieved_at,
+      local_path, sha256, notes, origin
+    FROM sources
+    ORDER BY id ASC
+  `).all() as any[];
+
+  const lines: string[] = [];
+  lines.push(csvRow([
+    'id', 'url', 'title',
+    'source_type', 'source_kind', 'provider',
+    'collection_method', 'authority_basis', 'reliability',
+    'access_level', 'retrieved_at',
+    'local_path', 'sha256', 'notes', 'origin',
+  ]));
+
+  for (const r of rows) {
+    lines.push(csvRow([
+      r.id, r.url, r.title,
+      r.source_type, r.source_kind, r.provider,
+      r.collection_method, r.authority_basis, r.reliability,
+      r.access_level, r.retrieved_at,
+      r.local_path, r.sha256, r.notes, r.origin,
+    ]));
+  }
+
+  return '\uFEFF' + lines.join('\r\n') + '\r\n';
+}
+
 // ============ Диалог сохранения + запись ============
 
 interface SaveResult {
@@ -218,4 +255,12 @@ export async function exportObservationsCsv(
   const csv = buildObservationsCsv();
   const timestamp = new Date().toISOString().slice(0, 10);
   return saveCsvWithDialog(parentWindow, `osint-observations-${timestamp}.csv`, csv);
+}
+
+export async function exportSourcesCsv(
+  parentWindow: BrowserWindow | null
+): Promise<SaveResult> {
+  const csv = buildSourcesCsv();
+  const timestamp = new Date().toISOString().slice(0, 10);
+  return saveCsvWithDialog(parentWindow, `osint-sources-${timestamp}.csv`, csv);
 }
