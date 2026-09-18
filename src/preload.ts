@@ -401,6 +401,9 @@ try {
     searchEntities: (query: string, type?: string, limit = 100, offset = 0) =>
       ipcRenderer.invoke('osint:search-entities', query, type, limit, offset),
 
+    searchAll: (query: string, kinds?: string[], limit = 100, offset = 0) =>
+      ipcRenderer.invoke('osint:search-all', query, kinds, limit, offset),
+
     getRelationDetails: (relationId: number) =>
       ipcRenderer.invoke('osint:get-relation-details', relationId),
 

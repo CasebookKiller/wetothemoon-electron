@@ -23,6 +23,7 @@ export interface SearchPanelProps {
   onReset: () => void;
   onRefreshAll: () => void;
   onHelp: () => void;
+  onOpenFullTextSearch: () => void;    // ← новое
 }
 
 export const SearchPanel: React.FC<SearchPanelProps> = ({
@@ -39,6 +40,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
   onReset,
   onRefreshAll,
   onHelp,
+  onOpenFullTextSearch,                // ← новое
 }) => (
   <Panel className="shadow-5 mb-3" header="Поиск по сущностям">
     <div className="flex flex-wrap align-items-center gap-3 py-2">
@@ -89,6 +91,15 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
         onClick={onRefreshAll}
       />
 
+      <Button
+        label="Полнотекстовый поиск"
+        icon="pi pi-search-plus"
+        className="p-button-raised p-button-accent"
+        onClick={onOpenFullTextSearch}
+        tooltip="Поиск по всем таблицам сразу"
+        tooltipOptions={{ position: 'bottom' }}
+      />
+      
       <Button
         label="Справка"
         icon="pi pi-question-circle"

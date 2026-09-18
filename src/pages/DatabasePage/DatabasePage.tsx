@@ -25,6 +25,8 @@ import { RelationDetailsContent } from '@/components/SIETCH/content/RelationDeta
 import { ObservationDetailsContent } from '@/components/SIETCH/content/ObservationDetailsContent';
 import { SourceDetailsContent } from '@/components/SIETCH/content/SourceDetailsContent';
 
+import { FullTextSearchDialog } from '@/components/SIETCH/FullTextSearchDialog';
+
 const entityTypeOptions = [
   { label: 'Все', value: 'all' },
   { label: 'Юрлицо', value: 'company' },
@@ -74,7 +76,8 @@ export const DatabasePage: React.FC = () => {
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [dangerVisible, setDangerVisible] = useState(false);
   const [backupVisible, setBackupVisible] = useState(false);           // ← новое
-  
+  const [ftsVisible, setFtsVisible] = useState(false);        // ← новое
+
   // ============ Хуки ============
   const dialogStackHook = useDialogStack();
   const {
@@ -351,6 +354,7 @@ export const DatabasePage: React.FC = () => {
         onReset={handleResetSearch}
         onRefreshAll={loadData}
         onHelp={() => setHelpVisible(true)}
+        onOpenFullTextSearch={() => setFtsVisible(true)}      // ← ново
       />
 
       <TablesPanel
@@ -426,6 +430,12 @@ export const DatabasePage: React.FC = () => {
       <DatabaseHelp
         visible={helpVisible}
         onHide={() => setHelpVisible(false)}
+      />
+
+      <FullTextSearchDialog                                  // ← новое
+        visible={ftsVisible}
+        onHide={() => setFtsVisible(false)}
+        onOpenHit={(type, id) => openDialog(type, id)}
       />
 
       <Dialog

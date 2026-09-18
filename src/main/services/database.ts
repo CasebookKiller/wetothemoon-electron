@@ -1909,3 +1909,206 @@ export function listAuditLogActions(): string[] {
   ).all() as Array<{ action: string }>;
   return rows.map((r) => r.action);
 }
+
+// ============ Полнотекстовый поиск ============
+
+export type SearchHitKind = 'entity' | 'relation' | 'observation' | 'source';
+
+export interface SearchHit {
+  kind: SearchHitKind;
+  id: number;
+  title: string;
+  subtitle: string;
+  matched_field: string;
+  matched_value: string;
+}
+
+export interface SearchAllResult {
+  items: SearchHit[];
+  total: number;
+  counts: Record<SearchHitKind, number>;
+}
+
+/**
+ * Полнотекстовый поиск (LIKE) по четырём таблицам одновременно.
+ * Возвращает плоский список «хитов» с указанием, в каком поле нашлось.
+ * Без FTS5 — на текущем масштабе LIKE работает мгновенно.
+ */
+export function searchAll(
+  query: string,
+  kinds: SearchHitKind[] = ['entity', 'relation', 'observation', 'source'],
+  limit = 100,
+  offset = 0
+): SearchAllResult {
+  const db = getDatabase();
+  const q = (query || '').trim();
+  const empty: SearchAllResult = {
+    items: [],
+    total: 0,
+    counts: { entity: 0, relation: 0, observation: 0, source: 0 },
+  };
+  if (!q) return empty;
+
+  const like = `%${q}%`;
+  const lowerQ = q.toLowerCase();
+  const items: SearchHit[] = [];
+  const counts: Record<SearchHitKind, number> = {
+    entity: 0, relation: 0, observation: 0, source: 0,
+  };
+
+  const pickMatch = (
+    fields: Array<[string, string | null]>
+  ): { field: string; value: string } => {
+    for (const [name, v] of fields) {
+      if (v && String(v).toLowerCase().includes(lowerQ)) {
+        return { field: name, value: String(v) };
+      }
+    }
+    // fallback — первое непустое поле
+    for (const [name, v] of fields) {
+      if (v) return { field: name, value: String(v) };
+    }
+    return { field: fields[0][0], value: '' };
+  };
+
+  // ===== ENTITIES =====
+  if (kinds.includes('entity')) {
+    counts.entity = (db.prepare(`
+      SELECT COUNT(*) AS c FROM entities
+      WHERE value LIKE ? OR label LIKE ? OR normalized_value LIKE ? OR notes LIKE ?
+    `).get(like, like, like, like) as any).c;
+
+    if (counts.entity > 0) {
+      const rows = db.prepare(`
+        SELECT id, type, value, label, notes
+        FROM entities
+        WHERE value LIKE ? OR label LIKE ? OR normalized_value LIKE ? OR notes LIKE ?
+        ORDER BY last_seen DESC
+        LIMIT ?
+      `).all(like, like, like, like, limit + offset) as any[];
+      for (const r of rows) {
+        const m = pickMatch([
+          ['value', r.value], ['label', r.label], ['notes', r.notes],
+        ]);
+        items.push({
+          kind: 'entity',
+          id: r.id,
+          title: r.label || r.value || `#${r.id}`,
+          subtitle: `сущность · ${r.type}`,
+          matched_field: m.field,
+          matched_value: m.value,
+        });
+      }
+    }
+  }
+
+  // ===== RELATIONS =====
+  if (kinds.includes('relation')) {
+    counts.relation = (db.prepare(`
+      SELECT COUNT(*) AS c FROM relations
+      WHERE predicate LIKE ? OR evidence_text LIKE ? OR notes LIKE ?
+    `).get(like, like, like) as any).c;
+
+    if (counts.relation > 0) {
+      const rows = db.prepare(`
+        SELECT r.id, r.predicate, r.evidence_text, r.notes,
+               s.label AS subject_label, s.value AS subject_value,
+               o.label AS object_label, o.value AS object_value
+        FROM relations r
+        JOIN entities s ON s.id = r.subject_id
+        JOIN entities o ON o.id = r.object_id
+        WHERE r.predicate LIKE ? OR r.evidence_text LIKE ? OR r.notes LIKE ?
+        ORDER BY r.id DESC
+        LIMIT ?
+      `).all(like, like, like, limit + offset) as any[];
+      for (const r of rows) {
+        const m = pickMatch([
+          ['predicate', r.predicate],
+          ['evidence_text', r.evidence_text],
+          ['notes', r.notes],
+        ]);
+        const subj = r.subject_label || r.subject_value || '?';
+        const obj = r.object_label || r.object_value || '?';
+        items.push({
+          kind: 'relation',
+          id: r.id,
+          title: `${subj} —${r.predicate}→ ${obj}`,
+          subtitle: 'связь',
+          matched_field: m.field,
+          matched_value: m.value,
+        });
+      }
+    }
+  }
+
+  // ===== OBSERVATIONS =====
+  if (kinds.includes('observation')) {
+    counts.observation = (db.prepare(`
+      SELECT COUNT(*) AS c FROM observations
+      WHERE attribute LIKE ? OR value LIKE ? OR notes LIKE ?
+    `).get(like, like, like) as any).c;
+
+    if (counts.observation > 0) {
+      const rows = db.prepare(`
+        SELECT o.id, o.attribute, o.value, o.notes, e.label AS entity_label
+        FROM observations o
+        JOIN entities e ON e.id = o.entity_id
+        WHERE o.attribute LIKE ? OR o.value LIKE ? OR o.notes LIKE ?
+        ORDER BY o.id DESC
+        LIMIT ?
+      `).all(like, like, like, limit + offset) as any[];
+      for (const r of rows) {
+        const m = pickMatch([
+          ['attribute', r.attribute], ['value', r.value], ['notes', r.notes],
+        ]);
+        items.push({
+          kind: 'observation',
+          id: r.id,
+          title: `${r.entity_label || '?'} · ${r.attribute} = ${r.value}`,
+          subtitle: 'наблюдение',
+          matched_field: m.field,
+          matched_value: m.value,
+        });
+      }
+    }
+  }
+
+  // ===== SOURCES =====
+  if (kinds.includes('source')) {
+    counts.source = (db.prepare(`
+      SELECT COUNT(*) AS c FROM sources
+      WHERE url LIKE ? OR title LIKE ? OR provider LIKE ?
+         OR authority_basis LIKE ? OR notes LIKE ?
+    `).get(like, like, like, like, like) as any).c;
+
+    if (counts.source > 0) {
+      const rows = db.prepare(`
+        SELECT id, url, title, provider, authority_basis, notes
+        FROM sources
+        WHERE url LIKE ? OR title LIKE ? OR provider LIKE ?
+           OR authority_basis LIKE ? OR notes LIKE ?
+        ORDER BY id DESC
+        LIMIT ?
+      `).all(like, like, like, like, like, limit + offset) as any[];
+      for (const r of rows) {
+        const m = pickMatch([
+          ['url', r.url], ['title', r.title], ['provider', r.provider],
+          ['authority_basis', r.authority_basis], ['notes', r.notes],
+        ]);
+        items.push({
+          kind: 'source',
+          id: r.id,
+          title: r.title || r.url || `#${r.id}`,
+          subtitle: 'источник',
+          matched_field: m.field,
+          matched_value: m.value,
+        });
+      }
+    }
+  }
+
+  const total = counts.entity + counts.relation + counts.observation + counts.source;
+  const paginated = items.slice(offset, offset + limit);
+
+  return { items: paginated, total, counts };
+}
