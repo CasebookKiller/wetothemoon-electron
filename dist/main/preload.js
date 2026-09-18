@@ -282,6 +282,7 @@ try {
 		listDumps: () => electron.ipcRenderer.invoke("osint:list-dumps"),
 		deleteDump: (companyInn, companyIdRusprofile) => electron.ipcRenderer.invoke("osint:delete-dump", companyInn, companyIdRusprofile),
 		searchEntities: (query, type, limit = 100, offset = 0) => electron.ipcRenderer.invoke("osint:search-entities", query, type, limit, offset),
+		searchAll: (query, kinds, limit = 100, offset = 0) => electron.ipcRenderer.invoke("osint:search-all", query, kinds, limit, offset),
 		getRelationDetails: (relationId) => electron.ipcRenderer.invoke("osint:get-relation-details", relationId),
 		markFalse: (table, recordId, reason) => electron.ipcRenderer.invoke("osint:mark-false", table, recordId, reason),
 		getEntityDetails: (entityId) => electron.ipcRenderer.invoke("osint:get-entity-details", entityId),
@@ -324,6 +325,7 @@ try {
 		exportEntitiesCsv: () => electron.ipcRenderer.invoke("osint:export-entities-csv"),
 		exportRelationsCsv: () => electron.ipcRenderer.invoke("osint:export-relations-csv"),
 		exportObservationsCsv: () => electron.ipcRenderer.invoke("osint:export-observations-csv"),
+		exportSourcesCsv: () => electron.ipcRenderer.invoke("osint:export-sources-csv"),
 		backupCreate: (options) => electron.ipcRenderer.invoke("osint:backup-create", options || {}),
 		backupRestore: () => electron.ipcRenderer.invoke("osint:backup-restore")
 	});

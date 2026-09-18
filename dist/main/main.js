@@ -9899,6 +9899,22 @@ function initializeSchema$1(db) {
     CREATE INDEX IF NOT EXISTS idx_raw_dumps_inn ON raw_dumps(company_inn);
     CREATE INDEX IF NOT EXISTS idx_shards_status ON shards(status);
   `);
+	try {
+		db.exec(`
+      CREATE UNIQUE INDEX IF NOT EXISTS ux_relations_triple
+        ON relations(subject_id, predicate, object_id);
+    `);
+	} catch (e) {
+		console.warn("[db] Не удалось создать ux_relations_triple — в relations, вероятно, есть дубликаты. Чистка: DELETE FROM relations WHERE id NOT IN (SELECT MAX(id) FROM relations GROUP BY subject_id, predicate, object_id);", e.message);
+	}
+	try {
+		db.exec(`
+      CREATE UNIQUE INDEX IF NOT EXISTS ux_observations_triple
+        ON observations(entity_id, attribute, value);
+    `);
+	} catch (e) {
+		console.warn("[db] Не удалось создать ux_observations_triple — в observations, вероятно, есть дубликаты. Чистка: DELETE FROM observations WHERE id NOT IN (SELECT MAX(id) FROM observations GROUP BY entity_id, attribute, value);", e.message);
+	}
 	for (const table of [
 		"entities",
 		"relations",
@@ -10101,6 +10117,9 @@ function addSource(source) {
 /**
 * Создаёт связь вручную (origin='manual').
 */
+/**
+* Создаёт связь вручную (origin='manual').
+*/
 function createRelation(patch) {
 	const db = getDatabase();
 	if (!patch.subject_id || !patch.object_id) return {
@@ -10130,9 +10149,14 @@ function createRelation(patch) {
 			id
 		};
 	} catch (e) {
+		const msg = e.message || "";
+		if (msg.includes("UNIQUE") || msg.includes("constraint")) return {
+			success: false,
+			error: "Такая связь уже существует (subject + predicate + object)"
+		};
 		return {
 			success: false,
-			error: e.message
+			error: msg
 		};
 	}
 }
@@ -10151,6 +10175,10 @@ function addRelation(relation) {
 	const db = getDatabase();
 	if (relation.subject_id === relation.object_id) {
 		console.warn(`[addRelation] Пропущена самосвязь: entity #${relation.subject_id} --${relation.predicate}--> сама себя`);
+		return { inserted: false };
+	}
+	if (!relation.predicate?.trim()) {
+		console.warn("[addRelation] Пустой predicate — запись пропущена");
 		return { inserted: false };
 	}
 	const existing = db.prepare(`
@@ -10174,16 +10202,32 @@ function addRelation(relation) {
 			id: existing.id
 		};
 	}
-	const info = db.prepare(`
-    INSERT INTO relations
-      (subject_id, predicate, object_id, source_id, valid_from, valid_to,
-       evidence_text, confidence, status, notes, raw_file_path)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(relation.subject_id, relation.predicate, relation.object_id, relation.source_id || null, relation.valid_from || null, relation.valid_to || null, relation.evidence_text || null, relation.confidence ?? 50, relation.status || "unverified", relation.notes || null, relation.raw_file_path || null);
-	return {
-		inserted: true,
-		id: Number(info.lastInsertRowid)
-	};
+	try {
+		const info = db.prepare(`
+      INSERT INTO relations
+        (subject_id, predicate, object_id, source_id, valid_from, valid_to,
+         evidence_text, confidence, status, notes, raw_file_path)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(relation.subject_id, relation.predicate, relation.object_id, relation.source_id || null, relation.valid_from || null, relation.valid_to || null, relation.evidence_text || null, relation.confidence ?? 50, relation.status || "unverified", relation.notes || null, relation.raw_file_path || null);
+		return {
+			inserted: true,
+			id: Number(info.lastInsertRowid)
+		};
+	} catch (e) {
+		const msg = e.message || "";
+		if (msg.includes("UNIQUE") || msg.includes("constraint")) {
+			const again = db.prepare(`
+        SELECT id FROM relations
+        WHERE subject_id = ? AND predicate = ? AND object_id = ?
+        LIMIT 1
+      `).get(relation.subject_id, relation.predicate, relation.object_id);
+			if (again) return {
+				inserted: false,
+				id: again.id
+			};
+		}
+		throw e;
+	}
 }
 /**
 * Создаёт наблюдение вручную (origin='manual').
@@ -10217,17 +10261,70 @@ function createObservation(patch) {
 			id
 		};
 	} catch (e) {
+		const msg = e.message || "";
+		if (msg.includes("UNIQUE") || msg.includes("constraint")) return {
+			success: false,
+			error: "Такое наблюдение уже существует (entity + attribute + value)"
+		};
 		return {
 			success: false,
-			error: e.message
+			error: msg
 		};
 	}
 }
 function addObservation(observation) {
-	getDatabase().prepare(`
-    INSERT INTO observations (entity_id, attribute, value, source_id, observed_at, confidence, notes, raw_file_path)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(observation.entity_id, observation.attribute, observation.value, observation.source_id || null, (/* @__PURE__ */ new Date()).toISOString(), observation.confidence ?? 50, observation.notes || null, observation.raw_file_path || null);
+	const db = getDatabase();
+	if (!observation.attribute?.trim() || !observation.value?.trim()) {
+		console.warn(`[addObservation] Пропущены пустые attribute/value: entity=${observation.entity_id}`);
+		return {
+			inserted: false,
+			id: 0
+		};
+	}
+	const existing = db.prepare(`
+    SELECT id FROM observations
+    WHERE entity_id = ? AND attribute = ? AND value = ?
+    LIMIT 1
+  `).get(observation.entity_id, observation.attribute, observation.value);
+	if (existing) {
+		db.prepare(`
+      UPDATE observations
+      SET observed_at = ?,
+          source_id = COALESCE(source_id, ?),
+          confidence = COALESCE(confidence, ?),
+          raw_file_path = COALESCE(raw_file_path, ?)
+      WHERE id = ?
+    `).run((/* @__PURE__ */ new Date()).toISOString(), observation.source_id || null, observation.confidence ?? 50, observation.raw_file_path || null, existing.id);
+		return {
+			inserted: false,
+			id: existing.id
+		};
+	}
+	try {
+		const info = db.prepare(`
+      INSERT INTO observations
+        (entity_id, attribute, value, source_id, observed_at, confidence, notes, raw_file_path)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(observation.entity_id, observation.attribute, observation.value, observation.source_id || null, (/* @__PURE__ */ new Date()).toISOString(), observation.confidence ?? 50, observation.notes || null, observation.raw_file_path || null);
+		return {
+			inserted: true,
+			id: Number(info.lastInsertRowid)
+		};
+	} catch (e) {
+		const msg = e.message || "";
+		if (msg.includes("UNIQUE") || msg.includes("constraint")) {
+			const again = db.prepare(`
+        SELECT id FROM observations
+        WHERE entity_id = ? AND attribute = ? AND value = ?
+        LIMIT 1
+      `).get(observation.entity_id, observation.attribute, observation.value);
+			if (again) return {
+				inserted: false,
+				id: again.id
+			};
+		}
+		throw e;
+	}
 }
 function auditChange(table_name, record_id, action, old_value, new_value, reason) {
 	getDatabase().prepare(`
@@ -10302,7 +10399,7 @@ function deleteDumpsByEntity(companyInn, companyIdRusprofile) {
 	};
 }
 /**
-* Поиск сущностей по подстроке в value / label / normalized_value.
+* Поиск сущностей по подстроке в value / label / normalized_value / notes.
 * Опционально можно фильтровать по типу.
 */
 function searchEntities(query, type, limit = 100, offset = 0) {
@@ -10313,17 +10410,17 @@ function searchEntities(query, type, limit = 100, offset = 0) {
       SELECT id, type, value, label, confidence, status, first_seen, last_seen, notes
       FROM entities
       WHERE type = ?
-        AND (value LIKE ? OR label LIKE ? OR normalized_value LIKE ?)
+        AND (value LIKE ? OR label LIKE ? OR normalized_value LIKE ? OR notes LIKE ?)
       ORDER BY last_seen DESC
       LIMIT ? OFFSET ?
-    `).all(type, rawQuery, rawQuery, normalizedQuery, limit, offset);
+    `).all(type, rawQuery, rawQuery, normalizedQuery, rawQuery, limit, offset);
 	return db.prepare(`
     SELECT id, type, value, label, confidence, status, first_seen, last_seen, notes
     FROM entities
-    WHERE value LIKE ? OR label LIKE ? OR normalized_value LIKE ?
+    WHERE value LIKE ? OR label LIKE ? OR normalized_value LIKE ? OR notes LIKE ?
     ORDER BY last_seen DESC
     LIMIT ? OFFSET ?
-  `).all(rawQuery, rawQuery, normalizedQuery, limit, offset);
+  `).all(rawQuery, rawQuery, normalizedQuery, rawQuery, limit, offset);
 }
 /**
 * Возвращает полную информацию о связи, включая subject/object и источник.
@@ -10917,6 +11014,191 @@ function listAuditLogTables() {
 function listAuditLogActions() {
 	return getDatabase().prepare("SELECT DISTINCT action FROM audit_log ORDER BY action ASC").all().map((r) => r.action);
 }
+/**
+* Полнотекстовый поиск (LIKE) по четырём таблицам одновременно.
+* Возвращает плоский список «хитов» с указанием, в каком поле нашлось.
+* Без FTS5 — на текущем масштабе LIKE работает мгновенно.
+*/
+function searchAll(query, kinds = [
+	"entity",
+	"relation",
+	"observation",
+	"source"
+], limit = 100, offset = 0) {
+	const db = getDatabase();
+	const q = (query || "").trim();
+	const empty = {
+		items: [],
+		total: 0,
+		counts: {
+			entity: 0,
+			relation: 0,
+			observation: 0,
+			source: 0
+		}
+	};
+	if (!q) return empty;
+	const like = `%${q}%`;
+	const lowerQ = q.toLowerCase();
+	const items = [];
+	const counts = {
+		entity: 0,
+		relation: 0,
+		observation: 0,
+		source: 0
+	};
+	const pickMatch = (fields) => {
+		for (const [name, v] of fields) if (v && String(v).toLowerCase().includes(lowerQ)) return {
+			field: name,
+			value: String(v)
+		};
+		for (const [name, v] of fields) if (v) return {
+			field: name,
+			value: String(v)
+		};
+		return {
+			field: fields[0][0],
+			value: ""
+		};
+	};
+	if (kinds.includes("entity")) {
+		counts.entity = db.prepare(`
+      SELECT COUNT(*) AS c FROM entities
+      WHERE value LIKE ? OR label LIKE ? OR normalized_value LIKE ? OR notes LIKE ?
+    `).get(like, like, like, like).c;
+		if (counts.entity > 0) {
+			const rows = db.prepare(`
+        SELECT id, type, value, label, notes
+        FROM entities
+        WHERE value LIKE ? OR label LIKE ? OR normalized_value LIKE ? OR notes LIKE ?
+        ORDER BY last_seen DESC
+        LIMIT ?
+      `).all(like, like, like, like, limit + offset);
+			for (const r of rows) {
+				const m = pickMatch([
+					["value", r.value],
+					["label", r.label],
+					["notes", r.notes]
+				]);
+				items.push({
+					kind: "entity",
+					id: r.id,
+					title: r.label || r.value || `#${r.id}`,
+					subtitle: `сущность · ${r.type}`,
+					matched_field: m.field,
+					matched_value: m.value
+				});
+			}
+		}
+	}
+	if (kinds.includes("relation")) {
+		counts.relation = db.prepare(`
+      SELECT COUNT(*) AS c FROM relations
+      WHERE predicate LIKE ? OR evidence_text LIKE ? OR notes LIKE ?
+    `).get(like, like, like).c;
+		if (counts.relation > 0) {
+			const rows = db.prepare(`
+        SELECT r.id, r.predicate, r.evidence_text, r.notes,
+               s.label AS subject_label, s.value AS subject_value,
+               o.label AS object_label, o.value AS object_value
+        FROM relations r
+        JOIN entities s ON s.id = r.subject_id
+        JOIN entities o ON o.id = r.object_id
+        WHERE r.predicate LIKE ? OR r.evidence_text LIKE ? OR r.notes LIKE ?
+        ORDER BY r.id DESC
+        LIMIT ?
+      `).all(like, like, like, limit + offset);
+			for (const r of rows) {
+				const m = pickMatch([
+					["predicate", r.predicate],
+					["evidence_text", r.evidence_text],
+					["notes", r.notes]
+				]);
+				const subj = r.subject_label || r.subject_value || "?";
+				const obj = r.object_label || r.object_value || "?";
+				items.push({
+					kind: "relation",
+					id: r.id,
+					title: `${subj} —${r.predicate}→ ${obj}`,
+					subtitle: "связь",
+					matched_field: m.field,
+					matched_value: m.value
+				});
+			}
+		}
+	}
+	if (kinds.includes("observation")) {
+		counts.observation = db.prepare(`
+      SELECT COUNT(*) AS c FROM observations
+      WHERE attribute LIKE ? OR value LIKE ? OR notes LIKE ?
+    `).get(like, like, like).c;
+		if (counts.observation > 0) {
+			const rows = db.prepare(`
+        SELECT o.id, o.attribute, o.value, o.notes, e.label AS entity_label
+        FROM observations o
+        JOIN entities e ON e.id = o.entity_id
+        WHERE o.attribute LIKE ? OR o.value LIKE ? OR o.notes LIKE ?
+        ORDER BY o.id DESC
+        LIMIT ?
+      `).all(like, like, like, limit + offset);
+			for (const r of rows) {
+				const m = pickMatch([
+					["attribute", r.attribute],
+					["value", r.value],
+					["notes", r.notes]
+				]);
+				items.push({
+					kind: "observation",
+					id: r.id,
+					title: `${r.entity_label || "?"} · ${r.attribute} = ${r.value}`,
+					subtitle: "наблюдение",
+					matched_field: m.field,
+					matched_value: m.value
+				});
+			}
+		}
+	}
+	if (kinds.includes("source")) {
+		counts.source = db.prepare(`
+      SELECT COUNT(*) AS c FROM sources
+      WHERE url LIKE ? OR title LIKE ? OR provider LIKE ?
+         OR authority_basis LIKE ? OR notes LIKE ?
+    `).get(like, like, like, like, like).c;
+		if (counts.source > 0) {
+			const rows = db.prepare(`
+        SELECT id, url, title, provider, authority_basis, notes
+        FROM sources
+        WHERE url LIKE ? OR title LIKE ? OR provider LIKE ?
+           OR authority_basis LIKE ? OR notes LIKE ?
+        ORDER BY id DESC
+        LIMIT ?
+      `).all(like, like, like, like, like, limit + offset);
+			for (const r of rows) {
+				const m = pickMatch([
+					["url", r.url],
+					["title", r.title],
+					["provider", r.provider],
+					["authority_basis", r.authority_basis],
+					["notes", r.notes]
+				]);
+				items.push({
+					kind: "source",
+					id: r.id,
+					title: r.title || r.url || `#${r.id}`,
+					subtitle: "источник",
+					matched_field: m.field,
+					matched_value: m.value
+				});
+			}
+		}
+	}
+	const total = counts.entity + counts.relation + counts.observation + counts.source;
+	return {
+		items: items.slice(offset, offset + limit),
+		total,
+		counts
+	};
+}
 //#endregion
 //#region src/main/services/rawStorage.ts
 function loadRawDumpSync(filePath) {
@@ -11092,15 +11374,14 @@ function persistCompanyData(companyId, companyInn, data, rawFilePath, sourceId) 
 		}
 	];
 	for (const obs of mainObservations) if (obs.value) {
-		addObservation({
+		if (addObservation({
 			entity_id: mainEntityId,
 			attribute: obs.attribute,
 			value: obs.value,
 			source_id: sourceId,
 			confidence: 90,
 			raw_file_path: rawFilePath
-		});
-		savedObservations++;
+		}).inserted) savedObservations++;
 	}
 	let savedEntities = 1;
 	let savedRelations = 0;
@@ -11138,44 +11419,40 @@ function persistCompanyData(companyId, companyInn, data, rawFilePath, sourceId) 
 			raw_file_path: rawFilePath
 		});
 		if (founder.inn) {
-			addObservation({
+			if (addObservation({
 				entity_id: founderId,
 				attribute: "inn",
 				value: founder.inn,
 				source_id: sourceId,
 				raw_file_path: rawFilePath
-			});
-			savedObservations++;
+			}).inserted) savedObservations++;
 		}
 		if (founder.ogrn) {
-			addObservation({
+			if (addObservation({
 				entity_id: founderId,
 				attribute: "ogrn",
 				value: founder.ogrn,
 				source_id: sourceId,
 				raw_file_path: rawFilePath
-			});
-			savedObservations++;
+			}).inserted) savedObservations++;
 		}
 		if (founder.ogrnip) {
-			addObservation({
+			if (addObservation({
 				entity_id: founderId,
 				attribute: "ogrnip",
 				value: founder.ogrnip,
 				source_id: sourceId,
 				raw_file_path: rawFilePath
-			});
-			savedObservations++;
+			}).inserted) savedObservations++;
 		}
 		if (founder.share) {
-			addObservation({
+			if (addObservation({
 				entity_id: founderId,
 				attribute: "share",
 				value: founder.share,
 				source_id: sourceId,
 				raw_file_path: rawFilePath
-			});
-			savedObservations++;
+			}).inserted) savedObservations++;
 		}
 		const { inserted } = addRelation({
 			subject_id: founderId,
@@ -11203,34 +11480,31 @@ function persistCompanyData(companyId, companyInn, data, rawFilePath, sourceId) 
 				raw_file_path: rawFilePath
 			});
 			if (org.inn) {
-				addObservation({
+				if (addObservation({
 					entity_id: orgId,
 					attribute: "inn",
 					value: org.inn,
 					source_id: sourceId,
 					raw_file_path: rawFilePath
-				});
-				savedObservations++;
+				}).inserted) savedObservations++;
 			}
 			if (org.ogrn) {
-				addObservation({
+				if (addObservation({
 					entity_id: orgId,
 					attribute: "ogrn",
 					value: org.ogrn,
 					source_id: sourceId,
 					raw_file_path: rawFilePath
-				});
-				savedObservations++;
+				}).inserted) savedObservations++;
 			}
 			if (org.ogrnip) {
-				addObservation({
+				if (addObservation({
 					entity_id: orgId,
 					attribute: "ogrnip",
 					value: org.ogrnip,
 					source_id: sourceId,
 					raw_file_path: rawFilePath
-				});
-				savedObservations++;
+				}).inserted) savedObservations++;
 			}
 			const { inserted } = addRelation({
 				subject_id: mainEntityId,
@@ -15566,6 +15840,54 @@ function buildObservationsCsv() {
 	]));
 	return "﻿" + lines.join("\r\n") + "\r\n";
 }
+function buildSourcesCsv() {
+	const rows = getDatabase().prepare(`
+    SELECT
+      id, url, title,
+      source_type, source_kind, provider,
+      collection_method, authority_basis, reliability,
+      access_level, retrieved_at,
+      local_path, sha256, notes, origin
+    FROM sources
+    ORDER BY id ASC
+  `).all();
+	const lines = [];
+	lines.push(csvRow([
+		"id",
+		"url",
+		"title",
+		"source_type",
+		"source_kind",
+		"provider",
+		"collection_method",
+		"authority_basis",
+		"reliability",
+		"access_level",
+		"retrieved_at",
+		"local_path",
+		"sha256",
+		"notes",
+		"origin"
+	]));
+	for (const r of rows) lines.push(csvRow([
+		r.id,
+		r.url,
+		r.title,
+		r.source_type,
+		r.source_kind,
+		r.provider,
+		r.collection_method,
+		r.authority_basis,
+		r.reliability,
+		r.access_level,
+		r.retrieved_at,
+		r.local_path,
+		r.sha256,
+		r.notes,
+		r.origin
+	]));
+	return "﻿" + lines.join("\r\n") + "\r\n";
+}
 async function saveCsvWithDialog(parentWindow, defaultFileName, content) {
 	try {
 		const dialogOptions = {
@@ -15607,6 +15929,10 @@ async function exportRelationsCsv(parentWindow) {
 async function exportObservationsCsv(parentWindow) {
 	const csv = buildObservationsCsv();
 	return saveCsvWithDialog(parentWindow, `osint-observations-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.csv`, csv);
+}
+async function exportSourcesCsv(parentWindow) {
+	const csv = buildSourcesCsv();
+	return saveCsvWithDialog(parentWindow, `osint-sources-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.csv`, csv);
 }
 //#endregion
 //#region src/main/services/osint/backupService.ts
@@ -15705,7 +16031,9 @@ async function createBackup(parentWindow, options = {}) {
 	}
 }
 /**
-* Восстанавливает osint_data.db и sensitive_data.db из каталога backup.
+* Восстанавливает osint_data.db, sensitive_data.db и raw_dumps/ из каталога backup.
+* Если raw_dumps/ есть в backup — текущий каталог userData/raw_dumps заменяется
+* содержимым из backup (не merge).
 * Приложение нужно перезапустить после восстановления.
 */
 async function restoreFromBackup(parentWindow) {
@@ -15741,7 +16069,20 @@ async function restoreFromBackup(parentWindow) {
 		}
 		fs.default.copyFileSync(osintSrc, osintDst);
 		if (fs.default.existsSync(sensSrc)) fs.default.copyFileSync(sensSrc, sensDst);
-		return { success: true };
+		let rawDumpsRestored = 0;
+		const rawSrc = path.default.join(sourceDir, "raw_dumps");
+		const rawDst = path.default.join(userData, "raw_dumps");
+		if (fs.default.existsSync(rawSrc)) {
+			if (fs.default.existsSync(rawDst)) fs.default.rmSync(rawDst, {
+				recursive: true,
+				force: true
+			});
+			rawDumpsRestored = copyDirRecursive(rawSrc, rawDst);
+		}
+		return {
+			success: true,
+			rawDumpsRestored
+		};
 	} catch (e) {
 		return {
 			success: false,
@@ -15977,6 +16318,19 @@ function registerOsintHandlers() {
 			return {
 				success: true,
 				items: searchEntities(query, type, limit, offset)
+			};
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:search-all", async (_event, query, kinds, limit = 100, offset = 0) => {
+		try {
+			return {
+				success: true,
+				...searchAll(query, kinds, limit, offset)
 			};
 		} catch (error) {
 			return {
@@ -16448,6 +16802,16 @@ function registerOsintHandlers() {
 	electron.ipcMain.handle("osint:export-observations-csv", async (event) => {
 		try {
 			return await exportObservationsCsv(electron.BrowserWindow.fromWebContents(event.sender));
+		} catch (error) {
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	});
+	electron.ipcMain.handle("osint:export-sources-csv", async (event) => {
+		try {
+			return await exportSourcesCsv(electron.BrowserWindow.fromWebContents(event.sender));
 		} catch (error) {
 			return {
 				success: false,
