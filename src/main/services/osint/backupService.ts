@@ -158,10 +158,13 @@ export interface RestoreResult {
   success: boolean;
   canceled?: boolean;
   error?: string;
+  rawDumpsRestored?: number;
 }
 
 /**
- * Восстанавливает osint_data.db и sensitive_data.db из каталога backup.
+ * Восстанавливает osint_data.db, sensitive_data.db и raw_dumps/ из каталога backup.
+ * Если raw_dumps/ есть в backup — текущий каталог userData/raw_dumps заменяется
+ * содержимым из backup (не merge).
  * Приложение нужно перезапустить после восстановления.
  */
 export async function restoreFromBackup(
@@ -212,7 +215,21 @@ export async function restoreFromBackup(
       fs.copyFileSync(sensSrc, sensDst);
     }
 
-    return { success: true };
+    // Восстанавливаем raw_dumps/, если они есть в backup
+    let rawDumpsRestored = 0;
+    const rawSrc = path.join(sourceDir, 'raw_dumps');
+    const rawDst = path.join(userData, 'raw_dumps');
+    if (fs.existsSync(rawSrc)) {
+      // Семантика «restore» — вернуть состояние из backup.
+      // Удаляем текущий каталог, чтобы не смешивать старое и новое
+      // (в БД после restore будут ссылки только на файлы из backup).
+      if (fs.existsSync(rawDst)) {
+        fs.rmSync(rawDst, { recursive: true, force: true });
+      }
+      rawDumpsRestored = copyDirRecursive(rawSrc, rawDst);
+    }
+
+    return { success: true, rawDumpsRestored };
   } catch (e) {
     return { success: false, error: (e as Error).message };
   }

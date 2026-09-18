@@ -113,7 +113,7 @@ export const TablesPanel: React.FC<TablesPanelProps> = ({
       },
     },
     { separator: true },
-    {
+        {
       label: 'Восстановить из backup…',
       icon: 'pi pi-upload',
       command: async () => {
@@ -121,7 +121,12 @@ export const TablesPanel: React.FC<TablesPanelProps> = ({
         if (!window.confirm('Восстановление заменит текущую базу. Продолжить?')) return;
         const res = await api.backupRestore();
         if (res?.success) {
-          alert('База восстановлена. Закройте и перезапустите приложение, чтобы изменения вступили в силу.');
+          const parts = ['База восстановлена.'];
+          if (typeof res.rawDumpsRestored === 'number' && res.rawDumpsRestored > 0) {
+            parts.push(`Файлов дампов восстановлено: ${res.rawDumpsRestored}.`);
+          }
+          parts.push('Закройте и перезапустите приложение, чтобы изменения вступили в силу.');
+          alert(parts.join(' '));
         } else if (!res?.canceled) {
           alert(`Ошибка: ${res?.error}`);
         }
