@@ -34,6 +34,7 @@ export interface TablesPanelProps {
   onRowClick: (type: DialogType, id: number) => void;
   onCreate: (type: CreateType) => void;
   onOpenDangerZone: () => void;
+  onOpenBackup: () => void;    // ← новое
 
   searchActive: boolean;
 }
@@ -57,6 +58,7 @@ export const TablesPanel: React.FC<TablesPanelProps> = ({
   onRowClick,
   onCreate,
   onOpenDangerZone,
+  onOpenBackup,               // ← новое
   searchActive,
 }) => {
   const exportMenuRef = React.useRef<Menu>(null);
@@ -104,19 +106,10 @@ export const TablesPanel: React.FC<TablesPanelProps> = ({
     },
     { separator: true },
     {
-      label: 'Backup БД',
+      label: 'Backup БД…',
       icon: 'pi pi-save',
-      command: async () => {
-        const api = (window as any).electronAPI;
-        // По умолчанию — только основная БД.
-        // Для расширенного backup можно сделать отдельный диалог с чекбоксами.
-        const res = await api.backupCreate({ includeSensitive: false, includeRawDumps: false });
-        if (res?.success) {
-          console.log('Backup сохранён:', res.backupDir);
-          console.log('Файлы:', res.files);
-        } else if (!res?.canceled) {
-          console.error('Ошибка backup:', res?.error);
-        }
+      command: () => {
+        onOpenBackup();
       },
     },
     { separator: true },

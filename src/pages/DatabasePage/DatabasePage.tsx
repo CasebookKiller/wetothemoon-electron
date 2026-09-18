@@ -16,6 +16,7 @@ import { CreateDialog, type CreateType } from '@/components/SIETCH/CreateDialog'
 import { MarkFalseDialog, type MarkFalseTable } from '@/components/SIETCH/MarkFalseDialog';
 import { DeleteDialog, type DeleteTarget } from '@/components/SIETCH/DeleteDialog';
 import { DangerZoneDialog } from '@/components/SIETCH/DangerZoneDialog';
+import { BackupDialog } from '@/components/SIETCH/BackupDialog';    // ← новое
 import { SensitiveVaultDialog } from '@/components/SIETCH/SensitiveVaultDialog';
 import { DatabaseHelp } from '@/components/SIETCH/DatabaseHelp';
 
@@ -72,7 +73,8 @@ export const DatabasePage: React.FC = () => {
   const [deleteVisible, setDeleteVisible] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [dangerVisible, setDangerVisible] = useState(false);
-
+  const [backupVisible, setBackupVisible] = useState(false);           // ← новое
+  
   // ============ Хуки ============
   const dialogStackHook = useDialogStack();
   const {
@@ -363,6 +365,7 @@ export const DatabasePage: React.FC = () => {
         onRowClick={(type, id) => openDialog(type, id)}
         onCreate={(type) => { setCreateType(type); setCreateDialog(true); }}
         onOpenDangerZone={() => setDangerVisible(true)}
+        onOpenBackup={() => setBackupVisible(true)}                        // ← новое
         searchActive={searchActive}
       />
 
@@ -406,6 +409,11 @@ export const DatabasePage: React.FC = () => {
           resetCache();
           await loadData();
         }}
+      />
+
+      <BackupDialog                                                         // ← новое
+        visible={backupVisible}
+        onHide={() => setBackupVisible(false)}
       />
 
       <SensitiveVaultDialog
