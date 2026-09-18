@@ -142,6 +142,38 @@ function initializeSchema(db: DatabaseSync) {
     CREATE INDEX IF NOT EXISTS idx_shards_status ON shards(status);
   `);
 
+  // Разовая миграция: схлопываем self-loops и дубли relations.
+  try {
+    const relDupRow = db.prepare(`
+      SELECT
+        (SELECT COUNT(*) FROM relations WHERE subject_id = object_id) AS self_loops,
+        (SELECT COUNT(*) - COUNT(DISTINCT subject_id || '|' || predicate || '|' || object_id)
+         FROM relations) AS extra
+    `).get() as { self_loops: number; extra: number } | undefined;
+
+    const selfLoops = relDupRow?.self_loops ?? 0;
+    const relExtra = relDupRow?.extra ?? 0;
+
+    if (selfLoops > 0) {
+      db.exec(`DELETE FROM relations WHERE subject_id = object_id;`);
+      console.log(`[db] Миграция relations: удалено ${selfLoops} self-loops`);
+    }
+    if (relExtra > 0) {
+      db.exec(`
+        DELETE FROM relations
+        WHERE id NOT IN (
+          SELECT MAX(id) FROM relations GROUP BY subject_id, predicate, object_id
+        );
+      `);
+      console.log(`[db] Миграция relations: схлопнуто ${relExtra} дубликатов`);
+    }
+  } catch (e) {
+    console.warn(
+      '[db] Не удалось схлопнуть self-loops/дубликаты relations:',
+      (e as Error).message
+    );
+  }
+
   // ← ИЗМЕНЕНО: defense-in-depth против дубликатов связей
   // Уникальный индекс на триплет (subject_id, predicate, object_id).
   // На существующих БД с дубликатами индекс НЕ создастся — тогда в лог
@@ -162,8 +194,33 @@ function initializeSchema(db: DatabaseSync) {
     );
   }
 
-    // ← НОВОЕ: defense-in-depth против дубликатов наблюдений.
-  // Одно (entity_id, attribute, value) = одна строка.
+  // ← Разовая миграция: схлопываем дубли observations, накопленные
+  // до введения UNIQUE-индекса. Порядок важен: DELETE идёт ДО
+  // CREATE UNIQUE INDEX, иначе индекс не создастся на «грязной» БД.
+  try {
+    const dupRow = db.prepare(`
+      SELECT COUNT(*) - COUNT(DISTINCT entity_id || '|' || attribute || '|' || value) AS extra
+      FROM observations
+    `).get() as { extra: number } | undefined;
+    const extra = dupRow?.extra ?? 0;
+    if (extra > 0) {
+      db.exec(`
+        DELETE FROM observations
+        WHERE id NOT IN (
+          SELECT MAX(id) FROM observations GROUP BY entity_id, attribute, value
+        );
+      `);
+      console.log(`[db] Миграция observations: схлопнуто ${extra} дубликатов`);
+    }
+  } catch (e) {
+    console.warn(
+      '[db] Не удалось схлопнуть дубликаты observations:',
+      (e as Error).message
+    );
+  }
+
+  // defense-in-depth: одно (entity_id, attribute, value) = одна строка.
+  // На этом этапе дубли уже удалены выше, индекс создастся всегда.
   try {
     db.exec(`
       CREATE UNIQUE INDEX IF NOT EXISTS ux_observations_triple
@@ -171,10 +228,7 @@ function initializeSchema(db: DatabaseSync) {
     `);
   } catch (e) {
     console.warn(
-      '[db] Не удалось создать ux_observations_triple — в observations, вероятно, есть дубликаты. ' +
-      'Чистка: DELETE FROM observations WHERE id NOT IN ' +
-      '(SELECT MAX(id) FROM observations GROUP BY entity_id, attribute, value);',
-      (e as Error).message
+      '[db] Не удалось создать ux_observations_triple: ' + (e as Error).message
     );
   }
 
