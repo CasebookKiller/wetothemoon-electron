@@ -142,6 +142,26 @@ function initializeSchema(db: DatabaseSync) {
     CREATE INDEX IF NOT EXISTS idx_shards_status ON shards(status);
   `);
 
+  // ← ИЗМЕНЕНО: defense-in-depth против дубликатов связей
+  // Уникальный индекс на триплет (subject_id, predicate, object_id).
+  // На существующих БД с дубликатами индекс НЕ создастся — тогда в лог
+  // упадёт warning, и это сигнал прогнать чистку:
+  //   DELETE FROM relations WHERE id NOT IN
+  //     (SELECT MAX(id) FROM relations GROUP BY subject_id, predicate, object_id);
+  try {
+    db.exec(`
+      CREATE UNIQUE INDEX IF NOT EXISTS ux_relations_triple
+        ON relations(subject_id, predicate, object_id);
+    `);
+  } catch (e) {
+    console.warn(
+      '[db] Не удалось создать ux_relations_triple — в relations, вероятно, есть дубликаты. ' +
+      'Чистка: DELETE FROM relations WHERE id NOT IN ' +
+      '(SELECT MAX(id) FROM relations GROUP BY subject_id, predicate, object_id);',
+      (e as Error).message
+    );
+  }
+
   // Миграция: добавляем поле origin во все таблицы с данными
   const tablesWithOrigin = ['entities', 'relations', 'observations', 'sources'];
   for (const table of tablesWithOrigin) {
@@ -554,6 +574,9 @@ export function addSource(source: {
 /**
  * Создаёт связь вручную (origin='manual').
  */
+/**
+ * Создаёт связь вручную (origin='manual').
+ */
 export function createRelation(patch: {
   subject_id: number;
   predicate: string;
@@ -611,7 +634,15 @@ export function createRelation(patch: {
 
     return { success: true, id };
   } catch (e) {
-    return { success: false, error: (e as Error).message };
+    // ← ИЗМЕНЕНО: распознаём UNIQUE-конфликт (сработает ux_relations_triple)
+    const msg = (e as Error).message || '';
+    if (msg.includes('UNIQUE') || msg.includes('constraint')) {
+      return {
+        success: false,
+        error: 'Такая связь уже существует (subject + predicate + object)',
+      };
+    }
+    return { success: false, error: msg };
   }
 }
 
@@ -656,6 +687,12 @@ export function addRelation(relation: {
     return { inserted: false };
   }
 
+  // ← ИЗМЕНЕНО: guard на пустой predicate
+  if (!relation.predicate?.trim()) {
+    console.warn('[addRelation] Пустой predicate — запись пропущена');
+    return { inserted: false };
+  }
+
   // 2. Проверить дубликат
   const existing = db.prepare(`
     SELECT id FROM relations
@@ -685,26 +722,45 @@ export function addRelation(relation: {
   }
 
   // 3. Вставить новую
-  const info = db.prepare(`
-    INSERT INTO relations
-      (subject_id, predicate, object_id, source_id, valid_from, valid_to,
-       evidence_text, confidence, status, notes, raw_file_path)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    relation.subject_id,
-    relation.predicate,
-    relation.object_id,
-    relation.source_id || null,
-    relation.valid_from || null,
-    relation.valid_to || null,
-    relation.evidence_text || null,
-    relation.confidence ?? 50,
-    relation.status || 'unverified',
-    relation.notes || null,
-    relation.raw_file_path || null
-  );
+  // ← ИЗМЕНЕНО: оборачиваем в try/catch и обрабатываем UNIQUE-конфликт
+  // (теоретическое TOCTOU-окно между SELECT и INSERT; node:sqlite
+  //  синхронный, но подстраховаться не вредно — плюс общий UNIQUE-индекс).
+  try {
+    const info = db.prepare(`
+      INSERT INTO relations
+        (subject_id, predicate, object_id, source_id, valid_from, valid_to,
+         evidence_text, confidence, status, notes, raw_file_path)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      relation.subject_id,
+      relation.predicate,
+      relation.object_id,
+      relation.source_id || null,
+      relation.valid_from || null,
+      relation.valid_to || null,
+      relation.evidence_text || null,
+      relation.confidence ?? 50,
+      relation.status || 'unverified',
+      relation.notes || null,
+      relation.raw_file_path || null
+    );
 
-  return { inserted: true, id: Number(info.lastInsertRowid) };
+    return { inserted: true, id: Number(info.lastInsertRowid) };
+  } catch (e) {
+    const msg = (e as Error).message || '';
+    if (msg.includes('UNIQUE') || msg.includes('constraint')) {
+      // Кто-то успел вставить между SELECT и INSERT — вернём существующий id
+      const again = db.prepare(`
+        SELECT id FROM relations
+        WHERE subject_id = ? AND predicate = ? AND object_id = ?
+        LIMIT 1
+      `).get(relation.subject_id, relation.predicate, relation.object_id) as
+        | { id: number }
+        | undefined;
+      if (again) return { inserted: false, id: again.id };
+    }
+    throw e;
+  }
 }
 
 /**
