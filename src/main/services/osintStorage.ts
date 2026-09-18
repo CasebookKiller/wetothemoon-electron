@@ -107,7 +107,7 @@ function persistCompanyData(
   ];
   for (const obs of mainObservations) {
     if (obs.value) {
-      addObservation({
+      const r = addObservation({
         entity_id: mainEntityId,
         attribute: obs.attribute,
         value: obs.value,
@@ -115,7 +115,7 @@ function persistCompanyData(
         confidence: 90,
         raw_file_path: rawFilePath,
       });
-      savedObservations++;
+      if (r.inserted) savedObservations++;
     }
   }
 
@@ -177,20 +177,16 @@ function persistCompanyData(
       });
 
       if (founder.inn) {
-        addObservation({ entity_id: founderId, attribute: 'inn', value: founder.inn, source_id: sourceId, raw_file_path: rawFilePath });
-        savedObservations++;
+        if (addObservation({ entity_id: founderId, attribute: 'inn', value: founder.inn, source_id: sourceId, raw_file_path: rawFilePath }).inserted) savedObservations++;
       }
       if (founder.ogrn) {
-        addObservation({ entity_id: founderId, attribute: 'ogrn', value: founder.ogrn, source_id: sourceId, raw_file_path: rawFilePath });
-        savedObservations++;
+        if (addObservation({ entity_id: founderId, attribute: 'ogrn', value: founder.ogrn, source_id: sourceId, raw_file_path: rawFilePath }).inserted) savedObservations++;
       }
       if (founder.ogrnip) {
-        addObservation({ entity_id: founderId, attribute: 'ogrnip', value: founder.ogrnip, source_id: sourceId, raw_file_path: rawFilePath });
-        savedObservations++;
+        if (addObservation({ entity_id: founderId, attribute: 'ogrnip', value: founder.ogrnip, source_id: sourceId, raw_file_path: rawFilePath }).inserted) savedObservations++;
       }
       if (founder.share) {
-        addObservation({ entity_id: founderId, attribute: 'share', value: founder.share, source_id: sourceId, raw_file_path: rawFilePath });
-        savedObservations++;
+        if (addObservation({ entity_id: founderId, attribute: 'share', value: founder.share, source_id: sourceId, raw_file_path: rawFilePath }).inserted) savedObservations++;
       }
 
       const { inserted } = addRelation({
@@ -229,16 +225,13 @@ function persistCompanyData(
           });
 
           if (org.inn) {
-            addObservation({ entity_id: orgId, attribute: 'inn', value: org.inn, source_id: sourceId, raw_file_path: rawFilePath });
-            savedObservations++;
+            if (addObservation({ entity_id: orgId, attribute: 'inn', value: org.inn, source_id: sourceId, raw_file_path: rawFilePath }).inserted) savedObservations++;
           }
           if (org.ogrn) {
-            addObservation({ entity_id: orgId, attribute: 'ogrn', value: org.ogrn, source_id: sourceId, raw_file_path: rawFilePath });
-            savedObservations++;
+            if (addObservation({ entity_id: orgId, attribute: 'ogrn', value: org.ogrn, source_id: sourceId, raw_file_path: rawFilePath }).inserted) savedObservations++;
           }
           if (org.ogrnip) {
-            addObservation({ entity_id: orgId, attribute: 'ogrnip', value: org.ogrnip, source_id: sourceId, raw_file_path: rawFilePath });
-            savedObservations++;
+            if (addObservation({ entity_id: orgId, attribute: 'ogrnip', value: org.ogrnip, source_id: sourceId, raw_file_path: rawFilePath }).inserted) savedObservations++;
           }
 
           const { inserted } = addRelation({

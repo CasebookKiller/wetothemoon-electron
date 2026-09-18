@@ -162,6 +162,22 @@ function initializeSchema(db: DatabaseSync) {
     );
   }
 
+    // ← НОВОЕ: defense-in-depth против дубликатов наблюдений.
+  // Одно (entity_id, attribute, value) = одна строка.
+  try {
+    db.exec(`
+      CREATE UNIQUE INDEX IF NOT EXISTS ux_observations_triple
+        ON observations(entity_id, attribute, value);
+    `);
+  } catch (e) {
+    console.warn(
+      '[db] Не удалось создать ux_observations_triple — в observations, вероятно, есть дубликаты. ' +
+      'Чистка: DELETE FROM observations WHERE id NOT IN ' +
+      '(SELECT MAX(id) FROM observations GROUP BY entity_id, attribute, value);',
+      (e as Error).message
+    );
+  }
+
   // Миграция: добавляем поле origin во все таблицы с данными
   const tablesWithOrigin = ['entities', 'relations', 'observations', 'sources'];
   for (const table of tablesWithOrigin) {
@@ -816,7 +832,14 @@ export function createObservation(patch: {
 
     return { success: true, id };
   } catch (e) {
-    return { success: false, error: (e as Error).message };
+    const msg = (e as Error).message || '';
+    if (msg.includes('UNIQUE') || msg.includes('constraint')) {
+      return {
+        success: false,
+        error: 'Такое наблюдение уже существует (entity + attribute + value)',
+      };
+    }
+    return { success: false, error: msg };
   }
 }
 
@@ -828,21 +851,80 @@ export function addObservation(observation: {
   confidence?: number;
   notes?: string;
   raw_file_path?: string;
-}): void {
+}): { inserted: boolean; id: number } {
   const db = getDatabase();
-  db.prepare(`
-    INSERT INTO observations (entity_id, attribute, value, source_id, observed_at, confidence, notes, raw_file_path)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
+
+  // Guard: пустые attribute/value не пишем
+  if (!observation.attribute?.trim() || !observation.value?.trim()) {
+    console.warn(
+      `[addObservation] Пропущены пустые attribute/value: entity=${observation.entity_id}`
+    );
+    return { inserted: false, id: 0 };
+  }
+
+  // 1. Проверить существующую запись
+  const existing = db.prepare(`
+    SELECT id FROM observations
+    WHERE entity_id = ? AND attribute = ? AND value = ?
+    LIMIT 1
+  `).get(
     observation.entity_id,
     observation.attribute,
-    observation.value,
-    observation.source_id || null,
-    new Date().toISOString(),
-    observation.confidence ?? 50,
-    observation.notes || null,
-    observation.raw_file_path || null
-  );
+    observation.value
+  ) as { id: number } | undefined;
+
+  if (existing) {
+    // Обновляем «видели ещё раз»: observed_at свежий, остальное — COALESCE
+    db.prepare(`
+      UPDATE observations
+      SET observed_at = ?,
+          source_id = COALESCE(source_id, ?),
+          confidence = COALESCE(confidence, ?),
+          raw_file_path = COALESCE(raw_file_path, ?)
+      WHERE id = ?
+    `).run(
+      new Date().toISOString(),
+      observation.source_id || null,
+      observation.confidence ?? 50,
+      observation.raw_file_path || null,
+      existing.id
+    );
+    return { inserted: false, id: existing.id };
+  }
+
+  // 2. Вставить новую (с обработкой UNIQUE на случай TOCTOU)
+  try {
+    const info = db.prepare(`
+      INSERT INTO observations
+        (entity_id, attribute, value, source_id, observed_at, confidence, notes, raw_file_path)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      observation.entity_id,
+      observation.attribute,
+      observation.value,
+      observation.source_id || null,
+      new Date().toISOString(),
+      observation.confidence ?? 50,
+      observation.notes || null,
+      observation.raw_file_path || null
+    );
+    return { inserted: true, id: Number(info.lastInsertRowid) };
+  } catch (e) {
+    const msg = (e as Error).message || '';
+    if (msg.includes('UNIQUE') || msg.includes('constraint')) {
+      const again = db.prepare(`
+        SELECT id FROM observations
+        WHERE entity_id = ? AND attribute = ? AND value = ?
+        LIMIT 1
+      `).get(
+        observation.entity_id,
+        observation.attribute,
+        observation.value
+      ) as { id: number } | undefined;
+      if (again) return { inserted: false, id: again.id };
+    }
+    throw e;
+  }
 }
 
 export function auditChange(
