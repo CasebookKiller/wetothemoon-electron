@@ -1043,7 +1043,7 @@ export function deleteDumpsByEntity(
 }
 
 /**
- * Поиск сущностей по подстроке в value / label / normalized_value.
+ * Поиск сущностей по подстроке в value / label / normalized_value / notes.
  * Опционально можно фильтровать по типу.
  */
 export function searchEntities(
@@ -1061,19 +1061,19 @@ export function searchEntities(
       SELECT id, type, value, label, confidence, status, first_seen, last_seen, notes
       FROM entities
       WHERE type = ?
-        AND (value LIKE ? OR label LIKE ? OR normalized_value LIKE ?)
+        AND (value LIKE ? OR label LIKE ? OR normalized_value LIKE ? OR notes LIKE ?)
       ORDER BY last_seen DESC
       LIMIT ? OFFSET ?
-    `).all(type, rawQuery, rawQuery, normalizedQuery, limit, offset) as unknown as any[];
+    `).all(type, rawQuery, rawQuery, normalizedQuery, rawQuery, limit, offset) as unknown as any[];
   }
 
   return db.prepare(`
     SELECT id, type, value, label, confidence, status, first_seen, last_seen, notes
     FROM entities
-    WHERE value LIKE ? OR label LIKE ? OR normalized_value LIKE ?
+    WHERE value LIKE ? OR label LIKE ? OR normalized_value LIKE ? OR notes LIKE ?
     ORDER BY last_seen DESC
     LIMIT ? OFFSET ?
-  `).all(rawQuery, rawQuery, normalizedQuery, limit, offset) as unknown as any[];
+  `).all(rawQuery, rawQuery, normalizedQuery, rawQuery, limit, offset) as unknown as any[];
 }
 
 /**
