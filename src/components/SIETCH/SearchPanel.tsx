@@ -75,10 +75,10 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
       (searchUnionCounts.sources || 0)
     : 0;
 
-  return (
+    return (
     <Panel className="shadow-5 mb-3" header="Поиск">
-      <div className="flex flex-wrap align-items-center gap-3 py-2">
-        <div className="flex-1" style={{ minWidth: '240px' }}>
+      <div className="flex flex-wrap align-items-center gap-2 audit-log-filters">
+        <div style={{ minWidth: '240px', flex: 1 }}>
           <span className="p-input-icon-left w-full search-input-with-icon">
             <i className="pi pi-search" />
             <InputText
@@ -86,7 +86,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
               onChange={(e) => onQueryChange(e.target.value)}
               onKeyDown={onKeyDown}
               placeholder="Название, ИНН, ФИО, predicate, notes…"
-              className="w-full text-base"
+              className="w-full"
             />
           </span>
         </div>
@@ -116,7 +116,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
         <Button
           label={loading ? 'Поиск...' : 'Найти'}
           icon={loading ? 'pi pi-spin pi-spinner' : 'pi pi-search'}
-          className="p-button-raised p-button-accent"
+          className="osint p-button-sm"
           onClick={onSearch}
           disabled={loading}
         />
@@ -125,7 +125,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
           <Button
             label="Сбросить"
             icon="pi pi-times"
-            className="p-button-raised p-button-outlined"
+            className="osint-soft p-button-sm"
             onClick={onReset}
           />
         )}
@@ -133,14 +133,13 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
         <Button
           label="Обновить всё"
           icon="pi pi-refresh"
-          className="p-button-raised p-button-accent"
+          className="osint-soft p-button-sm"
           onClick={onRefreshAll}
         />
 
         <Button
-          label="Справка"
           icon="pi pi-question-circle"
-          className="p-button-raised p-button-accent"
+          className="osint-soft p-button-sm"
           onClick={onHelp}
           tooltip="Как работать с базой данных"
           tooltipOptions={{ position: 'bottom' }}
