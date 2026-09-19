@@ -1981,6 +1981,21 @@ export interface SearchAllResult {
   items: SearchHit[];
   total: number;
   counts: Record<SearchHitKind, number>;
+  /** Прямые совпадения (то, что реально нашлось по LIKE). */
+  matchedIds: {
+    entities: number[];
+    relations: number[];
+    observations: number[];
+    sources: number[];
+  };
+  /** Финальный union: matchedIds ∪ всё связанное с найденными сущностями.
+   *  Именно это множество показывается в таблицах UI. */
+  unionIds: {
+    entities: number[];
+    relations: number[];
+    observations: number[];
+    sources: number[];
+  };
 }
 
 /**
@@ -1996,10 +2011,12 @@ export function searchAll(
 ): SearchAllResult {
   const db = getDatabase();
   const q = (query || '').trim();
-  const empty: SearchAllResult = {
+    const empty: SearchAllResult = {
     items: [],
     total: 0,
     counts: { entity: 0, relation: 0, observation: 0, source: 0 },
+    matchedIds: { entities: [], relations: [], observations: [], sources: [] },
+    unionIds:   { entities: [], relations: [], observations: [], sources: [] },
   };
   if (!q) return empty;
 
@@ -2009,6 +2026,11 @@ export function searchAll(
   const counts: Record<SearchHitKind, number> = {
     entity: 0, relation: 0, observation: 0, source: 0,
   };
+
+  const matchedEntityIds = new Set<number>();
+  const matchedRelationIds = new Set<number>();
+  const matchedObservationIds = new Set<number>();
+  const matchedSourceIds = new Set<number>();
 
   const pickMatch = (
     fields: Array<[string, string | null]>
@@ -2041,6 +2063,7 @@ export function searchAll(
         LIMIT ?
       `).all(like, like, like, like, limit + offset) as any[];
       for (const r of rows) {
+        matchedEntityIds.add(r.id);
         const m = pickMatch([
           ['value', r.value], ['label', r.label], ['notes', r.notes],
         ]);
@@ -2076,6 +2099,7 @@ export function searchAll(
         LIMIT ?
       `).all(like, like, like, limit + offset) as any[];
       for (const r of rows) {
+        matchedRelationIds.add(r.id);
         const m = pickMatch([
           ['predicate', r.predicate],
           ['evidence_text', r.evidence_text],
@@ -2112,6 +2136,7 @@ export function searchAll(
         LIMIT ?
       `).all(like, like, like, limit + offset) as any[];
       for (const r of rows) {
+        matchedObservationIds.add(r.id);
         const m = pickMatch([
           ['attribute', r.attribute], ['value', r.value], ['notes', r.notes],
         ]);
@@ -2145,6 +2170,7 @@ export function searchAll(
         LIMIT ?
       `).all(like, like, like, like, like, limit + offset) as any[];
       for (const r of rows) {
+        matchedSourceIds.add(r.id);
         const m = pickMatch([
           ['url', r.url], ['title', r.title], ['provider', r.provider],
           ['authority_basis', r.authority_basis], ['notes', r.notes],
@@ -2161,8 +2187,90 @@ export function searchAll(
     }
   }
 
+    // ===== Расширение через связи: matched ∪ related =====
+  const relatedEntityIds = new Set<number>();
+  const relatedRelationIds = new Set<number>();
+  const relatedObservationIds = new Set<number>();
+  const relatedSourceIds = new Set<number>();
+
+  // Если нашли сущности — подтянем их связи, наблюдения и источники
+  if (matchedEntityIds.size > 0) {
+    const ids = [...matchedEntityIds];
+    const ph = ids.map(() => '?').join(',');
+
+    // Связи, где найденная сущность — subject или object
+    const relRows = db.prepare(`
+      SELECT id, subject_id, object_id, source_id
+      FROM relations
+      WHERE subject_id IN (${ph}) OR object_id IN (${ph})
+    `).all(...ids, ...ids) as any[];
+    for (const r of relRows) {
+      relatedRelationIds.add(r.id);
+      relatedEntityIds.add(r.subject_id);
+      relatedEntityIds.add(r.object_id);
+      if (r.source_id) relatedSourceIds.add(r.source_id);
+    }
+
+    // Наблюдения найденных сущностей
+    const obsRows = db.prepare(`
+      SELECT id, source_id FROM observations WHERE entity_id IN (${ph})
+    `).all(...ids) as any[];
+    for (const o of obsRows) {
+      relatedObservationIds.add(o.id);
+      if (o.source_id) relatedSourceIds.add(o.source_id);
+    }
+  }
+
+  // Если нашли связи — добавим их участников и источники
+  if (matchedRelationIds.size > 0) {
+    const ids = [...matchedRelationIds];
+    const ph = ids.map(() => '?').join(',');
+    const relRows = db.prepare(`
+      SELECT subject_id, object_id, source_id FROM relations WHERE id IN (${ph})
+    `).all(...ids) as any[];
+    for (const r of relRows) {
+      relatedEntityIds.add(r.subject_id);
+      relatedEntityIds.add(r.object_id);
+      if (r.source_id) relatedSourceIds.add(r.source_id);
+    }
+  }
+
+  // Если нашли наблюдения — добавим их сущности и источники
+  if (matchedObservationIds.size > 0) {
+    const ids = [...matchedObservationIds];
+    const ph = ids.map(() => '?').join(',');
+    const obsRows = db.prepare(`
+      SELECT entity_id, source_id FROM observations WHERE id IN (${ph})
+    `).all(...ids) as any[];
+    for (const o of obsRows) {
+      relatedEntityIds.add(o.entity_id);
+      if (o.source_id) relatedSourceIds.add(o.source_id);
+    }
+  }
+
+  const unionEntities = [...new Set([...matchedEntityIds, ...relatedEntityIds])];
+  const unionRelations = [...new Set([...matchedRelationIds, ...relatedRelationIds])];
+  const unionObservations = [...new Set([...matchedObservationIds, ...relatedObservationIds])];
+  const unionSources = [...new Set([...matchedSourceIds, ...relatedSourceIds])];
+
   const total = counts.entity + counts.relation + counts.observation + counts.source;
   const paginated = items.slice(offset, offset + limit);
 
-  return { items: paginated, total, counts };
+    return {
+    items: paginated,
+    total,
+    counts,
+    matchedIds: {
+      entities: [...matchedEntityIds],
+      relations: [...matchedRelationIds],
+      observations: [...matchedObservationIds],
+      sources: [...matchedSourceIds],
+    },
+    unionIds: {
+      entities: unionEntities,
+      relations: unionRelations,
+      observations: unionObservations,
+      sources: unionSources,
+    },
+  };
 }
