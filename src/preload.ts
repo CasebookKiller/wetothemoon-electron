@@ -410,6 +410,13 @@ try {
     markFalse: (table: 'entities' | 'relations' | 'observations', recordId: number, reason: string) =>
       ipcRenderer.invoke('osint:mark-false', table, recordId, reason),
 
+    markFalseBatch: (
+      table: 'entities' | 'relations' | 'observations',
+      recordIds: number[],
+      reason: string
+    ) =>
+      ipcRenderer.invoke('osint:mark-false-batch', table, recordIds, reason),
+
     getEntityDetails: (entityId: number) =>
       ipcRenderer.invoke('osint:get-entity-details', entityId),
 

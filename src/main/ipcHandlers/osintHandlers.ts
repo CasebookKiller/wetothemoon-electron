@@ -38,6 +38,7 @@ import {
   getAuditLog,
   listAuditLogTables,
   listAuditLogActions,
+  markRecordsAsFalse,
 } from '../services/database';
 
 import {
@@ -338,6 +339,22 @@ export function registerOsintHandlers() {
       try {
         const result = markRecordAsFalse(table, recordId, reason);
         return result;
+      } catch (error) {
+        return { success: false, error: (error as Error).message };
+      }
+    }
+  );
+
+  ipcMain.handle(
+    'osint:mark-false-batch',
+    async (
+      _event,
+      table: 'entities' | 'relations' | 'observations',
+      recordIds: number[],
+      reason: string
+    ) => {
+      try {
+        return markRecordsAsFalse(table, recordIds, reason);
       } catch (error) {
         return { success: false, error: (error as Error).message };
       }
