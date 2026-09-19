@@ -69,6 +69,11 @@ export interface RelationsTableProps {
 
   /** Дополнительный CSS-класс */
   className?: string;
+
+  /** Мульти-выбор (batch-операции). Если передан onSelectionChange —
+   *  в таблице появляется колонка с чекбоксами. */
+  selection?: RelationRow[];
+  onSelectionChange?: (rows: RelationRow[]) => void;
 }
 
 export const RelationsTable: React.FC<RelationsTableProps> = ({
@@ -83,6 +88,8 @@ export const RelationsTable: React.FC<RelationsTableProps> = ({
   emptyMessage = 'Нет данных',
   showActions,
   className,
+  selection,
+  onSelectionChange,
 }) => {
   const rows = filterFn ? value.filter(filterFn) : value;
 
@@ -161,6 +168,11 @@ export const RelationsTable: React.FC<RelationsTableProps> = ({
   // В compact-режиме убираем часть колонок, чтобы не перегружать
   const showDates = !compact;
 
+  const multiSelect = !!onSelectionChange;
+  const effectiveSelectionMode = multiSelect
+    ? 'multiple'
+    : (onRowClick ? 'single' : undefined);
+
   return (
     <DataTable
       value={rows}
@@ -170,13 +182,24 @@ export const RelationsTable: React.FC<RelationsTableProps> = ({
       rowsPerPageOptions={compact ? undefined : [10, 20, 50, 100]}
       responsiveLayout="scroll"
       emptyMessage={emptyMessage}
-      selectionMode={onRowClick ? 'single' : undefined}
+            selectionMode={effectiveSelectionMode as any}
+      selection={multiSelect ? selection : undefined}
+      onSelectionChange={
+        multiSelect
+          ? (e: any) => onSelectionChange!(e.value as RelationRow[])
+          : undefined
+      }
+      dataKey="id"
       onRowClick={onRowClick ? (e) => onRowClick(e.data as RelationRow) : undefined}
       rowHover={!!onRowClick}
       size={compact ? 'small' : 'normal'}
       scrollable={compact}
       scrollHeight={compact ? '300px' : undefined}
     >
+      {multiSelect && (
+        <Column selectionMode="multiple" headerStyle={{ width: '3rem' }} />
+      )}
+      
       <Column field="id" header="ID" sortable style={{ width: '4rem' }} />
 
       {showSubject && (

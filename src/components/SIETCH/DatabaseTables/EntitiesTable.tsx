@@ -44,6 +44,11 @@ export interface EntitiesTableProps {
 
   /** Дополнительный CSS-класс контейнера */
   className?: string;
+  
+  /** Мульти-выбор (batch-операции). Если передан onSelectionChange —
+   *  в таблице появляется колонка с чекбоксами. */
+  selection?: EntityRow[];
+  onSelectionChange?: (rows: EntityRow[]) => void;
 }
 
 export const EntitiesTable: React.FC<EntitiesTableProps> = ({
@@ -55,6 +60,8 @@ export const EntitiesTable: React.FC<EntitiesTableProps> = ({
   emptyMessage = 'Нет данных',
   showActions,
   className,
+  selection,
+  onSelectionChange,
 }) => {
   const rows = filterFn ? value.filter(filterFn) : value;
 
@@ -91,6 +98,11 @@ export const EntitiesTable: React.FC<EntitiesTableProps> = ({
 
   const actionsVisible = showActions ?? !!onOpenInMain;
 
+  const multiSelect = !!onSelectionChange;
+  const effectiveSelectionMode = multiSelect
+    ? 'multiple'
+    : (onRowClick ? 'single' : undefined);
+
   return (
     <DataTable
       value={rows}
@@ -100,13 +112,23 @@ export const EntitiesTable: React.FC<EntitiesTableProps> = ({
       rowsPerPageOptions={compact ? undefined : [10, 20, 50, 100]}
       responsiveLayout="scroll"
       emptyMessage={emptyMessage}
-      selectionMode={onRowClick ? 'single' : undefined}
+      selectionMode={effectiveSelectionMode as any}
+      selection={multiSelect ? selection : undefined}
+      onSelectionChange={
+        multiSelect
+          ? (e: any) => onSelectionChange!(e.value as EntityRow[])
+          : undefined
+      }
+      dataKey="id"
       onRowClick={onRowClick ? (e) => onRowClick(e.data as EntityRow) : undefined}
       rowHover={!!onRowClick}
       size={compact ? 'small' : 'normal'}
       scrollable={compact}
       scrollHeight={compact ? '300px' : undefined}
     >
+      {multiSelect && (
+        <Column selectionMode="multiple" headerStyle={{ width: '3rem' }} />
+      )}
       <Column field="id" header="ID" sortable style={{ width: '4rem' }} />
       <Column field="type" header="Тип" sortable style={{ width: '8rem' }} />
       <Column field="label" header="Название" sortable body={(row: EntityRow) => row.label || row.value} />
