@@ -25,8 +25,6 @@ import { RelationDetailsContent } from '@/components/SIETCH/content/RelationDeta
 import { ObservationDetailsContent } from '@/components/SIETCH/content/ObservationDetailsContent';
 import { SourceDetailsContent } from '@/components/SIETCH/content/SourceDetailsContent';
 
-import { FullTextSearchDialog } from '@/components/SIETCH/FullTextSearchDialog';
-
 const entityTypeOptions = [
   { label: 'Все', value: 'all' },
   { label: 'Юрлицо', value: 'company' },
@@ -38,6 +36,14 @@ const entityTypeOptions = [
   { label: 'Адрес', value: 'address' },
   { label: 'Документ', value: 'document' },
   { label: 'Прочее', value: 'other' },
+];
+
+const searchScopeOptions = [
+  { label: 'Все таблицы', value: 'all' },
+  { label: 'Только сущности', value: 'entity' },
+  { label: 'Только связи', value: 'relation' },
+  { label: 'Только наблюдения', value: 'observation' },
+  { label: 'Только источники', value: 'source' },
 ];
 
 const typeToTabIndex: Record<DialogType, number> = {
@@ -60,10 +66,28 @@ export const DatabasePage: React.FC = () => {
 
   // ============ Поиск ============
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchType, setSearchType] = useState<string>('all');
-  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchScope, setSearchScope] = useState<string>('all');
+  const [searchEntityType, setSearchEntityType] = useState<string>('all');
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchActive, setSearchActive] = useState(false);
+  const [searchUnionIds, setSearchUnionIds] = useState<{
+    entities: number[];
+    relations: number[];
+    observations: number[];
+    sources: number[];
+  } | null>(null);
+  const [searchCounts, setSearchCounts] = useState<{
+    entity: number;
+    relation: number;
+    observation: number;
+    source: number;
+  } | null>(null);
+  const [searchUnionCounts, setSearchUnionCounts] = useState<{
+    entities: number;
+    relations: number;
+    observations: number;
+    sources: number;
+  } | null>(null);
 
   // ============ UI-состояния ============
   const [activeTab, setActiveTab] = useState(0);
@@ -76,7 +100,6 @@ export const DatabasePage: React.FC = () => {
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [dangerVisible, setDangerVisible] = useState(false);
   const [backupVisible, setBackupVisible] = useState(false);           // ← новое
-  const [ftsVisible, setFtsVisible] = useState(false);        // ← новое
 
   // ============ Хуки ============
   const dialogStackHook = useDialogStack();
@@ -115,7 +138,31 @@ export const DatabasePage: React.FC = () => {
 
   const sensitiveState = useSensitiveState();
 
-  const displayEntities = searchActive ? searchResults : entities;
+  // Поиск: если активен — режем все 4 таблицы по unionIds из searchAll.
+  // Фильтр по типу сущности применяем только к сущностям и только
+  // когда scope = 'all' или 'entity'.
+  const entityTypeFilterActive =
+    searchActive &&
+    (searchScope === 'all' || searchScope === 'entity') &&
+    searchEntityType !== 'all';
+
+  const displayEntities = searchActive && searchUnionIds
+    ? entities
+        .filter((e) => searchUnionIds.entities.includes(e.id))
+        .filter((e) => !entityTypeFilterActive || e.type === searchEntityType)
+    : entities;
+
+  const displayRelations = searchActive && searchUnionIds
+    ? relations.filter((r) => searchUnionIds.relations.includes(r.id))
+    : relations;
+
+  const displayObservations = searchActive && searchUnionIds
+    ? observations.filter((o) => searchUnionIds.observations.includes(o.id))
+    : observations;
+
+  const displaySources = searchActive && searchUnionIds
+    ? sources.filter((s) => searchUnionIds.sources.includes(s.id))
+    : sources;
 
   const {
     activeFilter,
@@ -127,9 +174,9 @@ export const DatabasePage: React.FC = () => {
     filteredSources,
   } = useCascadingFilter({
     displayEntities,
-    relations,
-    observations,
-    sources,
+    relations: displayRelations,
+    observations: displayObservations,
+    sources: displaySources,
   });
 
   // ============ Загрузка данных ============
@@ -165,15 +212,29 @@ export const DatabasePage: React.FC = () => {
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
       setSearchActive(false);
-      setSearchResults([]);
+      setSearchUnionIds(null);
+      setSearchCounts(null);
+      setSearchUnionCounts(null);
       return;
     }
     setSearchLoading(true);
     setError('');
     try {
-      const res = await api.searchEntities(searchQuery.trim(), searchType, 200, 0);
+      const kinds = searchScope === 'all' ? undefined : [searchScope];
+      const res = await api.searchAll(searchQuery.trim(), kinds, 500, 0);
       if (res.success) {
-        setSearchResults(res.items || []);
+        setSearchUnionIds(res.unionIds || null);
+        setSearchCounts(res.counts || null);
+        setSearchUnionCounts(
+          res.unionIds
+            ? {
+                entities: res.unionIds.entities?.length || 0,
+                relations: res.unionIds.relations?.length || 0,
+                observations: res.unionIds.observations?.length || 0,
+                sources: res.unionIds.sources?.length || 0,
+              }
+            : null
+        );
         setSearchActive(true);
       } else {
         setError(res.error || 'Ошибка поиска');
@@ -187,9 +248,12 @@ export const DatabasePage: React.FC = () => {
 
   const handleResetSearch = () => {
     setSearchQuery('');
-    setSearchType('all');
-    setSearchResults([]);
+    setSearchScope('all');
+    setSearchEntityType('all');
     setSearchActive(false);
+    setSearchUnionIds(null);
+    setSearchCounts(null);
+    setSearchUnionCounts(null);
   };
 
   const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -344,17 +408,20 @@ export const DatabasePage: React.FC = () => {
         query={searchQuery}
         onQueryChange={setSearchQuery}
         onKeyDown={handleSearchKeyDown}
-        type={searchType}
-        onTypeChange={setSearchType}
-        typeOptions={entityTypeOptions}
+        scope={searchScope}
+        onScopeChange={setSearchScope}
+        scopeOptions={searchScopeOptions}
+        entityType={searchEntityType}
+        onEntityTypeChange={setSearchEntityType}
+        entityTypeOptions={entityTypeOptions}
         loading={searchLoading}
         searchActive={searchActive}
-        resultCount={searchResults.length}
+        searchCounts={searchCounts}
+        searchUnionCounts={searchUnionCounts}
         onSearch={handleSearch}
         onReset={handleResetSearch}
         onRefreshAll={loadData}
         onHelp={() => setHelpVisible(true)}
-        onOpenFullTextSearch={() => setFtsVisible(true)}      // ← ново
       />
 
       <TablesPanel
@@ -430,12 +497,6 @@ export const DatabasePage: React.FC = () => {
       <DatabaseHelp
         visible={helpVisible}
         onHide={() => setHelpVisible(false)}
-      />
-
-      <FullTextSearchDialog                                  // ← новое
-        visible={ftsVisible}
-        onHide={() => setFtsVisible(false)}
-        onOpenHit={(type, id) => openDialog(type, id)}
       />
 
       <Dialog
