@@ -93,6 +93,7 @@ function initializeSchema(db: DatabaseSync) {
       source_id INTEGER,
       observed_at TEXT NOT NULL,
       confidence INTEGER CHECK(confidence BETWEEN 0 AND 100),
+      status TEXT NOT NULL DEFAULT 'unverified',
       notes TEXT,
       raw_file_path TEXT,
       FOREIGN KEY(entity_id) REFERENCES entities(id),
@@ -240,6 +241,17 @@ function initializeSchema(db: DatabaseSync) {
       db.exec(`ALTER TABLE ${table} ADD COLUMN origin TEXT NOT NULL DEFAULT 'scraper';`);
       console.log(`Добавлена колонка origin в ${table}`);
     }
+  }
+
+  // Миграция: добавляем status в observations для старых БД.
+  // В CREATE TABLE status уже есть, но существующие таблицы
+  // IF NOT EXISTS не трогает — а markRecordAsFalse использует
+  // эту колонку, из-за чего пометка наблюдения как ложного
+  // падала с «no such column: status».
+  const obsCols = db.prepare(`PRAGMA table_info(observations)`).all() as { name: string }[];
+  if (!obsCols.some((c) => c.name === 'status')) {
+    db.exec(`ALTER TABLE observations ADD COLUMN status TEXT NOT NULL DEFAULT 'unverified';`);
+    console.log('Добавлена колонка status в observations');
   }
 
   // Проверяем наличие колонки collected_sections в raw_dumps
@@ -1214,6 +1226,91 @@ export function markRecordAsFalse(
   );
 
   return { success: true };
+}
+
+/**
+ * Массовая пометка записей как ложных (best-effort).
+ * Помечает то, что смог; неудачные id складывает в errors.
+ * Всё выполняется внутри одной транзакции — быстро и консистентно
+ * по отношению к внешним читателям.
+ */
+export function markRecordsAsFalse(
+  table: 'entities' | 'relations' | 'observations',
+  recordIds: number[],
+  reason: string
+): {
+  success: boolean;
+  updated: number;
+  failed: number;
+  errors: { id: number; error: string }[];
+} {
+  const db = getDatabase();
+
+  if (!['entities', 'relations', 'observations'].includes(table)) {
+    return {
+      success: false,
+      updated: 0,
+      failed: 0,
+      errors: [{ id: 0, error: `Недопустимая таблица: ${table}` }],
+    };
+  }
+
+  if (!Array.isArray(recordIds) || recordIds.length === 0) {
+    return {
+      success: false,
+      updated: 0,
+      failed: 0,
+      errors: [{ id: 0, error: 'Пустой список id' }],
+    };
+  }
+
+  if (!reason || !reason.trim()) {
+    return {
+      success: false,
+      updated: 0,
+      failed: 0,
+      errors: [{ id: 0, error: 'Не указана причина' }],
+    };
+  }
+
+  let updated = 0;
+  let failed = 0;
+  const errors: { id: number; error: string }[] = [];
+
+  // Транзакция для скорости (одна запись WAL на батч вместо N).
+  // Best-effort: исключения от отдельных записей ловим и продолжаем.
+  try {
+    db.exec('BEGIN');
+    try {
+      for (const id of recordIds) {
+        try {
+          const r = markRecordAsFalse(table, id, reason);
+          if (r.success) {
+            updated++;
+          } else {
+            failed++;
+            errors.push({ id, error: r.error || 'неизвестная ошибка' });
+          }
+        } catch (e) {
+          failed++;
+          errors.push({ id, error: (e as Error).message });
+        }
+      }
+      db.exec('COMMIT');
+    } catch (e) {
+      db.exec('ROLLBACK');
+      throw e;
+    }
+  } catch (e) {
+    return {
+      success: false,
+      updated: 0,
+      failed: recordIds.length,
+      errors: [{ id: 0, error: (e as Error).message }],
+    };
+  }
+
+  return { success: true, updated, failed, errors };
 }
 
 /**
