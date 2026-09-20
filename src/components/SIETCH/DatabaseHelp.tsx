@@ -112,6 +112,9 @@ export const DatabaseHelp: React.FC<DatabaseHelpProps> = ({ visible, onHide }) =
               <li><b>company</b> — юридическое лицо (ООО, АО, ПАО). Идентификатор — название или ОГРН.</li>
               <li><b>entrepreneur</b> — ИП. Идентификатор — ФИО или ОГРНИП.</li>
               <li><b>person</b> — физлицо. Идентификатор — ФИО.</li>
+              <li><b>court</b> — суд (Арбитражный суд г. Москвы, Суд по интеллектуальным правам и т.п.). Идентификатор — полное наименование.</li>
+              <li><b>court_case</b> — судебное дело. Идентификатор — номер дела (<code>А40-123456/2020</code>). Дело связывает участников: через него юрлица, ИП и физлица соединяются между собой.</li>
+              <li><b>judge</b> — судья (должностное лицо). Идентификатор — ФИО.</li>
               <li><b>domain</b>, <b>email</b>, <b>phone</b>, <b>ip</b>, <b>address</b>, <b>document</b>, <b>other</b>.</li>
             </ul>
           </Panel>
@@ -135,6 +138,14 @@ status: hypothesis`}</CodeBlock>
             <CodeBlock>{`type: domain
 value: example.org
 label: example.org`}</CodeBlock>
+
+            <p className="mt-3"><b>Судебное дело:</b></p>
+            <CodeBlock>{`type: court_case
+value: А40-123456/2020
+label: Дело А40-123456/2020
+confidence: 95
+status: confirmed`}</CodeBlock>
+
           </Panel>
 
           <Panel header="Поле «Значение» vs «Название»">
@@ -174,6 +185,12 @@ label: example.org`}</CodeBlock>
               <li><b>mentions</b> — упоминает</li>
               <li><b>resolves_to</b> — домен → IP</li>
               <li><b>individual_entrepreneur_of</b> — физлицо ↔ ИП (один и тот же человек)</li>
+              <li><b>plaintiff_in</b> — истец по делу (entity → court_case)</li>
+              <li><b>defendant_in</b> — ответчик по делу (entity → court_case)</li>
+              <li><b>third_party_in</b> — третье лицо по делу (entity → court_case)</li>
+              <li><b>judge_of</b> — судья ведёт дело (judge → court_case)</li>
+              <li><b>heard_by</b> — дело рассматривается судом (court_case → court)</li>
+              <li><b>related_to</b> — связанное/объединённое дело (court_case → court_case)</li>
             </ul>
           </Panel>
 
@@ -918,6 +935,31 @@ access_level: public`}</CodeBlock>
               <li>Если у дочерних разные юр.адреса — создайте сущности <code>address</code> и связи <code>located_at</code>.</li>
             </ol>
             <p className="mt-2">После визуализации получится «дерево холдинга» с адресами на листьях.</p>
+          </Panel>
+
+          <Panel header="Судебное дело как узел связи" className="mb-3">
+            <p>
+              <b>Задача:</b> связать компанию и её контрагента через судебное дело.
+            </p>
+            <ol className="pl-4">
+              <li>Создать сущность компании-истца: type=<code>company</code>.</li>
+              <li>Создать сущность компании-ответчика: type=<code>company</code>.</li>
+              <li>Создать сущность-дело: type=<code>court_case</code>, value=<code>А40-123456/2020</code>.</li>
+              <li>Наблюдения по делу: <code>case_type</code>=<code>civil</code>, <code>filing_date</code>=<code>2020-03-15</code>, <code>amount</code>=<code>1500000</code>, <code>status</code>=<code>in_progress</code>.</li>
+              <li>Связи: <code>Истец --plaintiff_in--&gt; Дело</code>, <code>Ответчик --defendant_in--&gt; Дело</code>.</li>
+              <li>Если известно, каким судом рассматривается: создать сущность <code>court</code> и связь <code>Дело --heard_by--&gt; Суд</code>.</li>
+            </ol>
+            <p className="mt-2">
+              <b>Зачем узел, а не прямая связь:</b> у дела может быть больше двух
+              участников (третьи лица), а также собственные атрибуты (номер, суд,
+              сумма). Как узел, дело собирает всех участников в одну точку — через
+              него косвенно связываются ЮЛ, ИП и ФЛ между собой.
+            </p>
+            <p className="mt-2">
+              <b>В графе:</b> узел «дело» в центре, от него расходятся рёбра к истцу,
+              ответчику, третьим лицам, суду и судье. Полезно при поиске скрытых
+              связей между компаниями, которые не пересекаются напрямую.
+            </p>
           </Panel>
 
           <Panel header="Массовый импорт (когда появится)">
