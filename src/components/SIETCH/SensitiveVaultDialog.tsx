@@ -350,7 +350,7 @@ export const SensitiveVaultDialog: React.FC<SensitiveVaultDialogProps> = ({
           icon={revealed ? 'pi pi-eye-slash' : 'pi pi-eye'}
           className="osint-soft p-button-sm"
           onClick={() => handleReveal(row.id)}
-          tooltip={revealed ? 'Скрыть' : 'Показать'}
+          //tooltip={revealed ? 'Скрыть' : 'Показать'}
         />
         {revealed ? (
           <code style={{ wordBreak: 'break-all' }}>{revealed}</code>
@@ -757,6 +757,7 @@ export const SensitiveVaultDialog: React.FC<SensitiveVaultDialogProps> = ({
         )}
 
         <DataTable
+          key={Object.keys(revealedValues).sort().join('|')}
           value={records}
           emptyMessage="Нет чувствительных записей"
           responsiveLayout="scroll"
