@@ -95,7 +95,7 @@ export const DatabasePage: React.FC = () => {
   const [createDialog, setCreateDialog] = useState(false);
   const [createType, setCreateType] = useState<CreateType>('entity');
   const [markFalseVisible, setMarkFalseVisible] = useState(false);
-  const [markFalseTarget, setMarkFalseTarget] = useState<{ table: MarkFalseTable; id: number } | null>(null);
+  const [markFalseTarget, setMarkFalseTarget] = useState<{ table: MarkFalseTable; ids: number[] } | null>(null);
   const [deleteVisible, setDeleteVisible] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [dangerVisible, setDangerVisible] = useState(false);
@@ -268,9 +268,16 @@ export const DatabasePage: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const openMarkFalseDialog = (target: { table: MarkFalseTable; id: number }) => {
+  const openMarkFalseDialog = (target: { table: MarkFalseTable; ids: number[] }) => {
     setMarkFalseTarget(target);
     setMarkFalseVisible(true);
+  };
+
+  const handleMarkFalseBatch = (
+    table: 'entities' | 'relations' | 'observations',
+    ids: number[]
+  ) => {
+    openMarkFalseDialog({ table, ids });
   };
 
   const handleStartEdit = () => {
@@ -341,7 +348,7 @@ export const DatabasePage: React.FC = () => {
               onClick={() =>
                 openMarkFalseDialog({
                   table: current.type === 'entity' ? 'entities' : current.type === 'relation' ? 'relations' : 'observations',
-                  id: current.id,
+                  ids: [current.id],
                 })
               }
             />
@@ -437,6 +444,7 @@ export const DatabasePage: React.FC = () => {
         onCreate={(type) => { setCreateType(type); setCreateDialog(true); }}
         onOpenDangerZone={() => setDangerVisible(true)}
         onOpenBackup={() => setBackupVisible(true)}                        // ← новое
+        onMarkFalseBatch={handleMarkFalseBatch}
         searchActive={searchActive}
       />
 

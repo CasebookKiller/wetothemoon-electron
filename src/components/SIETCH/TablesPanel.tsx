@@ -1,6 +1,6 @@
 // src/components/SIETCH/TablesPanel.tsx
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Panel } from 'primereact/panel';
 import { Button } from 'primereact/button';
 import { TabView, TabPanel } from 'primereact/tabview';
@@ -37,6 +37,10 @@ export interface TablesPanelProps {
   onOpenBackup: () => void;    // ← новое
 
   searchActive: boolean;
+
+  /** Batch-пометка как false. Приходит из родителя; открывает
+   *  MarkFalseDialog с массивом ids. */
+  onMarkFalseBatch: (table: 'entities' | 'relations' | 'observations', ids: number[]) => void;
 }
 
 const FILTER_LABELS: Record<ActiveFilter['type'], string> = {
@@ -60,7 +64,13 @@ export const TablesPanel: React.FC<TablesPanelProps> = ({
   onOpenDangerZone,
   onOpenBackup,               // ← новое
   searchActive,
+  onMarkFalseBatch,
 }) => {
+  // Выделение для batch-операций — отдельно по каждой таблице
+  const [selectedEntities, setSelectedEntities] = useState<any[]>([]);
+  const [selectedRelations, setSelectedRelations] = useState<any[]>([]);
+  const [selectedObservations, setSelectedObservations] = useState<any[]>([]);
+
   const exportMenuRef = React.useRef<Menu>(null);
 
   const exportItems: MenuItem[] = [
@@ -133,6 +143,37 @@ export const TablesPanel: React.FC<TablesPanelProps> = ({
       },
     },
   ];
+
+  const renderSelectionToolbar = (
+    selected: any[],
+    clear: () => void,
+    table: 'entities' | 'relations' | 'observations'
+  ) => {
+    if (selected.length === 0) return null;
+    return (
+      <div
+        className="flex align-items-center gap-2 mb-2 p-2 border-round"
+        style={{
+          background: 'var(--tg-theme-secondary-bg-color)',
+          border: '1px solid var(--tg-theme-hint-color)',
+        }}
+      >
+        <span className="text-sm">Выбрано: <b>{selected.length}</b></span>
+        <Button
+          label="Пометить как false"
+          icon="pi pi-exclamation-triangle"
+          className="osint-destructive-soft p-button-sm"
+          onClick={() => onMarkFalseBatch(table, selected.map((r) => r.id))}
+        />
+        <Button
+          label="Снять выделение"
+          icon="pi pi-times"
+          className="osint-soft p-button-sm"
+          onClick={clear}
+        />
+      </div>
+    );
+  };
 
   return (
     <Panel 
@@ -208,10 +249,13 @@ export const TablesPanel: React.FC<TablesPanelProps> = ({
               onClick={() => onCreate('entity')}
             />
           </div>
+          {renderSelectionToolbar(selectedEntities, () => setSelectedEntities([]), 'entities')}
           <EntitiesTable
             value={filteredEntities}
             onRowClick={(row) => onRowClick('entity', row.id)}
             emptyMessage={searchActive ? 'Ничего не найдено' : 'Нет данных'}
+            selection={selectedEntities}
+            onSelectionChange={setSelectedEntities}
           />
         </TabPanel>
 
@@ -224,9 +268,12 @@ export const TablesPanel: React.FC<TablesPanelProps> = ({
               onClick={() => onCreate('relation')}
             />
           </div>
+          {renderSelectionToolbar(selectedRelations, () => setSelectedRelations([]), 'relations')}
           <RelationsTable
             value={filteredRelations}
             onRowClick={(row) => onRowClick('relation', row.id)}
+            selection={selectedRelations}
+            onSelectionChange={setSelectedRelations}
           />
         </TabPanel>
 
@@ -239,9 +286,12 @@ export const TablesPanel: React.FC<TablesPanelProps> = ({
               onClick={() => onCreate('observation')}
             />
           </div>
+          {renderSelectionToolbar(selectedObservations, () => setSelectedObservations([]), 'observations')}
           <ObservationsTable
             value={filteredObservations}
             onRowClick={(row) => onRowClick('observation', row.id)}
+            selection={selectedObservations}
+            onSelectionChange={setSelectedObservations}
           />
         </TabPanel>
 

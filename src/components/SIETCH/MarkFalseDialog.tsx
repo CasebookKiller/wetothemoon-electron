@@ -1,4 +1,4 @@
-// src/components/SIETCH/DatabasePage/MarkFalseDialog.tsx
+// src/components/SIETCH/MarkFalseDialog.tsx
 
 import React, { useEffect, useState } from 'react';
 import { Dialog } from 'primereact/dialog';
@@ -9,7 +9,8 @@ export type MarkFalseTable = 'entities' | 'relations' | 'observations';
 
 export interface MarkFalseDialogProps {
   visible: boolean;
-  target: { table: MarkFalseTable; id: number } | null;
+  /** Одна или несколько записей. Если ids.length > 1 — batch-режим. */
+  target: { table: MarkFalseTable; ids: number[] } | null;
   onHide: () => void;
   onSuccess?: () => void | Promise<void>;
 }
@@ -33,24 +34,40 @@ export const MarkFalseDialog: React.FC<MarkFalseDialogProps> = ({
   }, [visible]);
 
   const submit = async () => {
-    if (!target) return;
+    if (!target || !target.ids.length) return;
     if (!reason.trim()) {
       setMessage('Укажите причину');
       return;
     }
     setLoading(true);
     setMessage('');
+
     try {
-      const res = await api.markFalse(target.table, target.id, reason.trim());
-      if (res.success) {
-        setMessage('Запись помечена как ложная');
-        if (onSuccess) await onSuccess();
-        setTimeout(onHide, 800);
+      if (target.ids.length === 1) {
+        // одиночный режим — тот же старый канал
+        const res = await api.markFalse(target.table, target.ids[0], reason.trim());
+        if (res.success) {
+          setMessage('Запись помечена как ложная');
+          if (onSuccess) await onSuccess();
+          setTimeout(onHide, 800);
+        } else {
+          setMessage(`Ошибка: ${res.error}`);
+        }
       } else {
-        setMessage(`Ошибка: ${res.error}`);
+        // batch
+        const res = await api.markFalseBatch(target.table, target.ids, reason.trim());
+        if (res.success) {
+          const parts = [`Помечено: ${res.updated}`];
+          if (res.failed > 0) parts.push(`не удалось: ${res.failed}`);
+          setMessage(parts.join(', '));
+          if (onSuccess) await onSuccess();
+          setTimeout(onHide, 1200);
+        } else {
+          setMessage(`Ошибка: ${res.error || 'неизвестная'}`);
+        }
       }
     } catch (e) {
-      setMessage((e as Error).message);
+      setMessage(`Ошибка: ${(e as Error).message}`);
     } finally {
       setLoading(false);
     }
@@ -62,13 +79,20 @@ export const MarkFalseDialog: React.FC<MarkFalseDialogProps> = ({
     : target?.table === 'observations' ? 'наблюдение'
     : 'запись';
 
+  const count = target?.ids.length ?? 0;
+  const isBatch = count > 1;
+
+  const headerText = isBatch
+    ? `Пометить ${count} ${label === 'сущность' ? 'сущностей' : label === 'связь' ? 'связей' : 'наблюдений'} как ложные`
+    : `Пометить ${label} как ложную`;
+
   return (
     <Dialog
       visible={visible}
       style={{ width: '500px' }}
       modal
       onHide={onHide}
-      header={<span className="p-panel-title">Пометить {label} как ложную</span>}
+      header={<span className="p-panel-title">{headerText}</span>}
       footer={
         <div className="p-panel-footer flex justify-content-end gap-2">
           <Button
@@ -79,7 +103,7 @@ export const MarkFalseDialog: React.FC<MarkFalseDialogProps> = ({
             disabled={loading}
           />
           <Button
-            label={loading ? 'Отправка...' : 'Пометить'}
+            label={loading ? 'Отправка...' : isBatch ? `Пометить ${count}` : 'Пометить'}
             icon={loading ? 'pi pi-spin pi-spinner' : 'pi pi-check'}
             className="osint-destructive"
             onClick={submit}
@@ -90,8 +114,18 @@ export const MarkFalseDialog: React.FC<MarkFalseDialogProps> = ({
     >
       <div className="p-fluid">
         <p className="text-sm text-500">
-          Запись <b>#{target?.id}</b> будет помечена как <code>false</code>.
-          Причина сохранится в поле <code>notes</code> и в журнале изменений.
+          {isBatch ? (
+            <>
+              {count} {label === 'сущность' ? 'сущностей' : label === 'связь' ? 'связей' : 'наблюдений'} будут помечены как{' '}
+              <code>false</code>. Причина сохранится в <code>notes</code> каждой записи
+              и в журнале изменений.
+            </>
+          ) : (
+            <>
+              Запись <b>#{target?.ids[0]}</b> будет помечена как <code>false</code>.
+              Причина сохранится в поле <code>notes</code> и в журнале изменений.
+            </>
+          )}
         </p>
         <div className="field mt-3">
           <label htmlFor="markFalseReason" className="font-bold">Причина *</label>
