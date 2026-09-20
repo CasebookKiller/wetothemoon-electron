@@ -29,6 +29,9 @@ const entityTypeOptions: DropdownOption[] = [
   { label: 'IP', value: 'ip' },
   { label: 'Адрес', value: 'address' },
   { label: 'Документ', value: 'document' },
+  { label: 'Суд', value: 'court' },
+  { label: 'Судебное дело', value: 'court_case' },
+  { label: 'Судья', value: 'judge' },
   { label: 'Прочее', value: 'other' },
 ];
 
@@ -37,6 +40,7 @@ const statusOptions: DropdownOption[] = [
   { label: 'hypothesis', value: 'hypothesis' },
   { label: 'confirmed', value: 'confirmed' },
   { label: 'archived', value: 'archived' },
+  { label: 'false', value: 'false' },
 ];
 
 const predicateOptions: DropdownOption[] = [
@@ -51,6 +55,12 @@ const predicateOptions: DropdownOption[] = [
   { label: 'mentions', value: 'mentions' },
   { label: 'resolves_to', value: 'resolves_to' },
   { label: 'individual_entrepreneur_of', value: 'individual_entrepreneur_of' },
+  { label: 'plaintiff_in', value: 'plaintiff_in' },
+  { label: 'defendant_in', value: 'defendant_in' },
+  { label: 'third_party_in', value: 'third_party_in' },
+  { label: 'judge_of', value: 'judge_of' },
+  { label: 'heard_by', value: 'heard_by' },
+  { label: 'related_to', value: 'related_to' },
 ];
 
 const sourceTypeOptions: DropdownOption[] = [
