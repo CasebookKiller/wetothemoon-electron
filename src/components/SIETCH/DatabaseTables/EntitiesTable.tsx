@@ -44,7 +44,7 @@ export interface EntitiesTableProps {
 
   /** Дополнительный CSS-класс контейнера */
   className?: string;
-  
+
   /** Мульти-выбор (batch-операции). Если передан onSelectionChange —
    *  в таблице появляется колонка с чекбоксами. */
   selection?: EntityRow[];
@@ -100,7 +100,7 @@ export const EntitiesTable: React.FC<EntitiesTableProps> = ({
 
   const multiSelect = !!onSelectionChange;
   const effectiveSelectionMode = multiSelect
-    ? 'multiple'
+    ? 'checkbox'
     : (onRowClick ? 'single' : undefined);
 
   return (

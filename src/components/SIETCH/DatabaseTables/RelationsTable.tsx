@@ -170,7 +170,7 @@ export const RelationsTable: React.FC<RelationsTableProps> = ({
 
   const multiSelect = !!onSelectionChange;
   const effectiveSelectionMode = multiSelect
-    ? 'multiple'
+    ? 'checkbox'
     : (onRowClick ? 'single' : undefined);
 
   return (

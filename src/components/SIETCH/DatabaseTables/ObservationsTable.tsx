@@ -176,7 +176,7 @@ export const ObservationsTable: React.FC<ObservationsTableProps> = ({
 
   const multiSelect = !!onSelectionChange;
   const effectiveSelectionMode = multiSelect
-    ? 'multiple'
+    ? 'checkbox'
     : (onRowClick ? 'single' : undefined);
 
   return (
@@ -205,7 +205,7 @@ export const ObservationsTable: React.FC<ObservationsTableProps> = ({
       {multiSelect && (
         <Column selectionMode="multiple" headerStyle={{ width: '3rem' }} />
       )}
-      
+
       <Column field="id" header="ID" sortable style={{ width: '4rem' }} />
 
       {showEntity && (
