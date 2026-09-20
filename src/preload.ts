@@ -513,6 +513,15 @@ try {
     sensitiveReveal: (id: number) =>
       ipcRenderer.invoke('osint:sensitive-reveal', id),
 
+    sensitiveUpdate: (input: {
+      id: number;
+      field_value?: string | null;
+      legal_basis?: string | null;
+      retention_until?: string | null;
+      notes?: string | null;
+    }) =>
+      ipcRenderer.invoke('osint:sensitive-update', input),
+
     sensitiveDelete: (id: number) =>
       ipcRenderer.invoke('osint:sensitive-delete', id),
 

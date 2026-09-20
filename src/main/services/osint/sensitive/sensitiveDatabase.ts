@@ -417,3 +417,94 @@ export function resetSensitiveVault(): { success: boolean; error?: string } {
     return { success: false, error: (e as Error).message };
   }
 }
+
+export interface SensitiveUpdateInput {
+  id: number;
+  /** Если задано — перешифровываем значение с НОВОЙ IV.
+   *  undefined или null — поле не трогаем. */
+  field_value?: string | null;
+  /** Метаданные. undefined — не трогаем, null — обнуляем. */
+  legal_basis?: string | null;
+  retention_until?: string | null;
+  notes?: string | null;
+}
+
+/**
+ * Обновляет sensitive-запись. Если передано field_value — перешифровывает
+ * значение с новой IV (это критично для AES-GCM: повторное использование
+ * IV с тем же ключом ломает безопасность). Метаданные (legal_basis,
+ * retention_until, notes) обновляются отдельно.
+ *
+ * field_name и entity_id намеренно нельзя менять: смена семантики
+ * записи — это delete + add, а не update.
+ */
+export function updateSensitiveRecord(input: SensitiveUpdateInput): {
+  success: boolean;
+  error?: string;
+} {
+  if (!isUnlocked()) return { success: false, error: 'Хранилище заблокировано' };
+  if (!input.id) return { success: false, error: 'Не указан id записи' };
+
+  const db = getSensitiveDatabase();
+  const current = db.prepare(`
+    SELECT id, entity_id, field_name, iv, ciphertext, auth_tag,
+           legal_basis, retention_until, notes
+    FROM sensitive_data
+    WHERE id = ?
+  `).get(input.id) as any;
+
+  if (!current) {
+    return { success: false, error: `Запись #${input.id} не найдена` };
+  }
+
+  const newLegalBasis =
+    input.legal_basis !== undefined
+      ? (input.legal_basis || '').trim()
+      : current.legal_basis;
+  if (!newLegalBasis) {
+    return { success: false, error: 'Основание хранения не может быть пустым' };
+  }
+
+  const newRetentionUntil =
+    input.retention_until !== undefined
+      ? (input.retention_until || null)
+      : current.retention_until;
+
+  const newNotes =
+    input.notes !== undefined ? (input.notes || null) : current.notes;
+
+  try {
+    // Если передано новое значение — перешифровываем (с новой IV)
+    if (input.field_value !== undefined && input.field_value !== null) {
+      const trimmed = input.field_value.trim();
+      if (!trimmed) {
+        return { success: false, error: 'Значение не может быть пустым' };
+      }
+      const blob = encryptCurrent(trimmed);
+      db.prepare(`
+        UPDATE sensitive_data
+        SET iv = ?, ciphertext = ?, auth_tag = ?,
+            legal_basis = ?, retention_until = ?, notes = ?
+        WHERE id = ?
+      `).run(
+        blob.iv,
+        blob.ct,
+        blob.tag,
+        newLegalBasis,
+        newRetentionUntil,
+        newNotes,
+        input.id
+      );
+    } else {
+      // Меняем только метаданные, ciphertext/iv/auth_tag не трогаем
+      db.prepare(`
+        UPDATE sensitive_data
+        SET legal_basis = ?, retention_until = ?, notes = ?
+        WHERE id = ?
+      `).run(newLegalBasis, newRetentionUntil, newNotes, input.id);
+    }
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: (e as Error).message };
+  }
+}

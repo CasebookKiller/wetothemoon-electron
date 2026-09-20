@@ -54,6 +54,7 @@ import {
   deleteSensitiveRecord,
   listSensitiveFieldNames,
   resetSensitiveVault,
+  updateSensitiveRecord,
 } from '../services/osint/sensitive/sensitiveDatabase';
 
 import {
@@ -731,6 +732,14 @@ export function registerOsintHandlers() {
       const win = BrowserWindow.fromWebContents(event.sender);
       const res = await restoreFromBackup(win);
       return res;
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('osint:sensitive-update', async (_event, input: any) => {
+    try {
+      return updateSensitiveRecord(input);
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }

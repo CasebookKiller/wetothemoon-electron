@@ -10,7 +10,7 @@ import { DataTable } from 'primereact/datatable';
 import { Column } from 'primereact/column';
 import { Checkbox } from 'primereact/checkbox';
 import { Tag } from 'primereact/tag';
-
+import { SensitiveEditDialog } from './SensitiveEditDialog';
 
 export interface SensitiveVaultDialogProps {
   visible: boolean;
@@ -86,6 +86,9 @@ export const SensitiveVaultDialog: React.FC<SensitiveVaultDialogProps> = ({
   const [resetConfirmVisible, setResetConfirmVisible] = useState(false);
   const [resetConfirmText, setResetConfirmText] = useState('');
   const [resetBusy, setResetBusy] = useState(false);
+
+  // Редактирование sensitive-записи
+  const [editTarget, setEditTarget] = useState<SensitiveRecordMeta | null>(null);
 
   // ============ Инициализация ============
   useEffect(() => {
@@ -761,6 +764,28 @@ export const SensitiveVaultDialog: React.FC<SensitiveVaultDialogProps> = ({
           scrollable
           scrollHeight="300px"
         >
+          <Column
+            header=""
+            style={{ width: '6rem' }}
+            body={(r: SensitiveRecordMeta) => (
+              <div className="flex gap-1">
+                <Button
+                  icon="pi pi-pencil"
+                  className="osint-soft p-button-sm"
+                  tooltip="Редактировать"
+                  tooltipOptions={{ position: 'left' }}
+                  onClick={() => setEditTarget(r)}
+                />
+                <Button
+                  icon="pi pi-trash"
+                  className="osint-destructive-soft p-button-sm"
+                  tooltip="Удалить"
+                  tooltipOptions={{ position: 'left' }}
+                  onClick={() => handleDelete(r.id)}
+                />
+              </div>
+            )}
+          />
           <Column field="id" header="ID" style={{ width: '4rem' }} />
           <Column field="field_name" header="Поле" style={{ width: '12rem' }} />
           <Column header="Значение" body={renderValue} style={{ minWidth: '14rem' }} />
@@ -777,7 +802,7 @@ export const SensitiveVaultDialog: React.FC<SensitiveVaultDialogProps> = ({
             body={(r: SensitiveRecordMeta) => r.retention_until || '—'}
             style={{ width: '8rem' }}
           />
-          <Column
+          {/*<Column
             header=""
             style={{ width: '4rem' }}
             body={(r: SensitiveRecordMeta) => (
@@ -788,7 +813,7 @@ export const SensitiveVaultDialog: React.FC<SensitiveVaultDialogProps> = ({
                 tooltip="Удалить"
               />
             )}
-          />
+          />*/}
         </DataTable>
 
         {message && <p className="p-error mt-2">{message}</p>}
@@ -880,6 +905,14 @@ export const SensitiveVaultDialog: React.FC<SensitiveVaultDialogProps> = ({
           {message && <p className="p-error mt-2">{message}</p>}
         </div>
       </Dialog>
+      <SensitiveEditDialog
+        visible={!!editTarget}
+        record={editTarget}
+        onHide={() => setEditTarget(null)}
+        onSuccess={async () => {
+          await loadRecords();
+        }}
+      />
     </Dialog>
   );
 };
