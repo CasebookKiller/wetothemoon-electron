@@ -11,11 +11,18 @@ import type {
 const SEARCH_URL = '/Kad/SearchInstances';
 const DEFAULT_PAGE_SIZE = 25;
 
+// Kad.arbitr жёстко банит за частые запросы (429).
+// Ограничиваем 1 запрос/сек и делаем автоматический ретрай.
+const RATE_PER_SECOND = 1;
+const RATE_DELAY_MS = Math.max(0, Math.floor(1000 / RATE_PER_SECOND));
+const MAX_RETRIES_ON_429 = 2;
+const RETRY_DELAY_ON_429_MS = 60_000;   // 60 секунд пауза после 429
+
 /**
  * Публичная точка входа: собрать список дел по ИНН.
  *
  * Итерируется по страницам, на каждой делает POST /Kad/SearchInstances
- * и парсит HTML-ответ внутри браузерного контекста.
+ * и парсит HTML-ответ.
  */
 export async function searchCases(
   page: Page,
@@ -26,7 +33,6 @@ export async function searchCases(
   const maxTotalCases = options.maxTotalCases ?? 500;
   const roles = options.roles && options.roles.length > 0 ? options.roles : ['any'];
 
-  // В MVP поддерживаем одну роль за раз (как в UI kad.arbitr — один тег).
   const primaryRole = roles[0];
   const sideType = roleToType(primaryRole);
 
@@ -66,6 +72,11 @@ export async function searchCases(
     pageNum++;
 
     if (pageNum > pagesCount) break;
+    if (pageNum > maxPages) break;
+
+    // Пауза между страницами, чтобы не словить 429
+    console.log(`[kad-search] Пауза ${RATE_DELAY_MS}мс перед страницей ${pageNum}...`);
+    await new Promise((r) => setTimeout(r, RATE_DELAY_MS));
   }
 
   return {
@@ -113,33 +124,93 @@ interface PageResult {
 }
 
 /**
- * Один POST на /Kad/SearchInstances. Всё парсится внутри браузера,
- * наружу уходят уже готовые объекты.
+ * Один POST на /Kad/SearchInstances.
+ * При 429 — до MAX_RETRIES_ON_429 повторных попыток с паузой.
  */
 async function searchOnePage(
   page: Page,
   payload: KadArbitrSearchPayload
 ): Promise<PageResult> {
-  return page.evaluate(
-    async ({ url, body }: { url: string; body: KadArbitrSearchPayload }) => {
-      const res = await fetch(url, {
-        method: 'POST',
+  // Убеждаемся, что мы на kad.arbitr.ru
+  if (!page.url().startsWith('https://kad.arbitr.ru')) {
+    await page.goto('https://kad.arbitr.ru/', {
+      waitUntil: 'domcontentloaded',
+      timeout: 60000,
+    });
+  }
+
+  let attempt = 0;
+  let lastStatus = 0;
+
+  while (attempt <= MAX_RETRIES_ON_429) {
+    attempt++;
+
+    const response = await page.request.post(
+      'https://kad.arbitr.ru/Kad/SearchInstances',
+      {
         headers: {
           'Content-Type': 'application/json',
           'X-Requested-With': 'XMLHttpRequest',
           'x-date-format': 'iso',
+          'Origin': 'https://kad.arbitr.ru',
+          'Referer': 'https://kad.arbitr.ru/',
+          'Accept': '*/*',
         },
-        credentials: 'include',
-        body: JSON.stringify(body),
-      });
-
-      if (!res.ok) {
-        throw new Error(`SearchInstances вернул ${res.status}`);
+        data: payload,
+        timeout: 60000,
       }
+    );
 
-      const html = await res.text();
+    const status = response.status();
+    lastStatus = status;
 
-      // === Метаданные пагинации — проще через regexp, чем через DOM ===
+    if (status === 200) {
+      const html = await response.text();
+      return parseSearchResponse(page, html);
+    }
+
+    if (status === 429) {
+      if (attempt <= MAX_RETRIES_ON_429) {
+        console.warn(
+          `[kad-search] 429 Too Many Requests (попытка ${attempt}/${MAX_RETRIES_ON_429 + 1}). ` +
+          `Пауза ${RETRY_DELAY_ON_429_MS / 1000}с...`
+        );
+        await new Promise((r) => setTimeout(r, RETRY_DELAY_ON_429_MS));
+        continue;
+      }
+      throw new Error(
+        `Слишком много запросов к kad.arbitr (429). ` +
+        `Подождите 10–15 минут и попробуйте снова. ` +
+        `Рекомендуется уменьшить «Макс. страниц» в диалоге.`
+      );
+    }
+
+    if (status === 403) {
+      throw new Error(
+        `403 Доступ запрещён. Проверьте, что вы авторизованы на kad.arbitr.ru ` +
+        `и что прошла капча Pravocaptcha (кука rcid). ` +
+        `Попробуйте F5 в браузере, затем повторите.`
+      );
+    }
+
+    if (status !== 200) {
+      throw new Error(
+        `SearchInstances вернул ${status} ${response.statusText()}`
+      );
+    }
+  }
+
+  throw new Error(`SearchInstances: не удалось получить 200 (последний статус ${lastStatus})`);
+}
+
+/**
+ * Парсит HTML-ответ от SearchInstances через page.evaluate.
+ * Сетевых запросов не делает — только DOM-парсинг.
+ */
+async function parseSearchResponse(page: Page, html: string): Promise<PageResult> {
+  return page.evaluate(
+    ({ html }: { html: string }) => {
+      // === Метаданные ===
       const extractHidden = (id: string): string | null => {
         const re = new RegExp(`id=["']${id}["'][^>]*value=["']([^"']*)["']`);
         const m = html.match(re);
@@ -153,8 +224,7 @@ async function searchOnePage(
         pageSize: parseInt(extractHidden('documentsPageSize') || '25', 10) || 25,
       };
 
-      // === Строки — через настоящий DOM ===
-      // Оборачиваем в <table>, чтобы <tr>/<colgroup> корректно распарсились.
+      // === Парсинг строк ===
       const wrapper = document.createElement('table');
       wrapper.innerHTML = html;
 
@@ -174,14 +244,18 @@ async function searchOnePage(
         return m ? `${m[3]}-${m[2]}-${m[1]}` : '';
       };
 
-      const detectCaseType = (cls: string): 'civil' | 'administrative' | 'bankruptcy' | 'other' => {
+      const detectCaseType = (
+        cls: string
+      ): 'civil' | 'administrative' | 'bankruptcy' | 'other' => {
         if (cls.includes('bankruptcy')) return 'bankruptcy';
         if (cls.includes('administrative')) return 'administrative';
         if (cls.includes('civil')) return 'civil';
         return 'other';
       };
 
-      const detectCounterpartyType = (name: string): 'company' | 'person' | 'unknown' => {
+      const detectCounterpartyType = (
+        name: string
+      ): 'company' | 'person' | 'unknown' => {
         if (!name) return 'unknown';
         const upper = name.toUpperCase();
         if (/^ИП\s/.test(upper)) return 'person';
@@ -216,7 +290,6 @@ async function searchOnePage(
         const rollovers = td.querySelectorAll('.js-rollover');
 
         for (const roll of Array.from(rollovers)) {
-          // Пропускаем ссылку «Подробнее...»
           if (roll.querySelector('a.num_case')) continue;
 
           const htmlSpan = roll.querySelector('.js-rolloverHtml');
@@ -258,7 +331,7 @@ async function searchOnePage(
       };
 
       const rows = wrapper.querySelectorAll('tr');
-      const cases: KadArbitrCase[] = [];
+      const cases: any[] = [];
 
       for (const tr of Array.from(rows)) {
         const numTd = tr.querySelector('td.num');
@@ -286,8 +359,10 @@ async function searchOnePage(
           undefined;
 
         const courtDivs = courtTd.querySelectorAll('div[title]:not(.judge)');
-        const court = (courtDivs[0]?.textContent?.trim() ||
-          courtDivs[0]?.getAttribute('title')?.trim()) as string | undefined;
+        const court =
+          courtDivs[0]?.textContent?.trim() ||
+          courtDivs[0]?.getAttribute('title')?.trim() ||
+          '';
 
         const plaintiffs = parseParticipants(plaintiffTd);
         const respondents = parseParticipants(respondentTd);
@@ -297,7 +372,7 @@ async function searchOnePage(
           case_uuid: caseUuid,
           case_type: caseType,
           filing_date: filingDate,
-          court: court || '',
+          court,
           judge,
           plaintiffs: plaintiffs.items,
           respondents: respondents.items,
@@ -308,6 +383,6 @@ async function searchOnePage(
 
       return { cases, meta };
     },
-    { url: SEARCH_URL, body: payload }
+    { html }
   );
 }

@@ -381,8 +381,24 @@ try {
     deleteJudge: (judgeId: number) =>
       ipcRenderer.invoke('osint:judges-delete', judgeId),
 
+    // kad.arbitr — сбор дел по ИНН
+    fetchKadArbitrCases: (inn: string, options?: {
+      maxPages?: number;
+      maxTotalCases?: number;
+      roles?: string[];
+      dateFrom?: string | null;
+      dateTo?: string | null;
+    }) => ipcRenderer.invoke('osint:kad-arbitr-fetch', inn, options),
+
+    onKadArbitrProgress: (callback: (info: any) => void) => {
+      ipcRenderer.on('osint:kad-arbitr-progress', (_, info) => callback(info));
+    },
+
+    removeKadArbitrProgressListener: () =>
+      ipcRenderer.removeAllListeners('osint:kad-arbitr-progress'),
+
     ////
-    
+
     scrapeMosGorsud: (inn: string) => ipcRenderer.invoke('osint:scrape-mos-gorsud', inn),
 
     saveOsintCredentials: (site: string, login: string, password: string) =>

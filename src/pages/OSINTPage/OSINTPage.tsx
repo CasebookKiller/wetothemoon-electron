@@ -14,6 +14,7 @@ import { TAB_TO_SECTION } from '@/main/services/osint/scrapers/rusprofile/sectio
 
 import { JudgesCollectionDialog } from '@/components/SIETCH/JudgesCollectionDialog';
 import { JudgesDirectoryDialog } from '@/components/SIETCH/JudgesDirectoryDialog';
+import { KadArbitrDialog } from '@/components/SIETCH/KadArbitrDialog';
 
 export const OSINTPage: React.FC = () => {
   const [inn, setInn] = useState<string>(() => {
@@ -187,6 +188,8 @@ export const OSINTPage: React.FC = () => {
   const [judgesDialogVisible, setJudgesDialogVisible] = useState(false);
 
   const [judgesDirectoryVisible, setJudgesDirectoryVisible] = useState(false);
+
+  const [kadArbitrDialogVisible, setKadArbitrDialogVisible] = useState(false);
 
   const api = (window as any).electronAPI;
 
@@ -1571,20 +1574,23 @@ export const OSINTPage: React.FC = () => {
                 className="p-button-lg p-button-raised p-button-accent"
                 onClick={() => setJudgesDialogVisible(true)}
               />
+              <Button
+                label="Показать справочник"
+                icon="pi pi-list"
+                className="p-button-lg p-button-raised p-button-outlined p-button-accent"
+                onClick={() => setJudgesDirectoryVisible(true)}
+              />
             </div>
-            <Button
-              label="Показать справочник"
-              icon="pi pi-list"
-              className="p-button-lg p-button-raised p-button-outlined p-button-accent"
-              onClick={() => setJudgesDirectoryVisible(true)}
-            />
+
             <div className="flex align-items-center gap-2">
               <Button
                 label="kad.arbitr.ru"
                 icon="pi pi-external-link"
                 className="p-button-lg p-button-raised p-button-accent"
-                onClick={() => { /* дела kad.arbitr — следующим этапом */ }}
-                disabled
+                onClick={() => setKadArbitrDialogVisible(true)}
+                disabled={!inn.trim()}
+                tooltip={!inn.trim() ? 'Сначала введите ИНН в форме выше' : undefined}
+                tooltipOptions={{ position: 'top' }}
               />
               <Button
                 label="mos-gorsud.ru"
@@ -1607,6 +1613,17 @@ export const OSINTPage: React.FC = () => {
         visible={judgesDirectoryVisible}
         onHide={() => setJudgesDirectoryVisible(false)}
       />
+
+      <KadArbitrDialog
+        visible={kadArbitrDialogVisible}
+        inn={inn}
+        onHide={() => setKadArbitrDialogVisible(false)}
+        onSaved={() => {
+          // можно обновить список дампов или что-то ещё
+          console.log('[kad.arbitr] данные сохранены для', inn);
+        }}
+      />
+      
     </React.Fragment>
   );
 };

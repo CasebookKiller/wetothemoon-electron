@@ -43,7 +43,6 @@ export const JudgesDirectoryDialog: React.FC<JudgesDirectoryDialogProps> = ({
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const [search, setSearch] = useState('');
   const [courtTag, setCourtTag] = useState<string | null>(null);
@@ -53,6 +52,7 @@ export const JudgesDirectoryDialog: React.FC<JudgesDirectoryDialogProps> = ({
 
   const [page, setPage] = useState(0);
   const [first, setFirst] = useState(0);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const debounceRef = useRef<any>(null);
 
@@ -98,7 +98,6 @@ export const JudgesDirectoryDialog: React.FC<JudgesDirectoryDialogProps> = ({
     }
   };
 
-  // При открытии — сброс и загрузка
   useEffect(() => {
     if (!visible) return;
     setSearch('');
@@ -110,7 +109,6 @@ export const JudgesDirectoryDialog: React.FC<JudgesDirectoryDialogProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
-  // Debounce поиска
   useEffect(() => {
     if (!visible) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -125,7 +123,6 @@ export const JudgesDirectoryDialog: React.FC<JudgesDirectoryDialogProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
 
-  // Смена суда — сразу загрузка
   useEffect(() => {
     if (!visible) return;
     setPage(0);
@@ -146,6 +143,22 @@ export const JudgesDirectoryDialog: React.FC<JudgesDirectoryDialogProps> = ({
     load({ search, courtTag, offset: page * PAGE_SIZE });
   };
 
+  const resetFilters = () => {
+    setSearch('');
+    setCourtTag(null);
+    setPage(0);
+    setFirst(0);
+    load({ search: '', courtTag: null, offset: 0 });
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      setPage(0);
+      setFirst(0);
+      load({ search, courtTag, offset: 0 });
+    }
+  };
+
   const handleDelete = async (row: JudgeRow, e: React.MouseEvent) => {
     e.stopPropagation();
     const confirmed = window.confirm(
@@ -160,7 +173,6 @@ export const JudgesDirectoryDialog: React.FC<JudgesDirectoryDialogProps> = ({
     try {
       const res = await api.deleteJudge(row.id);
       if (res.success) {
-        // Обновить список
         await load({ search, courtTag, offset: page * PAGE_SIZE });
       } else {
         setError(res.error || 'Ошибка удаления');
@@ -174,6 +186,8 @@ export const JudgesDirectoryDialog: React.FC<JudgesDirectoryDialogProps> = ({
 
   const formatDate = (iso: string | null) =>
     iso ? new Date(iso).toLocaleString() : '—';
+
+  const filtersActive = !!search || !!courtTag;
 
   return (
     <Dialog
@@ -201,20 +215,22 @@ export const JudgesDirectoryDialog: React.FC<JudgesDirectoryDialogProps> = ({
       }
     >
       <div className="flex flex-column gap-2">
-        {/* Фильтры */}
-        <div className="flex flex-wrap align-items-center gap-2 mb-2">
-          <div style={{ minWidth: '280px', flex: 1 }}>
-            <span className="p-input-icon-left w-full">
+        {/* Панель фильтров в стиле SearchPanel */}
+        <div className="flex flex-wrap align-items-center gap-2 audit-log-filters">
+          <div style={{ minWidth: '240px', flex: 1 }}>
+            <span className="p-input-icon-left w-full search-input-with-icon">
               <i className="pi pi-search" />
               <InputText
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Поиск по ФИО..."
+                onKeyDown={handleKeyDown}
+                placeholder="ФИО судьи…"
                 className="w-full"
               />
             </span>
           </div>
-          <div style={{ minWidth: '280px' }}>
+
+          <div style={{ minWidth: '240px' }}>
             <Dropdown
               value={courtTag}
               options={courtOptions}
@@ -224,12 +240,35 @@ export const JudgesDirectoryDialog: React.FC<JudgesDirectoryDialogProps> = ({
               className="w-full"
             />
           </div>
+
+          <Button
+            label={loading ? 'Загрузка...' : 'Найти'}
+            icon={loading ? 'pi pi-spin pi-spinner' : 'pi pi-search'}
+            className="osint p-button-sm"
+            onClick={() => {
+              setPage(0);
+              setFirst(0);
+              load({ search, courtTag, offset: 0 });
+            }}
+            disabled={loading}
+          />
+
+          {filtersActive && (
+            <Button
+              label="Сбросить"
+              icon="pi pi-times"
+              className="osint-soft p-button-sm"
+              onClick={resetFilters}
+            />
+          )}
+
           <Button
             icon="pi pi-refresh"
-            className="osint-soft"
+            className="osint-soft p-button-sm"
             onClick={refresh}
             disabled={loading}
             tooltip="Обновить"
+            tooltipOptions={{ position: 'bottom' }}
           />
         </div>
 

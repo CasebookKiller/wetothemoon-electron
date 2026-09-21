@@ -186,10 +186,10 @@ export const DatabasePage: React.FC = () => {
   const loadData = async () => {
     try {
       const [ent, rel, obs, src] = await Promise.all([
-        api.getEntities(200, 0),
-        api.getRelations(200, 0),
-        api.getObservations(200, 0),
-        api.getSources(200, 0),
+        api.getEntities(5000, 0),      // ← лимит 500
+        api.getRelations(5000, 0),     // ← 500
+        api.getObservations(5000, 0),  // ← 500
+        api.getSources(5000, 0),       // ← 500
       ]);
       setEntities(ent);
       setRelations(rel);

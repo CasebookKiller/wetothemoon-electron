@@ -7,7 +7,43 @@ import {
   getStorageStatePath,
   launchBrowserWithSession,
 } from '../../playwrightService';
+
 import fs from 'fs';
+import path from 'path';
+import { app } from 'electron';
+
+const KAD_COOKIES_FILE = () => path.join(app.getPath('userData'), 'kad_cookies.json');
+
+/**
+ * Сохраняет ВСЕ cookies контекста (включая session — rcid, ASP.NET_SessionId).
+ */
+export async function saveAllKadCookies(page: Page): Promise<void> {
+  try {
+    const cookies = await page.context().cookies();
+    fs.writeFileSync(KAD_COOKIES_FILE(), JSON.stringify(cookies, null, 2), 'utf-8');
+    console.log(`[kad] Сохранено cookies: ${cookies.length}`);
+  } catch (e) {
+    console.warn('[kad] Не удалось сохранить cookies:', e);
+  }
+}
+
+/**
+ * Восстанавливает все cookies после создания контекста.
+ */
+export async function restoreAllKadCookies(page: Page): Promise<void> {
+  try {
+    const file = KAD_COOKIES_FILE();
+    if (!fs.existsSync(file)) {
+      console.log('[kad] Файл cookies не найден, пропускаем восстановление.');
+      return;
+    }
+    const cookies = JSON.parse(fs.readFileSync(file, 'utf-8'));
+    await page.context().addCookies(cookies);
+    console.log(`[kad] Восстановлено cookies: ${cookies.length}`);
+  } catch (e) {
+    console.warn('[kad] Не удалось восстановить cookies:', e);
+  }
+}
 
 const KAD_HOME = 'https://kad.arbitr.ru/';
 const SESSION_SAVE_TIMEOUT_MS = 10 * 60 * 1000; // 10 минут на ручной логин
@@ -26,6 +62,10 @@ export async function ensureKadSession(): Promise<Page> {
   }
 
   // Переходим на главную, если мы не на ней
+  // Восстанавливаем ВСЕ cookies (включая rcid, ASP.NET_SessionId) из своего файла
+  await restoreAllKadCookies(page);
+
+  // Переходим на главную, если мы не на ней
   const currentUrl = page.url();
   if (!currentUrl.includes('kad.arbitr.ru')) {
     await page.goto(KAD_HOME, { waitUntil: 'domcontentloaded', timeout: 60000 });
@@ -34,6 +74,10 @@ export async function ensureKadSession(): Promise<Page> {
   // Проверяем авторизацию
   if (await isKadAuthorized(page)) {
     console.log('[kad] Сессия уже активна.');
+    // Session-куки (rcid) теряются при storageState → нужен F5, чтобы Pravocaptcha переустановила rcid
+    await ensureRcid(page);
+    // Обновляем сохранённые cookies (могли обновиться rcid, __ddg*)
+    await saveAllKadCookies(page);
     return page;
   }
 
@@ -44,7 +88,7 @@ export async function ensureKadSession(): Promise<Page> {
 
   // Ждём, пока пользователь авторизуется
   await waitForManualLogin(page, SESSION_SAVE_TIMEOUT_MS);
-
+  
   // Сохраняем storageState
   try {
     await page.context().storageState({ path: getStorageStatePath('kad') });
@@ -52,6 +96,12 @@ export async function ensureKadSession(): Promise<Page> {
   } catch (e) {
     console.warn('[kad] Не удалось сохранить storageState:', e);
   }
+
+  // После ручного логина rcid может отсутствовать — принудительно получаем
+  await ensureRcid(page);
+
+  // Сохраняем ВСЕ cookies, включая session — при следующем запуске восстановим
+  await saveAllKadCookies(page);
 
   return page;
 }
@@ -97,4 +147,37 @@ export async function clearKadSession(): Promise<void> {
     fs.unlinkSync(p);
     console.log('[kad] Файл сессии удалён.');
   }
+}
+
+/**
+ * Pravocaptcha выдаёт куку rcid только после F5.
+ * При storageState она теряется (session cookie).
+ * Делаем reload, если rcid ещё нет.
+ */
+async function ensureRcid(page: Page): Promise<void> {
+  const hasRcid = async (): Promise<boolean> => {
+    try {
+      const cookies = await page.context().cookies('https://kad.arbitr.ru');
+      return cookies.some((c) => c.name === 'rcid' && c.value.length > 0);
+    } catch {
+      return false;
+    }
+  };
+
+  if (await hasRcid()) {
+    console.log('[kad] rcid уже есть.');
+    return;
+  }
+
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    console.log(`[kad] rcid нет, перезагружаем страницу (попытка ${attempt}/3)...`);
+    await page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 });
+    await page.waitForTimeout(5000);
+
+    if (await hasRcid()) {
+      console.log('[kad] rcid получен.');
+      return;
+    }
+  }
+  console.warn('[kad] rcid так и не появился — возможен 403 на SearchInstances.');
 }
