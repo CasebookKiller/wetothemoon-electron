@@ -8,6 +8,7 @@ import {
   scrapeJudgesDirectory,
   ensureKadSession,
   getJudgesDirectoryStats,
+  searchCases,
 } from '../services/osint/scrapers/kadArbitr';
 import { scrapeMosGorsud } from '../services/osint/scrapers/mosGorsud';
 import { getCredentials, setCredentials } from '../services/osint/credentials';
@@ -15,9 +16,10 @@ import { createDatabaseWindow, getDatabaseWindow } from '../windows/databaseWind
 import { deleteDumpsByEntity, findLatestRawDump, getRelatedIds, searchEntities, searchAll, listJudges,
   listCourts,
   listSaturatedPrefixes,
-  deleteJudge, } from '../services/database';
+  deleteJudge,
+  addSource, } from '../services/database';
 import { deleteAllRawDumps, loadRawDumpSync } from '../services/rawStorage';
-import { mergeCompanyDumps, saveCompanyData, updateCompanyData } from '../services/osintStorage';
+import { mergeCompanyDumps, persistKadArbitrData, saveCompanyData, updateCompanyData } from '../services/osintStorage';
 import { 
   getDatabase,
   getDumpSectionsUpdatedAt,
@@ -134,6 +136,64 @@ export function registerOsintHandlers() {
     };
   });
 
+  ipcMain.handle('osint:kad-arbitr-fetch', async (event, inn: string, options?: {
+    maxPages?: number;
+    maxTotalCases?: number;
+    roles?: Array<'plaintiff' | 'defendant' | 'third_party' | 'any'>;
+    dateFrom?: string | null;
+    dateTo?: string | null;
+  }) => {
+    try {
+      if (!inn || !inn.trim()) {
+        return { success: false, error: 'ИНН не указан' };
+      }
+
+      event.sender.send('osint:kad-arbitr-progress', {
+        stage: 'session',
+        message: 'Проверка сессии kad.arbitr...',
+      });
+      const page = await ensureKadSession();
+
+      event.sender.send('osint:kad-arbitr-progress', {
+        stage: 'search',
+        message: 'Поиск дел...',
+      });
+      const data = await searchCases(page, inn.trim(), options || {});
+
+      if (data.cases.length === 0) {
+        return {
+          success: true,
+          data,
+          stats: { savedEntities: 0, savedRelations: 0, savedObservations: 0, targetEntityId: 0 },
+          empty: true,
+        };
+      }
+
+      event.sender.send('osint:kad-arbitr-progress', {
+        stage: 'persist',
+        message: `Сохранение ${data.cases.length} дел...`,
+      });
+
+      const sourceId = addSource({
+        url: data.source_url,
+        title: `KAD Arbitr — дела по ИНН ${inn}`,
+        source_type: 'court',
+        source_kind: 'official_registry',
+        provider: 'kad.arbitr.ru',
+        collection_method: 'browser',
+        reliability: 90,
+        access_level: 'public',
+        retrieved_at: new Date().toISOString(),
+      });
+
+      const stats = persistKadArbitrData(inn.trim(), data, sourceId);
+
+      return { success: true, data, stats, sourceId };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
   ipcMain.handle('osint:scrape-mos-gorsud', async (_event, inn: string) => {
     try {
       const data = await scrapeMosGorsud(inn);
@@ -170,7 +230,9 @@ export function registerOsintHandlers() {
   ipcMain.handle('osint:get-entities', async (_event, limit = 100, offset = 0) => {
     const db = getDatabase();
     const rows = db.prepare(`
-      SELECT id, type, value, label, confidence, status, first_seen, last_seen
+      SELECT id, type, value, normalized_value, label,
+             confidence, status, first_seen, last_seen,
+             notes, origin, rusprofile_id, raw_file_path
       FROM entities
       ORDER BY id DESC
       LIMIT ? OFFSET ?
@@ -182,11 +244,31 @@ export function registerOsintHandlers() {
   ipcMain.handle('osint:get-relations', async (_event, limit = 100, offset = 0) => {
     const db = getDatabase();
     const rows = db.prepare(`
-      SELECT r.id, s.label AS subject_label, r.predicate, o.label AS object_label,
-            r.confidence, r.status, r.valid_from, r.valid_to
+      SELECT
+        r.id,
+        r.subject_id,
+        s.label AS subject_label,
+        s.type  AS subject_type,
+        s.value AS subject_value,
+        r.predicate,
+        r.object_id,
+        o.label AS object_label,
+        o.type  AS object_type,
+        o.value AS object_value,
+        r.confidence,
+        r.status,
+        r.valid_from,
+        r.valid_to,
+        r.evidence_text,
+        r.notes,
+        r.origin,
+        r.source_id,
+        src.url   AS source_url,
+        src.title AS source_title
       FROM relations r
       JOIN entities s ON s.id = r.subject_id
       JOIN entities o ON o.id = r.object_id
+      LEFT JOIN sources src ON src.id = r.source_id
       ORDER BY r.id DESC
       LIMIT ? OFFSET ?
     `).all(limit, offset);
@@ -197,9 +279,25 @@ export function registerOsintHandlers() {
   ipcMain.handle('osint:get-observations', async (_event, limit = 100, offset = 0) => {
     const db = getDatabase();
     const rows = db.prepare(`
-      SELECT o.id, e.label AS entity_label, o.attribute, o.value, o.observed_at, o.confidence
+      SELECT
+        o.id,
+        o.entity_id,
+        e.label AS entity_label,
+        e.type  AS entity_type,
+        o.attribute,
+        o.value,
+        o.confidence,
+        o.status,
+        o.observed_at,
+        o.notes,
+        o.origin,
+        o.source_id,
+        src.url      AS source_url,
+        src.title    AS source_title,
+        src.provider AS source_provider
       FROM observations o
       JOIN entities e ON e.id = o.entity_id
+      LEFT JOIN sources src ON src.id = o.source_id
       ORDER BY o.id DESC
       LIMIT ? OFFSET ?
     `).all(limit, offset);
@@ -210,7 +308,10 @@ export function registerOsintHandlers() {
   ipcMain.handle('osint:get-sources', async (_event, limit = 100, offset = 0) => {
     const db = getDatabase();
     const rows = db.prepare(`
-      SELECT id, url, title, source_type, source_kind, provider, access_level, retrieved_at
+      SELECT id, url, title, source_type, source_kind, provider,
+             collection_method, authority_basis, reliability,
+             access_level, retrieved_at, local_path, sha256,
+             notes, origin
       FROM sources
       ORDER BY id DESC
       LIMIT ? OFFSET ?
