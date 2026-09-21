@@ -4,11 +4,18 @@ import { BrowserWindow, ipcMain } from 'electron';
 import { createOsintWindow, getOsintWindow } from '@/main/windows/osintWindow';
 import { launchBrowser, closeBrowser } from '../services/osint/playwrightService'; // будет создан позже
 import { scrapeRusprofile } from '../services/osint/scrapers/rusprofile/index';
-import { scrapeKadArbitr } from '../services/osint/scrapers/kadArbitr';
+import {
+  scrapeJudgesDirectory,
+  ensureKadSession,
+  getJudgesDirectoryStats,
+} from '../services/osint/scrapers/kadArbitr';
 import { scrapeMosGorsud } from '../services/osint/scrapers/mosGorsud';
 import { getCredentials, setCredentials } from '../services/osint/credentials';
 import { createDatabaseWindow, getDatabaseWindow } from '../windows/databaseWindow';
-import { deleteDumpsByEntity, findLatestRawDump, getRelatedIds, searchEntities, searchAll } from '../services/database';
+import { deleteDumpsByEntity, findLatestRawDump, getRelatedIds, searchEntities, searchAll, listJudges,
+  listCourts,
+  listSaturatedPrefixes,
+  deleteJudge, } from '../services/database';
 import { deleteAllRawDumps, loadRawDumpSync } from '../services/rawStorage';
 import { mergeCompanyDumps, saveCompanyData, updateCompanyData } from '../services/osintStorage';
 import { 
@@ -120,13 +127,11 @@ export function registerOsintHandlers() {
     }
   });
 
-  ipcMain.handle('osint:scrape-kad-arbitr', async (_event, inn: string) => {
-    try {
-      const data = await scrapeKadArbitr(inn);
-      return { success: true, data };
-    } catch (error) {
-      return { success: false, error: (error as Error).message };
-    }
+  ipcMain.handle('osint:scrape-kad-arbitr', async () => {
+    return {
+      success: false,
+      error: 'Скрапер дел kad.arbitr ещё не реализован. Сначала соберите справочник судей.',
+    };
   });
 
   ipcMain.handle('osint:scrape-mos-gorsud', async (_event, inn: string) => {
@@ -742,6 +747,91 @@ export function registerOsintHandlers() {
       return updateSensitiveRecord(input);
     } catch (error) {
       return { success: false, error: (error as Error).message };
+    }
+  });
+
+  // ==================== KAD.ARBITR: справочник судей ====================
+
+  let judgesAbort: AbortController | null = null;
+
+  ipcMain.handle('osint:judges-start', async (event, options?: {
+    ratePerSecond?: number;
+    maxRequests?: number;
+  }) => {
+    if (judgesAbort) {
+      return { success: false, error: 'Обход справочника судей уже запущен' };
+    }
+    judgesAbort = new AbortController();
+    try {
+      const page = await ensureKadSession();
+      const result = await scrapeJudgesDirectory(page, {
+        ratePerSecond: options?.ratePerSecond ?? 1,
+        maxRequests: options?.maxRequests ?? 10000,
+        signal: judgesAbort.signal,
+        onProgress: (info) => {
+          try {
+            event.sender.send('osint:judges-progress', info);
+          } catch {
+            // окно закрылось — не страшно
+          }
+        },
+      });
+      return { success: true, ...result };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    } finally {
+      judgesAbort = null;
+    }
+  });
+
+  ipcMain.handle('osint:judges-stop', async () => {
+    if (!judgesAbort) {
+      return { success: false, error: 'Обход не запущен' };
+    }
+    judgesAbort.abort();
+    return { success: true };
+  });
+
+  ipcMain.handle('osint:judges-stats', async () => {
+    try {
+      return { success: true, ...getJudgesDirectoryStats() };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+    // ==================== KAD.ARBITR: просмотр справочника ====================
+
+  ipcMain.handle('osint:judges-list', async (_event, filters: any) => {
+    try {
+      const result = listJudges(filters || {});
+      return { success: true, ...result };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('osint:courts-list', async () => {
+    try {
+      return { success: true, items: listCourts() };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('osint:judges-saturated-prefixes', async () => {
+    try {
+      return { success: true, items: listSaturatedPrefixes('kad_judges') };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('osint:judges-delete', async (_event, judgeId: number) => {
+    try {
+      return deleteJudge(judgeId);
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
     }
   });
 

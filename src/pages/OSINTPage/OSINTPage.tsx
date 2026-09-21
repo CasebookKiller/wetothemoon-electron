@@ -12,6 +12,9 @@ import { classNames } from '@/css/classnames';
 import './OSINTPage.css';
 import { TAB_TO_SECTION } from '@/main/services/osint/scrapers/rusprofile/sectionMap';
 
+import { JudgesCollectionDialog } from '@/components/SIETCH/JudgesCollectionDialog';
+import { JudgesDirectoryDialog } from '@/components/SIETCH/JudgesDirectoryDialog';
+
 export const OSINTPage: React.FC = () => {
   const [inn, setInn] = useState<string>(() => {
     try {
@@ -177,11 +180,15 @@ export const OSINTPage: React.FC = () => {
 
   const [deletingDumpKey, setDeletingDumpKey] = useState<string | null>(null);
 
-  const api = (window as any).electronAPI;
-
   const innDigits = inn.replace(/\D/g, '');
   const isLegalEntityInn = innDigits.length === 10;
   const isIndividualInn = innDigits.length === 12;
+
+  const [judgesDialogVisible, setJudgesDialogVisible] = useState(false);
+
+  const [judgesDirectoryVisible, setJudgesDirectoryVisible] = useState(false);
+
+  const api = (window as any).electronAPI;
 
   useEffect(() => {
     if (inn.trim()) {
@@ -1556,26 +1563,50 @@ export const OSINTPage: React.FC = () => {
 
       <Panel className="shadow-5 mx-1" header="Дополнительные источники">
         <div className="flex flex-wrap app p-2 align-items-center gap-4 item-border-bottom">
-          <div className="flex-1 flex flex-column gap-1 xl:mr-8">
+          <div className="flex-1 flex flex-column gap-3 xl:mr-8">
+            <div className="flex align-items-center gap-2">
+              <Button
+                label="Собрать справочник судей"
+                icon="pi pi-users"
+                className="p-button-lg p-button-raised p-button-accent"
+                onClick={() => setJudgesDialogVisible(true)}
+              />
+            </div>
+            <Button
+              label="Показать справочник"
+              icon="pi pi-list"
+              className="p-button-lg p-button-raised p-button-outlined p-button-accent"
+              onClick={() => setJudgesDirectoryVisible(true)}
+            />
             <div className="flex align-items-center gap-2">
               <Button
                 label="kad.arbitr.ru"
                 icon="pi pi-external-link"
                 className="p-button-lg p-button-raised p-button-accent"
-                onClick={() => { /* будет реализовано позже */ }}
-                disabled={loading}
+                onClick={() => { /* дела kad.arbitr — следующим этапом */ }}
+                disabled
               />
               <Button
                 label="mos-gorsud.ru"
                 icon="pi pi-external-link"
                 className="p-button-lg p-button-raised p-button-accent"
                 onClick={() => { /* будет реализовано позже */ }}
-                disabled={loading}
+                disabled
               />
             </div>
           </div>
         </div>
       </Panel>
+
+      <JudgesCollectionDialog
+        visible={judgesDialogVisible}
+        onHide={() => setJudgesDialogVisible(false)}
+      />
+
+      <JudgesDirectoryDialog
+        visible={judgesDirectoryVisible}
+        onHide={() => setJudgesDirectoryVisible(false)}
+      />
     </React.Fragment>
   );
 };

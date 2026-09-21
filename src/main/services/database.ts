@@ -143,6 +143,57 @@ function initializeSchema(db: DatabaseSync) {
     CREATE INDEX IF NOT EXISTS idx_shards_status ON shards(status);
   `);
 
+  // === Справочник судов ===
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS courts (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      court_tag     TEXT NOT NULL UNIQUE,
+      court_name    TEXT NOT NULL,
+      court_type    TEXT NOT NULL DEFAULT 'arbitration',
+      region        TEXT,
+      source_id     INTEGER REFERENCES sources(id),
+      first_seen    TEXT NOT NULL,
+      last_seen     TEXT NOT NULL,
+      raw_file_path TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_courts_type ON courts(court_type);
+    CREATE INDEX IF NOT EXISTS idx_courts_name ON courts(court_name);
+  `);
+
+  // === Справочник судей ===
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS judges (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      judge_uuid    TEXT NOT NULL UNIQUE,
+      name          TEXT NOT NULL,
+      court_id      INTEGER REFERENCES courts(id),
+      post          TEXT,
+      source_id     INTEGER REFERENCES sources(id),
+      first_seen    TEXT NOT NULL,
+      last_seen     TEXT NOT NULL,
+      raw_file_path TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_judges_court ON judges(court_id);
+    CREATE INDEX IF NOT EXISTS idx_judges_name  ON judges(name);
+  `);
+
+  // === Прогресс обхода справочников (универсальная) ===
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS scrape_progress (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      source        TEXT NOT NULL,
+      prefix        TEXT NOT NULL,
+      status        TEXT NOT NULL,
+      items_found   INTEGER DEFAULT 0,
+      started_at    TEXT,
+      finished_at   TEXT,
+      last_error    TEXT,
+      UNIQUE(source, prefix)
+    );
+    CREATE INDEX IF NOT EXISTS idx_scrape_progress_source_status
+      ON scrape_progress(source, status);
+  `);
+
   // Разовая миграция: схлопываем self-loops и дубли relations.
   try {
     const relDupRow = db.prepare(`
@@ -656,9 +707,6 @@ export function addSource(source: {
 /**
  * Создаёт связь вручную (origin='manual').
  */
-/**
- * Создаёт связь вручную (origin='manual').
- */
 export function createRelation(patch: {
   subject_id: number;
   predicate: string;
@@ -744,6 +792,327 @@ export function listEntitiesForDropdown(): Array<{
     ORDER BY label COLLATE NOCASE ASC
   `).all() as Array<{ id: number; type: string; label: string }>;
   return rows;
+}
+
+// ============ Справочник: суды ============
+
+export interface CourtRecord {
+  id: number;
+  court_tag: string;
+  court_name: string;
+  court_type: string;
+  region: string | null;
+  source_id: number | null;
+}
+
+export function upsertCourt(input: {
+  court_tag: string;
+  court_name: string;
+  court_type?: string;
+  region?: string | null;
+  source_id?: number | null;
+}): { id: number; inserted: boolean } {
+  const db = getDatabase();
+  const now = new Date().toISOString();
+  const existing = db.prepare(
+    'SELECT id FROM courts WHERE court_tag = ?'
+  ).get(input.court_tag) as { id: number } | undefined;
+
+  if (existing) {
+    db.prepare(`
+      UPDATE courts
+      SET court_name = ?,
+          court_type = COALESCE(?, court_type),
+          region = COALESCE(?, region),
+          source_id = COALESCE(?, source_id),
+          last_seen = ?
+      WHERE id = ?
+    `).run(
+      input.court_name,
+      input.court_type || null,
+      input.region ?? null,
+      input.source_id ?? null,
+      now,
+      existing.id
+    );
+    return { id: existing.id, inserted: false };
+  }
+
+  const info = db.prepare(`
+    INSERT INTO courts
+      (court_tag, court_name, court_type, region, source_id, first_seen, last_seen)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    input.court_tag,
+    input.court_name,
+    input.court_type || 'arbitration',
+    input.region ?? null,
+    input.source_id ?? null,
+    now,
+    now
+  );
+  return { id: Number(info.lastInsertRowid), inserted: true };
+}
+
+export function getCourtByTag(court_tag: string): CourtRecord | null {
+  const db = getDatabase();
+  const row = db.prepare('SELECT * FROM courts WHERE court_tag = ?').get(court_tag) as unknown as CourtRecord | undefined;
+  return row ?? null;
+}
+
+// ============ Справочник: судьи ============
+
+export interface JudgeRecord {
+  id: number;
+  judge_uuid: string;
+  name: string;
+  court_id: number | null;
+  post: string | null;
+  source_id: number | null;
+}
+
+export function upsertJudge(input: {
+  judge_uuid: string;
+  name: string;
+  court_id?: number | null;
+  post?: string | null;
+  source_id?: number | null;
+}): { id: number; inserted: boolean } {
+  const db = getDatabase();
+  const now = new Date().toISOString();
+  const existing = db.prepare(
+    'SELECT id FROM judges WHERE judge_uuid = ?'
+  ).get(input.judge_uuid) as { id: number } | undefined;
+
+  if (existing) {
+    db.prepare(`
+      UPDATE judges
+      SET name = ?,
+          court_id = COALESCE(?, court_id),
+          post = COALESCE(?, post),
+          source_id = COALESCE(?, source_id),
+          last_seen = ?
+      WHERE id = ?
+    `).run(
+      input.name,
+      input.court_id ?? null,
+      input.post ?? null,
+      input.source_id ?? null,
+      now,
+      existing.id
+    );
+    return { id: existing.id, inserted: false };
+  }
+
+  const info = db.prepare(`
+    INSERT INTO judges
+      (judge_uuid, name, court_id, post, source_id, first_seen, last_seen)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    input.judge_uuid,
+    input.name,
+    input.court_id ?? null,
+    input.post ?? null,
+    input.source_id ?? null,
+    now,
+    now
+  );
+  return { id: Number(info.lastInsertRowid), inserted: true };
+}
+
+export function getJudgeByUuid(uuid: string): JudgeRecord | null {
+  const db = getDatabase();
+  const row = db.prepare('SELECT * FROM judges WHERE judge_uuid = ?').get(uuid) as unknown as JudgeRecord | undefined;
+  return row ?? null;
+}
+
+export function getJudgeDetails(judgeId: number): any | null {
+  const db = getDatabase();
+  const row = db.prepare(`
+    SELECT j.*, c.court_tag, c.court_name, c.court_type
+    FROM judges j
+    LEFT JOIN courts c ON c.id = j.court_id
+    WHERE j.id = ?
+  `).get(judgeId) as any;
+  return row ?? null;
+}
+
+export function countJudges(): number {
+  const db = getDatabase();
+  return (db.prepare('SELECT COUNT(*) AS c FROM judges').get() as any).c;
+}
+
+export function countCourts(): number {
+  const db = getDatabase();
+  return (db.prepare('SELECT COUNT(*) AS c FROM courts').get() as any).c;
+}
+
+// ============ Прогресс обхода справочников ============
+
+export interface ScrapeProgressRow {
+  id: number;
+  source: string;
+  prefix: string;
+  status: 'pending' | 'in_progress' | 'done' | 'error';
+  items_found: number;
+  started_at: string | null;
+  finished_at: string | null;
+  last_error: string | null;
+}
+
+export function markPrefixStatus(input: {
+  source: string;
+  prefix: string;
+  status: 'pending' | 'in_progress' | 'done' | 'error';
+  itemsFound?: number;
+  lastError?: string | null;
+}): void {
+  const db = getDatabase();
+  const now = new Date().toISOString();
+
+  const existing = db.prepare(
+    'SELECT id FROM scrape_progress WHERE source = ? AND prefix = ?'
+  ).get(input.source, input.prefix) as { id: number } | undefined;
+
+  if (existing) {
+    db.prepare(`
+      UPDATE scrape_progress
+      SET status = ?,
+          items_found = COALESCE(?, items_found),
+          started_at = CASE WHEN ? = 'in_progress' THEN ? ELSE started_at END,
+          finished_at = CASE WHEN ? IN ('done','error') THEN ? ELSE finished_at END,
+          last_error = ?
+      WHERE id = ?
+    `).run(
+      input.status,
+      input.itemsFound ?? null,
+      input.status,
+      now,
+      input.status,
+      now,
+      input.lastError ?? null,
+      existing.id
+    );
+    return;
+  }
+
+  db.prepare(`
+    INSERT INTO scrape_progress
+      (source, prefix, status, items_found, started_at, finished_at, last_error)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    input.source,
+    input.prefix,
+    input.status,
+    input.itemsFound ?? 0,
+    input.status === 'in_progress' ? now : null,
+    input.status === 'done' || input.status === 'error' ? now : null,
+    input.lastError ?? null
+  );
+}
+
+/**
+ * Возвращает список префиксов для обхода:
+ * 1) pending — никогда не собирали;
+ * 2) error — упали в прошлый раз;
+ * 3) done, но finished_at < now - staleDays — устарели.
+ * Отсортировано: pending → error → устаревшие done (сначала самые старые).
+ */
+export function listPrefixesToScrape(
+  source: string,
+  staleDays = 90
+): Array<{ prefix: string; status: string; finished_at: string | null }> {
+  const db = getDatabase();
+  const staleIso = new Date(Date.now() - staleDays * 24 * 3600 * 1000).toISOString();
+  return db.prepare(`
+    SELECT prefix, status, finished_at
+    FROM scrape_progress
+    WHERE source = ?
+      AND (
+        status IN ('pending', 'error', 'in_progress')
+        OR (status = 'done' AND (finished_at IS NULL OR finished_at < ?))
+      )
+    ORDER BY
+      CASE status
+        WHEN 'pending' THEN 0
+        WHEN 'error' THEN 1
+        WHEN 'in_progress' THEN 2
+        ELSE 3
+      END,
+      finished_at ASC NULLS FIRST,
+      prefix ASC
+  `).all(source, staleIso) as Array<{ prefix: string; status: string; finished_at: string | null }>;
+}
+
+/**
+ * Возвращает ВСЕ известные префиксы для данного source (любой статус).
+ * Используется, чтобы понять, какие буквы уже заведены в scrape_progress.
+ */
+export function listAllPrefixesForSource(
+  source: string
+): Array<{ prefix: string; status: string; finished_at: string | null }> {
+  const db = getDatabase();
+  return db.prepare(`
+    SELECT prefix, status, finished_at
+    FROM scrape_progress
+    WHERE source = ?
+  `).all(source) as Array<{ prefix: string; status: string; finished_at: string | null }>;
+}
+
+export function listSaturatedPrefixes(source: string): Array<{
+  prefix: string;
+  items_found: number;
+}> {
+  const db = getDatabase();
+  return db.prepare(`
+    SELECT prefix, items_found
+    FROM scrape_progress
+    WHERE source = ? AND items_found >= 25 AND status = 'done'
+    ORDER BY prefix ASC
+  `).all(source) as unknown as Array<{ prefix: string; items_found: number }>;
+}
+
+export function deleteJudge(judgeId: number): { success: boolean; error?: string } {
+  const db = getDatabase();
+  const old = db.prepare('SELECT * FROM judges WHERE id = ?').get(judgeId) as any;
+  if (!old) {
+    return { success: false, error: `Судья #${judgeId} не найден` };
+  }
+  try {
+    db.prepare('DELETE FROM judges WHERE id = ?').run(judgeId);
+  } catch (e) {
+    return { success: false, error: (e as Error).message };
+  }
+  auditChange(
+    'judges',
+    judgeId,
+    'delete',
+    JSON.stringify(old),
+    null,
+    'Удаление судьи из справочника через UI'
+  );
+  return { success: true };
+}
+
+export function getScrapeProgressSummary(source: string): {
+  pending: number;
+  in_progress: number;
+  done: number;
+  error: number;
+} {
+  const db = getDatabase();
+  const rows = db.prepare(`
+    SELECT status, COUNT(*) AS c
+    FROM scrape_progress
+    WHERE source = ?
+    GROUP BY status
+  `).all(source) as Array<{ status: string; c: number }>;
+
+  const summary = { pending: 0, in_progress: 0, done: 0, error: 0 };
+  for (const r of rows) {
+    if (r.status in summary) (summary as any)[r.status] = r.c;
+  }
+  return summary;
 }
 
 export function addRelation(relation: {
@@ -2370,4 +2739,86 @@ export function searchAll(
       sources: unionSources,
     },
   };
+}
+
+export interface JudgeListRow {
+  id: number;
+  judge_uuid: string;
+  name: string;
+  post: string | null;
+  court_id: number | null;
+  court_tag: string | null;
+  court_name: string | null;
+  court_type: string | null;
+  first_seen: string;
+  last_seen: string;
+}
+
+export interface JudgeListFilters {
+  search?: string;
+  courtTag?: string | null;
+  limit?: number;
+  offset?: number;
+}
+
+export function listJudges(filters: JudgeListFilters = {}): {
+  items: JudgeListRow[];
+  total: number;
+} {
+  const db = getDatabase();
+  const conditions: string[] = [];
+  const params: any[] = [];
+
+  if (filters.search && filters.search.trim()) {
+    conditions.push('LOWER(j.name) LIKE ?');
+    params.push(`%${filters.search.trim().toLowerCase()}%`);
+  }
+  if (filters.courtTag) {
+    conditions.push('c.court_tag = ?');
+    params.push(filters.courtTag);
+  }
+
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  const limit = filters.limit ?? 50;
+  const offset = filters.offset ?? 0;
+
+  const total = (db.prepare(`
+    SELECT COUNT(*) AS c
+    FROM judges j
+    LEFT JOIN courts c ON c.id = j.court_id
+    ${where}
+  `).get(...params) as any).c;
+
+  const items = db.prepare(`
+    SELECT
+      j.id, j.judge_uuid, j.name, j.post, j.court_id,
+      j.first_seen, j.last_seen,
+      c.court_tag, c.court_name, c.court_type
+    FROM judges j
+    LEFT JOIN courts c ON c.id = j.court_id
+    ${where}
+    ORDER BY j.name COLLATE NOCASE ASC
+    LIMIT ? OFFSET ?
+  `).all(...params, limit, offset) as unknown as JudgeListRow[];
+
+  return { items, total };
+}
+
+export function listCourts(): Array<{
+  id: number;
+  court_tag: string;
+  court_name: string;
+  court_type: string;
+}> {
+  const db = getDatabase();
+  return db.prepare(`
+    SELECT id, court_tag, court_name, court_type
+    FROM courts
+    ORDER BY court_name COLLATE NOCASE ASC
+  `).all() as unknown as Array<{
+    id: number;
+    court_tag: string;
+    court_name: string;
+    court_type: string;
+  }>;
 }

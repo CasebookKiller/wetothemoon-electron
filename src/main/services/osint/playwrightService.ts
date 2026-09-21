@@ -60,7 +60,10 @@ export function getStorageStatePath(site: string): string {
  * Запускает браузер, восстанавливая сессию из файла, если он существует.
  * После запуска открывает главную страницу Rusprofile.
  */
-export async function launchBrowserWithSession(site: string): Promise<void> {
+export async function launchBrowserWithSession(
+  site: string,
+  initialUrl?: string
+): Promise<void> {
   if (browser && browser.isConnected()) return;
   console.log(`Запуск браузера с сессией для ${site}...`);
 
@@ -82,8 +85,11 @@ export async function launchBrowserWithSession(site: string): Promise<void> {
 
     const context = await browser.newContext(contextOptions);
     currentPage = await context.newPage();
-    await currentPage.goto('https://www.rusprofile.ru', { waitUntil: 'domcontentloaded', timeout: 60000 });
-    console.log('Браузер запущен и страница открыта.');
+
+    // ← ИЗМЕНЕНО: вместо хардкода rusprofile используем параметр
+    const url = initialUrl || 'https://www.rusprofile.ru';
+    await currentPage.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    console.log(`Браузер запущен, страница ${url} открыта.`);
   } catch (error) {
     console.error('Ошибка при запуске браузера с сессией:', error);
     throw error;

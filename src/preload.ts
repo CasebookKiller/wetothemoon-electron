@@ -348,6 +348,41 @@ try {
 
     scrapeKadArbitr: (inn: string) => ipcRenderer.invoke('osint:scrape-kad-arbitr', inn),
 
+    // ==================== KAD.ARBITR: справочник судей ====================
+    scrapeJudgesDirectory: (options?: { ratePerSecond?: number; maxRequests?: number }) =>
+      ipcRenderer.invoke('osint:judges-start', options),
+
+    stopJudgesDirectory: () =>
+      ipcRenderer.invoke('osint:judges-stop'),
+
+    getJudgesStats: () =>
+      ipcRenderer.invoke('osint:judges-stats'),
+
+    onJudgesProgress: (callback: (info: any) => void) => {
+      ipcRenderer.on('osint:judges-progress', (_, info) => callback(info));
+    },
+
+    removeJudgesProgressListener: () =>
+      ipcRenderer.removeAllListeners('osint:judges-progress'),
+
+    listJudges: (filters?: {
+      search?: string;
+      courtTag?: string | null;
+      limit?: number;
+      offset?: number;
+    }) => ipcRenderer.invoke('osint:judges-list', filters),
+
+    listCourts: () =>
+      ipcRenderer.invoke('osint:courts-list'),
+
+    getSaturatedPrefixes: () =>
+      ipcRenderer.invoke('osint:judges-saturated-prefixes'),
+
+    deleteJudge: (judgeId: number) =>
+      ipcRenderer.invoke('osint:judges-delete', judgeId),
+
+    ////
+    
     scrapeMosGorsud: (inn: string) => ipcRenderer.invoke('osint:scrape-mos-gorsud', inn),
 
     saveOsintCredentials: (site: string, login: string, password: string) =>
