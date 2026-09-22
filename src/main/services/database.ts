@@ -324,42 +324,114 @@ function initializeSchema(db: DatabaseSync) {
     }
   }
 
-  // Одноразовая миграция: нормализация case_number для court_case.
-  // Приводит А40-283283/2026 → А40-283283-2026 (слэш → дефис, uppercase).
-  // Нужно для сопоставления дел из rusprofile и kad.arbitr.
-  // Идемпотентно: повторный прогон ничего не делает.
+  // Одноразовая миграция: нормализация case_number и слияние дублей.
+  // SQLite без ICU не умеет UPPER/LOWER для кириллицы, поэтому
+  // нормализацию делаем в JS. Заодно схлопываем дубли, которые могли
+  // накопиться, пока normalized_value не совпадал с normalize(value).
   try {
-    const toMigrate = db.prepare(`
-      SELECT COUNT(*) AS c FROM entities
-      WHERE type = 'court_case' AND value LIKE '%/%'
-    `).get() as { c: number } | undefined;
+    const rows = db.prepare(`
+      SELECT id, value, normalized_value FROM entities WHERE type = 'court_case'
+    `).all() as Array<{ id: number; value: string; normalized_value: string }>;
 
-    if (toMigrate && toMigrate.c > 0) {
-      // Проверяем, не создаст ли миграция конфликтов UNIQUE
-      const wouldConflict = db.prepare(`
-        SELECT COUNT(*) AS c FROM entities e1
-        WHERE e1.type = 'court_case' AND e1.value LIKE '%/%'
-          AND EXISTS (
-            SELECT 1 FROM entities e2
-            WHERE e2.type = 'court_case'
-              AND e2.value = UPPER(REPLACE(e1.value, '/', '-'))
-          )
-      `).get() as { c: number } | undefined;
+    // Группируем по каноническому значению
+    const groups = new Map<string, Array<{ id: number; value: string }>>();
+    for (const row of rows) {
+      const canonical = normalizeCaseNumberLocal(row.value);
+      const list = groups.get(canonical) ?? [];
+      list.push({ id: row.id, value: row.value });
+      groups.set(canonical, list);
+    }
 
-      if (wouldConflict && wouldConflict.c > 0) {
-        console.warn(
-          `[db] Миграция case_number: ${wouldConflict.c} записей конфликтуют, пропускаем. ` +
-          `Требуется ручная чистка.`
-        );
-      } else {
-        db.exec(`
-          UPDATE entities
-          SET value = UPPER(REPLACE(value, '/', '-')),
-              normalized_value = LOWER(UPPER(REPLACE(value, '/', '-')))
-          WHERE type = 'court_case' AND value LIKE '%/%';
-        `);
-        console.log(`[db] Миграция case_number: нормализовано ${toMigrate.c} записей`);
+    let normalized = 0;
+    let merged = 0;
+
+    db.exec('BEGIN');
+    try {
+      for (const [canonical, items] of groups) {
+        items.sort((a, b) => a.id - b.id);
+        const keeper = items[0];
+        const normalizedCanonical = normalize(canonical);
+
+        // 1. Сначала сливаем все дубли НА keeper (переносим наблюдения/связи)
+        for (let i = 1; i < items.length; i++) {
+          const dup = items[i];
+
+          // Observations — переносим на keeper, конфликты удаляем
+          const dupObs = db.prepare(
+            'SELECT id, attribute, value FROM observations WHERE entity_id = ?'
+          ).all(dup.id) as Array<{ id: number; attribute: string; value: string }>;
+          for (const obs of dupObs) {
+            const conflict = db.prepare(`
+              SELECT id FROM observations
+              WHERE entity_id = ? AND attribute = ? AND value = ?
+            `).get(keeper.id, obs.attribute, obs.value) as { id: number } | undefined;
+
+            if (conflict) {
+              db.prepare('DELETE FROM observations WHERE id = ?').run(obs.id);
+            } else {
+              db.prepare('UPDATE observations SET entity_id = ? WHERE id = ?').run(keeper.id, obs.id);
+            }
+          }
+
+          // Relations (subject) — переносим, конфликты удаляем
+          const dupSubj = db.prepare(
+            'SELECT id, predicate, object_id FROM relations WHERE subject_id = ?'
+          ).all(dup.id) as Array<{ id: number; predicate: string; object_id: number }>;
+          for (const rel of dupSubj) {
+            const conflict = db.prepare(`
+              SELECT id FROM relations
+              WHERE subject_id = ? AND predicate = ? AND object_id = ?
+            `).get(keeper.id, rel.predicate, rel.object_id) as { id: number } | undefined;
+
+            if (conflict) {
+              db.prepare('DELETE FROM relations WHERE id = ?').run(rel.id);
+            } else {
+              db.prepare('UPDATE relations SET subject_id = ? WHERE id = ?').run(keeper.id, rel.id);
+            }
+          }
+
+          // Relations (object) — переносим, конфликты удаляем
+          const dupObj = db.prepare(
+            'SELECT id, subject_id, predicate FROM relations WHERE object_id = ?'
+          ).all(dup.id) as Array<{ id: number; subject_id: number; predicate: string }>;
+          for (const rel of dupObj) {
+            const conflict = db.prepare(`
+              SELECT id FROM relations
+              WHERE subject_id = ? AND predicate = ? AND object_id = ?
+            `).get(rel.subject_id, rel.predicate, keeper.id) as { id: number } | undefined;
+
+            if (conflict) {
+              db.prepare('DELETE FROM relations WHERE id = ?').run(rel.id);
+            } else {
+              db.prepare('UPDATE relations SET object_id = ? WHERE id = ?').run(keeper.id, rel.id);
+            }
+          }
+
+          // 2. Удаляем дубль (освобождаем normalized_value для keeper)
+          db.prepare('DELETE FROM entities WHERE id = ?').run(dup.id);
+          merged++;
+        }
+
+        // 3. Теперь обновляем keeper — конфликтов больше нет
+        const current = db.prepare(
+          'SELECT value, normalized_value FROM entities WHERE id = ?'
+        ).get(keeper.id) as { value: string; normalized_value: string } | undefined;
+
+        if (current && (current.value !== canonical || current.normalized_value !== normalizedCanonical)) {
+          db.prepare(`
+            UPDATE entities SET value = ?, normalized_value = ? WHERE id = ?
+          `).run(canonical, normalizedCanonical, keeper.id);
+          normalized++;
+        }
       }
+      db.exec('COMMIT');
+    } catch (e) {
+      db.exec('ROLLBACK');
+      throw e;
+    }
+
+    if (normalized > 0 || merged > 0) {
+      console.log(`[db] Миграция case_number: нормализовано ${normalized}, слито дублей ${merged}`);
     }
   } catch (e) {
     console.warn('[db] Миграция case_number не удалась:', (e as Error).message);
@@ -468,6 +540,15 @@ export function getDumpSectionsUpdatedAt(dumpId: number): Record<string, string>
 
 export function normalize(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+/**
+ * Локальная копия normalizeCaseNumber из osintStorage.
+ * Дублируется, чтобы не было циклической зависимости database ← osintStorage.
+ */
+function normalizeCaseNumberLocal(raw: string): string {
+  if (!raw) return '';
+  return raw.replace(/\s+/g, '').replace(/\//g, '-').toUpperCase().trim();
 }
 
 /**
