@@ -12,6 +12,16 @@ export function getPage(): Page | null {
   return currentPage;
 }
 
+// === Общие опции для всех запусков ===
+// ВАЖНО: минимум флагов. --disable-gpu ломает WebGL (SwiftShader),
+// из-за чего ЕСИА блокирует SAML и Pravocaptcha не работает.
+const LAUNCH_ARGS = ['--disable-blink-features=AutomationControlled'];
+
+const CONTEXT_OPTIONS = {
+  viewport: { width: 1440, height: 900 },
+  locale: 'ru-RU',
+};
+
 export async function launchBrowser(): Promise<void> {
   if (browser && browser.isConnected()) return;
   console.log('launching browser...');
@@ -19,10 +29,10 @@ export async function launchBrowser(): Promise<void> {
   try {
     browser = await chromium.launch({
       headless: false,
-      args: ['--no-sandbox', '--disable-gpu', '--ozone-platform=x11'],
+      args: LAUNCH_ARGS,
     });
 
-    const context = await browser.newContext();
+    const context = await browser.newContext(CONTEXT_OPTIONS);
     currentPage = await context.newPage();
     await currentPage.goto('https://www.rusprofile.ru', { waitUntil: 'domcontentloaded', timeout: 60000 });
     console.log('Browser launched and navigated to rusprofile.ru');
@@ -37,16 +47,16 @@ export async function launchBrowserWithRusprofile(): Promise<void> {
 
   browser = await chromium.launch({
     headless: false,
-    args: ['--no-sandbox', '--disable-gpu', '--ozone-platform=x11'],
+    args: LAUNCH_ARGS,
   });
 
-  const context = await browser.newContext();
+  const context = await browser.newContext(CONTEXT_OPTIONS);
   currentPage = await context.newPage();
   await currentPage.goto('https://www.rusprofile.ru', { waitUntil: 'domcontentloaded', timeout: 60000 });
   console.log('Browser launched and navigated to rusprofile.ru');
 }
 
-// ==================== НОВЫЕ ФУНКЦИИ ДЛЯ РАБОТЫ С СЕССИЯМИ ====================
+// ==================== СЕССИИ ====================
 
 /**
  * Возвращает путь к файлу сохранённого состояния браузера (cookies, localStorage)
@@ -58,7 +68,8 @@ export function getStorageStatePath(site: string): string {
 
 /**
  * Запускает браузер, восстанавливая сессию из файла, если он существует.
- * После запуска открывает главную страницу Rusprofile.
+ * Опции запуска идентичны bash-тесту launch-manual.mjs — минимум флагов,
+ * viewport и locale заданы. Это критично для прохождения ЕСИА и Pravocaptcha.
  */
 export async function launchBrowserWithSession(
   site: string,
@@ -68,7 +79,7 @@ export async function launchBrowserWithSession(
   console.log(`Запуск браузера с сессией для ${site}...`);
 
   const statePath = getStorageStatePath(site);
-  let contextOptions: any = {};
+  let contextOptions: any = { ...CONTEXT_OPTIONS };
 
   if (fs.existsSync(statePath)) {
     console.log(`Найден файл сессии ${site}, восстанавливаем состояние.`);
@@ -80,13 +91,24 @@ export async function launchBrowserWithSession(
   try {
     browser = await chromium.launch({
       headless: false,
-      args: ['--no-sandbox', '--disable-gpu', '--ozone-platform=x11'],
+      args: LAUNCH_ARGS,
     });
 
     const context = await browser.newContext(contextOptions);
+
+    // Chrome всегда кэпит deviceMemory на 8. Playwright отдаёт реальное
+    // значение (16 ГБ → 16), что палит автоматизацию — ЕСИА блокирует SAML.
+    await context.addInitScript(() => {
+      try {
+        Object.defineProperty(Navigator.prototype, 'deviceMemory', {
+          get: () => 8,
+          configurable: true,
+        });
+      } catch {}
+    });
+
     currentPage = await context.newPage();
 
-    // ← ИЗМЕНЕНО: вместо хардкода rusprofile используем параметр
     const url = initialUrl || 'https://www.rusprofile.ru';
     await currentPage.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
     console.log(`Браузер запущен, страница ${url} открыта.`);
@@ -96,7 +118,7 @@ export async function launchBrowserWithSession(
   }
 }
 
-// ==================== УПРАВЛЕНИЕ БРАУЗЕРОМ ====================
+// ==================== УПРАВЛЕНИЕ ====================
 
 export async function closeBrowser(): Promise<void> {
   if (browser) {
@@ -110,7 +132,7 @@ export function getBrowser(): Browser | null {
   return browser;
 }
 
-// ==================== ХРАНЕНИЕ УЧЁТНЫХ ДАННЫХ ====================
+// ==================== КРЕДЫ ====================
 
 export function encrypt(text: string): Buffer {
   return safeStorage.encryptString(text);
