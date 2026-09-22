@@ -463,12 +463,35 @@ async function parseHtmlResult(page: Page, html: string): Promise<PageResult> {
         name: string
       ): 'company' | 'person' | 'unknown' => {
         if (!name) return 'unknown';
-        const upper = name.toUpperCase();
+        const upper = name.toUpperCase().trim();
+
         if (/^ИП\s/.test(upper)) return 'person';
-        if (/\b(ООО|ОАО|ЗАО|ПАО|АО|НП|СРО|ГУП|МУП|ФГУП|КБ|ПК|ТСЖ|ЖСК)\b/.test(upper)) {
+
+        if (/^(ООО|ОАО|ЗАО|ПАО|АО|НП|СРО|ГУП|МУП|ФГУП|КБ|ПК|ТСЖ|ЖСК|СНТ|ОО|ОД|АНО|ФГБУ|ФГАУ)(\s|$|"|«|\()/.test(upper + ' ')) {
           return 'company';
         }
+
+        const govPrefixes = [
+          'ФЕДЕРАЛЬНАЯ ', 'ФЕДЕРАЛЬНОЕ ', 'ФЕДЕРАЛЬНЫЙ ',
+          'УПРАВЛЕНИЕ ', 'АДМИНИСТРАЦИЯ ', 'ДЕПАРТАМЕНТ ',
+          'МИНИСТЕРСТВО ', 'ГОСУДАРСТВЕННАЯ ', 'ГОСУДАРСТВЕННОЕ ',
+          'ГОСУДАРСТВЕННЫЙ ', 'ГЛАВНОЕ ', 'ГЛАВНЫЙ ',
+          'ЦЕНТРАЛЬНЫЙ ', 'ЦЕНТРАЛЬНОЕ ',
+          'ИНСПЕКЦИЯ ', 'ПРОКУРАТУРА ',
+          'ВЫСШИЙ ', 'МИНФС ', 'МРИ ФНС ',
+          'ГУ ', 'ОСП ', 'СПИ ',
+          'ТЕРРИТОРИАЛЬНЫЙ ', 'МЕЖРАЙОННАЯ ',
+        ];
+        if (govPrefixes.some((p) => upper.startsWith(p))) return 'company';
+
+        if (/БАНК|СТРАХОВ|ФОНД/.test(upper)) return 'company';
+
         if (/[А-ЯЁ][а-яё]+\s+[А-ЯЁ]\.\s*[А-ЯЁ]?\.?/.test(name)) return 'person';
+
+        if (/^[А-ЯЁ][а-яё]+\s+[А-ЯЁ][а-яё]+\s+[А-ЯЁ][а-яё]+(ич|вна|чна|ична)$/i.test(name.trim())) {
+          return 'person';
+        }
+
         return 'unknown';
       };
 
