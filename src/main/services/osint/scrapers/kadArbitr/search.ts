@@ -146,12 +146,25 @@ async function submitSearchUI(
   await page.goto(KAD_HOME, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.waitForTimeout(3000);
 
+  // Удаляем rcid перед кликом, чтобы chain Pravocaptcha пошёл через
+  // checkIsNeedShow (сервер сам решит, нужна ли капча). Без этого
+  // цепочка идёт через ветку "rcid уже есть" и POST уходит без токена → 403.
+  try {
+    const cookies = await page.context().cookies('https://kad.arbitr.ru');
+    const filtered = cookies.filter((c) => c.name !== 'rcid');
+    await page.context().clearCookies({ name: 'rcid', domain: '.kad.arbitr.ru' }).catch(() => {});
+    await page.context().clearCookies({ name: 'rcid', domain: 'kad.arbitr.ru' }).catch(() => {});
+    console.log('[kad-search] rcid удалён перед кликом');
+  } catch (e) {
+    console.warn('[kad-search] Не удалось удалить rcid:', (e as Error).message);
+  }
+  
   // 2. Перехватываем Pravocaptcha ДО клика.
   // WASM-модуль в Playwright-Chromium падает с RuntimeError, из-за чего
   // промис внутри Pravocaptcha зависает и POST не отправляется.
   // Подменяем executePravocaptcha заглушкой — callback зовётся сразу,
   // POST уходит без RecaptchaToken (kad.arbitr это допускает).
-  await page.evaluate(() => {
+  /*await page.evaluate(() => {
     const w = window as any;
 
     const override = () => {
@@ -178,7 +191,7 @@ async function submitSearchUI(
     setTimeout(override, 3000);
   });
 
-  console.log('[kad-search] Pravocaptcha перехвачена, будет вызвана без WASM');
+  console.log('[kad-search] Pravocaptcha перехвачена, будет вызвана без WASM');*/
 
   // === СНИФФЕР СЕТИ ===
   // Перехватываем XHR и fetch, чтобы увидеть реальные запросы и ответы.
@@ -323,7 +336,7 @@ async function submitSearchUI(
   } catch (e) {
     console.warn('[kad-search] Не удалось прочитать netLog:', (e as Error).message);
   }
-  
+
   // 6. Ждём результат
   await waitForSearchResult(page);
 
