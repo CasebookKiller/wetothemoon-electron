@@ -91,25 +91,13 @@ export async function launchBrowserWithSession(
   try {
     browser = await chromium.launch({
       headless: false,
+      channel: 'chrome',                                  // ← добавить
       args: LAUNCH_ARGS,
     });
 
     const context = await browser.newContext(contextOptions);
 
-    // Блокируем WASM-модули Pravocaptcha. У kad.arbitr они по неочевидным URL,
-    // не /Content/Static/js/. Абсолютные адреса — чтобы не задеть ЕСИА.
-    //
-    // При abort() jQuery вызывает error-колбэк, что для Pravocaptcha означает:
-    //   - initializeFp → reject → .finally() → loadWasm
-    //   - loadWasm → error → callback() → checkRelevance
-    // Это позволяет chain пройти до конца без падающего WASM.
-    await context.route('https://kad.arbitr.ru/Wasm/api/v1/wasm.js*', (route) => route.abort());
-    await context.route('https://kad.arbitr.ru/Wasm/api/v1/wasm_bg.wasm*', (route) => route.abort());
-    await context.route('https://kad.arbitr.ru/Content/Static/js/common/fp.js*', (route) => route.abort());
-    await context.route('https://kad.arbitr.ru/Content/Static/js/common/fp_bg.wasm*', (route) => route.abort());
-
     await context.addInitScript(() => {
-      // deviceMemory — как было
       try {
         Object.defineProperty(Navigator.prototype, 'deviceMemory', {
           get: () => 8,

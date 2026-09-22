@@ -13,18 +13,9 @@ import { saveAllKadCookies } from './login';
 const KAD_HOME = 'https://kad.arbitr.ru/';
 const DEFAULT_PAGE_SIZE = 25;
 const RATE_DELAY_MS = 3000;
-const MAX_RETRIES_ON_CAPTCHA = 2;
 
 /**
  * Поиск дел по ИНН через UI-клик.
- *
- * Логика:
- * 1. Открываем главную kad.arbitr.
- * 2. Заполняем поле «Участник дела» + выбираем роль.
- * 3. Кликаем «Найти».
- * 4. Ждём результатов (или капчи, или «нет результатов»).
- * 5. Парсим HTML таблицы.
- * 6. Пагинация — клик по номерам страниц.
  */
 export async function searchCases(
   page: Page,
@@ -40,46 +31,48 @@ export async function searchCases(
   let totalFound = 0;
   let pagesCount = 1;
 
-  // 1. Первая страница — через клик по кнопке «Найти»
-  const firstPageResult = await submitSearchUI(page, inn, primaryRole);
-
-  if (firstPageResult.empty) {
-    return buildResult(inn, options, primaryRole, [], 0, 1);
-  }
-
-  totalFound = firstPageResult.meta.totalCount;
-  pagesCount = firstPageResult.meta.pagesCount;
-
-  for (const c of firstPageResult.cases) {
-    if (allCases.length >= maxTotalCases) break;
-    allCases.push(c);
-  }
-
-  // 2. Остальные страницы — через клик по номерам страниц
-  for (let pageNum = 2; pageNum <= Math.min(maxPages, pagesCount); pageNum++) {
-    if (allCases.length >= maxTotalCases) break;
-
-    console.log(`[kad-search] Пауза ${RATE_DELAY_MS}мс перед страницей ${pageNum}...`);
-    await new Promise((r) => setTimeout(r, RATE_DELAY_MS));
-
-    try {
-      const pageResult = await navigateToPage(page, pageNum);
-      if (!pageResult || pageResult.cases.length === 0) break;
-
-      for (const c of pageResult.cases) {
-        if (allCases.length >= maxTotalCases) break;
-        allCases.push(c);
-      }
-    } catch (e) {
-      console.warn(`[kad-search] Ошибка на странице ${pageNum}:`, (e as Error).message);
-      break;
-    }
-  }
-
   try {
-    await saveAllKadCookies(page);
-  } catch (e) {
-    console.warn('[kad-search] Не удалось сохранить cookies:', (e as Error).message);
+    // 1. Первая страница — через клик по кнопке «Найти»
+    const firstPageResult = await submitSearchUI(page, inn, primaryRole);
+
+    if (firstPageResult.empty) {
+      return buildResult(inn, options, primaryRole, [], 0, 1);
+    }
+
+    totalFound = firstPageResult.meta.totalCount;
+    pagesCount = firstPageResult.meta.pagesCount;
+
+    for (const c of firstPageResult.cases) {
+      if (allCases.length >= maxTotalCases) break;
+      allCases.push(c);
+    }
+
+    // 2. Остальные страницы — через клик по номерам страниц
+    for (let pageNum = 2; pageNum <= Math.min(maxPages, pagesCount); pageNum++) {
+      if (allCases.length >= maxTotalCases) break;
+
+      console.log(`[kad-search] Пауза ${RATE_DELAY_MS}мс перед страницей ${pageNum}...`);
+      await new Promise((r) => setTimeout(r, RATE_DELAY_MS));
+
+      try {
+        const pageResult = await navigateToPage(page, pageNum);
+        if (!pageResult || pageResult.cases.length === 0) break;
+
+        for (const c of pageResult.cases) {
+          if (allCases.length >= maxTotalCases) break;
+          allCases.push(c);
+        }
+      } catch (e) {
+        console.warn(`[kad-search] Ошибка на странице ${pageNum}:`, (e as Error).message);
+        break;
+      }
+    }
+  } finally {
+    try {
+      await saveAllKadCookies(page);
+    } catch (e) {
+      console.warn('[kad-search] Не удалось сохранить cookies:', (e as Error).message);
+    }
   }
 
   return buildResult(inn, options, primaryRole, allCases, totalFound, pagesCount);
@@ -146,58 +139,113 @@ async function submitSearchUI(
   await page.goto(KAD_HOME, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.waitForTimeout(3000);
 
-  // Удаляем rcid перед кликом, чтобы chain Pravocaptcha пошёл через
-  // checkIsNeedShow (сервер сам решит, нужна ли капча). Без этого
-  // цепочка идёт через ветку "rcid уже есть" и POST уходит без токена → 403.
-  try {
-    const cookies = await page.context().cookies('https://kad.arbitr.ru');
-    const filtered = cookies.filter((c) => c.name !== 'rcid');
-    await page.context().clearCookies({ name: 'rcid', domain: '.kad.arbitr.ru' }).catch(() => {});
-    await page.context().clearCookies({ name: 'rcid', domain: 'kad.arbitr.ru' }).catch(() => {});
-    console.log('[kad-search] rcid удалён перед кликом');
-  } catch (e) {
-    console.warn('[kad-search] Не удалось удалить rcid:', (e as Error).message);
-  }
-  
-  // 2. Перехватываем Pravocaptcha ДО клика.
-  // WASM-модуль в Playwright-Chromium падает с RuntimeError, из-за чего
-  // промис внутри Pravocaptcha зависает и POST не отправляется.
-  // Подменяем executePravocaptcha заглушкой — callback зовётся сразу,
-  // POST уходит без RecaptchaToken (kad.arbitr это допускает).
-  /*await page.evaluate(() => {
-    const w = window as any;
-
-    const override = () => {
-      // Основной путь: Common.executePravocaptcha
-      if (w.Common && typeof w.Common.executePravocaptcha === 'function') {
-        w.Common.executePravocaptcha = function (callback: any) {
-          console.log('[FIX] Common.executePravocaptcha → callback(null)');
-          if (typeof callback === 'function') callback(null);
-        };
-      }
-
-      // Дублирующий — сам объект Pravocaptcha
-      if (w.pravocaptcha && typeof w.pravocaptcha.execute === 'function') {
-        w.pravocaptcha.execute = function (callback: any) {
-          console.log('[FIX] Pravocaptcha.execute → callback(null)');
-          if (typeof callback === 'function') callback(null);
-        };
-      }
-    };
-
-    override();
-    // На случай, если объекты ещё не созданы — повторим через таймер
-    setTimeout(override, 1000);
-    setTimeout(override, 3000);
+  // Перехват на уровне Playwright — покажет ВСЕ заголовки запроса,
+  // включая Cookie, Origin, Referer, sec-ch-ua*.
+  page.on('request', (req) => {
+    if (req.url().includes('SearchInstances')) {
+      console.log('\n[kad-search] === REAL REQUEST (Playwright) ===');
+      console.log('URL:', req.url());
+      console.log('Method:', req.method());
+      console.log('Headers:', JSON.stringify(req.headers(), null, 2));
+      console.log('PostData:', req.postData());
+      console.log('[kad-search] === /REAL REQUEST ===\n');
+    }
   });
 
-  console.log('[kad-search] Pravocaptcha перехвачена, будет вызвана без WASM');*/
+  page.on('response', async (res) => {
+    if (res.url().includes('SearchInstances')) {
+      console.log('\n[kad-search] === REAL RESPONSE (Playwright) ===');
+      console.log('Status:', res.status());
+      console.log('Headers:', JSON.stringify(res.headers(), null, 2));
+      const body = await res.text().catch(() => '');
+      console.log('Body:', body.slice(0, 400));
+      console.log('[kad-search] === /REAL RESPONSE ===\n');
+    }
+  });
 
-  // === СНИФФЕР СЕТИ ===
-  // Перехватываем XHR и fetch, чтобы увидеть реальные запросы и ответы.
-  // Нужно для диагностики 403 на /Kad/SearchInstances.
+  // 2. Удаляем rcid через Playwright API.
+  // Это единственный надёжный способ: clearCookies без указания домена
+  // удаляет все куки с этим именем, включая HttpOnly.
+  // document.cookie в page.evaluate не видит HttpOnly и не матчит домен строго.
+  await page.context().clearCookies({ name: 'rcid' });
+
+  // Проверяем результат
+  const cookiesAfter = await page.context().cookies('https://kad.arbitr.ru');
+  const stillHasRcid = cookiesAfter.some((c) => c.name === 'rcid');
+  if (stillHasRcid) {
+    console.error('[kad-search] rcid НЕ удалился через clearCookies!');
+  } else {
+    console.log('[kad-search] rcid удалён (проверено через context.cookies)');
+  }
+
+  // 3. Устанавливаем сниффер сети (перехват XHR/fetch)
+  await installNetSniffer(page);
+
+  // 4. Заполняем поле «Участник дела»
+  const participantInput = page
+    .locator('.b-selected-tags textarea[placeholder="название, ИНН или ОГРН"]')
+    .first();
+
+  await participantInput.waitFor({ state: 'visible', timeout: 20000 });
+  await participantInput.click();
+  await participantInput.fill('');
+  await participantInput.type(inn, { delay: 50 });
+  await page.waitForTimeout(800);
+
+  // 5. Устанавливаем роль (если не «любой»)
+  const roleType = roleToType(primaryRole);
+  if (roleType !== -1) {
+    try {
+      const switcher = page.locator('.b-type-switcher-current').first();
+      if (await switcher.isVisible().catch(() => false)) {
+        await switcher.click();
+        await page.waitForTimeout(500);
+        const radio = page.locator(
+          `.b-type-switcher .content ul li input[type="radio"][value="${roleType}"]`
+        ).first();
+        if ((await radio.count()) > 0) {
+          await radio.click({ force: true });
+          await page.waitForTimeout(500);
+        }
+      }
+    } catch (e) {
+      console.warn('[kad-search] Не удалось установить роль:', (e as Error).message);
+    }
+  }
+
+  // 6. Клик по «Найти»
+  const submitBtn = page.locator('#b-form-submit button').first();
+  await submitBtn.waitFor({ state: 'visible', timeout: 10000 });
+
+  const btnText = await submitBtn.textContent().catch(() => '');
+  const btnEnabled = await submitBtn.isEnabled().catch(() => false);
+  console.log(`[kad-search] Кнопка «Найти»: text="${btnText?.trim()}", enabled=${btnEnabled}`);
+
+  await submitBtn.click();
+  console.log('[kad-search] Клик по «Найти» выполнен');
+
+  // 7. Даём запросам уйти и вернуться
+  await page.waitForTimeout(6000);
+
+  // 8. Дамп сетевого лога
+  await dumpNetLog(page);
+
+  // 9. Ждём результат
+  await waitForSearchResult(page);
+
+  // 10. Парсим
+  return parseCurrentPage(page);
+}
+
+/**
+ * Устанавливает перехват fetch и XHR для дампа сети.
+ * Защита от повторной установки: если __netLog уже есть — не переопределяем.
+ */
+async function installNetSniffer(page: Page): Promise<void> {
   await page.evaluate(() => {
     const w = window as any;
+    if (w.__netLogInstalled) return;
+    w.__netLogInstalled = true;
     w.__netLog = [];
 
     // fetch
@@ -267,81 +315,37 @@ async function submitSearchUI(
       return origSend.apply(this, [body] as any);
     };
   });
+}
 
-  // 3. Заполняем поле «Участник дела»
-  const participantInput = page
-    .locator('.b-selected-tags textarea[placeholder="название, ИНН или ОГРН"]')
-    .first();
-
-  await participantInput.waitFor({ state: 'visible', timeout: 20000 });
-  await participantInput.click();
-  await participantInput.fill('');
-  // type вместо fill — имитация ввода пользователя (WASM это видит)
-  await participantInput.type(inn, { delay: 50 });
-  await page.waitForTimeout(800);
-
-  // 4. Устанавливаем роль (если не «любой»)
-  const roleType = roleToType(primaryRole);
-  if (roleType !== -1) {
-    try {
-      const switcher = page.locator('.b-type-switcher-current').first();
-      if (await switcher.isVisible().catch(() => false)) {
-        await switcher.click();
-        await page.waitForTimeout(500);
-        const radio = page.locator(
-          `.b-type-switcher .content ul li input[type="radio"][value="${roleType}"]`
-        ).first();
-        if ((await radio.count()) > 0) {
-          await radio.click({ force: true });
-          await page.waitForTimeout(500);
-        }
-      }
-    } catch (e) {
-      console.warn('[kad-search] Не удалось установить роль:', (e as Error).message);
-    }
-  }
-
-  // 5. Клик по «Найти»
-  const submitBtn = page.locator('#b-form-submit button').first();
-  await submitBtn.waitFor({ state: 'visible', timeout: 10000 });
-  await submitBtn.click();
-
-    // Даём запросу SearchInstances время уйти и вернуться
-  await page.waitForTimeout(5000);
-
-  // Дамп сетевого лога
+/**
+ * Печатает дамп сетевого лога (без трекеров).
+ */
+async function dumpNetLog(page: Page): Promise<void> {
   try {
     const netLog = await page.evaluate(() => (window as any).__netLog || []);
     console.log(`\n[kad-search] === СЕТЕВОЙ ЛОГ (${netLog.length} записей) ===`);
     for (const e of netLog) {
-      // Печатаем только релевантные — SearchInstances, CheckCaptcha, Wasm, Fp
       const url = String(e.url || '');
-      const interesting =
-        url.includes('SearchInstances') ||
-        url.includes('CheckCaptcha') ||
-        url.includes('GetCaptcha') ||
-        url.includes('checkIsNeedShow') ||
-        url.includes('WasCaptcha') ||
-        url.includes('wasm') ||
-        url.includes('fp');
-      if (!interesting) continue;
+      if (
+        url.includes('google-analytics') ||
+        url.includes('googletagmanager') ||
+        url.includes('mc.yandex') ||
+        url.includes('top-fwz1') ||
+        url.includes('vk.com') ||
+        url.includes('mail.ru') ||
+        url.includes('doubleclick')
+      ) continue;
 
       console.log(`\n--- ${e.type.toUpperCase()} ${e.method} ${url}`);
       console.log(`    Status: ${e.status ?? e.error ?? '?'}`);
       console.log(`    ReqHeaders: ${JSON.stringify(e.reqHeaders)}`);
-      console.log(`    ReqBody: ${e.reqBody}`);
-      console.log(`    RespBody: ${e.respBody}`);
+      console.log(`    ReqBody: ${(e.reqBody || '').slice(0, 300)}`);
+      console.log(`    RespBody: ${(e.respBody || '').slice(0, 300)}`);
     }
     console.log(`[kad-search] === /СЕТЕВОЙ ЛОГ ===\n`);
   } catch (e) {
     console.warn('[kad-search] Не удалось прочитать netLog:', (e as Error).message);
   }
-
-  // 6. Ждём результат
-  await waitForSearchResult(page);
-
-  // 7. Парсим
-  return parseCurrentPage(page);
 }
 
 /**
@@ -354,18 +358,15 @@ async function waitForSearchResult(page: Page): Promise<void> {
     { timeout: 90000 }
   ).catch(() => null);
 
-  // Проверка капчи
   const captchaVisible = await page
     .locator('.b-pravocaptcha')
     .isVisible()
     .catch(() => false);
 
   if (captchaVisible) {
-    // Ждём прохождения капчи вручную (до 2 минут)
     console.log('[kad-search] Обнаружена капча. Ожидаем прохождения вручную (2 минуты)...');
     await page.waitForSelector('.b-pravocaptcha', { state: 'hidden', timeout: 120000 })
       .catch(() => null);
-    // После прохождения — ждём результаты
     await page.waitForSelector(
       '.b-results:not(.g-hidden), .b-noResults:not(.g-hidden)',
       { timeout: 60000 }
@@ -381,7 +382,6 @@ async function parseCurrentPage(page: Page): Promise<PageResult> {
     const container = document.querySelector('#main-column2');
     if (!container) return '';
 
-    // Извлекаем только таблицу + input'ы с метаданными
     const table = container.querySelector('#b-cases');
     const metas = Array.from(container.querySelectorAll('input[type="hidden"]'))
       .map((el) => (el as HTMLInputElement).outerHTML)
@@ -397,7 +397,6 @@ async function parseCurrentPage(page: Page): Promise<PageResult> {
  * Пагинация: клик по номеру страницы.
  */
 async function navigateToPage(page: Page, pageNum: number): Promise<PageResult | null> {
-  // Ищем кнопку с номером страницы
   const pageLink = page
     .locator(`.b-footer-pages a, #b-footer-pages a, .pager a, a:has-text("${pageNum}")`)
     .filter({ hasText: new RegExp(`^${pageNum}$`) })
@@ -419,7 +418,6 @@ async function navigateToPage(page: Page, pageNum: number): Promise<PageResult |
 async function parseHtmlResult(page: Page, html: string): Promise<PageResult> {
   return page.evaluate(
     ({ html }: { html: string }) => {
-      // === Метаданные ===
       const extractHidden = (id: string): string | null => {
         const re = new RegExp(`id=["']${id}["'][^>]*value=["']([^"']*)["']`);
         const m = html.match(re);
@@ -433,7 +431,6 @@ async function parseHtmlResult(page: Page, html: string): Promise<PageResult> {
         pageSize: parseInt(extractHidden('documentsPageSize') || '25', 10) || 25,
       };
 
-      // === Парсинг строк ===
       const wrapper = document.createElement('table');
       wrapper.innerHTML = html;
 
@@ -589,9 +586,6 @@ async function parseHtmlResult(page: Page, html: string): Promise<PageResult> {
           hidden_respondents_count: respondents.hidden || undefined,
         });
       }
-
-      // Проверяем «нет результатов»
-      const noResults = html.includes('b-noResults') && !html.includes('b-results:not');
 
       return { cases, meta, empty: cases.length === 0 };
     },
