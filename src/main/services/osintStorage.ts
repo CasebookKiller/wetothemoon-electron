@@ -406,6 +406,26 @@ export function mergeCompanyDumps(existingData: any, newData: any): any {
 }
 
 // ============================================================================
+// Нормализация номера дела (для сопоставления источников)
+// ============================================================================
+
+/**
+ * Приводит номер дела к каноническому виду:
+ *  - убирает пробелы,
+ *  - заменяет слэш на дефис,
+ *  - приводит к верхнему регистру.
+ *
+ * Пример: "А40-283283/2026" → "А40-283283-2026".
+ *
+ * Одна и та же сущность court_case, найденная через rusprofile и kad.arbitr,
+ * получает одинаковый normalized_value и не дублируется.
+ */
+export function normalizeCaseNumber(raw: string): string {
+  if (!raw) return '';
+  return raw.replace(/\s+/g, '').replace(/\//g, '-').toUpperCase().trim();
+}
+
+// ============================================================================
 // KAD.ARBITR: сохранение дел
 // ============================================================================
 
@@ -578,16 +598,238 @@ function promoteJudgeToEntity(
   return entityId;
 }
 
+// ============================================================================
+// Универсальное сохранение одного дела
+// ============================================================================
+
+interface PersistCaseParams {
+  caseItem: KadArbitrCase;
+  sourceId: number;
+  targetEntityId?: number;       // целевая организация (для роли)
+  targetRole?: 'plaintiff' | 'defendant' | 'third_party' | 'any';
+  targetInn?: string;             // для определения роли при 'any'
+  rawFilePath?: string;
+}
+
+interface PersistCaseResult {
+  caseEntityId: number;
+  savedEntities: number;
+  savedRelations: number;
+  savedObservations: number;
+}
+
+/**
+ * Сохраняет одно судебное дело в БД.
+ *
+ * Идемпотентно: повторный вызов обновляет существующие записи
+ * (по normalized_value сущности и по ux_relations_triple / ux_observations_triple).
+ *
+ * Логика:
+ *  1. Нормализация case_number.
+ *  2. Upsert сущности court_case.
+ *  3. Observations на case.
+ *  4. Связь целевой организации с делом (если передан targetEntityId).
+ *  5. Контрагенты — upsert + связь с делом.
+ *  6. Судья — промоция + judge_of.
+ *  7. Суд — промоция + heard_by.
+ */
+function persistCase(params: PersistCaseParams): PersistCaseResult {
+  const { caseItem, sourceId, targetEntityId, targetRole, targetInn, rawFilePath } = params;
+
+  let savedEntities = 0;
+  let savedRelations = 0;
+  let savedObservations = 0;
+
+  // 1. Нормализация
+  const normalizedCaseNumber = normalizeCaseNumber(caseItem.case_number);
+  const displayLabel = `Дело ${caseItem.case_number}`;
+
+  // 2. Сущность court_case
+  const caseEntityId = upsertEntity({
+    type: 'court_case',
+    value: normalizedCaseNumber,
+    label: displayLabel,
+    confidence: 90,
+    status: 'confirmed',
+    notes: `Тип: ${caseItem.case_type}; суд: ${caseItem.court}`,
+    raw_file_path: rawFilePath,
+  });
+  savedEntities++;
+
+  // 3. Observations на case
+  const caseObs: Array<{ attribute: string; value: string | undefined }> = [
+    { attribute: 'case_number', value: caseItem.case_number }, // оригинал для отображения
+    { attribute: 'case_type',   value: caseItem.case_type },
+    { attribute: 'case_uuid',   value: caseItem.case_uuid },
+    { attribute: 'filing_date', value: caseItem.filing_date },
+    { attribute: 'court',       value: caseItem.court },
+    { attribute: 'judge',       value: caseItem.judge },
+  ];
+  for (const obs of caseObs) {
+    if (!obs.value) continue;
+    const r = addObservation({
+      entity_id: caseEntityId,
+      attribute: obs.attribute,
+      value: obs.value,
+      source_id: sourceId,
+      confidence: 90,
+      raw_file_path: rawFilePath,
+    });
+    if (r.inserted) savedObservations++;
+  }
+
+  // 4. Связь целевой организации с делом
+  if (targetEntityId) {
+    const predicate = resolveTargetPredicate(targetRole, caseItem, targetInn);
+
+    if (predicate) {
+      const r = addRelation({
+        subject_id: targetEntityId,
+        predicate,
+        object_id: caseEntityId,
+        source_id: sourceId,
+        evidence_text: `Дело ${caseItem.case_number}`,
+        confidence: 90,
+        status: 'confirmed',
+        raw_file_path: rawFilePath,
+      });
+      if (r.inserted) savedRelations++;
+    }
+  }
+
+  // 5. Контрагенты
+  const partyGroups: Array<{
+    items: KadArbitrCounterparty[];
+    predicate: CasePredicate;
+  }> = [
+    { items: caseItem.plaintiffs, predicate: 'plaintiff_in' },
+    { items: caseItem.respondents, predicate: 'defendant_in' },
+  ];
+
+  for (const group of partyGroups) {
+    for (const party of group.items) {
+      // Пропускаем саму целевую организацию — она уже связана
+      if (targetInn && party.inn === targetInn) continue;
+
+      const type =
+        party.type === 'person'  ? 'person'
+        : party.type === 'company' ? 'company'
+        : 'other';
+
+      const partyEntityId = upsertEntity({
+        type,
+        value: party.name,
+        label: party.name,
+        confidence: party.type === 'unknown' ? 50 : 70,
+        status: 'unverified',
+        notes: party.hidden_data ? 'Данные скрыты в kad.arbitr' : undefined,
+        raw_file_path: rawFilePath,
+      });
+      savedEntities++;
+
+      if (party.inn) {
+        const r = addObservation({
+          entity_id: partyEntityId,
+          attribute: 'inn',
+          value: party.inn,
+          source_id: sourceId,
+          confidence: 80,
+          raw_file_path: rawFilePath,
+        });
+        if (r.inserted) savedObservations++;
+      }
+      if (party.address) {
+        const r = addObservation({
+          entity_id: partyEntityId,
+          attribute: 'address',
+          value: party.address,
+          source_id: sourceId,
+          confidence: 70,
+          raw_file_path: rawFilePath,
+        });
+        if (r.inserted) savedObservations++;
+      }
+
+      const r = addRelation({
+        subject_id: partyEntityId,
+        predicate: group.predicate,
+        object_id: caseEntityId,
+        source_id: sourceId,
+        evidence_text: `${group.predicate} по делу ${caseItem.case_number}`,
+        confidence: 80,
+        status: 'unverified',
+        raw_file_path: rawFilePath,
+      });
+      if (r.inserted) savedRelations++;
+    }
+  }
+
+  // 6. Суд
+  if (caseItem.court) {
+    const courtEntityId = promoteCourtToEntity(caseItem.court, sourceId);
+    const r = addRelation({
+      subject_id: caseEntityId,
+      predicate: 'heard_by',
+      object_id: courtEntityId,
+      source_id: sourceId,
+      evidence_text: caseItem.court,
+      confidence: 90,
+      status: 'confirmed',
+      raw_file_path: rawFilePath,
+    });
+    if (r.inserted) savedRelations++;
+  }
+
+  // 7. Судья
+  if (caseItem.judge) {
+    const judgeEntityId = promoteJudgeToEntity(caseItem.judge, caseItem.court, sourceId);
+    const r = addRelation({
+      subject_id: judgeEntityId,
+      predicate: 'judge_of',
+      object_id: caseEntityId,
+      source_id: sourceId,
+      evidence_text: caseItem.judge,
+      confidence: 90,
+      status: 'confirmed',
+      raw_file_path: rawFilePath,
+    });
+    if (r.inserted) savedRelations++;
+  }
+
+  return { caseEntityId, savedEntities, savedRelations, savedObservations };
+}
+
+/**
+ * Определяет предикат для целевой организации.
+ *  - Если targetRole задан явно ('plaintiff'|'defendant'|'third_party') — используем его.
+ *  - Если 'any' — определяем по спискам дела по targetInn.
+ *  - Если ИНН не найден ни в одном списке — null (связь не создаётся).
+ */
+function resolveTargetPredicate(
+  targetRole: 'plaintiff' | 'defendant' | 'third_party' | 'any' | undefined,
+  caseItem: KadArbitrCase,
+  targetInn: string | undefined
+): CasePredicate | null {
+  if (targetRole && targetRole !== 'any') {
+    return roleToPredicate(targetRole);
+  }
+
+  if (!targetInn) return null;
+
+  if (caseItem.plaintiffs.some((p) => p.inn === targetInn))  return 'plaintiff_in';
+  if (caseItem.respondents.some((p) => p.inn === targetInn)) return 'defendant_in';
+  return null;
+}
+
 /**
  * Сохраняет результат scrapeKadArbitr в БД.
  *
- * Логика:
- * 1. Находит/создаёт целевую сущность по ИНН.
- * 2. Для каждого дела — upsert сущности court_case + observations.
- * 3. Связь целевой сущности с делом (plaintiff_in/defendant_in/third_party_in).
- * 4. Контрагенты — upsert сущностей + связи с делом.
- * 5. Суд — ленивая промоция + связь heard_by.
- * 6. Судья — ленивая промоция + связь judge_of.
+ * Тонкая обёртка над `persistCase`:
+ *  1. Находит/создаёт целевую сущность по ИНН.
+ *  2. Для каждого дела вызывает `persistCase`.
+ *
+ * Вся логика обработки одного дела — внутри `persistCase`.
+ * Это позволяет переиспользовать её для данных из rusprofile.
  */
 export function persistKadArbitrData(
   inn: string,
@@ -605,184 +847,24 @@ export function persistKadArbitrData(
 
   // 1. Целевая сущность
   const targetEntityId = findOrCreateTargetEntity(inn, data.cases, sourceId);
-  savedEntities++; // как минимум 1 (или подтверждённая существующая)
+  savedEntities++;
 
-  const primaryRole = data.search_params.roles[0] || 'any';
-  const targetPredicate = roleToPredicate(primaryRole);
+  const targetRole = (data.search_params.roles[0] || 'any') as
+    | 'plaintiff' | 'defendant' | 'third_party' | 'any';
 
+  // 2. Цикл по делам
   for (const caseItem of data.cases) {
-    // 2. Сущность court_case
-    const caseEntityId = upsertEntity({
-      type: 'court_case',
-      value: caseItem.case_number,
-      label: `Дело ${caseItem.case_number}`,
-      confidence: 90,
-      status: 'confirmed',
-      notes: `Тип: ${caseItem.case_type}; суд: ${caseItem.court}`,
+    const r = persistCase({
+      caseItem,
+      sourceId,
+      targetEntityId,
+      targetRole,
+      targetInn: inn,
     });
-    savedEntities++;
 
-    // Observations дела
-    const caseObs: Array<{ attribute: string; value: string | undefined }> = [
-      { attribute: 'case_number', value: caseItem.case_number },
-      { attribute: 'case_type',   value: caseItem.case_type },
-      { attribute: 'case_uuid',   value: caseItem.case_uuid },
-      { attribute: 'filing_date', value: caseItem.filing_date },
-      { attribute: 'court',       value: caseItem.court },
-      { attribute: 'judge',       value: caseItem.judge },
-    ];
-    for (const obs of caseObs) {
-      if (!obs.value) continue;
-      const r = addObservation({
-        entity_id: caseEntityId,
-        attribute: obs.attribute,
-        value: obs.value,
-        source_id: sourceId,
-        confidence: 90,
-      });
-      if (r.inserted) savedObservations++;
-    }
-
-    // 3. Роль целевой сущности в деле
-    if (targetPredicate) {
-      const r = addRelation({
-        subject_id: targetEntityId,
-        predicate: targetPredicate,
-        object_id: caseEntityId,
-        source_id: sourceId,
-        evidence_text: `Дело ${caseItem.case_number}`,
-        confidence: 90,
-        status: 'confirmed',
-      });
-      if (r.inserted) savedRelations++;
-    } else {
-      // 'any' — уточняем по спискам
-      const asPlaintiff = caseItem.plaintiffs.find((p) => p.inn === inn);
-      const asDefendant = caseItem.respondents.find((p) => p.inn === inn);
-      if (asPlaintiff) {
-        const r = addRelation({
-          subject_id: targetEntityId,
-          predicate: 'plaintiff_in',
-          object_id: caseEntityId,
-          source_id: sourceId,
-          evidence_text: `Дело ${caseItem.case_number}`,
-          confidence: 90,
-          status: 'confirmed',
-        });
-        if (r.inserted) savedRelations++;
-      }
-      if (asDefendant) {
-        const r = addRelation({
-          subject_id: targetEntityId,
-          predicate: 'defendant_in',
-          object_id: caseEntityId,
-          source_id: sourceId,
-          evidence_text: `Дело ${caseItem.case_number}`,
-          confidence: 90,
-          status: 'confirmed',
-        });
-        if (r.inserted) savedRelations++;
-      }
-    }
-
-    // 4. Суд
-    if (caseItem.court) {
-      const courtEntityId = promoteCourtToEntity(caseItem.court, sourceId);
-      if (courtEntityId) {
-        const r = addRelation({
-          subject_id: caseEntityId,
-          predicate: 'heard_by',
-          object_id: courtEntityId,
-          source_id: sourceId,
-          evidence_text: caseItem.court,
-          confidence: 90,
-          status: 'confirmed',
-        });
-        if (r.inserted) savedRelations++;
-      }
-    }
-
-    // 5. Судья
-    if (caseItem.judge) {
-      const judgeEntityId = promoteJudgeToEntity(caseItem.judge, caseItem.court, sourceId);
-      if (judgeEntityId) {
-        const r = addRelation({
-          subject_id: judgeEntityId,
-          predicate: 'judge_of',
-          object_id: caseEntityId,
-          source_id: sourceId,
-          evidence_text: caseItem.judge,
-          confidence: 90,
-          status: 'confirmed',
-        });
-        if (r.inserted) savedRelations++;
-      }
-    }
-
-    // 6. Контрагенты
-    const partyGroups: Array<{
-      items: KadArbitrCounterparty[];
-      predicate: CasePredicate;
-    }> = [
-      { items: caseItem.plaintiffs, predicate: 'plaintiff_in' },
-      { items: caseItem.respondents, predicate: 'defendant_in' },
-    ];
-
-    for (const group of partyGroups) {
-      for (const party of group.items) {
-        // Пропускаем саму целевую организацию — она уже связана
-        if (party.inn === inn) continue;
-
-        const type =
-          party.type === 'person'  ? 'person'
-          : party.type === 'company' ? 'company'
-          : 'other';
-
-        const partyEntityId = upsertEntity({
-          type,
-          value: party.name,
-          label: party.name,
-          confidence: party.type === 'unknown' ? 50 : 70,
-          status: 'unverified',
-          notes: party.hidden_data ? 'Данные скрыты в kad.arbitr' : undefined,
-        });
-        savedEntities++;
-
-        // Наблюдения контрагента
-        if (party.inn) {
-          const r = addObservation({
-            entity_id: partyEntityId,
-            attribute: 'inn',
-            value: party.inn,
-            source_id: sourceId,
-            confidence: 80,
-          });
-          if (r.inserted) savedObservations++;
-        }
-        if (party.address) {
-          const r = addObservation({
-            entity_id: partyEntityId,
-            attribute: 'address',
-            value: party.address,
-            source_id: sourceId,
-            confidence: 70,
-          });
-          if (r.inserted) savedObservations++;
-        }
-
-        // Связь контрагент → дело
-        const r = addRelation({
-          subject_id: partyEntityId,
-          predicate: group.predicate,
-          object_id: caseEntityId,
-          source_id: sourceId,
-          evidence_text: `${group.predicate} по делу ${caseItem.case_number}`,
-          confidence: 80,
-          status: 'unverified',
-        });
-        if (r.inserted) savedRelations++;
-      }
-    }
+    savedEntities += r.savedEntities;
+    savedRelations += r.savedRelations;
+    savedObservations += r.savedObservations;
   }
 
   return { savedEntities, savedRelations, savedObservations, targetEntityId };
