@@ -83,6 +83,7 @@ function persistCompanyData(
   savedEntities: number;
   savedRelations: number;
   savedObservations: number;
+  mainEntityId: number;
 } {
   const mainSummary = data.summary || {};
   const mainType = detectEntityTypeFromData(mainSummary);
@@ -255,7 +256,7 @@ function persistCompanyData(
   // Аудит
   auditChange('entities', mainEntityId, 'update', null, JSON.stringify(mainSummary), 'Сохранение/обновление сущности из Rusprofile');
 
-  return { savedEntities, savedRelations, savedObservations };
+  return { savedEntities, savedRelations, savedObservations, mainEntityId };
 }
 
 
@@ -316,8 +317,22 @@ export function saveCompanyData(
   // 6. Сохраняем данные в БД
   const result = persistCompanyData(companyId, companyInn, data, raw.filePath, sourceId);
 
+  // 7. Судебные дела из arbitration_details (если есть)
+  let arbStats = { savedEntities: 0, savedRelations: 0, savedObservations: 0, casesProcessed: 0 };
+  if (data.arbitration_details?.cases?.length) {
+    arbStats = persistRusprofileArbitration(
+      result.mainEntityId,
+      companyId,
+      data.arbitration_details,
+      sourceId,
+      raw.filePath
+    );
+  }
+
   return {
-    ...result,
+    savedEntities: result.savedEntities + arbStats.savedEntities,
+    savedRelations: result.savedRelations + arbStats.savedRelations,
+    savedObservations: result.savedObservations + arbStats.savedObservations,
     rawDumpPath: raw.filePath,
   };
 }
@@ -377,8 +392,22 @@ export function updateCompanyData(
   // 5. Сохраняем данные в БД
   const result = persistCompanyData(companyId, companyInn, data, existingDumpPath, sourceId);
 
+  // 6. Судебные дела из arbitration_details
+  let arbStats = { savedEntities: 0, savedRelations: 0, savedObservations: 0, casesProcessed: 0 };
+  if (data.arbitration_details?.cases?.length) {
+    arbStats = persistRusprofileArbitration(
+      result.mainEntityId,
+      companyId,
+      data.arbitration_details,
+      sourceId,
+      existingDumpPath
+    );
+  }
+
   return {
-    ...result,
+    savedEntities: result.savedEntities + arbStats.savedEntities,
+    savedRelations: result.savedRelations + arbStats.savedRelations,
+    savedObservations: result.savedObservations + arbStats.savedObservations,
     rawDumpPath: existingDumpPath,
   };
 }
@@ -677,6 +706,22 @@ function persistCase(params: PersistCaseParams): PersistCaseResult {
     });
     if (r.inserted) savedObservations++;
   }
+ 
+  // Extra observations (сумма, категория, тип и т.д. — из rusprofile)
+  if (caseItem.extra_observations) {
+    for (const obs of caseItem.extra_observations) {
+      if (!obs.value) continue;
+      const r = addObservation({
+        entity_id: caseEntityId,
+        attribute: obs.attribute,
+        value: obs.value,
+        source_id: sourceId,
+        confidence: 90,
+        raw_file_path: rawFilePath,
+      });
+      if (r.inserted) savedObservations++;
+    }
+  }
 
   // 4. Связь целевой организации с делом
   if (targetEntityId) {
@@ -704,6 +749,7 @@ function persistCase(params: PersistCaseParams): PersistCaseResult {
   }> = [
     { items: caseItem.plaintiffs, predicate: 'plaintiff_in' },
     { items: caseItem.respondents, predicate: 'defendant_in' },
+    { items: caseItem.third_parties || [], predicate: 'third_party_in' },
   ];
 
   for (const group of partyGroups) {
@@ -712,17 +758,19 @@ function persistCase(params: PersistCaseParams): PersistCaseResult {
       if (targetInn && party.inn === targetInn) continue;
 
       const type =
-        party.type === 'person'  ? 'person'
-        : party.type === 'company' ? 'company'
+        party.type === 'person'       ? 'person'
+        : party.type === 'entrepreneur' ? 'entrepreneur'
+        : party.type === 'company'      ? 'company'
         : 'other';
 
       const partyEntityId = upsertEntity({
+        rusprofile_id: party.rusprofile_id,
         type,
         value: party.name,
         label: party.name,
         confidence: party.type === 'unknown' ? 50 : 70,
         status: 'unverified',
-        notes: party.hidden_data ? 'Данные скрыты в kad.arbitr' : undefined,
+        notes: party.hidden_data ? 'Данные скрыты' : undefined,
         raw_file_path: rawFilePath,
       });
       savedEntities++;
@@ -868,4 +916,222 @@ export function persistKadArbitrData(
   }
 
   return { savedEntities, savedRelations, savedObservations, targetEntityId };
+}
+
+// ============================================================================
+// RUSPROFILE: судебные дела (arbitration_details)
+// ============================================================================
+
+/**
+ * "№ А40-283253/2026 от 04.09.2026" → { number: "А40-283253/2026", date: "2026-09-04" }
+ */
+function parseRusprofileCaseNumber(raw: string): { number: string; date: string } {
+  if (!raw) return { number: '', date: '' };
+
+  let numberRaw = raw;
+  let dateRaw = '';
+
+  const idx = raw.indexOf(' от ');
+  if (idx !== -1) {
+    numberRaw = raw.slice(0, idx);
+    dateRaw = raw.slice(idx + 4).trim();
+  }
+
+  numberRaw = numberRaw.replace(/^№\s*/, '').trim();
+
+  let isoDate = '';
+  const dm = dateRaw.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  if (dm) isoDate = `${dm[3]}-${dm[2]}-${dm[1]}`;
+
+  return { number: numberRaw, date: isoDate };
+}
+
+/**
+ * "Экономические споры по гражданским правоотношениям" → "civil"
+ * "Дела о несостоятельности (банкротстве)" → "bankruptcy"
+ */
+function mapRusprofileCaseType(typeRaw: string): 'civil' | 'administrative' | 'bankruptcy' | 'other' {
+  if (!typeRaw) return 'other';
+  const t = typeRaw.toLowerCase();
+  if (t.includes('банкротств') || t.includes('несостоятельност')) return 'bankruptcy';
+  if (t.includes('административн')) return 'administrative';
+  if (t.includes('гражданск')) return 'civil';
+  return 'other';
+}
+
+/**
+ * Извлекает UUID карточки kad.arbitr из ссылки вида
+ * "https://kad.arbitr.ru/Card/af78742a-...".
+ * Для ссылок вида "/Document/Pdf/..." возвращает ''.
+ */
+function extractKadUuidFromUrl(url?: string): string {
+  if (!url) return '';
+  const m = url.match(/\/Card\/([a-f0-9-]+)/i);
+  return m ? m[1] : '';
+}
+
+/**
+ * Преобразует объект {text, href} из rusprofile в KadArbitrCounterparty.
+ */
+function rusprofilePartyToCounterparty(party: any): KadArbitrCounterparty | null {
+  if (!party || typeof party !== 'object' || !party.text) return null;
+
+  const name: string = String(party.text);
+  const href: string | undefined = party.href;
+
+  const hrefType = detectEntityTypeFromHref(href);
+  const type: KadArbitrCounterparty['type'] =
+    hrefType === 'company'      ? 'company'
+    : hrefType === 'entrepreneur' ? 'entrepreneur'
+    : hrefType === 'person'       ? 'person'
+    : 'unknown';
+
+  return {
+    name,
+    type,
+    rusprofile_id: extractRusprofileId(href),
+  };
+}
+
+/**
+ * Читает массив или одиночный объект — на случай, если rusprofile
+ * вернёт несколько истцов/ответчиков.
+ */
+function asArray<T>(value: T | T[] | undefined): T[] {
+  if (!value) return [];
+  return Array.isArray(value) ? value : [value];
+}
+
+/**
+ * Одно дело из arbitration_details → KadArbitrCase (универсальный формат).
+ *
+ *  - case_number парсится из "№ А40-... от DD.MM.YYYY";
+ *  - case_uuid извлекается из kad_url, если это карточка;
+ *  - суд и судья неизвестны из этого формата — пустые строки;
+ *  - Истец/Ответчик/Третье лицо → plaintiffs/respondents/third_parties;
+ *  - Сумма, Категория, Тип, Исход, Статус → extra_observations.
+ */
+function rusprofileCaseToKadArbitrCase(caseItem: any): KadArbitrCase | null {
+  if (!caseItem) return null;
+
+  const parsed = parseRusprofileCaseNumber(String(caseItem.case_number || ''));
+  if (!parsed.number) return null;
+
+  const fields = caseItem.fields || {};
+
+  const plaintiffs: KadArbitrCounterparty[] = [];
+  const respondents: KadArbitrCounterparty[] = [];
+  const thirdParties: KadArbitrCounterparty[] = [];
+
+  for (const p of asArray(fields['Истец'])) {
+    const c = rusprofilePartyToCounterparty(p);
+    if (c) plaintiffs.push(c);
+  }
+  for (const p of asArray(fields['Ответчик'])) {
+    const c = rusprofilePartyToCounterparty(p);
+    if (c) respondents.push(c);
+  }
+  for (const p of asArray(fields['Третье лицо'])) {
+    const c = rusprofilePartyToCounterparty(p);
+    if (c) thirdParties.push(c);
+  }
+
+  const extra: Array<{ attribute: string; value: string }> = [];
+  if (fields['Сумма'])     extra.push({ attribute: 'amount',   value: String(fields['Сумма']) });
+  if (fields['Категория']) extra.push({ attribute: 'category', value: String(fields['Категория']) });
+  if (fields['Тип'])       extra.push({ attribute: 'subject',  value: String(fields['Тип']) });
+  if (fields['Исход'])     extra.push({ attribute: 'result',   value: String(fields['Исход']) });
+  if (caseItem.status)     extra.push({ attribute: 'status',   value: String(caseItem.status) });
+
+  return {
+    case_number: parsed.number,
+    case_uuid: extractKadUuidFromUrl(caseItem.kad_url),
+    case_type: mapRusprofileCaseType(String(fields['Тип'] || '')),
+    filing_date: parsed.date,
+    court: '',
+    judge: undefined,
+    plaintiffs,
+    respondents,
+    third_parties: thirdParties,
+    extra_observations: extra,
+  };
+}
+
+/**
+ * Определяет роль целевой компании в деле по её rusprofile_id.
+ */
+function detectTargetRoleInRusprofileCase(
+  caseItem: any,
+  targetRusprofileId: string
+): 'plaintiff' | 'defendant' | 'third_party' | undefined {
+  const fields = caseItem?.fields || {};
+  const target = `id:${targetRusprofileId}`;
+
+  const check = (value: any, role: 'plaintiff' | 'defendant' | 'third_party') => {
+    for (const p of asArray(value)) {
+      if (extractRusprofileId(p?.href) === target) return role;
+    }
+    return undefined;
+  };
+
+  return (
+    check(fields['Истец'], 'plaintiff') ||
+    check(fields['Ответчик'], 'defendant') ||
+    check(fields['Третье лицо'], 'third_party')
+  );
+}
+
+/**
+ * Сохраняет все дела из rusprofile `arbitration_details`.
+ * Каждое дело прогоняется через `persistCase` — ту же функцию,
+ * что и для kad.arbitr. Дедупликация по normalized_case_number
+ * автоматически объединяет дела из двух источников.
+ */
+export function persistRusprofileArbitration(
+  targetEntityId: number,
+  targetRusprofileId: string,
+  arbitrationDetails: any,
+  sourceId: number,
+  rawFilePath?: string
+): {
+  savedEntities: number;
+  savedRelations: number;
+  savedObservations: number;
+  casesProcessed: number;
+} {
+  let savedEntities = 0;
+  let savedRelations = 0;
+  let savedObservations = 0;
+  let casesProcessed = 0;
+
+  const cases: any[] = Array.isArray(arbitrationDetails?.cases)
+    ? arbitrationDetails.cases
+    : [];
+
+  for (const caseItem of cases) {
+    const kadCase = rusprofileCaseToKadArbitrCase(caseItem);
+    if (!kadCase) continue;
+
+    const targetRole = detectTargetRoleInRusprofileCase(caseItem, targetRusprofileId);
+
+    const r = persistCase({
+      caseItem: kadCase,
+      sourceId,
+      targetEntityId,
+      targetRole,
+      rawFilePath,
+    });
+
+    savedEntities += r.savedEntities;
+    savedRelations += r.savedRelations;
+    savedObservations += r.savedObservations;
+    casesProcessed++;
+  }
+
+  console.log(
+    `[persistRusprofileArbitration] Обработано дел: ${casesProcessed}, ` +
+    `сущностей: ${savedEntities}, связей: ${savedRelations}, наблюдений: ${savedObservations}`
+  );
+
+  return { savedEntities, savedRelations, savedObservations, casesProcessed };
 }

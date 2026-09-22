@@ -42,23 +42,26 @@ export interface KadArbitrCounterparty {
   name: string;
   inn?: string;
   address?: string;
-  type: 'company' | 'person' | 'unknown';
-  hidden_data?: boolean;   // «Данные скрыты» — физлицо без ИНН
+  type: 'company' | 'entrepreneur' | 'person' | 'unknown';
+  hidden_data?: boolean;
+  rusprofile_id?: string;   // "id:3350222" — из href rusprofile
 }
 
 export type KadArbitrCaseType = 'civil' | 'administrative' | 'bankruptcy' | 'other';
 
 export interface KadArbitrCase {
-  case_number: string;       // 'А40-283283/2026'
-  case_uuid: string;         // UUID для ссылки на карточку
-  case_type: KadArbitrCaseType;
-  filing_date: string;       // ISO
-  court: string;             // 'АС города Москвы'
-  judge?: string;            // 'Романенкова С. В.'
+  case_number: string;
+  case_uuid: string;
+  case_type: 'civil' | 'administrative' | 'bankruptcy' | 'other';
+  filing_date: string;
+  court: string;
+  judge?: string;
   plaintiffs: KadArbitrCounterparty[];
   respondents: KadArbitrCounterparty[];
+  third_parties?: KadArbitrCounterparty[];               // НОВОЕ
   hidden_plaintiffs_count?: number;
   hidden_respondents_count?: number;
+  extra_observations?: Array<{ attribute: string; value: string }>;   // НОВОЕ
 }
 
 export interface KadArbitrSearchOptions {
