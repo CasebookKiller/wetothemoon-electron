@@ -75,7 +75,7 @@ export async function ensureKadSession(): Promise<Page> {
   if (await isKadAuthorized(page)) {
     console.log('[kad] Сессия уже активна.');
     // Session-куки (rcid) теряются при storageState → нужен F5, чтобы Pravocaptcha переустановила rcid
-    await ensureRcid(page);
+    //await ensureRcid(page);
     // Обновляем сохранённые cookies (могли обновиться rcid, __ddg*)
     await saveAllKadCookies(page);
     return page;
@@ -98,7 +98,7 @@ export async function ensureKadSession(): Promise<Page> {
   }
 
   // После ручного логина rcid может отсутствовать — принудительно получаем
-  await ensureRcid(page);
+  //await ensureRcid(page);
 
   // Сохраняем ВСЕ cookies, включая session — при следующем запуске восстановим
   await saveAllKadCookies(page);
