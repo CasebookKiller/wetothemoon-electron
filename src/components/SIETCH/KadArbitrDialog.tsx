@@ -165,40 +165,45 @@ export const KadArbitrDialog: React.FC<KadArbitrDialogProps> = ({
         </div>
 
         {/* Пагинация */}
-        <div className="flex align-items-center gap-3 flex-wrap">
-          <span className="white-space-nowrap">Макс. страниц:</span>
-          <InputNumber
-            value={maxPages}
-            onValueChange={(e) => setMaxPages(e.value ?? 5)}
-            min={1}
-            max={50}
-            showButtons
-            buttonLayout="horizontal"
-            decrementButtonClassName="osint-soft"
-            incrementButtonClassName="osint-soft"
-            decrementButtonIcon="pi pi-minus"
-            incrementButtonIcon="pi pi-plus"
-            inputClassName="text-center"
-            disabled={running}
-            style={{ width: '10rem' }}
-          />
-          <span className="white-space-nowrap">Макс. дел:</span>
-          <InputNumber
-            value={maxTotalCases}
-            onValueChange={(e) => setMaxTotalCases(e.value ?? 500)}
-            min={25}
-            max={5000}
-            step={25}
-            showButtons
-            buttonLayout="horizontal"
-            decrementButtonClassName="osint-soft"
-            incrementButtonClassName="osint-soft"
-            decrementButtonIcon="pi pi-minus"
-            incrementButtonIcon="pi pi-plus"
-            inputClassName="text-center"
-            disabled={running}
-            style={{ width: '10rem' }}
-          />
+        <div className="flex align-items-center gap-4 flex-wrap">
+          <div className="flex align-items-center gap-2" style={{ flexShrink: 0 }}>
+            <span className="white-space-nowrap">Макс. страниц:</span>
+            <InputNumber
+              value={maxPages}
+              onValueChange={(e) => setMaxPages(e.value ?? 5)}
+              min={1}
+              max={50}
+              showButtons
+              buttonLayout="horizontal"
+              decrementButtonClassName="osint-soft"
+              incrementButtonClassName="osint-soft"
+              decrementButtonIcon="pi pi-minus"
+              incrementButtonIcon="pi pi-plus"
+              inputClassName="text-center"
+              disabled={running}
+              style={{ width: '9rem' }}
+            />
+          </div>
+
+          <div className="flex align-items-center gap-2" style={{ flexShrink: 0 }}>
+            <span className="white-space-nowrap">Макс. дел:</span>
+            <InputNumber
+              value={maxTotalCases}
+              onValueChange={(e) => setMaxTotalCases(e.value ?? 500)}
+              min={25}
+              max={5000}
+              step={25}
+              showButtons
+              buttonLayout="horizontal"
+              decrementButtonClassName="osint-soft"
+              incrementButtonClassName="osint-soft"
+              decrementButtonIcon="pi pi-minus"
+              incrementButtonIcon="pi pi-plus"
+              inputClassName="text-center"
+              disabled={running}
+              style={{ width: '9rem' }}
+            />
+          </div>
         </div>
 
         {/* Роли */}

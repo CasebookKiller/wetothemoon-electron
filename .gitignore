@@ -114,3 +114,7 @@ src/renderer/dist/
 *.bak
 
 .env
+
+
+# Отладочные скрипты для kad.arbitr — не коммитим
+scripts/kad-test/
