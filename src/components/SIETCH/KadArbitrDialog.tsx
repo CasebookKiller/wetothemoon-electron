@@ -248,14 +248,6 @@ export const KadArbitrDialog: React.FC<KadArbitrDialogProps> = ({
 
         {/* Роли */}
         <div className="flex align-items-center gap-3 flex-wrap">
-          <label className="flex align-items-center gap-1">
-            <Checkbox
-              checked={forceRefresh}
-              onChange={(e) => setForceRefresh(!!e.checked)}
-              disabled={running}
-            />
-            <span>Обновить из kad.arbitr (игнорировать кеш)</span>
-          </label>
           <span className="white-space-nowrap">Роль:</span>
           <label className="flex align-items-center gap-1">
             <Checkbox
@@ -284,6 +276,14 @@ export const KadArbitrDialog: React.FC<KadArbitrDialogProps> = ({
           <span className="text-sm" style={{ color: 'var(--tg-theme-hint-color)' }}>
             (не отмечено — любая)
           </span>
+          <label className="flex align-items-center gap-1">
+            <Checkbox
+              checked={forceRefresh}
+              onChange={(e) => setForceRefresh(!!e.checked)}
+              disabled={running}
+            />
+            <span>Обновить из kad.arbitr (игнорировать кеш)</span>
+          </label>
         </div>
 
         {/* Журнал */}
