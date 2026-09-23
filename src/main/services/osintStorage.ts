@@ -1,18 +1,18 @@
 import fs from 'fs';
 import { encode } from '@msgpack/msgpack';
 
-import {
-  addObservation,
-  addRawDumpRecord,
-  addRelation,
-  addSource,
-  auditChange,
-  getDumpSectionsUpdatedAt,
-  updateRawDumpSections,
-  upsertEntity,
-  getDatabase,
-  addCaseEvent,
-} from './database';
+//import {
+//  addObservation,
+//  addRawDumpRecord,
+//  addRelation,
+//  addSource,
+//  auditChange,
+//  getDumpSectionsUpdatedAt,
+//  updateRawDumpSections,
+//  upsertEntity,
+//  getDatabase,
+//  addCaseEvent,
+//} from './database';
 import { saveRawDumpSync } from './rawStorage';
 import {
   KadArbitrCase,
@@ -23,6 +23,7 @@ import {
   KadArbitrCardSide,
 } from './osint/scrapers/kadArbitr';
 import { detectCounterpartyType } from './osint/scrapers/kadArbitr/helpers';
+import { addCaseEvent, addObservation, addRawDumpRecord, addRelation, addSource, auditChange, getDatabase, getDumpSectionsUpdatedAt, updateRawDumpSections, upsertEntity } from './db';
 
 /**
  * Определяет тип сущности по ссылке на профиль Rusprofile.

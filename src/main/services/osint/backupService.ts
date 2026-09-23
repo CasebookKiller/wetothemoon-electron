@@ -3,7 +3,8 @@
 import fs from 'fs';
 import path from 'path';
 import { app, dialog, BrowserWindow } from 'electron';
-import { getDatabase } from '../database';
+import { getDatabase } from '../db';
+//import { getDatabase } from '../database';
 
 // ============ Вспомогательные ============
 

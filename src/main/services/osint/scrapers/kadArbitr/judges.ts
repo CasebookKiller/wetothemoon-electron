@@ -1,17 +1,17 @@
 // src/main/services/osint/scrapers/kadArbitr/judges.ts
 
 import { Page } from 'playwright';
-import {
-  markPrefixStatus,
-  listPrefixesToScrape,
-  upsertCourt,
-  upsertJudge,
-  countJudges,
-  countCourts,
-  listAllPrefixesForSource,
-  listSaturatedPrefixes,
-} from '../../../database';
-import { addSource } from '../../../database';
+//import {
+//  markPrefixStatus,
+//  listPrefixesToScrape,
+//  upsertCourt,
+//  upsertJudge,
+//  countJudges,
+//  countCourts,
+//  listAllPrefixesForSource,
+//  listSaturatedPrefixes,
+//} from '../../../database';
+//import { addSource } from '../../../database';
 import { sleep, normalizeJudgeName } from './helpers';
 import type {
   JudgeSuggestion,
@@ -19,6 +19,7 @@ import type {
   JudgesDirectoryOptions,
   JudgesProgressInfo,
 } from './types';
+import { addSource, countCourts, countJudges, listAllPrefixesForSource, listPrefixesToScrape, listSaturatedPrefixes, markPrefixStatus, upsertCourt, upsertJudge } from '@/main/services/db';
 
 const KAD_HOME = 'https://kad.arbitr.ru/';
 const SUGGEST_URL = '/Suggest/Judges';

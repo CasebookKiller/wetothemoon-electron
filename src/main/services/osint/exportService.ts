@@ -3,7 +3,8 @@
 import path from 'path';
 import fs from 'fs';
 import { app, dialog, BrowserWindow } from 'electron';
-import { getDatabase } from '../database';
+import { getDatabase } from '../db';
+//import { getDatabase } from '../database';
 
 /**
  * Экранирует значение для CSV по RFC 4180.

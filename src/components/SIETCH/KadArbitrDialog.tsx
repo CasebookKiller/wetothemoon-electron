@@ -6,6 +6,10 @@ import { Button } from 'primereact/button';
 import { InputText } from 'primereact/inputtext';
 import { InputNumber } from 'primereact/inputnumber';
 import { Checkbox } from 'primereact/checkbox';
+import { DataTable } from 'primereact/datatable';
+import { Column } from 'primereact/column';
+import { KadArbitrCardDialog } from './KadArbitrCardDialog';
+import { KadArbitrCasesDialog } from './KadArbitrCasesDialog';
 
 export interface KadArbitrDialogProps {
   visible: boolean;
@@ -50,6 +54,12 @@ export const KadArbitrDialog: React.FC<KadArbitrDialogProps> = ({
   const [error, setError] = useState('');
   const logRef = useRef<HTMLPreElement>(null);
 
+  const [foundCases, setFoundCases] = useState<any[]>([]);
+  const [cardDialogVisible, setCardDialogVisible] = useState(false);
+  const [cardDialogUuid, setCardDialogUuid] = useState('');
+
+  const [casesDialogVisible, setCasesDialogVisible] = useState(false);
+
   // Синхронизация входного ИНН
   useEffect(() => {
     if (visible) {
@@ -58,6 +68,10 @@ export const KadArbitrDialog: React.FC<KadArbitrDialogProps> = ({
       setError('');
       setStats(null);
       setLog([]);
+      setFoundCases([]);
+      setCardDialogVisible(false);
+      setCardDialogUuid('');
+      setCasesDialogVisible(false);
     }
   }, [visible, initialInn]);
 
@@ -106,6 +120,7 @@ export const KadArbitrDialog: React.FC<KadArbitrDialogProps> = ({
       if (res.success) {
         if (res.empty) {
           setResult('Дел не найдено.');
+          setFoundCases([]);
         } else {
           const s = res.stats;
           setStats(s);
@@ -113,6 +128,7 @@ export const KadArbitrDialog: React.FC<KadArbitrDialogProps> = ({
             `Найдено дел: ${res.data.cases.length} из ${res.data.totals.cases_found}. ` +
             `Сохранено: сущностей ${s.savedEntities}, связей ${s.savedRelations}, наблюдений ${s.savedObservations}.`
           );
+          setFoundCases(res.data.cases || []);
           if (onSaved) onSaved(inn.trim());
         }
       } else {
@@ -152,58 +168,68 @@ export const KadArbitrDialog: React.FC<KadArbitrDialogProps> = ({
       }
     >
       <div className="flex flex-column gap-3">
-        {/* ИНН */}
-        <div className="flex align-items-center gap-3 flex-wrap">
+        {/* Пагинация */}
+        {/* Параметры поиска — одной строкой */}
+        <div className="flex flex-nowrap align-items-center gap-2">
           <span className="white-space-nowrap">ИНН:</span>
           <InputText
             value={inn}
             onChange={(e) => setInn(e.target.value)}
             placeholder="10 или 12 цифр"
             disabled={running}
-            style={{ width: '16rem' }}
+            style={{ width: '11rem', height: '2.5rem' }}
           />
-        </div>
 
-        {/* Пагинация */}
-        <div className="flex align-items-center gap-4 flex-wrap">
-          <div className="flex align-items-center gap-2" style={{ flexShrink: 0 }}>
-            <span className="white-space-nowrap">Макс. страниц:</span>
-            <InputNumber
-              value={maxPages}
-              onValueChange={(e) => setMaxPages(e.value ?? 5)}
-              min={1}
-              max={50}
-              showButtons
-              buttonLayout="horizontal"
-              decrementButtonClassName="osint-soft"
-              incrementButtonClassName="osint-soft"
-              decrementButtonIcon="pi pi-minus"
-              incrementButtonIcon="pi pi-plus"
-              inputClassName="text-center"
-              disabled={running}
-              style={{ width: '9rem' }}
-            />
-          </div>
+          <span className="white-space-nowrap">Стр.:</span>
+          <InputNumber
+            value={maxPages}
+            onValueChange={(e) => setMaxPages(e.value ?? 5)}
+            min={1}
+            max={50}
+            showButtons
+            buttonLayout="horizontal"
+            decrementButtonClassName="osint-soft"
+            incrementButtonClassName="osint-soft"
+            decrementButtonIcon="pi pi-minus"
+            incrementButtonIcon="pi pi-plus"
+            disabled={running}
+            style={{ width: '10rem', height: '2.5rem' }}
+            inputStyle={{
+              width: '3.2rem',
+              minWidth: '3.2rem',
+              maxWidth: '3.2rem',
+              flex: '0 0 3.2rem',
+              padding: '0 0.25rem',
+              textAlign: 'center',
+              height: '2.5rem',
+            }}
+          />
 
-          <div className="flex align-items-center gap-2" style={{ flexShrink: 0 }}>
-            <span className="white-space-nowrap">Макс. дел:</span>
-            <InputNumber
-              value={maxTotalCases}
-              onValueChange={(e) => setMaxTotalCases(e.value ?? 500)}
-              min={25}
-              max={5000}
-              step={25}
-              showButtons
-              buttonLayout="horizontal"
-              decrementButtonClassName="osint-soft"
-              incrementButtonClassName="osint-soft"
-              decrementButtonIcon="pi pi-minus"
-              incrementButtonIcon="pi pi-plus"
-              inputClassName="text-center"
-              disabled={running}
-              style={{ width: '9rem' }}
-            />
-          </div>
+          <span className="white-space-nowrap ms-4">Дел:</span>
+          <InputNumber
+            value={maxTotalCases}
+            onValueChange={(e) => setMaxTotalCases(e.value ?? 500)}
+            min={25}
+            max={5000}
+            step={25}
+            showButtons
+            buttonLayout="horizontal"
+            decrementButtonClassName="osint-soft"
+            incrementButtonClassName="osint-soft"
+            decrementButtonIcon="pi pi-minus"
+            incrementButtonIcon="pi pi-plus"
+            disabled={running}
+            style={{ width: '10rem', height: '2.5rem' }}
+            inputStyle={{
+              width: '3.2rem',
+              minWidth: '3.2rem',
+              maxWidth: '3.2rem',
+              flex: '0 0 3.2rem',
+              padding: '0 0.25rem',
+              textAlign: 'center',
+              height: '2.5rem',
+            }}
+          />
         </div>
 
         {/* Роли */}
@@ -256,19 +282,36 @@ export const KadArbitrDialog: React.FC<KadArbitrDialogProps> = ({
           </pre>
         </div>
 
-        {result && <p className="p-success">{result}</p>}
-        {error && <p className="p-error">Ошибка: {error}</p>}
-
-        {stats && (
-          <div
-            className="text-sm"
-            style={{ color: 'var(--tg-theme-hint-color)' }}
-          >
-            Сущность #{stats.targetEntityId} · сущностей {stats.savedEntities} · связей{' '}
-            {stats.savedRelations} · наблюдений {stats.savedObservations}
+        {result && (
+          <div className="flex align-items-center gap-3 flex-wrap">
+            <p className="p-success" style={{ margin: 0 }}>{result}</p>
+            {foundCases.length > 0 && (
+              <Button
+                label={`Показать найденные дела (${foundCases.length})`}
+                icon="pi pi-table"
+                className="osint-soft"
+                onClick={() => setCasesDialogVisible(true)}
+              />
+            )}
           </div>
         )}
+        {error && <p className="p-error">Ошибка: {error}</p>}
+
       </div>
+
+      <KadArbitrCardDialog
+        visible={cardDialogVisible}
+        caseUuid={cardDialogUuid}
+        onHide={() => setCardDialogVisible(false)}
+      />
+
+      <KadArbitrCasesDialog
+        visible={casesDialogVisible}
+        cases={foundCases}
+        inn={inn}
+        onHide={() => setCasesDialogVisible(false)}
+      />
+
     </Dialog>
   );
 };

@@ -14,42 +14,42 @@ import {
 import { scrapeMosGorsud } from '../services/osint/scrapers/mosGorsud';
 import { getCredentials, setCredentials } from '../services/osint/credentials';
 import { createDatabaseWindow, getDatabaseWindow } from '../windows/databaseWindow';
-import { deleteDumpsByEntity, findLatestRawDump, getRelatedIds, searchEntities, searchAll, listJudges,
-  listCourts,
-  listSaturatedPrefixes,
-  deleteJudge,
-  addSource, } from '../services/database';
+//import { deleteDumpsByEntity, findLatestRawDump, getRelatedIds, searchEntities, searchAll, listJudges,
+//  listCourts,
+//  listSaturatedPrefixes,
+//  deleteJudge,
+//  addSource, } from '../services/database';
 import { deleteAllRawDumps, loadRawDumpSync } from '../services/rawStorage';
 import { mergeCompanyDumps, persistKadArbitrCard, persistKadArbitrData, saveCompanyData, updateCompanyData } from '../services/osintStorage';
-import { 
-  getDatabase,
-  getDumpSectionsUpdatedAt,
-  hasRawDumpForInn,
-  listDumps,
-  getRelationDetails,
-  markRecordAsFalse,
-  getEntityDetails,
-  getObservationDetails,
-  getSourceDetails,
-  createEntity,
-  updateEntity,
-  createRelation,
-  updateRelation,
-  createObservation,
-  updateObservation,
-  createSource,
-  updateSource,
-  listEntitiesForDropdown,
-  deleteEntity,
-  deleteRelation,
-  deleteObservation,
-  deleteSource,
-  clearAllTables,
-  getAuditLog,
-  listAuditLogTables,
-  listAuditLogActions,
-  markRecordsAsFalse,
-} from '../services/database';
+//import { 
+//  getDatabase,
+//  getDumpSectionsUpdatedAt,
+//  hasRawDumpForInn,
+//  listDumps,
+//  getRelationDetails,
+//  markRecordAsFalse,
+//  getEntityDetails,
+//  getObservationDetails,
+//  getSourceDetails,
+//  createEntity,
+//  updateEntity,
+//  createRelation,
+//  updateRelation,
+//  createObservation,
+//  updateObservation,
+//  createSource,
+//  updateSource,
+//  listEntitiesForDropdown,
+//  deleteEntity,
+//  deleteRelation,
+//  deleteObservation,
+//  deleteSource,
+//  clearAllTables,
+//  getAuditLog,
+//  listAuditLogTables,
+//  listAuditLogActions,
+//  markRecordsAsFalse,
+//} from '../services/database';
 
 import {
   getSensitiveStatus,
@@ -85,6 +85,7 @@ import {
   createBackup,
   restoreFromBackup,
 } from '../services/osint/backupService';
+import { addSource, clearAllTables, createEntity, createObservation, createRelation, createSource, deleteDumpsByEntity, deleteEntity, deleteJudge, deleteObservation, deleteRelation, deleteSource, findLatestRawDump, getAuditLog, getDatabase, getDumpSectionsUpdatedAt, getEntityDetails, getObservationDetails, getRelatedIds, getRelationDetails, getSourceDetails, hasRawDumpForInn, listAuditLogActions, listAuditLogTables, listCourts, listDumps, listEntitiesForDropdown, listJudges, listSaturatedPrefixes, markRecordAsFalse, markRecordsAsFalse, searchAll, searchEntities, updateEntity, updateObservation, updateRelation, updateSource } from '../services/db';
 
 export function registerOsintHandlers() {
   // Открыть окно OSINT
