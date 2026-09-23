@@ -16,6 +16,10 @@ const RATE_DELAY_MS = 3000;
 
 /**
  * Поиск дел по ИНН через UI-клик.
+ *
+ * Между страницами kad иногда отдаёт пересекающиеся дела (одно дело
+ * попадает на границу страниц). Собираем всё в Map по case_uuid,
+ * чтобы `data.cases` были уникальны.
  */
 export async function searchCases(
   page: Page,
@@ -27,12 +31,24 @@ export async function searchCases(
   const roles = options.roles && options.roles.length > 0 ? options.roles : ['any'];
   const primaryRole = roles[0];
 
-  const allCases: KadArbitrCase[] = [];
+  // Ключ — case_uuid, fallback — case_number (если uuid не извлёкся).
+  const byUuid = new Map<string, KadArbitrCase>();
+
   let totalFound = 0;
   let pagesCount = 1;
 
+  const addCase = (c: KadArbitrCase) => {
+    if (byUuid.size >= maxTotalCases) return false;
+    const key = c.case_uuid && c.case_uuid.length > 0
+      ? `uuid:${c.case_uuid}`
+      : `num:${c.case_number}`;
+    if (!byUuid.has(key)) {
+      byUuid.set(key, c);
+    }
+    return true;
+  };
+
   try {
-    // 1. Первая страница — через клик по кнопке «Найти»
     const firstPageResult = await submitSearchUI(page, inn, primaryRole);
 
     if (firstPageResult.empty) {
@@ -43,13 +59,11 @@ export async function searchCases(
     pagesCount = firstPageResult.meta.pagesCount;
 
     for (const c of firstPageResult.cases) {
-      if (allCases.length >= maxTotalCases) break;
-      allCases.push(c);
+      if (!addCase(c)) break;
     }
 
-    // 2. Остальные страницы — через клик по номерам страниц
     for (let pageNum = 2; pageNum <= Math.min(maxPages, pagesCount); pageNum++) {
-      if (allCases.length >= maxTotalCases) break;
+      if (byUuid.size >= maxTotalCases) break;
 
       console.log(`[kad-search] Пауза ${RATE_DELAY_MS}мс перед страницей ${pageNum}...`);
       await new Promise((r) => setTimeout(r, RATE_DELAY_MS));
@@ -59,8 +73,7 @@ export async function searchCases(
         if (!pageResult || pageResult.cases.length === 0) break;
 
         for (const c of pageResult.cases) {
-          if (allCases.length >= maxTotalCases) break;
-          allCases.push(c);
+          if (!addCase(c)) break;
         }
       } catch (e) {
         console.warn(`[kad-search] Ошибка на странице ${pageNum}:`, (e as Error).message);
@@ -75,7 +88,12 @@ export async function searchCases(
     }
   }
 
-  return buildResult(inn, options, primaryRole, allCases, totalFound, pagesCount);
+  const uniqueCases = Array.from(byUuid.values());
+  console.log(
+    `[kad-search] Уникальных дел: ${uniqueCases.length} (kad сообщил ${totalFound})`
+  );
+
+  return buildResult(inn, options, primaryRole, uniqueCases, totalFound, pagesCount);
 }
 
 function buildResult(
