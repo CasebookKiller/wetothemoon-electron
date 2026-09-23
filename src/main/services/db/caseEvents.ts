@@ -15,6 +15,12 @@ export interface CaseEventInput {
   source_id?: number | null;
   origin?: 'scraper' | 'manual' | 'import';
   notes?: string | null;
+
+  // 12a: дата/время/место следующего заседания + список судей
+  hearing_date?: string | null;
+  hearing_time?: string | null;
+  hearing_place?: string | null;
+  hearing_judges?: string | null;   // JSON-массив
 }
 
 export interface CaseEventRow {
@@ -33,6 +39,12 @@ export interface CaseEventRow {
   notes: string | null;
   created_at: string;
   updated_at: string;
+
+  // 12a
+  hearing_date: string | null;
+  hearing_time: string | null;
+  hearing_place: string | null;
+  hearing_judges: string | null;
 }
 
 /**
@@ -89,16 +101,20 @@ export function addCaseEvent(input: CaseEventInput): {
 
     db.prepare(`
       UPDATE case_events
-      SET event_uuid       = COALESCE(?, event_uuid),
-          judge_entity_id  = COALESCE(?, judge_entity_id),
-          court_entity_id  = COALESCE(?, court_entity_id),
-          result           = COALESCE(?, result),
-          content          = COALESCE(?, content),
-          document_url     = COALESCE(?, document_url),
-          source_id        = COALESCE(?, source_id),
-          notes            = COALESCE(?, notes),
-          origin           = ?,
-          updated_at       = ?
+      SET event_uuid        = COALESCE(?, event_uuid),
+          judge_entity_id   = COALESCE(?, judge_entity_id),
+          court_entity_id   = COALESCE(?, court_entity_id),
+          result            = COALESCE(?, result),
+          content           = COALESCE(?, content),
+          document_url      = COALESCE(?, document_url),
+          source_id         = COALESCE(?, source_id),
+          notes             = COALESCE(?, notes),
+          hearing_date      = COALESCE(?, hearing_date),
+          hearing_time      = COALESCE(?, hearing_time),
+          hearing_place     = COALESCE(?, hearing_place),
+          hearing_judges    = COALESCE(?, hearing_judges),
+          origin            = ?,
+          updated_at        = ?
       WHERE id = ?
     `).run(
       eventUuid,
@@ -109,6 +125,10 @@ export function addCaseEvent(input: CaseEventInput): {
       input.document_url ?? null,
       input.source_id ?? null,
       input.notes ?? null,
+      input.hearing_date ?? null,
+      input.hearing_time ?? null,
+      input.hearing_place ?? null,
+      input.hearing_judges ?? null,
       origin,
       now,
       existing.id
@@ -130,8 +150,10 @@ export function addCaseEvent(input: CaseEventInput): {
     INSERT INTO case_events
       (case_entity_id, event_uuid, event_date, event_type,
        judge_entity_id, court_entity_id, result, content, document_url,
-       source_id, origin, notes, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       source_id, origin, notes,
+       hearing_date, hearing_time, hearing_place, hearing_judges,
+       created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     input.case_entity_id,
     eventUuid,
@@ -145,6 +167,10 @@ export function addCaseEvent(input: CaseEventInput): {
     input.source_id ?? null,
     origin,
     input.notes ?? null,
+    input.hearing_date ?? null,
+    input.hearing_time ?? null,
+    input.hearing_place ?? null,
+    input.hearing_judges ?? null,
     now,
     now
   );
@@ -197,6 +223,10 @@ export function updateCaseEvent(
         document_url     = COALESCE(?, document_url),
         source_id        = COALESCE(?, source_id),
         notes            = COALESCE(?, notes),
+        hearing_date     = COALESCE(?, hearing_date),
+        hearing_time     = COALESCE(?, hearing_time),
+        hearing_place    = COALESCE(?, hearing_place),
+        hearing_judges   = COALESCE(?, hearing_judges),
         origin           = 'manual',
         updated_at       = ?
     WHERE id = ?
@@ -210,6 +240,10 @@ export function updateCaseEvent(
     patch.document_url ?? null,
     patch.source_id ?? null,
     patch.notes ?? null,
+    patch.hearing_date ?? null,
+    patch.hearing_time ?? null,
+    patch.hearing_place ?? null,
+    patch.hearing_judges ?? null,
     now,
     id
   );

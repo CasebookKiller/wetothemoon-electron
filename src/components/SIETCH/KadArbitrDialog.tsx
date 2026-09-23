@@ -6,10 +6,9 @@ import { Button } from 'primereact/button';
 import { InputText } from 'primereact/inputtext';
 import { InputNumber } from 'primereact/inputnumber';
 import { Checkbox } from 'primereact/checkbox';
-import { DataTable } from 'primereact/datatable';
-import { Column } from 'primereact/column';
 import { KadArbitrCardDialog } from './KadArbitrCardDialog';
 import { KadArbitrCasesDialog } from './KadArbitrCasesDialog';
+import { Tag } from 'primereact/tag';
 
 export interface KadArbitrDialogProps {
   visible: boolean;
@@ -60,6 +59,9 @@ export const KadArbitrDialog: React.FC<KadArbitrDialogProps> = ({
 
   const [casesDialogVisible, setCasesDialogVisible] = useState(false);
 
+  const [forceRefresh, setForceRefresh] = useState(false);
+  const [fromCache, setFromCache] = useState<string | null>(null);
+
   // Синхронизация входного ИНН
   useEffect(() => {
     if (visible) {
@@ -72,6 +74,8 @@ export const KadArbitrDialog: React.FC<KadArbitrDialogProps> = ({
       setCardDialogVisible(false);
       setCardDialogUuid('');
       setCasesDialogVisible(false);
+      setForceRefresh(false);
+      setFromCache(null);
     }
   }, [visible, initialInn]);
 
@@ -115,24 +119,34 @@ export const KadArbitrDialog: React.FC<KadArbitrDialogProps> = ({
         maxPages,
         maxTotalCases,
         roles: buildRoles(),
+        forceRefresh,                     // ← добавили
       });
 
       if (res.success) {
         if (res.empty) {
           setResult('Дел не найдено.');
           setFoundCases([]);
+          setFromCache(null);
         } else {
-          const s = res.stats;
-          setStats(s);
-          setResult(
-            `Найдено дел: ${res.data.cases.length} из ${res.data.totals.cases_found}. ` +
-            `Сохранено: сущностей ${s.savedEntities}, связей ${s.savedRelations}, наблюдений ${s.savedObservations}.`
-          );
           setFoundCases(res.data.cases || []);
-          if (onSaved) onSaved(inn.trim());
+          setFromCache(res.fromCache ? res.cachedAt : null);
+
+          if (res.fromCache) {
+            setStats(null);
+            setResult(
+              `Из кеша: ${res.data.cases.length} дел из ${res.data.totals.cases_found}. ` +
+              `Данные от ${new Date(res.cachedAt).toLocaleString('ru-RU')}.`
+            );
+          } else {
+            const s = res.stats;
+            setStats(s);
+            setResult(
+              `Найдено дел: ${res.data.cases.length} из ${res.data.totals.cases_found}. ` +
+              `Сохранено: сущностей ${s.savedEntities}, связей ${s.savedRelations}, наблюдений ${s.savedObservations}.`
+            );
+            if (onSaved) onSaved(inn.trim());
+          }
         }
-      } else {
-        setError(res.error || 'Неизвестная ошибка');
       }
     } catch (e) {
       setError((e as Error).message);
@@ -234,6 +248,14 @@ export const KadArbitrDialog: React.FC<KadArbitrDialogProps> = ({
 
         {/* Роли */}
         <div className="flex align-items-center gap-3 flex-wrap">
+          <label className="flex align-items-center gap-1">
+            <Checkbox
+              checked={forceRefresh}
+              onChange={(e) => setForceRefresh(!!e.checked)}
+              disabled={running}
+            />
+            <span>Обновить из kad.arbitr (игнорировать кеш)</span>
+          </label>
           <span className="white-space-nowrap">Роль:</span>
           <label className="flex align-items-center gap-1">
             <Checkbox
@@ -285,6 +307,14 @@ export const KadArbitrDialog: React.FC<KadArbitrDialogProps> = ({
         {result && (
           <div className="flex align-items-center gap-3 flex-wrap">
             <p className="p-success" style={{ margin: 0 }}>{result}</p>
+            {fromCache && (
+              <Tag
+                value="из кеша"
+                severity="info"
+                icon="pi pi-history"
+                style={{ fontSize: '0.85rem' }}
+              />
+            )}
             {foundCases.length > 0 && (
               <Button
                 label={`Показать найденные дела (${foundCases.length})`}

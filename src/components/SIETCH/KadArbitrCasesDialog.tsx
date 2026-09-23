@@ -52,6 +52,16 @@ export const KadArbitrCasesDialog: React.FC<KadArbitrCasesDialogProps> = ({
     );
   };
 
+  const uniqueCases = React.useMemo(() => {
+  const seen = new Set<string>();
+  return cases.filter((c) => {
+    const key = c.case_uuid || c.case_number;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  }, [cases]);
+
   return (
     <>
       <Dialog
@@ -81,11 +91,11 @@ export const KadArbitrCasesDialog: React.FC<KadArbitrCasesDialogProps> = ({
           <p>Нет данных</p>
         ) : (
           <DataTable
-            value={cases}
+            value={uniqueCases}
+            dataKey="case_uuid"      // uuid всегда уникален
             size="small"
             scrollable
             scrollHeight="600px"
-            dataKey="case_number"
             emptyMessage="Нет данных"
             className="p-datatable-sm"
           >

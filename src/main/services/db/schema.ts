@@ -341,22 +341,31 @@ export function initializeSchema(db: DatabaseSync) {
     }
   }
 
-  // Одноразовая миграция: нормализация case_number и слияние дублей.
-  // SQLite без ICU не умеет UPPER/LOWER для кириллицы, поэтому
-  // нормализацию делаем в JS. Заодно схлопываем дубли, которые могли
-  // накопиться, пока normalized_value не совпадал с normalize(value).
+    // Миграция court_case:
+  // 1) вычисляем для каждой сущности желаемый normalized_value (lowercase);
+  // 2) группируем по нему;
+  // 3) сливаем дубли на keeper (min id) — переносим events/observations/relations;
+  // 4) у keeper обновляем normalized_value и value.
+  //
+  // Порядок именно такой: если сначала обновить normalized_value, UNIQUE
+  // idx_entities_unique(type, normalized_value) упадёт на дублях.
   try {
+    db.exec('PRAGMA foreign_keys = OFF;');
+
     const rows = db.prepare(`
       SELECT id, value, normalized_value FROM entities WHERE type = 'court_case'
     `).all() as Array<{ id: number; value: string; normalized_value: string }>;
 
-    // Группируем по каноническому значению
+    const wantNormalized = (v: string) =>
+      v.trim().toLowerCase().replace(/\s+/g, ' ');
+
+    // Группируем по желаемому normalized_value
     const groups = new Map<string, Array<{ id: number; value: string }>>();
     for (const row of rows) {
-      const canonical = normalizeCaseNumberLocal(row.value);
-      const list = groups.get(canonical) ?? [];
+      const key = wantNormalized(row.value);
+      const list = groups.get(key) ?? [];
       list.push({ id: row.id, value: row.value });
-      groups.set(canonical, list);
+      groups.set(key, list);
     }
 
     let normalized = 0;
@@ -364,16 +373,18 @@ export function initializeSchema(db: DatabaseSync) {
 
     db.exec('BEGIN');
     try {
-      for (const [canonical, items] of groups) {
+      for (const [wantNorm, items] of groups) {
         items.sort((a, b) => a.id - b.id);
         const keeper = items[0];
-        const normalizedCanonical = normalize(canonical);
+        const dups = items.slice(1);
 
-        // 1. Сначала сливаем все дубли НА keeper (переносим наблюдения/связи)
-        for (let i = 1; i < items.length; i++) {
-          const dup = items[i];
+        // 1. Сливаем дубли НА keeper
+        for (const dup of dups) {
+          // case_events (FK на entities)
+          db.prepare('UPDATE case_events SET case_entity_id = ? WHERE case_entity_id = ?')
+            .run(keeper.id, dup.id);
 
-          // Observations — переносим на keeper, конфликты удаляем
+          // observations — конфликты удаляем, остальное переносим
           const dupObs = db.prepare(
             'SELECT id, attribute, value FROM observations WHERE entity_id = ?'
           ).all(dup.id) as Array<{ id: number; attribute: string; value: string }>;
@@ -382,15 +393,15 @@ export function initializeSchema(db: DatabaseSync) {
               SELECT id FROM observations
               WHERE entity_id = ? AND attribute = ? AND value = ?
             `).get(keeper.id, obs.attribute, obs.value) as { id: number } | undefined;
-
             if (conflict) {
               db.prepare('DELETE FROM observations WHERE id = ?').run(obs.id);
             } else {
-              db.prepare('UPDATE observations SET entity_id = ? WHERE id = ?').run(keeper.id, obs.id);
+              db.prepare('UPDATE observations SET entity_id = ? WHERE id = ?')
+                .run(keeper.id, obs.id);
             }
           }
 
-          // Relations (subject) — переносим, конфликты удаляем
+          // relations (subject)
           const dupSubj = db.prepare(
             'SELECT id, predicate, object_id FROM relations WHERE subject_id = ?'
           ).all(dup.id) as Array<{ id: number; predicate: string; object_id: number }>;
@@ -399,15 +410,15 @@ export function initializeSchema(db: DatabaseSync) {
               SELECT id FROM relations
               WHERE subject_id = ? AND predicate = ? AND object_id = ?
             `).get(keeper.id, rel.predicate, rel.object_id) as { id: number } | undefined;
-
             if (conflict) {
               db.prepare('DELETE FROM relations WHERE id = ?').run(rel.id);
             } else {
-              db.prepare('UPDATE relations SET subject_id = ? WHERE id = ?').run(keeper.id, rel.id);
+              db.prepare('UPDATE relations SET subject_id = ? WHERE id = ?')
+                .run(keeper.id, rel.id);
             }
           }
 
-          // Relations (object) — переносим, конфликты удаляем
+          // relations (object)
           const dupObj = db.prepare(
             'SELECT id, subject_id, predicate FROM relations WHERE object_id = ?'
           ).all(dup.id) as Array<{ id: number; subject_id: number; predicate: string }>;
@@ -416,42 +427,46 @@ export function initializeSchema(db: DatabaseSync) {
               SELECT id FROM relations
               WHERE subject_id = ? AND predicate = ? AND object_id = ?
             `).get(rel.subject_id, rel.predicate, keeper.id) as { id: number } | undefined;
-
             if (conflict) {
               db.prepare('DELETE FROM relations WHERE id = ?').run(rel.id);
             } else {
-              db.prepare('UPDATE relations SET object_id = ? WHERE id = ?').run(keeper.id, rel.id);
+              db.prepare('UPDATE relations SET object_id = ? WHERE id = ?')
+                .run(keeper.id, rel.id);
             }
           }
 
-          // 2. Удаляем дубль (освобождаем normalized_value для keeper)
+          // Удаляем дубль — освобождаем normalized_value
           db.prepare('DELETE FROM entities WHERE id = ?').run(dup.id);
           merged++;
         }
 
-        // 3. Теперь обновляем keeper — конфликтов больше нет
-        const current = db.prepare(
+        // 2. Теперь у keeper можно выставить желаемый normalized_value
+        const keeperRow = db.prepare(
           'SELECT value, normalized_value FROM entities WHERE id = ?'
         ).get(keeper.id) as { value: string; normalized_value: string } | undefined;
 
-        if (current && (current.value !== canonical || current.normalized_value !== normalizedCanonical)) {
-          db.prepare(`
-            UPDATE entities SET value = ?, normalized_value = ? WHERE id = ?
-          `).run(canonical, normalizedCanonical, keeper.id);
+        if (keeperRow && keeperRow.normalized_value !== wantNorm) {
+          db.prepare('UPDATE entities SET normalized_value = ? WHERE id = ?')
+            .run(wantNorm, keeper.id);
           normalized++;
         }
       }
+
       db.exec('COMMIT');
     } catch (e) {
       db.exec('ROLLBACK');
       throw e;
+    } finally {
+      db.exec('PRAGMA foreign_keys = ON;');
     }
 
     if (normalized > 0 || merged > 0) {
-      console.log(`[db] Миграция case_number: нормализовано ${normalized}, слито дублей ${merged}`);
+      console.log(
+        `[db] Миграция court_case: normalized_value=${normalized}, слито дублей=${merged}`
+      );
     }
   } catch (e) {
-    console.warn('[db] Миграция case_number не удалась:', (e as Error).message);
+    console.warn('[db] Миграция court_case не удалась:', (e as Error).message);
   }
 
   // Миграция: добавляем status в observations для старых БД.
@@ -483,6 +498,29 @@ export function initializeSchema(db: DatabaseSync) {
   // Всегда создаём индекс — идемпотентно, безопасно на новой и старой БД.
   db.exec(`CREATE INDEX IF NOT EXISTS idx_case_events_uuid
            ON case_events(case_entity_id, event_uuid);`);
+
+  // Миграция 12a: поля hearing_* и significance в case_events (аддитивная).
+  // Старые события остаются нетронутыми — новые колонки заполняются NULL.
+  try {
+    const ceCols = db.prepare(`PRAGMA table_info(case_events)`).all() as { name: string }[];
+    const addCeCol = (name: string, type = 'TEXT') => {
+      if (!ceCols.some((c) => c.name === name)) {
+        db.exec(`ALTER TABLE case_events ADD COLUMN ${name} ${type};`);
+        console.log(`[db] Добавлена колонка ${name} в case_events`);
+      }
+    };
+
+    addCeCol('hearing_date');
+    addCeCol('hearing_time');
+    addCeCol('hearing_place');
+    addCeCol('hearing_judges');
+
+    // Задел под направление 12 (фильтры событий). Заполняется позже.
+    addCeCol('significance');
+    addCeCol('significance_reason');
+  } catch (e) {
+    console.warn('[db] Миграция case_events (hearing_*) не удалась:', (e as Error).message);
+  }
 
   const caseRow = db.prepare('SELECT id FROM case_info WHERE id = 1').get();
   if (!caseRow) {

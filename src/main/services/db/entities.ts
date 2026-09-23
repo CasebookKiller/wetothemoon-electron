@@ -91,6 +91,7 @@ export function upsertEntity(entity: {
       UPDATE entities SET
         rusprofile_id = COALESCE(?, rusprofile_id),
         value = ?,
+        normalized_value = ?,
         label = COALESCE(?, label),
         last_seen = ?,
         confidence = COALESCE(?, confidence),
@@ -101,6 +102,7 @@ export function upsertEntity(entity: {
     `).run(
       entity.rusprofile_id || null,
       entity.value,
+      normalized,
       entity.label || entity.value,
       now,
       entity.confidence ?? 50,

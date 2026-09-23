@@ -30,6 +30,8 @@ export const KadArbitrCardDialog: React.FC<KadArbitrCardDialogProps> = ({
   const [error, setError] = useState('');
   const [progress, setProgress] = useState('');
 
+  const [fromCache, setFromCache] = useState<string | null>(null);
+
   useEffect(() => {
     if (!visible) return;
     const onProgress = (info: ProgressInfo) => setProgress(info.message || '');
@@ -37,26 +39,33 @@ export const KadArbitrCardDialog: React.FC<KadArbitrCardDialogProps> = ({
     return () => api.removeKadArbitrCardProgressListener();
   }, [visible]);
 
-  useEffect(() => {
-    if (!visible || !caseUuid) return;
+  const loadCard = async (forceRefresh: boolean) => {
     setLoading(true);
     setError('');
     setCard(null);
     setStats(null);
     setProgress('');
+    setFromCache(null);
 
-    api
-      .fetchKadArbitrCard(caseUuid)
-      .then((res: any) => {
-        if (res.success) {
-          setCard(res.card);
-          setStats(res.stats);
-        } else {
-          setError(res.error || 'Неизвестная ошибка');
-        }
-      })
-      .catch((e: any) => setError(e.message))
-      .finally(() => setLoading(false));
+    try {
+      const res = await api.fetchKadArbitrCard(caseUuid, { forceRefresh });
+      if (res.success) {
+        setCard(res.card);
+        setStats(res.stats);
+        setFromCache(res.fromCache ? res.cachedAt : null);
+      } else {
+        setError(res.error || 'Неизвестная ошибка');
+      }
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!visible || !caseUuid) return;
+    loadCard(false);
   }, [visible, caseUuid]);
 
   return (
@@ -66,12 +75,35 @@ export const KadArbitrCardDialog: React.FC<KadArbitrCardDialogProps> = ({
       modal
       onHide={() => { if (!loading) onHide(); }}
       header={
-        <span className="p-panel-title">
+        <span className="p-panel-title flex align-items-center gap-2">
           {card ? `Карточка ${card.case_number}` : `Карточка ${caseUuid}`}
+          {fromCache && (
+            <span
+              className="text-xs"
+              style={{
+                padding: '0.15rem 0.5rem',
+                borderRadius: '0.75rem',
+                background: 'var(--tg-theme-secondary-bg-color)',
+                color: 'var(--tg-theme-hint-color)',
+              }}
+              title={`Загружено из кеша: ${new Date(fromCache).toLocaleString('ru-RU')}`}
+            >
+              из кеша
+            </span>
+          )}
         </span>
       }
       footer={
         <div className="p-panel-footer flex justify-content-end gap-2">
+          <Button
+            label="Обновить из kad.arbitr"
+            icon="pi pi-refresh"
+            className="osint-soft"
+            disabled={loading}
+            onClick={() => loadCard(true)}
+            tooltip="Игнорирует кеш и запрашивает карточку заново"
+            tooltipOptions={{ position: 'top' }}
+          />
           <Button
             label="Закрыть"
             icon="pi pi-times"

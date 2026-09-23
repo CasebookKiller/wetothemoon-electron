@@ -86,6 +86,14 @@ import {
   restoreFromBackup,
 } from '../services/osint/backupService';
 import { addSource, clearAllTables, createEntity, createObservation, createRelation, createSource, deleteDumpsByEntity, deleteEntity, deleteJudge, deleteObservation, deleteRelation, deleteSource, findLatestRawDump, getAuditLog, getDatabase, getDumpSectionsUpdatedAt, getEntityDetails, getObservationDetails, getRelatedIds, getRelationDetails, getSourceDetails, hasRawDumpForInn, listAuditLogActions, listAuditLogTables, listCourts, listDumps, listEntitiesForDropdown, listJudges, listSaturatedPrefixes, markRecordAsFalse, markRecordsAsFalse, searchAll, searchEntities, updateEntity, updateObservation, updateRelation, updateSource } from '../services/db';
+import { getKadDump, upsertKadDump, touchKadDump } from '../services/database';
+import {
+  saveKadDumpSync,
+  loadKadDumpSync,
+  isSameLocalDay,
+  extractCaseYear,
+} from '../services/kaddumpStorage';
+import { enrichCardHearing } from '../services/osint/scrapers/kadArbitr/card';
 
 export function registerOsintHandlers() {
   // Открыть окно OSINT
@@ -144,12 +152,41 @@ export function registerOsintHandlers() {
     roles?: Array<'plaintiff' | 'defendant' | 'third_party' | 'any'>;
     dateFrom?: string | null;
     dateTo?: string | null;
+    forceRefresh?: boolean;
   }) => {
     try {
       if (!inn || !inn.trim()) {
         return { success: false, error: 'ИНН не указан' };
       }
+      const trimmedInn = inn.trim();
+      const forceRefresh = options?.forceRefresh === true;
 
+      // 1. Кеш
+      if (!forceRefresh) {
+        const dump = getKadDump('cases_by_inn', trimmedInn);
+        if (dump && isSameLocalDay(dump.updated_at)) {
+          event.sender.send('osint:kad-arbitr-progress', {
+            stage: 'cache',
+            message: `Загружено из кеша (${dump.updated_at})`,
+          });
+          try {
+            const data = loadKadDumpSync(dump.dump_file_path);
+            touchKadDump(dump.id);
+            return {
+              success: true,
+              data,
+              stats: null,
+              sourceId: null,
+              fromCache: true,
+              cachedAt: dump.updated_at,
+            };
+          } catch (e) {
+            console.warn('[kad] Не удалось загрузить кеш, идём в сеть:', e);
+          }
+        }
+      }
+
+      // 2. Сеть
       event.sender.send('osint:kad-arbitr-progress', {
         stage: 'session',
         message: 'Проверка сессии kad.arbitr...',
@@ -160,7 +197,31 @@ export function registerOsintHandlers() {
         stage: 'search',
         message: 'Поиск дел...',
       });
-      const data = await searchCases(page, inn.trim(), options || {});
+      const data = await searchCases(page, trimmedInn, {
+        maxPages: options?.maxPages,
+        maxTotalCases: options?.maxTotalCases,
+        roles: options?.roles,
+        dateFrom: options?.dateFrom,
+        dateTo: options?.dateTo,
+      });
+
+      // 3. Дамп
+      try {
+        const raw = saveKadDumpSync('cases_by_inn', trimmedInn, data);
+        upsertKadDump({
+          kind: 'cases_by_inn',
+          key: trimmedInn,
+          shard: raw.shard,
+          dumpFilePath: raw.filePath,
+          sizeBytes: raw.sizeBytes,
+          payloadMeta: JSON.stringify({
+            casesCount: data.cases.length,
+            totalFound: data.totals.cases_found,
+          }),
+        });
+      } catch (e) {
+        console.warn('[kad] Не удалось сохранить дамп списка:', e);
+      }
 
       if (data.cases.length === 0) {
         return {
@@ -168,17 +229,18 @@ export function registerOsintHandlers() {
           data,
           stats: { savedEntities: 0, savedRelations: 0, savedObservations: 0, targetEntityId: 0 },
           empty: true,
+          fromCache: false,
         };
       }
 
+      // 4. Persist
       event.sender.send('osint:kad-arbitr-progress', {
         stage: 'persist',
         message: `Сохранение ${data.cases.length} дел...`,
       });
-
       const sourceId = addSource({
         url: data.source_url,
-        title: `KAD Arbitr — дела по ИНН ${inn}`,
+        title: `KAD Arbitr — дела по ИНН ${trimmedInn}`,
         source_type: 'court',
         source_kind: 'official_registry',
         provider: 'kad.arbitr.ru',
@@ -187,10 +249,9 @@ export function registerOsintHandlers() {
         access_level: 'public',
         retrieved_at: new Date().toISOString(),
       });
+      const stats = persistKadArbitrData(trimmedInn, data, sourceId);
 
-      const stats = persistKadArbitrData(inn.trim(), data, sourceId);
-
-      return { success: true, data, stats, sourceId };
+      return { success: true, data, stats, sourceId, fromCache: false };
     } catch (e) {
       return { success: false, error: (e as Error).message };
     }
@@ -967,12 +1028,45 @@ export function registerOsintHandlers() {
   });
 
   // ==================== KAD.ARBITR: карточка дела ====================
-  ipcMain.handle('osint:kad-arbitr-fetch-card', async (event, caseUuid: string) => {
+  ipcMain.handle('osint:kad-arbitr-fetch-card', async (
+    event,
+    caseUuid: string,
+    options?: { forceRefresh?: boolean }
+  ) => {
     try {
       if (!caseUuid || !caseUuid.trim()) {
         return { success: false, error: 'UUID дела не указан' };
       }
+      const uuid = caseUuid.trim();
+      const forceRefresh = options?.forceRefresh === true;
 
+      // 1. Кеш
+      if (!forceRefresh) {
+        const dump = getKadDump('card', uuid);
+        if (dump && isSameLocalDay(dump.updated_at)) {
+          event.sender.send('osint:kad-arbitr-card-progress', {
+            stage: 'cache',
+            message: `Загружено из кеша (${dump.updated_at})`,
+          });
+          try {
+            const card = loadKadDumpSync(dump.dump_file_path);
+            enrichCardHearing(card);
+            touchKadDump(dump.id);
+            return {
+              success: true,
+              card,
+              stats: null,
+              sourceId: null,
+              fromCache: true,
+              cachedAt: dump.updated_at,
+            };
+          } catch (e) {
+            console.warn('[kad] Не удалось загрузить кеш карточки:', e);
+          }
+        }
+      }
+
+      // 2. Сеть
       event.sender.send('osint:kad-arbitr-card-progress', {
         stage: 'session',
         message: 'Проверка сессии kad.arbitr...',
@@ -983,8 +1077,34 @@ export function registerOsintHandlers() {
         stage: 'fetch',
         message: 'Загрузка карточки дела...',
       });
-      const card = await fetchCard(page, caseUuid.trim());
+      const card = await fetchCard(page, uuid);
+      enrichCardHearing(card);
 
+      // 3. Дамп (шард = год из номера дела)
+      const year = extractCaseYear(card.case_number);
+      try {
+        const raw = saveKadDumpSync('card', uuid, card, year);
+        const totalEvents = card.instances.reduce(
+          (s: number, i: any) => s + (i.events?.length || 0),
+          0
+        );
+        upsertKadDump({
+          kind: 'card',
+          key: uuid,
+          shard: raw.shard,
+          dumpFilePath: raw.filePath,
+          sizeBytes: raw.sizeBytes,
+          payloadMeta: JSON.stringify({
+            caseNumber: card.case_number,
+            instances: card.instances.length,
+            events: totalEvents,
+          }),
+        });
+      } catch (e) {
+        console.warn('[kad] Не удалось сохранить дамп карточки:', e);
+      }
+
+      // 4. Persist
       event.sender.send('osint:kad-arbitr-card-progress', {
         stage: 'persist',
         message: 'Сохранение карточки...',
@@ -1000,9 +1120,8 @@ export function registerOsintHandlers() {
         access_level: 'public',
         retrieved_at: new Date().toISOString(),
       });
-
       const stats = persistKadArbitrCard(card, sourceId);
-      return { success: true, card, stats, sourceId };
+      return { success: true, card, stats, sourceId, fromCache: false };
     } catch (e) {
       return { success: false, error: (e as Error).message };
     }

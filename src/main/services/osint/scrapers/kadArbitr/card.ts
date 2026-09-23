@@ -215,10 +215,44 @@ async function parseCard(page: Page, caseUuid: string): Promise<KadArbitrCard> {
         .replace(/\s+/g, ' ')
         .trim() || undefined;
 
-      const subjectSpan = item.querySelector('.case-subject span[title]') as HTMLElement | null;
-      const subjectText = decode(
-        subjectSpan?.getAttribute('title') || subjectSpan?.textContent || ''
-      ) || undefined;
+      // Полный текст .case-subject. В шаблоне cardChrono там лежит
+      // "Дата и время судебного заседания ДД.ММ.ГГГГ ЧЧ:ММ, зал N, ФИО, ..."
+      // для определений об отложении/назначении — эту дату нельзя терять.
+      const subjectEl = item.querySelector('.case-subject');
+      const subjectText = subjectEl
+        ? decode((subjectEl.textContent || '').replace(/\s+/g, ' ').trim())
+        : undefined;
+
+      // Отдельные имена судей — из span[title] (нужны для judge / declarer).
+      const judgeNamesFromSubject: string[] = Array.from(
+        item.querySelectorAll('.case-subject span[title]')
+      )
+        .map((s) => decode((s as HTMLElement).getAttribute('title') || s.textContent || '').trim())
+        .filter(Boolean);
+
+      // Дата заседания может лежать и в .case-subject, и в .additional-info —
+      // kad в разных шаблонах кладёт её в разные места. Собираем оба текста.
+      // В .case-subject обычно — судья/заявитель, в .additional-info — дата.
+      let hearing_date: string | undefined;
+      let hearing_time: string | undefined;
+      let hearing_place: string | undefined;
+
+      const hearingSource = [subjectText, additionalInfo].filter(Boolean).join(' | ');
+      if (hearingSource) {
+        // Формат: "Дата и время судебного заседания DD.MM.YYYY, HH:MM, <место>"
+        // между датой и временем — запятая + пробел (а не просто пробел).
+        const dtMatch = hearingSource.match(
+          /Дата и время судебного заседания\s+(\d{2}\.\d{2}\.\d{4})[,\s]+(\d{1,2}:\d{2})(?:[,\s]+([^,|]+))?/i
+        );
+        if (dtMatch) {
+          hearing_date = parseDate(dtMatch[1]);
+          hearing_time = dtMatch[2];
+          if (dtMatch[3]) {
+            // Место — всё до конца токена: "ЗАЛ 6", "13 (кабинет 207)"
+            hearing_place = dtMatch[3].trim();
+          }
+        }
+      }
 
       const resultEl = item.querySelector('.b-case-result-text') as HTMLElement | null;
       const content = decode(
@@ -254,13 +288,23 @@ async function parseCard(page: Page, caseUuid: string): Promise<KadArbitrCard> {
         }
       }
 
-      // Если есть роль судьи — subjectText это судья, иначе — declarer
+      // Если есть роль судьи — берём первого судью из span[title].
+      // Иначе первый span[title] — это заявитель. Если span'ов нет —
+      // используем очищенный от префикса текст как fallback.
       let judge: string | undefined;
       let declarer: string | undefined;
+
+      const cleanSubjectText = subjectText
+        ? subjectText
+            .replace(/^Дата и время судебного заседания\s+[\d\.]*\s*[\d:]*\s*,?\s*/i, '')
+            .replace(/^зал[а-я]*\s+[\w/.-]+\s*,?\s*/i, '')
+            .trim()
+        : undefined;
+
       if (judgeRole) {
-        judge = subjectText;
+        judge = judgeNamesFromSubject[0] || cleanSubjectText;
       } else {
-        declarer = subjectText;
+        declarer = judgeNamesFromSubject[0] || cleanSubjectText;
       }
 
       let amount: string | undefined;
@@ -284,6 +328,10 @@ async function parseCard(page: Page, caseUuid: string): Promise<KadArbitrCard> {
         additional_info: additionalInfo,
         amount,
         declarer,
+        hearing_date,
+        hearing_time,
+        hearing_place,
+        hearing_judges: judgeNamesFromSubject.length > 0 ? judgeNamesFromSubject : undefined,
       };
     };
 
@@ -326,9 +374,16 @@ async function parseCard(page: Page, caseUuid: string): Promise<KadArbitrCard> {
       });
     }
 
-    // Судьи из шапки относим к первой инстанции
-    if (instances.length > 0 && judgesFromHeader.length > 0) {
-      instances[0].judges = judgesFromHeader;
+    // Судьи из шапки относятся к суду первой инстанции.
+    // Ищем инстанс с level='Первая инстанция' и совпадающим court_name,
+    // а не просто instances[0].
+    if (judgesFromHeader.length > 0) {
+      const firstInstance = instances.find(
+        (i) => i.level === 'Первая инстанция'
+      );
+      if (firstInstance) {
+        firstInstance.judges = judgesFromHeader;
+      }
     }
 
     return {
@@ -345,4 +400,41 @@ async function parseCard(page: Page, caseUuid: string): Promise<KadArbitrCard> {
       source_url: location.href,
     };
   }, caseUuid);
+}
+
+/**
+ * Обогащает card извлечёнными полями hearing_* там, где их ещё нет.
+ * Применяется и к свежескачанной, и к кешированной карточке
+ * (кеш хранит только распарсенный объект без HTML).
+ *
+ * Источник данных — .additional-info / .case-subject / .content,
+ * которые уже извлечены parseEvent.
+ */
+export function enrichCardHearing(card: KadArbitrCard): void {
+  for (const inst of card.instances) {
+    for (const ev of inst.events) {
+      if (ev.hearing_date) continue; // уже есть — не трогаем
+
+      // Собираем все текстовые источники, где может лежать дата
+      const sources = [ev.additional_info, ev.content, ev.event_type_raw]
+        .filter(Boolean)
+        .join(' | ');
+
+      // Формат: "Дата и время судебного заседания DD.MM.YYYY, HH:MM, <место>"
+      // Между датой и временем может быть запятая или пробел.
+      // Место — всё после времени до следующей запятой или разделителя.
+      const dtMatch = sources.match(
+        /Дата и время судебного заседания\s+(\d{2}\.\d{2}\.\d{4})[,\s]+(\d{1,2}:\d{2})(?:\s*,\s*([^,|]+))?/i
+      );
+      if (!dtMatch) continue;
+
+      const [, dd, hhmm, place] = dtMatch;
+      const dm = dd.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+      if (!dm) continue;
+
+      ev.hearing_date = `${dm[3]}-${dm[2]}-${dm[1]}`;
+      ev.hearing_time = hhmm;
+      if (place) ev.hearing_place = place.trim();
+    }
+  }
 }

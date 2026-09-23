@@ -388,6 +388,7 @@ try {
       roles?: string[];
       dateFrom?: string | null;
       dateTo?: string | null;
+      forceRefresh?: boolean;
     }) => ipcRenderer.invoke('osint:kad-arbitr-fetch', inn, options),
 
     onKadArbitrProgress: (callback: (info: any) => void) => {
@@ -397,8 +398,8 @@ try {
     removeKadArbitrProgressListener: () =>
       ipcRenderer.removeAllListeners('osint:kad-arbitr-progress'),
 
-    fetchKadArbitrCard: (caseUuid: string) =>
-      ipcRenderer.invoke('osint:kad-arbitr-fetch-card', caseUuid),
+    fetchKadArbitrCard: (caseUuid: string, options?: { forceRefresh?: boolean }) =>
+      ipcRenderer.invoke('osint:kad-arbitr-fetch-card', caseUuid, options),
 
     onKadArbitrCardProgress: (callback: (info: any) => void) => {
       ipcRenderer.on('osint:kad-arbitr-card-progress', (_, info) => callback(info));

@@ -1264,6 +1264,14 @@ export function persistCaseEvents(
       source_id: sourceId,
       origin: 'scraper',
       notes,
+      // 12a: дата/время/место следующего заседания + судьи
+      hearing_date: ev.hearing_date ?? null,
+      hearing_time: ev.hearing_time ?? null,
+      hearing_place: ev.hearing_place ?? null,
+      hearing_judges:
+        ev.hearing_judges && ev.hearing_judges.length > 0
+          ? JSON.stringify(ev.hearing_judges)
+          : null,
     });
 
     if (r.inserted) inserted++;

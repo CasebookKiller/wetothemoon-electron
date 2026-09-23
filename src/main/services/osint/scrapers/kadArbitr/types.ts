@@ -140,6 +140,11 @@ export interface KadArbitrCardEvent {
   additional_info?: string;    // "Заявление № б/н от 04.09.2026 . Сумма исковых требований 544070,23"
   amount?: string;             // из additional_info
   declarer?: string;           // заявитель, если это не судья
+  // НОВОЕ — извлекается из .case-subject (определения об отложении и т.п.)
+  hearing_date?: string;       // ISO YYYY-MM-DD
+  hearing_time?: string;       // "HH:MM"
+  hearing_place?: string;      // "зал 304" или "комн. 201"
+  hearing_judges?: string[];
 }
 
 export interface KadArbitrCardInstance {
