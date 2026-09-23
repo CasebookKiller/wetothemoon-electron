@@ -45,7 +45,7 @@ export function decodeHtmlEntities(s: string): string {
  * ИП / ООО / АО / ПАО / ЗАО → company
  * 'Иванов И. И.' (есть инициалы) → person
  */
-export function detectCounterpartyType(name: string): 'company' | 'person' | 'unknown' {
+/*export function detectCounterpartyType(name: string): 'company' | 'person' | 'unknown' {
   if (!name) return 'unknown';
   const upper = name.toUpperCase();
   if (/\b(ООО|ОАО|ЗАО|ПАО|АО|ИП|НП|СРО|ГУП|МУП|ФГУП|КБ|ПК|ТСЖ|ЖСК)\b/.test(upper)) {
@@ -55,6 +55,44 @@ export function detectCounterpartyType(name: string): 'company' | 'person' | 'un
   }
   // ФИО с инициалами: 'Иванов И. И.' или 'Иванов И.И.'
   if (/[А-ЯЁ][а-яё]+\s+[А-ЯЁ]\.\s*[А-ЯЁ]?\.?/.test(name)) return 'person';
+  return 'unknown';
+}*/
+export function detectCounterpartyType(name: string): 'company' | 'person' | 'unknown' {
+  if (!name) return 'unknown';
+  const upper = name.toUpperCase().trim();
+
+  // ИП — это физлицо (в kad отдельная категория)
+  if (/^ИП\s/.test(upper)) return 'person';
+
+  // ЮЛ: префикс + разделитель (пробел, кавычка, скобка, конец строки).
+  // Без \b — он не работает на кириллице без флага u.
+  if (/^(ООО|ОАО|ЗАО|ПАО|АО|НП|СРО|ГУП|МУП|ФГУП|КБ|ПК|ТСЖ|ЖСК|СНТ|ОО|ОД|АНО|ФГБУ|ФГАУ|ГБУ|ГКУ)([\s"«(]|$)/.test(upper)) {
+    return 'company';
+  }
+
+  // Гос. структуры по префиксу
+  const govPrefixes = [
+    'ФЕДЕРАЛЬНАЯ ', 'ФЕДЕРАЛЬНОЕ ', 'ФЕДЕРАЛЬНЫЙ ',
+    'УПРАВЛЕНИЕ ', 'АДМИНИСТРАЦИЯ ', 'ДЕПАРТАМЕНТ ',
+    'МИНИСТЕРСТВО ', 'ГОСУДАРСТВЕННАЯ ', 'ГОСУДАРСТВЕННОЕ ', 'ГОСУДАРСТВЕННЫЙ ',
+    'ГЛАВНОЕ ', 'ГЛАВНЫЙ ', 'ЦЕНТРАЛЬНЫЙ ', 'ЦЕНТРАЛЬНОЕ ',
+    'ИНСПЕКЦИЯ ', 'ПРОКУРАТУРА ',
+    'ВЫСШИЙ ', 'МИНФС ', 'МРИ ФНС ',
+    'ГУ ', 'ОСП ', 'СПИ ', 'ГК ', 'К/У ',
+    'ТЕРРИТОРИАЛЬНЫЙ ', 'МЕЖРАЙОННАЯ ',
+  ];
+  if (govPrefixes.some((p) => upper.startsWith(p))) return 'company';
+
+  if (/БАНК|СТРАХОВ|ФОНД/.test(upper)) return 'company';
+
+  // ФИО с инициалами: 'Иванов И. И.'
+  if (/^[А-ЯЁ][а-яё]+\s+[А-ЯЁ]\.\s*[А-ЯЁ]?\.?$/.test(name.trim())) return 'person';
+
+  // Полное ФИО: 'Иванов Иван Иванович'
+  if (/^[А-ЯЁ][а-яё]+\s+[А-ЯЁ][а-яё]+\s+[А-ЯЁ][а-яё]+(ич|вна|чна|ична)$/i.test(name.trim())) {
+    return 'person';
+  }
+
   return 'unknown';
 }
 

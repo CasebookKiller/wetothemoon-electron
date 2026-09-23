@@ -196,9 +196,10 @@ function initializeSchema(db: DatabaseSync) {
 
     // === Timeline судебных событий (case_events) ===
   db.exec(`
-    CREATE TABLE IF NOT EXISTS case_events (
+        CREATE TABLE IF NOT EXISTS case_events (
       id                INTEGER PRIMARY KEY AUTOINCREMENT,
       case_entity_id    INTEGER NOT NULL,
+      event_uuid        TEXT,
       event_date        TEXT NOT NULL,
       event_type        TEXT NOT NULL,
       judge_entity_id   INTEGER,
@@ -456,6 +457,16 @@ function initializeSchema(db: DatabaseSync) {
   if (!rawDumpColumns.some(col => col.name === 'section_updated_at')) {
     db.exec(`ALTER TABLE raw_dumps ADD COLUMN section_updated_at TEXT;`);
   }
+
+  // Миграция: event_uuid в case_events (для БД, созданных до Фазы 3)
+  const caseEventsCols = db.prepare(`PRAGMA table_info(case_events)`).all() as { name: string }[];
+  if (!caseEventsCols.some((c) => c.name === 'event_uuid')) {
+    db.exec(`ALTER TABLE case_events ADD COLUMN event_uuid TEXT;`);
+    console.log('Добавлена колонка event_uuid в case_events');
+  }
+  // Всегда создаём индекс — идемпотентно, безопасно на новой и старой БД.
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_case_events_uuid
+           ON case_events(case_entity_id, event_uuid);`);
 
   const caseRow = db.prepare('SELECT id FROM case_info WHERE id = 1').get();
   if (!caseRow) {
@@ -2979,8 +2990,10 @@ export function listCourts(): Array<{
 
 export interface CaseEventInput {
   case_entity_id: number;
-  event_date: string;       // ISO или YYYY-MM-DD
-  event_type: 'hearing' | 'decision' | 'ruling' | 'appeal' | 'cassation' | 'other';
+  event_uuid?: string | null;                // новое
+  event_date: string;
+  event_type: 'filing' | 'hearing' | 'decision' | 'ruling'
+            | 'appeal' | 'cassation' | 'other';
   judge_entity_id?: number | null;
   court_entity_id?: number | null;
   result?: string | null;
@@ -2994,6 +3007,7 @@ export interface CaseEventInput {
 export interface CaseEventRow {
   id: number;
   case_entity_id: number;
+  event_uuid: string | null;        // новое
   event_date: string;
   event_type: string;
   judge_entity_id: number | null;
@@ -3026,25 +3040,45 @@ export function addCaseEvent(input: CaseEventInput): {
   const db = getDatabase();
   const now = new Date().toISOString();
   const origin = input.origin || 'manual';
+  const eventUuid = input.event_uuid?.trim() || null;
 
-  const existing = db.prepare(`
-    SELECT id, origin FROM case_events
-    WHERE case_entity_id = ? AND event_date = ? AND event_type = ?
-    LIMIT 1
-  `).get(input.case_entity_id, input.event_date, input.event_type) as
-    | { id: number; origin: string }
-    | undefined;
+  // Дедуп: если event_uuid есть — по нему; иначе по (case, date, type, content)
+  let existing: { id: number; origin: string } | undefined;
+
+  if (eventUuid) {
+    existing = db.prepare(`
+      SELECT id, origin FROM case_events
+      WHERE case_entity_id = ? AND event_uuid = ?
+      LIMIT 1
+    `).get(input.case_entity_id, eventUuid) as { id: number; origin: string } | undefined;
+  }
+
+  if (!existing) {
+    existing = db.prepare(`
+      SELECT id, origin FROM case_events
+      WHERE case_entity_id = ?
+        AND event_date = ?
+        AND event_type = ?
+        AND COALESCE(content, '') = COALESCE(?, '')
+      LIMIT 1
+    `).get(
+      input.case_entity_id,
+      input.event_date,
+      input.event_type,
+      input.content ?? null
+    ) as { id: number; origin: string } | undefined;
+  }
 
   if (existing) {
-    // manual приоритетнее — не перезаписываем
     if (existing.origin === 'manual' && origin !== 'manual') {
       return { inserted: false, updated: false, id: existing.id };
     }
 
     db.prepare(`
       UPDATE case_events
-      SET judge_entity_id = COALESCE(?, judge_entity_id),
-          court_entity_id = COALESCE(?, court_entity_id),
+      SET event_uuid       = COALESCE(?, event_uuid),
+          judge_entity_id  = COALESCE(?, judge_entity_id),
+          court_entity_id  = COALESCE(?, court_entity_id),
           result           = COALESCE(?, result),
           content          = COALESCE(?, content),
           document_url     = COALESCE(?, document_url),
@@ -3054,6 +3088,7 @@ export function addCaseEvent(input: CaseEventInput): {
           updated_at       = ?
       WHERE id = ?
     `).run(
+      eventUuid,
       input.judge_entity_id ?? null,
       input.court_entity_id ?? null,
       input.result ?? null,
@@ -3071,7 +3106,7 @@ export function addCaseEvent(input: CaseEventInput): {
       existing.id,
       'update',
       null,
-      `event_date=${input.event_date}; event_type=${input.event_type}; origin=${origin}`,
+      `uuid=${eventUuid ?? '-'}; date=${input.event_date}; type=${input.event_type}; origin=${origin}`,
       'Обновление события (scraper/import)'
     );
 
@@ -3080,11 +3115,13 @@ export function addCaseEvent(input: CaseEventInput): {
 
   const info = db.prepare(`
     INSERT INTO case_events
-      (case_entity_id, event_date, event_type, judge_entity_id, court_entity_id,
-       result, content, document_url, source_id, origin, notes, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (case_entity_id, event_uuid, event_date, event_type,
+       judge_entity_id, court_entity_id, result, content, document_url,
+       source_id, origin, notes, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     input.case_entity_id,
+    eventUuid,
     input.event_date,
     input.event_type,
     input.judge_entity_id ?? null,
@@ -3100,7 +3137,6 @@ export function addCaseEvent(input: CaseEventInput): {
   );
 
   const id = Number(info.lastInsertRowid);
-
   auditChange(
     'case_events',
     id,

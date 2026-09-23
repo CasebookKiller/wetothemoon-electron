@@ -6,6 +6,7 @@
 export { ensureKadSession, isKadAuthorized, clearKadSession } from './login';
 export { scrapeJudgesDirectory, getJudgesDirectoryStats } from './judges';
 export { searchCases } from './search';
+export { fetchCard } from './card';
 
 export type {
   JudgesDirectoryOptions,
@@ -18,4 +19,14 @@ export type {
   KadArbitrCounterparty,
   KadArbitrSearchOptions,
   KadArbitrSearchPayload,
+} from './types';
+
+export type {
+  KadArbitrCard,
+  KadArbitrCardEvent,
+  KadArbitrCardInstance,
+  KadArbitrCardOptions,
+  KadArbitrCardSide,
+  KadArbitrCardSides,
+  KadArbitrEventType,
 } from './types';

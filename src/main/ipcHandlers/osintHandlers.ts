@@ -9,6 +9,7 @@ import {
   ensureKadSession,
   getJudgesDirectoryStats,
   searchCases,
+  fetchCard,
 } from '../services/osint/scrapers/kadArbitr';
 import { scrapeMosGorsud } from '../services/osint/scrapers/mosGorsud';
 import { getCredentials, setCredentials } from '../services/osint/credentials';
@@ -19,7 +20,7 @@ import { deleteDumpsByEntity, findLatestRawDump, getRelatedIds, searchEntities, 
   deleteJudge,
   addSource, } from '../services/database';
 import { deleteAllRawDumps, loadRawDumpSync } from '../services/rawStorage';
-import { mergeCompanyDumps, persistKadArbitrData, saveCompanyData, updateCompanyData } from '../services/osintStorage';
+import { mergeCompanyDumps, persistKadArbitrCard, persistKadArbitrData, saveCompanyData, updateCompanyData } from '../services/osintStorage';
 import { 
   getDatabase,
   getDumpSectionsUpdatedAt,
@@ -931,6 +932,76 @@ export function registerOsintHandlers() {
   ipcMain.handle('osint:judges-delete', async (_event, judgeId: number) => {
     try {
       return deleteJudge(judgeId);
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  // ВРЕМЕННО — разведка парсера карточки дела. Удалить после проверки.
+  ipcMain.handle('osint:kad-arbitr-card-test', async (_event, caseUuid: string) => {
+    try {
+      const page = await ensureKadSession();
+      const card = await fetchCard(page, caseUuid.trim());
+
+      const sourceId = addSource({
+        url: card.source_url,
+        title: `KAD Arbitr — карточка ${card.case_number}`,
+        source_type: 'court',
+        source_kind: 'official_registry',
+        provider: 'kad.arbitr.ru',
+        collection_method: 'browser',
+        reliability: 95,
+        access_level: 'public',
+        retrieved_at: new Date().toISOString(),
+      });
+
+      const stats = persistKadArbitrCard(card, sourceId);
+
+      console.log('[card-test] persist:', JSON.stringify(stats, null, 2));
+      return { success: true, card, stats };
+    } catch (e) {
+      console.error('[card-test] ошибка:', e);
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  // ==================== KAD.ARBITR: карточка дела ====================
+  ipcMain.handle('osint:kad-arbitr-fetch-card', async (event, caseUuid: string) => {
+    try {
+      if (!caseUuid || !caseUuid.trim()) {
+        return { success: false, error: 'UUID дела не указан' };
+      }
+
+      event.sender.send('osint:kad-arbitr-card-progress', {
+        stage: 'session',
+        message: 'Проверка сессии kad.arbitr...',
+      });
+      const page = await ensureKadSession();
+
+      event.sender.send('osint:kad-arbitr-card-progress', {
+        stage: 'fetch',
+        message: 'Загрузка карточки дела...',
+      });
+      const card = await fetchCard(page, caseUuid.trim());
+
+      event.sender.send('osint:kad-arbitr-card-progress', {
+        stage: 'persist',
+        message: 'Сохранение карточки...',
+      });
+      const sourceId = addSource({
+        url: card.source_url,
+        title: `KAD Arbitr — карточка ${card.case_number}`,
+        source_type: 'court',
+        source_kind: 'official_registry',
+        provider: 'kad.arbitr.ru',
+        collection_method: 'browser',
+        reliability: 95,
+        access_level: 'public',
+        retrieved_at: new Date().toISOString(),
+      });
+
+      const stats = persistKadArbitrCard(card, sourceId);
+      return { success: true, card, stats, sourceId };
     } catch (e) {
       return { success: false, error: (e as Error).message };
     }

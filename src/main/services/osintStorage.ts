@@ -11,9 +11,18 @@ import {
   updateRawDumpSections,
   upsertEntity,
   getDatabase,
+  addCaseEvent,
 } from './database';
 import { saveRawDumpSync } from './rawStorage';
-import { KadArbitrCase, KadArbitrData, KadArbitrCounterparty } from './osint/scrapers/kadArbitr';
+import {
+  KadArbitrCase,
+  KadArbitrData,
+  KadArbitrCounterparty,
+  KadArbitrCard,
+  KadArbitrCardEvent,
+  KadArbitrCardSide,
+} from './osint/scrapers/kadArbitr';
+import { detectCounterpartyType } from './osint/scrapers/kadArbitr/helpers';
 
 /**
  * Определяет тип сущности по ссылке на профиль Rusprofile.
@@ -1134,4 +1143,280 @@ export function persistRusprofileArbitration(
   );
 
   return { savedEntities, savedRelations, savedObservations, casesProcessed };
+}
+
+// ============================================================================
+// KAD.ARBITR: карточка дела (стороны + инстансы + события)
+// ============================================================================
+
+/**
+ * Определяет предикат-роль стороны в деле по типу td в карточке.
+ * Используется, когда side пришёл из карточки (там нет поля role).
+ */
+function sidePredicateFromTd(
+  td: 'plaintiffs' | 'defendants' | 'third' | 'others'
+): 'plaintiff_in' | 'defendant_in' | 'third_party_in' | 'associated_with' {
+  switch (td) {
+    case 'plaintiffs': return 'plaintiff_in';
+    case 'defendants': return 'defendant_in';
+    case 'third':      return 'third_party_in';
+    case 'others':     return 'associated_with';
+  }
+}
+
+/**
+ * Upsert стороны дела (из карточки kad.arbitr).
+ * Возвращает id сущности-стороны.
+ */
+function persistCardSide(
+  side: KadArbitrCardSide,
+  predicate: 'plaintiff_in' | 'defendant_in' | 'third_party_in' | 'associated_with',
+  caseEntityId: number,
+  sourceId: number,
+  rawFilePath?: string
+): { entityId: number; savedRelations: number; savedObservations: number } {
+  const type = detectCounterpartyType(side.name);
+  const entityType =
+    type === 'person' ? 'person'
+    : type === 'company' ? 'company'
+    : 'other';
+
+  const entityId = upsertEntity({
+    type: entityType,
+    value: side.name,
+    label: side.name,
+    confidence: type === 'unknown' ? 50 : 75,
+    status: 'unverified',
+    raw_file_path: rawFilePath,
+  });
+
+  let savedObservations = 0;
+  let savedRelations = 0;
+
+  if (side.address) {
+    const r = addObservation({
+      entity_id: entityId,
+      attribute: 'address',
+      value: side.address,
+      source_id: sourceId,
+      confidence: 70,
+      raw_file_path: rawFilePath,
+    });
+    if (r.inserted) savedObservations++;
+  }
+
+  if (side.side_uuid) {
+    const r = addObservation({
+      entity_id: entityId,
+      attribute: 'kad_side_uuid',
+      value: side.side_uuid,
+      source_id: sourceId,
+      confidence: 90,
+      raw_file_path: rawFilePath,
+    });
+    if (r.inserted) savedObservations++;
+  }
+
+  const rel = addRelation({
+    subject_id: entityId,
+    predicate,
+    object_id: caseEntityId,
+    source_id: sourceId,
+    evidence_text: `Сторона дела (kad.arbitr)`,
+    confidence: 85,
+    status: 'unverified',
+    raw_file_path: rawFilePath,
+  });
+  if (rel.inserted) savedRelations++;
+
+  return { entityId, savedRelations, savedObservations };
+}
+
+/**
+ * Сохраняет все события одного инстанса.
+ * Судья и суд уже промотированы заранее, их id передаются сюда.
+ */
+export function persistCaseEvents(
+  caseEntityId: number,
+  events: KadArbitrCardEvent[],
+  sourceId: number,
+  judgeEntityId?: number,
+  courtEntityId?: number,
+  rawFilePath?: string
+): { inserted: number; updated: number; skipped: number } {
+  let inserted = 0;
+  let updated = 0;
+  let skipped = 0;
+
+  for (const ev of events) {
+    const notes = ev.additional_info || null;
+
+    const r = addCaseEvent({
+      case_entity_id: caseEntityId,
+      event_uuid: ev.event_uuid ?? null,
+      event_date: ev.event_date,
+      event_type: ev.event_type,
+      judge_entity_id: ev.judge ? judgeEntityId ?? null : null,
+      court_entity_id: courtEntityId ?? null,
+      content: ev.content ?? null,
+      document_url: ev.document_url ?? null,
+      source_id: sourceId,
+      origin: 'scraper',
+      notes,
+    });
+
+    if (r.inserted) inserted++;
+    else if (r.updated) updated++;
+    else skipped++;
+  }
+
+  return { inserted, updated, skipped };
+}
+
+/**
+ * Сохраняет карточку дела целиком:
+ *  - сущность court_case;
+ *  - observations на неё;
+ *  - стороны (истцы/ответчики/третьи/иные);
+ *  - судью и суд первой инстанции;
+ *  - события по всем инстансам.
+ *
+ * Идемпотентно: повторный вызов не создаёт дубликатов.
+ */
+export function persistKadArbitrCard(
+  card: KadArbitrCard,
+  sourceId: number,
+  rawFilePath?: string
+): {
+  caseEntityId: number;
+  savedEntities: number;
+  savedRelations: number;
+  savedObservations: number;
+  eventsInserted: number;
+  eventsUpdated: number;
+} {
+  let savedEntities = 0;
+  let savedRelations = 0;
+  let savedObservations = 0;
+  let eventsInserted = 0;
+  let eventsUpdated = 0;
+
+  // 1. Сущность court_case
+  const normalized = normalizeCaseNumber(card.case_number);
+  const caseEntityId = upsertEntity({
+    type: 'court_case',
+    value: normalized,
+    label: `Дело ${card.case_number}`,
+    confidence: 95,
+    status: 'confirmed',
+    notes: `Тип: ${card.case_type}${card.category ? `; ${card.category}` : ''}`,
+    raw_file_path: rawFilePath,
+  });
+  savedEntities++;
+
+  // 2. Observations на court_case
+  const caseObs: Array<{ attribute: string; value: string | undefined }> = [
+    { attribute: 'case_number', value: card.case_number },
+    { attribute: 'case_uuid',   value: card.case_uuid },
+    { attribute: 'case_type',   value: card.case_type },
+    { attribute: 'filing_date', value: card.filing_date },
+    { attribute: 'category',    value: card.category },
+    { attribute: 'status',      value: card.status },
+  ];
+  for (const obs of caseObs) {
+    if (!obs.value) continue;
+    const r = addObservation({
+      entity_id: caseEntityId,
+      attribute: obs.attribute,
+      value: obs.value,
+      source_id: sourceId,
+      confidence: 90,
+      raw_file_path: rawFilePath,
+    });
+    if (r.inserted) savedObservations++;
+  }
+
+  // 3. Стороны
+  const sideGroups: Array<{
+    items: KadArbitrCardSide[];
+    td: 'plaintiffs' | 'defendants' | 'third' | 'others';
+  }> = [
+    { items: card.sides.plaintiffs,   td: 'plaintiffs' },
+    { items: card.sides.respondents,  td: 'defendants' },
+    { items: card.sides.third_parties, td: 'third' },
+    { items: card.sides.others,       td: 'others' },
+  ];
+
+  for (const group of sideGroups) {
+    for (const side of group.items) {
+      const predicate = sidePredicateFromTd(group.td);
+      const r = persistCardSide(side, predicate, caseEntityId, sourceId, rawFilePath);
+      savedEntities++;
+      savedRelations += r.savedRelations;
+      savedObservations += r.savedObservations;
+    }
+  }
+
+  // 4. Инстансы, судьи, суды, события
+  for (const inst of card.instances) {
+    // Суд инстанса
+    let courtEntityId: number | undefined;
+    if (inst.court_name) {
+      courtEntityId = promoteCourtToEntity(inst.court_name, sourceId);
+      const r = addRelation({
+        subject_id: caseEntityId,
+        predicate: 'heard_by',
+        object_id: courtEntityId,
+        source_id: sourceId,
+        evidence_text: `${inst.level}: ${inst.court_name}`,
+        confidence: 90,
+        status: 'confirmed',
+        raw_file_path: rawFilePath,
+      });
+      if (r.inserted) savedRelations++;
+    }
+
+    // Судьи инстанса (если есть в шапке — только у первой инстанции)
+    let judgeEntityId: number | undefined;
+    if (inst.judges && inst.judges.length > 0) {
+      for (const judgeName of inst.judges) {
+        const jid = promoteJudgeToEntity(judgeName, inst.court_name, sourceId);
+        if (!judgeEntityId) judgeEntityId = jid; // для событий берём первого
+        const r = addRelation({
+          subject_id: jid,
+          predicate: 'judge_of',
+          object_id: caseEntityId,
+          source_id: sourceId,
+          evidence_text: `${judgeName} (${inst.court_name})`,
+          confidence: 90,
+          status: 'confirmed',
+          raw_file_path: rawFilePath,
+        });
+        if (r.inserted) savedRelations++;
+      }
+    }
+
+    // События инстанса
+    if (inst.events.length > 0) {
+      const evStats = persistCaseEvents(
+        caseEntityId,
+        inst.events,
+        sourceId,
+        judgeEntityId,
+        courtEntityId,
+        rawFilePath
+      );
+      eventsInserted += evStats.inserted;
+      eventsUpdated += evStats.updated;
+    }
+  }
+
+  return {
+    caseEntityId,
+    savedEntities,
+    savedRelations,
+    savedObservations,
+    eventsInserted,
+    eventsUpdated,
+  };
 }

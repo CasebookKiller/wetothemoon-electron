@@ -397,6 +397,16 @@ try {
     removeKadArbitrProgressListener: () =>
       ipcRenderer.removeAllListeners('osint:kad-arbitr-progress'),
 
+    fetchKadArbitrCard: (caseUuid: string) =>
+      ipcRenderer.invoke('osint:kad-arbitr-fetch-card', caseUuid),
+
+    onKadArbitrCardProgress: (callback: (info: any) => void) => {
+      ipcRenderer.on('osint:kad-arbitr-card-progress', (_, info) => callback(info));
+    },
+
+    removeKadArbitrCardProgressListener: () =>
+      ipcRenderer.removeAllListeners('osint:kad-arbitr-card-progress'),
+
     ////
 
     scrapeMosGorsud: (inn: string) => ipcRenderer.invoke('osint:scrape-mos-gorsud', inn),
