@@ -1,9 +1,10 @@
 // src/components/SIETCH/DetailFields.tsx
 
-import React from 'react';
+import React, { useState } from 'react';
 import { InputText } from 'primereact/inputtext';
 import { InputTextarea } from 'primereact/inputtextarea';
 import { Dropdown } from 'primereact/dropdown';
+import { AutoComplete } from 'primereact/autocomplete';
 
 export interface DetailField {
   /** Подпись поля */
@@ -21,9 +22,17 @@ export interface DetailField {
   /** Ключ поля в editForm */
   editKey?: string;
   /** Тип редактора */
-  editType?: 'text' | 'textarea' | 'number' | 'dropdown';
-  /** Опции для dropdown */
+  editType?: 'text' | 'textarea' | 'number' | 'dropdown' | 'autocomplete';
+  /** Опции для dropdown / autocomplete */
   editOptions?: { label: string; value: any }[];
+
+  // === Дополнительно для autocomplete ===
+  /** Placeholder (autocomplete) */
+  editPlaceholder?: string;
+  /** Минимальная длина запроса для autocomplete (по умолчанию 0) */
+  editMinLength?: number;
+  /** Максимум suggestions (по умолчанию 100) */
+  editMaxSuggestions?: number;
 }
 
 export interface DetailFieldsProps {
@@ -45,6 +54,23 @@ export const DetailFields: React.FC<DetailFieldsProps> = ({
   editForm,
   onEditChange,
 }) => {
+  // Кеш suggestions для autocomplete-полей: editKey → отфильтрованный список.
+  // Одно состояние на все autocomplete-поля, ключ — editKey.
+  const [suggestions, setSuggestions] = useState<
+    Record<string, { label: string; value: any }[]>
+  >({});
+
+  const searchOptions = (field: DetailField, query: string) => {
+    const key = field.editKey ?? '';
+    const all = field.editOptions ?? [];
+    const q = (query || '').trim().toLowerCase();
+    const filtered = q
+      ? all.filter((o) => String(o.label).toLowerCase().includes(q))
+      : all;
+    const max = field.editMaxSuggestions ?? 100;
+    setSuggestions((prev) => ({ ...prev, [key]: filtered.slice(0, max) }));
+  };
+
   return (
     <div className={`grid p-fluid detail-fields ${className || ''}`}>
       {fields.map((field, index) => {
@@ -59,7 +85,13 @@ export const DetailFields: React.FC<DetailFieldsProps> = ({
             <label className="font-bold">{field.label}</label>
             <div className="detail-field__content">
               {isEditable
-                ? renderEditor(field, editForm, onEditChange)
+                ? renderEditor(
+                    field,
+                    editForm,
+                    onEditChange,
+                    field.editKey ? suggestions[field.editKey] : undefined,
+                    searchOptions
+                  )
                 : (field.value ?? <span className="text-500">—</span>)}
             </div>
           </div>
@@ -71,8 +103,10 @@ export const DetailFields: React.FC<DetailFieldsProps> = ({
 
 function renderEditor(
   field: DetailField,
-  editForm?: Record<string, any> | null,
-  onEditChange?: (key: string, value: any) => void
+  editForm: Record<string, any> | null | undefined,
+  onEditChange: ((key: string, value: any) => void) | undefined,
+  suggestions: { label: string; value: any }[] | undefined,
+  searchOptions: (field: DetailField, query: string) => void
 ): React.ReactNode {
   const key = field.editKey!;
   const value = editForm?.[key];
@@ -89,6 +123,7 @@ function renderEditor(
           className="w-full"
         />
       );
+
     case 'number':
       return (
         <InputText
@@ -101,6 +136,7 @@ function renderEditor(
           className="w-full"
         />
       );
+
     case 'dropdown':
       return (
         <Dropdown
@@ -110,6 +146,35 @@ function renderEditor(
           className="w-full"
         />
       );
+
+    case 'autocomplete': {
+      const allOptions = field.editOptions || [];
+      const selected = allOptions.find((o) => o.value === value) || null;
+
+      return (
+        <AutoComplete
+          value={selected}
+          suggestions={suggestions || []}
+          completeMethod={(e) => searchOptions(field, e.query)}
+          field="label"
+          dropdown
+          forceSelection
+          minLength={field.editMinLength ?? 0}
+          placeholder={field.editPlaceholder || 'Начните печатать...'}
+          onChange={(e) => {
+            const v = e.value;
+            if (v && typeof v === 'object' && 'value' in v) {
+              change(v.value);
+            } else if (v === null || v === '') {
+              change(null);
+            }
+          }}
+          className="w-full"
+          inputClassName="w-full"
+        />
+      );
+    }
+
     case 'text':
     default:
       return (

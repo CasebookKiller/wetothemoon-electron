@@ -10,46 +10,14 @@ import {
   getJudgesDirectoryStats,
   searchCases,
   fetchCard,
+  downloadKadDocument,
+  extractCaseUuidFromPdfUrl,
 } from '../services/osint/scrapers/kadArbitr';
 import { scrapeMosGorsud } from '../services/osint/scrapers/mosGorsud';
 import { getCredentials, setCredentials } from '../services/osint/credentials';
 import { createDatabaseWindow, getDatabaseWindow } from '../windows/databaseWindow';
-//import { deleteDumpsByEntity, findLatestRawDump, getRelatedIds, searchEntities, searchAll, listJudges,
-//  listCourts,
-//  listSaturatedPrefixes,
-//  deleteJudge,
-//  addSource, } from '../services/database';
 import { deleteAllRawDumps, loadRawDumpSync } from '../services/rawStorage';
 import { mergeCompanyDumps, persistKadArbitrCard, persistKadArbitrData, saveCompanyData, updateCompanyData } from '../services/osintStorage';
-//import { 
-//  getDatabase,
-//  getDumpSectionsUpdatedAt,
-//  hasRawDumpForInn,
-//  listDumps,
-//  getRelationDetails,
-//  markRecordAsFalse,
-//  getEntityDetails,
-//  getObservationDetails,
-//  getSourceDetails,
-//  createEntity,
-//  updateEntity,
-//  createRelation,
-//  updateRelation,
-//  createObservation,
-//  updateObservation,
-//  createSource,
-//  updateSource,
-//  listEntitiesForDropdown,
-//  deleteEntity,
-//  deleteRelation,
-//  deleteObservation,
-//  deleteSource,
-//  clearAllTables,
-//  getAuditLog,
-//  listAuditLogTables,
-//  listAuditLogActions,
-//  markRecordsAsFalse,
-//} from '../services/database';
 
 import {
   getSensitiveStatus,
@@ -1123,6 +1091,47 @@ export function registerOsintHandlers() {
       const stats = persistKadArbitrCard(card, sourceId);
       return { success: true, card, stats, sourceId, fromCache: false };
     } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  // Скачивание PDF судебного акта kad.arbitr через Playwright-контекст.
+  // Вызывается из renderer после перехвата target=_blank в osintWindow.
+  // Дедуп: если тот же URL прилетел < 5 сек назад — игнорируем.
+  const recentPdfDownloads = new Map<string, number>();
+
+  ipcMain.handle('osint:kad-download-document', async (_event, url: string) => {
+    console.log('[kad-pdf] invoke:', url, 'at', new Date().toISOString());
+
+    try {
+      if (!url || !url.trim()) {
+        return { success: false, error: 'URL не указан' };
+      }
+
+      const now = Date.now();
+      const prev = recentPdfDownloads.get(url);
+      if (prev && now - prev < 5000) {
+        console.log('[kad-pdf] duplicate within 5s, ignored');
+        return { success: false, error: 'Дубликат запроса (уже скачивается)' };
+      }
+      recentPdfDownloads.set(url, now);
+
+      // Чистим старые записи
+      for (const [k, t] of recentPdfDownloads.entries()) {
+        if (now - t > 30000) recentPdfDownloads.delete(k);
+      }
+
+      const caseUuid = extractCaseUuidFromPdfUrl(url);
+      const page = await ensureKadSession();
+      const result = await downloadKadDocument(page, url, caseUuid);
+
+      return {
+        success: true,
+        localPath: result.localPath,
+        sizeBytes: result.sizeBytes,
+      };
+    } catch (e) {
+      console.error('[kad-pdf] error:', e);
       return { success: false, error: (e as Error).message };
     }
   });

@@ -622,6 +622,17 @@ try {
     backupRestore: () =>
       ipcRenderer.invoke('osint:backup-restore'),
 
+    downloadKadDocument: (url: string) =>
+      ipcRenderer.invoke('osint:kad-download-document', url),
+
+    onKadPdfClicked: (callback: (info: { url: string }) => void) => {
+      ipcRenderer.on('osint:kad-pdf-clicked', (_, info) => callback(info));
+    },
+
+    removeKadPdfClickedListener: () => {
+      ipcRenderer.removeAllListeners('osint:kad-pdf-clicked');
+    },
+
     // ==================== Prana-Bindu ====================
     openPranaBinduWindow: () => ipcRenderer.invoke('pb:open-window'),
     pb: {

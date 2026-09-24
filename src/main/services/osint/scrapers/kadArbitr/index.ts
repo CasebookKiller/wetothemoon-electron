@@ -30,3 +30,11 @@ export type {
   KadArbitrCardSides,
   KadArbitrEventType,
 } from './types';
+
+export {
+  downloadKadDocument,
+  extractCaseUuidFromPdfUrl,
+  isKadPdfUrl,
+} from './documents';
+
+export type { DownloadedDocument } from './documents';

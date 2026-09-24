@@ -1,10 +1,11 @@
 // src/components/SIETCH/KadArbitrCardDialog.tsx
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Dialog } from 'primereact/dialog';
 import { Button } from 'primereact/button';
 import { DataTable } from 'primereact/datatable';
 import { Column } from 'primereact/column';
+import { Toast } from 'primereact/toast';
 
 export interface KadArbitrCardDialogProps {
   visible: boolean;
@@ -13,7 +14,7 @@ export interface KadArbitrCardDialogProps {
 }
 
 interface ProgressInfo {
-  stage: 'session' | 'fetch' | 'persist';
+  stage: 'session' | 'fetch' | 'persist' | 'cache';
   message: string;
 }
 
@@ -23,20 +24,64 @@ export const KadArbitrCardDialog: React.FC<KadArbitrCardDialogProps> = ({
   onHide,
 }) => {
   const api = (window as any).electronAPI;
+  const toastRef = useRef<Toast>(null);
 
   const [loading, setLoading] = useState(false);
   const [card, setCard] = useState<any>(null);
   const [stats, setStats] = useState<any>(null);
   const [error, setError] = useState('');
   const [progress, setProgress] = useState('');
-
   const [fromCache, setFromCache] = useState<string | null>(null);
 
+  // Прогресс загрузки карточки
   useEffect(() => {
     if (!visible) return;
     const onProgress = (info: ProgressInfo) => setProgress(info.message || '');
     api.onKadArbitrCardProgress(onProgress);
     return () => api.removeKadArbitrCardProgressListener();
+  }, [visible]);
+
+  // Перехват клика по PDF (из osintWindow через IPC) → скачивание
+  useEffect(() => {
+    if (!visible) return;
+
+    const onPdfClick = async (info: { url: string }) => {
+      toastRef.current?.show({
+        severity: 'info',
+        summary: 'Скачивание PDF...',
+        detail: 'Запрос через сессию kad.arbitr',
+        life: 3000,
+      });
+
+      try {
+        const res = await api.downloadKadDocument(info.url);
+        if (res.success) {
+          toastRef.current?.show({
+            severity: 'success',
+            summary: 'PDF скачан',
+            detail: `${res.localPath} (${(res.sizeBytes / 1024).toFixed(0)} KB)`,
+            life: 6000,
+          });
+        } else {
+          toastRef.current?.show({
+            severity: 'error',
+            summary: 'Не удалось скачать PDF',
+            detail: res.error,
+            life: 8000,
+          });
+        }
+      } catch (e: any) {
+        toastRef.current?.show({
+          severity: 'error',
+          summary: 'Ошибка IPC',
+          detail: e.message,
+          life: 8000,
+        });
+      }
+    };
+
+    api.onKadPdfClicked(onPdfClick);
+    return () => api.removeKadPdfClickedListener();
   }, [visible]);
 
   const loadCard = async (forceRefresh: boolean) => {
@@ -114,6 +159,8 @@ export const KadArbitrCardDialog: React.FC<KadArbitrCardDialogProps> = ({
         </div>
       }
     >
+      <Toast ref={toastRef} />
+
       {loading && <p>{progress || 'Загрузка карточки...'}</p>}
       {error && <p className="p-error">Ошибка: {error}</p>}
 
@@ -123,7 +170,10 @@ export const KadArbitrCardDialog: React.FC<KadArbitrCardDialogProps> = ({
             <div><b>Тип:</b> {card.case_type}</div>
             <div><b>Статус:</b> {card.status || '—'}</div>
             <div><b>Дата подачи:</b> {card.filing_date || '—'}</div>
-            <div><b>Длительность:</b> {card.duration_days ? `${card.duration_days} дн.` : '—'}</div>
+            <div>
+              <b>Дней с последнего события:</b>{' '}
+              {card.duration_days ? `${card.duration_days}` : '—'}
+            </div>
           </div>
           {card.category && (
             <div><b>Категория:</b> {card.category}</div>
@@ -148,7 +198,7 @@ export const KadArbitrCardDialog: React.FC<KadArbitrCardDialogProps> = ({
             </div>
           )}
 
-                    {card.instances.map((inst: any) => {
+          {card.instances.map((inst: any) => {
             const eventsSorted = [...(inst.events || [])].sort((a: any, b: any) =>
               (b.event_date || '').localeCompare(a.event_date || '')
             );
@@ -251,8 +301,8 @@ export const KadArbitrCardDialog: React.FC<KadArbitrCardDialogProps> = ({
                               target="_blank"
                               rel="noreferrer"
                               className="pi pi-file-pdf"
-                              style={{ fontSize: '1.1rem' }}
-                              title="Открыть PDF"
+                              style={{ fontSize: '1.1rem', cursor: 'pointer' }}
+                              title="Скачать PDF (через сессию kad.arbitr)"
                             />
                           ) : (
                             <span style={{ opacity: 0.3 }}>—</span>
