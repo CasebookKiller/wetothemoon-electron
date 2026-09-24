@@ -292,8 +292,6 @@ function renderEditor(
         dateFormat="yy-mm-dd"
         showIcon
         placeholder="гггг-мм-дд"
-        style={{ width: '100%' }}
-        inputStyle={{ width: '100%' }}
         className="w-full"
       />
     );
