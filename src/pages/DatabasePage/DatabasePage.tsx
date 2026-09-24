@@ -84,6 +84,12 @@ export const DatabasePage: React.FC = () => {
     observations: number[];
     sources: number[];
   } | null>(null);
+  const [searchMatchedIds, setSearchMatchedIds] = useState<{
+    entities: number[];
+    relations: number[];
+    observations: number[];
+    sources: number[];
+  } | null>(null);
   const [searchCounts, setSearchCounts] = useState<{
     entity: number;
     relation: number;
@@ -152,6 +158,25 @@ export const DatabasePage: React.FC = () => {
 
   const sensitiveState = useSensitiveState();
 
+  /**
+   * Сортирует строки: сначала прямые совпадения (по matchedIds),
+   * затем связанные. Внутри каждой группы — порядок сохраняется
+   * (обычно id DESC из SQL).
+   */
+  const sortByMatch = <T extends { id: number }>(
+    rows: T[],
+    matchedIds: number[]
+  ): T[] => {
+    const matchedSet = new Set(matchedIds);
+    const direct: T[] = [];
+    const related: T[] = [];
+    for (const r of rows) {
+      if (matchedSet.has(r.id)) direct.push(r);
+      else related.push(r);
+    }
+    return [...direct, ...related];
+  };
+
   // Поиск: если активен — режем все 4 таблицы по unionIds из searchAll.
   // Фильтр по типу сущности применяем только к сущностям и только
   // когда scope = 'all' или 'entity'.
@@ -160,22 +185,39 @@ export const DatabasePage: React.FC = () => {
     (searchScope === 'all' || searchScope === 'entity') &&
     searchEntityType !== 'all';
 
+  const matchedEntityIds = searchMatchedIds?.entities || [];
+  const matchedRelationIds = searchMatchedIds?.relations || [];
+  const matchedObservationIds = searchMatchedIds?.observations || [];
+  const matchedSourceIds = searchMatchedIds?.sources || [];
+
   const displayEntities = searchActive && searchUnionIds
-    ? entities
-        .filter((e) => searchUnionIds.entities.includes(e.id))
-        .filter((e) => !entityTypeFilterActive || e.type === searchEntityType)
+    ? sortByMatch(
+        entities
+          .filter((e) => searchUnionIds.entities.includes(e.id))
+          .filter((e) => !entityTypeFilterActive || e.type === searchEntityType),
+        matchedEntityIds
+      )
     : entities;
 
   const displayRelations = searchActive && searchUnionIds
-    ? relations.filter((r) => searchUnionIds.relations.includes(r.id))
+    ? sortByMatch(
+        relations.filter((r) => searchUnionIds.relations.includes(r.id)),
+        matchedRelationIds
+      )
     : relations;
 
   const displayObservations = searchActive && searchUnionIds
-    ? observations.filter((o) => searchUnionIds.observations.includes(o.id))
+    ? sortByMatch(
+        observations.filter((o) => searchUnionIds.observations.includes(o.id)),
+        matchedObservationIds
+      )
     : observations;
 
   const displaySources = searchActive && searchUnionIds
-    ? sources.filter((s) => searchUnionIds.sources.includes(s.id))
+    ? sortByMatch(
+        sources.filter((s) => searchUnionIds.sources.includes(s.id)),
+        matchedSourceIds
+      )
     : sources;
 
   const {
@@ -238,6 +280,7 @@ export const DatabasePage: React.FC = () => {
       const res = await api.searchAll(searchQuery.trim(), kinds, 500, 0);
       if (res.success) {
         setSearchUnionIds(res.unionIds || null);
+        setSearchMatchedIds(res.matchedIds || null);
         setSearchCounts(res.counts || null);
         setSearchUnionCounts(
           res.unionIds
@@ -266,6 +309,7 @@ export const DatabasePage: React.FC = () => {
     setSearchEntityType('all');
     setSearchActive(false);
     setSearchUnionIds(null);
+    setSearchMatchedIds(null);
     setSearchCounts(null);
     setSearchUnionCounts(null);
   };
