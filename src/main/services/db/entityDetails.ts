@@ -35,10 +35,13 @@ export function getEntityDetails(entityId: number): any | null {
   const relationsOut = db.prepare(`
     SELECT r.id, r.predicate, r.confidence, r.status, r.evidence_text,
            r.valid_from, r.valid_to, r.source_id, r.origin,
+           r.via_entity_id,
            e.id AS object_id, e.label AS object_label, e.type AS object_type,
+           v.label AS via_label, v.type AS via_type, v.value AS via_value,
            s.url AS source_url, s.title AS source_title
     FROM relations r
     JOIN entities e ON e.id = r.object_id
+    LEFT JOIN entities v ON v.id = r.via_entity_id
     LEFT JOIN sources s ON s.id = r.source_id
     WHERE r.subject_id = ?
     ORDER BY r.id DESC
@@ -47,10 +50,13 @@ export function getEntityDetails(entityId: number): any | null {
   const relationsIn = db.prepare(`
     SELECT r.id, r.predicate, r.confidence, r.status, r.evidence_text,
            r.valid_from, r.valid_to, r.source_id, r.origin,
+           r.via_entity_id,
            e.id AS subject_id, e.label AS subject_label, e.type AS subject_type,
+           v.label AS via_label, v.type AS via_type, v.value AS via_value,
            s.url AS source_url, s.title AS source_title
     FROM relations r
     JOIN entities e ON e.id = r.subject_id
+    LEFT JOIN entities v ON v.id = r.via_entity_id
     LEFT JOIN sources s ON s.id = r.source_id
     WHERE r.object_id = ?
     ORDER BY r.id DESC
@@ -63,10 +69,12 @@ export function getEntityDetails(entityId: number): any | null {
     WHERE s.id IN (
       SELECT source_id FROM observations WHERE entity_id = ? AND source_id IS NOT NULL
       UNION
-      SELECT source_id FROM relations WHERE (subject_id = ? OR object_id = ?) AND source_id IS NOT NULL
+      SELECT source_id FROM relations
+        WHERE (subject_id = ? OR object_id = ? OR via_entity_id = ?)
+          AND source_id IS NOT NULL
     )
     ORDER BY s.id DESC
-  `).all(entityId, entityId, entityId) as any[];
+  `).all(entityId, entityId, entityId, entityId) as any[];
 
   return {
     entity,
@@ -109,24 +117,28 @@ export function getRelatedIds(
   const loadRelationsByEntities = (ids: number[]) => {
     if (ids.length === 0) return;
     const placeholders = ids.map(() => '?').join(',');
-    db.prepare(`SELECT id, subject_id, object_id, source_id FROM relations
-                WHERE subject_id IN (${placeholders}) OR object_id IN (${placeholders})`)
-      .all(...ids, ...ids)
+    db.prepare(`SELECT id, subject_id, object_id, via_entity_id, source_id FROM relations
+                WHERE subject_id IN (${placeholders})
+                   OR object_id IN (${placeholders})
+                   OR via_entity_id IN (${placeholders})`)
+      .all(...ids, ...ids, ...ids)
       .forEach((r: any) => {
         relationIds.add(r.id);
         entityIds.add(r.subject_id);
         entityIds.add(r.object_id);
+        if (r.via_entity_id) entityIds.add(r.via_entity_id);
         if (r.source_id) sourceIds.add(r.source_id);
       });
   };
 
   const loadRelationsBySource = (sourceId: number) => {
-    db.prepare(`SELECT id, subject_id, object_id FROM relations WHERE source_id = ?`)
+    db.prepare(`SELECT id, subject_id, object_id, via_entity_id FROM relations WHERE source_id = ?`)
       .all(sourceId)
       .forEach((r: any) => {
         relationIds.add(r.id);
         entityIds.add(r.subject_id);
         entityIds.add(r.object_id);
+        if (r.via_entity_id) entityIds.add(r.via_entity_id);
       });
   };
 

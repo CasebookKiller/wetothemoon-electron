@@ -293,6 +293,44 @@ export function initializeSchema(db: DatabaseSync) {
     );
   }
 
+  // Миграция: via_entity_id в relations — контекст тройных связей.
+  // Пример: P --represents--> A, via=Case. Позволяет хранить представителей
+  // (и другие контекстные связи) без пятой таблицы, оставаясь в бинарной
+  // модели relations.
+  const relCols = db.prepare(`PRAGMA table_info(relations)`).all() as { name: string }[];
+  if (!relCols.some((c) => c.name === 'via_entity_id')) {
+    db.exec(`ALTER TABLE relations ADD COLUMN via_entity_id INTEGER REFERENCES entities(id);`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_relations_via ON relations(via_entity_id);`);
+    console.log('Добавлена колонка via_entity_id в relations');
+  }
+
+  // Миграция: расширяем уникальный индекс relations до (subject, predicate, object, via).
+  // Старый ux_relations_triple не пропускал "P представляет A в деле X" и
+  // "P представляет A в деле Y" одновременно.
+  try {
+    // Проверяем, существует ли старый индекс
+    const oldIdx = db.prepare(
+      `SELECT name FROM sqlite_master WHERE type='index' AND name='ux_relations_triple'`
+    ).get();
+
+    if (oldIdx) {
+      db.exec(`DROP INDEX ux_relations_triple;`);
+      console.log('[db] Удалён старый ux_relations_triple');
+    }
+
+    db.exec(`
+      CREATE UNIQUE INDEX IF NOT EXISTS ux_relations_triple_via
+        ON relations(subject_id, predicate, object_id, COALESCE(via_entity_id, 0));
+    `);
+  } catch (e) {
+    console.warn(
+      '[db] Не удалось создать ux_relations_triple_via — в relations, вероятно, есть дубликаты. ' +
+      'Чистка: DELETE FROM relations WHERE id NOT IN ' +
+      '(SELECT MAX(id) FROM relations GROUP BY subject_id, predicate, object_id, COALESCE(via_entity_id, 0));',
+      (e as Error).message
+    );
+  }
+
   // ← Разовая миграция: схлопываем дубли observations, накопленные
   // до введения UNIQUE-индекса. Порядок важен: DELETE идёт ДО
   // CREATE UNIQUE INDEX, иначе индекс не создастся на «грязной» БД.
@@ -341,7 +379,7 @@ export function initializeSchema(db: DatabaseSync) {
     }
   }
 
-    // Миграция court_case:
+  // Миграция court_case:
   // 1) вычисляем для каждой сущности желаемый normalized_value (lowercase);
   // 2) группируем по нему;
   // 3) сливаем дубли на keeper (min id) — переносим events/observations/relations;

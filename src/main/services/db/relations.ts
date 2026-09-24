@@ -77,6 +77,7 @@ export function addRelation(relation: {
   subject_id: number;
   predicate: string;
   object_id: number;
+  via_entity_id?: number;      // ← НОВОЕ: контекст связи
   source_id?: number;
   valid_from?: string;
   valid_to?: string;
@@ -103,13 +104,20 @@ export function addRelation(relation: {
   }
 
   // 2. Проверить дубликат
+  const via = relation.via_entity_id ?? null;
   const existing = db.prepare(`
     SELECT id FROM relations
     WHERE subject_id = ?
       AND predicate = ?
       AND object_id = ?
+      AND COALESCE(via_entity_id, 0) = COALESCE(?, 0)
     LIMIT 1
-  `).get(relation.subject_id, relation.predicate, relation.object_id) as { id: number } | undefined;
+  `).get(
+    relation.subject_id,
+    relation.predicate,
+    relation.object_id,
+    via
+  ) as { id: number } | undefined;
 
   if (existing) {
     // Обновить confidence/source, если они не заданы у существующей
@@ -134,16 +142,17 @@ export function addRelation(relation: {
   // ← ИЗМЕНЕНО: оборачиваем в try/catch и обрабатываем UNIQUE-конфликт
   // (теоретическое TOCTOU-окно между SELECT и INSERT; node:sqlite
   //  синхронный, но подстраховаться не вредно — плюс общий UNIQUE-индекс).
-  try {
+    try {
     const info = db.prepare(`
       INSERT INTO relations
-        (subject_id, predicate, object_id, source_id, valid_from, valid_to,
-         evidence_text, confidence, status, notes, raw_file_path)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (subject_id, predicate, object_id, via_entity_id, source_id,
+         valid_from, valid_to, evidence_text, confidence, status, notes, raw_file_path)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       relation.subject_id,
       relation.predicate,
       relation.object_id,
+      relation.via_entity_id || null,
       relation.source_id || null,
       relation.valid_from || null,
       relation.valid_to || null,
@@ -158,14 +167,19 @@ export function addRelation(relation: {
   } catch (e) {
     const msg = (e as Error).message || '';
     if (msg.includes('UNIQUE') || msg.includes('constraint')) {
-      // Кто-то успел вставить между SELECT и INSERT — вернём существующий id
       const again = db.prepare(`
         SELECT id FROM relations
-        WHERE subject_id = ? AND predicate = ? AND object_id = ?
+        WHERE subject_id = ?
+          AND predicate = ?
+          AND object_id = ?
+          AND COALESCE(via_entity_id, 0) = COALESCE(?, 0)
         LIMIT 1
-      `).get(relation.subject_id, relation.predicate, relation.object_id) as
-        | { id: number }
-        | undefined;
+      `).get(
+        relation.subject_id,
+        relation.predicate,
+        relation.object_id,
+        relation.via_entity_id ?? null
+      ) as { id: number } | undefined;
       if (again) return { inserted: false, id: again.id };
     }
     throw e;
@@ -182,6 +196,7 @@ export function updateRelation(
     valid_to?: string | null;
     evidence_text?: string | null;
     notes?: string | null;
+    via_entity_id?: number | null;
   }
 ): { success: boolean; error?: string } {
   const db = getDatabase();
@@ -198,6 +213,7 @@ export function updateRelation(
   const valid_to = patch.valid_to !== undefined ? patch.valid_to : old.valid_to;
   const evidence_text = patch.evidence_text !== undefined ? patch.evidence_text : old.evidence_text;
   const notes = patch.notes !== undefined ? patch.notes : old.notes;
+  const via_entity_id = patch.via_entity_id !== undefined ? patch.via_entity_id : old.via_entity_id;
 
   const oldOrigin = old.origin || 'scraper';
   const newOrigin = 'manual';
@@ -212,6 +228,7 @@ export function updateRelation(
           valid_to = ?,
           evidence_text = ?,
           notes = ?,
+          via_entity_id = ?,
           origin = ?
       WHERE id = ?
     `).run(
@@ -271,7 +288,8 @@ export function deleteRelation(relationId: number): { success: boolean; error?: 
 }
 
 /**
- * Возвращает полную информацию о связи, включая subject/object и источник.
+ * Возвращает полную информацию о связи, включая subject/object, источник
+ * и контекст (via_entity_id).
  */
 export function getRelationDetails(relationId: number): any | null {
   const db = getDatabase();
@@ -290,12 +308,16 @@ export function getRelationDetails(relationId: number): any | null {
       r.subject_id,
       r.object_id,
       r.source_id,
+      r.via_entity_id,
       s.label AS subject_label,
       s.type  AS subject_type,
       s.value AS subject_value,
       o.label AS object_label,
       o.type  AS object_type,
       o.value AS object_value,
+      v.label AS via_label,
+      v.type  AS via_type,
+      v.value AS via_value,
       src.url          AS source_url,
       src.title        AS source_title,
       src.source_type  AS source_type,
@@ -305,6 +327,7 @@ export function getRelationDetails(relationId: number): any | null {
     FROM relations r
     JOIN entities s ON s.id = r.subject_id
     JOIN entities o ON o.id = r.object_id
+    LEFT JOIN entities v ON v.id = r.via_entity_id
     LEFT JOIN sources src ON src.id = r.source_id
     WHERE r.id = ?
   `).get(relationId) as any;

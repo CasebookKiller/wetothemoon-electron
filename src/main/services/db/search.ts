@@ -116,35 +116,45 @@ export function searchAll(
   // ===== RELATIONS =====
   if (kinds.includes('relation')) {
     counts.relation = (db.prepare(`
-      SELECT COUNT(*) AS c FROM relations
-      WHERE predicate LIKE ? OR evidence_text LIKE ? OR notes LIKE ?
-    `).get(like, like, like) as any).c;
+      SELECT COUNT(*) AS c
+      FROM relations r
+      LEFT JOIN entities v ON v.id = r.via_entity_id
+      WHERE r.predicate LIKE ? OR r.evidence_text LIKE ? OR r.notes LIKE ?
+         OR v.label LIKE ? OR v.value LIKE ?
+    `).get(like, like, like, like, like) as any).c;
 
     if (counts.relation > 0) {
       const rows = db.prepare(`
         SELECT r.id, r.predicate, r.evidence_text, r.notes,
+               r.via_entity_id,
                s.label AS subject_label, s.value AS subject_value,
-               o.label AS object_label, o.value AS object_value
+               o.label AS object_label, o.value AS object_value,
+               v.label AS via_label, v.value AS via_value
         FROM relations r
         JOIN entities s ON s.id = r.subject_id
         JOIN entities o ON o.id = r.object_id
+        LEFT JOIN entities v ON v.id = r.via_entity_id
         WHERE r.predicate LIKE ? OR r.evidence_text LIKE ? OR r.notes LIKE ?
+           OR v.label LIKE ? OR v.value LIKE ?
         ORDER BY r.id DESC
         LIMIT ?
-      `).all(like, like, like, limit + offset) as any[];
+      `).all(like, like, like, like, like, limit + offset) as any[];
       for (const r of rows) {
         matchedRelationIds.add(r.id);
         const m = pickMatch([
           ['predicate', r.predicate],
           ['evidence_text', r.evidence_text],
           ['notes', r.notes],
+          ['via', r.via_label || r.via_value],
         ]);
         const subj = r.subject_label || r.subject_value || '?';
         const obj = r.object_label || r.object_value || '?';
+        const viaLabel = r.via_label || r.via_value;
+        const viaSuffix = viaLabel ? ` [${viaLabel}]` : '';
         items.push({
           kind: 'relation',
           id: r.id,
-          title: `${subj} —${r.predicate}→ ${obj}`,
+          title: `${subj} —${r.predicate}→ ${obj}${viaSuffix}`,
           subtitle: 'связь',
           matched_field: m.field,
           matched_value: m.value,
@@ -232,16 +242,19 @@ export function searchAll(
     const ids = [...matchedEntityIds];
     const ph = ids.map(() => '?').join(',');
 
-    // Связи, где найденная сущность — subject или object
+    // Связи, где найденная сущность — subject, object или контекст (via)
     const relRows = db.prepare(`
-      SELECT id, subject_id, object_id, source_id
+      SELECT id, subject_id, object_id, via_entity_id, source_id
       FROM relations
-      WHERE subject_id IN (${ph}) OR object_id IN (${ph})
-    `).all(...ids, ...ids) as any[];
+      WHERE subject_id IN (${ph})
+         OR object_id IN (${ph})
+         OR via_entity_id IN (${ph})
+    `).all(...ids, ...ids, ...ids) as any[];
     for (const r of relRows) {
       relatedRelationIds.add(r.id);
       relatedEntityIds.add(r.subject_id);
       relatedEntityIds.add(r.object_id);
+      if (r.via_entity_id) relatedEntityIds.add(r.via_entity_id);
       if (r.source_id) relatedSourceIds.add(r.source_id);
     }
 
@@ -260,11 +273,13 @@ export function searchAll(
     const ids = [...matchedRelationIds];
     const ph = ids.map(() => '?').join(',');
     const relRows = db.prepare(`
-      SELECT subject_id, object_id, source_id FROM relations WHERE id IN (${ph})
+      SELECT subject_id, object_id, via_entity_id, source_id
+      FROM relations WHERE id IN (${ph})
     `).all(...ids) as any[];
     for (const r of relRows) {
       relatedEntityIds.add(r.subject_id);
       relatedEntityIds.add(r.object_id);
+      if (r.via_entity_id) relatedEntityIds.add(r.via_entity_id);
       if (r.source_id) relatedSourceIds.add(r.source_id);
     }
   }
