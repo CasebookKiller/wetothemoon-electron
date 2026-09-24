@@ -72,6 +72,9 @@ export interface ObservationsTableProps {
    *  в таблице появляется колонка с чекбоксами. */
   selection?: ObservationRow[];
   onSelectionChange?: (rows: ObservationRow[]) => void;
+
+  /** ID строк — прямые совпадения в поиске (для подсветки). */
+  directMatchIds?: number[];
 }
 
 export const ObservationsTable: React.FC<ObservationsTableProps> = ({
@@ -88,6 +91,7 @@ export const ObservationsTable: React.FC<ObservationsTableProps> = ({
   className,
   selection,
   onSelectionChange,
+  directMatchIds,   // ← новое
 }) => {
   const rows = filterFn ? value.filter(filterFn) : value;
 
@@ -182,10 +186,17 @@ export const ObservationsTable: React.FC<ObservationsTableProps> = ({
     ? 'checkbox'
     : (onRowClick ? 'single' : undefined);
 
+  const directSet = directMatchIds && directMatchIds.length > 0
+    ? new Set(directMatchIds)
+    : null;
+
   return (
     <DataTable
       value={rows}
       className={className}
+      rowClassName={(row: ObservationRow) =>
+        directSet && directSet.has(row.id) ? 'search-direct-match' : ''
+      }
       paginator={!compact}
       rows={compact ? undefined : 20}
       rowsPerPageOptions={compact ? undefined : [10, 20, 50, 100]}

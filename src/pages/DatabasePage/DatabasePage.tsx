@@ -535,6 +535,10 @@ export const DatabasePage: React.FC = () => {
         onOpenBackup={() => setBackupVisible(true)}                        // ← новое
         onMarkFalseBatch={handleMarkFalseBatch}
         searchActive={searchActive}
+        directMatchEntityIds={searchActive ? matchedEntityIds : undefined}
+        directMatchRelationIds={searchActive ? matchedRelationIds : undefined}
+        directMatchObservationIds={searchActive ? matchedObservationIds : undefined}
+        directMatchSourceIds={searchActive ? matchedSourceIds : undefined}
       />
 
       <CreateDialog

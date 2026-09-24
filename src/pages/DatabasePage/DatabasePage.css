@@ -611,3 +611,63 @@ body.p-overflow-hidden {
   color: #fff !important;
   border-color: var(--accent-color, #6ab2f2) !important;
 }
+
+/* ============ Выравнивание высоты полей в DetailFields ============ */
+
+/* Все однострочные редакторы в редактируемых полях — единая высота 2.5rem */
+.detail-field__content .p-inputtext,
+.detail-field__content .p-dropdown,
+.detail-field__content .p-calendar .p-inputtext,
+.detail-field__content .p-calendar .p-datepicker-trigger {
+  height: 2.5rem !important;
+  min-height: 2.5rem !important;
+  box-sizing: border-box !important;
+}
+
+/* Многострочные textarea — НЕ трогаем, им нужна автовысота */
+.detail-field__content .p-inputtextarea {
+  height: auto !important;
+  min-height: 2.5rem !important;
+}
+
+/* Внутри dropdown — метка и триггер растянуты на всю высоту */
+.detail-field__content .p-dropdown .p-dropdown-label {
+  display: flex !important;
+  align-items: center !important;
+  height: 100% !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  box-sizing: border-box;
+}
+
+.detail-field__content .p-dropdown .p-dropdown-trigger {
+  height: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  box-sizing: border-box;
+}
+
+/* Input внутри autocomplete-обёртки (у нас div с position:relative) */
+.detail-field__content > div > .p-inputtext,
+.detail-field__content > div > input.p-inputtext {
+  height: 2.5rem !important;
+  min-height: 2.5rem !important;
+  box-sizing: border-box;
+}
+
+/* ============ Подсветка прямых совпадений в поиске ============ */
+
+/* Строка — прямое совпадение по запросу (содержит искомое в value/label/notes).
+   Мягкий accent-фон + акцентная полоска слева, чтобы не мешало читать теги
+   (у тегов своя непрозрачная заливка) и не сливалось с ними. */
+.p-datatable .search-direct-match > td {
+  background: var(--tg-theme-secondary-bg-color, rgba(59, 130, 246, 0.06)) !important;
+  box-shadow: inset 3px 0 0 0 var(--accent-color, #6ab2f2);
+}
+
+/* На hover — усиливаем, чтобы не терялось при наведении */
+.p-datatable .search-direct-match:hover > td {
+  background: var(--tg-theme-hover-bg-color, rgba(59, 130, 246, 0.12)) !important;
+}

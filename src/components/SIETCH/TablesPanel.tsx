@@ -41,6 +41,11 @@ export interface TablesPanelProps {
   /** Batch-пометка как false. Приходит из родителя; открывает
    *  MarkFalseDialog с массивом ids. */
   onMarkFalseBatch: (table: 'entities' | 'relations' | 'observations', ids: number[]) => void;
+
+  directMatchEntityIds?: number[];
+  directMatchRelationIds?: number[];
+  directMatchObservationIds?: number[];
+  directMatchSourceIds?: number[];
 }
 
 const FILTER_LABELS: Record<ActiveFilter['type'], string> = {
@@ -65,6 +70,10 @@ export const TablesPanel: React.FC<TablesPanelProps> = ({
   onOpenBackup,               // ← новое
   searchActive,
   onMarkFalseBatch,
+  directMatchEntityIds,
+  directMatchRelationIds,
+  directMatchObservationIds,
+  directMatchSourceIds,
 }) => {
   // Выделение для batch-операций — отдельно по каждой таблице
   const [selectedEntities, setSelectedEntities] = useState<any[]>([]);
@@ -256,6 +265,7 @@ export const TablesPanel: React.FC<TablesPanelProps> = ({
             emptyMessage={searchActive ? 'Ничего не найдено' : 'Нет данных'}
             selection={selectedEntities}
             onSelectionChange={setSelectedEntities}
+            directMatchIds={directMatchEntityIds}
           />
         </TabPanel>
 
@@ -274,6 +284,7 @@ export const TablesPanel: React.FC<TablesPanelProps> = ({
             onRowClick={(row) => onRowClick('relation', row.id)}
             selection={selectedRelations}
             onSelectionChange={setSelectedRelations}
+            directMatchIds={directMatchRelationIds}
           />
         </TabPanel>
 
@@ -292,6 +303,7 @@ export const TablesPanel: React.FC<TablesPanelProps> = ({
             onRowClick={(row) => onRowClick('observation', row.id)}
             selection={selectedObservations}
             onSelectionChange={setSelectedObservations}
+            directMatchIds={directMatchObservationIds}
           />
         </TabPanel>
 
@@ -307,6 +319,7 @@ export const TablesPanel: React.FC<TablesPanelProps> = ({
           <SourcesTable
             value={filteredSources}
             onRowClick={(row) => onRowClick('source', row.id)}
+            directMatchIds={directMatchSourceIds}
           />
         </TabPanel>
 

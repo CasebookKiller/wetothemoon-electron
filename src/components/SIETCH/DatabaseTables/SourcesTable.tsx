@@ -49,6 +49,9 @@ export interface SourcesTableProps {
 
   /** Дополнительный CSS-класс */
   className?: string;
+
+  /** ID строк — прямые совпадения в поиске (для подсветки). */
+  directMatchIds?: number[];
 }
 
 export const SourcesTable: React.FC<SourcesTableProps> = ({
@@ -60,6 +63,7 @@ export const SourcesTable: React.FC<SourcesTableProps> = ({
   emptyMessage = 'Нет данных',
   showActions,
   className,
+  directMatchIds,   // ← новое
 }) => {
   const rows = filterFn ? value.filter(filterFn) : value;
 
@@ -142,10 +146,17 @@ export const SourcesTable: React.FC<SourcesTableProps> = ({
   const showAccess = !compact;
   const showReliability = !compact;
 
+  const directSet = directMatchIds && directMatchIds.length > 0
+    ? new Set(directMatchIds)
+    : null;
+
   return (
     <DataTable
       value={rows}
       className={className}
+      rowClassName={(row: SourceRow) =>
+        directSet && directSet.has(row.id) ? 'search-direct-match' : ''
+      }
       paginator={!compact}
       rows={compact ? undefined : 20}
       rowsPerPageOptions={compact ? undefined : [10, 20, 50, 100]}
