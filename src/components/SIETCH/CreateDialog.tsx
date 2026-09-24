@@ -4,14 +4,22 @@ import React, { useEffect, useState } from 'react';
 import { Dialog } from 'primereact/dialog';
 import { Button } from 'primereact/button';
 import { DetailFields } from '@/components/SIETCH/DetailFields';
+import { Calendar } from 'primereact/calendar';
 
 export type CreateType = 'entity' | 'relation' | 'observation' | 'source';
+
+export interface CreateDialogInitialValues {
+  predicate?: string;
+  subject_id?: number | null;
+  object_id?: number | null;
+}
 
 export interface CreateDialogProps {
   visible: boolean;
   createType: CreateType;
   onHide: () => void;
   onSuccess?: (type: CreateType, id: number) => void | Promise<void>;
+  initialValues?: CreateDialogInitialValues | null;
 }
 
 interface DropdownOption {
@@ -62,6 +70,13 @@ const predicateOptions: DropdownOption[] = [
   { label: 'judge_of', value: 'judge_of' },
   { label: 'heard_by', value: 'heard_by' },
   { label: 'related_to', value: 'related_to' },
+];
+
+const representativeRoleOptions: DropdownOption[] = [
+  { label: 'Руководитель', value: 'Руководитель' },
+  { label: 'Адвокат', value: 'Адвокат' },
+  { label: 'Представитель по доверенности', value: 'Представитель по доверенности' },
+  { label: 'Арбитражный управляющий', value: 'Арбитражный управляющий' },
 ];
 
 const sourceTypeOptions: DropdownOption[] = [
@@ -125,12 +140,13 @@ function initialForm(type: CreateType): any {
         predicate: 'associated_with',
         object_id: null,
         source_id: null,
-        valid_from: '',
-        valid_to: '',
+        valid_from: null,
+        valid_to: null,
         evidence_text: '',
         confidence: 50,
         status: 'unverified',
         notes: '',
+        representative_role: '',   // ← новое
       };
     case 'observation':
       return {
@@ -162,6 +178,7 @@ export const CreateDialog: React.FC<CreateDialogProps> = ({
   createType,
   onHide,
   onSuccess,
+  initialValues,
 }) => {
   const api = (window as any).electronAPI;
 
@@ -175,11 +192,20 @@ export const CreateDialog: React.FC<CreateDialogProps> = ({
   // Инициализация формы при каждом открытии
   useEffect(() => {
     if (!visible) return;
-    setForm(initialForm(createType));
+    const base = initialForm(createType);
+
+    // Применяем prefill только для relation (кнопки из карточки сущности)
+    if (createType === 'relation' && initialValues) {
+      if (initialValues.predicate) base.predicate = initialValues.predicate;
+      if (initialValues.subject_id != null) base.subject_id = initialValues.subject_id;
+      if (initialValues.object_id != null) base.object_id = initialValues.object_id;
+    }
+
+    setForm(base);
     setMessage('');
     loadDropdowns();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, createType]);
+  }, [visible, createType, initialValues]);
 
   const loadDropdowns = async () => {
     try {
@@ -198,13 +224,12 @@ export const CreateDialog: React.FC<CreateDialogProps> = ({
       }
 
       if (Array.isArray(sourcesRes)) {
-        setSourceOptions([
-          { label: '— Не указан —', value: null },
-          ...sourcesRes.map((s: any) => ({
+        setSourceOptions(
+          sourcesRes.map((s: any) => ({
             label: `[${s.id}] ${s.title || s.url}`,
             value: s.id,
-          })),
-        ]);
+          }))
+        );
       }
     } catch (e) {
       console.error('Не удалось загрузить опции для dropdown:', e);
@@ -246,8 +271,22 @@ export const CreateDialog: React.FC<CreateDialogProps> = ({
     setMessage('');
     try {
       let res: any;
-      if (createType === 'entity') res = await api.createEntity(form);
-      else if (createType === 'relation') res = await api.createRelation(form);
+      if (createType === 'entity') {
+        res = await api.createEntity(form);
+      } else if (createType === 'relation') {
+        // Для representative_of роль пишем в evidence_text
+        const payload: any = { ...form };
+        if (
+          payload.predicate === 'representative_of' &&
+          payload.representative_role
+        ) {
+          payload.evidence_text = payload.evidence_text
+            ? `${payload.representative_role}. ${payload.evidence_text}`
+            : payload.representative_role;
+        }
+        delete payload.representative_role;
+        res = await api.createRelation(payload);
+      }
       else if (createType === 'observation') res = await api.createObservation(form);
       else if (createType === 'source') res = await api.createSource(form);
 
@@ -392,6 +431,17 @@ export const CreateDialog: React.FC<CreateDialogProps> = ({
               editOptions: entityOptions,
               editPlaceholder: 'Начните печатать ФИО, название или ИНН',
             },
+            ...(form.predicate === 'representative_of'
+              ? [{
+                  label: 'Роль представителя',
+                  span: 2 as const,
+                  value: form.representative_role,
+                  editable: true,
+                  editKey: 'representative_role',
+                  editType: 'dropdown' as const,
+                  editOptions: representativeRoleOptions,
+                }]
+              : []),
             {
               label: 'Уверенность',
               value: form.confidence,
@@ -412,22 +462,23 @@ export const CreateDialog: React.FC<CreateDialogProps> = ({
               value: form.source_id,
               editable: true,
               editKey: 'source_id',
-              editType: 'dropdown',
+              editType: 'autocomplete',
               editOptions: sourceOptions,
+              editPlaceholder: 'Начните печатать название или URL источника',
             },
             {
               label: 'Действует с',
               value: form.valid_from,
               editable: true,
               editKey: 'valid_from',
-              editType: 'text',
+              editType: 'date',
             },
             {
               label: 'Действует до',
               value: form.valid_to,
               editable: true,
               editKey: 'valid_to',
-              editType: 'text',
+              editType: 'date',
             },
             {
               label: 'Подтверждение (evidence)',
@@ -493,8 +544,9 @@ export const CreateDialog: React.FC<CreateDialogProps> = ({
               value: form.source_id,
               editable: true,
               editKey: 'source_id',
-              editType: 'dropdown',
+              editType: 'autocomplete',
               editOptions: sourceOptions,
+              editPlaceholder: 'Начните печатать название или URL источника',
             },
             {
               label: 'Заметки',

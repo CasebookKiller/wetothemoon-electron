@@ -1,10 +1,11 @@
 // src/components/SIETCH/DetailFields.tsx
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { InputText } from 'primereact/inputtext';
 import { InputTextarea } from 'primereact/inputtextarea';
 import { Dropdown } from 'primereact/dropdown';
 import { AutoComplete } from 'primereact/autocomplete';
+import { Calendar } from 'primereact/calendar';
 
 export interface DetailField {
   /** Подпись поля */
@@ -17,33 +18,22 @@ export interface DetailField {
   className?: string;
 
   // === Для режима редактирования ===
-  /** Можно ли редактировать это поле */
   editable?: boolean;
-  /** Ключ поля в editForm */
   editKey?: string;
-  /** Тип редактора */
-  editType?: 'text' | 'textarea' | 'number' | 'dropdown' | 'autocomplete';
-  /** Опции для dropdown / autocomplete */
+  editType?: 'text' | 'textarea' | 'number' | 'dropdown' | 'autocomplete' | 'date';
   editOptions?: { label: string; value: any }[];
 
   // === Дополнительно для autocomplete ===
-  /** Placeholder (autocomplete) */
   editPlaceholder?: string;
-  /** Минимальная длина запроса для autocomplete (по умолчанию 0) */
   editMinLength?: number;
-  /** Максимум suggestions (по умолчанию 100) */
   editMaxSuggestions?: number;
 }
 
 export interface DetailFieldsProps {
   fields: DetailField[];
   className?: string;
-
-  /** Режим редактирования */
   editing?: boolean;
-  /** Объект формы: { [editKey]: value } */
   editForm?: Record<string, any> | null;
-  /** Колбэк при изменении поля */
   onEditChange?: (key: string, value: any) => void;
 }
 
@@ -54,23 +44,6 @@ export const DetailFields: React.FC<DetailFieldsProps> = ({
   editForm,
   onEditChange,
 }) => {
-  // Кеш suggestions для autocomplete-полей: editKey → отфильтрованный список.
-  // Одно состояние на все autocomplete-поля, ключ — editKey.
-  const [suggestions, setSuggestions] = useState<
-    Record<string, { label: string; value: any }[]>
-  >({});
-
-  const searchOptions = (field: DetailField, query: string) => {
-    const key = field.editKey ?? '';
-    const all = field.editOptions ?? [];
-    const q = (query || '').trim().toLowerCase();
-    const filtered = q
-      ? all.filter((o) => String(o.label).toLowerCase().includes(q))
-      : all;
-    const max = field.editMaxSuggestions ?? 100;
-    setSuggestions((prev) => ({ ...prev, [key]: filtered.slice(0, max) }));
-  };
-
   return (
     <div className={`grid p-fluid detail-fields ${className || ''}`}>
       {fields.map((field, index) => {
@@ -85,13 +58,7 @@ export const DetailFields: React.FC<DetailFieldsProps> = ({
             <label className="font-bold">{field.label}</label>
             <div className="detail-field__content">
               {isEditable
-                ? renderEditor(
-                    field,
-                    editForm,
-                    onEditChange,
-                    field.editKey ? suggestions[field.editKey] : undefined,
-                    searchOptions
-                  )
+                ? renderEditor(field, editForm, onEditChange)
                 : (field.value ?? <span className="text-500">—</span>)}
             </div>
           </div>
@@ -101,12 +68,160 @@ export const DetailFields: React.FC<DetailFieldsProps> = ({
   );
 };
 
+/**
+ * Локальный компонент для autocomplete.
+ *
+ * ВАЖНО: `suggestions` живёт ЗДЕСЬ, а не в родителе.
+ * Иначе каждый keystroke вызывает ре-рендер DetailFields,
+ * `value={selected}` обнуляется (пока ничего не выбрано),
+ * и поле очищается.
+ */
+/**
+ * Самописный autocomplete: InputText + выпадающий список.
+ * Не используем PrimeReact AutoComplete — там нет inputValue до v11,
+ * а value-объект конфликтует с редактированием строки.
+ */
+const AutoCompleteField: React.FC<{
+  allOptions: { label: string; value: any }[];
+  value: any;
+  placeholder?: string;
+  minLength?: number;
+  maxSuggestions?: number;
+  onChange: (v: any) => void;
+}> = ({ allOptions, value, placeholder, maxSuggestions, onChange }) => {
+  const [query, setQuery] = useState<string>('');
+  const [open, setOpen] = useState<boolean>(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  // Синхронизация внешнего value → строка в input
+  useEffect(() => {
+    const found = allOptions.find((o) => o.value === value);
+    setQuery(found ? String(found.label) : '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  // Фильтрация: от любого вхождения в label, case-insensitive
+  const q = query.trim().toLowerCase();
+  const filtered = useMemo(() => {
+    const limit = maxSuggestions ?? 50;
+    if (!q) return allOptions.slice(0, limit);
+    return allOptions
+      .filter((o) => String(o.label).toLowerCase().includes(q))
+      .slice(0, limit);
+  }, [q, allOptions, maxSuggestions]);
+
+  // Закрытие при клике вне компонента
+  useEffect(() => {
+    const onDocMouseDown = (e: MouseEvent) => {
+      if (
+        wrapperRef.current &&
+        !wrapperRef.current.contains(e.target as Node)
+      ) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDocMouseDown);
+    return () => document.removeEventListener('mousedown', onDocMouseDown);
+  }, []);
+
+  return (
+    <div ref={wrapperRef} style={{ position: 'relative', width: '100%' }}>
+      <InputText
+        value={query}
+        placeholder={placeholder || 'Начните печатать...'}
+        onChange={(e) => {
+          const v = e.target.value;
+          setQuery(v);
+          setOpen(true);
+          if (!v) onChange(null);
+        }}
+        onFocus={() => setOpen(true)}
+        className="w-full"
+      />
+
+      {open && (
+        <ul
+          style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            maxHeight: '240px',
+            overflowY: 'auto',
+            margin: 0,
+            marginTop: '2px',
+            padding: '0.25rem 0',
+            listStyle: 'none',
+            background: 'var(--tg-theme-secondary-bg-color, #fff)',
+            border: '1px solid rgba(128,128,128,0.3)',
+            borderRadius: '4px',
+            zIndex: 1000,
+            boxShadow: '0 4px 10px rgba(0,0,0,0.15)',
+          }}
+        >
+          {filtered.length === 0 && (
+            <li
+              style={{
+                padding: '0.35rem 0.75rem',
+                fontSize: '0.9rem',
+                opacity: 0.6,
+              }}
+            >
+              Ничего не найдено
+            </li>
+          )}
+          {filtered.map((o: any) => (
+            <li
+              key={o.value}
+              // onMouseDown с preventDefault — чтобы input не терял фокус
+              // до того, как onClick сработает
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                setQuery(String(o.label));
+                onChange(o.value);
+                setOpen(false);
+              }}
+              style={{
+                padding: '0.35rem 0.75rem',
+                cursor: 'pointer',
+                fontSize: '0.9rem',
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.background =
+                  'rgba(0, 157, 234, 0.15)';
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.background = 'transparent';
+              }}
+            >
+              {o.label}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+};
+
+/**
+ * Строка ISO YYYY-MM-DD → Date | null.
+ * Пустое/невалидное значение → null (Calendar покажет пустое поле).
+ */
+function parseDateValue(v: any): Date | null {
+  if (!v) return null;
+  if (v instanceof Date) return v;
+  const s = String(v);
+  // ISO-дата (YYYY-MM-DD) или ISO-datetime (YYYY-MM-DDTHH:MM...)
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return null;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return isNaN(d.getTime()) ? null : d;
+}
+
 function renderEditor(
   field: DetailField,
-  editForm: Record<string, any> | null | undefined,
-  onEditChange: ((key: string, value: any) => void) | undefined,
-  suggestions: { label: string; value: any }[] | undefined,
-  searchOptions: (field: DetailField, query: string) => void
+  editForm?: Record<string, any> | null,
+  onEditChange?: (key: string, value: any) => void
 ): React.ReactNode {
   const key = field.editKey!;
   const value = editForm?.[key];
@@ -147,33 +262,42 @@ function renderEditor(
         />
       );
 
-    case 'autocomplete': {
-      const allOptions = field.editOptions || [];
-      const selected = allOptions.find((o) => o.value === value) || null;
-
+    case 'autocomplete':
       return (
-        <AutoComplete
-          value={selected}
-          suggestions={suggestions || []}
-          completeMethod={(e) => searchOptions(field, e.query)}
-          field="label"
-          dropdown
-          forceSelection
-          minLength={field.editMinLength ?? 0}
-          placeholder={field.editPlaceholder || 'Начните печатать...'}
-          onChange={(e) => {
-            const v = e.value;
-            if (v && typeof v === 'object' && 'value' in v) {
-              change(v.value);
-            } else if (v === null || v === '') {
-              change(null);
-            }
-          }}
-          className="w-full"
-          inputClassName="w-full"
+        <AutoCompleteField
+          allOptions={field.editOptions || []}
+          value={value}
+          placeholder={field.editPlaceholder}
+          minLength={field.editMinLength}
+          maxSuggestions={field.editMaxSuggestions}
+          onChange={change}
         />
       );
-    }
+
+    case 'date':
+    return (
+      <Calendar
+        value={parseDateValue(value)}
+        onChange={(e) => {
+          const d = e.value as Date | null;
+          if (!d) {
+            change(null);
+            return;
+          }
+          // YYYY-MM-DD (локальная дата, без TZ-сдвигов)
+          const yyyy = d.getFullYear();
+          const mm = String(d.getMonth() + 1).padStart(2, '0');
+          const dd = String(d.getDate()).padStart(2, '0');
+          change(`${yyyy}-${mm}-${dd}`);
+        }}
+        dateFormat="dd.mm.yy"
+        showIcon
+        showButtonBar
+        placeholder="дд.мм.гг"
+        className="w-full"
+        inputClassName="w-full"
+      />
+    );
 
     case 'text':
     default:
