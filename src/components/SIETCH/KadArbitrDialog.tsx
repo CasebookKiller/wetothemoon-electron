@@ -9,6 +9,7 @@ import { Checkbox } from 'primereact/checkbox';
 import { KadArbitrCardDialog } from './KadArbitrCardDialog';
 import { KadArbitrCasesDialog } from './KadArbitrCasesDialog';
 import { Tag } from 'primereact/tag';
+import { Toast } from 'primereact/toast';
 
 export interface KadArbitrDialogProps {
   visible: boolean;
@@ -62,6 +63,8 @@ export const KadArbitrDialog: React.FC<KadArbitrDialogProps> = ({
   const [forceRefresh, setForceRefresh] = useState(false);
   const [fromCache, setFromCache] = useState<string | null>(null);
 
+  const toastRef = useRef<Toast>(null);
+
   // Синхронизация входного ИНН
   useEffect(() => {
     if (visible) {
@@ -79,7 +82,7 @@ export const KadArbitrDialog: React.FC<KadArbitrDialogProps> = ({
     }
   }, [visible, initialInn]);
 
-  // Прогресс
+  // Прогресс и клик по PDF
   useEffect(() => {
     if (!visible) return;
     const onProgress = (info: ProgressInfo) => {
@@ -91,6 +94,34 @@ export const KadArbitrDialog: React.FC<KadArbitrDialogProps> = ({
         if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
       });
     };
+
+    const onPdfClick = async (info: { url: string }) => {
+      toastRef.current?.show({
+        severity: 'info',
+        summary: 'Скачивание PDF...',
+        detail: 'Запрос через сессию kad.arbitr',
+        life: 3000,
+      });
+
+      const res = await api.downloadKadDocument(info.url);
+      if (res.success) {
+        toastRef.current?.show({
+          severity: 'success',
+          summary: 'PDF скачан',
+          detail: `${res.localPath} (${(res.sizeBytes / 1024).toFixed(0)} KB)`,
+          life: 6000,
+        });
+      } else {
+        toastRef.current?.show({
+          severity: 'error',
+          summary: 'Не удалось скачать PDF',
+          detail: res.error,
+          life: 8000,
+        });
+      }
+    };
+    
+    api.onKadPdfClicked(onPdfClick);
     api.onKadArbitrProgress(onProgress);
     return () => api.removeKadArbitrProgressListener();
   }, [visible]);
