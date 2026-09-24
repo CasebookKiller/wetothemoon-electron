@@ -522,3 +522,92 @@ body.p-overflow-hidden {
 .sensitive-add-button.p-button .p-button-icon {
   font-size: 1rem;
 }
+
+/* ============ Календари в DetailFields — в стиле AuditLogTab ============ */
+
+/* Input: фиксированная высота, чтобы совпадал с триггером */
+.detail-field__content .p-calendar {
+  width: 100%;
+}
+
+.detail-field__content .p-calendar .p-inputtext {
+  height: 2.5rem !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  box-sizing: border-box;
+}
+
+.detail-field__content .p-calendar .p-inputtext:enabled:focus {
+  border-color: var(--accent-color, #6ab2f2) !important;
+  box-shadow: 0 0 0 1px var(--accent-color, #6ab2f2) !important;
+  outline: none !important;
+}
+
+/* Триггер календаря (иконка справа) — accent */
+.detail-field__content .p-calendar .p-datepicker-trigger {
+  height: 2.5rem !important;
+  width: 2.5rem !important;
+  padding: 0 !important;
+  color: var(--accent-color, #6ab2f2) !important;
+  background: transparent !important;
+  border: 1px solid var(--accent-color, #6ab2f2) !important;
+  border-radius: 6px !important;
+  box-sizing: border-box;
+}
+
+.detail-field__content .p-calendar .p-datepicker-trigger:hover {
+  background: var(--accent-color, #6ab2f2) !important;
+  color: var(--tg-theme-bg-color, #fff) !important;
+  border-color: var(--accent-color, #6ab2f2) !important;
+}
+
+.detail-field__content .p-calendar .p-datepicker-trigger:focus {
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(106, 178, 242, 0.25) !important;
+}
+
+.detail-field__content .p-calendar .p-datepicker-trigger .p-icon,
+.detail-field__content .p-calendar .p-datepicker-trigger svg {
+  color: inherit !important;
+  fill: currentColor !important;
+}
+
+.detail-field__content .p-calendar .p-datepicker-trigger svg path {
+  fill: currentColor !important;
+}
+
+/* Сама панель датапикера — тоже в акценте (совпадает с AuditLogTab) */
+.p-datepicker .p-datepicker-header button,
+.p-datepicker .p-datepicker-header .p-datepicker-prev,
+.p-datepicker .p-datepicker-header .p-datepicker-next,
+.p-datepicker .p-datepicker-header .p-datepicker-month,
+.p-datepicker .p-datepicker-header .p-datepicker-year {
+  color: var(--accent-color, #6ab2f2) !important;
+  background: transparent !important;
+}
+
+.p-datepicker .p-datepicker-header .p-datepicker-prev,
+.p-datepicker .p-datepicker-header .p-datepicker-next {
+  border: 1px solid var(--accent-color, #6ab2f2) !important;
+  border-radius: 6px !important;
+}
+
+.p-datepicker .p-datepicker-header .p-datepicker-prev:hover,
+.p-datepicker .p-datepicker-header .p-datepicker-next:hover,
+.p-datepicker .p-datepicker-header .p-datepicker-month:hover,
+.p-datepicker .p-datepicker-header .p-datepicker-year:hover {
+  background: var(--accent-color, #6ab2f2) !important;
+  color: var(--tg-theme-bg-color, #1a1a1a) !important;
+}
+
+.p-datepicker .p-datepicker-header button svg path {
+  fill: currentColor !important;
+}
+
+/* Выбранный день — accent */
+.p-datepicker .p-datepicker-calendar .p-highlight,
+.p-datepicker .p-datepicker-calendar .p-datepicker-today.p-highlight {
+  background: var(--accent-color, #6ab2f2) !important;
+  color: #fff !important;
+  border-color: var(--accent-color, #6ab2f2) !important;
+}
