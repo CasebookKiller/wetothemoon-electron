@@ -622,6 +622,22 @@ try {
     backupRestore: () =>
       ipcRenderer.invoke('osint:backup-restore'),
 
+    // ==================== Prana-Bindu ====================
+    openPranaBinduWindow: () => ipcRenderer.invoke('pb:open-window'),
+    pb: {
+      openWindow: () => ipcRenderer.invoke('pb:open-window'),
+      ping: () => ipcRenderer.invoke('pb:ping'),
+      getProfile: () => ipcRenderer.invoke('pb:get-profile'),
+      updateProfile: (patch: any) => ipcRenderer.invoke('pb:update-profile', patch),
+      syncSettingsGet: () => ipcRenderer.invoke('pb:sync-settings-get'),
+      syncSettingsUpdate: (patch: any) =>
+        ipcRenderer.invoke('pb:sync-settings-update', patch),
+      zeppConnect: (email: string, password: string) =>
+        ipcRenderer.invoke('pb:zepp-connect', email, password),
+      zeppCheckProvider: (name: string) =>
+        ipcRenderer.invoke('pb:zepp-check-provider', name),
+    },
+
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

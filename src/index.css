@@ -51,6 +51,15 @@
   --app-theme-hint-color: var(--tg-theme-hint-color);
   --app-theme-accent-text-color: var(--tg-theme-accent-text-color);
   --app-theme-secondary-bg-color: var(--tg-theme-secondary-bg-color);
+
+
+/* ============================================================
+   Prana-Bindu — локальный акцент
+   Фон/текст/hint берём из --tg-theme-*.
+   Меняем только accent (акцентный цвет).
+   ============================================================ */
+  --pb-accent: #d4a574;              /* песочный — «специя/меланж» */
+  --pb-accent-rgb: 212, 165, 116;    /* тот же цвет в RGB для rgba() */
 }
 
 body {

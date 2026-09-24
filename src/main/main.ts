@@ -31,6 +31,8 @@ import { createTradingAssistantWindow, getTradingAssistantWindow } from './windo
 import { registerTradingAssistantHandlers } from './ipcHandlers/tradingAssistantHandlers';
 import { createOsintWindow, getOsintWindow } from './windows/osintWindow';
 import { registerOsintHandlers } from './ipcHandlers/osintHandlers';
+import { registerPranaBinduHandlers } from './ipcHandlers/pranaBinduHandlers.ts';
+import { openMelange, seed as seedMelange } from './services/pranaBindu/melange';
 
 import fs from 'fs';
 import path from 'path';
@@ -51,7 +53,8 @@ import {
   mdWindowMenuTemplate,
   osintWindowMenuTemplate,
   gatewayWindowMenuTemplate,
-  databaseWindowMenuTemplate
+  databaseWindowMenuTemplate,
+  pranaBinduWindowMenuTemplate
 } from './menus/windowMenus.ts';
 import { registerGrpcHandlers } from './ipcHandlers/grpcHandlers.ts';
 import { registerTasksHandlers } from './ipcHandlers/tasksHandlers.ts';
@@ -84,6 +87,7 @@ import { registerGatewayHandlers } from './ipcHandlers/gatewayHandlers';
 import { createGatewayWindow, getGatewayWindow } from './windows/gatewayWindow.ts';
 
 import { createDatabaseWindow, getDatabaseWindow } from './windows/databaseWindow';
+import { createPranaBinduWindow, getPranaBinduWindow } from './windows/pranaBinduWindow.ts';
 
 try {
   require('node:sqlite');
@@ -227,8 +231,23 @@ app.whenReady().then(() => {
         }
       };
     }
-    
+
+    const openPranaBindu = fileMenu.items.find(i => i.label === 'Открыть Прана-Бинду');
+    if (openPranaBindu) {
+      openPranaBindu.click = () => {
+        const existing = getPranaBinduWindow();
+        if (existing && !existing.isDestroyed()) {
+          existing.focus();
+        } else {
+          const win = createPranaBinduWindow();
+          if (win) applyMenuToWindow(win, pranaBinduWindowMenuTemplate);
+        }
+      };
+    }
+
   }
+
+  
 
   mainWindow.setMenu(menu);
   console.log('Menu items:', menu.items.map(i => i.label));
@@ -265,6 +284,15 @@ app.whenReady().then(() => {
   registerOsintHandlers();
 
   registerGatewayHandlers();
+  
+  // Melange: открываем БД ДО регистрации хендлеров,
+  // чтобы репозитории сразу были доступны.
+  const melangeDb = openMelange(
+    path.join(app.getPath('userData'), 'prana_bindu.db')
+  );
+  seedMelange(melangeDb);
+
+  registerPranaBinduHandlers();
 
   // ----------------- Order Manager -----------------
   const orderManager = new OrderManager({

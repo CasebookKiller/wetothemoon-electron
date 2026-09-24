@@ -5,7 +5,7 @@
   "description": "Template of Electron Forge application with Vite, TypeScript and React",
   "main": "dist/main/main.js",
   "scripts": {
-    "start": "cross-env VITE_CONFIG_NATIVE_IGNORE_WARNING=true electron-forge start",
+        "start": "cross-env VITE_CONFIG_NATIVE_IGNORE_WARNING=true electron-forge start",
     "package": "electron-forge package",
     "make": "electron-forge make",
     "publish": "electron-forge publish",
@@ -36,7 +36,7 @@
     "@vitejs/plugin-react-swc": "^4.3.0",
     "concurrently": "^10.0.3",
     "cross-env": "^10.1.0",
-    "electron": "^44.2.0",
+    "electron": "^44.4.5",
     "eslint": "^10.2.0",
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-react": "^7.37.5",

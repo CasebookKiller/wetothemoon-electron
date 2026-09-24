@@ -18,6 +18,7 @@ import { TradingAssistantPage } from '@/pages/TradingAssistantPage/TradingAssist
 import { OSINTPage } from '@/pages/OSINTPage/OSINTPage';
 import { GatewayPage } from '@/pages/GatewayPage/GatewayPage';
 import { DatabasePage } from '@/pages/DatabasePage/DatabasePage';
+import { PranaBinduPage } from '@/pages/PranaBinduPage/PranaBinduPage';
 
 export interface Route {
   path: string;
@@ -43,6 +44,7 @@ const tradingAssistant: Route = { path: '/trading-assistant', Component: Trading
 const osint: Route = { path: '/osint', Component: OSINTPage, title: 'Взгляд Фримена' };
 const database: Route = { path: '/database', Component: DatabasePage, title: 'База данных' };
 const gateway: Route = { path: '/gateway', Component: GatewayPage, title: 'Шлюз' };
+const pranaBindu: Route = { path: '/prana-bindu', Component: PranaBinduPage, title: 'Прана-Бинду' };
 
 
 export const routes: Route[] = [];
@@ -63,5 +65,6 @@ routes.push(
   tradingAssistant,
   osint,
   database,
-  gateway
+  gateway,
+  pranaBindu
 );

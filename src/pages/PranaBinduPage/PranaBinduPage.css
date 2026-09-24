@@ -1,0 +1,321 @@
+/* src/pages/PranaBinduPage/PranaBinduPage.css */
+
+/* ============================================================
+   Контейнер страницы
+   ============================================================ */
+
+.pb-page .p-panel {
+  margin-bottom: 0;
+}
+
+.pb-page .p-inputtext {
+  width: 100%;
+}
+
+.pb-page .p-checkbox {
+  margin-right: 0.5rem;
+}
+
+.pb-page .p-button {
+  min-width: 120px;
+}
+
+/* ============================================================
+   Типографика и карточки модулей
+   ============================================================ */
+
+.pb-title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0;
+  display: flex;
+  align-items: center;
+}
+
+.pb-title-icon {
+  margin-right: 0.75rem;
+  color: var(--pb-accent);
+}
+
+.pb-subtitle {
+  color: var(--tg-theme-hint-color, #708499);
+  margin: 0.25rem 0 0 0;
+}
+
+.pb-module-name {
+  font-weight: 600;
+  font-size: 1.05rem;
+  margin-bottom: 0.25rem;
+  color: var(--tg-theme-text-color, #f5f5f5);
+}
+
+.pb-module-desc {
+  font-size: 0.875rem;
+  color: var(--tg-theme-hint-color, #708499);
+}
+
+.pb-label {
+  font-size: 0.875rem;
+  color: var(--tg-theme-hint-color, #708499);
+}
+
+.pb-panel {
+  max-width: 640px;
+}
+
+.pb-status {
+  font-size: 0.85rem;
+  color: var(--tg-theme-hint-color, #708499);
+  word-break: break-all;
+}
+
+.pb-status code {
+  background: var(--tg-theme-secondary-bg-color, #232e3c);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  display: inline-block;
+  color: var(--tg-theme-text-color, #f5f5f5);
+}
+
+/* ============================================================
+   Кнопки .pb / .pb-soft / .pb-destructive / .pb-destructive-soft
+   Структура 1-в-1 как у .osint-*, но с песочным акцентом.
+   ============================================================ */
+
+/* --- базовый .pb --- */
+.pb.p-button {
+  color: var(--pb-accent);
+  background: var(--tg-theme-bg-color, #17212b);
+  border: 1px solid var(--pb-accent);
+  padding: 0.75rem 1.25rem;
+  font-size: 0.75rem;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s;
+  border-radius: 6px;
+}
+
+.pb.p-button:hover {
+  background: var(--pb-accent);
+  color: var(--tg-theme-bg-color, #17212b);
+  border-color: var(--pb-accent);
+}
+
+.pb.p-button:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(var(--pb-accent-rgb), 0.25);
+}
+
+.pb.p-inputtext:enabled:focus {
+  outline: 0 none;
+  outline-offset: 0;
+  box-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
+  border-color: var(--pb-accent);
+}
+
+.pb.p-inputtext:enabled:hover {
+  border-color: var(--pb-accent);
+}
+
+span.pb {
+  color: var(--pb-accent);
+}
+
+/* --- мягкий вариант .pb-soft --- */
+.pb-soft.p-button {
+  color: var(--pb-accent);
+  background: var(--tg-theme-bg-color, #17212b);
+  border: 1px solid var(--pb-accent);
+  padding: 0.75rem 1.25rem;
+  font-size: 0.75rem;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s;
+  border-radius: 6px;
+}
+
+.pb-soft.p-button:hover {
+  background: rgba(var(--pb-accent-rgb), 0.12);
+  color: var(--pb-accent);
+  border-color: var(--pb-accent);
+}
+
+.pb-soft.p-button:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(var(--pb-accent-rgb), 0.25);
+}
+
+/* --- destructive .pb-destructive --- */
+.pb-destructive.p-button {
+  color: var(--tg-theme-destructive-text-color, #ec3942);
+  background: var(--tg-theme-bg-color, #17212b);
+  border: 1px solid var(--tg-theme-destructive-text-color, #ec3942);
+  padding: 0.75rem 1.25rem;
+  font-size: 0.75rem;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s;
+  border-radius: 6px;
+}
+
+.pb-destructive.p-button:hover {
+  background: var(--tg-theme-destructive-text-color, #ec3942);
+  color: var(--tg-theme-bg-color, #17212b);
+  border-color: var(--tg-theme-destructive-text-color, #ec3942);
+}
+
+.pb-destructive.p-button:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(236, 57, 66, 0.25);
+}
+
+span.pb-destructive {
+  color: var(--tg-theme-destructive-text-color, #ec3942);
+}
+
+/* --- destructive soft .pb-destructive-soft --- */
+.pb-destructive-soft.p-button {
+  color: var(--tg-theme-destructive-text-color, #ec3942);
+  background: var(--tg-theme-bg-color, #17212b);
+  border: 1px solid var(--tg-theme-destructive-text-color, #ec3942);
+  padding: 0.75rem 1.25rem;
+  font-size: 0.75rem;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s;
+  border-radius: 6px;
+}
+
+.pb-destructive-soft.p-button:hover {
+  background: rgba(236, 57, 66, 0.12);
+  color: var(--tg-theme-destructive-text-color, #ec3942);
+  border-color: var(--tg-theme-destructive-text-color, #ec3942);
+}
+
+/* --- disabled для destructive --- */
+.pb-destructive.p-button:disabled,
+.pb-destructive.p-button.p-disabled {
+  color: var(--tg-theme-destructive-text-color, #ec3942) !important;
+  background: var(--tg-theme-bg-color, #17212b) !important;
+  border: 1px solid var(--tg-theme-destructive-text-color, #ec3942) !important;
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pb-destructive.p-button:disabled .p-button-icon,
+.pb-destructive.p-button:disabled .p-button-label,
+.pb-destructive.p-button.p-disabled .p-button-icon,
+.pb-destructive.p-button.p-disabled .p-button-label {
+  color: var(--tg-theme-destructive-text-color, #ec3942) !important;
+}
+
+.pb-destructive.p-button:disabled:hover,
+.pb-destructive.p-button.p-disabled:hover {
+  background: var(--tg-theme-bg-color, #17212b) !important;
+  color: var(--tg-theme-destructive-text-color, #ec3942) !important;
+  border-color: var(--tg-theme-destructive-text-color, #ec3942) !important;
+}
+
+/* ============================================================
+   Отдельные переопределения для контролов PrimeReact
+   ============================================================ */
+
+/* Кнопки внутри панели «Синхронизация» — сохраняем min-width как у OSINT */
+.pb-page .pb.p-button,
+.pb-page .pb-soft.p-button,
+.pb-page .pb-destructive.p-button,
+.pb-page .pb-destructive-soft.p-button {
+  min-width: 120px;
+}
+
+/* Чекбоксы и радиокнопки — песочный акцент */
+.pb-page .p-checkbox.p-highlight .p-checkbox-box,
+.pb-page .p-radiobutton.p-highlight .p-radiobutton-box {
+  border-color: var(--pb-accent);
+  background: var(--pb-accent);
+}
+
+/* Toggle кнопка тоже — на всякий случай */
+.pb-page .p-inputswitch.p-inputswitch-checked .p-inputswitch-slider {
+  background: var(--pb-accent);
+}
+
+/* Dropdown — border-color при focus */
+.pb-page .p-dropdown:not(.p-disabled).p-focus {
+  box-shadow: 0 0 0 1px var(--pb-accent);
+  border-color: var(--pb-accent);
+}
+
+/* InputText — focus-цвет */
+.pb-page .p-inputtext:enabled:focus {
+  outline: 0 none;
+  outline-offset: 0;
+  box-shadow: 0 0 0 1px var(--pb-accent);
+  border-color: var(--pb-accent);
+}
+
+/* ============================================================
+   Переопределение глобального стиля панели внутри .pb-page
+   Затрагивает только панели Prana-Bindu, не трогает OSINT.
+   ============================================================ */
+
+/* Заголовок панели — песочный акцент */
+.pb-page .p-panel .p-panel-header {
+  color: var(--pb-accent);
+}
+
+/* Заголовок-текст внутри хедера (если используется p-panel-title) */
+.pb-page .p-panel .p-panel-header .p-panel-title {
+  color: var(--pb-accent);
+}
+
+/* Иконка-тогглер панели — песочная */
+.pb-page .p-panel .p-panel-header-icon.p-panel-toggler,
+.pb-page .p-panel .p-panel-header-icon.p-panel-toggler svg,
+.pb-page .p-panel .p-panel-header-icon.p-panel-toggler .p-icon {
+  color: var(--pb-accent) !important;
+}
+
+.pb-page .p-panel .p-panel-header-icon.p-panel-toggler:hover,
+.pb-page .p-panel .p-panel-header-icon.p-panel-toggler:focus {
+  color: var(--pb-accent) !important;
+  background-color: rgba(var(--pb-accent-rgb), 0.12) !important;
+}
+
+/* InputText — hover-цвет рамки, песочный */
+.pb-page .p-inputtext:enabled:hover {
+  border-color: var(--pb-accent);
+}
+
+/* Dropdown — focus-цвет рамки и тени, песочный */
+.pb-page .p-dropdown:not(.p-disabled).p-focus {
+  outline: 0 none;
+  outline-offset: 0;
+  box-shadow: 0 0 0 0.2rem rgba(var(--pb-accent-rgb), 0.2);
+  border-color: var(--pb-accent);
+}
+
+/* Dropdown — hover-цвет рамки, песочный */
+.pb-page .p-dropdown:not(.p-disabled):hover {
+  border-color: var(--pb-accent);
+}
+
+/* Calendar (если появится) */
+.pb-page .p-calendar:not(.p-disabled).p-focus > .p-inputtext {
+  box-shadow: 0 0 0 0.2rem rgba(var(--pb-accent-rgb), 0.2);
+  border-color: var(--pb-accent);
+}
+
+/* MultiSelect (если появится) */
+.pb-page .p-multiselect:not(.p-disabled).p-focus {
+  box-shadow: 0 0 0 0.2rem rgba(var(--pb-accent-rgb), 0.2);
+  border-color: var(--pb-accent);
+}
+
+.pb-page .p-multiselect:not(.p-disabled):hover {
+  border-color: var(--pb-accent);
+}
+
+/* InputSwitch — checked (уже был в файле, оставим) */
+.pb-page .p-inputswitch.p-inputswitch-checked .p-inputswitch-slider {
+  background: var(--pb-accent);
+}
+
+.pb-page .p-dropdown:not(.p-disabled).p-focus {
+  outline: 0 none !important;
+  outline-offset: 0 !important;
+  box-shadow: 0 0 0 0.2rem rgba(var(--pb-accent-rgb), 0.2) !important;
+  border-color: var(--pb-accent) !important;
+}

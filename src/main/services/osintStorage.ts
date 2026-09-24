@@ -1237,6 +1237,18 @@ function persistCardSide(
  * Сохраняет все события одного инстанса.
  * Судья и суд уже промотированы заранее, их id передаются сюда.
  */
+/**
+ * Сохраняет все события одного инстанса.
+ *
+ * Дополнительно: для «определений об отложении/назначении», в которых
+ * есть hearing_date (дата следующего заседания), создаём дубль-событие
+ * типа `hearing`. Это даёт календарю «будущие заседания» без разбора
+ * текста на уровне UI.
+ *
+ * Идемпотентно: дубль дедуплицируется по (case, event_date, event_type,
+ * content) внутри `addCaseEvent` — повторный прогон не создаст копий.
+ * `event_uuid` для дубля не передаём — это производная запись.
+ */
 export function persistCaseEvents(
   caseEntityId: number,
   events: KadArbitrCardEvent[],
@@ -1264,7 +1276,6 @@ export function persistCaseEvents(
       source_id: sourceId,
       origin: 'scraper',
       notes,
-      // 12a: дата/время/место следующего заседания + судьи
       hearing_date: ev.hearing_date ?? null,
       hearing_time: ev.hearing_time ?? null,
       hearing_place: ev.hearing_place ?? null,
@@ -1277,6 +1288,35 @@ export function persistCaseEvents(
     if (r.inserted) inserted++;
     else if (r.updated) updated++;
     else skipped++;
+
+    // Дубль-событие hearing из «определений об отложении».
+    // Создаём только если у события есть hearing_date.
+    if (ev.event_type === 'ruling' && ev.hearing_date) {
+      const hearingContent = ev.hearing_time
+        ? `Заседание в ${ev.hearing_time}`
+        : 'Судебное заседание';
+
+      const dup = addCaseEvent({
+        case_entity_id: caseEntityId,
+        // event_uuid не передаём — производная запись, дедуп по контенту
+        event_date: ev.hearing_date,
+        event_type: 'hearing',
+        judge_entity_id: judgeEntityId ?? null,
+        court_entity_id: courtEntityId ?? null,
+        content: hearingContent,
+        source_id: sourceId,
+        origin: 'scraper',
+        notes: ev.hearing_place ?? null,
+        // дубль сам тоже «знает» своё время/место
+        hearing_date: ev.hearing_date,
+        hearing_time: ev.hearing_time ?? null,
+        hearing_place: ev.hearing_place ?? null,
+      });
+
+      if (dup.inserted) inserted++;
+      else if (dup.updated) updated++;
+      else skipped++;
+    }
   }
 
   return { inserted, updated, skipped };

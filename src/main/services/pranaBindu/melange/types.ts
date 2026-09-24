@@ -38,3 +38,47 @@ export interface RecoveryLogsRow {
   traffic_light: string | null;
   notes: string | null;
 }
+
+// Row-типы Melange. Snake_case, 1-в-1 с DDL.
+
+export interface ProfileRow {
+  id: number;
+  age: number | null;
+  max_hr: number | null;
+  lthr: number | null;
+  resting_hr: number | null;
+  weight_kg: number | null;
+  goal_marathon_date: string | null;
+  notes: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface SyncSettingsRow {
+  id: number;
+  source: string | null;
+  mode: string;
+  auto_interval_min: number | null;
+  auto_on_start: 0 | 1;
+  google_token_json: string | null;
+  zeppbridge_path: string | null;
+  zepp_provider: string | null;
+  zepp_fallback_provider: string | null;
+  zepp_credentials_json: string | null;
+  zepp_auth_host: string | null;
+  zepp_data_host: string | null;
+  zepp_app_token: string | null;
+  zepp_user_id: string | null;
+  zepp_last_sync_at: string | null;
+  zepp_last_sync_status: string | null;
+  last_sync_at: string | null;
+  last_sync_status: string | null;
+}
+
+export interface MetaRow {
+  key: string;
+  value: string;
+}
+
+// (существующие: MovementsRow, ProgressionsRow, UserMovementStateRow,
+//  RecoveryLogsRow — оставить как есть)

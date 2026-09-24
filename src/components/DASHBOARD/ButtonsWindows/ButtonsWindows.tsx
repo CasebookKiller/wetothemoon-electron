@@ -20,6 +20,14 @@ export const ButtonsWindows = () => {
     electronAPI[method]();
   };
 
+  const callPb = (method: string) => () => {
+    if (!electronAPI?.pb?.[method]) {
+      console.warn(`electronAPI.pb.${method} is not available`);
+      return;
+    }
+    electronAPI.pb[method]();
+  };
+
   const buttons: ButtonConfig[] = [
     { label: 'Нейро', icon: 'pi pi-prime', action: call('openAIWindow') },
     { label: 'Облигации', icon: 'pi pi-chart-line', action: call('openBondsWindow') },
@@ -32,6 +40,7 @@ export const ButtonsWindows = () => {
     { label: 'Ситч', icon: 'pi pi-warehouse', action: call('openDatabaseWindow') },
     // Новая кнопка «Шлюз»
     { label: 'Шлюз', icon: 'pi pi-server', action: call('openGatewayWindow') },
+    { label: 'Прана-Бинду', icon: 'pi pi-wave-pulse', action: callPb('openWindow') },
 
     // Заглушки
     { label: 'Сталкер', icon: 'pi pi-compass', disabled: true },
