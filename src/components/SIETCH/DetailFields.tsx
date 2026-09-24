@@ -284,18 +284,17 @@ function renderEditor(
             change(null);
             return;
           }
-          // YYYY-MM-DD (локальная дата, без TZ-сдвигов)
           const yyyy = d.getFullYear();
           const mm = String(d.getMonth() + 1).padStart(2, '0');
           const dd = String(d.getDate()).padStart(2, '0');
           change(`${yyyy}-${mm}-${dd}`);
         }}
-        dateFormat="dd.mm.yy"
+        dateFormat="yy-mm-dd"
         showIcon
-        showButtonBar
-        placeholder="дд.мм.гг"
+        placeholder="гггг-мм-дд"
+        style={{ width: '100%' }}
+        inputStyle={{ width: '100%' }}
         className="w-full"
-        inputClassName="w-full"
       />
     );
 
