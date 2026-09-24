@@ -5,6 +5,7 @@ import { DataTable } from 'primereact/datatable';
 import { Column } from 'primereact/column';
 import { Button } from 'primereact/button';
 import { Tag } from 'primereact/tag';
+import { StatusTag } from '../StatusTag';
 
 export interface RelationRow {
   id: number;              // ← было id?: number
@@ -107,17 +108,6 @@ export const RelationsTable: React.FC<RelationsTableProps> = ({
         }}
       />
     );
-  };
-
-  const renderStatus = (row: RelationRow) => {
-    const status = row.status || '—';
-    const color =
-      status === 'confirmed' ? 'green'
-      : status === 'false' ? '#ec3942'
-      : status === 'hypothesis' ? '#e6a23c'
-      : status === 'archived' ? '#888'
-      : 'inherit';
-    return <span style={{ color }}>{status}</span>;
   };
 
   const renderEntityLink = (
@@ -239,7 +229,7 @@ export const RelationsTable: React.FC<RelationsTableProps> = ({
         header="Статус"
         sortable
         style={{ width: '8rem' }}
-        body={renderStatus}
+        body={(row: RelationRow) => <StatusTag status={row.status} />}
       />
 
       {showDates && (

@@ -5,6 +5,7 @@ import { DataTable } from 'primereact/datatable';
 import { Column } from 'primereact/column';
 import { Button } from 'primereact/button';
 import { Tag } from 'primereact/tag';
+import { StatusTag } from '../StatusTag';
 
 export interface ObservationRow {
   id: number;
@@ -24,6 +25,8 @@ export interface ObservationRow {
   source_url?: string | null;
   source_title?: string | null;
   source_provider?: string | null;
+
+  status?: string | null;
 
   origin?: string | null;
 }
@@ -240,6 +243,14 @@ export const ObservationsTable: React.FC<ObservationsTableProps> = ({
         sortable
         style={{ width: '7rem' }}
         body={(row: ObservationRow) => row.confidence ?? '—'}
+      />
+
+      <Column
+        field="status"
+        header="Статус"
+        sortable
+        style={{ width: '8rem' }}
+        body={(row: ObservationRow) => <StatusTag status={row.status} />}
       />
 
       <Column

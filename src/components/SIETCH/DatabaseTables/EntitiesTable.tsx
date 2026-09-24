@@ -5,6 +5,7 @@ import { DataTable } from 'primereact/datatable';
 import { Column } from 'primereact/column';
 import { Button } from 'primereact/button';
 import { Tag } from 'primereact/tag';
+import { StatusTag } from '../StatusTag';
 
 export interface EntityRow {
   id: number;
@@ -81,17 +82,6 @@ export const EntitiesTable: React.FC<EntitiesTableProps> = ({
     );
   };
 
-  const renderStatus = (row: EntityRow) => {
-    const status = row.status || '—';
-    const color =
-      status === 'confirmed' ? 'green'
-      : status === 'false' ? '#ec3942'
-      : status === 'hypothesis' ? '#e6a23c'
-      : status === 'archived' ? '#888'
-      : 'inherit';
-    return <span style={{ color }}>{status}</span>;
-  };
-
   const renderDate = (row: EntityRow) => {
     return row.last_seen ? new Date(row.last_seen).toLocaleString() : '—';
   };
@@ -134,7 +124,13 @@ export const EntitiesTable: React.FC<EntitiesTableProps> = ({
       <Column field="label" header="Название" sortable body={(row: EntityRow) => row.label || row.value} />
       <Column field="value" header="Значение" sortable body={(row: EntityRow) => row.value} />
       <Column field="confidence" header="Уверенность" sortable style={{ width: '7rem' }} body={(row: EntityRow) => row.confidence ?? '—'} />
-      <Column field="status" header="Статус" sortable style={{ width: '8rem' }} body={renderStatus} />
+            <Column
+        field="status"
+        header="Статус"
+        sortable
+        style={{ width: '8rem' }}
+        body={(row: EntityRow) => <StatusTag status={row.status} />}
+      />
       <Column field="last_seen" header="Обновлено" sortable body={renderDate} />
       <Column
         field="origin"
