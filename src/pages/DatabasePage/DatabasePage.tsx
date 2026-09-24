@@ -20,6 +20,7 @@ import {
 import { MarkFalseDialog, type MarkFalseTable } from '@/components/SIETCH/MarkFalseDialog';
 import { DeleteDialog, type DeleteTarget } from '@/components/SIETCH/DeleteDialog';
 import { DangerZoneDialog } from '@/components/SIETCH/DangerZoneDialog';
+import { RepresentativeDialog } from '@/components/SIETCH/RepresentativeDialog';
 import { BackupDialog } from '@/components/SIETCH/BackupDialog';    // ← новое
 import { SensitiveVaultDialog } from '@/components/SIETCH/SensitiveVaultDialog';
 import { DatabaseHelp } from '@/components/SIETCH/DatabaseHelp';
@@ -109,6 +110,10 @@ export const DatabasePage: React.FC = () => {
   const [backupVisible, setBackupVisible] = useState(false);           // ← новое
 
   const [createDialogInitialValues, setCreateDialogInitialValues] = useState<CreateDialogInitialValues | null>(null);
+  // ← новое:
+  const [repDialogVisible, setRepDialogVisible] = useState(false);
+  const [repDialogFixedCase, setRepDialogFixedCase] = useState<number | null>(null);
+  const [repDialogFixedRepresentative, setRepDialogFixedRepresentative] = useState<number | null>(null);
 
   // ============ Хуки ============
   const dialogStackHook = useDialogStack();
@@ -294,18 +299,17 @@ export const DatabasePage: React.FC = () => {
     startEditing(current.type, currentData);
   };
 
-  const openCreateRepresentative = (
-    entityId: number,
-    entityType: string
-  ) => {
-    const init: CreateDialogInitialValues =
-      entityType === 'court_case'
-        ? { predicate: 'representative_of', object_id: entityId }
-        : { predicate: 'representative_of', subject_id: entityId };
-
-    setCreateDialogInitialValues(init);
-    setCreateType('relation');
-    setCreateDialog(true);
+  const openRepresentativeDialog = (entityId: number, entityType: string) => {
+    if (entityType === 'court_case') {
+      setRepDialogFixedCase(entityId);
+      setRepDialogFixedRepresentative(null);
+    } else if (entityType === 'person') {
+      setRepDialogFixedRepresentative(entityId);
+      setRepDialogFixedCase(null);
+    } else {
+      return; // не поддерживаем
+    }
+    setRepDialogVisible(true);
   };
 
   const handleSaveEdit = async () => {
@@ -356,11 +360,9 @@ export const DatabasePage: React.FC = () => {
             />
           )}
           
-          {current.type === 'entity' &&
+                    {current.type === 'entity' &&
           (currentData?.entity?.type === 'court_case' ||
-            currentData?.entity?.type === 'person' ||
-            currentData?.entity?.type === 'company' ||
-            currentData?.entity?.type === 'entrepreneur') && (
+            currentData?.entity?.type === 'person') && (
             <Button
               icon="pi pi-user-plus"
               className="osint-soft p-button-sm"
@@ -371,7 +373,7 @@ export const DatabasePage: React.FC = () => {
               }
               tooltipOptions={{ position: 'top' }}
               onClick={() =>
-                openCreateRepresentative(current.id, currentData.entity.type)
+                openRepresentativeDialog(current.id, currentData.entity.type)
               }
             />
           )}
@@ -504,6 +506,21 @@ export const DatabasePage: React.FC = () => {
           await loadData();
           resetCache();
           await openDialog(type, id);
+        }}
+      />
+
+      <RepresentativeDialog
+        visible={repDialogVisible}
+        fixedCaseId={repDialogFixedCase}
+        fixedRepresentativeId={repDialogFixedRepresentative}
+        onHide={() => {
+          setRepDialogVisible(false);
+          setRepDialogFixedCase(null);
+          setRepDialogFixedRepresentative(null);
+        }}
+        onSuccess={async () => {
+          await loadData();
+          await refreshTopDialog();
         }}
       />
 

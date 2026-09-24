@@ -3,11 +3,13 @@ import { getDatabase } from './connection';
 
 /**
  * Создаёт связь вручную (origin='manual').
+ * via_entity_id — контекст связи (например, дело для representatives).
  */
 export function createRelation(patch: {
   subject_id: number;
   predicate: string;
   object_id: number;
+  via_entity_id?: number | null;
   source_id?: number | null;
   valid_from?: string | null;
   valid_to?: string | null;
@@ -31,14 +33,15 @@ export function createRelation(patch: {
   try {
     const info = db.prepare(`
       INSERT INTO relations
-        (subject_id, predicate, object_id, source_id,
+        (subject_id, predicate, object_id, via_entity_id, source_id,
          valid_from, valid_to, evidence_text,
          confidence, status, notes, origin)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual')
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual')
     `).run(
       patch.subject_id,
       patch.predicate.trim(),
       patch.object_id,
+      patch.via_entity_id || null,
       patch.source_id || null,
       patch.valid_from || null,
       patch.valid_to || null,
@@ -50,23 +53,23 @@ export function createRelation(patch: {
 
     const id = Number(info.lastInsertRowid);
 
+    const viaInfo = patch.via_entity_id ? `; via=${patch.via_entity_id}` : '';
     auditChange(
       'relations',
       id,
       'create',
       null,
-      `subject=${patch.subject_id}; predicate=${patch.predicate}; object=${patch.object_id}; origin=manual`,
+      `subject=${patch.subject_id}; predicate=${patch.predicate}; object=${patch.object_id}${viaInfo}; origin=manual`,
       'Ручное создание связи через UI'
     );
 
     return { success: true, id };
   } catch (e) {
-    // ← ИЗМЕНЕНО: распознаём UNIQUE-конфликт (сработает ux_relations_triple)
     const msg = (e as Error).message || '';
     if (msg.includes('UNIQUE') || msg.includes('constraint')) {
       return {
         success: false,
-        error: 'Такая связь уже существует (subject + predicate + object)',
+        error: 'Такая связь уже существует (subject + predicate + object + via)',
       };
     }
     return { success: false, error: msg };
