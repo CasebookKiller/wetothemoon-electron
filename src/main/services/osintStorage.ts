@@ -24,6 +24,7 @@ import {
 } from './osint/scrapers/kadArbitr';
 import { detectCounterpartyType } from './osint/scrapers/kadArbitr/helpers';
 import { addCaseEvent, addObservation, addRawDumpRecord, addRelation, addSource, auditChange, getDatabase, getDumpSectionsUpdatedAt, updateRawDumpSections, upsertEntity } from './db';
+import { parseSummaryObservations } from './osint/scrapers/parsers/rusprofileSummary';
 
 /**
  * Определяет тип сущности по ссылке на профиль Rusprofile.
@@ -108,27 +109,17 @@ function persistCompanyData(
   });
 
   let savedObservations = 0;
-  const mainObservations = [
-    { attribute: 'inn', value: mainSummary.inn },
-    { attribute: 'ogrn', value: mainSummary.ogrn },
-    { attribute: 'ogrnip', value: mainSummary.ogrnip },
-    { attribute: 'kpp', value: mainSummary.kpp },
-    { attribute: 'address', value: mainSummary.address },
-    { attribute: 'activity', value: mainSummary.main_activity },
-    { attribute: 'director', value: mainSummary.manager?.name },
-  ];
-  for (const obs of mainObservations) {
-    if (obs.value) {
-      const r = addObservation({
-        entity_id: mainEntityId,
-        attribute: obs.attribute,
-        value: obs.value,
-        source_id: sourceId,
-        confidence: 90,
-        raw_file_path: rawFilePath,
-      });
-      if (r.inserted) savedObservations++;
-    }
+  const summaryObservations = parseSummaryObservations(mainSummary);
+  for (const obs of summaryObservations) {
+    const r = addObservation({
+      entity_id: mainEntityId,
+      attribute: obs.attribute,
+      value: obs.value,
+      source_id: sourceId,
+      confidence: obs.confidence,
+      raw_file_path: rawFilePath,
+    });
+    if (r.inserted) savedObservations++;
   }
 
   let savedEntities = 1;
