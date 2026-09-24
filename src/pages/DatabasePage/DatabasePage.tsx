@@ -12,7 +12,11 @@ import { useEditingState } from '@/components/SIETCH/useEditingState';
 import { useSensitiveState } from '@/components/SIETCH/useSensitiveState';
 import { useCascadingFilter } from '@/components/SIETCH/useCascadingFilter';
 
-import { CreateDialog, type CreateType } from '@/components/SIETCH/CreateDialog';
+import {
+  CreateDialog,
+  type CreateType,
+  type CreateDialogInitialValues,
+} from '@/components/SIETCH/CreateDialog';
 import { MarkFalseDialog, type MarkFalseTable } from '@/components/SIETCH/MarkFalseDialog';
 import { DeleteDialog, type DeleteTarget } from '@/components/SIETCH/DeleteDialog';
 import { DangerZoneDialog } from '@/components/SIETCH/DangerZoneDialog';
@@ -103,6 +107,8 @@ export const DatabasePage: React.FC = () => {
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [dangerVisible, setDangerVisible] = useState(false);
   const [backupVisible, setBackupVisible] = useState(false);           // ← новое
+
+  const [createDialogInitialValues, setCreateDialogInitialValues] = useState<CreateDialogInitialValues | null>(null);
 
   // ============ Хуки ============
   const dialogStackHook = useDialogStack();
@@ -288,6 +294,20 @@ export const DatabasePage: React.FC = () => {
     startEditing(current.type, currentData);
   };
 
+  const openCreateRepresentative = (
+    entityId: number,
+    entityType: string
+  ) => {
+    const init: CreateDialogInitialValues =
+      entityType === 'court_case'
+        ? { predicate: 'representative_of', object_id: entityId }
+        : { predicate: 'representative_of', subject_id: entityId };
+
+    setCreateDialogInitialValues(init);
+    setCreateType('relation');
+    setCreateDialog(true);
+  };
+
   const handleSaveEdit = async () => {
     if (!current) return;
     await saveEditing(current.type, current.id);
@@ -333,6 +353,26 @@ export const DatabasePage: React.FC = () => {
                   currentData?.entity?.label || currentData?.entity?.value || `#${current.id}`
                 );
               }}
+            />
+          )}
+          
+          {current.type === 'entity' &&
+          (currentData?.entity?.type === 'court_case' ||
+            currentData?.entity?.type === 'person' ||
+            currentData?.entity?.type === 'company' ||
+            currentData?.entity?.type === 'entrepreneur') && (
+            <Button
+              icon="pi pi-user-plus"
+              className="osint-soft p-button-sm"
+              tooltip={
+                currentData.entity.type === 'court_case'
+                  ? 'Добавить представителя в это дело'
+                  : 'Добавить как представителя в деле'
+              }
+              tooltipOptions={{ position: 'top' }}
+              onClick={() =>
+                openCreateRepresentative(current.id, currentData.entity.type)
+              }
             />
           )}
           <Button
@@ -454,8 +494,13 @@ export const DatabasePage: React.FC = () => {
       <CreateDialog
         visible={createDialog}
         createType={createType}
-        onHide={() => setCreateDialog(false)}
+        initialValues={createDialogInitialValues}
+        onHide={() => {
+          setCreateDialog(false);
+          setCreateDialogInitialValues(null);
+        }}
         onSuccess={async (type, id) => {
+          setCreateDialogInitialValues(null);
           await loadData();
           resetCache();
           await openDialog(type, id);
