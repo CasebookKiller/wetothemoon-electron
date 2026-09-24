@@ -225,9 +225,12 @@ export function parseSummaryObservations(summary: any): ParsedObservation[] {
   push('okogu', sc.okogu, 95);
   push('okopf', sc.okopf, 95);
 
-  // === Уровень 1: описание ===
-  push('description', summary.detailed_description);
-
+  // === Уровень 1: описание — НЕ сохраняем ===
+  // detailed_description — большой многострочный текст из rusprofile,
+  // дублирует сводку и засоряет observations. Исходник остаётся в
+  // MessagePack-дампе — при необходимости можно достать оттуда.
+  // push('description', summary.detailed_description);
+  
   // === Уровень 1: дата обновления дампа ===
   push('summary_updated', parseRussianDate(summary.updated));
 
