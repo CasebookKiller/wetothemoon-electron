@@ -62,6 +62,25 @@ export function getEntityDetails(entityId: number): any | null {
     ORDER BY r.id DESC
   `).all(entityId) as any[];
 
+  // Связи, где эта сущность — контекст (via_entity_id).
+  // Пример: для court_case это представители, где via=дело.
+  const relationsVia = db.prepare(`
+    SELECT r.id, r.predicate, r.confidence, r.status, r.evidence_text,
+           r.valid_from, r.valid_to, r.source_id, r.origin,
+           r.via_entity_id,
+           s.id AS subject_id, s.label AS subject_label, s.type AS subject_type, s.value AS subject_value,
+           o.id AS object_id, o.label AS object_label, o.type AS object_type, o.value AS object_value,
+           v.label AS via_label, v.type AS via_type, v.value AS via_value,
+           src.url AS source_url, src.title AS source_title
+    FROM relations r
+    JOIN entities s ON s.id = r.subject_id
+    JOIN entities o ON o.id = r.object_id
+    LEFT JOIN entities v ON v.id = r.via_entity_id
+    LEFT JOIN sources src ON src.id = r.source_id
+    WHERE r.via_entity_id = ?
+    ORDER BY r.id DESC
+  `).all(entityId) as any[];
+
   const sources = db.prepare(`
     SELECT DISTINCT s.id, s.url, s.title, s.source_type, s.provider,
            s.access_level, s.retrieved_at, s.origin
@@ -81,6 +100,7 @@ export function getEntityDetails(entityId: number): any | null {
     observations,
     relations_out: relationsOut,
     relations_in: relationsIn,
+    relations_via: relationsVia,   // ← добавить
     sources,
   };
 }
