@@ -1,18 +1,6 @@
 import fs from 'fs';
 import { encode } from '@msgpack/msgpack';
 
-//import {
-//  addObservation,
-//  addRawDumpRecord,
-//  addRelation,
-//  addSource,
-//  auditChange,
-//  getDumpSectionsUpdatedAt,
-//  updateRawDumpSections,
-//  upsertEntity,
-//  getDatabase,
-//  addCaseEvent,
-//} from './database';
 import { saveRawDumpSync } from './rawStorage';
 import {
   KadArbitrCase,
@@ -24,7 +12,163 @@ import {
 } from './osint/scrapers/kadArbitr';
 import { detectCounterpartyType } from './osint/scrapers/kadArbitr/helpers';
 import { addCaseEvent, addObservation, addRawDumpRecord, addRelation, addSource, auditChange, getDatabase, getDumpSectionsUpdatedAt, updateRawDumpSections, upsertEntity } from './db';
-import { parseSummaryObservations } from './osint/scrapers/parsers/rusprofileSummary';
+import { parseSummaryObservations, parseSummaryObservationsByType } from './osint/scrapers/parsers/rusprofileSummary';
+import { isoFromDdMmYyyy } from './osint/scrapers/parsers/rusprofileSummary';
+
+type PersistCtx = {
+  sourceId: number;
+  rawFilePath: string;
+  savedObservations: number;
+  savedEntities: number;
+  savedRelations: number;
+};
+
+/** «с 09.11.2018» / «с 02.03.2009 по 03.11.2010» → { from, to } */
+function parseRolePeriod(period: string): { from: string | undefined; to: string | undefined } {
+  if (!period) return { from: undefined, to: undefined };
+  const m = String(period).match(/с\s+(\d{2}\.\d{2}\.\d{4})(?:\s+по\s+(\d{2}\.\d{2}\.\d{4}))?/);
+  if (!m) return { from: undefined, to: undefined };
+  return {
+    from: isoFromDdMmYyyy(m[1]) ?? undefined,
+    to:   m[2] ? (isoFromDdMmYyyy(m[2]) ?? undefined) : undefined,
+  };
+}
+
+function upsertOrgFromConnection(org: any, ctx: PersistCtx): number {
+  const orgType = detectEntityTypeFromHref(org.href) || detectEntityTypeFromData(org);
+  const orgRusprofileId = extractRusprofileId(org.href)
+    || (org.inn ? `inn:${org.inn}` : undefined);
+  const orgValue = org.name || org.inn || 'Связанная организация';
+
+  const orgId = upsertEntity({
+    rusprofile_id: orgRusprofileId,
+    type: orgType,
+    value: orgValue,
+    label: org.name,
+    confidence: 60,
+    status: 'unverified',
+    raw_file_path: ctx.rawFilePath,
+  });
+
+  if (org.inn) {
+    if (addObservation({
+      entity_id: orgId, attribute: 'inn', value: org.inn,
+      source_id: ctx.sourceId, raw_file_path: ctx.rawFilePath,
+    }).inserted) ctx.savedObservations++;
+  }
+  if (org.ogrn) {
+    if (addObservation({
+      entity_id: orgId, attribute: 'ogrn', value: org.ogrn,
+      source_id: ctx.sourceId, raw_file_path: ctx.rawFilePath,
+    }).inserted) ctx.savedObservations++;
+  }
+  if (org.ogrnip) {
+    if (addObservation({
+      entity_id: orgId, attribute: 'ogrnip', value: org.ogrnip,
+      source_id: ctx.sourceId, raw_file_path: ctx.rawFilePath,
+    }).inserted) ctx.savedObservations++;
+  }
+  if (org.status) {
+    if (addObservation({
+      entity_id: orgId, attribute: 'status', value: org.status,
+      source_id: ctx.sourceId, raw_file_path: ctx.rawFilePath,
+    }).inserted) ctx.savedObservations++;
+  }
+
+  ctx.savedEntities++;
+  return orgId;
+}
+
+const CONNECTION_ROLE_PREDICATES: Record<string, string> = {
+  'Учредитель':   'founder_of',
+  'Руководитель': 'director_of',
+  'ИП':           'individual_entrepreneur_of',
+};
+
+function persistEntrepreneurConnections(
+  data: any,
+  mainEntityId: number,
+  mainSummary: any,
+  ctx: PersistCtx
+): void {
+  const groups = data?.connections_details?.connections ?? [];
+  const selfOgrnip = mainSummary?.ogrnip;
+
+  for (const group of groups) {
+    const predicate = CONNECTION_ROLE_PREDICATES[group?.title] ?? 'associated_with';
+
+    for (const org of (group.organizations ?? [])) {
+      if (predicate === 'individual_entrepreneur_of'
+          && selfOgrnip
+          && org.ogrn === selfOgrnip) {
+        continue;
+      }
+
+      const orgId = upsertOrgFromConnection(org, ctx);
+
+      let validFrom: string | undefined;
+      let validTo: string | undefined;
+      for (const r of (org.roles ?? [])) {
+        const parsed = parseRolePeriod(r?.period);
+        if (parsed.from) validFrom = parsed.from;
+        if (parsed.to)   validTo   = parsed.to;
+      }
+
+      const { inserted } = addRelation({
+        subject_id: mainEntityId,
+        predicate,
+        object_id: orgId,
+        source_id: ctx.sourceId,
+        valid_from: validFrom,
+        valid_to: validTo,
+        evidence_text: group.title ?? null,
+        confidence: 75,
+        status: 'confirmed',
+        raw_file_path: ctx.rawFilePath,
+      });
+      if (inserted) ctx.savedRelations++;
+    }
+  }
+}
+
+function persistPersonRoleSection(
+  section: any,
+  mainEntityId: number,
+  predicate: 'director_of' | 'founder_of',
+  ctx: PersistCtx
+): void {
+  if (!section) return;
+
+  for (const bucket of ['current', 'past'] as const) {
+    for (const org of (section[bucket] ?? [])) {
+      const orgId = upsertOrgFromConnection(org, ctx);
+
+      const { from, to } = parseRolePeriod(org.period ?? '');
+
+      let roleFrom = from;
+      let roleTo = bucket === 'past' ? to : undefined;   // ← undefined вместо null
+      for (const r of (org.roles ?? [])) {
+        const p = parseRolePeriod(r?.period);
+        if (p.from) roleFrom = p.from;
+        if (p.to)   roleTo   = p.to;
+      }
+
+      const { inserted } = addRelation({
+        subject_id: mainEntityId,
+        predicate,
+        object_id: orgId,
+        source_id: ctx.sourceId,
+        valid_from: roleFrom,
+        valid_to: roleTo,
+        evidence_text: org.position ?? null,
+        confidence: 80,
+        status: 'confirmed',
+        raw_file_path: ctx.rawFilePath,
+      });
+      if (inserted) ctx.savedRelations++;
+    }
+  }
+}
 
 /**
  * Определяет тип сущности по ссылке на профиль Rusprofile.
@@ -41,7 +185,7 @@ function detectEntityTypeFromHref(href?: string): string | null {
 /**
  * Определяет тип сущности по данным (если нет ссылки).
  */
-function detectEntityTypeFromData(data: any): string {
+function detectEntityTypeFromData(data: any): 'company' | 'entrepreneur' | 'person' {
   // 1. Явный тип из collectSummary имеет высший приоритет
   if (data.entity_type === 'person') return 'person';
   if (data.entity_type === 'entrepreneur') return 'entrepreneur';
@@ -84,7 +228,7 @@ function findEntrepreneurByOgrnip(ogrnip: string): number | null {
   return row?.id ?? null;
 }
 
-function persistCompanyData(
+export function persistCompanyData(
   companyId: string,
   companyInn: string,
   data: any,
@@ -98,6 +242,7 @@ function persistCompanyData(
 } {
   const mainSummary = data.summary || {};
   const mainType = detectEntityTypeFromData(mainSummary);
+
   const mainEntityId = upsertEntity({
     type: mainType,
     value: mainSummary.name || `Сущность ${companyInn}`,
@@ -108,8 +253,9 @@ function persistCompanyData(
     raw_file_path: rawFilePath,
   });
 
+  // ===== 1. Observations из summary (диспетчер по типу) =====
   let savedObservations = 0;
-  const summaryObservations = parseSummaryObservations(mainSummary);
+  const summaryObservations = parseSummaryObservationsByType(mainSummary, mainType);
   for (const obs of summaryObservations) {
     const r = addObservation({
       entity_id: mainEntityId,
@@ -125,17 +271,13 @@ function persistCompanyData(
   let savedEntities = 1;
   let savedRelations = 0;
 
-  // === Автоматическая связь ФЛ ↔ ИП ===
-  // Если это физлицо и у него есть признак ИП в summary.ip — попытаемся
-  // связать его с существующей сущностью entrepreneur (по ОГРНИП).
-  // Если сущности ИП нет — не создаём «висячую» связь.
+  // ===== 2. Автосвязь ФЛ ↔ ИП (по ОГРНИП из summary.ip) =====
   if (mainType === 'person') {
     const ipInfo = mainSummary.ip;
     const ogrnip = ipInfo?.ogrnip;
 
     if (ogrnip) {
       const ipEntityId = findEntrepreneurByOgrnip(ogrnip);
-
       if (ipEntityId && ipEntityId !== mainEntityId) {
         const { inserted, id } = addRelation({
           subject_id: mainEntityId,
@@ -152,90 +294,73 @@ function persistCompanyData(
           console.log(
             `[persistCompanyData] Автосвязь ФЛ #${mainEntityId} ↔ ИП #${ipEntityId} (ОГРНИП ${ogrnip}) создана (id=${id})`
           );
-        } else {
-          console.log(
-            `[persistCompanyData] Связь ФЛ #${mainEntityId} ↔ ИП #${ipEntityId} уже существует (id=${id})`
-          );
         }
       }
     }
   }
 
-  // Обработка учредителей (как раньше)
-  if (data.founders_details?.founders) {
-    for (const founder of data.founders_details.founders) {
-      const founderType =
-        detectEntityTypeFromHref(founder.href) || detectEntityTypeFromData(founder);
-      const founderRusprofileId = extractRusprofileId(founder.href);
-      const founderValue = founder.name || founder.inn || 'Неизвестный учредитель';
+  // ===== 3. Роли/связи — диспетчер по типу =====
+  const ctx: PersistCtx = {
+    sourceId,
+    rawFilePath,
+    savedObservations,
+    savedEntities,
+    savedRelations,
+  };
 
-      const founderId = upsertEntity({
-        rusprofile_id: founderRusprofileId,
-        type: founderType,
-        value: founderValue,
-        label: founder.name,
-        confidence: 70,
-        status: 'hypothesis',
-        raw_file_path: rawFilePath,
-      });
+  if (mainType === 'company') {
+    // --- Учредители ЮЛ ---
+    if (data.founders_details?.founders) {
+      for (const founder of data.founders_details.founders) {
+        const founderType =
+          detectEntityTypeFromHref(founder.href) || detectEntityTypeFromData(founder);
+        const founderRusprofileId = extractRusprofileId(founder.href);
+        const founderValue = founder.name || founder.inn || 'Неизвестный учредитель';
 
-      if (founder.inn) {
-        if (addObservation({ entity_id: founderId, attribute: 'inn', value: founder.inn, source_id: sourceId, raw_file_path: rawFilePath }).inserted) savedObservations++;
-      }
-      if (founder.ogrn) {
-        if (addObservation({ entity_id: founderId, attribute: 'ogrn', value: founder.ogrn, source_id: sourceId, raw_file_path: rawFilePath }).inserted) savedObservations++;
-      }
-      if (founder.ogrnip) {
-        if (addObservation({ entity_id: founderId, attribute: 'ogrnip', value: founder.ogrnip, source_id: sourceId, raw_file_path: rawFilePath }).inserted) savedObservations++;
-      }
-      if (founder.share) {
-        if (addObservation({ entity_id: founderId, attribute: 'share', value: founder.share, source_id: sourceId, raw_file_path: rawFilePath }).inserted) savedObservations++;
-      }
+        const founderId = upsertEntity({
+          rusprofile_id: founderRusprofileId,
+          type: founderType,
+          value: founderValue,
+          label: founder.name,
+          confidence: 70,
+          status: 'hypothesis',
+          raw_file_path: rawFilePath,
+        });
 
-      const { inserted } = addRelation({
-        subject_id: founderId,
-        predicate: 'founder_of',
-        object_id: mainEntityId,
-        source_id: sourceId,
-        evidence_text: founder.share || null,
-        confidence: 75,
-        status: 'unverified',
-        raw_file_path: rawFilePath,
-      });
-      if (inserted) savedRelations++;
-      savedEntities++;
+        if (founder.inn) {
+          if (addObservation({ entity_id: founderId, attribute: 'inn', value: founder.inn, source_id: sourceId, raw_file_path: rawFilePath }).inserted) ctx.savedObservations++;
+        }
+        if (founder.ogrn) {
+          if (addObservation({ entity_id: founderId, attribute: 'ogrn', value: founder.ogrn, source_id: sourceId, raw_file_path: rawFilePath }).inserted) ctx.savedObservations++;
+        }
+        if (founder.ogrnip) {
+          if (addObservation({ entity_id: founderId, attribute: 'ogrnip', value: founder.ogrnip, source_id: sourceId, raw_file_path: rawFilePath }).inserted) ctx.savedObservations++;
+        }
+        if (founder.share) {
+          if (addObservation({ entity_id: founderId, attribute: 'share', value: founder.share, source_id: sourceId, raw_file_path: rawFilePath }).inserted) ctx.savedObservations++;
+        }
+
+        const { inserted } = addRelation({
+          subject_id: founderId,
+          predicate: 'founder_of',
+          object_id: mainEntityId,
+          source_id: sourceId,
+          evidence_text: founder.share || null,
+          confidence: 75,
+          status: 'unverified',
+          raw_file_path: rawFilePath,
+        });
+        if (inserted) ctx.savedRelations++;
+        ctx.savedEntities++;
+      }
     }
-  }
 
-  // Обработка связей (connections_details)
-  if (data.connections_details?.connections) {
-    for (const group of data.connections_details.connections) {
-      if (group.organizations) {
+    // --- Связи ЮЛ (connections_details) ---
+    if (data.connections_details?.connections) {
+      for (const group of data.connections_details.connections) {
+        if (!group.organizations) continue;
         for (const org of group.organizations) {
-          const orgType =
-            detectEntityTypeFromHref(org.href) || detectEntityTypeFromData(org);
-          const orgRusprofileId = extractRusprofileId(org.href) || (org.inn ? `inn:${org.inn}` : undefined);
-          const orgValue = org.name || org.inn || 'Связанная организация';
-
-          const orgId = upsertEntity({
-            rusprofile_id: orgRusprofileId,
-            type: orgType,
-            value: orgValue,
-            label: org.name,
-            confidence: 60,
-            status: 'unverified',
-            raw_file_path: rawFilePath,
-          });
-
-          if (org.inn) {
-            if (addObservation({ entity_id: orgId, attribute: 'inn', value: org.inn, source_id: sourceId, raw_file_path: rawFilePath }).inserted) savedObservations++;
-          }
-          if (org.ogrn) {
-            if (addObservation({ entity_id: orgId, attribute: 'ogrn', value: org.ogrn, source_id: sourceId, raw_file_path: rawFilePath }).inserted) savedObservations++;
-          }
-          if (org.ogrnip) {
-            if (addObservation({ entity_id: orgId, attribute: 'ogrnip', value: org.ogrnip, source_id: sourceId, raw_file_path: rawFilePath }).inserted) savedObservations++;
-          }
+          const orgId = upsertOrgFromConnection(org, ctx);
 
           const { inserted } = addRelation({
             subject_id: mainEntityId,
@@ -247,19 +372,34 @@ function persistCompanyData(
             status: 'unverified',
             raw_file_path: rawFilePath,
           });
-          if (inserted) savedRelations++;
-          savedEntities++;
+          if (inserted) ctx.savedRelations++;
         }
       }
     }
+  } else if (mainType === 'entrepreneur') {
+    persistEntrepreneurConnections(data, mainEntityId, mainSummary, ctx);
+  } else if (mainType === 'person') {
+    persistPersonRoleSection(data.person_ceo_details,     mainEntityId, 'director_of', ctx);
+    persistPersonRoleSection(data.person_founder_details, mainEntityId, 'founder_of',  ctx);
   }
 
-  // Аудит
-  auditChange('entities', mainEntityId, 'update', null, JSON.stringify(mainSummary), 'Сохранение/обновление сущности из Rusprofile');
+  // ===== 4. Разворачиваем счётчики =====
+  savedObservations = ctx.savedObservations;
+  savedEntities     = ctx.savedEntities;
+  savedRelations    = ctx.savedRelations;
+
+  // ===== 5. Аудит =====
+  auditChange(
+    'entities',
+    mainEntityId,
+    'update',
+    null,
+    JSON.stringify(mainSummary),
+    'Сохранение/обновление сущности из Rusprofile'
+  );
 
   return { savedEntities, savedRelations, savedObservations, mainEntityId };
 }
-
 
 export function saveCompanyData(
   companyId: string,
