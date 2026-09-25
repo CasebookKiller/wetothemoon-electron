@@ -24,15 +24,28 @@
   opacity: 0.55;
 }
 
-.dumps-panel .p-panel-header-icon.p-panel-toggler,
-.dumps-panel .p-panel-header-icon.p-panel-toggler svg,
-.dumps-panel .p-panel-header-icon.p-panel-toggler .p-icon {
-  color: var(--accent-color, #6ab2f2) !important;
-  background-color: rgba(106, 178, 242, 0.36) !important;
+.dumps-panel .p-panel-header-icon.p-panel-toggler {
+  color: #052e16 !important;
+  background-color: var(--tg-theme-accent-text-color) !important;
+  border-radius: 4px !important;
+  width: 24px !important;
+  height: 24px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
 }
 
 .dumps-panel .p-panel-header-icon.p-panel-toggler:hover,
 .dumps-panel .p-panel-header-icon.p-panel-toggler:focus {
-  color: var(--accent-color, #6ab2f2) !important;
-  background-color: rgba(106, 178, 242, 0.64) !important;
+  background-color: var(--tg-theme-accent-text-color) !important;
+}
+
+/* SVG и путь — прозрачный фон, цвет наследуется */
+.dumps-panel .p-panel-header-icon.p-panel-toggler svg,
+.dumps-panel .p-panel-header-icon.p-panel-toggler .p-icon,
+.dumps-panel .p-panel-header-icon.p-panel-toggler svg path {
+  background-color: transparent !important;
+  color: #052e16 !important;
+  fill: currentColor !important;
 }

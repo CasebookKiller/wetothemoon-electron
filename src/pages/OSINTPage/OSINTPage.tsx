@@ -180,6 +180,7 @@ export const OSINTPage: React.FC = () => {
   const [dumpsLoading, setDumpsLoading] = useState(false);
 
   const [deletingDumpKey, setDeletingDumpKey] = useState<string | null>(null);
+  const [reparsingKey, setReparsingKey] = useState<string | null>(null);
 
   const innDigits = inn.replace(/\D/g, '');
   const isLegalEntityInn = innDigits.length === 10;
@@ -190,6 +191,8 @@ export const OSINTPage: React.FC = () => {
   const [judgesDirectoryVisible, setJudgesDirectoryVisible] = useState(false);
 
   const [kadArbitrDialogVisible, setKadArbitrDialogVisible] = useState(false);
+
+  const [copyingKey, setCopyingKey] = useState<string | null>(null);
 
   const api = (window as any).electronAPI;
 
@@ -260,6 +263,62 @@ export const OSINTPage: React.FC = () => {
       alert(`Ошибка: ${(e as Error).message}`);
     } finally {
       setDeletingDumpKey(null);
+    }
+  };
+  
+  const handleReparseDump = async (item: any, event: React.MouseEvent) => {
+    event.stopPropagation();
+
+    const key = `${item.company_inn}-${item.company_id_rusprofile}`;
+    setReparsingKey(key);
+
+    try {
+      const res = await api.reparseDump(item.latest_dump_id);
+      if (res.success) {
+        console.log(
+          `[reparse] ${item.entity_name || item.company_inn}: ` +
+          `сущностей ${res.savedEntities}, ` +
+          `связей ${res.savedRelations}, ` +
+          `наблюдений ${res.savedObservations}`
+        );
+        // entity_name мог обновиться (если парсер стал тянуть другое поле),
+        // поэтому перечитываем список
+        await loadDumpsList();
+      } else {
+        alert(`Ошибка перечитывания: ${res.error}`);
+      }
+    } catch (e) {
+      alert(`Ошибка: ${(e as Error).message}`);
+    } finally {
+      setReparsingKey(null);
+    }
+  };
+
+  const handleCopyDump = async (item: any, event: React.MouseEvent) => {
+    event.stopPropagation();
+    const key = `${item.company_inn}-${item.company_id_rusprofile}`;
+    setCopyingKey(key);
+    try {
+      const res = await api.loadDump(item.latest_dump_id);
+      if (!res.success) {
+        alert(`Ошибка: ${res.error}`);
+        return;
+      }
+      const json = JSON.stringify(res.data, null, 2);
+      const sizeMb = (res.meta.sizeBytes ?? 0) / 1024 / 1024;
+      if (sizeMb > 5) {
+        const ok = window.confirm(
+          `Дамп весит ${sizeMb.toFixed(1)} МБ. Копировать в буфер?`
+        );
+        if (!ok) return;
+      }
+      await navigator.clipboard.writeText(json);
+      // опционально: короткий toast/alert
+      console.log(`Дамп #${res.meta.id} скопирован (${json.length} символов)`);
+    } catch (e) {
+      alert(`Ошибка копирования: ${(e as Error).message}`);
+    } finally {
+      setCopyingKey(null);
     }
   };
 
@@ -833,6 +892,26 @@ export const OSINTPage: React.FC = () => {
                     </div>
                   </div>
 
+                  {/* Кнопка копирования */}
+                  <Button
+                    icon={copyingKey === rowKey ? 'pi pi-spin pi-spinner' : 'pi pi-copy'}
+                    className="p-button-sm p-button-text p-button-accent"
+                    tooltip="Скопировать дамп в буфер (JSON)"
+                    tooltipOptions={{ position: 'left' }}
+                    onClick={(e) => handleCopyDump(item, e)}
+                    disabled={copyingKey === rowKey}
+                  />
+
+                  {/* Кнопка «Перечитать из дампа» (reparse без сети) */}
+                  <Button
+                    icon={reparsingKey === rowKey ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'}
+                    className="p-button-sm p-button-text p-button-accent"
+                    tooltip="Перечитать из дампа (без сети)"
+                    tooltipOptions={{ position: 'left' }}
+                    onClick={(e) => handleReparseDump(item, e)}
+                    disabled={reparsingKey === rowKey}
+                  />
+                  
                   {/* Кнопка удаления */}
                   <Button
                     icon={isDeleting ? 'pi pi-spin pi-spinner' : 'pi pi-trash'}
