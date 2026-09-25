@@ -1,7 +1,7 @@
 import fs from 'fs';
 import { encode } from '@msgpack/msgpack';
 
-import { saveRawDumpSync } from './rawStorage';
+import { loadRawDumpSync, saveRawDumpSync } from './rawStorage';
 import {
   KadArbitrCase,
   KadArbitrData,
@@ -893,6 +893,8 @@ function persistCase(params: PersistCaseParams): PersistCaseResult {
     { items: caseItem.third_parties || [], predicate: 'third_party_in' },
   ];
 
+  const db = getDatabase();
+
   for (const group of partyGroups) {
     for (const party of group.items) {
       // Пропускаем саму целевую организацию — она уже связана
@@ -904,17 +906,37 @@ function persistCase(params: PersistCaseParams): PersistCaseResult {
         : party.type === 'company'      ? 'company'
         : 'other';
 
-      const partyEntityId = upsertEntity({
-        rusprofile_id: party.rusprofile_id,
-        type,
-        value: party.name,
-        label: party.name,
-        confidence: party.type === 'unknown' ? 50 : 70,
-        status: 'unverified',
-        notes: party.hidden_data ? 'Данные скрыты' : undefined,
-        raw_file_path: rawFilePath,
-      });
-      savedEntities++;
+      // Если у контрагента есть rusprofile_id — сначала проверяем, нет ли
+      // уже сущности с таким id. На reparse (или повторном scrape) контрагент
+      // мог быть заведён ранее — например, в connections_details или
+      // founders_details — с тем же rusprofile_id, но другим value.
+      // В этом случае переиспользуем существующую запись, иначе
+      // получим UNIQUE constraint failed: entities.rusprofile_id.
+      // Если у контрагента есть rusprofile_id — сначала проверяем, нет ли
+      // уже сущности с таким id. На reparse (или повторном scrape) контрагент
+      // мог быть заведён ранее (например, в connections_details) с тем же
+      // rusprofile_id, но другим value. Переиспользуем существующую запись,
+      // иначе получим UNIQUE constraint failed: entities.rusprofile_id.
+      const existingByRusprofileId = party.rusprofile_id
+        ? (db.prepare(
+            'SELECT id FROM entities WHERE rusprofile_id = ? LIMIT 1'
+          ).get(party.rusprofile_id) as { id: number } | undefined)
+        : undefined;
+
+      const partyEntityId = existingByRusprofileId
+        ? existingByRusprofileId.id
+        : upsertEntity({
+            rusprofile_id: party.rusprofile_id,
+            type,
+            value: party.name,
+            label: party.name,
+            confidence: party.type === 'unknown' ? 50 : 70,
+            status: 'unverified',
+            notes: party.hidden_data ? 'Данные скрыты' : undefined,
+            raw_file_path: rawFilePath,
+          });
+
+      if (!existingByRusprofileId) savedEntities++;
 
       if (party.inn) {
         const r = addObservation({
@@ -1255,18 +1277,28 @@ export function persistRusprofileArbitration(
 
     const targetRole = detectTargetRoleInRusprofileCase(caseItem, targetRusprofileId);
 
-    const r = persistCase({
-      caseItem: kadCase,
-      sourceId,
-      targetEntityId,
-      targetRole,
-      rawFilePath,
-    });
+    try {
+      const r = persistCase({
+        caseItem: kadCase,
+        sourceId,
+        targetEntityId,
+        targetRole,
+        rawFilePath,
+      });
 
-    savedEntities += r.savedEntities;
-    savedRelations += r.savedRelations;
-    savedObservations += r.savedObservations;
-    casesProcessed++;
+      savedEntities += r.savedEntities;
+      savedRelations += r.savedRelations;
+      savedObservations += r.savedObservations;
+      casesProcessed++;
+    } catch (e) {
+      console.warn(
+        `[persistRusprofileArbitration] Дело пропущено: ` +
+        `number=${kadCase.case_number}, ` +
+        `plaintiffs=${kadCase.plaintiffs.map(p => `${p.name}(${p.rusprofile_id ?? '-'})`).join(', ')}, ` +
+        `respondents=${kadCase.respondents.map(p => `${p.name}(${p.rusprofile_id ?? '-'})`).join(', ')}; ` +
+        `error=${(e as Error).message}`
+      );
+    }
   }
 
   console.log(
@@ -1598,5 +1630,113 @@ export function persistKadArbitrCard(
     savedObservations,
     eventsInserted,
     eventsUpdated,
+  };
+}
+
+// ============================================================================
+// RUSPROFILE: reparse из дампа (без сети)
+// ============================================================================
+
+/**
+ * Перечитывает ранее сохранённый дамп без обращения к сети.
+ *
+ * Прогоняет сырой JSON через те же парсеры, что и обычный scrape:
+ *   - persistCompanyData (summary, founders, connections, IP, ФЛ→ИП);
+ *   - persistRusprofileArbitration (arbitration_details.cases).
+ *
+ * Используется для отладки парсеров: правим код → reparse → смотрим БД.
+ *
+ * Не делает:
+ *   - не скачивает данные,
+ *   - не трогает raw_dumps (файл, collected_sections, section_updated_at),
+ *   - не меняет другие модули.
+ *
+ * Идемпотентна: повторный reparse не создаст дубликатов
+ * (за счёт ux_observations_triple и ux_relations_triple_via).
+ */
+export function reparseCompanyFromDump(dumpId: number): {
+  savedEntities: number;
+  savedRelations: number;
+  savedObservations: number;
+  mainEntityId: number;
+} {
+  const db = getDatabase();
+
+  const row = db.prepare(`
+    SELECT id, company_inn, company_id_rusprofile, dump_file_path
+    FROM raw_dumps
+    WHERE id = ?
+  `).get(dumpId) as
+    | {
+        id: number;
+        company_inn: string;
+        company_id_rusprofile: string | null;
+        dump_file_path: string;
+      }
+    | undefined;
+
+  if (!row) {
+    throw new Error(`Дамп #${dumpId} не найден`);
+  }
+
+  const data = loadRawDumpSync(row.dump_file_path);
+  const companyId = row.company_id_rusprofile ?? '';
+
+  // Источник с collection_method='reparse' — отделяем пересборку из дампа
+  // от сетевого сбора в аудите.
+  const mainSummary = data.summary || {};
+  const mainType = detectEntityTypeFromData(mainSummary);
+  const urlPath =
+    mainType === 'company'      ? 'id'
+    : mainType === 'entrepreneur' ? 'ip'
+    : 'person';
+  const sourceUrl = companyId
+    ? `https://www.rusprofile.ru/${urlPath}/${companyId}`
+    : `rusprofile://reparse/${row.company_inn}`;
+
+  const sourceId = addSource({
+    url: sourceUrl,
+    title: 'Rusprofile (reparse)',
+    source_type: 'registry',
+    source_kind: 'official_registry',
+    provider: 'rusprofile.ru',
+    collection_method: 'reparse',
+    reliability: 80,
+    access_level: 'public',
+    retrieved_at: new Date().toISOString(),
+    local_path: row.dump_file_path,
+  });
+
+  const result = persistCompanyData(
+    companyId,
+    row.company_inn,
+    data,
+    row.dump_file_path,
+    sourceId
+  );
+
+  // arbitration_details.cases — как в saveCompanyData/updateCompanyData,
+  // но без сети и без записи в raw_dumps.
+  let arbSavedEntities = 0;
+  let arbSavedRelations = 0;
+  let arbSavedObservations = 0;
+  if (data.arbitration_details?.cases?.length) {
+    const arb = persistRusprofileArbitration(
+      result.mainEntityId,
+      companyId,
+      data.arbitration_details,
+      sourceId,
+      row.dump_file_path
+    );
+    arbSavedEntities = arb.savedEntities;
+    arbSavedRelations = arb.savedRelations;
+    arbSavedObservations = arb.savedObservations;
+  }
+
+  return {
+    savedEntities: result.savedEntities + arbSavedEntities,
+    savedRelations: result.savedRelations + arbSavedRelations,
+    savedObservations: result.savedObservations + arbSavedObservations,
+    mainEntityId: result.mainEntityId,
   };
 }
