@@ -1098,42 +1098,78 @@ export function registerOsintHandlers() {
   // Скачивание PDF судебного акта kad.arbitr через Playwright-контекст.
   // Вызывается из renderer после перехвата target=_blank в osintWindow.
   // Дедуп: если тот же URL прилетел < 5 сек назад — игнорируем.
-  const recentPdfDownloads = new Map<string, number>();
+  ipcMain.handle(
+    'osint:test-pdf-download',
+    async (_event, pdfUrl: string, targetDir: string) => {
+      try {
+        const { downloadKadDocument } = await import(
+          '../services/osint/scrapers/kadArbitr/documents'
+        );
+        const { getPage } = await import('../services/osint/playwrightService');
+        const page = getPage();
+        if (!page) return { success: false, error: 'Playwright-страница не найдена' };
+        return await downloadKadDocument(page, pdfUrl, targetDir);
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
 
-  ipcMain.handle('osint:kad-download-document', async (_event, url: string) => {
-    console.log('[kad-pdf] invoke:', url, 'at', new Date().toISOString());
-
+  ipcMain.handle('osint:load-dump', async (_event, dumpId: number) => {
     try {
-      if (!url || !url.trim()) {
-        return { success: false, error: 'URL не указан' };
-      }
+      const db = getDatabase();
+      const row = db.prepare(
+        'SELECT id, dump_file_path, company_inn, size_bytes, created_at FROM raw_dumps WHERE id = ?'
+      ).get(dumpId) as
+        | { id: number; dump_file_path: string; company_inn: string; size_bytes: number | null; created_at: string }
+        | undefined;
 
-      const now = Date.now();
-      const prev = recentPdfDownloads.get(url);
-      if (prev && now - prev < 5000) {
-        console.log('[kad-pdf] duplicate within 5s, ignored');
-        return { success: false, error: 'Дубликат запроса (уже скачивается)' };
-      }
-      recentPdfDownloads.set(url, now);
+      if (!row) return { success: false, error: `Дамп #${dumpId} не найден` };
 
-      // Чистим старые записи
-      for (const [k, t] of recentPdfDownloads.entries()) {
-        if (now - t > 30000) recentPdfDownloads.delete(k);
-      }
-
-      const caseUuid = extractCaseUuidFromPdfUrl(url);
-      const page = await ensureKadSession();
-      const result = await downloadKadDocument(page, url, caseUuid);
-
+      const data = loadRawDumpSync(row.dump_file_path);
       return {
         success: true,
-        localPath: result.localPath,
-        sizeBytes: result.sizeBytes,
+        data,
+        meta: {
+          id: row.id,
+          companyInn: row.company_inn,
+          sizeBytes: row.size_bytes,
+          createdAt: row.created_at,
+          path: row.dump_file_path,
+        },
       };
     } catch (e) {
-      console.error('[kad-pdf] error:', e);
       return { success: false, error: (e as Error).message };
     }
   });
 
+  ipcMain.handle('osint:_debug-reparse', async (_e, dumpId: number) => {
+    const { getDatabase } = await import('../services/db/connection');
+    const { loadRawDumpSync } = await import('../services/rawStorage');
+    const { persistCompanyData } = await import('../services/osintStorage');
+    const { addSource } = await import('../services/db/sources');
+
+    const db = getDatabase();
+    const row = db.prepare(
+      'SELECT id, company_inn, company_id_rusprofile, dump_file_path FROM raw_dumps WHERE id = ?'
+    ).get(dumpId) as any;
+    if (!row) throw new Error(`Дамп #${dumpId} не найден`);
+
+    const data = loadRawDumpSync(row.dump_file_path) as any;
+    const sourceId = addSource({
+      url: `rusprofile://debug-reparse/${row.company_inn}`,
+      source_type: 'database',
+      provider: 'rusprofile',
+      collection_method: 'reparse',
+      retrieved_at: new Date().toISOString(),
+      local_path: row.dump_file_path,
+    });
+    return persistCompanyData(
+      row.company_id_rusprofile ?? row.company_inn,
+      row.company_inn,
+      data,
+      row.dump_file_path,
+      sourceId
+    );
+  });
 }

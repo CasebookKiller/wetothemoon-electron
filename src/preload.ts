@@ -633,6 +633,14 @@ try {
       ipcRenderer.removeAllListeners('osint:kad-pdf-clicked');
     },
 
+    testPdf: (pdfUrl: string) => ipcRenderer.invoke('osint:test-pdf', pdfUrl),
+    testPdfDownload: (pdfUrl: string, targetDir: string) =>
+      ipcRenderer.invoke('osint:test-pdf-download', pdfUrl, targetDir),
+
+    loadDump: (dumpId: number) => ipcRenderer.invoke('osint:load-dump', dumpId),
+
+    _debugReparse: (dumpId: number) => ipcRenderer.invoke('osint:_debug-reparse', dumpId),
+
     // ==================== Prana-Bindu ====================
     openPranaBinduWindow: () => ipcRenderer.invoke('pb:open-window'),
     pb: {
