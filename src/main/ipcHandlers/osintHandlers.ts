@@ -17,7 +17,7 @@ import { scrapeMosGorsud } from '../services/osint/scrapers/mosGorsud';
 import { getCredentials, setCredentials } from '../services/osint/credentials';
 import { createDatabaseWindow, getDatabaseWindow } from '../windows/databaseWindow';
 import { deleteAllRawDumps, loadRawDumpSync } from '../services/rawStorage';
-import { mergeCompanyDumps, persistKadArbitrCard, persistKadArbitrData, saveCompanyData, updateCompanyData } from '../services/osintStorage';
+import { mergeCompanyDumps, persistKadArbitrCard, persistKadArbitrData, reparseCompanyFromDump, saveCompanyData, updateCompanyData } from '../services/osintStorage';
 
 import {
   getSensitiveStatus,
@@ -417,6 +417,19 @@ export function registerOsintHandlers() {
       };
     } catch (error) {
       return { exists: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('osint:reparse-dump', async (_event, dumpId: number) => {
+    try {
+      if (!Number.isFinite(dumpId) || dumpId <= 0) {
+        return { success: false, error: 'dumpId должен быть положительным числом' };
+      }
+      const stats = reparseCompanyFromDump(dumpId);
+      return { success: true, ...stats };
+    } catch (e) {
+      console.error('[osint:reparse-dump]', e);
+      return { success: false, error: (e as Error).message };
     }
   });
 

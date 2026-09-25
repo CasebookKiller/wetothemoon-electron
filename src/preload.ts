@@ -457,6 +457,9 @@ try {
     checkDumpExists: (inn: string) => ipcRenderer.invoke('osint:check-dump-exists', inn),
     listDumps: () => ipcRenderer.invoke('osint:list-dumps'),
 
+    reparseDump: (dumpId: number) =>
+      ipcRenderer.invoke('osint:reparse-dump', dumpId),
+
     deleteDump: (companyInn: string, companyIdRusprofile: string | null) =>
       ipcRenderer.invoke('osint:delete-dump', companyInn, companyIdRusprofile),
 
