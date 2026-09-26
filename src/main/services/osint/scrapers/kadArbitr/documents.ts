@@ -1,8 +1,11 @@
 // src/main/services/osint/scrapers/kadArbitr/documents.ts
 //
 // Скачивание PDF судебных актов через контекст Playwright.
-// Использует page.request — те же cookies/rcid, что у страниц карточки.
-// Referer обязателен: kad отвергает скачивание без него.
+// Работаем в СУЩЕСТВУЮЩЕЙ вкладке (не создаём новую):
+//  - rcid и ASP.NET_SessionId уже активны;
+//  - Referer естественный — мы на /Card/{uuid};
+//  - Pravocaptcha если появится — в интерфейсе пользователя,
+//    а не в скрытой вкладке (можно решить руками).
 
 import fs from 'fs';
 import path from 'path';
@@ -28,122 +31,144 @@ export function extractCaseUuidFromPdfUrl(url: string): string {
 }
 
 /**
- * Проверяет, что URL — это ссылка на PDF судебного акта kad.arbitr.
+ * Проверяет, что URL — ссылка на PDF судебного акта kad.arbitr.
  */
 export function isKadPdfUrl(url: string): boolean {
   return /kad\.arbitr\.ru\/(?:Kad\/PdfDocument|Document\/Pdf)\//i.test(url);
 }
 
 /**
- * Скачивает PDF судебного акта через route-перехват в новой вкладке
- * того же BrowserContext. Route ловит ответ ДО Chromium-плагина PDF-viewer,
- * поэтому тело доступно гарантированно.
+ * Скачивает PDF судебного акта с kad.arbitr.
  *
- * Первый запрос вернёт HTML с Pravocaptcha → JS в браузере пере-сабмитит
- * форму → второй запрос вернёт PDF. Route срабатывает на оба.
+ * Гипотеза: kad проверяет Referer. При прямом fetch без Referer карточки
+ * отдаётся Pravocaptcha. Значит нужно:
+ *  1. Сначала перейти на карточку дела (/Card/{caseUuid}) — Referer станет правильный.
+ *  2. Затем fetch на исходный URL /Kad/PdfDocument/... (он редиректит на
+ *     /Document/Pdf/...?isAddStamp=True сам).
  */
 export async function downloadKadDocument(
   page: Page,
   pdfUrl: string,
-  caseUuid: string
-): Promise<DownloadedDocument> {
-  const fileNameMatch = pdfUrl.match(/\/([^/?]+\.pdf)/i);
-  const fileName = fileNameMatch ? fileNameMatch[1] : 'unknown.pdf';
-  const yearMatch = fileName.match(/_(\d{4})\d{4}_/);
-  const year = yearMatch ? yearMatch[1] : 'unknown_year';
-
-  const dir = path.join(
-    app.getPath('userData'),
-    'raw_dumps',
-    'kad',
-    'docs',
-    year
-  );
-  fs.mkdirSync(dir, { recursive: true });
-  const localPath = path.join(dir, fileName);
-
-  if (fs.existsSync(localPath)) {
-    const stat = fs.statSync(localPath);
-    return { localPath, sizeBytes: stat.size, contentType: 'application/pdf' };
-  }
-
-  const referer = caseUuid
-    ? `https://kad.arbitr.ru/Card/${caseUuid}`
-    : 'https://kad.arbitr.ru/';
-
-  const ctx = page.context();
-  const docPage = await ctx.newPage();
-
-  // Диагностика: какие cookies в новой вкладке
-  const cookies = await ctx.cookies('https://kad.arbitr.ru');
-  console.log('[kad-pdf] cookies:',
-    cookies.map(c => `${c.name}=${(c.value || '').slice(0, 8)}...`).join(', ')
-  );
-  const hasRcid = cookies.some(c => c.name === 'rcid' && c.value.length > 0);
-  console.log('[kad-pdf] has rcid:', hasRcid);
-
-  let savedResult: DownloadedDocument | null = null;
-
-  // Перехватываем на уровне route — до Chromium PDF-viewer.
-  await docPage.route(
-    /\/Document\/Pdf\/|\/Kad\/PdfDocument\//i,
-    async (route) => {
-      if (savedResult) {
-        await route.continue();
-        return;
-      }
-      try {
-        const response = await route.fetch();
-        const body = await response.body();
-        const magic = body.slice(0, 4).toString('utf-8');
-
-        console.log('[kad-pdf] route:', route.request().method(), route.request().url(),
-                    'content-type=', response.headers()['content-type'],
-                    'magic=', magic,
-                    'len=', body.length);
-
-        if (magic !== '%PDF' && body.length > 10000) {
-          try {
-            const dumpPath = `/tmp/kad-pravocaptcha-${Date.now()}.html`;
-            fs.writeFileSync(dumpPath, body);
-            console.log('[kad-pdf] saved HTML to', dumpPath);
-          } catch { /* ignore */ }
-        }
-
-        if (magic === '%PDF') {
-          fs.writeFileSync(localPath, body);
-          savedResult = {
-            localPath,
-            sizeBytes: body.length,
-            contentType: 'application/pdf',
-          };
-        }
-        await route.fulfill({ response, body });
-      } catch (e) {
-        console.warn('[kad-pdf] route error:', (e as Error).message);
-        await route.continue();
-      }
-    }
-  );
-
+  targetDir: string
+): Promise<{
+  success: boolean;
+  savedPath?: string;
+  error?: string;
+  size?: number;
+  status?: number;
+  debug?: any;
+}> {
   try {
-    await docPage
-      .goto(pdfUrl, { referer, timeout: 90000, waitUntil: 'domcontentloaded' })
-      .catch(() => null);
-
-    const deadline = Date.now() + 60000;
-    while (!savedResult && Date.now() < deadline) {
-      await docPage.waitForTimeout(1000);
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
     }
 
-    if (!savedResult) {
-      throw new Error(
-        'PDF не получен за 60 секунд. ' +
-        'Возможно, Pravocaptcha требует ввода.'
-      );
+    const urlObj = new URL(pdfUrl);
+    const filename = decodeURIComponent(
+      urlObj.pathname.split('/').pop() || 'document.pdf'
+    );
+    const targetPath = path.join(targetDir, filename);
+
+    // Извлекаем caseUuid и docUuid из пути.
+    // Форматы:
+    //   /Document/Pdf/{caseUuid}/{docUuid}/{filename}.pdf?isAddStamp=True
+    //   /Kad/PdfDocument/{caseUuid}/{docUuid}/{filename}.pdf
+    const parts = urlObj.pathname.split('/').filter(Boolean);
+    const caseUuid = parts[2]; // 2-й после /Document/Pdf или /Kad/PdfDocument
+    const docUuid = parts[3];
+
+    // 1. Навигация на карточку дела — чтобы Referer стал правильный
+    if (caseUuid) {
+      const cardUrl = `https://kad.arbitr.ru/Card/${caseUuid}`;
+      console.log(`[kad] Навигация на карточку: ${cardUrl}`);
+      await page.goto(cardUrl, {
+        waitUntil: 'domcontentloaded',
+        timeout: 60_000,
+      });
+      // Даём JS прогрузиться (Pravocaptcha проверка на карточке)
+      await page.waitForTimeout(3000);
     }
-    return savedResult;
-  } finally {
-    try { await docPage.close(); } catch { /* ignore */ }
+
+    // 2. Формируем исходный URL (Kad/PdfDocument) — без ?isAddStamp=True
+    //    Он редиректит на Document/Pdf/... сам.
+    const originalUrl = docUuid
+      ? `https://kad.arbitr.ru/Kad/PdfDocument/${caseUuid}/${docUuid}/${filename}`
+      : pdfUrl;
+
+    console.log(`[kad] fetch original: ${originalUrl}`);
+
+    // 3. Fetch изнутри страницы (Referer = /Card/{caseUuid} теперь)
+    const result = await page.evaluate(async (url) => {
+      try {
+        const r = await fetch(url, {
+          credentials: 'include',
+          redirect: 'follow',
+        });
+        const ct = r.headers.get('content-type') || '';
+        const buf = await r.arrayBuffer();
+        const bytes = new Uint8Array(buf);
+
+        // Base64
+        let binary = '';
+        const chunk = 8192;
+        for (let i = 0; i < bytes.byteLength; i += chunk) {
+          binary += String.fromCharCode.apply(
+            null,
+            Array.from(bytes.subarray(i, i + chunk)) as unknown as number[]
+          );
+        }
+        const base64 = btoa(binary);
+
+        return {
+          base64,
+          size: bytes.byteLength,
+          status: r.status,
+          contentType: ct,
+          finalUrl: r.url,
+        };
+      } catch (e) {
+        return { error: (e as Error).message };
+      }
+    }, originalUrl);
+
+    const res = result as any;
+
+    console.log(
+      `[kad] fetch результат: status=${res.status} ct=${res.contentType} size=${res.size} url=${res.finalUrl}`
+    );
+
+    if (res.error) {
+      return { success: false, error: res.error, status: res.status };
+    }
+
+    if (!res.base64 || !res.size) {
+      return { success: false, error: 'Пустое тело ответа' };
+    }
+
+    if (!res.contentType?.includes('pdf')) {
+      return {
+        success: false,
+        error: `Не PDF. content-type=${res.contentType}, размер=${res.size}`,
+        debug: { finalUrl: res.finalUrl, status: res.status },
+      };
+    }
+
+    const buffer = Buffer.from(res.base64, 'base64');
+    fs.writeFileSync(targetPath, buffer);
+
+    console.log(
+      `[kad] PDF сохранён: ${targetPath} (${buffer.length} байт, status=${res.status})`
+    );
+
+    return {
+      success: true,
+      savedPath: targetPath,
+      size: buffer.length,
+      status: res.status,
+    };
+  } catch (e) {
+    return { success: false, error: (e as Error).message };
   }
 }
+
+

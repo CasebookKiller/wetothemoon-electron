@@ -439,6 +439,7 @@ try {
       ipcRenderer.invoke('gateway:regenerate-message', conversationId, messageIndex),
     gatewaySendFeedback: (conversationId: string, messageIndex: number, type: 'like' | 'dislike') =>
       ipcRenderer.invoke('gateway:send-feedback', conversationId, messageIndex, type),
+    gatewayDebugDump: (name: string) => ipcRenderer.invoke('gateway:debug-dump', name),
 
     saveCompany: (companyId: string, companyInn: string, data: any) =>
       ipcRenderer.invoke('osint:save-company', companyId, companyInn, data),

@@ -1,0 +1,31 @@
+{
+  "agent": "deepseek",
+  "version": 1,
+  "createdAt": "2025-09-26T00:00:00Z",
+  "updatedAt": "2025-09-26T00:00:00Z",
+  "notes": "Initial profile after Expert mode removal",
+  "selectors": {
+    "reasoningToggle": {
+      "chain": [
+        "div.ds-toggle-button:has(span:has-text('Глубокое мышление'))",
+        "div.ds-toggle-button:has(span:has-text('DeepThink'))",
+        "div.ds-toggle-button:has(span:has-text('Размышление'))"
+      ]
+    },
+    "searchToggle": {
+      "chain": [
+        "div.ds-toggle-button:has(span:has-text('Умный поиск'))",
+        "div.ds-toggle-button:has(span:has-text('Search'))",
+        "div.ds-toggle-button:has(span:has-text('Поиск'))"
+      ]
+    },
+    "messageInput": {
+      "chain": [
+        "textarea[placeholder='Сообщение для DeepSeek']",
+        "textarea[placeholder='Message DeepSeek']",
+        "textarea[placeholder*='Сообщение']",
+        "textarea[placeholder*='Message']"
+      ]
+    }
+  }
+}

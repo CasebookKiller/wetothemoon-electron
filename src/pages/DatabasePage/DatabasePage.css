@@ -659,15 +659,14 @@ body.p-overflow-hidden {
 
 /* ============ Подсветка прямых совпадений в поиске ============ */
 
-/* Строка — прямое совпадение по запросу (содержит искомое в value/label/notes).
-   Мягкий accent-фон + акцентная полоска слева, чтобы не мешало читать теги
-   (у тегов своя непрозрачная заливка) и не сливалось с ними. */
+/* Только фон, без полоски слева.
+   Чуть плотнее, чтобы отличалось от базового фона темы,
+   но всё ещё мягко — не перекрывает теги. */
 .p-datatable .search-direct-match > td {
-  background: var(--tg-theme-secondary-bg-color, rgba(59, 130, 246, 0.06)) !important;
-  box-shadow: inset 3px 0 0 0 var(--accent-color, #6ab2f2);
+  background: color-mix(in srgb, var(--tg-theme-accent-text-color, #6ab2f2) 14%, transparent) !important;
 }
 
 /* На hover — усиливаем, чтобы не терялось при наведении */
 .p-datatable .search-direct-match:hover > td {
-  background: var(--tg-theme-hover-bg-color, rgba(59, 130, 246, 0.12)) !important;
+  background: color-mix(in srgb, var(--tg-theme-accent-text-color, #6ab2f2) 22%, transparent) !important;
 }

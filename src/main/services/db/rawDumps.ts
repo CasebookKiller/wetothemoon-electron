@@ -7,6 +7,8 @@ export interface DumpListItem {
   entity_name: string | null;
   last_update: string;
   dump_count: number;
+  latest_dump_id: number;          // ← новое
+  latest_dump_file_path: string;   // ← новое
 }
 
 export function addRawDumpRecord(
@@ -164,7 +166,21 @@ export function listDumps(): DumpListItem[] {
                AND o.value = rd.company_inn
            )
         LIMIT 1
-      ) AS entity_name
+      ) AS entity_name,
+      (
+        SELECT rd2.id FROM raw_dumps rd2
+        WHERE rd2.company_inn = rd.company_inn
+          AND (rd2.company_id_rusprofile IS rd.company_id_rusprofile)
+        ORDER BY rd2.created_at DESC, rd2.id DESC
+        LIMIT 1
+      ) AS latest_dump_id,
+      (
+        SELECT rd2.dump_file_path FROM raw_dumps rd2
+        WHERE rd2.company_inn = rd.company_inn
+          AND (rd2.company_id_rusprofile IS rd.company_id_rusprofile)
+        ORDER BY rd2.created_at DESC, rd2.id DESC
+        LIMIT 1
+      ) AS latest_dump_file_path
     FROM raw_dumps rd
     GROUP BY rd.company_inn, rd.company_id_rusprofile
     ORDER BY last_update DESC

@@ -72,6 +72,14 @@ export function parseRussianDate(text: string | null | undefined): string | null
   return null;
 }
 
+/** «17.02.2017» → «2017-02-17» */
+export function isoFromDdMmYyyy(s: string): string | null {
+  if (!s) return null;
+  const m = String(s).trim().match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  if (!m) return null;
+  return `${m[3]}-${m[2]}-${m[1]}`;
+}
+
 // ============ Парсинг капитала ============
 
 /**
@@ -248,3 +256,110 @@ export function parseSummaryObservations(summary: any): ParsedObservation[] {
 
   return out;
 }
+
+/**
+ * Парсер summary для ИП. Переиспользует базовый (ЮЛ) набор, добавляя
+ * ИП-специфичные поля. У ИП нет капитала, статкодов ОКФС/ОКОГУ/ОКОПФ,
+ * зато есть registrar / pension_* / special_tax_regime / msp_category.
+ */
+export function parseEntrepreneurSummary(summary: any): ParsedObservation[] {
+  const out = parseSummaryObservations(summary);
+  const push = makePusher(out);
+
+  // Демография
+  push('gender', summary.gender);
+  push('citizenship', summary.citizenship);
+
+  // Реестровые (высокая достоверность)
+  push('registrar', summary.registrar, 95);
+  push('pension_reg_number', summary.pension_reg_number, 95);
+  push('pension_reg_date', parseRussianDate(summary.pension_reg_date));
+  push('pension_authority', summary.pension_authority);
+
+  // Налоговый режим и МСП — у ИП это отдельные поля
+  push('special_tax_regime', summary.special_tax_regime);
+  push('msp_category', summary.msp_category);
+
+  return out;
+}
+
+/**
+ * Парсер summary для ФЛ. У ФЛ нет ни ОГРН, ни КПП, ни статкодов,
+ * зато есть business_activity и risk_factors.
+ */
+export function parsePersonSummary(summary: any): ParsedObservation[] {
+  const out: ParsedObservation[] = [];
+  const push = makePusher(out);
+
+  // Идентификация
+  push('inn', summary.inn);
+  push('region', summary.region);
+
+  // Дата начала деятельности (не регистрации — у ФЛ её нет)
+  push('activity_start', parseRussianDate(summary.activity_start));
+
+  // Сводка по участию
+  const ba = summary.business_activity ?? {};
+  push('ceo_count', ba.ceo_count, 70);
+  push('founder_count', ba.founder_count, 70);
+  push('ip_status', ba.ip_status, 70);
+
+  // Персональные риск-факторы (секция «Персональные»)
+  for (const group of (summary.risk_factors ?? [])) {
+    if (group?.title !== 'Персональные') continue;
+    for (const f of (group.factors ?? [])) {
+      const parsed = parsePersonRiskFactor(f);
+      if (parsed) push(parsed.attr, parsed.value, 70);
+    }
+  }
+
+  return out;
+}
+
+/**
+ * Парсит строку риск-фактора ФЛ вида:
+ *   «✓ Не имеет признаков массового руководителя» → risk_mass_director=false
+ *   «✓ Не включен в Реестр дисквалифицированных лиц» → risk_disqualified=false
+ * Warning-факторы (⚠) в секции «Персональные» не встречаются — они
+ * относятся к связанным организациям и лежат в person_reliability_details.
+ */
+export function parsePersonRiskFactor(text: string): { attr: string; value: string } | null {
+  const s = String(text ?? '').trim();
+  if (!s) return null;
+  const isPositive = s.startsWith('✓') || s.startsWith('✔');
+  if (!isPositive) return null;
+
+  const clean = s.replace(/^[✓✔]\s*/, '').trim();
+  if (!clean.startsWith('Не ')) return null;
+
+  if (/массово(го|й)\s+руководителя/i.test(clean)) return { attr: 'risk_mass_director', value: 'false' };
+  if (/массово(го|й)\s+учредителя/i.test(clean))  return { attr: 'risk_mass_founder',  value: 'false' };
+  if (/дисквалифицированных/i.test(clean))        return { attr: 'risk_disqualified',  value: 'false' };
+  if (/санкци/i.test(clean))                      return { attr: 'risk_sanctions',     value: 'false' };
+
+  return null;
+}
+
+/** Диспетчер по типу сущности. */
+export function parseSummaryObservationsByType(
+  summary: any,
+  entityType: string          // ← было: 'company' | 'entrepreneur' | 'person'
+): ParsedObservation[] {
+  switch (entityType) {
+    case 'entrepreneur': return parseEntrepreneurSummary(summary);
+    case 'person':       return parsePersonSummary(summary);
+    case 'company':
+    default:             return parseSummaryObservations(summary);
+  }
+}
+
+/** Вспомогательный pusher — вынести из parseSummaryObservations, чтобы переиспользовать. */
+export function makePusher(out: ParsedObservation[]) {
+  return (attribute: string, value: any, confidence = 90): void => {
+    if (value === null || value === undefined) return;
+    const str = String(value).trim();
+    if (!str) return;
+    out.push({ attribute, value: str, confidence });
+  };
+}
+

@@ -171,4 +171,13 @@ export function registerGatewayHandlers(): void {
       return { success: false, error: (error as Error).message };
     }
   });
+
+  ipcMain.handle('gateway:debug-dump', async (_event, name: string) => {
+    try {
+      const filePath = await service.dumpCurrentPage(name || 'manual');
+      return { success: true, data: filePath };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
 }

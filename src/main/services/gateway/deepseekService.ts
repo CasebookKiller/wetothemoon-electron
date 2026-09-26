@@ -3,9 +3,11 @@
 import { app, safeStorage } from 'electron';
 import { chromium, Browser, BrowserContext, Page } from 'playwright';
 import fs from 'fs';
+import fsPromises from 'fs/promises';
 import path from 'path';
 import { getCredentials, setCredentials } from '../osint/credentials'; // переиспользуем
 import * as dotenv from 'dotenv';
+import { SelectorProfileService } from './selectorProfiles/SelectorProfileService';
 
 dotenv.config();
 
@@ -37,12 +39,15 @@ export interface GatewayChatMessage {
 
 export class DeepSeekService {
   private static instance: DeepSeekService;
+  private profileService: SelectorProfileService;
   private browser: Browser | null = null;
   private context: BrowserContext | null = null;
   private page: Page | null = null;
   private isLoggedIn = false;
 
-  private constructor() {}
+  private constructor() {
+    this.profileService = new SelectorProfileService('deepseek');
+  }
 
   static getInstance(): DeepSeekService {
     if (!DeepSeekService.instance) {
@@ -202,46 +207,10 @@ export class DeepSeekService {
   private async stopLoadingSpinner(): Promise<void> {
     const page = this.page;
     if (!page) return;
-
     try {
-      // 1. Кликаем по кнопке профиля
-      const profileButton = page.locator('div._2afd28d').first();
-      await profileButton.waitFor({ state: 'visible', timeout: 10000 });
-      await profileButton.scrollIntoViewIfNeeded();
-      await profileButton.click({ force: true });
-      console.log('[DeepSeek] Клик по профилю выполнен');
-
-      // 2. Ждём появления меню
-      const menuSelector = 'div.ds-dropdown-menu';
-      await page.locator(menuSelector).waitFor({ state: 'visible', timeout: 5000 });
-      console.log('[DeepSeek] Меню открыто');
-
-      // 3. Кликаем по пункту "Настройки"
-      const settingsItem = page.locator('div.ds-dropdown-menu-option__label', { hasText: 'Настройки' });
-      await settingsItem.waitFor({ state: 'visible', timeout: 5000 });
-      await settingsItem.click({ force: true });
-      console.log('[DeepSeek] Клик по "Настройки" выполнен');
-
-      // 4. Ждём перехода на страницу настроек
-      await page.waitForTimeout(2000);
-
-      // 5. Возвращаемся обратно (назад к чату)
-      try {
-        await page.goBack({ waitUntil: 'commit', timeout: 10000 });
-      } catch (goBackError) {
-        console.warn('[DeepSeek] goBack не сработал, пробуем клик по логотипу');
-        await page.locator('div.e066abb8').first().click({ force: true });
-      }
-      await page.waitForTimeout(1000);
-
-      console.log('[DeepSeek] Спиннер остановлен через меню настроек');
-    } catch (error) {
-      console.warn('[DeepSeek] Не удалось остановить спиннер через меню настроек:', error);
-      try {
-        await page.keyboard.press('Escape');
-        await page.waitForTimeout(500);
-      } catch {}
-    }
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(300);
+    } catch { /* не критично */ }
   }
 
   /**
@@ -313,7 +282,7 @@ export class DeepSeekService {
     setCredentials('deepseek', credentials.login, credentials.password);
     await this.saveStorageState();
     console.log('[DeepSeek] Вход выполнен успешно, сессия сохранена');
-
+    //await this.setRussianLanguage();     // ← добавить
     // Останавливаем спиннер через меню профиля
     await this.stopLoadingSpinner();
   }
@@ -357,6 +326,7 @@ export class DeepSeekService {
 
     // Уже авторизованы
     this.isLoggedIn = true;
+    //await this.setRussianLanguage();     // ← добавить
     await this.stopLoadingSpinner();
     await this.saveStorageState();
     return { status: 'logged_in' };
@@ -403,22 +373,13 @@ export class DeepSeekService {
    */
   private async ensureReadyForChat(): Promise<void> {
     if (!this.page) throw new Error('Браузер не запущен');
-
-    const textareaSelector = 'textarea[placeholder="Сообщение для DeepSeek"]';
-    // Если textarea уже есть — выходим
-    const textarea = this.page.locator(textareaSelector);
-    if (await textarea.count() > 0) return;
-
-    console.log('Интерфейс чата не обнаружен, пробуем выбрать режим...');
-    // Ищем кнопку выбора режима "Быстрый" (data-model-type="default")
-    const fastModeSelector = '[data-model-type="default"][role="radio"]';
-    const fastMode = this.page.locator(fastModeSelector);
-    await fastMode.waitFor({ state: 'visible', timeout: 10000 });
-    await fastMode.click();
-
-    // Ждём появления textarea после выбора
+    const textareaSelector = [
+      'textarea[placeholder="Сообщение для DeepSeek"]',
+      'textarea[placeholder="Message DeepSeek"]',
+      'textarea[placeholder*="Сообщение"]',
+      'textarea[placeholder*="Message"]',
+    ].join(', ');
     await this.page.waitForSelector(textareaSelector, { timeout: 15000 });
-    console.log('Готов к отправке сообщений');
   }
 
   /**
@@ -569,67 +530,58 @@ export class DeepSeekService {
   }
 
   /**
-   * Выбирает режим модели: 'default' (Быстрый), 'expert' (Эксперт), 'vision' (Распознавание).
+   * @deprecated Режимы модели (default/expert/vision) удалены из DeepSeek.
+   * Метод сохранён для совместимости и всегда возвращает 'default'.
    */
-  async selectModel(modelType: 'default' | 'expert' | 'vision'): Promise<void> {
-    if (!this.page) throw new Error('Браузер не запущен');
-
-    const selector = `[data-model-type="${modelType}"][role="radio"]`;
-    const radio = this.page.locator(selector).first();
-    await radio.waitFor({ state: 'visible', timeout: 10000 });
-    await radio.click({ force: true });
-    console.log(`[DeepSeek] Выбран режим: ${modelType}`);
+  async selectModel(_modelType: string): Promise<void> {
+    console.warn('[DeepSeek] selectModel устарел — режимы модели больше не поддерживаются сайтом');
   }
 
   /**
-   * Включает/выключает режим «Глубокое мышление».
+   * Ищет тумблер по тексту лейбла. Порядок labels — приоритет поиска.
+   */
+  private async findToggleByLabels(labels: string[]): Promise<import('playwright').Locator | null> {
+    if (!this.page) return null;
+    for (const label of labels) {
+      const toggle = this.page
+        .locator(`div.ds-toggle-button:has(span:has-text("${label}"))`)
+        .first();
+      if ((await toggle.count()) > 0) return toggle;
+    }
+    return null;
+  }
+
+  /**
+   * Включает/выключает режим "Глубокое мышление" / "DeepThink".
+   * Поддерживает русскую и английскую версии интерфейса.
    */
   async setDeepThinking(enabled: boolean): Promise<void> {
     if (!this.page) throw new Error('Браузер не запущен');
-
-    const toggle = this.page.locator('div.ds-toggle-button:has(span:has-text("Глубокое мышление"))').first();
-    await toggle.waitFor({ state: 'visible', timeout: 10000 });
-
+    const toggle = await this.findToggleByLabels([
+      'Глубокое мышление', 'DeepThink', 'Deep Think', 'Размышление',
+    ]);
+    if (!toggle) throw new Error('Тумблер DeepThink не найден');
     const isPressed = (await toggle.getAttribute('aria-pressed')) === 'true';
-    if (isPressed !== enabled) {
-      await toggle.click({ force: true });
-    }
-    console.log(`[DeepSeek] Глубокое мышление: ${enabled}`);
+    if (isPressed !== enabled) await toggle.click({ force: true });
   }
 
   /**
-   * Включает/выключает режим «Умный поиск».
+   * Включает/выключает режим "Умный поиск" / "Search".
    */
   async setSearch(enabled: boolean): Promise<void> {
     if (!this.page) throw new Error('Браузер не запущен');
-
-    const toggle = this.page.locator('div.ds-toggle-button:has(span:has-text("Умный поиск"))').first();
-    const isVisible = await toggle.isVisible().catch(() => false);
-    if (!isVisible) {
-      console.warn('[DeepSeek] Кнопка "Умный поиск" недоступна в текущем режиме');
-      return;
-    }
-
-    await toggle.waitFor({ state: 'visible', timeout: 10000 });
+    const toggle = await this.findToggleByLabels([
+      'Умный поиск', 'Search', 'Поиск',
+    ]);
+    if (!toggle) { console.warn('[DeepSeek] Тумблер Search не найден'); return; }
     const isPressed = (await toggle.getAttribute('aria-pressed')) === 'true';
-    if (isPressed !== enabled) {
-      await toggle.click({ force: true });
-    }
-    console.log(`[DeepSeek] Умный поиск: ${enabled}`);
+    if (isPressed !== enabled) await toggle.click({ force: true });
   }
 
   /**
-   * Возвращает текущий выбранный режим модели.
+   * @deprecated См. selectModel.
    */
-  async getCurrentModel(): Promise<'default' | 'expert' | 'vision'> {
-    if (!this.page) throw new Error('Браузер не запущен');
-
-    const types: ('default' | 'expert' | 'vision')[] = ['default', 'expert', 'vision'];
-    for (const type of types) {
-      const radio = this.page.locator(`[data-model-type="${type}"][role="radio"]`);
-      const isChecked = await radio.getAttribute('aria-checked').catch(() => 'false');
-      if (isChecked === 'true') return type;
-    }
+  async getCurrentModel(): Promise<'default'> {
     return 'default';
   }
 
@@ -638,9 +590,11 @@ export class DeepSeekService {
    */
   async getDeepThinking(): Promise<boolean> {
     if (!this.page) return false;
-    const toggle = this.page.locator('div.ds-toggle-button:has(span:has-text("Глубокое мышление"))').first();
-    const pressed = await toggle.getAttribute('aria-pressed').catch(() => 'false');
-    return pressed === 'true';
+    const toggle = await this.findToggleByLabels([
+      'Глубокое мышление', 'DeepThink', 'Deep Think', 'Размышление',
+    ]);
+    if (!toggle) return false;
+    return (await toggle.getAttribute('aria-pressed')) === 'true';
   }
 
   /**
@@ -648,11 +602,11 @@ export class DeepSeekService {
    */
   async getSearch(): Promise<boolean> {
     if (!this.page) return false;
-    const toggle = this.page.locator('div.ds-toggle-button:has(span:has-text("Умный поиск"))').first();
-    const visible = await toggle.isVisible().catch(() => false);
-    if (!visible) return false;
-    const pressed = await toggle.getAttribute('aria-pressed').catch(() => 'false');
-    return pressed === 'true';
+    const toggle = await this.findToggleByLabels([
+      'Умный поиск', 'Search', 'Поиск',
+    ]);
+    if (!toggle) return false;
+    return (await toggle.getAttribute('aria-pressed')) === 'true';
   }
 
   async getConversationMessages(): Promise<GatewayChatMessage[]> {
@@ -774,10 +728,12 @@ export class DeepSeekService {
    */
   async startSelectionMode(): Promise<void> {
     if (!this.page) throw new Error('Браузер не запущен');
-    //const selector = 'div._1aa2651 div._57370c5';
-    const selector = 'div._57370c5._5dedc1e';
-    const button = this.page.locator(selector).first();
-    await button.waitFor({ state: 'visible', timeout: 10000 });
+    const profile = await this.profileService.load();
+    const button = await this.findWithFallback(
+      'startSelectionButton',
+      profile.selectors.startSelectionButton.chain
+    );
+    if (!button) throw new Error('Кнопка входа в режим выбора не найдена');
     await button.click({ force: true });
     console.log('[DeepSeek] Режим выбора включён');
   }
@@ -883,8 +839,12 @@ export class DeepSeekService {
     if (!this.page) throw new Error('Браузер не запущен');
 
     //const createButton = this.page.locator('div.fab07e97 .ds-button--primary');
-    const createButton = this.page.locator('div.fab07e97 .ds-button--primary:not(.ds-button--disabled)');
-    await createButton.waitFor({ state: 'visible', timeout: 10000 });
+    const profile = await this.profileService.load();
+    const createButton = await this.findWithFallback(
+      'publicLinkButton',
+      profile.selectors.publicLinkButton.chain
+    );
+    if (!createButton) throw new Error('Кнопка создания публичной ссылки не найдена');
     await createButton.click({ force: true });
 
     const modal = this.page.locator('div.ds-modal');
@@ -906,6 +866,86 @@ export class DeepSeekService {
     }
 
     return url.trim();
+  }
+
+  /**
+   * Пытается установить русский язык интерфейса через Settings.
+   * Best-effort: если что-то не найдено — не падаем, просто логируем.
+   */
+  async setRussianLanguage(): Promise<void> {
+    console.warn('[DeepSeek] setRussianLanguage отключён — нужны селекторы страницы Settings');
+    if (!this.page) return;
+
+    try {
+      // 1. Открываем меню профиля
+      const profileBtn = this.page.locator('div._2afd28d').first();
+      if ((await profileBtn.count()) === 0) {
+        console.warn('[DeepSeek] Кнопка профиля не найдена');
+        return;
+      }
+      await profileBtn.click({ force: true });
+      await this.page.waitForTimeout(700);
+
+      // 2. Ищем Settings / Настройки
+      const settingsItem = this.page
+        .locator('div.ds-dropdown-menu-option__label, div[role="menuitem"], button, div[role="button"]')
+        .filter({ hasText: /Settings|Настройки/i })
+        .first();
+      if ((await settingsItem.count()) === 0) {
+        console.warn('[DeepSeek] Пункт Settings не найден');
+        await this.page.keyboard.press('Escape');
+        return;
+      }
+      await settingsItem.click({ force: true });
+      await this.page.waitForTimeout(1500);
+
+      // 3. Ищем кнопку выбора языка (несколько возможных вариантов)
+      const langCandidates = [
+        'div[role="button"]:has-text("Language")',
+        'div[role="button"]:has-text("Язык")',
+        'div[role="button"]:has-text("Display Language")',
+        'button:has-text("Language")',
+      ];
+      let langBtn = null as import('playwright').Locator | null;
+      for (const sel of langCandidates) {
+        const candidate = this.page.locator(sel).first();
+        if (await candidate.count()) { langBtn = candidate; break; }
+      }
+
+      if (!langBtn) {
+        console.warn('[DeepSeek] Кнопка выбора языка не найдена — сохраняем дамп для анализа');
+        await this.dumpCurrentPage('settings_language_missing');
+        await this.page.goBack({ waitUntil: 'commit', timeout: 8000 }).catch(() => {});
+        return;
+      }
+
+      await langBtn.click({ force: true });
+      await this.page.waitForTimeout(500);
+
+      // 4. Ищем "Русский" в списке
+      const ruOption = this.page
+        .locator('div[role="option"], div[role="menuitem"], li, div[role="button"]')
+        .filter({ hasText: /Русский|Russian/i })
+        .first();
+
+      if ((await ruOption.count()) === 0) {
+        console.warn('[DeepSeek] Пункт "Русский" не найден');
+        await this.page.keyboard.press('Escape');
+        await this.page.goBack({ waitUntil: 'commit', timeout: 8000 }).catch(() => {});
+        return;
+      }
+
+      await ruOption.click({ force: true });
+      await this.page.waitForTimeout(1200);
+      console.log('[DeepSeek] Язык переключён на русский');
+
+      // 5. Возвращаемся к чату
+      await this.page.goBack({ waitUntil: 'commit', timeout: 8000 }).catch(() => {});
+      await this.page.waitForTimeout(500);
+    } catch (err) {
+      console.warn('[DeepSeek] setRussianLanguage: ' + (err as Error).message);
+      try { await this.page.keyboard.press('Escape'); } catch { /* ignore */ }
+    }
   }
 
   /**
@@ -971,4 +1011,41 @@ export class DeepSeekService {
 
     console.log(`[DeepSeek] Отправлен ${type} для сообщения ${messageIndex}`);
   }
+
+  async dumpCurrentPage(name: string = 'dump'): Promise<string> {
+    if (!this.page) throw new Error('Браузер не запущен');
+    const dir = path.join(app.getPath('userData'), 'debug_dumps');
+    await fsPromises.mkdir(dir, { recursive: true });
+    const filename = `${name}_${new Date().toISOString().replace(/[:.]/g, '-')}.html`;
+    const filePath = path.join(dir, filename);
+    const html = await this.page.content();
+    await fsPromises.writeFile(filePath, html, 'utf-8');
+    console.log(`[DeepSeek] HTML дамп сохранён: ${filePath}`);
+    return filePath;
+  }
+
+  // в deepseekService.ts
+  private async findWithFallback(
+    name: string,
+    chain: string[],
+    timeout = 5000
+  ): Promise<import('playwright').Locator | null> {
+    if (!this.page) return null;
+    for (const selector of chain) {
+      try {
+        const locator = this.page.locator(selector).first();
+        await locator.waitFor({ state: 'visible', timeout });
+        return locator;
+      } catch {
+        // пробуем следующий селектор
+      }
+    }
+    await this.dumpCurrentPage(`failed_${name}`);
+    return null;
+  }
+
+  
+  
 }
+
+
