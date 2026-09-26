@@ -73,6 +73,12 @@ export interface SyncSettingsRow {
   zepp_last_sync_status: string | null;
   last_sync_at: string | null;
   last_sync_status: string | null;
+  // dodofo
+  dodofo_token: string | null;
+  dodofo_user_id: string | null;
+  dodofo_username: string | null;
+  dodofo_last_sync_at: string | null;
+  dodofo_last_sync_status: string | null;
 }
 
 export interface MetaRow {

@@ -235,3 +235,13 @@ export const ALL_INDEXES: readonly string[] = [
   `CREATE INDEX IF NOT EXISTS idx_progress_checks_date ON progress_checks(date);`,
   `CREATE INDEX IF NOT EXISTS idx_recommendations_status ON recommendations(status);`,
 ];
+
+// ==================== Миграция v2: dodofo ====================
+
+export const MIGRATION_V2_DODOFO: readonly string[] = [
+  `ALTER TABLE sync_settings ADD COLUMN dodofo_token TEXT;`,
+  `ALTER TABLE sync_settings ADD COLUMN dodofo_user_id TEXT;`,
+  `ALTER TABLE sync_settings ADD COLUMN dodofo_username TEXT;`,
+  `ALTER TABLE sync_settings ADD COLUMN dodofo_last_sync_at TEXT;`,
+  `ALTER TABLE sync_settings ADD COLUMN dodofo_last_sync_status TEXT;`,
+];

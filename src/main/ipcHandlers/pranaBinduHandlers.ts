@@ -22,7 +22,12 @@ import {
   updateSyncSettings,
   setZeppSecrets,
   getSyncSecretsFlags,
+  setDodofoToken,
+  getDodofoTokenEncrypted,
+  hasDodofoToken,
 } from '../services/pranaBindu/melange';
+
+import { DodofoProvider } from '../services/pranaBindu/spice/providers/dodofoProvider';
 
 // ==================== Регистрация провайдеров ====================
 
@@ -33,8 +38,9 @@ function ensureProvidersRegistered(): void {
   registerProvider(new DofekZeppProvider());
   registerProvider(new ZeppMcpProvider());
   registerProvider(new ZeppBridgeProvider());
+  registerProvider(new DodofoProvider(getDodofoToken));
   providersRegistered = true;
-  console.log(`[Prana-Bindu] Зарегистрировано провайдеров Zepp: ${listProviders().length}`);
+  console.log(`[Prana-Bindu] Зарегистрировано провайдеров: ${listProviders().length} (${listProviders().map(p => p.name).join(', ')})`);
 }
 
 // ==================== safeStorage helpers ====================
@@ -54,6 +60,51 @@ function encryptSecret(plain: string): string | null {
     console.error('[Prana-Bindu] Ошибка шифрования:', (e as Error).message);
     return null;
   }
+}
+
+// ==================== dodofo token ====================
+
+/**
+ * Источник токена dodofo.
+ * 1. Из БД (расшифрован через safeStorage) — основной путь (будет позже).
+ * 2. Fallback: process.env.VITE_DODOFO_TOKEN — только для dev.
+ * TODO: убрать env-fallback после того, как UI подключения будет готов.
+ */
+/**
+ * Источник токена dodofo.
+ * 1. Из БД (расшифрован через safeStorage) — основной путь.
+ * 2. Fallback: process.env.VITE_DODOFO_TOKEN — только для dev.
+ */
+function getDodofoToken(): string | null {
+  try {
+    const db = getMelange();
+    const encrypted = getDodofoTokenEncrypted(db);
+    if (encrypted && safeStorage.isEncryptionAvailable()) {
+      const decrypted = safeStorage.decryptString(
+        Buffer.from(encrypted, 'base64')
+      );
+      if (decrypted) return decrypted;
+    }
+  } catch {
+    // БД ещё не готова или расшифровка недоступна — уходим в env.
+  }
+  return process.env.VITE_DODOFO_TOKEN?.trim() || null;
+}
+
+/**
+ * Шифрует и сохраняет токен dodofo. Если safeStorage недоступен,
+ * пишет как есть (dev-режим без keyring).
+ */
+function persistDodofoToken(plainToken: string): void {
+  const db = getMelange();
+  let stored: string;
+  if (safeStorage.isEncryptionAvailable()) {
+    stored = safeStorage.encryptString(plainToken).toString('base64');
+  } else {
+    console.warn('[Prana-Bindu] safeStorage недоступен — токен сохранён без шифрования');
+    stored = plainToken;
+  }
+  setDodofoToken(db, stored);
 }
 
 // ==================== Регистрация хендлеров ====================
@@ -172,6 +223,58 @@ export function registerPranaBinduHandlers(): void {
       } catch {
         // ignore — если БД ещё не готова
       }
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  // -------- Подключение к dodofo --------
+  ipcMain.handle('pb:dodofo-connect', async (_event, token: string) => {
+    if (!token || !token.trim()) {
+      return { success: false, error: 'Токен обязателен' };
+    }
+    const trimmed = token.trim();
+    if (!trimmed.startsWith('dodofo_')) {
+      return { success: false, error: 'Токен должен начинаться с "dodofo_"' };
+    }
+
+    try {
+      persistDodofoToken(trimmed);
+
+      // Проверяем токен живым запросом
+      const provider = getProvider('dodofo');
+      if (!provider) {
+        return { success: false, error: 'Провайдер dodofo не зарегистрирован' };
+      }
+      const check = await provider.isAvailable();
+      if (!check.available) {
+        return { success: false, error: check.reason ?? 'Токен не работает' };
+      }
+
+      updateSyncSettings(getMelange(), {
+        source: 'dodofo',
+        dodofoLastSyncAt: new Date().toISOString(),
+        dodofoLastSyncStatus: 'connected',
+      });
+
+      return { success: true };
+    } catch (e) {
+      try {
+        updateSyncSettings(getMelange(), {
+          dodofoLastSyncAt: new Date().toISOString(),
+          dodofoLastSyncStatus: 'error',
+        });
+      } catch {
+        // ignore
+      }
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  // -------- Статус токена dodofo --------
+  ipcMain.handle('pb:dodofo-token-status', () => {
+    try {
+      return { success: true, hasToken: hasDodofoToken(getMelange()) };
+    } catch (e) {
       return { success: false, error: (e as Error).message };
     }
   });

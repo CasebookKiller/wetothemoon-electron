@@ -3,6 +3,7 @@
  */
 
 export type SyncSource =
+  | 'dodofo'
   | 'google-fit'
   | 'zepp-dofek'
   | 'zepp-mcp'
@@ -21,4 +22,9 @@ export interface SyncSettings {
   zeppUserId?: string;
   zeppLastSyncAt?: string;
   zeppLastSyncStatus?: string;
+  // dodofo
+  dodofoUserId?: string;
+  dodofoUsername?: string;
+  dodofoLastSyncAt?: string;
+  dodofoLastSyncStatus?: string;
 }

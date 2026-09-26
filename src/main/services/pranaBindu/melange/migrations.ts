@@ -1,12 +1,14 @@
 // src/main/services/pranaBindu/melange/migrations.ts
-//
-// Идемпотентные миграции. Версия схемы хранится в meta.schema_version.
-// v1 — создание всех таблиц + индексов.
 
 import type { DatabaseSync } from 'node:sqlite';
-import { ALL_TABLES, ALL_INDEXES, CREATE_META } from './schema';
+import {
+  ALL_TABLES,
+  ALL_INDEXES,
+  CREATE_META,
+  MIGRATION_V2_DODOFO,
+} from './schema';
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 interface Migration {
   version: number;
@@ -19,6 +21,32 @@ const migrations: readonly Migration[] = [
     apply: (db) => {
       for (const sql of ALL_TABLES) db.exec(sql);
       for (const sql of ALL_INDEXES) db.exec(sql);
+    },
+  },
+  {
+    version: 2,
+    apply: (db) => {
+      // Колонки могут уже существовать, если v1 создавала таблицу
+      // с ними. Проверяем через PRAGMA.
+      const cols = db
+        .prepare(`PRAGMA table_info(sync_settings)`)
+        .all() as { name: string }[];
+      const has = (name: string) => cols.some((c) => c.name === name);
+
+      const addIfMissing: [string, string][] = [
+        ['dodofo_token', 'TEXT'],
+        ['dodofo_user_id', 'TEXT'],
+        ['dodofo_username', 'TEXT'],
+        ['dodofo_last_sync_at', 'TEXT'],
+        ['dodofo_last_sync_status', 'TEXT'],
+      ];
+
+      for (const [name, type] of addIfMissing) {
+        if (!has(name)) {
+          db.exec(`ALTER TABLE sync_settings ADD COLUMN ${name} ${type};`);
+          console.log(`[Melange] v2: добавлена колонка sync_settings.${name}`);
+        }
+      }
     },
   },
 ];
@@ -40,7 +68,6 @@ function setVersion(db: DatabaseSync, version: number): void {
 }
 
 export function applyMigrations(db: DatabaseSync): void {
-  // meta создаётся вне миграций — иначе некуда писать версию.
   db.exec(CREATE_META);
 
   const current = getCurrentVersion(db);

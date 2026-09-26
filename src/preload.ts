@@ -659,6 +659,10 @@ try {
         ipcRenderer.invoke('pb:zepp-connect', email, password),
       zeppCheckProvider: (name: string) =>
         ipcRenderer.invoke('pb:zepp-check-provider', name),
+      dodofoConnect: (token: string) =>
+        ipcRenderer.invoke('pb:dodofo-connect', token),
+      dodofoTokenStatus: () =>
+        ipcRenderer.invoke('pb:dodofo-token-status'),
     },
 
   });
