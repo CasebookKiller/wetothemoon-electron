@@ -678,6 +678,53 @@ export function registerPranaBinduHandlers(): void {
     }
   });
 
+    // -------- Метаданные потоков для набора run_fact_id (для таблицы) --------
+  ipcMain.handle(
+    'pb:list-run-streams-batch',
+    (_event, runFactIds: number[]) => {
+      try {
+        if (!Array.isArray(runFactIds) || runFactIds.length === 0) {
+          return { success: true, data: {} };
+        }
+        // Защита от слишком большого IN-списка
+        const ids = runFactIds
+          .filter((x) => Number.isFinite(x))
+          .slice(0, 500);
+
+        if (ids.length === 0) {
+          return { success: true, data: {} };
+        }
+
+        const db = getMelange();
+        const placeholders = ids.map(() => '?').join(',');
+        const rows = db
+          .prepare(
+            `SELECT run_fact_id, source, point_count, size_bytes, fetched_at
+             FROM run_streams
+             WHERE run_fact_id IN (${placeholders})
+             ORDER BY run_fact_id, source`
+          )
+          .all(...ids) as unknown as Array<{
+            run_fact_id: number;
+            source: string;
+            point_count: number | null;
+            size_bytes: number;
+            fetched_at: string;
+          }>;
+
+        const data: Record<number, typeof rows> = {};
+        for (const row of rows) {
+          if (!data[row.run_fact_id]) data[row.run_fact_id] = [];
+          data[row.run_fact_id].push(row);
+        }
+
+        return { success: true, data };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
   console.log('[Prana-Bindu] IPC-хендлеры зарегистрированы (pb:*)');
 }
 

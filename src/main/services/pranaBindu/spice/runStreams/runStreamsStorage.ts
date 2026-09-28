@@ -1,10 +1,11 @@
 // src/main/services/pranaBindu/spice/runStreams/runStreamsStorage.ts
 //
 // Файловое хранилище run_streams (MessagePack).
-// Паттерн 1-в-1 как у OSINT rawStorage.ts — payload в .msgpack,
-// метаданные — в SQLite (run_streams).
+// Паттерн как у OSINT rawStorage.ts — payload в .msgpack,
+// метаданные в SQLite (run_streams).
 //
-// Не импортирует Electron, кроме app.getPath('userData') — как в rawStorage.
+// app.getPath('userData') — единственная причина, почему файл вообще
+// видит Electron. Всё остальное — чистый Node.
 
 import fs from 'fs';
 import path from 'path';
@@ -12,7 +13,6 @@ import { app } from 'electron';
 import { encode, decode } from '@msgpack/msgpack';
 
 export interface RunStreamsPayload {
-  // Произвольная структура от провайдера. Ничего не маппим.
   [key: string]: unknown;
 }
 
@@ -20,13 +20,13 @@ export interface SavedRunStreams {
   filePath: string;
   sizeBytes: number;
   pointCount: number;
-  channels: string;   // 'dist_m,sec_t,speed_kmh,hr,power_w,poly_sec_t,...'
+  channels: string;
 }
 
 /**
  * Извлекает метаданные из payload:
  *  - pointCount = максимальная длина числового массива верхнего уровня;
- *  - channels   = список ключей верхнего уровня с массивами.
+ *  - channels   = список ключей верхнего уровня с массивами чисел.
  */
 function extractMeta(payload: RunStreamsPayload): {
   pointCount: number;

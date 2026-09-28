@@ -678,6 +678,9 @@ try {
       syncRunStreamsAll: (from: string, to: string, opts?: { onlyMissing?: boolean }) =>
         ipcRenderer.invoke('pb:sync-run-streams-all', from, to, opts),
 
+      listRunStreamsBatch: (runFactIds: number[]) =>
+        ipcRenderer.invoke('pb:list-run-streams-batch', runFactIds),
+
     },
 
   });

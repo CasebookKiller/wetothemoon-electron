@@ -3,10 +3,16 @@
 import React, { useEffect, useState } from 'react';
 import { Button } from 'primereact/button';
 import { Calendar } from 'primereact/calendar';
+import { Column } from 'primereact/column';
+import { DataTable } from 'primereact/datatable';
 import { Dropdown } from 'primereact/dropdown';
 import { InputText } from 'primereact/inputtext';
-import { Panel } from 'primereact/panel';
 import { Message } from 'primereact/message';
+import { Panel } from 'primereact/panel';
+import {
+  RunStreamsDrawer,
+  type RunFactLite,
+} from '@/components/PRANA_BINDU/RunStreamsDrawer';
 
 import './PranaBinduPage.css';
 
@@ -44,6 +50,20 @@ function defaultSyncRange(): { from: Date; to: Date } {
   return { from, to };
 }
 
+function fmtKm(v: number | null | undefined): string {
+  if (v == null) return '—';
+  return v.toFixed(2);
+}
+
+function fmtDuration(sec: number | null | undefined): string {
+  if (sec == null) return '—';
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  if (h > 0) return `${h}ч ${String(m).padStart(2, '0')}м`;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
 export const PranaBinduPage: React.FC = () => {
   const api = (window as any).electronAPI;
 
@@ -71,7 +91,65 @@ export const PranaBinduPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  // Загрузка статуса dodofo-токена при монтировании
+  // Таблица пробежек
+  const [runFacts, setRunFacts] = useState<any[]>([]);
+  const [factsLoading, setFactsLoading] = useState(false);
+  const [factsError, setFactsError] = useState('');
+
+  // Потоки
+  const [streamsMap, setStreamsMap] = useState<Record<number, any[]>>({});
+  const [drawerVisible, setDrawerVisible] = useState(false);
+  const [selectedFact, setSelectedFact] = useState<RunFactLite | null>(null);
+  const [syncingStreams, setSyncingStreams] = useState(false);
+  const [streamsAllResult, setStreamsAllResult] = useState<{
+    fetched: number;
+    skipped: number;
+    failed: number;
+    total: number;
+  } | null>(null);
+  const [streamsAllError, setStreamsAllError] = useState('');
+
+  // ==================== Загрузка потоков (map) ====================
+
+  const loadStreamsMap = async (items: any[]) => {
+    if (!api?.pb?.listRunStreamsBatch || items.length === 0) {
+      setStreamsMap({});
+      return;
+    }
+    try {
+      const ids = items.map((x) => x.id);
+      const res = await api.pb.listRunStreamsBatch(ids);
+      if (res?.success) setStreamsMap(res.data ?? {});
+    } catch {
+      // ignore
+    }
+  };
+
+  // ==================== Загрузка списка пробежек ====================
+
+  const loadRunFacts = async (from?: Date, to?: Date) => {
+    if (!api?.pb?.listRunFacts) return;
+    setFactsLoading(true);
+    setFactsError('');
+    try {
+      const f = toIsoDate(from ?? syncFrom);
+      const t = toIsoDate(to ?? syncTo);
+      const res = await api.pb.listRunFacts(f, t);
+      if (res.success) {
+        const items = res.items ?? [];
+        setRunFacts(items);
+        await loadStreamsMap(items);
+      } else {
+        setFactsError(res.error ?? 'Ошибка загрузки');
+      }
+    } catch (e) {
+      setFactsError((e as Error).message);
+    } finally {
+      setFactsLoading(false);
+    }
+  };
+
+  // Загрузка токена + пробежек при монтировании
   useEffect(() => {
     (async () => {
       if (!api?.pb?.dodofoTokenStatus) return;
@@ -82,6 +160,7 @@ export const PranaBinduPage: React.FC = () => {
         // ignore
       }
     })();
+    loadRunFacts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -110,7 +189,7 @@ export const PranaBinduPage: React.FC = () => {
     }
   };
 
-  // ==================== Синхронизация ====================
+  // ==================== Синхронизация тренировок ====================
 
   const handleSync = async () => {
     if (!api?.pb?.syncNow) {
@@ -135,6 +214,7 @@ export const PranaBinduPage: React.FC = () => {
           updated: res.updated ?? 0,
           total: res.total ?? 0,
         });
+        await loadRunFacts();
       } else {
         setSyncError(res.error ?? 'Неизвестная ошибка');
       }
@@ -142,6 +222,43 @@ export const PranaBinduPage: React.FC = () => {
       setSyncError((e as Error).message);
     } finally {
       setSyncing(false);
+    }
+  };
+
+  // ==================== Массовая заливка потоков ====================
+
+  const handleSyncAllStreams = async () => {
+    if (!api?.pb?.syncRunStreamsAll) {
+      setStreamsAllError('electronAPI.pb.syncRunStreamsAll недоступен');
+      return;
+    }
+    if (!syncFrom || !syncTo) {
+      setStreamsAllError('Укажите обе даты');
+      return;
+    }
+    setSyncingStreams(true);
+    setStreamsAllError('');
+    setStreamsAllResult(null);
+    try {
+      const res = await api.pb.syncRunStreamsAll(
+        toIsoDate(syncFrom),
+        toIsoDate(syncTo)
+      );
+      if (res.success) {
+        setStreamsAllResult({
+          fetched: res.fetched ?? 0,
+          skipped: res.skipped ?? 0,
+          failed: res.failed ?? 0,
+          total: res.total ?? 0,
+        });
+        await loadRunFacts();
+      } else {
+        setStreamsAllError(res.error ?? 'Ошибка');
+      }
+    } catch (e) {
+      setStreamsAllError((e as Error).message);
+    } finally {
+      setSyncingStreams(false);
     }
   };
 
@@ -354,7 +471,7 @@ export const PranaBinduPage: React.FC = () => {
 
           {renderProviderForm()}
 
-                    <hr className="pb-sep" />
+          <hr className="pb-sep" />
 
           <div className="flex flex-column gap-2">
             <label className="pb-label">Диапазон ручной синхронизации</label>
@@ -399,6 +516,24 @@ export const PranaBinduPage: React.FC = () => {
                     : undefined
                 }
               />
+              <Button
+                label={syncingStreams ? 'Потоки…' : 'Залить потоки'}
+                icon={
+                  syncingStreams
+                    ? 'pi pi-spin pi-spinner'
+                    : 'pi pi-cloud-download'
+                }
+                className="pb-soft p-button-sm"
+                onClick={handleSyncAllStreams}
+                disabled={
+                  syncingStreams ||
+                  !hasDodofoToken ||
+                  provider !== 'dodofo' ||
+                  !syncFrom ||
+                  !syncTo
+                }
+                tooltip="Загрузить секундные потоки за выбранный период (для тренировок без потоков)"
+              />
             </div>
             <small className="pb-hint">
               Повторный запуск за тот же период не создаёт дубликаты —
@@ -424,6 +559,26 @@ export const PranaBinduPage: React.FC = () => {
             />
           )}
 
+          {streamsAllError && (
+            <Message severity="error" text={streamsAllError} className="w-full" />
+          )}
+
+          {streamsAllResult && (
+            <Message
+              severity={streamsAllResult.failed > 0 ? 'warn' : 'info'}
+              className="w-full"
+              content={
+                <span>
+                  Потоки: загружено <b>{streamsAllResult.fetched}</b>
+                  {' · '}пропущено <b>{streamsAllResult.skipped}</b>
+                  {streamsAllResult.failed > 0 && (
+                    <> · ошибок <b>{streamsAllResult.failed}</b></>
+                  )}
+                </span>
+              }
+            />
+          )}
+
           {status && (
             <div className="pb-status">
               <code>{status}</code>
@@ -431,6 +586,98 @@ export const PranaBinduPage: React.FC = () => {
           )}
         </div>
       </Panel>
+
+      <Panel
+        header={`Пробежки (${runFacts.length})`}
+        className="shadow-5 mb-3 pb-panel"
+      >
+        {factsError && (
+          <Message severity="error" text={factsError} className="w-full mb-2" />
+        )}
+
+        <DataTable
+          value={runFacts}
+          loading={factsLoading}
+          size="small"
+          stripedRows
+          scrollable
+          scrollHeight="420px"
+          emptyMessage="За выбранный период пробежек нет"
+          className="p-datatable-sm"
+          selectionMode="single"
+          onRowClick={(e) => {
+            setSelectedFact(e.data as RunFactLite);
+            setDrawerVisible(true);
+          }}
+        >
+          <Column
+            header=""
+            style={{ width: '40px', textAlign: 'center' }}
+            body={(r) =>
+              streamsMap[r.id]?.length ? (
+                <i
+                  className="pi pi-chart-line"
+                  style={{ color: 'var(--pb-accent)' }}
+                  title={`Потоков: ${streamsMap[r.id].length}`}
+                />
+              ) : (
+                <i
+                  className="pi pi-minus"
+                  style={{ opacity: 0.25 }}
+                  title="Потоков нет"
+                />
+              )
+            }
+          />
+          <Column
+            field="date"
+            header="Дата"
+            sortable
+            style={{ width: '110px' }}
+          />
+          <Column
+            field="actual_km"
+            header="Км"
+            body={(r) => fmtKm(r.actual_km)}
+            sortable
+            style={{ width: '80px' }}
+          />
+          <Column
+            field="actual_pace"
+            header="Темп"
+            style={{ width: '80px' }}
+          />
+          <Column
+            field="duration_sec"
+            header="Время"
+            body={(r) => fmtDuration(r.duration_sec)}
+            style={{ width: '100px' }}
+          />
+          <Column
+            field="avg_hr"
+            header="Ср. пульс"
+            style={{ width: '100px' }}
+          />
+          <Column
+            field="max_hr"
+            header="Макс. пульс"
+            body={(r) => r.max_hr ?? '—'}
+            style={{ width: '110px' }}
+          />
+          <Column
+            field="source"
+            header="Источник"
+            style={{ width: '100px' }}
+          />
+        </DataTable>
+      </Panel>
+
+      <RunStreamsDrawer
+        visible={drawerVisible}
+        runFact={selectedFact}
+        onHide={() => setDrawerVisible(false)}
+        onAfterSync={() => loadRunFacts()}
+      />
     </div>
   );
 };
