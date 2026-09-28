@@ -2,9 +2,11 @@
 
 import React, { useEffect, useState } from 'react';
 import { Button } from 'primereact/button';
+import { Calendar } from 'primereact/calendar';
 import { Dropdown } from 'primereact/dropdown';
 import { InputText } from 'primereact/inputtext';
 import { Panel } from 'primereact/panel';
+import { Message } from 'primereact/message';
 
 import './PranaBinduPage.css';
 
@@ -28,12 +30,38 @@ const MODULES = [
   { name: 'Spice', description: 'Аналитика, Google Fit, Zepp, dodofo' },
 ];
 
+function toIsoDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function defaultSyncRange(): { from: Date; to: Date } {
+  const to = new Date();
+  const from = new Date();
+  from.setDate(from.getDate() - 30);
+  return { from, to };
+}
+
 export const PranaBinduPage: React.FC = () => {
   const api = (window as any).electronAPI;
 
   const [provider, setProvider] = useState<string>('dodofo');
   const [status, setStatus] = useState<string>('');
   const [loading, setLoading] = useState(false);
+
+  // Синхронизация
+  const initialRange = defaultSyncRange();
+  const [syncFrom, setSyncFrom] = useState<Date>(initialRange.from);
+  const [syncTo, setSyncTo] = useState<Date>(initialRange.to);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<{
+    added: number;
+    updated: number;
+    total: number;
+  } | null>(null);
+  const [syncError, setSyncError] = useState<string>('');
 
   // dodofo
   const [dodofoToken, setDodofoToken] = useState('');
@@ -79,6 +107,41 @@ export const PranaBinduPage: React.FC = () => {
       setStatus(`Ошибка: ${(e as Error).message}`);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // ==================== Синхронизация ====================
+
+  const handleSync = async () => {
+    if (!api?.pb?.syncNow) {
+      setSyncError('electronAPI.pb.syncNow недоступен');
+      return;
+    }
+    if (!syncFrom || !syncTo) {
+      setSyncError('Укажите обе даты');
+      return;
+    }
+    setSyncing(true);
+    setSyncError('');
+    setSyncResult(null);
+    try {
+      const res = await api.pb.syncNow(
+        toIsoDate(syncFrom),
+        toIsoDate(syncTo)
+      );
+      if (res.success) {
+        setSyncResult({
+          added: res.added ?? 0,
+          updated: res.updated ?? 0,
+          total: res.total ?? 0,
+        });
+      } else {
+        setSyncError(res.error ?? 'Неизвестная ошибка');
+      }
+    } catch (e) {
+      setSyncError((e as Error).message);
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -290,6 +353,76 @@ export const PranaBinduPage: React.FC = () => {
           </div>
 
           {renderProviderForm()}
+
+                    <hr className="pb-sep" />
+
+          <div className="flex flex-column gap-2">
+            <label className="pb-label">Диапазон ручной синхронизации</label>
+            <div className="flex gap-2 flex-wrap align-items-center">
+              <Calendar
+                value={syncFrom}
+                onChange={(e) => setSyncFrom(e.value as Date)}
+                dateFormat="dd.mm.yy"
+                placeholder="С"
+                showIcon
+                className="pb-cal"
+                maxDate={syncTo ?? undefined}
+              />
+              <span className="pb-hint">—</span>
+              <Calendar
+                value={syncTo}
+                onChange={(e) => setSyncTo(e.value as Date)}
+                dateFormat="dd.mm.yy"
+                placeholder="По"
+                showIcon
+                className="pb-cal"
+                minDate={syncFrom ?? undefined}
+                maxDate={new Date()}
+              />
+              <Button
+                label={syncing ? 'Синхронизация...' : 'Синхронизировать'}
+                icon={syncing ? 'pi pi-spin pi-spinner' : 'pi pi-sync'}
+                className="pb p-button-sm"
+                onClick={handleSync}
+                disabled={
+                  syncing ||
+                  !hasDodofoToken ||
+                  provider !== 'dodofo' ||
+                  !syncFrom ||
+                  !syncTo
+                }
+                tooltip={
+                  provider !== 'dodofo'
+                    ? 'Синхронизация пока только для dodofo'
+                    : !hasDodofoToken
+                    ? 'Сначала сохраните токен dodofo'
+                    : undefined
+                }
+              />
+            </div>
+            <small className="pb-hint">
+              Повторный запуск за тот же период не создаёт дубликаты —
+              обновляет существующие записи.
+            </small>
+          </div>
+
+          {syncError && (
+            <Message severity="error" text={syncError} className="w-full" />
+          )}
+
+          {syncResult && (
+            <Message
+              severity={syncResult.added > 0 ? 'success' : 'info'}
+              className="w-full"
+              content={
+                <span>
+                  Добавлено: <b>{syncResult.added}</b>
+                  {' · '}Обновлено: <b>{syncResult.updated}</b>
+                  {' · '}Всего из источника: <b>{syncResult.total}</b>
+                </span>
+              }
+            />
+          )}
 
           {status && (
             <div className="pb-status">

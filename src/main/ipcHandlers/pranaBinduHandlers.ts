@@ -1,6 +1,10 @@
 // src/main/ipcHandlers/pranaBinduHandlers.ts
 
-import { ipcMain, safeStorage } from 'electron';
+// src/main/ipcHandlers/pranaBinduHandlers.ts
+
+import fs from 'fs';
+import path from 'path';
+import { app, ipcMain, safeStorage } from 'electron';
 import {
   createPranaBinduWindow,
   getPranaBinduWindow,
@@ -25,6 +29,13 @@ import {
   setDodofoToken,
   getDodofoTokenEncrypted,
   hasDodofoToken,
+  upsertRunFact,
+  listRunFacts,
+  upsertRunStreams,
+  listRunStreams,
+  getRunStreamWithPayload,
+  getRunStreamMeta,
+  hasRunStreams,
 } from '../services/pranaBindu/melange';
 
 import { DodofoProvider } from '../services/pranaBindu/spice/providers/dodofoProvider';
@@ -62,14 +73,61 @@ function encryptSecret(plain: string): string | null {
   }
 }
 
+/**
+ * Компактная сводка по сырому ответу fetchStreams.
+ * Не возвращает массивы целиком — только длину, тип, sample, min/max/avg.
+ * Полный JSON — через опцию writeFile.
+ */
+function summarizeStreams(raw: unknown): Record<string, unknown> {
+  if (raw == null) return { empty: true };
+
+  const out: any = {
+    raw_type: Array.isArray(raw) ? 'array' : typeof raw,
+    channels: {},
+    total_points: 0,
+  };
+
+  const walk = (obj: any, prefix = ''): void => {
+    if (Array.isArray(obj)) {
+      const len = obj.length;
+      const first = obj[0];
+      const info: any = {
+        length: len,
+        sample: obj.slice(0, 5),
+        type: typeof first,
+      };
+
+      if (typeof first === 'number' && len > 0) {
+        let min = first, max = first, sum = 0, nulls = 0;
+        for (const v of obj) {
+          if (v == null || Number.isNaN(v)) { nulls++; continue; }
+          if (v < min) min = v;
+          if (v > max) max = v;
+          sum += v;
+        }
+        info.min = min;
+        info.max = max;
+        info.avg = Number((sum / Math.max(1, len - nulls)).toFixed(3));
+        info.nulls = nulls;
+      }
+
+      out.channels[prefix || 'root'] = info;
+      out.total_points = Math.max(out.total_points, len);
+    } else if (obj && typeof obj === 'object') {
+      for (const k of Object.keys(obj)) {
+        walk(obj[k], prefix ? `${prefix}.${k}` : k);
+      }
+    } else {
+      out.channels[prefix || 'root'] = { value: obj, type: typeof obj };
+    }
+  };
+
+  walk(raw);
+  return out;
+}
+
 // ==================== dodofo token ====================
 
-/**
- * Источник токена dodofo.
- * 1. Из БД (расшифрован через safeStorage) — основной путь (будет позже).
- * 2. Fallback: process.env.VITE_DODOFO_TOKEN — только для dev.
- * TODO: убрать env-fallback после того, как UI подключения будет готов.
- */
 /**
  * Источник токена dodofo.
  * 1. Из БД (расшифрован через safeStorage) — основной путь.
@@ -279,5 +337,347 @@ export function registerPranaBinduHandlers(): void {
     }
   });
 
+  // -------- Список тренировок --------
+  ipcMain.handle(
+    'pb:list-run-facts',
+    (_event, from: string, to: string) => {
+      try {
+        if (!from || !to) {
+          return { success: false, error: 'from и to обязательны' };
+        }
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+          return {
+            success: false,
+            error: 'Неверный формат даты. Ожидается YYYY-MM-DD',
+          };
+        }
+        const rows = listRunFacts(getMelange(), from, to);
+        return { success: true, items: rows, total: rows.length };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+    // -------- Ручная синхронизация --------
+  ipcMain.handle(
+    'pb:sync-now',
+    async (_event, from: string, to: string) => {
+      if (!from || !to) {
+        return {
+          success: false,
+          error: 'from и to обязательны (YYYY-MM-DD)',
+        };
+      }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+        return {
+          success: false,
+          error: 'Неверный формат даты. Ожидается YYYY-MM-DD',
+        };
+      }
+      if (from > to) {
+        return { success: false, error: 'from больше to' };
+      }
+
+      try {
+        const provider = getProvider('dodofo');
+        if (!provider) {
+          return { success: false, error: 'Провайдер dodofo не зарегистрирован' };
+        }
+
+        const db = getMelange();
+        const workouts = await provider.fetchWorkouts(from, to);
+
+        let added = 0;
+        let updated = 0;
+        for (const w of workouts) {
+          const res = upsertRunFact(db, w);
+          if (res.inserted) added += 1;
+          else updated += 1;
+        }
+
+        // last_sync_at / last_sync_status в updateSyncSettings не мапятся —
+        // если позже понадобится, добавим в syncRepo. Пока фиксируем dodofo-поля.
+        updateSyncSettings(db, {
+          dodofoLastSyncAt: new Date().toISOString(),
+          dodofoLastSyncStatus: 'ok',
+        });
+
+        console.log(
+          `[Prana-Bindu] sync-now ${from}..${to}: +${added} ~${updated} (всего ${workouts.length})`
+        );
+
+        return {
+          success: true,
+          added,
+          updated,
+          skipped: 0,
+          total: workouts.length,
+        };
+      } catch (e) {
+        try {
+          updateSyncSettings(getMelange(), {
+            dodofoLastSyncAt: new Date().toISOString(),
+            dodofoLastSyncStatus: 'error',
+          });
+        } catch {
+          // ignore
+        }
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+    // -------- Разведка: сырой ответ fetchStreams --------
+  ipcMain.handle(
+    'pb:debug-streams',
+    async (_event, runFactId: number, opts?: { writeFile?: boolean }) => {
+      try {
+        if (!Number.isFinite(runFactId)) {
+          return { success: false, error: 'runFactId обязателен (число)' };
+        }
+
+        const db = getMelange();
+        const row = db
+          .prepare(
+            `SELECT id, source, external_id, date, actual_km
+             FROM run_facts WHERE id = ?`
+          )
+          .get(runFactId) as
+          | { id: number; source: string; external_id: string; date: string; actual_km: number | null }
+          | undefined;
+
+        if (!row) {
+          return { success: false, error: `run_fact #${runFactId} не найден` };
+        }
+        if (row.source !== 'dodofo') {
+          return {
+            success: false,
+            error: `Источник '${row.source}' — debug-streams пока только для dodofo`,
+          };
+        }
+
+        const m = String(row.external_id || '').match(/^dodofo:(\d+)$/);
+        if (!m) {
+          return {
+            success: false,
+            error: `external_id '${row.external_id}' не в формате 'dodofo:<id>'`,
+          };
+        }
+        const activityId = Number(m[1]);
+
+        const provider = getProvider('dodofo') as any;
+        if (!provider || typeof provider.fetchStreams !== 'function') {
+          return { success: false, error: 'Провайдер dodofo не поддерживает fetchStreams' };
+        }
+
+        const t0 = Date.now();
+        const raw = await provider.fetchStreams(activityId);
+        const dt = Date.now() - t0;
+
+        const jsonStr = JSON.stringify(raw);
+        const summary = summarizeStreams(raw);
+        summary.json_size_bytes = jsonStr.length;
+        summary.fetch_ms = dt;
+
+        if (opts?.writeFile) {
+          const dir = path.join(app.getPath('userData'), 'prana_bindu', 'debug');
+          fs.mkdirSync(dir, { recursive: true });
+          const fn = `streams_${runFactId}_${new Date()
+            .toISOString()
+            .replace(/[:.]/g, '-')}.json`;
+          const fp = path.join(dir, fn);
+          fs.writeFileSync(fp, jsonStr, 'utf8');
+          summary.debug_file = fp;
+        }
+
+        console.log(
+          `[Prana-Bindu] debug-streams: fact=${runFactId}, activity=${activityId}, ` +
+          `points=${summary.total_points}, size=${summary.json_size_bytes}B, ${dt}ms`
+        );
+
+        return { success: true, activityId, data: summary };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+    // -------- Сохранение потоков одной тренировки --------
+  ipcMain.handle(
+    'pb:sync-run-streams',
+    async (_event, runFactId: number) => {
+      if (!Number.isFinite(runFactId)) {
+        return { success: false, error: 'runFactId обязателен (число)' };
+      }
+      try {
+        const db = getMelange();
+        const fact = db
+          .prepare(
+            `SELECT id, source, external_id, date FROM run_facts WHERE id = ?`
+          )
+          .get(runFactId) as
+          | { id: number; source: string; external_id: string | null; date: string }
+          | undefined;
+        if (!fact) {
+          return { success: false, error: `run_fact #${runFactId} не найден` };
+        }
+
+        if (fact.source === 'dodofo') {
+          const m = String(fact.external_id || '').match(/^dodofo:(\d+)$/);
+          if (!m) {
+            return { success: false, error: 'external_id не в формате dodofo:<id>' };
+          }
+          const activityId = Number(m[1]);
+          const provider = getProvider('dodofo') as any;
+          if (!provider || typeof provider.fetchStreams !== 'function') {
+            return { success: false, error: 'Провайдер dodofo не поддерживает fetchStreams' };
+          }
+
+          const t0 = Date.now();
+          const raw = await provider.fetchStreams(activityId);
+          const dt = Date.now() - t0;
+
+          if (raw == null || typeof raw !== 'object') {
+            return { success: false, error: 'Пустой ответ fetchStreams' };
+          }
+
+          const meta = upsertRunStreams(
+            db,
+            runFactId,
+            'dodofo',
+            fact.external_id,
+            fact.date,
+            raw as Record<string, unknown>
+          );
+
+          console.log(
+            `[Prana-Bindu] sync-run-streams: fact=${runFactId} (dodofo:${activityId}), ` +
+            `points=${meta.point_count}, size=${meta.size_bytes}B, ${dt}ms`
+          );
+
+          return {
+            success: true,
+            source: 'dodofo',
+            pointCount: meta.point_count,
+            sizeBytes: meta.size_bytes,
+            channels: meta.channels,
+            fetchMs: dt,
+          };
+        }
+
+        return { success: false, error: `Источник '${fact.source}' пока не поддержан` };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+    // -------- Массовая заливка потоков за период --------
+  ipcMain.handle(
+    'pb:sync-run-streams-all',
+    async (_event, from: string, to: string, opts?: { onlyMissing?: boolean }) => {
+      if (!from || !to) {
+        return { success: false, error: 'from и to обязательны' };
+      }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+        return { success: false, error: 'Формат даты: YYYY-MM-DD' };
+      }
+      if (from > to) {
+        return { success: false, error: 'from больше to' };
+      }
+
+      try {
+        const db = getMelange();
+        const onlyMissing = opts?.onlyMissing !== false; // по умолчанию — только отсутствующие
+
+        const facts = db
+          .prepare(
+            `SELECT id, source, external_id, date FROM run_facts
+             WHERE date >= ? AND date <= ? AND source = 'dodofo'
+             ORDER BY date ASC`
+          )
+          .all(from, to) as unknown as Array<{
+            id: number;
+            source: string;
+            external_id: string | null;
+            date: string;
+          }>;
+
+        const provider = getProvider('dodofo') as any;
+        if (!provider || typeof provider.fetchStreams !== 'function') {
+          return { success: false, error: 'Провайдер dodofo не поддерживает fetchStreams' };
+        }
+
+        let fetched = 0;
+        let skipped = 0;
+        let failed = 0;
+        const errors: Array<{ runFactId: number; error: string }> = [];
+
+        for (const fact of facts) {
+          if (onlyMissing && hasRunStreams(db, fact.id, 'dodofo')) {
+            skipped++;
+            continue;
+          }
+
+          const m = String(fact.external_id || '').match(/^dodofo:(\d+)$/);
+          if (!m) {
+            failed++;
+            errors.push({ runFactId: fact.id, error: 'external_id не в формате dodofo:<id>' });
+            continue;
+          }
+
+          try {
+            const raw = await provider.fetchStreams(Number(m[1]));
+            if (raw == null || typeof raw !== 'object') {
+              failed++;
+              errors.push({ runFactId: fact.id, error: 'Пустой ответ' });
+              continue;
+            }
+            upsertRunStreams(
+              db,
+              fact.id,
+              'dodofo',
+              fact.external_id,
+              fact.date,
+              raw as Record<string, unknown>
+            );
+            fetched++;
+          } catch (e) {
+            failed++;
+            errors.push({ runFactId: fact.id, error: (e as Error).message });
+          }
+        }
+
+        console.log(
+          `[Prana-Bindu] sync-run-streams-all ${from}..${to}: ` +
+          `fetched=${fetched}, skipped=${skipped}, failed=${failed}, total=${facts.length}`
+        );
+
+        return {
+          success: true,
+          fetched,
+          skipped,
+          failed,
+          total: facts.length,
+          errors: errors.slice(0, 20), // не раздуваем ответ
+        };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+  // -------- Метаданные потоков по runFactId --------
+  ipcMain.handle('pb:get-run-streams-meta', (_event, runFactId: number) => {
+    try {
+      const rows = listRunStreams(getMelange(), runFactId);
+      return { success: true, items: rows };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
   console.log('[Prana-Bindu] IPC-хендлеры зарегистрированы (pb:*)');
 }
+

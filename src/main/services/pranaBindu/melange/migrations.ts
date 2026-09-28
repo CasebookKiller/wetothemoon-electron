@@ -6,9 +6,10 @@ import {
   ALL_INDEXES,
   CREATE_META,
   MIGRATION_V2_DODOFO,
+  MIGRATION_V3_RUN_STREAMS,   // ← добавили
 } from './schema';
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 interface Migration {
   version: number;
@@ -47,6 +48,13 @@ const migrations: readonly Migration[] = [
           console.log(`[Melange] v2: добавлена колонка sync_settings.${name}`);
         }
       }
+    },
+  },
+  {
+    version: 3,
+    apply: (db) => {
+      for (const sql of MIGRATION_V3_RUN_STREAMS) db.exec(sql);
+      console.log('[Melange] v3: создана таблица run_streams');
     },
   },
 ];

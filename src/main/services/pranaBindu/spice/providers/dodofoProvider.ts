@@ -25,7 +25,8 @@ const RUN_SPORTS = new Set(['run', 'trail_run', 'treadmill_run']);
 
 function activityToRawWorkout(a: DodofoActivity): RawWorkout {
   const startTime = a.started_at ?? new Date().toISOString();
-  const durationS = a.duration_s ?? a.moving_time_s ?? 0;
+  const durationRaw = a.duration_s ?? a.moving_time_s ?? 0;
+  const durationS = Math.round(durationRaw);
   const endTime = new Date(
     new Date(startTime).getTime() + durationS * 1000
   ).toISOString();
@@ -35,9 +36,10 @@ function activityToRawWorkout(a: DodofoActivity): RawWorkout {
     source: 'dodofo',
     startTime,
     endTime,
-    distanceM: a.distance_m ?? undefined,
+    distanceM:
+      typeof a.distance_m === 'number' ? Math.round(a.distance_m) : undefined,
     durationS: durationS || undefined,
-    avgHr: a.avg_hr ?? undefined,
+    avgHr: typeof a.avg_hr === 'number' ? Math.round(a.avg_hr) : undefined,
     // max_hr в списке активностей не отдаётся — только через /streams.
     raw: a,
   };

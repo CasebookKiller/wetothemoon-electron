@@ -93,6 +93,22 @@ export const CREATE_RUN_FACTS = `
   );
 `;
 
+// В schema.ts — новый блок
+export const CREATE_RUN_STREAMS = `
+  CREATE TABLE IF NOT EXISTS run_streams (
+    run_fact_id   INTEGER NOT NULL,
+    source        TEXT NOT NULL,
+    external_id   TEXT,
+    file_path     TEXT NOT NULL,
+    size_bytes    INTEGER NOT NULL,
+    point_count   INTEGER,
+    channels      TEXT,
+    fetched_at    TEXT NOT NULL,
+    PRIMARY KEY (run_fact_id, source),
+    FOREIGN KEY (run_fact_id) REFERENCES run_facts(id) ON DELETE CASCADE
+  );
+`;
+
 export const CREATE_STRENGTH_PLANS = `
   CREATE TABLE IF NOT EXISTS strength_plans (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -217,6 +233,7 @@ export const ALL_TABLES: readonly string[] = [
   CREATE_USER_MOVEMENT_STATE,
   CREATE_RUN_PLANS,
   CREATE_RUN_FACTS,
+  CREATE_RUN_STREAMS,
   CREATE_STRENGTH_PLANS,
   CREATE_STRENGTH_SESSIONS,
   CREATE_RECOVERY_LOGS,
@@ -234,6 +251,7 @@ export const ALL_INDEXES: readonly string[] = [
   `CREATE INDEX IF NOT EXISTS idx_recovery_logs_date ON recovery_logs(date);`,
   `CREATE INDEX IF NOT EXISTS idx_progress_checks_date ON progress_checks(date);`,
   `CREATE INDEX IF NOT EXISTS idx_recommendations_status ON recommendations(status);`,
+  `CREATE INDEX IF NOT EXISTS idx_run_streams_source ON run_streams(source);`,
 ];
 
 // ==================== Миграция v2: dodofo ====================
@@ -244,4 +262,11 @@ export const MIGRATION_V2_DODOFO: readonly string[] = [
   `ALTER TABLE sync_settings ADD COLUMN dodofo_username TEXT;`,
   `ALTER TABLE sync_settings ADD COLUMN dodofo_last_sync_at TEXT;`,
   `ALTER TABLE sync_settings ADD COLUMN dodofo_last_sync_status TEXT;`,
+];
+
+// ==================== Миграция v3: run_streams ====================
+
+export const MIGRATION_V3_RUN_STREAMS: readonly string[] = [
+  CREATE_RUN_STREAMS,
+  `CREATE INDEX IF NOT EXISTS idx_run_streams_source ON run_streams(source);`,
 ];

@@ -331,3 +331,304 @@ span.pb-destructive {
   color: var(--tg-theme-hint-color, #708499);
   line-height: 1.35;
 }
+
+.pb-sep {
+  border: none;
+  border-top: 1px solid var(--surface-border, #e5e7eb);
+  margin: 0.25rem 0;
+}
+
+.pb-cal {
+  width: 10.5rem;
+}
+
+/* ============================================================
+   Prana-Bindu: календари, кнопки, разделители — в стиле AuditLogTab
+   ============================================================ */
+
+.pb-page {
+  --pb-accent: var(--pb-accent-color, #d4a373);
+}
+
+/* --- Разделитель между подключением и синхронизацией --- */
+.pb-sep {
+  border: none;
+  border-top: 1px solid var(--surface-border, rgba(255,255,255,0.12));
+  margin: 0.25rem 0;
+}
+
+/* ============================================================
+   Календарь: input + триггер, единая высота 2.5rem
+   ============================================================ */
+
+/* ============================================================
+   Календарь: input растягивается, триггер — фиксированно 2.5rem
+   ============================================================ */
+
+.pb-cal.p-calendar {
+  width: 12rem !important;
+  max-width: 12rem !important;
+  display: inline-flex !important;
+  align-items: stretch !important;
+  flex-shrink: 0;
+}
+
+/* Input — занимает всё свободное место, не обрезает текст */
+.pb-cal .p-inputtext {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  width: auto !important;
+  height: 2.5rem !important;
+  padding: 0 0.75rem !important;
+  text-overflow: clip !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  box-sizing: border-box;
+}
+
+.pb-cal .p-inputtext:enabled:focus {
+  border-color: var(--pb-accent) !important;
+  box-shadow: 0 0 0 1px var(--pb-accent) !important;
+  outline: none !important;
+}
+
+/* Триггер — жёстко 2.5×2.5rem, никаких min-width: 120px */
+.pb-cal .p-datepicker-trigger {
+  flex: 0 0 2.5rem !important;
+  width: 2.5rem !important;
+  min-width: 2.5rem !important;
+  max-width: 2.5rem !important;
+  height: 2.5rem !important;
+  padding: 0 !important;
+  color: var(--pb-accent) !important;
+  background: transparent !important;
+  border: 1px solid var(--pb-accent) !important;
+  border-radius: 6px !important;
+  box-sizing: border-box;
+}
+
+.pb-cal .p-datepicker-trigger:hover {
+  background: var(--pb-accent) !important;
+  color: var(--tg-theme-bg-color, #1a1a1a) !important;
+  border-color: var(--pb-accent) !important;
+}
+
+.pb-cal .p-datepicker-trigger:focus {
+  outline: none !important;
+  box-shadow: 0 0 0 2px
+    color-mix(in srgb, var(--pb-accent) 30%, transparent) !important;
+}
+
+.pb-cal .p-datepicker-trigger .p-icon,
+.pb-cal .p-datepicker-trigger svg,
+.pb-cal .p-datepicker-trigger svg path {
+  color: inherit !important;
+  fill: currentColor !important;
+}
+
+/* Убираем min-width у кнопок, которым он не нужен */
+.pb-page .p-button.pb.p-button-sm,
+.pb-page .p-button.pb-soft.p-button-sm {
+  min-width: auto !important;
+}
+
+.pb-cal .p-inputtext:enabled:focus {
+  border-color: var(--pb-accent) !important;
+  box-shadow: 0 0 0 1px var(--pb-accent) !important;
+  outline: none !important;
+}
+
+.pb-page .p-button.pb,
+.pb-page .p-button.pb-soft {
+  min-width: 9rem !important;
+}
+
+.pb-cal .p-datepicker-trigger {
+  height: 2.5rem !important;
+  width: 2.5rem !important;
+  padding: 0 !important;
+  color: var(--pb-accent) !important;
+  background: transparent !important;
+  border: 1px solid var(--pb-accent) !important;
+  border-radius: 6px !important;
+  box-sizing: border-box;
+}
+
+.pb-cal .p-datepicker-trigger:hover {
+  background: var(--pb-accent) !important;
+  color: var(--tg-theme-bg-color, #1a1a1a) !important;
+  border-color: var(--pb-accent) !important;
+}
+
+.pb-cal .p-datepicker-trigger:focus {
+  outline: none !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pb-accent) 30%, transparent) !important;
+}
+
+.pb-cal .p-datepicker-trigger .p-icon,
+.pb-cal .p-datepicker-trigger svg,
+.pb-cal .p-datepicker-trigger svg path {
+  color: inherit !important;
+  fill: currentColor !important;
+}
+
+/* ============================================================
+   Панель датапикера — в pb-акценте
+   ============================================================ */
+
+.p-datepicker .p-datepicker-header button,
+.p-datepicker .p-datepicker-header .p-datepicker-prev,
+.p-datepicker .p-datepicker-header .p-datepicker-next,
+.p-datepicker .p-datepicker-header .p-datepicker-month,
+.p-datepicker .p-datepicker-header .p-datepicker-year,
+.p-datepicker .p-datepicker-buttonbar button {
+  color: var(--pb-accent) !important;
+  background: transparent !important;
+  border-radius: 6px !important;
+  font-size: 0.95rem !important;
+  min-width: 2rem !important;
+  height: 2rem !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Год и месяц в шапке datepicker: не режем 4-значный год */
+.p-datepicker .p-datepicker-header .p-datepicker-year,
+.p-datepicker .p-datepicker-header .p-datepicker-month {
+  min-width: auto !important;
+  width: auto !important;
+  padding: 0 0.6rem !important;
+  height: 2rem !important;
+  font-size: 0.95rem !important;
+}
+
+.p-datepicker .p-datepicker-header .p-datepicker-prev,
+.p-datepicker .p-datepicker-header .p-datepicker-next {
+  border: 1px solid var(--pb-accent) !important;
+}
+
+.p-datepicker .p-datepicker-header .p-datepicker-prev:hover,
+.p-datepicker .p-datepicker-header .p-datepicker-next:hover,
+.p-datepicker .p-datepicker-header .p-datepicker-month:hover,
+.p-datepicker .p-datepicker-header .p-datepicker-year:hover {
+  background: var(--pb-accent) !important;
+  color: var(--tg-theme-bg-color, #1a1a1a) !important;
+}
+
+.p-datepicker .p-datepicker-buttonbar button {
+  padding: 0.5rem 1rem !important;
+  border: 1px solid var(--pb-accent) !important;
+}
+
+.p-datepicker .p-datepicker-header button svg path {
+  fill: currentColor !important;
+}
+
+/* Выбранный день — pb-акцент */
+.p-datepicker .p-datepicker-calendar .p-highlight,
+.p-datepicker .p-datepicker-calendar .p-datepicker-today.p-highlight {
+  background: var(--pb-accent) !important;
+  color: #1a1a1a !important;
+  border-color: var(--pb-accent) !important;
+}
+
+/* Сегодня — только обводка */
+.p-datepicker .p-datepicker-calendar .p-datepicker-today > span:not(.p-highlight) {
+  border: 1px solid var(--pb-accent) !important;
+  color: var(--pb-accent) !important;
+  background: transparent !important;
+}
+
+/* ============================================================
+   Кнопки синхронизации — те же pb / pb-soft (в вашем стиле)
+   ============================================================ */
+
+/* На всякий случай фиксируем высоту кнопки, чтобы совпадала с календарём */
+.pb-page .p-button.p-button-sm {
+  height: 2.5rem !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  box-sizing: border-box;
+}
+
+/* ============================================================
+   Кнопки Prana-Bindu — accent + мягкий, единая высота 2.5rem
+   ============================================================ */
+
+.pb-page .p-button.pb.p-button-sm,
+.pb-page .p-button.pb-soft.p-button-sm {
+  height: 2.5rem !important;
+  padding: 0 1rem !important;
+  font-size: 0.8125rem !important;
+  border-radius: 6px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.5rem;
+  box-sizing: border-box;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s,
+    box-shadow 0.2s;
+}
+
+.pb-page .p-button.pb.p-button-sm .p-button-icon,
+.pb-page .p-button.pb-soft.p-button-sm .p-button-icon {
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+/* --- основной .pb — акцентная рамка, заливка при hover --- */
+.pb-page .p-button.pb {
+  color: var(--pb-accent) !important;
+  background: transparent !important;
+  border: 1px solid var(--pb-accent) !important;
+}
+
+.pb-page .p-button.pb:hover:not(:disabled) {
+  background: var(--pb-accent) !important;
+  color: var(--tg-theme-bg-color, #1a1a1a) !important;
+  border-color: var(--pb-accent) !important;
+}
+
+.pb-page .p-button.pb:focus:not(:disabled) {
+  outline: none !important;
+  box-shadow: 0 0 0 2px
+    color-mix(in srgb, var(--pb-accent) 30%, transparent) !important;
+}
+
+/* --- мягкий .pb-soft — при hover лёгкая заливка, не перекрывает текст --- */
+.pb-page .p-button.pb-soft {
+  color: var(--pb-accent) !important;
+  background: transparent !important;
+  border: 1px solid var(--pb-accent) !important;
+}
+
+.pb-page .p-button.pb-soft:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--pb-accent) 14%, transparent) !important;
+  color: var(--pb-accent) !important;
+  border-color: var(--pb-accent) !important;
+}
+
+.pb-page .p-button.pb-soft:focus:not(:disabled) {
+  outline: none !important;
+  box-shadow: 0 0 0 2px
+    color-mix(in srgb, var(--pb-accent) 25%, transparent) !important;
+}
+
+/* --- disabled: тот же контур, но приглушённый --- */
+.pb-page .p-button.pb:disabled,
+.pb-page .p-button.pb-soft:disabled,
+.pb-page .p-button.pb.p-disabled,
+.pb-page .p-button.pb-soft.p-disabled {
+  opacity: 0.45 !important;
+  cursor: not-allowed !important;
+  background: transparent !important;
+  color: var(--pb-accent) !important;
+  border-color: var(--pb-accent) !important;
+}
+
+.pb-page .p-button.pb:disabled .p-button-icon,
+.pb-page .p-button.pb:disabled .p-button-label,
+.pb-page .p-button.pb-soft:disabled .p-button-icon,
+.pb-page .p-button.pb-soft:disabled .p-button-label {
+  color: var(--pb-accent) !important;
+}

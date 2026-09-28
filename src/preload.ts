@@ -663,6 +663,21 @@ try {
         ipcRenderer.invoke('pb:dodofo-connect', token),
       dodofoTokenStatus: () =>
         ipcRenderer.invoke('pb:dodofo-token-status'),
+     
+      listRunFacts: (from: string, to: string) =>
+        ipcRenderer.invoke('pb:list-run-facts', from, to),
+      syncNow: (from: string, to: string) =>
+        ipcRenderer.invoke('pb:sync-now', from, to),
+      debugStreams: (runFactId: number, opts?: { writeFile?: boolean }) =>
+        ipcRenderer.invoke('pb:debug-streams', runFactId, opts),
+
+      syncRunStreams: (runFactId: number) =>
+        ipcRenderer.invoke('pb:sync-run-streams', runFactId),
+      getRunStreamsMeta: (runFactId: number) =>
+        ipcRenderer.invoke('pb:get-run-streams-meta', runFactId),
+      syncRunStreamsAll: (from: string, to: string, opts?: { onlyMissing?: boolean }) =>
+        ipcRenderer.invoke('pb:sync-run-streams-all', from, to, opts),
+
     },
 
   });
