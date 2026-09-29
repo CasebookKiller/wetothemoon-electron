@@ -685,6 +685,7 @@ try {
         ipcRenderer.invoke('pb:get-run-streams', runFactId, source),
 
       debugThresholds: () => ipcRenderer.invoke('pb:debug-thresholds'),
+      syncThresholds: () => ipcRenderer.invoke('pb:sync-thresholds'),
 
       debugZones: () => ipcRenderer.invoke('pb:debug-zones'),
 

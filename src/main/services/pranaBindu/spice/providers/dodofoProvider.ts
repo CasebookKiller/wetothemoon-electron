@@ -148,5 +148,5 @@ export class DodofoProvider implements ZeppDataProvider {
     return await dodofoRequest<unknown>('/api/v1/auth/me/zones', token);
   }
 
-  
+
 }

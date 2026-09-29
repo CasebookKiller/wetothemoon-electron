@@ -359,7 +359,7 @@ export function registerPranaBinduHandlers(): void {
     }
   );
 
-    // -------- Ручная синхронизация --------
+  // -------- Ручная синхронизация --------
   ipcMain.handle(
     'pb:sync-now',
     async (_event, from: string, to: string) => {
@@ -428,7 +428,7 @@ export function registerPranaBinduHandlers(): void {
     }
   );
 
-    // -------- Разведка: сырой ответ fetchStreams --------
+  // -------- Разведка: сырой ответ fetchStreams --------
   ipcMain.handle(
     'pb:debug-streams',
     async (_event, runFactId: number, opts?: { writeFile?: boolean }) => {
@@ -503,7 +503,7 @@ export function registerPranaBinduHandlers(): void {
     }
   );
 
-    // -------- Разведка: сырой ответ fetchThresholds --------
+  // -------- Разведка: сырой ответ fetchThresholds --------
   ipcMain.handle('pb:debug-thresholds', async () => {
     try {
       const provider = getProvider('dodofo') as any;
@@ -517,6 +517,54 @@ export function registerPranaBinduHandlers(): void {
       console.log('[Prana-Bindu] debug-thresholds:', JSON.stringify(raw));
 
       return { success: true, fetchMs: dt, data: raw };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  // -------- Подтянуть пороги из dodofo --------
+  ipcMain.handle('pb:sync-thresholds', async () => {
+    try {
+      const provider = getProvider('dodofo') as any;
+      if (!provider || typeof provider.fetchThresholds !== 'function') {
+        return { success: false, error: 'Провайдер dodofo не поддерживает fetchThresholds' };
+      }
+
+      const raw = await provider.fetchThresholds();
+      const db = getMelange();
+
+      const patch: Record<string, number> = {};
+      const applied: string[] = [];
+
+      // Толерантно: пишем только то, что пришло.
+      if (raw?.resthr?.value != null) {
+        patch.restingHr = Number(raw.resthr.value);
+        applied.push(`resthr=${raw.resthr.value}`);
+      }
+      if (raw?.lthr?.value != null) {
+        patch.lthr = Number(raw.lthr.value);
+        applied.push(`lthr=${raw.lthr.value}`);
+      }
+      if (raw?.hrmax?.value != null) {
+        patch.maxHr = Number(raw.hrmax.value);
+        applied.push(`hrmax=${raw.hrmax.value}`);
+      }
+
+      if (Object.keys(patch).length === 0) {
+        return {
+          success: false,
+          error: 'dodofo не отдал ни одного порога (только resthr поддерживается)',
+        };
+      }
+
+      const updated = updateProfile(db, patch);
+      console.log(`[Prana-Bindu] sync-thresholds: ${applied.join(', ')}`);
+
+      return {
+        success: true,
+        applied,
+        data: updated,
+      };
     } catch (e) {
       return { success: false, error: (e as Error).message };
     }

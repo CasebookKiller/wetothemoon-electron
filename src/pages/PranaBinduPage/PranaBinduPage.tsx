@@ -110,6 +110,10 @@ export const PranaBinduPage: React.FC = () => {
   } | null>(null);
   const [streamsAllError, setStreamsAllError] = useState('');
 
+  const [syncingThresholds, setSyncingThresholds] = useState(false);
+  const [thresholdsResult, setThresholdsResult] = useState<string>('');
+  const [thresholdsError, setThresholdsError] = useState('');
+
   // Debug
   const [debugVisible, setDebugVisible] = useState(false);
 
@@ -276,6 +280,32 @@ export const PranaBinduPage: React.FC = () => {
       setStreamsAllError((e as Error).message);
     } finally {
       setSyncingStreams(false);
+    }
+  };
+
+  // ==================== Синхронизация порогов ====================
+
+  const handleSyncThresholds = async () => {
+    if (!api?.pb?.syncThresholds) {
+      setThresholdsError('electronAPI.pb.syncThresholds недоступен');
+      return;
+    }
+    setSyncingThresholds(true);
+    setThresholdsError('');
+    setThresholdsResult('');
+    try {
+      const res = await api.pb.syncThresholds();
+      if (res.success) {
+        setThresholdsResult(
+          (res.applied ?? []).join(' · ') || 'обновлено'
+        );
+      } else {
+        setThresholdsError(res.error ?? 'Ошибка');
+      }
+    } catch (e) {
+      setThresholdsError((e as Error).message);
+    } finally {
+      setSyncingThresholds(false);
     }
   };
 
@@ -552,6 +582,20 @@ export const PranaBinduPage: React.FC = () => {
                 tooltip="Загрузить секундные потоки за выбранный период (для тренировок без потоков)"
               />
               <Button
+                label={syncingThresholds ? 'Пороги…' : 'Подтянуть пороги'}
+                icon={
+                  syncingThresholds
+                    ? 'pi pi-spin pi-spinner'
+                    : 'pi pi-sliders-h'
+                }
+                className="pb-soft p-button-sm"
+                onClick={handleSyncThresholds}
+                disabled={
+                  syncingThresholds || !hasDodofoToken || provider !== 'dodofo'
+                }
+                tooltip="Забрать пороги (restHR и др.) из dodofo в профиль"
+              />
+              <Button
                 label="Отладка"
                 icon="pi pi-code"
                 className="pb-soft p-button-sm"
@@ -600,6 +644,22 @@ export const PranaBinduPage: React.FC = () => {
                   )}
                 </span>
               }
+            />
+          )}
+
+          {thresholdsError && (
+            <Message
+              severity="error"
+              text={thresholdsError}
+              className="w-full"
+            />
+          )}
+
+          {thresholdsResult && (
+            <Message
+              severity="success"
+              className="w-full"
+              content={<span>Пороги обновлены: <b>{thresholdsResult}</b></span>}
             />
           )}
 
