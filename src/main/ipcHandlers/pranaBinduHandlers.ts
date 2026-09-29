@@ -705,6 +705,27 @@ export function registerPranaBinduHandlers(): void {
           return { success: false, error: `run_fact #${runFactId} не найден` };
         }
 
+        if (fact.source === 'fit') {
+          // FIT-потоки записаны при импорте файла.
+          // Проверяем, есть ли они, и возвращаем метаданные.
+          const existing = getRunStreamMeta(db, runFactId, 'fit');
+          if (existing) {
+            return {
+              success: true,
+              source: 'fit',
+              alreadyInDb: true,
+              pointCount: existing.point_count,
+              sizeBytes: existing.size_bytes,
+              channels: existing.channels,
+              fetchMs: 0,
+            };
+          }
+          return {
+            success: false,
+            error: 'FIT-потоки отсутствуют в БД — переимпортируйте файл',
+          };
+        }
+
         if (fact.source === 'dodofo') {
           const m = String(fact.external_id || '').match(/^dodofo:(\d+)$/);
           if (!m) {
