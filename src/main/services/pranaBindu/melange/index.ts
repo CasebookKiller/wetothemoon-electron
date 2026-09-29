@@ -24,3 +24,5 @@ export {
   deleteRunStreams,
 } from './repositories/runStreamsRepo';
 export type { RunStreamRow, RunStreamWithPayload } from './repositories/runStreamsRepo';
+
+export { setFitArchivePath, getFitArchivePath } from './repositories/syncRepo';

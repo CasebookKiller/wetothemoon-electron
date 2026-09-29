@@ -701,8 +701,19 @@ try {
 
       importFitDir: (
         dirPath: string,
-        opts?: { recursive?: boolean; skipImported?: boolean; origin?: string }
+        opts?: {
+          recursive?: boolean;
+          skipImported?: boolean;
+          origin?: string;
+          savePath?: boolean;
+        }
       ) => ipcRenderer.invoke('pb:import-fit-dir', dirPath, opts),
+
+      pickDirectory: (opts?: { title?: string; defaultPath?: string }) =>
+        ipcRenderer.invoke('pb:pick-directory', opts),
+      fitArchivePathGet: () =>
+        ipcRenderer.invoke('pb:fit-archive-path-get'),
+
 
     },
 

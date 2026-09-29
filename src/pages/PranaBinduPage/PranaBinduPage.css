@@ -1216,3 +1216,25 @@ span.pb-destructive {
 .pb-profile__field .pb-debug__input.p-inputnumber {
   width: 100%;
 }
+
+.pb-archive-path {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  font-size: 0.75rem;
+  color: var(--tg-theme-hint-color, #708499);
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--surface-border, rgba(255,255,255,0.08));
+  border-radius: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  height: 2.5rem;
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.pb-archive-path i {
+  opacity: 0.6;
+}

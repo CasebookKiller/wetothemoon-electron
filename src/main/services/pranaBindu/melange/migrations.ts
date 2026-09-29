@@ -7,9 +7,10 @@ import {
   CREATE_META,
   MIGRATION_V2_DODOFO,
   MIGRATION_V3_RUN_STREAMS,   // ← добавили
+  MIGRATION_V5_FIT_ARCHIVE,   // ← добавьте
 } from './schema';
 
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 interface Migration {
   version: number;
@@ -71,6 +72,20 @@ const migrations: readonly Migration[] = [
         console.log('[Melange] v4: добавлена колонка run_facts.origin');
       }
       db.exec(`CREATE INDEX IF NOT EXISTS idx_run_facts_origin ON run_facts(origin);`);
+    },
+  },
+  {
+    version: 5,
+    apply: (db) => {
+      const cols = db
+        .prepare(`PRAGMA table_info(sync_settings)`)
+        .all() as { name: string }[];
+      const has = (n: string) => cols.some((c) => c.name === n);
+
+      if (!has('fit_archive_path')) {
+        db.exec(`ALTER TABLE sync_settings ADD COLUMN fit_archive_path TEXT;`);
+        console.log('[Melange] v5: добавлена колонка sync_settings.fit_archive_path');
+      }
     },
   },
 ];

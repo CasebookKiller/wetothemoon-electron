@@ -126,7 +126,6 @@ export const PranaBinduPage: React.FC = () => {
   // Debug
   const [debugVisible, setDebugVisible] = useState(false);
 
-
   // ==================== Загрузка потоков (map) ====================
 
   const loadStreamsMap = async (items: any[]) => {
@@ -189,7 +188,7 @@ export const PranaBinduPage: React.FC = () => {
     }
   };
 
-    const loadProfile = async () => {
+  const loadProfile = async () => {
     if (!api?.pb?.getProfile) return;
     try {
       const res = await api.pb.getProfile();
@@ -213,6 +212,14 @@ export const PranaBinduPage: React.FC = () => {
       try {
         const res = await api.pb.dodofoTokenStatus();
         if (res?.success) setHasDodofoToken(!!res.hasToken);
+      } catch {
+        // ignore
+      }
+    })();
+    (async () => {
+      try {
+        const res = await api.pb.fitArchivePathGet?.();
+        if (res?.success && res.path) setFitArchivePath(res.path);
       } catch {
         // ignore
       }
@@ -555,6 +562,88 @@ export const PranaBinduPage: React.FC = () => {
     }
   };
 
+  const [fitArchivePath, setFitArchivePath] = useState<string>('');
+  const [archiveUpdating, setArchiveUpdating] = useState(false);
+  const [archiveResult, setArchiveResult] = useState<{
+    imported: number;
+    updated: number;
+    skipped: number;
+    failed: number;
+    total: number;
+  } | null>(null);
+  const [archiveError, setArchiveError] = useState('');
+
+  const handlePickArchiveFolder = async (): Promise<string | null> => {
+    if (!api?.pb?.pickDirectory) return null;
+    const res = await api.pb.pickDirectory({
+      title: 'Выберите папку с FIT-файлами Strava',
+      defaultPath: fitArchivePath || undefined,
+    });
+    if (!res?.success || !res.path) return null;
+    return res.path;
+  };
+
+  const handleUpdateFitArchive = async () => {
+    if (!api?.pb?.importFitDir) {
+      setArchiveError('electronAPI.pb.importFitDir недоступен');
+      return;
+    }
+    setArchiveUpdating(true);
+    setArchiveError('');
+    setArchiveResult(null);
+
+    try {
+      let targetPath = fitArchivePath;
+      if (!targetPath) {
+        const picked = await handlePickArchiveFolder();
+        if (!picked) {
+          setArchiveUpdating(false);
+          return; // отмена пользователя
+        }
+        targetPath = picked;
+      }
+
+      const res = await api.pb.importFitDir(targetPath, {
+        origin: 'strava-archive',
+        skipImported: false, // обновляем
+        savePath: true,
+      });
+
+      if (res.success) {
+        setFitArchivePath(targetPath);
+        setArchiveResult({
+          imported: res.imported ?? 0,
+          updated: res.updated ?? 0,
+          skipped: res.skipped ?? 0,
+          failed: res.failed ?? 0,
+          total: res.total ?? 0,
+        });
+        await loadRunFacts();
+      } else {
+        setArchiveError(res.error ?? 'Ошибка импорта');
+      }
+    } catch (e) {
+      setArchiveError((e as Error).message);
+    } finally {
+      setArchiveUpdating(false);
+    }
+  };
+
+  const handleChangeArchiveFolder = async () => {
+    const picked = await handlePickArchiveFolder();
+    if (!picked) return;
+    setFitArchivePath(picked);
+    // Сохраним путь сразу, без импорта
+    try {
+      await api.pb.importFitDir(picked, {
+        skipImported: true,
+        savePath: true,
+      });
+    } catch {
+      // ignore
+    }
+  };
+
   return (
     <div className="pb-page p-4">
       <div className="mb-4">
@@ -679,6 +768,64 @@ export const PranaBinduPage: React.FC = () => {
 
         {profileError && (
           <Message severity="error" text={profileError} className="w-full mt-2" />
+        )}
+      </Panel>
+
+      <Panel header="FIT-архив" className="shadow-5 mb-3 pb-panel">
+        <div className="flex flex-column gap-2">
+          <label className="pb-label">Путь к папке с FIT-файлами Strava</label>
+          <div className="flex gap-2 flex-wrap align-items-center">
+            <span className="pb-archive-path" title={fitArchivePath || undefined}>
+              {fitArchivePath || <i>папка не выбрана</i>}
+            </span>
+            <Button
+              label={fitArchivePath ? 'Сменить папку' : 'Выбрать папку'}
+              icon="pi pi-folder-open"
+              className="pb-soft p-button-sm"
+              onClick={handleChangeArchiveFolder}
+              disabled={archiveUpdating}
+            />
+            <Button
+              label={archiveUpdating ? 'Обновление…' : 'Обновить архив'}
+              icon={archiveUpdating ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'}
+              className="pb p-button-sm"
+              onClick={handleUpdateFitArchive}
+              disabled={archiveUpdating}
+              tooltip={
+                fitArchivePath
+                  ? 'Перечитать все FIT-файлы, обновить существующие'
+                  : 'Выбрать папку и импортировать все FIT-файлы'
+              }
+            />
+          </div>
+          <small className="pb-hint">
+            При обновлении перечитываются все файлы. Существующие записи
+            обновляются (например, если в Strava изменили описание).
+          </small>
+        </div>
+
+        {archiveError && (
+          <Message severity="error" text={archiveError} className="w-full mt-2" />
+        )}
+
+        {archiveResult && (
+          <Message
+            severity={archiveResult.failed > 0 ? 'warn' : 'success'}
+            className="w-full mt-2"
+            content={
+              <span>
+                Добавлено <b>{archiveResult.imported}</b>
+                {' · '}обновлено <b>{archiveResult.updated}</b>
+                {archiveResult.skipped > 0 && (
+                  <> · пропущено <b>{archiveResult.skipped}</b></>
+                )}
+                {archiveResult.failed > 0 && (
+                  <> · ошибок <b>{archiveResult.failed}</b></>
+                )}
+                {' · '}всего файлов <b>{archiveResult.total}</b>
+              </span>
+            }
+          />
         )}
       </Panel>
 

@@ -277,3 +277,9 @@ export const MIGRATION_V4_RUN_FACTS_ORIGIN: readonly string[] = [
   `ALTER TABLE run_facts ADD COLUMN origin TEXT;`,
   `CREATE INDEX IF NOT EXISTS idx_run_facts_origin ON run_facts(origin);`,
 ];
+
+// ==================== Миграция v5: fit_archive_path ====================
+
+export const MIGRATION_V5_FIT_ARCHIVE: readonly string[] = [
+  `ALTER TABLE sync_settings ADD COLUMN fit_archive_path TEXT;`,
+];

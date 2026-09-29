@@ -158,3 +158,19 @@ export function hasDodofoToken(db: DatabaseSync): boolean {
     .get() as { dodofo_token: string | null } | undefined;
   return !!row?.dodofo_token;
 }
+
+/**
+ * Путь к папке с FIT-архивом Strava (для кнопки «Обновить»).
+ */
+export function setFitArchivePath(db: DatabaseSync, path: string | null): void {
+  db.prepare(`UPDATE sync_settings SET fit_archive_path = ? WHERE id = 1`).run(
+    path
+  );
+}
+
+export function getFitArchivePath(db: DatabaseSync): string | null {
+  const row = db
+    .prepare(`SELECT fit_archive_path FROM sync_settings WHERE id = 1`)
+    .get() as { fit_archive_path: string | null } | undefined;
+  return row?.fit_archive_path ?? null;
+}

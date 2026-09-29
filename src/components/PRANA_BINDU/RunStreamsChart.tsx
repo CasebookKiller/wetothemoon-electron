@@ -84,13 +84,26 @@ export const RunStreamsChart: React.FC<Props> = ({
     const xOpts: { label: string; value: string }[] = [];
     const yOpts: { label: string; value: string }[] = [];
 
+    // Кандидаты в X-ось для разных источников:
+    //  - dodofo: sec_t, dist_m, poly_sec_t
+    //  - fit/tcx (UnifiedStreams): secT, distM
+    const X_CANDIDATES = new Set([
+      'sec_t', 'secT',
+      'dist_m', 'distM',
+      'poly_sec_t', 'polySecT',
+    ]);
+
     for (const [key, val] of Object.entries(payload)) {
-      if (Array.isArray(val) && val.length > 0 && typeof val[0] === 'number') {
-        if (key === 'sec_t' || key === 'dist_m' || key === 'poly_sec_t') {
-          xOpts.push({ label: key, value: key });
-        }
-        yOpts.push({ label: key, value: key });
+      if (!Array.isArray(val) || val.length === 0) continue;
+
+      // Первый элемент может быть null (FIT) — ищем первый number.
+      const firstNum = val.find((v) => typeof v === 'number');
+      if (typeof firstNum !== 'number') continue;
+
+      if (X_CANDIDATES.has(key)) {
+        xOpts.push({ label: key, value: key });
       }
+      yOpts.push({ label: key, value: key });
     }
     return { xOptions: xOpts, yOptions: yOpts };
   }, [payload]);
@@ -98,20 +111,27 @@ export const RunStreamsChart: React.FC<Props> = ({
   // Автовыбор X
   useEffect(() => {
     if (!xOptions.length) return;
-    if (!xOptions.some((o) => o.value === xAxis)) {
-      const hasSecT = xOptions.find((o) => o.value === 'sec_t');
-      setXAxis(hasSecT ? 'sec_t' : xOptions[0].value);
-    }
+    if (xOptions.some((o) => o.value === xAxis)) return;
+
+    // Приоритет: секунды → дистанция → первый доступный
+    const prefer = ['sec_t', 'secT', 'poly_sec_t', 'polySecT', 'dist_m', 'distM'];
+    const found = prefer
+      .map((p) => xOptions.find((o) => o.value === p))
+      .find(Boolean);
+    setXAxis(found ? found.value : xOptions[0].value);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [xOptions]);
 
   // Автовыбор Y
   useEffect(() => {
     if (!yOptions.length) return;
-    if (!yOptions.some((o) => o.value === yChannel)) {
-      const hasHr = yOptions.find((o) => o.value === 'hr');
-      setYChannel(hasHr ? 'hr' : yOptions[0].value);
-    }
+    if (yOptions.some((o) => o.value === yChannel)) return;
+
+    const prefer = ['hr', 'heart_rate', 'speedKmh', 'speed_kmh', 'cadence', 'distM', 'dist_m'];
+    const found = prefer
+      .map((p) => yOptions.find((o) => o.value === p))
+      .find(Boolean);
+    setYChannel(found ? found.value : yOptions[0].value);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [yOptions]);
 
@@ -224,11 +244,11 @@ export const RunStreamsChart: React.FC<Props> = ({
     const yMax = max + yPadding;
 
     const xLabel =
-      xAxis === 'sec_t'
+      xAxis === 'sec_t' || xAxis === 'secT'
         ? 'время, сек'
-        : xAxis === 'dist_m'
+        : xAxis === 'dist_m' || xAxis === 'distM'
         ? 'дистанция, м'
-        : xAxis === 'poly_sec_t'
+        : xAxis === 'poly_sec_t' || xAxis === 'polySecT'
         ? 'секунда'
         : xAxis;
 

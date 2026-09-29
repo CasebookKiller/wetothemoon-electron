@@ -5,7 +5,7 @@
 import fs from 'fs';
 import path from 'path';
 import zlib from 'zlib';
-import { app, ipcMain, safeStorage } from 'electron';
+import { app, dialog, ipcMain, safeStorage } from 'electron';
 import {
   createPranaBinduWindow,
   getPranaBinduWindow,
@@ -37,6 +37,8 @@ import {
   getRunStreamWithPayload,
   getRunStreamMeta,
   hasRunStreams,
+  getFitArchivePath,
+  setFitArchivePath,
 } from '../services/pranaBindu/melange';
 
 import { DodofoProvider } from '../services/pranaBindu/spice/providers/dodofoProvider';
@@ -1046,13 +1048,49 @@ export function registerPranaBinduHandlers(): void {
     }
   });
 
+    // -------- Диалог выбора папки --------
+  ipcMain.handle(
+    'pb:pick-directory',
+    async (
+      _event,
+      opts?: { title?: string; defaultPath?: string }
+    ) => {
+      try {
+        const res = await dialog.showOpenDialog({
+          properties: ['openDirectory'],
+          title: opts?.title ?? 'Выберите папку',
+          defaultPath: opts?.defaultPath,
+        });
+        if (res.canceled || res.filePaths.length === 0) {
+          return { success: false, canceled: true };
+        }
+        return { success: true, path: res.filePaths[0] };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+  ipcMain.handle('pb:fit-archive-path-get', () => {
+    try {
+      return { success: true, path: getFitArchivePath(getMelange()) };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
   // -------- Импорт FIT из папки (.fit и .fit.gz) --------
   ipcMain.handle(
     'pb:import-fit-dir',
     async (
       _event,
       dirPath: string,
-      opts?: { recursive?: boolean; skipImported?: boolean; origin?: string }
+      opts?: {
+        recursive?: boolean;
+        skipImported?: boolean;
+        origin?: string;
+        savePath?: boolean;
+      }
     ) => {
       try {
         if (!dirPath || typeof dirPath !== 'string') {
@@ -1063,10 +1101,10 @@ export function registerPranaBinduHandlers(): void {
         }
 
         const recursive = opts?.recursive === true;
-        const skipImported = opts?.skipImported !== false;
+        const skipImported = opts?.skipImported === true; // по умолчанию — обновлять
         const origin = opts?.origin ?? 'strava-archive';
+        const savePath = opts?.savePath !== false;
 
-        // Собираем .fit И .fit.gz
         const files: string[] = [];
         const walk = (dir: string) => {
           const entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -1085,15 +1123,14 @@ export function registerPranaBinduHandlers(): void {
         const db = getMelange();
 
         let imported = 0;
+        let updated = 0;
         let skipped = 0;
         let failed = 0;
         const errors: Array<{ file: string; error: string }> = [];
         const importedIds: number[] = [];
 
         for (const file of files) {
-          const basename = path
-            .basename(file)
-            .replace(/\.fit(\.gz)?$/i, '');
+          const basename = path.basename(file).replace(/\.fit(\.gz)?$/i, '');
           const externalId = `fit:${basename}`;
 
           if (skipImported) {
@@ -1109,7 +1146,6 @@ export function registerPranaBinduHandlers(): void {
           }
 
           try {
-            // Читаем: обычный .fit — как есть; .fit.gz — через gunzip
             const buffer = file.toLowerCase().endsWith('.gz')
               ? zlib.gunzipSync(fs.readFileSync(file))
               : fs.readFileSync(file);
@@ -1140,7 +1176,7 @@ export function registerPranaBinduHandlers(): void {
               },
             };
 
-            const { id: runFactId } = upsertRunFact(db, raw);
+            const { inserted, id: runFactId } = upsertRunFact(db, raw);
 
             const row = db
               .prepare(`SELECT date FROM run_facts WHERE id = ?`)
@@ -1156,7 +1192,8 @@ export function registerPranaBinduHandlers(): void {
               workout.streams as unknown as Record<string, unknown>
             );
 
-            imported++;
+            if (inserted) imported++;
+            else updated++;
             importedIds.push(runFactId);
           } catch (e) {
             failed++;
@@ -1167,15 +1204,22 @@ export function registerPranaBinduHandlers(): void {
           }
         }
 
+        if (savePath && failed === 0) {
+          setFitArchivePath(db, dirPath);
+        }
+
         console.log(
           `[Prana-Bindu] import-fit-dir (${origin}) ${dirPath}: ` +
-          `imported=${imported}, skipped=${skipped}, failed=${failed}, total=${files.length}`
+          `imported=${imported}, updated=${updated}, skipped=${skipped}, ` +
+          `failed=${failed}, total=${files.length}`
         );
 
         return {
           success: true,
           origin,
+          dirPath,
           imported,
+          updated,
           skipped,
           failed,
           total: files.length,
