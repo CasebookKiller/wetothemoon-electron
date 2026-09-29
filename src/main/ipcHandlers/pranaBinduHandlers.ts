@@ -4,6 +4,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import zlib from 'zlib';
 import { app, ipcMain, safeStorage } from 'electron';
 import {
   createPranaBinduWindow,
@@ -956,6 +957,7 @@ export function registerPranaBinduHandlers(): void {
       const raw = {
         externalId,
         source: 'fit',
+        origin: 'strava-archive',   // ← добавили (или параметром, если нужно)
         startTime: workout.startTime,
         endTime,
         distanceM: workout.distanceM,
@@ -1022,6 +1024,148 @@ export function registerPranaBinduHandlers(): void {
       return { success: false, error: (e as Error).message };
     }
   });
+
+  // -------- Импорт FIT из папки (.fit и .fit.gz) --------
+  ipcMain.handle(
+    'pb:import-fit-dir',
+    async (
+      _event,
+      dirPath: string,
+      opts?: { recursive?: boolean; skipImported?: boolean; origin?: string }
+    ) => {
+      try {
+        if (!dirPath || typeof dirPath !== 'string') {
+          return { success: false, error: 'dirPath обязателен' };
+        }
+        if (!fs.existsSync(dirPath)) {
+          return { success: false, error: `Папка не найдена: ${dirPath}` };
+        }
+
+        const recursive = opts?.recursive === true;
+        const skipImported = opts?.skipImported !== false;
+        const origin = opts?.origin ?? 'strava-archive';
+
+        // Собираем .fit И .fit.gz
+        const files: string[] = [];
+        const walk = (dir: string) => {
+          const entries = fs.readdirSync(dir, { withFileTypes: true });
+          for (const e of entries) {
+            const full = path.join(dir, e.name);
+            if (e.isDirectory() && recursive) walk(full);
+            else if (e.isFile() && /\.fit(\.gz)?$/i.test(e.name)) files.push(full);
+          }
+        };
+        walk(dirPath);
+
+        if (files.length === 0) {
+          return { success: false, error: 'FIT-файлы не найдены' };
+        }
+
+        const db = getMelange();
+
+        let imported = 0;
+        let skipped = 0;
+        let failed = 0;
+        const errors: Array<{ file: string; error: string }> = [];
+        const importedIds: number[] = [];
+
+        for (const file of files) {
+          const basename = path
+            .basename(file)
+            .replace(/\.fit(\.gz)?$/i, '');
+          const externalId = `fit:${basename}`;
+
+          if (skipImported) {
+            const existing = db
+              .prepare(
+                `SELECT id FROM run_facts WHERE source = 'fit' AND external_id = ? LIMIT 1`
+              )
+              .get(externalId) as { id: number } | undefined;
+            if (existing) {
+              skipped++;
+              continue;
+            }
+          }
+
+          try {
+            // Читаем: обычный .fit — как есть; .fit.gz — через gunzip
+            const buffer = file.toLowerCase().endsWith('.gz')
+              ? zlib.gunzipSync(fs.readFileSync(file))
+              : fs.readFileSync(file);
+
+            const workout = await parseFit(buffer, { externalId: basename });
+
+            const startMs = new Date(workout.startTime).getTime();
+            const endTime = new Date(
+              startMs + workout.durationSec * 1000
+            ).toISOString();
+
+            const raw = {
+              externalId,
+              source: 'fit',
+              origin,
+              startTime: workout.startTime,
+              endTime,
+              distanceM: workout.distanceM,
+              durationS: workout.durationSec,
+              avgHr: workout.summary.avgHr,
+              maxHr: workout.summary.maxHr,
+              raw: {
+                sport: workout.sport,
+                summary: workout.summary,
+                validation: workout.validation,
+                lapCount: workout.laps?.length ?? 0,
+                importedFrom: file,
+              },
+            };
+
+            const { id: runFactId } = upsertRunFact(db, raw);
+
+            const row = db
+              .prepare(`SELECT date FROM run_facts WHERE id = ?`)
+              .get(runFactId) as { date: string } | undefined;
+            const dateForFile = row?.date ?? workout.startTime.slice(0, 10);
+
+            upsertRunStreams(
+              db,
+              runFactId,
+              'fit',
+              externalId,
+              dateForFile,
+              workout.streams as unknown as Record<string, unknown>
+            );
+
+            imported++;
+            importedIds.push(runFactId);
+          } catch (e) {
+            failed++;
+            errors.push({
+              file: path.basename(file),
+              error: (e as Error).message,
+            });
+          }
+        }
+
+        console.log(
+          `[Prana-Bindu] import-fit-dir (${origin}) ${dirPath}: ` +
+          `imported=${imported}, skipped=${skipped}, failed=${failed}, total=${files.length}`
+        );
+
+        return {
+          success: true,
+          origin,
+          imported,
+          skipped,
+          failed,
+          total: files.length,
+          importedIds,
+          errors: errors.slice(0, 20),
+        };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
 
   console.log('[Prana-Bindu] IPC-хендлеры зарегистрированы (pb:*)');
 }

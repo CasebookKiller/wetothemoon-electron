@@ -270,3 +270,10 @@ export const MIGRATION_V3_RUN_STREAMS: readonly string[] = [
   CREATE_RUN_STREAMS,
   `CREATE INDEX IF NOT EXISTS idx_run_streams_source ON run_streams(source);`,
 ];
+
+// ==================== Миграция v4: origin в run_facts ====================
+
+export const MIGRATION_V4_RUN_FACTS_ORIGIN: readonly string[] = [
+  `ALTER TABLE run_facts ADD COLUMN origin TEXT;`,
+  `CREATE INDEX IF NOT EXISTS idx_run_facts_origin ON run_facts(origin);`,
+];

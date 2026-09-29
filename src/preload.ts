@@ -699,6 +699,11 @@ try {
       importFit: (filePath: string) =>
         ipcRenderer.invoke('pb:import-fit', filePath),
 
+      importFitDir: (
+        dirPath: string,
+        opts?: { recursive?: boolean; skipImported?: boolean; origin?: string }
+      ) => ipcRenderer.invoke('pb:import-fit-dir', dirPath, opts),
+
     },
 
   });

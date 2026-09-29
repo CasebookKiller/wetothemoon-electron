@@ -18,6 +18,7 @@ export interface RunFactRow {
   duration_sec: number | null;
   rpe: number | null;
   source: string | null;
+  origin: string | null;       // ← новое
   external_id: string | null;
   raw_json: string | null;
   notes: string | null;
@@ -124,6 +125,7 @@ export function upsertRunFact(
         max_hr       = ?,
         duration_sec = ?,
         source       = ?,
+        origin       = ?,
         raw_json     = ?
        WHERE id = ?`
     ).run(
@@ -134,6 +136,7 @@ export function upsertRunFact(
       fact.maxHr != null ? Math.round(fact.maxHr) : null,
       fact.durationS != null ? Math.round(fact.durationS) : null,
       fact.source,
+      fact.origin ?? null,
       rawJson,
       existing.id
     );
@@ -144,17 +147,18 @@ export function upsertRunFact(
     .prepare(
       `INSERT INTO run_facts
         (date, actual_km, actual_pace, avg_hr, max_hr, duration_sec,
-         source, external_id, raw_json)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         source, origin, external_id, raw_json)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       date,
       actualKm,
       pace,
-      fact.avgHr ?? null,
-      fact.maxHr ?? null,
-      fact.durationS ?? null,
+      fact.avgHr != null ? Math.round(fact.avgHr) : null,
+      fact.maxHr != null ? Math.round(fact.maxHr) : null,
+      fact.durationS != null ? Math.round(fact.durationS) : null,
       fact.source,
+      fact.origin ?? null,
       fact.externalId,
       rawJson
     );

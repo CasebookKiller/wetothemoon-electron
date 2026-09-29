@@ -9,7 +9,7 @@ import {
   MIGRATION_V3_RUN_STREAMS,   // ← добавили
 } from './schema';
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 interface Migration {
   version: number;
@@ -55,6 +55,22 @@ const migrations: readonly Migration[] = [
     apply: (db) => {
       for (const sql of MIGRATION_V3_RUN_STREAMS) db.exec(sql);
       console.log('[Melange] v3: создана таблица run_streams');
+    },
+  },
+  {
+    version: 4,
+    apply: (db) => {
+      // Проверяем, что колонки ещё нет — идемпотентность
+      const cols = db
+        .prepare(`PRAGMA table_info(run_facts)`)
+        .all() as { name: string }[];
+      const has = (n: string) => cols.some((c) => c.name === n);
+
+      if (!has('origin')) {
+        db.exec(`ALTER TABLE run_facts ADD COLUMN origin TEXT;`);
+        console.log('[Melange] v4: добавлена колонка run_facts.origin');
+      }
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_run_facts_origin ON run_facts(origin);`);
     },
   },
 ];
