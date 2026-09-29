@@ -36,12 +36,22 @@ function extractMeta(payload: RunStreamsPayload): {
   const channels: string[] = [];
 
   for (const [key, value] of Object.entries(payload)) {
-    if (Array.isArray(value)) {
-      if (value.length > 0 && typeof value[0] === 'number') {
-        channels.push(key);
-        if (value.length > pointCount) pointCount = value.length;
+    if (!Array.isArray(value) || value.length === 0) continue;
+
+    // Массив числовой, если каждый элемент либо number, либо null/undefined.
+    // Так мы ловим и чистые number[], и (number|null)[] из FIT-парсера.
+    let numeric = true;
+    for (const v of value) {
+      if (v === null || v === undefined) continue;
+      if (typeof v !== 'number') {
+        numeric = false;
+        break;
       }
     }
+    if (!numeric) continue;
+
+    channels.push(key);
+    if (value.length > pointCount) pointCount = value.length;
   }
 
   return { pointCount, channels: channels.join(',') };

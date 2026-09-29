@@ -696,6 +696,9 @@ try {
       providerCapabilities: (name: string) =>
         ipcRenderer.invoke('pb:provider-capabilities', name),
 
+      importFit: (filePath: string) =>
+        ipcRenderer.invoke('pb:import-fit', filePath),
+
     },
 
   });

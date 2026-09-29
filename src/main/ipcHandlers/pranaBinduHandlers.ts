@@ -928,6 +928,101 @@ export function registerPranaBinduHandlers(): void {
     }
   );
 
+  // -------- Импорт FIT-файла в БД --------
+  ipcMain.handle('pb:import-fit', async (_event, filePath: string) => {
+    try {
+      if (!filePath || typeof filePath !== 'string') {
+        return { success: false, error: 'filePath обязателен' };
+      }
+      if (!fs.existsSync(filePath)) {
+        return { success: false, error: `Файл не найден: ${filePath}` };
+      }
+
+      const buffer = fs.readFileSync(filePath);
+      const basename = path.basename(filePath).replace(/\.fit$/i, '');
+      const externalId = `fit:${basename}`;
+
+      const t0 = Date.now();
+      const workout = await parseFit(buffer, { externalId: basename });
+      const parseMs = Date.now() - t0;
+
+      // Маппинг UnifiedWorkout → RawWorkout (контракт upsertRunFact).
+      // Дистанцию берём из workout.distanceM — это уже accel или gps
+      // по решению классификатора (в FIT distance = session.total_distance
+      // = шагомерная, и это самый надёжный источник).
+      const startMs = new Date(workout.startTime).getTime();
+      const endTime = new Date(startMs + workout.durationSec * 1000).toISOString();
+
+      const raw = {
+        externalId,
+        source: 'fit',
+        startTime: workout.startTime,
+        endTime,
+        distanceM: workout.distanceM,
+        durationS: workout.durationSec,
+        avgHr: workout.summary.avgHr,
+        maxHr: workout.summary.maxHr,
+        raw: {
+          sport: workout.sport,
+          summary: workout.summary,
+          validation: workout.validation,
+          lapCount: workout.laps?.length ?? 0,
+          streamLengths: {
+            secT: workout.streams.secT.length,
+            hr: workout.streams.hr?.length,
+            latlng: workout.streams.latlng?.length,
+          },
+          importedFrom: filePath,
+        },
+      };
+
+      const db = getMelange();
+      const { inserted, id: runFactId } = upsertRunFact(db, raw);
+
+      // Стримы пишем в run_streams под source='fit'.
+      // В run_facts дата уже зафиксирована в локальной зоне — читаем её
+      // для правильного раскладывания по папкам.
+      const row = db
+        .prepare(`SELECT date FROM run_facts WHERE id = ?`)
+        .get(runFactId) as { date: string } | undefined;
+      const dateForFile = row?.date ?? workout.startTime.slice(0, 10);
+
+      const streamsPayload = workout.streams as unknown as Record<string, unknown>;
+      const meta = upsertRunStreams(
+        db,
+        runFactId,
+        'fit',
+        externalId,
+        dateForFile,
+        streamsPayload
+      );
+
+      console.log(
+        `[Prana-Bindu] import-fit: ${basename} → run_fact #${runFactId} ` +
+        `(${inserted ? 'new' : 'update'}), streams: ${meta.point_count} pts, ` +
+        `${meta.size_bytes}B, channels=[${meta.channels}], parse ${parseMs}ms`
+      );
+
+      return {
+        success: true,
+        runFactId,
+        inserted,
+        source: 'fit',
+        externalId,
+        summary: workout.summary,
+        validation: workout.validation,
+        streams: {
+          pointCount: meta.point_count,
+          sizeBytes: meta.size_bytes,
+          channels: meta.channels,
+        },
+        parseMs,
+      };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
   console.log('[Prana-Bindu] IPC-хендлеры зарегистрированы (pb:*)');
 }
 
