@@ -137,4 +137,16 @@ export class DodofoProvider implements ZeppDataProvider {
       token
     );
   }
+
+  /**
+   * Тренировочные зоны Коггана.
+   * Путь: /api/v1/auth/me/zones
+   */
+  async fetchZones(): Promise<unknown> {
+    const token = this.getToken();
+    if (!token) throw new Error('dodofo token not configured');
+    return await dodofoRequest<unknown>('/api/v1/auth/me/zones', token);
+  }
+
+  
 }

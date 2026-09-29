@@ -757,3 +757,335 @@ span.pb-destructive {
   padding-top: 0.75rem;
   border-top: 1px solid var(--surface-border, rgba(255,255,255,0.1));
 }
+
+/* ============================================================
+   График потоков
+   ============================================================ */
+
+.pb-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.pb-chart__controls {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.pb-chart__control {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  flex: 1 1 8rem;
+  min-width: 7rem;
+}
+
+.pb-chart__dropdown {
+  width: 100%;
+}
+
+.pb-chart__stats {
+  display: flex;
+  gap: 0.75rem;
+  font-size: 0.8rem;
+  color: var(--tg-theme-hint-color, #708499);
+  flex-wrap: wrap;
+}
+
+.pb-chart__stats b {
+  color: var(--pb-accent);
+  font-weight: 600;
+}
+
+.pb-chart__canvas {
+  height: 240px;
+  position: relative;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 6px;
+  padding: 0.5rem;
+}
+
+/* ============================================================
+   Debug dialog
+   ============================================================ */
+
+.pb-debug-dialog .p-dialog-content {
+  padding: 0.75rem 1rem !important;
+  background: var(--tg-theme-bg-color, #17212b);
+  color: var(--tg-theme-text-color, #f5f5f5);
+}
+
+.pb-debug__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.pb-debug__runfact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* small занимает всю ширину строки, переносится под строку с input */
+.pb-debug__runfact-hint {
+  flex-basis: 100%;
+  order: 10;              /* всегда после label и input */
+  margin-top: 0.15rem;
+  margin-bottom: 0;
+}
+
+.pb-debug__input {
+  width: 8rem;
+}
+
+.pb-debug__meta {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--tg-theme-hint-color, #708499);
+}
+
+.pb-debug__hint {
+  font-size: 0.85rem;
+  color: var(--tg-theme-hint-color, #708499);
+  padding: 0.5rem 0;
+  margin-bottom: 0.5rem;
+}
+
+.pb-debug__pre {
+  max-height: 60vh;
+  overflow: auto;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 0.75rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #d4e0ea;
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+}
+
+.pb-debug-dialog .p-tabview-panels {
+  background: transparent;
+  padding: 0.5rem 0 0 0;
+}
+
+.pb-debug-dialog .p-tabview-nav-link {
+  color: var(--tg-theme-hint-color, #708499);
+  background: transparent;
+}
+
+.pb-debug-dialog .p-tabview-nav li.p-highlight .p-tabview-nav-link {
+  color: var(--pb-accent) !important;
+  border-color: var(--pb-accent) !important;
+  background: transparent !important;
+}
+
+/* ============================================================
+   Debug: InputNumber с горизонтальными кнопками в pb-стиле
+   ============================================================ */
+
+.pb-debug__input.p-inputnumber {
+  display: inline-flex !important;
+  align-items: stretch;
+  height: 2.5rem;
+}
+
+/* Сам input — без закруглений, кроме краёв */
+.pb-debug__input .p-inputnumber-input.p-inputtext {
+  height: 2.5rem !important;
+  padding: 0 0.75rem !important;
+  background: transparent !important;
+  color: var(--tg-theme-text-color, #f5f5f5) !important;
+  border: 1px solid var(--pb-accent) !important;
+  border-radius: 0 !important;
+  box-sizing: border-box;
+  text-align: center;
+  width: 6rem;
+  flex: 0 0 auto;
+}
+
+.pb-debug__input .p-inputnumber-input.p-inputtext:enabled:focus {
+  outline: none !important;
+  box-shadow: 0 0 0 1px var(--pb-accent) !important;
+  border-color: var(--pb-accent) !important;
+}
+
+/* Кнопки-плюс и минус */
+.pb-debug__input .p-inputnumber-button {
+  width: 2.5rem !important;
+  height: 2.5rem !important;
+  padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: transparent !important;
+  color: var(--pb-accent) !important;
+  border: 1px solid var(--pb-accent) !important;
+  border-radius: 0 !important;
+  box-sizing: border-box;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.pb-debug__input .p-inputnumber-button:hover:not(:disabled) {
+  background: var(--pb-accent) !important;
+  color: var(--tg-theme-bg-color, #1a1a1a) !important;
+}
+
+.pb-debug__input .p-inputnumber-button:focus {
+  outline: none !important;
+  box-shadow: 0 0 0 1px var(--pb-accent) !important;
+}
+
+.pb-debug__input .p-inputnumber-button:disabled {
+  opacity: 0.35 !important;
+  cursor: not-allowed;
+}
+
+/* Закругления — только у крайних кнопок */
+.pb-debug__input .p-inputnumber-button.p-inputnumber-decrement-button {
+  border-top-left-radius: 6px !important;
+  border-bottom-left-radius: 6px !important;
+  border-right: none !important;
+}
+
+.pb-debug__input .p-inputnumber-button.p-inputnumber-increment-button {
+  border-top-right-radius: 6px !important;
+  border-bottom-right-radius: 6px !important;
+  border-left: none !important;
+}
+
+/* Иконки внутри кнопок */
+.pb-debug__input .p-inputnumber-button .pi {
+  font-size: 0.8rem;
+}
+
+/* ============================================================
+   Debug dialog: заголовок в стиле Prana-Bindu
+   ============================================================ */
+
+.pb-debug-dialog .p-dialog-header {
+  background: var(--tg-theme-section-bg-color, #1e2a38);
+  color: var(--pb-accent);
+  border: none !important;
+  border-bottom: 1px solid var(--surface-border, rgba(255, 255, 255, 0.08)) !important;
+  padding: 0.75rem 1rem;
+}
+
+.pb-debug-dialog .p-dialog-header .p-dialog-title {
+  color: var(--pb-accent) !important;
+  font-weight: 600;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* Иконка закрытия */
+.pb-debug-dialog .p-dialog-header .p-dialog-header-icon,
+.pb-debug-dialog .p-dialog-header .p-dialog-header-close {
+  color: var(--pb-accent) !important;
+  background: transparent !important;
+  width: 2rem !important;
+  height: 2rem !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 6px !important;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.pb-debug-dialog .p-dialog-header .p-dialog-header-icon:hover,
+.pb-debug-dialog .p-dialog-header .p-dialog-header-close:hover {
+  background: color-mix(in srgb, var(--pb-accent) 14%, transparent) !important;
+  color: var(--pb-accent) !important;
+}
+
+/* Иконки maximize */
+.pb-debug-dialog .p-dialog-header .p-dialog-header-maximize {
+  color: var(--pb-accent) !important;
+  background: transparent !important;
+}
+
+.pb-debug-dialog .p-dialog-header .p-dialog-header-maximize:hover {
+  background: color-mix(in srgb, var(--pb-accent) 14%, transparent) !important;
+}
+
+/* ============================================================
+   Debug: индикатор «плоских» каналов
+   ============================================================ */
+
+.pb-chan-list {
+  margin-bottom: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 6px;
+}
+
+.pb-chan-list__title {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--tg-theme-hint-color, #708499);
+  margin-bottom: 0.4rem;
+}
+
+.pb-chan {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding: 0.2rem 0;
+  font-size: 0.8rem;
+}
+
+.pb-chan__key {
+  font-weight: 600;
+  min-width: 6rem;
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+}
+
+.pb-chan__badge {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.05rem 0.4rem;
+  border-radius: 3px;
+  font-weight: 600;
+}
+
+.pb-chan__meta {
+  color: var(--tg-theme-hint-color, #708499);
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  font-size: 0.75rem;
+}
+
+/* OK — зелёный */
+.pb-chan--ok .pi { color: #6fbf73; }
+.pb-chan--ok .pb-chan__badge {
+  background: rgba(111, 191, 115, 0.15);
+  color: #6fbf73;
+}
+
+/* Low var — жёлтый */
+.pb-chan--low .pi { color: #e8a838; }
+.pb-chan--low .pb-chan__badge {
+  background: rgba(232, 168, 56, 0.15);
+  color: #e8a838;
+}
+
+/* Flat — красный */
+.pb-chan--flat .pi { color: #ec3942; }
+.pb-chan--flat .pb-chan__badge {
+  background: rgba(236, 57, 66, 0.15);
+  color: #ec3942;
+}

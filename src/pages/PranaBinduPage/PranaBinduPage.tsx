@@ -13,6 +13,7 @@ import {
   RunStreamsDrawer,
   type RunFactLite,
 } from '@/components/PRANA_BINDU/RunStreamsDrawer';
+import { DodofoDebugDialog } from '@/components/PRANA_BINDU/DodofoDebugDialog';
 
 import './PranaBinduPage.css';
 
@@ -109,19 +110,35 @@ export const PranaBinduPage: React.FC = () => {
   } | null>(null);
   const [streamsAllError, setStreamsAllError] = useState('');
 
+  // Debug
+  const [debugVisible, setDebugVisible] = useState(false);
+
+
   // ==================== Загрузка потоков (map) ====================
 
   const loadStreamsMap = async (items: any[]) => {
+    console.log('[loadStreamsMap] start, items:', items.length);
     if (!api?.pb?.listRunStreamsBatch || items.length === 0) {
+      console.log('[loadStreamsMap] skip');
       setStreamsMap({});
       return;
     }
     try {
       const ids = items.map((x) => x.id);
+      console.log('[loadStreamsMap] ids:', ids);
       const res = await api.pb.listRunStreamsBatch(ids);
-      if (res?.success) setStreamsMap(res.data ?? {});
-    } catch {
-      // ignore
+      console.log('[loadStreamsMap] res.success:', res?.success, 'keys:', Object.keys(res?.data ?? {}));
+      //if (res?.success) setStreamsMap(res.data ?? {});
+      if (res?.success) {
+        const raw = res.data ?? {};
+        const normalized: Record<number, any[]> = {};
+        for (const [k, v] of Object.entries(raw)) {
+          normalized[Number(k)] = v as any[];
+        }
+        setStreamsMap(normalized);
+      }
+    } catch (e) {
+      console.error('[loadStreamsMap] ERROR:', e);
     }
   };
 
@@ -534,6 +551,13 @@ export const PranaBinduPage: React.FC = () => {
                 }
                 tooltip="Загрузить секундные потоки за выбранный период (для тренировок без потоков)"
               />
+              <Button
+                label="Отладка"
+                icon="pi pi-code"
+                className="pb-soft p-button-sm"
+                onClick={() => setDebugVisible(true)}
+                tooltip="Сырые ответы dodofo API"
+              />
             </div>
             <small className="pb-hint">
               Повторный запуск за тот же период не создаёт дубликаты —
@@ -671,6 +695,12 @@ export const PranaBinduPage: React.FC = () => {
           />
         </DataTable>
       </Panel>
+
+      <DodofoDebugDialog
+        visible={debugVisible}
+        onHide={() => setDebugVisible(false)}
+        initialRunFactId={selectedFact?.id ?? null}
+      />
 
       <RunStreamsDrawer
         visible={drawerVisible}

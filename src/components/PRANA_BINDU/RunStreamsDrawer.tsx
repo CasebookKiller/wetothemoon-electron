@@ -7,6 +7,7 @@ import React, { useEffect, useState } from 'react';
 import { Button } from 'primereact/button';
 import { Message } from 'primereact/message';
 import { Sidebar } from 'primereact/sidebar';
+import { RunStreamsChart } from './RunStreamsChart';
 
 export interface RunFactLite {
   id: number;
@@ -171,6 +172,17 @@ export const RunStreamsDrawer: React.FC<Props> = ({
             <span>{runFact.source ?? '—'}</span>
           </div>
         </div>
+      )}
+
+      {!loading && metas.length > 0 && metas[0] && (
+        <>
+          <div className="pb-drawer__section-title">График</div>
+          <RunStreamsChart
+            runFactId={runFact?.id ?? null}
+            source={metas[0].source}
+            refreshKey={metas[0].fetched_at}
+          />
+        </>
       )}
 
       <div className="pb-drawer__section-title">

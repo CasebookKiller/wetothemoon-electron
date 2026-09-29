@@ -681,6 +681,13 @@ try {
       listRunStreamsBatch: (runFactIds: number[]) =>
         ipcRenderer.invoke('pb:list-run-streams-batch', runFactIds),
 
+      getRunStreams: (runFactId: number, source: string) =>
+        ipcRenderer.invoke('pb:get-run-streams', runFactId, source),
+
+      debugThresholds: () => ipcRenderer.invoke('pb:debug-thresholds'),
+
+      debugZones: () => ipcRenderer.invoke('pb:debug-zones'),
+
     },
 
   });

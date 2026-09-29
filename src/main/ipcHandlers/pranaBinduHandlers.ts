@@ -503,7 +503,45 @@ export function registerPranaBinduHandlers(): void {
     }
   );
 
-    // -------- Сохранение потоков одной тренировки --------
+    // -------- Разведка: сырой ответ fetchThresholds --------
+  ipcMain.handle('pb:debug-thresholds', async () => {
+    try {
+      const provider = getProvider('dodofo') as any;
+      if (!provider || typeof provider.fetchThresholds !== 'function') {
+        return { success: false, error: 'Провайдер dodofo не поддерживает fetchThresholds' };
+      }
+      const t0 = Date.now();
+      const raw = await provider.fetchThresholds();
+      const dt = Date.now() - t0;
+
+      console.log('[Prana-Bindu] debug-thresholds:', JSON.stringify(raw));
+
+      return { success: true, fetchMs: dt, data: raw };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  // -------- Разведка: сырой ответ fetchZones --------
+  ipcMain.handle('pb:debug-zones', async () => {
+    try {
+      const provider = getProvider('dodofo') as any;
+      if (!provider || typeof provider.fetchZones !== 'function') {
+        return { success: false, error: 'Провайдер dodofo не поддерживает fetchZones' };
+      }
+      const t0 = Date.now();
+      const raw = await provider.fetchZones();
+      const dt = Date.now() - t0;
+
+      console.log('[Prana-Bindu] debug-zones:', JSON.stringify(raw));
+
+      return { success: true, fetchMs: dt, data: raw };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  // -------- Сохранение потоков одной тренировки --------
   ipcMain.handle(
     'pb:sync-run-streams',
     async (_event, runFactId: number) => {
@@ -573,7 +611,7 @@ export function registerPranaBinduHandlers(): void {
     }
   );
 
-    // -------- Массовая заливка потоков за период --------
+  // -------- Массовая заливка потоков за период --------
   ipcMain.handle(
     'pb:sync-run-streams-all',
     async (_event, from: string, to: string, opts?: { onlyMissing?: boolean }) => {
@@ -678,7 +716,29 @@ export function registerPranaBinduHandlers(): void {
     }
   });
 
-    // -------- Метаданные потоков для набора run_fact_id (для таблицы) --------
+  // -------- Payload потоков для графика --------
+  ipcMain.handle(
+    'pb:get-run-streams',
+    (_event, runFactId: number, source: string) => {
+      try {
+        if (!Number.isFinite(runFactId) || !source) {
+          return { success: false, error: 'runFactId и source обязательны' };
+        }
+        const res = getRunStreamWithPayload(getMelange(), runFactId, source);
+        if (!res) {
+          return { success: false, error: 'Потоки не найдены' };
+        }
+        if (!res.payload) {
+          return { success: false, error: 'Файл потоков не найден или повреждён' };
+        }
+        return { success: true, meta: res.meta, payload: res.payload };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+  // -------- Метаданные потоков для набора run_fact_id (для таблицы) --------
   ipcMain.handle(
     'pb:list-run-streams-batch',
     (_event, runFactIds: number[]) => {
