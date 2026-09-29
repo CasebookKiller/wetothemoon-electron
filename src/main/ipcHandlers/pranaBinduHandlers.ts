@@ -383,6 +383,33 @@ export function registerPranaBinduHandlers(): void {
     }
   );
 
+  // -------- Все тренировки за дату --------
+  ipcMain.handle('pb:list-run-facts-by-date', (_event, date: string) => {
+    try {
+      if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        return { success: false, error: 'Дата в формате YYYY-MM-DD' };
+      }
+      const rows = getMelange()
+        .prepare(
+          `SELECT * FROM run_facts
+           WHERE date = ?
+           ORDER BY
+             CASE source
+               WHEN 'fit' THEN 1
+               WHEN 'tcx' THEN 2
+               WHEN 'dodofo' THEN 3
+               WHEN 'manual' THEN 4
+               ELSE 5
+             END,
+             id ASC`
+        )
+        .all(date) as unknown as any[];
+      return { success: true, items: rows, total: rows.length };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
   // -------- Ручная синхронизация --------
   ipcMain.handle(
     'pb:sync-now',

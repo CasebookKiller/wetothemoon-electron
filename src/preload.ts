@@ -714,6 +714,8 @@ try {
       fitArchivePathGet: () =>
         ipcRenderer.invoke('pb:fit-archive-path-get'),
 
+      listRunFactsByDate: (date: string) =>
+        ipcRenderer.invoke('pb:list-run-facts-by-date', date),
 
     },
 

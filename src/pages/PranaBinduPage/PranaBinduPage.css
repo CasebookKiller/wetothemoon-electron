@@ -1238,3 +1238,88 @@ span.pb-destructive {
 .pb-archive-path i {
   opacity: 0.6;
 }
+
+/* ============================================================
+   Source panel внутри drawer
+   ============================================================ */
+
+.pb-source-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.pb-source-panel__source {
+  margin-bottom: 0.25rem;
+}
+
+.pb-source-panel__badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--pb-accent) 15%, transparent);
+  color: var(--pb-accent);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: lowercase;
+}
+
+/* ============================================================
+   TabView внутри drawer — pb-стиль
+   ============================================================ */
+
+.pb-drawer .p-tabview {
+  background: transparent;
+}
+
+.pb-drawer .p-tabview .p-tabview-nav {
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 1px solid var(--surface-border, rgba(255, 255, 255, 0.1)) !important;
+  padding: 0;
+  margin-bottom: 0.75rem;
+}
+
+.pb-drawer .p-tabview .p-tabview-nav li {
+  margin-right: 0.25rem;
+}
+
+.pb-drawer .p-tabview .p-tabview-nav li .p-tabview-nav-link {
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 2px solid transparent !important;
+  border-radius: 0 !important;
+  color: var(--tg-theme-hint-color, #708499) !important;
+  font-size: 0.85rem;
+  padding: 0.5rem 0.75rem;
+  transition: color 0.15s ease, border-color 0.15s ease;
+  box-shadow: none !important;
+}
+
+.pb-drawer .p-tabview .p-tabview-nav li:not(.p-highlight) .p-tabview-nav-link:hover {
+  color: var(--pb-accent) !important;
+  border-bottom-color: color-mix(in srgb, var(--pb-accent) 40%, transparent) !important;
+}
+
+.pb-drawer .p-tabview .p-tabview-nav li.p-highlight .p-tabview-nav-link {
+  background: transparent !important;
+  border-bottom: 2px solid var(--pb-accent) !important;
+  color: var(--pb-accent) !important;
+}
+
+.pb-drawer .p-tabview .p-tabview-nav-link:focus {
+  box-shadow: none !important;
+}
+
+/* Убираем «инк» анимацию PrimeReact под активным табом */
+.pb-drawer .p-tabview .p-tabview-ink-bar {
+  background-color: var(--pb-accent) !important;
+  display: none !important;
+}
+
+.pb-drawer .p-tabview .p-tabview-panels {
+  background: transparent !important;
+  padding: 0 !important;
+  border: none !important;
+}
