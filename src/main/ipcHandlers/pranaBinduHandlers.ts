@@ -549,12 +549,31 @@ export function registerPranaBinduHandlers(): void {
   });
 
   // -------- Синхронизация порогов --------
-  ipcMain.handle('pb:sync-thresholds', async () => {
+  // -------- Подтянуть пороги из активного провайдера --------
+  ipcMain.handle('pb:sync-thresholds', async (_event, providerName?: string) => {
     try {
-      const provider = getProvider('dodofo') as any;
-      if (!provider || typeof provider.fetchThresholds !== 'function') {
-        return { success: false, error: 'Провайдер dodofo не поддерживает fetchThresholds' };
+      const name =
+        providerName ??
+        getSyncSettings(getMelange()).source ??
+        'dodofo';
+
+      const provider = getProvider(name) as any;
+      if (!provider) {
+        return { success: false, error: `Провайдер «${name}» не зарегистрирован` };
       }
+      if (!provider.capabilities?.thresholds) {
+        return {
+          success: false,
+          error: `Провайдер «${name}» не поддерживает пороги`,
+        };
+      }
+      if (typeof provider.fetchThresholds !== 'function') {
+        return {
+          success: false,
+          error: `Провайдер «${name}» не реализует fetchThresholds`,
+        };
+      }
+
       const raw = await provider.fetchThresholds();
       const db = getMelange();
 
@@ -577,13 +596,14 @@ export function registerPranaBinduHandlers(): void {
       if (Object.keys(patch).length === 0) {
         return {
           success: false,
-          error: 'dodofo не отдал ни одного порога',
+          error: `Провайдер «${name}» не отдал ни одного порога`,
         };
       }
 
       const updated = updateProfile(db, patch);
-      console.log(`[Prana-Bindu] sync-thresholds: ${applied.join(', ')}`);
-      return { success: true, applied, data: updated };
+      console.log(`[Prana-Bindu] sync-thresholds (${name}): ${applied.join(', ')}`);
+
+      return { success: true, provider: name, applied, data: updated };
     } catch (e) {
       return { success: false, error: (e as Error).message };
     }
