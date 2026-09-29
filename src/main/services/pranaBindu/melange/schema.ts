@@ -283,3 +283,10 @@ export const MIGRATION_V4_RUN_FACTS_ORIGIN: readonly string[] = [
 export const MIGRATION_V5_FIT_ARCHIVE: readonly string[] = [
   `ALTER TABLE sync_settings ADD COLUMN fit_archive_path TEXT;`,
 ];
+
+// ==================== Миграция v6: start_time в run_facts ====================
+
+export const MIGRATION_V6_RUN_FACTS_START_TIME: readonly string[] = [
+  `ALTER TABLE run_facts ADD COLUMN start_time TEXT;`,
+  `CREATE INDEX IF NOT EXISTS idx_run_facts_date_start ON run_facts(date, start_time);`,
+];

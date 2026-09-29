@@ -716,6 +716,8 @@ try {
 
       listRunFactsByDate: (date: string) =>
         ipcRenderer.invoke('pb:list-run-facts-by-date', date),
+      backfillStartTime: () =>
+        ipcRenderer.invoke('pb:backfill-start-time'),
 
     },
 

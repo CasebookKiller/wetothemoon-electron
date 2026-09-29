@@ -10,6 +10,7 @@ import type { RawWorkout } from '../../spice/providers/types';
 export interface RunFactRow {
   id: number;
   date: string;
+  start_time: string | null;   // ← новое
   plan_id: number | null;
   actual_km: number | null;
   actual_pace: string | null;
@@ -18,7 +19,7 @@ export interface RunFactRow {
   duration_sec: number | null;
   rpe: number | null;
   source: string | null;
-  origin: string | null;       // ← новое
+  origin: string | null;
   external_id: string | null;
   raw_json: string | null;
   notes: string | null;
@@ -61,6 +62,18 @@ function formatPaceFromRaw(
 
 function round3(n: number): number {
   return Math.round(n * 1000) / 1000;
+}
+
+/**
+ * Приводит значение к ISO-строке или null. node:sqlite не умеет биндить Date
+ * напрямую, а разные источники (fit-file-parser, будущие парсеры) могут
+ * возвращать Date-объекты в timestamp-полях.
+ */
+function toIsoOrNull(v: unknown): string | null {
+  if (v == null) return null;
+  if (typeof v === 'string') return v;
+  if (v instanceof Date) return v.toISOString();
+  return String(v);
 }
 
 // ==================== Чтение ====================
@@ -119,6 +132,7 @@ export function upsertRunFact(
     db.prepare(
       `UPDATE run_facts SET
         date         = ?,
+        start_time   = ?,
         actual_km    = ?,
         actual_pace  = ?,
         avg_hr       = ?,
@@ -130,6 +144,7 @@ export function upsertRunFact(
        WHERE id = ?`
     ).run(
       date,
+      toIsoOrNull(fact.startTime),
       actualKm,
       pace,
       fact.avgHr != null ? Math.round(fact.avgHr) : null,
@@ -146,12 +161,13 @@ export function upsertRunFact(
   const info = db
     .prepare(
       `INSERT INTO run_facts
-        (date, actual_km, actual_pace, avg_hr, max_hr, duration_sec,
-         source, origin, external_id, raw_json)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        (date, start_time, actual_km, actual_pace, avg_hr, max_hr,
+         duration_sec, source, origin, external_id, raw_json)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       date,
+      toIsoOrNull(fact.startTime),
       actualKm,
       pace,
       fact.avgHr != null ? Math.round(fact.avgHr) : null,

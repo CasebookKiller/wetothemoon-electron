@@ -67,6 +67,18 @@ export function parseFit(
   });
 }
 
+function toIsoString(v: unknown): string {
+  if (v == null) return new Date().toISOString();
+  if (v instanceof Date) return v.toISOString();
+  if (typeof v === 'string') return v;
+  try {
+    const d = new Date(v as any);
+    return Number.isNaN(d.getTime()) ? String(v) : d.toISOString();
+  } catch {
+    return String(v);
+  }
+}
+
 function buildUnifiedWorkout(
   data: any,
   options: ParseFitOptions
@@ -78,7 +90,10 @@ function buildUnifiedWorkout(
   if (records.length < 2) throw new Error('FIT: недостаточно records');
 
   // === Агрегаты из session ===
-  const startTime: string = session.start_time ?? records[0].timestamp;
+  // fit-file-parser возвращает timestamp как Date-объект.
+  // node:sqlite принимает только строку/число/null — конвертируем явно.
+  const startTimeRaw = session.start_time ?? records[0].timestamp;
+  const startTime = toIsoString(startTimeRaw);
   const durationSec: number = Math.round(session.total_timer_time ?? 0);
   const distanceM: number = Math.round(session.total_distance ?? 0);
   const sport = mapSport(session.sport);

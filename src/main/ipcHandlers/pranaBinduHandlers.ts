@@ -1075,7 +1075,89 @@ export function registerPranaBinduHandlers(): void {
     }
   });
 
-    // -------- Диалог выбора папки --------
+  // -------- Однократный бэкфилл start_time --------
+  ipcMain.handle('pb:backfill-start-time', async () => {
+    try {
+      const db = getMelange();
+      const rows = db
+        .prepare(
+          `SELECT id, source, external_id, date, raw_json
+           FROM run_facts
+           WHERE start_time IS NULL`
+        )
+        .all() as unknown as Array<{
+          id: number;
+          source: string;
+          external_id: string | null;
+          date: string;
+          raw_json: string | null;
+        }>;
+
+      let updated = 0;
+      let fallback = 0;
+      let failed = 0;
+      const errors: Array<{ id: number; error: string }> = [];
+
+      const updateStmt = db.prepare(
+        `UPDATE run_facts SET start_time = ? WHERE id = ?`
+      );
+
+      for (const row of rows) {
+        try {
+          let startTime: string | null = null;
+
+          if (row.source === 'dodofo' && row.raw_json) {
+            const raw = JSON.parse(row.raw_json);
+            startTime = raw?.started_at ?? null;
+          } else if (row.source === 'fit' && row.raw_json) {
+            const raw = JSON.parse(row.raw_json);
+            const filePath: string | undefined = raw?.importedFrom;
+            if (filePath && fs.existsSync(filePath)) {
+              const buffer = filePath.toLowerCase().endsWith('.gz')
+                ? zlib.gunzipSync(fs.readFileSync(filePath))
+                : fs.readFileSync(filePath);
+              const basename = path
+                .basename(filePath)
+                .replace(/\.fit(\.gz)?$/i, '');
+              const workout = await parseFit(buffer, { externalId: basename });
+              startTime = workout.startTime;
+            }
+          }
+
+          if (!startTime) {
+            // fallback — полдень дня. Дальше можно скорректировать
+            // вручную или переимпортом.
+            startTime = `${row.date}T12:00:00.000Z`;
+            fallback++;
+          }
+
+          updateStmt.run(startTime, row.id);
+          updated++;
+        } catch (e) {
+          failed++;
+          errors.push({ id: row.id, error: (e as Error).message });
+        }
+      }
+
+      console.log(
+        `[Prana-Bindu] backfill-start-time: updated=${updated}, ` +
+        `fallback=${fallback}, failed=${failed}, total=${rows.length}`
+      );
+
+      return {
+        success: true,
+        updated,
+        fallback,
+        failed,
+        total: rows.length,
+        errors: errors.slice(0, 20),
+      };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  // -------- Диалог выбора папки --------
   ipcMain.handle(
     'pb:pick-directory',
     async (
@@ -1180,9 +1262,7 @@ export function registerPranaBinduHandlers(): void {
             const workout = await parseFit(buffer, { externalId: basename });
 
             const startMs = new Date(workout.startTime).getTime();
-            const endTime = new Date(
-              startMs + workout.durationSec * 1000
-            ).toISOString();
+            const endTime = new Date(startMs + workout.durationSec * 1000).toISOString();
 
             const raw = {
               externalId,

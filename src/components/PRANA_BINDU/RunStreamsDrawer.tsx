@@ -11,9 +11,18 @@ import { Sidebar } from 'primereact/sidebar';
 import { TabView, TabPanel } from 'primereact/tabview';
 import { RunStreamsChart } from './RunStreamsChart';
 
+/**
+ * Порог, при котором две записи считаются одной тренировкой
+ * из разных источников (не утро+вечер).
+ * Синхронизировано с PranaBinduPage.tsx.
+ */
+const SAME_WORKOUT_WINDOW_MIN = 30;
+const SAME_WORKOUT_WINDOW_MS = SAME_WORKOUT_WINDOW_MIN * 60 * 1000;
+
 export interface RunFactLite {
   id: number;
   date: string;
+  start_time?: string | null;   // ← новое
   source: string | null;
   origin?: string | null;
   actual_km: number | null;
@@ -110,6 +119,7 @@ const SourcePanel: React.FC<{
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [fact.id]);
 
   const handleSync = async () => {
@@ -265,9 +275,10 @@ export const RunStreamsDrawer: React.FC<Props> = ({
       try {
         const res = await api.pb.listRunFactsByDate(runFact.date);
         if (res?.success && Array.isArray(res.items) && res.items.length > 0) {
-          const items: RunFactLite[] = res.items.map((r: any) => ({
+          const all: RunFactLite[] = res.items.map((r: any) => ({
             id: r.id,
             date: r.date,
+            start_time: r.start_time ?? null,
             source: r.source,
             origin: r.origin ?? null,
             actual_km: r.actual_km,
@@ -276,7 +287,25 @@ export const RunStreamsDrawer: React.FC<Props> = ({
             avg_hr: r.avg_hr,
             max_hr: r.max_hr,
           }));
-          setFacts(items);
+
+          // Фильтр: только источники, относящиеся к той же тренировке,
+          // что и кликнутая строка.
+          const anchorMs = runFact.start_time
+            ? new Date(runFact.start_time).getTime()
+            : null;
+
+          const filtered = anchorMs
+            ? all.filter((f) => {
+                const ms = f.start_time
+                  ? new Date(f.start_time).getTime()
+                  : null;
+                // Нет времени хотя бы у одного → та же тренировка
+                if (anchorMs == null || ms == null) return true;
+                return Math.abs(ms - anchorMs) <= SAME_WORKOUT_WINDOW_MS;
+              })
+            : all;
+
+          setFacts(filtered.length > 0 ? filtered : [runFact]);
         } else {
           setFacts([runFact]);
         }
@@ -287,7 +316,7 @@ export const RunStreamsDrawer: React.FC<Props> = ({
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, runFact?.date, runFact?.id]);
+  }, [visible, runFact?.date, runFact?.id, runFact?.start_time]);
 
   const hasMulti = facts.length > 1;
 

@@ -45,6 +45,14 @@ function toIsoDate(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+/**
+ * Две записи считаются «одной тренировкой из разных источников»,
+ * если start_time отличается меньше чем на это окно.
+ * Потом вынесем в настройки приложения.
+ */
+const SAME_WORKOUT_WINDOW_MIN = 30;
+const SAME_WORKOUT_WINDOW_MS = SAME_WORKOUT_WINDOW_MIN * 60 * 1000;
+
 function defaultSyncRange(): { from: Date; to: Date } {
   const to = new Date();
   const from = new Date();
@@ -64,6 +72,106 @@ function fmtDuration(sec: number | null | undefined): string {
   const s = sec % 60;
   if (h > 0) return `${h}ч ${String(m).padStart(2, '0')}м`;
   return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+const SOURCE_PRIORITY: Record<string, number> = {
+  fit: 1,
+  tcx: 2,
+  manual: 3,
+  dodofo: 4,
+};
+
+interface GroupedRunFact {
+  date: string;
+  startTime: string | null;   // якорь группы
+  sources: string[];
+  primary: any;
+  count: number;
+  hasStreams: boolean;
+}
+
+function groupRunFacts(
+  items: any[],
+  streamsMap: Record<number, any[]>
+): GroupedRunFact[] {
+  if (items.length === 0) return [];
+
+  // 1. Сортировка: по дате, потом по start_time (null — в конец)
+  const sorted = [...items].sort((a, b) => {
+    if (a.date !== b.date) return a.date.localeCompare(b.date);
+    const sa = a.start_time ?? '9999-12-31T23:59:59Z';
+    const sb = b.start_time ?? '9999-12-31T23:59:59Z';
+    return sa.localeCompare(sb);
+  });
+
+  // 2. Группировка: подряд идущие записи с одной датой.
+  //    Если хотя бы у одной в группе нет start_time — считаем её той же тренировкой.
+  const groups: any[][] = [];
+  for (const it of sorted) {
+    const last = groups[groups.length - 1];
+
+    if (last && last.length > 0) {
+      const anchor = last[0];
+      const sameDate = anchor.date === it.date;
+
+      if (sameDate) {
+        const anchorMs = anchor.start_time
+          ? new Date(anchor.start_time).getTime()
+          : null;
+        const itMs = it.start_time
+          ? new Date(it.start_time).getTime()
+          : null;
+
+        // Одна тренировка, если:
+        //  a) хотя бы у одной нет start_time
+        //  b) или времена в пределах окна
+        const noTime = anchorMs == null || itMs == null;
+        const withinWindow =
+          anchorMs != null &&
+          itMs != null &&
+          Math.abs(itMs - anchorMs) <= SAME_WORKOUT_WINDOW_MS;
+
+        if (noTime || withinWindow) {
+          last.push(it);
+          continue;
+        }
+      }
+    }
+
+    groups.push([it]);
+  }
+
+  // 3. Из каждой группы — GroupedRunFact
+  return groups
+    .map((group) => {
+      const sortedGroup = [...group].sort((a, b) => {
+        const pa = SOURCE_PRIORITY[a.source ?? ''] ?? 99;
+        const pb = SOURCE_PRIORITY[b.source ?? ''] ?? 99;
+        if (pa !== pb) return pa - pb;
+        return (a.id ?? 0) - (b.id ?? 0);
+      });
+      const sources = sortedGroup.map((s) => s.source ?? '—');
+      const hasStreams = sortedGroup.some((s) => streamsMap[s.id]?.length);
+
+      // Якорный start_time: берём первый непустой из группы
+      const anchorStartTime =
+        sortedGroup.find((s) => s.start_time)?.start_time ?? null;
+
+      return {
+        date: group[0].date,
+        startTime: anchorStartTime,
+        sources,
+        primary: sortedGroup[0],
+        count: sortedGroup.length,
+        hasStreams,
+      };
+    })
+    .sort((a, b) => {
+      if (a.date !== b.date) return b.date.localeCompare(a.date);
+      const sa = a.startTime ?? '';
+      const sb = b.startTime ?? '';
+      return sb.localeCompare(sa);
+    });
 }
 
 export const PranaBinduPage: React.FC = () => {
@@ -103,6 +211,7 @@ export const PranaBinduPage: React.FC = () => {
 
   // Таблица пробежек
   const [runFacts, setRunFacts] = useState<any[]>([]);
+  
   const [factsLoading, setFactsLoading] = useState(false);
   const [factsError, setFactsError] = useState('');
 
@@ -163,6 +272,11 @@ export const PranaBinduPage: React.FC = () => {
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileError, setProfileError] = useState('');
   const [profileSaved, setProfileSaved] = useState(false);
+
+  const groupedFacts = React.useMemo(
+    () => groupRunFacts(runFacts, streamsMap),
+    [runFacts, streamsMap]
+  );
 
   // ==================== Загрузка списка пробежек ====================
 
@@ -1000,7 +1114,11 @@ export const PranaBinduPage: React.FC = () => {
       </Panel>
 
       <Panel
-        header={`Пробежки (${runFacts.length})`}
+        header={`Пробежки (${groupedFacts.length}${
+          groupedFacts.length !== runFacts.length
+            ? ` · ${runFacts.length} записей`
+            : ''
+        })`}
         className="shadow-5 mb-3 pb-panel"
       >
         {factsError && (
@@ -1008,7 +1126,7 @@ export const PranaBinduPage: React.FC = () => {
         )}
 
         <DataTable
-          value={runFacts}
+          value={groupedFacts}
           loading={factsLoading}
           size="small"
           stripedRows
@@ -1018,19 +1136,23 @@ export const PranaBinduPage: React.FC = () => {
           className="p-datatable-sm"
           selectionMode="single"
           onRowClick={(e) => {
-            setSelectedFact(e.data as RunFactLite);
+            const g = e.data as GroupedRunFact;
+            setSelectedFact({
+              ...(g.primary as RunFactLite),
+              start_time: g.startTime,
+            });
             setDrawerVisible(true);
           }}
         >
           <Column
             header=""
             style={{ width: '40px', textAlign: 'center' }}
-            body={(r) =>
-              streamsMap[r.id]?.length ? (
+            body={(r: GroupedRunFact) =>
+              r.hasStreams ? (
                 <i
                   className="pi pi-chart-line"
                   style={{ color: 'var(--pb-accent)' }}
-                  title={`Потоков: ${streamsMap[r.id].length}`}
+                  title="Есть потоки"
                 />
               ) : (
                 <i
@@ -1045,41 +1167,68 @@ export const PranaBinduPage: React.FC = () => {
             field="date"
             header="Дата"
             sortable
-            style={{ width: '110px' }}
+            style={{ width: '140px' }}
+            body={(r: GroupedRunFact) => {
+              let time = '';
+              if (r.startTime) {
+                const t = new Date(r.startTime);
+                if (!Number.isNaN(t.getTime())) {
+                  time = ` ${String(t.getHours()).padStart(2, '0')}:${String(
+                    t.getMinutes()
+                  ).padStart(2, '0')}`;
+                }
+              }
+              return (
+                <span title={`Источников: ${r.count}`}>
+                  {r.date}
+                  {time}
+                </span>
+              );
+            }}
           />
           <Column
-            field="actual_km"
             header="Км"
-            body={(r) => fmtKm(r.actual_km)}
             sortable
+            sortField="primary.actual_km"
             style={{ width: '80px' }}
+            body={(r: GroupedRunFact) => fmtKm(r.primary.actual_km)}
           />
           <Column
-            field="actual_pace"
             header="Темп"
             style={{ width: '80px' }}
+            body={(r: GroupedRunFact) => r.primary.actual_pace ?? '—'}
           />
           <Column
-            field="duration_sec"
             header="Время"
-            body={(r) => fmtDuration(r.duration_sec)}
             style={{ width: '100px' }}
+            body={(r: GroupedRunFact) => fmtDuration(r.primary.duration_sec)}
           />
           <Column
-            field="avg_hr"
             header="Ср. пульс"
             style={{ width: '100px' }}
+            body={(r: GroupedRunFact) => r.primary.avg_hr ?? '—'}
           />
           <Column
-            field="max_hr"
             header="Макс. пульс"
-            body={(r) => r.max_hr ?? '—'}
             style={{ width: '110px' }}
+            body={(r: GroupedRunFact) => r.primary.max_hr ?? '—'}
           />
           <Column
-            field="source"
-            header="Источник"
-            style={{ width: '100px' }}
+            header="Источники"
+            style={{ width: '160px' }}
+            body={(r: GroupedRunFact) => (
+              <div className="pb-source-badges">
+                {r.sources.map((s, i) => (
+                  <span
+                    key={`${r.date}-${s}-${i}`}
+                    className={`pb-source-badge pb-source-badge--${s}`}
+                    title={s}
+                  >
+                    {s}
+                  </span>
+                ))}
+              </div>
+            )}
           />
         </DataTable>
       </Panel>

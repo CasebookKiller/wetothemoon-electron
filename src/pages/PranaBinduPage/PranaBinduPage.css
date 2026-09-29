@@ -1323,3 +1323,45 @@ span.pb-destructive {
   padding: 0 !important;
   border: none !important;
 }
+
+/* ============================================================
+   Бейджи источников в таблице
+   ============================================================ */
+
+.pb-source-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+}
+
+.pb-source-badge {
+  display: inline-block;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.7rem;
+  line-height: 1.2;
+  border-radius: 3px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+  white-space: nowrap;
+}
+
+.pb-source-badge--fit {
+  background: color-mix(in srgb, var(--pb-accent) 22%, transparent);
+  color: var(--pb-accent);
+}
+
+.pb-source-badge--tcx {
+  background: rgba(106, 178, 242, 0.18);
+  color: #6ab2f2;
+}
+
+.pb-source-badge--dodofo {
+  background: rgba(232, 168, 56, 0.18);
+  color: #e8a838;
+}
+
+.pb-source-badge--manual {
+  background: rgba(111, 191, 115, 0.18);
+  color: #6fbf73;
+}

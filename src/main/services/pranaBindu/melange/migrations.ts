@@ -8,9 +8,10 @@ import {
   MIGRATION_V2_DODOFO,
   MIGRATION_V3_RUN_STREAMS,   // ← добавили
   MIGRATION_V5_FIT_ARCHIVE,   // ← добавьте
+  MIGRATION_V6_RUN_FACTS_START_TIME,   // ← добавьте
 } from './schema';
 
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 interface Migration {
   version: number;
@@ -86,6 +87,23 @@ const migrations: readonly Migration[] = [
         db.exec(`ALTER TABLE sync_settings ADD COLUMN fit_archive_path TEXT;`);
         console.log('[Melange] v5: добавлена колонка sync_settings.fit_archive_path');
       }
+    },
+  },
+    {
+    version: 6,
+    apply: (db) => {
+      const cols = db
+        .prepare(`PRAGMA table_info(run_facts)`)
+        .all() as { name: string }[];
+      const has = (n: string) => cols.some((c) => c.name === n);
+
+      if (!has('start_time')) {
+        db.exec(`ALTER TABLE run_facts ADD COLUMN start_time TEXT;`);
+        console.log('[Melange] v6: добавлена колонка run_facts.start_time');
+      }
+      db.exec(
+        `CREATE INDEX IF NOT EXISTS idx_run_facts_date_start ON run_facts(date, start_time);`
+      );
     },
   },
 ];
