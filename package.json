@@ -75,6 +75,8 @@
     "chartjs-plugin-zoom": "^2.2.0",
     "dotenv": "^17.4.2",
     "electron-squirrel-startup": "^1.0.1",
+    "fast-xml-parser": "^5.11.2",
+    "fit-file-parser": "^6.1.2",
     "fs-extra": "^11.3.5",
     "highlight.js": "^11.11.1",
     "ignore": "^7.0.5",

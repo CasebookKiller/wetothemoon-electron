@@ -690,6 +690,9 @@ try {
 
       debugZones: () => ipcRenderer.invoke('pb:debug-zones'),
 
+      debugParseFit: (filePath: string) =>
+        ipcRenderer.invoke('pb:debug-parse-fit', filePath),
+
       providerCapabilities: (name: string) =>
         ipcRenderer.invoke('pb:provider-capabilities', name),
 

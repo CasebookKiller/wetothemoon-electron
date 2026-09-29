@@ -39,6 +39,7 @@ import {
 } from '../services/pranaBindu/melange';
 
 import { DodofoProvider } from '../services/pranaBindu/spice/providers/dodofoProvider';
+import { parseFit } from '../services/pranaBindu/spice/parsers/fitParser';
 
 // ==================== Регистрация провайдеров ====================
 
@@ -623,6 +624,61 @@ export function registerPranaBinduHandlers(): void {
       console.log('[Prana-Bindu] debug-zones:', JSON.stringify(raw));
 
       return { success: true, fetchMs: dt, data: raw };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  // -------- Разведка: парсинг FIT --------
+  ipcMain.handle('pb:debug-parse-fit', async (_event, filePath: string) => {
+    try {
+      if (!filePath || typeof filePath !== 'string') {
+        return { success: false, error: 'filePath обязателен' };
+      }
+      if (!fs.existsSync(filePath)) {
+        return { success: false, error: `Файл не найден: ${filePath}` };
+      }
+
+      const buffer = fs.readFileSync(filePath);
+      const externalId = path.basename(filePath).replace(/\.fit$/i, '');
+
+      const t0 = Date.now();
+      const workout = await parseFit(buffer, { externalId });
+      const dt = Date.now() - t0;
+
+      const summary = {
+        source: workout.source,
+        externalId: workout.externalId,
+        startTime: workout.startTime,
+        durationSec: workout.durationSec,
+        distanceM: workout.distanceM,
+        sport: workout.sport,
+        streamLengths: {
+          secT: workout.streams.secT.length,
+          hr: workout.streams.hr?.length,
+          speedKmh: workout.streams.speedKmh?.length,
+          cadence: workout.streams.cadence?.length,
+          elevationM: workout.streams.elevationM?.length,
+          latlng: workout.streams.latlng?.length,
+          distM: workout.streams.distM?.length,
+        },
+        summary: workout.summary,
+        validation: workout.validation,
+        lapCount: workout.laps?.length ?? 0,
+        parseMs: dt,
+        fileBytes: buffer.length,
+      };
+
+      console.log(
+        `[Prana-Bindu] debug-parse-fit: ${externalId}, ` +
+        `records=${workout.streams.secT.length}, ` +
+        `HR uniq=${new Set(workout.streams.hr?.filter((v) => v != null)).size}, ` +
+        `GPS=${workout.summary.gpsCoveragePct}%, ` +
+        `flags=[${workout.validation.flags.join(',')}], ` +
+        `conf=${workout.validation.confidence}, ${dt}ms`
+      );
+
+      return { success: true, data: summary };
     } catch (e) {
       return { success: false, error: (e as Error).message };
     }
