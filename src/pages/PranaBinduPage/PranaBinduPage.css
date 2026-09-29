@@ -1089,3 +1089,130 @@ span.pb-destructive {
   background: rgba(236, 57, 66, 0.15);
   color: #ec3942;
 }
+
+/* ============================================================
+   Профиль
+   ============================================================ */
+
+.pb-profile__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+@media (max-width: 700px) {
+  .pb-profile__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pb-profile__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.pb-profile__missing {
+  margin-left: 0.5rem;
+  font-size: 0.7rem;
+  color: #e8a838;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.pb-profile__actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* ============================================================
+   InputNumber с горизонтальными кнопками в pb-стиле
+   (используется в debug-dialog и в панели «Профиль»)
+   ============================================================ */
+
+.pb-debug__input.p-inputnumber {
+  display: inline-flex !important;
+  align-items: stretch;
+  height: 2.5rem;
+  max-width: 100%;
+  width: 100%;
+}
+
+/* Input — гибкий, сжимается при необходимости */
+.pb-debug__input .p-inputnumber-input.p-inputtext {
+  flex: 1 1 auto !important;
+  min-width: 2.5rem;
+  width: auto !important;
+  height: 2.5rem !important;
+  padding: 0 0.5rem !important;
+  background: transparent !important;
+  color: var(--tg-theme-text-color, #f5f5f5) !important;
+  border: 1px solid var(--pb-accent) !important;
+  border-radius: 0 !important;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.pb-debug__input .p-inputnumber-input.p-inputtext:enabled:focus {
+  outline: none !important;
+  box-shadow: 0 0 0 1px var(--pb-accent) !important;
+  border-color: var(--pb-accent) !important;
+}
+
+/* Кнопки + и − — жёстко 2.5×2.5rem, побеждают min-width: 120px */
+.pb-debug__input .p-inputnumber-button {
+  flex: 0 0 2.5rem !important;
+  width: 2.5rem !important;
+  min-width: 2.5rem !important;
+  max-width: 2.5rem !important;
+  height: 2.5rem !important;
+  padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: transparent !important;
+  color: var(--pb-accent) !important;
+  border: 1px solid var(--pb-accent) !important;
+  border-radius: 0 !important;
+  box-sizing: border-box;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.pb-debug__input .p-inputnumber-button:hover:not(:disabled) {
+  background: var(--pb-accent) !important;
+  color: var(--tg-theme-bg-color, #1a1a1a) !important;
+}
+
+.pb-debug__input .p-inputnumber-button:focus {
+  outline: none !important;
+  box-shadow: 0 0 0 1px var(--pb-accent) !important;
+}
+
+.pb-debug__input .p-inputnumber-button:disabled {
+  opacity: 0.35 !important;
+  cursor: not-allowed;
+}
+
+/* Скругления — только внешних углов */
+.pb-debug__input .p-inputnumber-button.p-inputnumber-decrement-button {
+  border-top-left-radius: 6px !important;
+  border-bottom-left-radius: 6px !important;
+  border-right: none !important;
+}
+
+.pb-debug__input .p-inputnumber-button.p-inputnumber-increment-button {
+  border-top-right-radius: 6px !important;
+  border-bottom-right-radius: 6px !important;
+  border-left: none !important;
+}
+
+.pb-debug__input .p-inputnumber-button .pi {
+  font-size: 0.8rem;
+}
+
+/* В панели «Профиль» — inputnumber растягивается на всю колонку */
+.pb-profile__field .pb-debug__input.p-inputnumber {
+  width: 100%;
+}

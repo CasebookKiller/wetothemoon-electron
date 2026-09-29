@@ -237,6 +237,26 @@ export function registerPranaBinduHandlers(): void {
     }
   });
 
+  // -------- Возможности провайдера --------
+  ipcMain.handle('pb:provider-capabilities', (_event, name: string) => {
+    try {
+      const provider = getProvider(name);
+      if (!provider) {
+        return {
+          success: false,
+          error: `Провайдер «${name}» не зарегистрирован`,
+        };
+      }
+      return {
+        success: true,
+        provider: name,
+        data: provider.capabilities,
+      };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
   // -------- Подключение к Zepp --------
   ipcMain.handle('pb:zepp-connect', async (_event, email: string, password: string) => {
     if (!email || !password) {
@@ -380,9 +400,15 @@ export function registerPranaBinduHandlers(): void {
       }
 
       try {
-        const provider = getProvider('dodofo');
+        const provider = getProvider('dodofo') as any;
         if (!provider) {
           return { success: false, error: 'Провайдер dodofo не зарегистрирован' };
+        }
+        if (typeof provider.fetchWorkouts !== 'function') {
+          return {
+            success: false,
+            error: 'Провайдер dodofo не реализует fetchWorkouts',
+          };
         }
 
         const db = getMelange();
@@ -522,21 +548,19 @@ export function registerPranaBinduHandlers(): void {
     }
   });
 
-  // -------- Подтянуть пороги из dodofo --------
+  // -------- Синхронизация порогов --------
   ipcMain.handle('pb:sync-thresholds', async () => {
     try {
       const provider = getProvider('dodofo') as any;
       if (!provider || typeof provider.fetchThresholds !== 'function') {
         return { success: false, error: 'Провайдер dodofo не поддерживает fetchThresholds' };
       }
-
       const raw = await provider.fetchThresholds();
       const db = getMelange();
 
       const patch: Record<string, number> = {};
       const applied: string[] = [];
 
-      // Толерантно: пишем только то, что пришло.
       if (raw?.resthr?.value != null) {
         patch.restingHr = Number(raw.resthr.value);
         applied.push(`resthr=${raw.resthr.value}`);
@@ -553,18 +577,13 @@ export function registerPranaBinduHandlers(): void {
       if (Object.keys(patch).length === 0) {
         return {
           success: false,
-          error: 'dodofo не отдал ни одного порога (только resthr поддерживается)',
+          error: 'dodofo не отдал ни одного порога',
         };
       }
 
       const updated = updateProfile(db, patch);
       console.log(`[Prana-Bindu] sync-thresholds: ${applied.join(', ')}`);
-
-      return {
-        success: true,
-        applied,
-        data: updated,
-      };
+      return { success: true, applied, data: updated };
     } catch (e) {
       return { success: false, error: (e as Error).message };
     }

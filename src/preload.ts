@@ -689,6 +689,9 @@ try {
 
       debugZones: () => ipcRenderer.invoke('pb:debug-zones'),
 
+      providerCapabilities: (name: string) =>
+        ipcRenderer.invoke('pb:provider-capabilities', name),
+
     },
 
   });

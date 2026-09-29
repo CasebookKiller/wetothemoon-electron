@@ -16,6 +16,7 @@ import {
 import { DodofoDebugDialog } from '@/components/PRANA_BINDU/DodofoDebugDialog';
 
 import './PranaBinduPage.css';
+import { InputNumber } from 'primereact/inputnumber';
 
 interface ProviderOption {
   label: string;
@@ -69,6 +70,14 @@ export const PranaBinduPage: React.FC = () => {
   const api = (window as any).electronAPI;
 
   const [provider, setProvider] = useState<string>('dodofo');
+  const [providerCaps, setProviderCaps] = useState<{
+    workouts: boolean;
+    streams: boolean;
+    thresholds: boolean;
+    zones: boolean;
+    wellness: boolean;
+  } | null>(null);
+  
   const [status, setStatus] = useState<string>('');
   const [loading, setLoading] = useState(false);
 
@@ -146,6 +155,16 @@ export const PranaBinduPage: React.FC = () => {
     }
   };
 
+  // ========================== Профиль =============================
+  const [profile, setProfile] = useState<{
+    maxHr: number | null;
+    lthr: number | null;
+    restingHr: number | null;
+  }>({ maxHr: null, lthr: null, restingHr: null });
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileError, setProfileError] = useState('');
+  const [profileSaved, setProfileSaved] = useState(false);
+
   // ==================== Загрузка списка пробежек ====================
 
   const loadRunFacts = async (from?: Date, to?: Date) => {
@@ -170,6 +189,23 @@ export const PranaBinduPage: React.FC = () => {
     }
   };
 
+    const loadProfile = async () => {
+    if (!api?.pb?.getProfile) return;
+    try {
+      const res = await api.pb.getProfile();
+      if (res?.success) {
+        const d = res.data ?? {};
+        setProfile({
+          maxHr: d.maxHr ?? null,
+          lthr: d.lactateThresholdHr ?? d.lthr ?? null,
+          restingHr: d.restingHr ?? null,
+        });
+      }
+    } catch {
+      // ignore
+    }
+  };
+
   // Загрузка токена + пробежек при монтировании
   useEffect(() => {
     (async () => {
@@ -182,12 +218,23 @@ export const PranaBinduPage: React.FC = () => {
       }
     })();
     loadRunFacts();
+    loadProfile();   // ← добавил
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Сброс статуса при смене провайдера
   useEffect(() => {
     setStatus('');
+    (async () => {
+      if (!api?.pb?.providerCapabilities) return;
+      try {
+        const res = await api.pb.providerCapabilities(provider);
+        if (res?.success) setProviderCaps(res.data);
+        else setProviderCaps(null);
+      } catch {
+        setProviderCaps(null);
+      }
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [provider]);
 
@@ -286,15 +333,12 @@ export const PranaBinduPage: React.FC = () => {
   // ==================== Синхронизация порогов ====================
 
   const handleSyncThresholds = async () => {
-    if (!api?.pb?.syncThresholds) {
-      setThresholdsError('electronAPI.pb.syncThresholds недоступен');
-      return;
-    }
+    if (!api?.pb?.syncThresholds) return;
     setSyncingThresholds(true);
     setThresholdsError('');
     setThresholdsResult('');
     try {
-      const res = await api.pb.syncThresholds();
+      const res = await api.pb.syncThresholds(provider);   // ← передаём текущий
       if (res.success) {
         setThresholdsResult(
           (res.applied ?? []).join(' · ') || 'обновлено'
@@ -482,6 +526,35 @@ export const PranaBinduPage: React.FC = () => {
     );
   };
 
+  // ==================== Сохранение Профиля ===============
+
+  const handleSaveProfile = async () => {
+    if (!api?.pb?.updateProfile) {
+      setProfileError('electronAPI.pb.updateProfile недоступен');
+      return;
+    }
+    setProfileSaving(true);
+    setProfileError('');
+    setProfileSaved(false);
+    try {
+      const res = await api.pb.updateProfile({
+        maxHr: profile.maxHr,
+        lthr: profile.lthr,
+        restingHr: profile.restingHr,
+      });
+      if (res?.success) {
+        setProfileSaved(true);
+        setTimeout(() => setProfileSaved(false), 2000);
+      } else {
+        setProfileError(res?.error ?? 'Не удалось сохранить');
+      }
+    } catch (e) {
+      setProfileError((e as Error).message);
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
   return (
     <div className="pb-page p-4">
       <div className="mb-4">
@@ -502,6 +575,112 @@ export const PranaBinduPage: React.FC = () => {
           </div>
         ))}
       </div>
+
+      <Panel header="Профиль" className="shadow-5 mb-3 pb-panel">
+        <div className="pb-profile__grid">
+          <div className="pb-profile__field">
+            <label className="pb-label" htmlFor="pb-profile-hrmax">
+              HRmax
+              {!profile.maxHr && <span className="pb-profile__missing">не задан</span>}
+            </label>
+            <InputNumber
+              inputId="pb-profile-hrmax"
+              value={profile.maxHr}
+              onValueChange={(e) =>
+                setProfile((p) => ({ ...p, maxHr: e.value ?? null }))
+              }
+              placeholder="напр. 178"
+              min={100}
+              max={230}
+              showButtons
+              buttonLayout="horizontal"
+              incrementButtonIcon="pi pi-plus"
+              decrementButtonIcon="pi pi-minus"
+              className="pb-debug__input"
+            />
+            <small className="pb-hint">Максимальный пульс. dodofo не отдаёт — задайте вручную.</small>
+          </div>
+
+          <div className="pb-profile__field">
+            <label className="pb-label" htmlFor="pb-profile-lthr">
+              LTHR
+              {!profile.lthr && <span className="pb-profile__missing">не задан</span>}
+            </label>
+            <InputNumber
+              inputId="pb-profile-lthr"
+              value={profile.lthr}
+              onValueChange={(e) =>
+                setProfile((p) => ({ ...p, lthr: e.value ?? null }))
+              }
+              placeholder="напр. 165"
+              min={80}
+              max={220}
+              showButtons
+              buttonLayout="horizontal"
+              incrementButtonIcon="pi pi-plus"
+              decrementButtonIcon="pi pi-minus"
+              className="pb-debug__input"
+            />
+            <small className="pb-hint">Лактатный порог. Ключевой параметр для зон.</small>
+          </div>
+
+          <div className="pb-profile__field">
+            <label className="pb-label" htmlFor="pb-profile-resthr">
+              RestHR
+              {!profile.restingHr && <span className="pb-profile__missing">не задан</span>}
+            </label>
+            <InputNumber
+              inputId="pb-profile-resthr"
+              value={profile.restingHr}
+              onValueChange={(e) =>
+                setProfile((p) => ({ ...p, restingHr: e.value ?? null }))
+              }
+              placeholder="напр. 48"
+              min={30}
+              max={120}
+              showButtons
+              buttonLayout="horizontal"
+              incrementButtonIcon="pi pi-plus"
+              decrementButtonIcon="pi pi-minus"
+              className="pb-debug__input"
+            />
+            <small className="pb-hint">Пульс покоя. Подтягивается из dodofo.</small>
+          </div>
+        </div>
+
+        <div className="pb-profile__actions">
+          <Button
+            label={
+              profileSaving
+                ? 'Сохранение…'
+                : profileSaved
+                ? 'Сохранено'
+                : 'Сохранить'
+            }
+            icon={
+              profileSaving
+                ? 'pi pi-spin pi-spinner'
+                : profileSaved
+                ? 'pi pi-check'
+                : 'pi pi-save'
+            }
+            className="pb p-button-sm"
+            onClick={handleSaveProfile}
+            disabled={profileSaving}
+          />
+          <Button
+            label="Перечитать"
+            icon="pi pi-refresh"
+            className="pb-soft p-button-sm"
+            onClick={loadProfile}
+            disabled={profileSaving}
+          />
+        </div>
+
+        {profileError && (
+          <Message severity="error" text={profileError} className="w-full mt-2" />
+        )}
+      </Panel>
 
       <Panel header="Синхронизация" className="shadow-5 mb-3 pb-panel">
         <div className="flex flex-column gap-3">
@@ -550,16 +729,13 @@ export const PranaBinduPage: React.FC = () => {
                 onClick={handleSync}
                 disabled={
                   syncing ||
-                  !hasDodofoToken ||
-                  provider !== 'dodofo' ||
+                  !providerCaps?.workouts ||
                   !syncFrom ||
                   !syncTo
                 }
                 tooltip={
-                  provider !== 'dodofo'
-                    ? 'Синхронизация пока только для dodofo'
-                    : !hasDodofoToken
-                    ? 'Сначала сохраните токен dodofo'
+                  !providerCaps?.workouts
+                    ? `Провайдер «${provider}» не поддерживает список тренировок`
                     : undefined
                 }
               />
@@ -574,12 +750,15 @@ export const PranaBinduPage: React.FC = () => {
                 onClick={handleSyncAllStreams}
                 disabled={
                   syncingStreams ||
-                  !hasDodofoToken ||
-                  provider !== 'dodofo' ||
+                  !providerCaps?.streams ||
                   !syncFrom ||
                   !syncTo
                 }
-                tooltip="Загрузить секундные потоки за выбранный период (для тренировок без потоков)"
+                tooltip={
+                  !providerCaps?.streams
+                    ? `Провайдер «${provider}» не поддерживает потоки`
+                    : 'Загрузить секундные потоки за выбранный период'
+                }
               />
               <Button
                 label={syncingThresholds ? 'Пороги…' : 'Подтянуть пороги'}
@@ -590,10 +769,12 @@ export const PranaBinduPage: React.FC = () => {
                 }
                 className="pb-soft p-button-sm"
                 onClick={handleSyncThresholds}
-                disabled={
-                  syncingThresholds || !hasDodofoToken || provider !== 'dodofo'
+                disabled={syncingThresholds || !providerCaps?.thresholds}
+                tooltip={
+                  !providerCaps?.thresholds
+                    ? `Провайдер «${provider}» не поддерживает пороги`
+                    : 'Забрать пороги (restHR и др.) в профиль'
                 }
-                tooltip="Забрать пороги (restHR и др.) из dodofo в профиль"
               />
               <Button
                 label="Отладка"

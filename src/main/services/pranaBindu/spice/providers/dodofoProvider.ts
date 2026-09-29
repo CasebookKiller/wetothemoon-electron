@@ -5,7 +5,7 @@
 // через safeStorage). Расшифровка — снаружи, в handler; сюда
 // приходит уже готовая функция getToken().
 
-import type { ZeppDataProvider, ProviderCheckResult, RawWorkout } from './types';
+import type { ZeppDataProvider, ProviderCheckResult, RawWorkout, ProviderCapabilities } from './types';
 import {
   dodofoRequest,
   DodofoApiError,
@@ -47,6 +47,14 @@ function activityToRawWorkout(a: DodofoActivity): RawWorkout {
 
 export class DodofoProvider implements ZeppDataProvider {
   readonly name = 'dodofo';
+
+  readonly capabilities: ProviderCapabilities = {
+    workouts: true,
+    streams: true,
+    thresholds: true,   // только resthr, но метод реализован
+    zones: true,        // метод реализован, но ответ пустой (не ошибка)
+    wellness: false,    // TODO: реализуем в блоке wellness
+  };
 
   /**
    * Колбэк, возвращающий уже расшифрованный Bearer-токен.

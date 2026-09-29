@@ -7,11 +7,20 @@ import type {
   ZeppDataProvider,
   ProviderCheckResult,
   RawWorkout,
+  ProviderCapabilities,
 } from './types';
 
 export class DofekZeppProvider implements ZeppDataProvider {
   readonly name = 'dofek-zepp';
 
+  readonly capabilities: ProviderCapabilities = {
+    workouts: true,
+    streams: false,      // пока не реализовали
+    thresholds: false,
+    zones: false,
+    wellness: false,
+  };
+  
   /**
    * Проверка доступности. Сейчас — просто сообщаем, что провайдер
    * рабочий. Реальная проверка через sync_settings (наличие appToken)

@@ -7,10 +7,19 @@ import type {
   ZeppDataProvider,
   ProviderCheckResult,
   RawWorkout,
+  ProviderCapabilities,
 } from './types';
 
 export class ZeppMcpProvider implements ZeppDataProvider {
   readonly name = 'zepp-mcp';
+
+  readonly capabilities: ProviderCapabilities = {
+    workouts: false,
+    streams: false,
+    thresholds: false,
+    zones: false,
+    wellness: false,
+  };
 
   async isAvailable(): Promise<ProviderCheckResult> {
     return { available: false, reason: 'not implemented' };
