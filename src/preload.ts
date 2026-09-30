@@ -719,6 +719,25 @@ try {
       backfillStartTime: () =>
         ipcRenderer.invoke('pb:backfill-start-time'),
 
+      importCancel: () => ipcRenderer.invoke('pb:import-cancel'),
+      onImportProgress: (
+        cb: (data: {
+          current: number;
+          total: number;
+          filename: string;
+          imported: number;
+          updated: number;
+          skipped: number;
+          failed: number;
+        }) => void
+      ) => {
+        ipcRenderer.removeAllListeners('pb:import-progress');
+        ipcRenderer.on('pb:import-progress', (_e, data) => cb(data));
+      },
+      removeImportProgressListener: () => {
+        ipcRenderer.removeAllListeners('pb:import-progress');
+      },
+
     },
 
   });

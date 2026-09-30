@@ -43,10 +43,13 @@ import {
 
 import { DodofoProvider } from '../services/pranaBindu/spice/providers/dodofoProvider';
 import { parseFit } from '../services/pranaBindu/spice/parsers/fitParser';
+import { parseTcx } from '../services/pranaBindu/spice/parsers/tcxParser';
 
 // ==================== Регистрация провайдеров ====================
 
 let providersRegistered = false;
+/** Флаг отмены текущего импорта (один импорт за раз — этого достаточно). */
+let importFitCancelRequested = false;
 
 function ensureProvidersRegistered(): void {
   if (providersRegistered) return;
@@ -128,6 +131,33 @@ function summarizeStreams(raw: unknown): Record<string, unknown> {
 
   walk(raw);
   return out;
+}
+
+/**
+ * Читает файл (.fit / .fit.gz / .tcx / .tcx.gz) и парсит в UnifiedWorkout.
+ * Возвращает workout и реальный source ('fit' | 'tcx').
+ */
+function parseWorkoutFile(
+  filePath: string,
+  externalId: string
+): Promise<import('../services/pranaBindu/spice/parsers/types').UnifiedWorkout> {
+  const lower = filePath.toLowerCase();
+  const isGz = lower.endsWith('.gz');
+  const isFit = /\.fit(\.gz)?$/i.test(lower);
+  const isTcx = /\.tcx(\.gz)?$/i.test(lower);
+
+  const raw = fs.readFileSync(filePath);
+  const buffer = isGz ? zlib.gunzipSync(raw) : raw;
+
+  if (isFit) return parseFit(buffer, { externalId });
+  if (isTcx) return Promise.resolve(parseTcx(buffer, { externalId }));
+  return Promise.reject(new Error(`Неизвестный формат: ${filePath}`));
+}
+
+function detectSource(filePath: string): 'fit' | 'tcx' {
+  if (/\.fit(\.gz)?$/i.test(filePath)) return 'fit';
+  if (/\.tcx(\.gz)?$/i.test(filePath)) return 'tcx';
+  throw new Error(`Не удалось определить источник: ${filePath}`);
 }
 
 // ==================== dodofo token ====================
@@ -989,25 +1019,21 @@ export function registerPranaBinduHandlers(): void {
         return { success: false, error: `Файл не найден: ${filePath}` };
       }
 
-      const buffer = fs.readFileSync(filePath);
-      const basename = path.basename(filePath).replace(/\.fit$/i, '');
-      const externalId = `fit:${basename}`;
+      const basename = path.basename(filePath).replace(/\.(fit|tcx)(\.gz)?$/i, '');
+      const source = detectSource(filePath);
+      const externalId = `${source}:${basename}`;
 
       const t0 = Date.now();
-      const workout = await parseFit(buffer, { externalId: basename });
+      const workout = await parseWorkoutFile(filePath, basename);
       const parseMs = Date.now() - t0;
 
-      // Маппинг UnifiedWorkout → RawWorkout (контракт upsertRunFact).
-      // Дистанцию берём из workout.distanceM — это уже accel или gps
-      // по решению классификатора (в FIT distance = session.total_distance
-      // = шагомерная, и это самый надёжный источник).
       const startMs = new Date(workout.startTime).getTime();
       const endTime = new Date(startMs + workout.durationSec * 1000).toISOString();
 
       const raw = {
         externalId,
-        source: 'fit',
-        origin: 'strava-archive',   // ← добавили (или параметром, если нужно)
+        source: workout.source,     // 'fit' или 'tcx'
+        origin: 'strava-archive',
         startTime: workout.startTime,
         endTime,
         distanceM: workout.distanceM,
@@ -1019,11 +1045,6 @@ export function registerPranaBinduHandlers(): void {
           summary: workout.summary,
           validation: workout.validation,
           lapCount: workout.laps?.length ?? 0,
-          streamLengths: {
-            secT: workout.streams.secT.length,
-            hr: workout.streams.hr?.length,
-            latlng: workout.streams.latlng?.length,
-          },
           importedFrom: filePath,
         },
       };
@@ -1031,35 +1052,31 @@ export function registerPranaBinduHandlers(): void {
       const db = getMelange();
       const { inserted, id: runFactId } = upsertRunFact(db, raw);
 
-      // Стримы пишем в run_streams под source='fit'.
-      // В run_facts дата уже зафиксирована в локальной зоне — читаем её
-      // для правильного раскладывания по папкам.
       const row = db
         .prepare(`SELECT date FROM run_facts WHERE id = ?`)
         .get(runFactId) as { date: string } | undefined;
       const dateForFile = row?.date ?? workout.startTime.slice(0, 10);
 
-      const streamsPayload = workout.streams as unknown as Record<string, unknown>;
       const meta = upsertRunStreams(
         db,
         runFactId,
-        'fit',
+        workout.source,              // 'fit' или 'tcx'
         externalId,
         dateForFile,
-        streamsPayload
+        workout.streams as unknown as Record<string, unknown>
       );
 
       console.log(
-        `[Prana-Bindu] import-fit: ${basename} → run_fact #${runFactId} ` +
+        `[Prana-Bindu] import-${source}: ${basename} → run_fact #${runFactId} ` +
         `(${inserted ? 'new' : 'update'}), streams: ${meta.point_count} pts, ` +
-        `${meta.size_bytes}B, channels=[${meta.channels}], parse ${parseMs}ms`
+        `${meta.size_bytes}B, ${parseMs}ms`
       );
 
       return {
         success: true,
         runFactId,
         inserted,
-        source: 'fit',
+        source: workout.source,
         externalId,
         summary: workout.summary,
         validation: workout.validation,
@@ -1220,7 +1237,8 @@ export function registerPranaBinduHandlers(): void {
           for (const e of entries) {
             const full = path.join(dir, e.name);
             if (e.isDirectory() && recursive) walk(full);
-            else if (e.isFile() && /\.fit(\.gz)?$/i.test(e.name)) files.push(full);
+            else if (e.isFile() && /\.(fit|tcx)(\.gz)?$/i.test(e.name))
+              files.push(full);
           }
         };
         walk(dirPath);
@@ -1231,42 +1249,68 @@ export function registerPranaBinduHandlers(): void {
 
         const db = getMelange();
 
+        importFitCancelRequested = false;
+        const sender = _event.sender;
+        const sendProgress = (payload: Record<string, unknown>) => {
+          if (!sender.isDestroyed()) {
+            sender.send('pb:import-progress', payload);
+          }
+        };
+
         let imported = 0;
         let updated = 0;
         let skipped = 0;
         let failed = 0;
+        let cancelled = false;
         const errors: Array<{ file: string; error: string }> = [];
         const importedIds: number[] = [];
 
-        for (const file of files) {
-          const basename = path.basename(file).replace(/\.fit(\.gz)?$/i, '');
-          const externalId = `fit:${basename}`;
+        for (let i = 0; i < files.length; i++) {
+          if (importFitCancelRequested) {
+            cancelled = true;
+            break;
+          }
+
+          const file = files[i];
+          const basename = path
+            .basename(file)
+            .replace(/\.(fit|tcx)(\.gz)?$/i, '');
+          const source = detectSource(file);
+          const externalId = `${source}:${basename}`;
 
           if (skipImported) {
             const existing = db
               .prepare(
-                `SELECT id FROM run_facts WHERE source = 'fit' AND external_id = ? LIMIT 1`
+                `SELECT id FROM run_facts WHERE source = ? AND external_id = ? LIMIT 1`
               )
-              .get(externalId) as { id: number } | undefined;
+              .get(source, externalId) as { id: number } | undefined;
             if (existing) {
               skipped++;
+              sendProgress({
+                current: i + 1,
+                total: files.length,
+                filename: path.basename(file),
+                imported,
+                updated,
+                skipped,
+                failed,
+              });
+              await new Promise((r) => setImmediate(r));
               continue;
             }
           }
 
           try {
-            const buffer = file.toLowerCase().endsWith('.gz')
-              ? zlib.gunzipSync(fs.readFileSync(file))
-              : fs.readFileSync(file);
-
-            const workout = await parseFit(buffer, { externalId: basename });
+            const workout = await parseWorkoutFile(file, basename);
 
             const startMs = new Date(workout.startTime).getTime();
-            const endTime = new Date(startMs + workout.durationSec * 1000).toISOString();
+            const endTime = new Date(
+              startMs + workout.durationSec * 1000
+            ).toISOString();
 
             const raw = {
               externalId,
-              source: 'fit',
+              source: workout.source,
               origin,
               startTime: workout.startTime,
               endTime,
@@ -1293,7 +1337,7 @@ export function registerPranaBinduHandlers(): void {
             upsertRunStreams(
               db,
               runFactId,
-              'fit',
+              workout.source,
               externalId,
               dateForFile,
               workout.streams as unknown as Record<string, unknown>
@@ -1309,6 +1353,19 @@ export function registerPranaBinduHandlers(): void {
               error: (e as Error).message,
             });
           }
+
+          sendProgress({
+            current: i + 1,
+            total: files.length,
+            filename: path.basename(file),
+            imported,
+            updated,
+            skipped,
+            failed,
+          });
+
+          // Уступаем event loop — UI остаётся отзывчивым.
+          await new Promise((r) => setImmediate(r));
         }
 
         if (savePath && failed === 0) {
@@ -1329,6 +1386,7 @@ export function registerPranaBinduHandlers(): void {
           updated,
           skipped,
           failed,
+          cancelled,          // ← новое
           total: files.length,
           importedIds,
           errors: errors.slice(0, 20),
@@ -1338,6 +1396,12 @@ export function registerPranaBinduHandlers(): void {
       }
     }
   );
+
+  // -------- Отмена активного импорта --------
+  ipcMain.handle('pb:import-cancel', () => {
+    importFitCancelRequested = true;
+    return { success: true };
+  });
 
   console.log('[Prana-Bindu] IPC-хендлеры зарегистрированы (pb:*)');
 }

@@ -18,6 +18,8 @@ import { DodofoDebugDialog } from '@/components/PRANA_BINDU/DodofoDebugDialog';
 import './PranaBinduPage.css';
 import { InputNumber } from 'primereact/inputnumber';
 
+import { ProgressBar } from 'primereact/progressbar';
+
 interface ProviderOption {
   label: string;
   value: string;
@@ -235,6 +237,16 @@ export const PranaBinduPage: React.FC = () => {
   // Debug
   const [debugVisible, setDebugVisible] = useState(false);
 
+  const [importProgress, setImportProgress] = useState<{
+    current: number;
+    total: number;
+    filename: string;
+    imported: number;
+    updated: number;
+    skipped: number;
+    failed: number;
+  } | null>(null);
+
   // ==================== Загрузка потоков (map) ====================
 
   const loadStreamsMap = async (items: any[]) => {
@@ -358,6 +370,15 @@ export const PranaBinduPage: React.FC = () => {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [provider]);
+
+  useEffect(() => {
+    if (!api?.pb?.onImportProgress) return;
+    api.pb.onImportProgress((data: any) => setImportProgress(data));
+    return () => {
+      api.pb.removeImportProgressListener?.();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ==================== Проверка доступности ====================
 
@@ -740,6 +761,7 @@ export const PranaBinduPage: React.FC = () => {
       setArchiveError((e as Error).message);
     } finally {
       setArchiveUpdating(false);
+      setImportProgress(null);
     }
   };
 
@@ -753,6 +775,14 @@ export const PranaBinduPage: React.FC = () => {
         skipImported: true,
         savePath: true,
       });
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleCancelImport = async () => {
+    try {
+      await api.pb.importCancel?.();
     } catch {
       // ignore
     }
@@ -917,6 +947,41 @@ export const PranaBinduPage: React.FC = () => {
             обновляются (например, если в Strava изменили описание).
           </small>
         </div>
+
+        {archiveUpdating && importProgress && (
+          <div className="pb-import-progress">
+            <div className="pb-import-progress__header">
+              <span>
+                {importProgress.current} / {importProgress.total}
+                {' · '}
+                <code>{importProgress.filename}</code>
+              </span>
+              <Button
+                label="Отмена"
+                icon="pi pi-times"
+                className="pb-soft p-button-sm"
+                onClick={handleCancelImport}
+              />
+            </div>
+            <ProgressBar
+              value={Math.round(
+                (importProgress.current / importProgress.total) * 100
+              )}
+              showValue={false}
+              style={{ height: '6px' }}
+            />
+            <div className="pb-import-progress__stats">
+              <span>+{importProgress.imported}</span>
+              <span>~{importProgress.updated}</span>
+              <span>·{importProgress.skipped}</span>
+              {importProgress.failed > 0 && (
+                <span className="pb-import-progress__fail">
+                  ✗{importProgress.failed}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
 
         {archiveError && (
           <Message severity="error" text={archiveError} className="w-full mt-2" />

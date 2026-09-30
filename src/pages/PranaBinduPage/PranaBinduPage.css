@@ -1365,3 +1365,55 @@ span.pb-destructive {
   background: rgba(111, 191, 115, 0.18);
   color: #6fbf73;
 }
+
+/* ============================================================
+   Progress импорта FIT
+   ============================================================ */
+
+.pb-import-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--pb-accent) 30%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--pb-accent) 5%, transparent);
+}
+
+.pb-import-progress__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--tg-theme-hint-color, #708499);
+}
+
+.pb-import-progress__header code {
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  color: var(--pb-accent);
+  font-size: 0.75rem;
+}
+
+.pb-import-progress .p-progressbar {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.pb-import-progress .p-progressbar-value {
+  background: var(--pb-accent) !important;
+}
+
+.pb-import-progress__stats {
+  display: flex;
+  gap: 0.75rem;
+  font-size: 0.75rem;
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  color: var(--tg-theme-hint-color, #708499);
+}
+
+.pb-import-progress__fail {
+  color: #ec3942;
+}
