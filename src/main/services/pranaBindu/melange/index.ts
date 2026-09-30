@@ -6,6 +6,11 @@ export { seed } from './seed';
 // Репозитории — экспортируем явно, не через repositories/index.ts
 export * from './repositories/profileRepo';
 export * from './repositories/syncRepo';
+export {
+  setIntervalsCredentials,
+  getIntervalsApiKeyEncrypted,
+  getIntervalsAthleteId,
+} from './repositories/syncRepo';
 
 export {
   upsertRunFact,
@@ -26,3 +31,13 @@ export {
 export type { RunStreamRow, RunStreamWithPayload } from './repositories/runStreamsRepo';
 
 export { setFitArchivePath, getFitArchivePath } from './repositories/syncRepo';
+
+export {
+  upsertRecoveryLog,
+  listRecoveryLogs,
+  getRecoveryLog,
+} from './repositories/recoveryRepo';
+export type {
+  RecoveryLogRow,
+  RecoveryLogInput,
+} from './repositories/recoveryRepo';

@@ -53,7 +53,7 @@ export class DodofoProvider implements ZeppDataProvider {
     streams: true,
     thresholds: true,   // только resthr, но метод реализован
     zones: true,        // метод реализован, но ответ пустой (не ошибка)
-    wellness: false,    // TODO: реализуем в блоке wellness
+    wellness: true    // TODO: реализуем в блоке wellness
   };
 
   /**
@@ -147,13 +147,29 @@ export class DodofoProvider implements ZeppDataProvider {
   }
 
   /**
-   * Тренировочные зоны Коггана.
-   * Путь: /api/v1/auth/me/zones
+   * Дневник здоровья: сон, HRV, пульс покоя, шаги, вес.
+   * Путь: /api/v1/wellness?from=&to=
    */
-  async fetchZones(): Promise<unknown> {
+  async fetchWellness(from: string, to: string): Promise<unknown> {
     const token = this.getToken();
     if (!token) throw new Error('dodofo token not configured');
-    return await dodofoRequest<unknown>('/api/v1/auth/me/zones', token);
+    return await dodofoRequest<unknown>('/api/v1/wellness', token, {
+      from,
+      to,
+    });
+  }
+
+  /**
+   * Посуточный журнал: тренировки + wellness + агрегаты по дню.
+   * Путь: /api/v1/activities/daily?from=&to=
+   */
+  async fetchDaily(from: string, to: string): Promise<unknown> {
+    const token = this.getToken();
+    if (!token) throw new Error('dodofo token not configured');
+    return await dodofoRequest<unknown>('/api/v1/activities/daily', token, {
+      from,
+      to,
+    });
   }
 
 

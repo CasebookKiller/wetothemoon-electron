@@ -298,3 +298,53 @@ export const MIGRATION_V7_RUN_FACTS_GPS: readonly string[] = [
   `ALTER TABLE run_facts ADD COLUMN distance_source TEXT;`,
   `ALTER TABLE run_facts ADD COLUMN gps_coverage_pct REAL;`,
 ];
+
+// ==================== Миграция v8: расширение recovery_logs ====================
+
+export const MIGRATION_V8_RECOVERY_FIELDS: readonly string[] = [
+  // вес (критично — цель по сбросу)
+  `ALTER TABLE recovery_logs ADD COLUMN weight_kg REAL;`,
+  // сон — детально
+  `ALTER TABLE recovery_logs ADD COLUMN sleep_score INTEGER;`,
+  `ALTER TABLE recovery_logs ADD COLUMN sleep_total_min INTEGER;`,
+  `ALTER TABLE recovery_logs ADD COLUMN deep_min INTEGER;`,
+  `ALTER TABLE recovery_logs ADD COLUMN rem_min INTEGER;`,
+  `ALTER TABLE recovery_logs ADD COLUMN light_min INTEGER;`,
+  `ALTER TABLE recovery_logs ADD COLUMN awake_min INTEGER;`,
+  // нагрузка и состояние
+  `ALTER TABLE recovery_logs ADD COLUMN steps INTEGER;`,
+  `ALTER TABLE recovery_logs ADD COLUMN vo2max REAL;`,
+  `ALTER TABLE recovery_logs ADD COLUMN body_battery_charged INTEGER;`,
+  `ALTER TABLE recovery_logs ADD COLUMN body_battery_drained INTEGER;`,
+  `ALTER TABLE recovery_logs ADD COLUMN stress_avg INTEGER;`,
+  `ALTER TABLE recovery_logs ADD COLUMN auto_source TEXT;`,
+  `ALTER TABLE recovery_logs ADD COLUMN raw_json TEXT;`,
+];
+
+// ==================== Миграция v9: intervals.icu ====================
+
+export const MIGRATION_V9_INTERVALS_ICU: readonly string[] = [
+  // recovery_logs — расширение под intervals.icu
+  `ALTER TABLE recovery_logs ADD COLUMN ctl REAL;`,
+  `ALTER TABLE recovery_logs ADD COLUMN atl REAL;`,
+  `ALTER TABLE recovery_logs ADD COLUMN ramp_rate REAL;`,
+  `ALTER TABLE recovery_logs ADD COLUMN readiness INTEGER;`,
+  `ALTER TABLE recovery_logs ADD COLUMN soreness INTEGER;`,
+  `ALTER TABLE recovery_logs ADD COLUMN fatigue INTEGER;`,
+  `ALTER TABLE recovery_logs ADD COLUMN stress INTEGER;`,
+  `ALTER TABLE recovery_logs ADD COLUMN mood INTEGER;`,
+  `ALTER TABLE recovery_logs ADD COLUMN motivation INTEGER;`,
+  `ALTER TABLE recovery_logs ADD COLUMN injury INTEGER;`,
+  `ALTER TABLE recovery_logs ADD COLUMN avg_sleeping_hr INTEGER;`,
+  `ALTER TABLE recovery_logs ADD COLUMN hrv_sdnn REAL;`,
+  `ALTER TABLE recovery_logs ADD COLUMN baevsky_si REAL;`,
+  `ALTER TABLE recovery_logs ADD COLUMN sp_o2 INTEGER;`,
+  `ALTER TABLE recovery_logs ADD COLUMN systolic INTEGER;`,
+  `ALTER TABLE recovery_logs ADD COLUMN diastolic INTEGER;`,
+
+  // sync_settings — секреты intervals.icu
+  `ALTER TABLE sync_settings ADD COLUMN intervals_api_key TEXT;`,
+  `ALTER TABLE sync_settings ADD COLUMN intervals_athlete_id TEXT;`,
+  `ALTER TABLE sync_settings ADD COLUMN intervals_last_sync_at TEXT;`,
+  `ALTER TABLE sync_settings ADD COLUMN intervals_last_sync_status TEXT;`,
+];

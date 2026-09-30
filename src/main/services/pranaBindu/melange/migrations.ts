@@ -10,9 +10,11 @@ import {
   MIGRATION_V5_FIT_ARCHIVE,
   MIGRATION_V6_RUN_FACTS_START_TIME,
   MIGRATION_V7_RUN_FACTS_GPS,
+  MIGRATION_V8_RECOVERY_FIELDS,
+  MIGRATION_V9_INTERVALS_ICU,
 } from './schema';
 
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 9;
 
 interface Migration {
   version: number;
@@ -127,6 +129,80 @@ const migrations: readonly Migration[] = [
         db.exec(`ALTER TABLE run_facts ADD COLUMN gps_coverage_pct REAL;`);
         console.log('[Melange] v7: добавлена колонка run_facts.gps_coverage_pct');
       }
+    },
+  },
+  {
+    version: 8,
+    apply: (db) => {
+      const cols = db
+        .prepare(`PRAGMA table_info(recovery_logs)`)
+        .all() as { name: string }[];
+      const has = (n: string) => cols.some((c) => c.name === n);
+
+      const addIfMissing: [string, string][] = [
+        ['weight_kg', 'REAL'],
+        ['sleep_score', 'INTEGER'],
+        ['sleep_total_min', 'INTEGER'],
+        ['deep_min', 'INTEGER'],
+        ['rem_min', 'INTEGER'],
+        ['light_min', 'INTEGER'],
+        ['awake_min', 'INTEGER'],
+        ['steps', 'INTEGER'],
+        ['vo2max', 'REAL'],
+        ['body_battery_charged', 'INTEGER'],
+        ['body_battery_drained', 'INTEGER'],
+        ['stress_avg', 'INTEGER'],
+        ['auto_source', 'TEXT'],
+        ['raw_json', 'TEXT'],
+      ];
+
+      for (const [name, type] of addIfMissing) {
+        if (!has(name)) {
+          db.exec(`ALTER TABLE recovery_logs ADD COLUMN ${name} ${type};`);
+          console.log(`[Melange] v8: добавлена колонка recovery_logs.${name}`);
+        }
+      }
+    },
+  },
+  {
+    version: 9,
+    apply: (db) => {
+      // recovery_logs
+      const rcols = db
+        .prepare(`PRAGMA table_info(recovery_logs)`)
+        .all() as { name: string }[];
+      const hasR = (n: string) => rcols.some((c) => c.name === n);
+
+      const recAdd: [string, string][] = [
+        ['ctl', 'REAL'], ['atl', 'REAL'], ['ramp_rate', 'REAL'],
+        ['readiness', 'INTEGER'], ['soreness', 'INTEGER'],
+        ['fatigue', 'INTEGER'], ['stress', 'INTEGER'],
+        ['mood', 'INTEGER'], ['motivation', 'INTEGER'],
+        ['injury', 'INTEGER'], ['avg_sleeping_hr', 'INTEGER'],
+        ['hrv_sdnn', 'REAL'], ['baevsky_si', 'REAL'],
+        ['sp_o2', 'INTEGER'], ['systolic', 'INTEGER'], ['diastolic', 'INTEGER'],
+      ];
+      for (const [n, t] of recAdd) {
+        if (!hasR(n)) db.exec(`ALTER TABLE recovery_logs ADD COLUMN ${n} ${t};`);
+      }
+
+      // sync_settings
+      const scols = db
+        .prepare(`PRAGMA table_info(sync_settings)`)
+        .all() as { name: string }[];
+      const hasS = (n: string) => scols.some((c) => c.name === n);
+
+      const syncAdd: [string, string][] = [
+        ['intervals_api_key', 'TEXT'],
+        ['intervals_athlete_id', 'TEXT'],
+        ['intervals_last_sync_at', 'TEXT'],
+        ['intervals_last_sync_status', 'TEXT'],
+      ];
+      for (const [n, t] of syncAdd) {
+        if (!hasS(n)) db.exec(`ALTER TABLE sync_settings ADD COLUMN ${n} ${t};`);
+      }
+
+      console.log('[Melange] v9: recovery_logs + sync_settings под intervals.icu');
     },
   },
 ];

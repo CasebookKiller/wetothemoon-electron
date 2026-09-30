@@ -174,3 +174,29 @@ export function getFitArchivePath(db: DatabaseSync): string | null {
     .get() as { fit_archive_path: string | null } | undefined;
   return row?.fit_archive_path ?? null;
 }
+
+export function setIntervalsCredentials(
+  db: DatabaseSync,
+  encryptedApiKey: string | null,
+  athleteId: string | null
+): void {
+  db.prepare(
+    `UPDATE sync_settings
+     SET intervals_api_key = ?, intervals_athlete_id = ?
+     WHERE id = 1`
+  ).run(encryptedApiKey, athleteId);
+}
+
+export function getIntervalsApiKeyEncrypted(db: DatabaseSync): string | null {
+  const row = db
+    .prepare(`SELECT intervals_api_key FROM sync_settings WHERE id = 1`)
+    .get() as { intervals_api_key: string | null } | undefined;
+  return row?.intervals_api_key ?? null;
+}
+
+export function getIntervalsAthleteId(db: DatabaseSync): string | null {
+  const row = db
+    .prepare(`SELECT intervals_athlete_id FROM sync_settings WHERE id = 1`)
+    .get() as { intervals_athlete_id: string | null } | undefined;
+  return row?.intervals_athlete_id ?? null;
+}

@@ -326,6 +326,10 @@ export const PranaBinduPage: React.FC = () => {
   const [profileError, setProfileError] = useState('');
   const [profileSaved, setProfileSaved] = useState(false);
 
+  const [syncingWellness, setSyncingWellness] = useState(false);
+  const [wellnessResult, setWellnessResult] = useState<string>('');
+  const [wellnessError, setWellnessError] = useState('');
+
   const groupedFacts = React.useMemo(
     () => groupRunFacts(runFacts, streamsMap),
     [runFacts, streamsMap]
@@ -334,6 +338,15 @@ export const PranaBinduPage: React.FC = () => {
   const [dragActive, setDragActive] = useState(false);
 
   const [importOrigin, setImportOrigin] = useState<string>('zepp-app');
+
+  const [intervalsApiKey, setIntervalsApiKey] = useState('');
+  const [intervalsAthleteId, setIntervalsAthleteId] = useState('');
+  const [intervalsHasKey, setIntervalsHasKey] = useState(false);
+  const [intervalsSaving, setIntervalsSaving] = useState(false);
+  const [intervalsError, setIntervalsError] = useState('');
+  const [intervalsInfo, setIntervalsInfo] = useState('');
+
+  const [recoveryLogs, setRecoveryLogs] = useState<any[]>([]);
 
   // ==================== Загрузка списка пробежек ====================
 
@@ -395,8 +408,18 @@ export const PranaBinduPage: React.FC = () => {
         // ignore
       }
     })();
+    (async () => {
+      try {
+        const r = await api.pb.intervalsStatus?.();
+        if (r?.success) {
+          setIntervalsHasKey(!!r.hasApiKey);
+          setIntervalsAthleteId(r.athleteId ?? '');
+        }
+      } catch { /* ignore */ }
+    })();
     //loadRunFacts();
     loadProfile();   // ← добавил
+    loadRecoveryLogs();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -925,6 +948,106 @@ export const PranaBinduPage: React.FC = () => {
     setDragActive(false);
   };
 
+  const handleSyncWellness = async () => {
+    if (!api?.pb?.syncWellness) {
+      setWellnessError('electronAPI.pb.syncWellness недоступен');
+      return;
+    }
+    if (!syncFrom || !syncTo) {
+      setWellnessError('Укажите обе даты');
+      return;
+    }
+    setSyncingWellness(true);
+    setWellnessError('');
+    setWellnessResult('');
+    try {
+      const res = await api.pb.syncWellness(
+        toIsoDate(syncFrom),
+        toIsoDate(syncTo)
+      );
+      if (res.success) {
+        setWellnessResult(
+          `Добавлено ${res.added} · обновлено ${res.updated} · всего ${res.total}`
+        );
+      } else {
+        setWellnessError(res.error ?? 'Ошибка');
+      }
+    } catch (e) {
+      setWellnessError((e as Error).message);
+    } finally {
+      setSyncingWellness(false);
+    }
+  };
+
+  const handleIntervalsSave = async () => {
+    if (!api?.pb?.intervalsSetup) return;
+    if (!intervalsApiKey.trim() && !intervalsHasKey) {
+      setIntervalsError('API key обязателен');
+      return;
+    }
+    setIntervalsSaving(true);
+    setIntervalsError('');
+    setIntervalsInfo('');
+    try {
+      const res = await api.pb.intervalsSetup(
+        intervalsApiKey.trim(),
+        intervalsAthleteId.trim()
+      );
+      if (res.success) {
+        setIntervalsHasKey(true);
+        setIntervalsApiKey('');
+        setIntervalsInfo('Ключ сохранён и проверен');
+      } else {
+        setIntervalsError(res.error ?? 'Ошибка');
+      }
+    } catch (e) {
+      setIntervalsError((e as Error).message);
+    } finally {
+      setIntervalsSaving(false);
+    }
+  };
+
+  const handleSyncWellnessNew = async () => {
+    if (!api?.pb?.syncWellness) return;
+    if (!syncFrom || !syncTo) { setWellnessError('Укажите обе даты'); return; }
+    setSyncingWellness(true);
+    setWellnessError('');
+    setWellnessResult('');
+    try {
+      const res = await api.pb.syncWellness(
+        'intervals-icu',
+        toIsoDate(syncFrom),
+        toIsoDate(syncTo)
+      );
+      if (res.success) {
+        setWellnessResult(`Добавлено ${res.added} · обновлено ${res.updated} · всего ${res.total}`);
+        await loadRecoveryLogs();    // ← добавили
+      } else {
+        setWellnessError(res.error ?? 'Ошибка');
+      }
+    } catch (e) {
+      setWellnessError((e as Error).message);
+    } finally {
+      setSyncingWellness(false);
+    }
+  };
+
+  const loadRecoveryLogs = async () => {
+    if (!api?.pb?.listRecoveryLogs) return;
+    try {
+      const to = new Date();
+      const from = new Date();
+      from.setDate(from.getDate() - 14);
+      const res = await api.pb.listRecoveryLogs(
+        toIsoDate(from),
+        toIsoDate(to)
+      );
+      if (res?.success) setRecoveryLogs(res.items ?? []);
+    } catch {
+      // ignore
+    }
+  };
+
   return (
     <div className="pb-page p-4">
       <div className="mb-4">
@@ -1053,6 +1176,140 @@ export const PranaBinduPage: React.FC = () => {
         {profileError && (
           <Message severity="error" text={profileError} className="w-full mt-2" />
         )}
+      </Panel>
+
+      <Panel header="Wellness · intervals.icu" className="shadow-5 mb-3 pb-panel">
+        <div className="flex flex-column gap-2">
+          <div className="flex flex-column gap-1">
+            <label className="pb-label">
+              API Key {intervalsHasKey && <span className="pb-label-ok">✓ сохранён</span>}
+            </label>
+            <InputText
+              type="password"
+              value={intervalsApiKey}
+              onChange={(e) => setIntervalsApiKey(e.target.value)}
+              placeholder={intervalsHasKey ? '•••••••• (оставьте пустым)' : 'ваш ключ из Settings → Developer'}
+              className="w-full"
+            />
+          </div>
+
+          <div className="flex flex-column gap-1">
+            <label className="pb-label">Athlete ID (опционально)</label>
+            <InputText
+              value={intervalsAthleteId}
+              onChange={(e) => setIntervalsAthleteId(e.target.value)}
+              placeholder="i123456 — или пусто для «self»"
+              className="w-full"
+            />
+          </div>
+
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              label={intervalsSaving ? 'Сохранение…' : 'Сохранить ключ'}
+              icon={intervalsSaving ? 'pi pi-spin pi-spinner' : 'pi pi-save'}
+              className="pb p-button-sm"
+              onClick={handleIntervalsSave}
+              disabled={intervalsSaving || (!intervalsApiKey.trim() && !intervalsHasKey)}
+            />
+            <Button
+              label={syncingWellness ? 'Wellness…' : 'Подтянуть wellness'}
+              icon={syncingWellness ? 'pi pi-spin pi-spinner' : 'pi pi-heart'}
+              className="pb-soft p-button-sm"
+              onClick={handleSyncWellnessNew}
+              disabled={syncingWellness || !intervalsHasKey || !syncFrom || !syncTo}
+            />
+          </div>
+
+          {intervalsError && (
+            <Message
+              severity="error"
+              className="w-full"
+              content={<span>{intervalsError}</span>}
+            />
+          )}
+          {intervalsInfo && (
+            <Message
+              severity="success"
+              className="w-full"
+              content={<span>{intervalsInfo}</span>}
+            />
+          )}
+          {wellnessError && (
+            <Message
+              severity="error"
+              className="w-full"
+              content={<span>{wellnessError}</span>}
+            />
+          )}
+          {wellnessResult && (
+            <Message
+              severity="success"
+              className="w-full"
+              content={<span>Wellness: {wellnessResult}</span>}
+            />
+          )}
+
+          {recoveryLogs.length > 0 && (
+            <div className="pb-wellness-table">
+              <div className="pb-wellness-table__header">
+                <span>Дата</span>
+                <span title="Пульс покоя">RHR</span>
+                <span title="Сон, часов">Сон</span>
+                <span title="Sleep score">Score</span>
+                <span title="Шаги">Шаги</span>
+                <span title="Chronic Training Load">CTL</span>
+                <span title="Acute Training Load">ATL</span>
+              </div>
+              {recoveryLogs.slice(0, 14).map((r) => {
+                // индикация RHR: если ниже среднего за период — зелёный,
+                // если выше — оранжевый/красный
+                const avgRhr =
+                  recoveryLogs.filter((x) => x.resting_hr != null).reduce(
+                    (a, x) => a + x.resting_hr,
+                    0
+                  ) / (recoveryLogs.filter((x) => x.resting_hr != null).length || 1);
+                const rhrCls =
+                  r.resting_hr == null
+                    ? ''
+                    : r.resting_hr <= avgRhr - 2
+                    ? 'pb-wellness-table__val--good'
+                    : r.resting_hr >= avgRhr + 3
+                    ? 'pb-wellness-table__val--warn'
+                    : '';
+
+                return (
+                  <div key={r.date} className="pb-wellness-table__row">
+                    <span className="pb-wellness-table__date">
+                      {r.date.slice(5)}
+                    </span>
+                    <span className={`pb-wellness-table__val ${rhrCls}`}>
+                      {r.resting_hr ?? '—'}
+                    </span>
+                    <span className="pb-wellness-table__val">
+                      {r.sleep_hours != null
+                        ? r.sleep_hours.toFixed(1)
+                        : '—'}
+                    </span>
+                    <span className="pb-wellness-table__val">
+                      {r.sleep_score ?? '—'}
+                    </span>
+                    <span className="pb-wellness-table__val">
+                      {r.steps != null
+                        ? r.steps.toLocaleString('ru-RU')
+                        : '—'}
+                    </span>
+                    <span className="pb-wellness-table__val pb-wellness-table__val--dim">
+                      {r.ctl != null ? r.ctl.toFixed(1) : '—'}
+                    </span>
+                    <span className="pb-wellness-table__val pb-wellness-table__val--dim">
+                      {r.atl != null ? r.atl.toFixed(1) : '—'}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </Panel>
 
       <div
@@ -1291,6 +1548,27 @@ export const PranaBinduPage: React.FC = () => {
                     : 'Забрать пороги (restHR и др.) в профиль'
                 }
               />
+              {/* временно убираем до ответа разработчика
+              <Button
+                label={syncingWellness ? 'Wellness…' : 'Подтянуть wellness'}
+                icon={
+                  syncingWellness
+                    ? 'pi pi-spin pi-spinner'
+                    : 'pi pi-heart'
+                }
+                className="pb-soft p-button-sm"
+                onClick={handleSyncWellness}
+                disabled={
+                  syncingWellness ||
+                  !providerCaps?.wellness ||
+                  provider !== 'dodofo'
+                }
+                tooltip={
+                  !providerCaps?.wellness
+                    ? `Провайдер «${provider}» не поддерживает wellness`
+                    : 'Сон, HRV, пульс покоя, вес'
+                }
+              />*/}
               <Button
                 label="Отладка"
                 icon="pi pi-code"
@@ -1320,6 +1598,16 @@ export const PranaBinduPage: React.FC = () => {
                   {' · '}Всего из источника: <b>{syncResult.total}</b>
                 </span>
               }
+            />
+          )}
+          {wellnessError && (
+            <Message severity="error" text={wellnessError} className="w-full" />
+          )}
+          {wellnessResult && (
+            <Message
+              severity="success"
+              className="w-full"
+              content={<span>Wellness: {wellnessResult}</span>}
             />
           )}
 

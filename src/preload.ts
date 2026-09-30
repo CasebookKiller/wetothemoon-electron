@@ -745,6 +745,21 @@ try {
         opts?: { origin?: string; skipImported?: boolean }
       ) => ipcRenderer.invoke('pb:import-files', paths, opts),
       getPathForFile: (file: File) => webUtils.getPathForFile(file),
+      debugWellness: (from: string, to: string) =>
+        ipcRenderer.invoke('pb:debug-wellness', from, to),
+
+      syncWellness: (providerName: string | undefined, from: string, to: string) =>
+        ipcRenderer.invoke('pb:sync-wellness', providerName, from, to),
+      listRecoveryLogs: (from: string, to: string) =>
+        ipcRenderer.invoke('pb:list-recovery-logs', from, to),
+
+      debugDaily: (from: string, to: string) =>
+        ipcRenderer.invoke('pb:debug-daily', from, to),
+
+      intervalsSetup: (apiKey: string, athleteId: string) =>
+        ipcRenderer.invoke('pb:intervals-setup', apiKey, athleteId),
+      intervalsStatus: () => ipcRenderer.invoke('pb:intervals-status'),
+
 
     },
 

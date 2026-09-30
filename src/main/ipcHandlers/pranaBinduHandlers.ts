@@ -39,9 +39,15 @@ import {
   hasRunStreams,
   getFitArchivePath,
   setFitArchivePath,
+  upsertRecoveryLog,
+  listRecoveryLogs,
+  setIntervalsCredentials,
+  getIntervalsApiKeyEncrypted,
+  getIntervalsAthleteId as getIntervalsAthleteIdFromDb,
 } from '../services/pranaBindu/melange';
 
 import { DodofoProvider } from '../services/pranaBindu/spice/providers/dodofoProvider';
+import { IntervalsIcuProvider } from '../services/pranaBindu/spice/providers/intervalsIcuProvider';
 import { parseFit } from '../services/pranaBindu/spice/parsers/fitParser';
 import { parseTcx } from '../services/pranaBindu/spice/parsers/tcxParser';
 
@@ -51,12 +57,24 @@ let providersRegistered = false;
 /** Флаг отмены текущего импорта (один импорт за раз — этого достаточно). */
 let importFitCancelRequested = false;
 
+function getIntervalsAthleteId(): string | null {
+  try {
+    const id = getIntervalsAthleteIdFromDb(getMelange());
+    if (id) return id;
+  } catch { /* ignore */ }
+  return process.env.VITE_INTERVALS_ATHLETE_ID?.trim() || null;
+}
+
 function ensureProvidersRegistered(): void {
   if (providersRegistered) return;
   registerProvider(new DofekZeppProvider());
   registerProvider(new ZeppMcpProvider());
   registerProvider(new ZeppBridgeProvider());
   registerProvider(new DodofoProvider(getDodofoToken));
+  registerProvider(new IntervalsIcuProvider({
+    getApiKey: getIntervalsApiKey,
+    getAthleteId: getIntervalsAthleteId,
+  }));
   providersRegistered = true;
   console.log(`[Prana-Bindu] Зарегистрировано провайдеров: ${listProviders().length} (${listProviders().map(p => p.name).join(', ')})`);
 }
@@ -319,6 +337,18 @@ function getDodofoToken(): string | null {
     // БД ещё не готова или расшифровка недоступна — уходим в env.
   }
   return process.env.VITE_DODOFO_TOKEN?.trim() || null;
+}
+
+function getIntervalsApiKey(): string | null {
+  try {
+    const db = getMelange();
+    const enc = getIntervalsApiKeyEncrypted(db);
+    if (enc && safeStorage.isEncryptionAvailable()) {
+      return safeStorage.decryptString(Buffer.from(enc, 'base64'));
+    }
+  } catch { /* ignore */ }
+  // Dev-fallback
+  return process.env.VITE_INTERVALS_API_KEY?.trim() || null;
 }
 
 /**
@@ -1538,6 +1568,191 @@ export function registerPranaBinduHandlers(): void {
   ipcMain.handle('pb:import-cancel', () => {
     importFitCancelRequested = true;
     return { success: true };
+  });
+
+    // -------- Разведка: сырой ответ fetchWellness --------
+  ipcMain.handle(
+    'pb:debug-wellness',
+    async (_event, from: string, to: string) => {
+      try {
+        const provider = getProvider('dodofo') as any;
+        if (!provider || typeof provider.fetchWellness !== 'function') {
+          return { success: false, error: 'Провайдер dodofo не поддерживает fetchWellness' };
+        }
+        const t0 = Date.now();
+        const raw = await provider.fetchWellness(from, to);
+        const dt = Date.now() - t0;
+
+        console.log('[Prana-Bindu] debug-wellness:', JSON.stringify(raw).slice(0, 2000));
+
+        return { success: true, fetchMs: dt, data: raw };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+  // -------- Подтянуть wellness из dodofo --------
+  ipcMain.handle(
+    'pb:sync-wellness',
+    async (_event, providerName: string | undefined, from: string, to: string) => {
+      if (!from || !to) return { success: false, error: 'from и to обязательны' };
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+        return { success: false, error: 'Формат даты: YYYY-MM-DD' };
+      }
+
+      const name = providerName ?? 'intervals-icu';
+      try {
+        const provider = getProvider(name) as any;
+        if (!provider) return { success: false, error: `Провайдер «${name}» не зарегистрирован` };
+        if (!provider.capabilities?.wellness) {
+          return { success: false, error: `Провайдер «${name}» не поддерживает wellness` };
+        }
+        if (typeof provider.fetchWellness !== 'function') {
+          return { success: false, error: `Провайдер «${name}» не реализует fetchWellness` };
+        }
+
+        const raw = await provider.fetchWellness(from, to);
+        const days: any[] = Array.isArray(raw) ? raw : (raw?.days ?? []);
+
+        const db = getMelange();
+        let added = 0;
+        let updated = 0;
+
+        for (const day of days) {
+          if (!day?.id && !day?.date) continue;
+          const date = day.id ?? day.date;
+
+          const res = upsertRecoveryLog(db, {
+            date,
+            resting_hr: day.restingHR ?? day.resting_hr,
+            hrv: day.hrv ?? day.hrv_ms,
+            hrv_sdnn: day.hrvSDNN,
+            sleep_hours: day.sleepSecs != null
+              ? Math.round((day.sleepSecs / 3600) * 100) / 100
+              : day.sleep_hours,
+            sleep_score: day.sleepScore,
+            sleep_quality: day.sleepQuality,
+            steps: day.steps,
+            weight_kg: day.weight,
+            ctl: day.ctl,
+            atl: day.atl,
+            ramp_rate: day.rampRate,
+            readiness: day.readiness,
+            soreness: day.soreness,
+            fatigue: day.fatigue,
+            stress: day.stress,
+            mood: day.mood,
+            motivation: day.motivation,
+            injury: day.injury,
+            avg_sleeping_hr: day.avgSleepingHR,
+            baevsky_si: day.baevskySI,
+            sp_o2: day.spO2,
+            systolic: day.systolic,
+            diastolic: day.diastolic,
+            raw_json: JSON.stringify(day),
+          });
+
+          if (res.inserted) added++;
+          else updated++;
+        }
+
+        console.log(
+          `[Prana-Bindu] sync-wellness (${name}) ${from}..${to}: +${added} ~${updated} (всего ${days.length})`
+        );
+
+        return { success: true, provider: name, added, updated, total: days.length };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+  // -------- Список wellness за период --------
+  ipcMain.handle(
+    'pb:list-recovery-logs',
+    (_event, from: string, to: string) => {
+      try {
+        const rows = listRecoveryLogs(getMelange(), from, to);
+        return { success: true, items: rows, total: rows.length };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+  // -------- Разведка: /activities/daily --------
+  ipcMain.handle(
+    'pb:debug-daily',
+    async (_event, from: string, to: string) => {
+      try {
+        const provider = getProvider('dodofo') as any;
+        if (!provider || typeof provider.fetchDaily !== 'function') {
+          return { success: false, error: 'fetchDaily не реализован' };
+        }
+        const t0 = Date.now();
+        const raw = await provider.fetchDaily(from, to);
+        const dt = Date.now() - t0;
+
+        console.log(
+          '[Prana-Bindu] debug-daily:',
+          JSON.stringify(raw).slice(0, 2000)
+        );
+
+        return { success: true, fetchMs: dt, data: raw };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+  ipcMain.handle(
+    'pb:intervals-setup',
+    async (_event, apiKey: string, athleteId: string) => {
+      if (!apiKey || !apiKey.trim()) {
+        return { success: false, error: 'API key обязателен' };
+      }
+      try {
+        const trimmedKey = apiKey.trim();
+        const trimmedAthlete = (athleteId ?? '').trim();
+
+        const db = getMelange();
+        let encKey: string;
+        if (safeStorage.isEncryptionAvailable()) {
+          encKey = safeStorage.encryptString(trimmedKey).toString('base64');
+        } else {
+          console.warn('[Prana-Bindu] safeStorage недоступен — ключ без шифрования');
+          encKey = trimmedKey;
+        }
+        setIntervalsCredentials(db, encKey, trimmedAthlete || null);
+
+        const provider = getProvider('intervals-icu');
+        if (!provider) {
+          return { success: false, error: 'Провайдер intervals-icu не зарегистрирован' };
+        }
+        const check = await provider.isAvailable();
+        if (!check.available) {
+          return { success: false, error: check.reason ?? 'Ключ не работает' };
+        }
+
+        return { success: true };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+  ipcMain.handle('pb:intervals-status', () => {
+    try {
+      const db = getMelange();
+      return {
+        success: true,
+        hasApiKey: !!getIntervalsApiKeyEncrypted(db),
+        athleteId: getIntervalsAthleteIdFromDb(db),
+      };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
   });
 
   console.log('[Prana-Bindu] IPC-хендлеры зарегистрированы (pb:*)');
