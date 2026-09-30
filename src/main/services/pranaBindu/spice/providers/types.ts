@@ -6,13 +6,16 @@
 export interface RawWorkout {
   externalId: string;
   source: string;
-  origin?: string;    // ← новое. strava-archive | zepp-app | ...
+  origin?: string;
   startTime: string;
   endTime: string;
   distanceM?: number;
   durationS?: number;
   avgHr?: number;
   maxHr?: number;
+  gpsQuality?: string;         // ← новое
+  distanceSource?: string;     // ← новое
+  gpsCoveragePct?: number;     // ← новое
   raw?: unknown;
 }
 

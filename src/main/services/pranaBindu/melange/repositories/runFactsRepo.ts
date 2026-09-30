@@ -23,6 +23,9 @@ export interface RunFactRow {
   external_id: string | null;
   raw_json: string | null;
   notes: string | null;
+  gps_quality: string | null;
+  distance_source: string | null;
+  gps_coverage_pct: number | null;
 }
 
 export interface UpsertResult {
@@ -145,6 +148,9 @@ export function upsertRunFact(
         duration_sec = ?,
         source       = ?,
         origin       = ?,
+        gps_quality       = ?,
+        distance_source   = ?,
+        gps_coverage_pct  = ?,
         raw_json     = ?
        WHERE id = ?`
     ).run(
@@ -157,6 +163,9 @@ export function upsertRunFact(
       fact.durationS != null ? Math.round(fact.durationS) : null,
       fact.source,
       existing.origin ?? fact.origin ?? null,
+      fact.gpsQuality ?? null,
+      fact.distanceSource ?? null,
+      fact.gpsCoveragePct ?? null,
       rawJson,
       existing.id
     );
@@ -166,9 +175,10 @@ export function upsertRunFact(
   const info = db
     .prepare(
       `INSERT INTO run_facts
-        (date, start_time, actual_km, actual_pace, avg_hr, max_hr,
-         duration_sec, source, origin, external_id, raw_json)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         (date, start_time, actual_km, actual_pace, avg_hr, max_hr,
+         duration_sec, source, origin, external_id, raw_json,
+         gps_quality, distance_source, gps_coverage_pct)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       date,
@@ -180,6 +190,9 @@ export function upsertRunFact(
       fact.durationS != null ? Math.round(fact.durationS) : null,
       fact.source,
       fact.origin ?? null,
+      fact.gpsQuality ?? null,
+      fact.distanceSource ?? null,
+      fact.gpsCoveragePct ?? null,
       fact.externalId,
       rawJson
     );

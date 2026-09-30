@@ -11,14 +11,25 @@
                   https://*.supabase.co
                   http://localhost:11434
                   wss://invest-public-api.tbank.ru
+                  https://*.basemaps.cartocdn.com
+                  https://*.tile.openstreetmap.org
+                  https://tiles.openfreemap.org 
+                  https://assets.openfreemap.org
+                  https://*.openfreemap.org
                   https://esm.sh;
                script-src 'self' 'unsafe-inline' blob: 'unsafe-eval';
                worker-src 'self' blob: data:;
                style-src 'self' 'unsafe-inline';
                img-src 'self'
                   https://invest-brands.cdn-tinkoff.ru
-                  data: https://static.deepseek.com;
-               font-src 'self' data: https://fe-static.deepseek.com;
+                  data: https://static.deepseek.com
+                  https://*.basemaps.cartocdn.com
+                  https://*.tile.openstreetmap.org
+                  https://tiles.openfreemap.org
+                  https://assets.openfreemap.org
+                  https://*.openfreemap.org
+                  ;
+               font-src 'self' data: https://fe-static.deepseek.com data: https://*.openfreemap.org;
       "
     >
     <script type="module" src="./renderer.ts"></script>

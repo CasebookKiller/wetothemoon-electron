@@ -10,6 +10,7 @@ import { Message } from 'primereact/message';
 import { Sidebar } from 'primereact/sidebar';
 import { TabView, TabPanel } from 'primereact/tabview';
 import { RunStreamsChart } from './RunStreamsChart';
+import { GpsMapView } from './GpsMapView';
 
 /**
  * Порог, при котором две записи считаются одной тренировкой
@@ -22,7 +23,7 @@ const SAME_WORKOUT_WINDOW_MS = SAME_WORKOUT_WINDOW_MIN * 60 * 1000;
 export interface RunFactLite {
   id: number;
   date: string;
-  start_time?: string | null;   // ← новое
+  start_time?: string | null;
   source: string | null;
   origin?: string | null;
   actual_km: number | null;
@@ -30,6 +31,7 @@ export interface RunFactLite {
   duration_sec: number | null;
   avg_hr: number | null;
   max_hr: number | null;
+  gps_quality?: string | null;   // ← новое
 }
 
 interface RunStreamMeta {
@@ -89,6 +91,11 @@ function sourceLabel(f: RunFactLite): string {
   return f.source ?? '—';
 }
 
+function normalizeGpsQuality(v: unknown): 'good' | 'poor' | 'lost' {
+  if (v === 'poor' || v === 'lost' || v === 'good') return v;
+  return 'good';
+}
+
 // ==================== SourcePanel ====================
 
 const SourcePanel: React.FC<{
@@ -98,6 +105,7 @@ const SourcePanel: React.FC<{
   const api = (window as any).electronAPI;
 
   const [metas, setMetas] = useState<RunStreamMeta[]>([]);
+  const [streamsPayload, setStreamsPayload] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState('');
@@ -107,11 +115,19 @@ const SourcePanel: React.FC<{
     setLoading(true);
     setError('');
     setInfo('');
+    setStreamsPayload(null);
     (async () => {
       try {
         const res = await api.pb.getRunStreamsMeta(fact.id);
-        if (res?.success) setMetas(res.items ?? []);
-        else setError(res?.error ?? 'Ошибка загрузки метаданных');
+        if (res?.success && Array.isArray(res.items) && res.items.length > 0) {
+          setMetas(res.items);
+          // Подтягиваем payload первого источника — для карты
+          const firstSource = res.items[0].source;
+          const p = await api.pb.getRunStreams(fact.id, firstSource);
+          if (p?.success) setStreamsPayload(p.payload);
+        } else {
+          setMetas([]);
+        }
       } catch (e) {
         setError((e as Error).message);
       } finally {
@@ -119,7 +135,6 @@ const SourcePanel: React.FC<{
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    
   }, [fact.id]);
 
   const handleSync = async () => {
@@ -179,6 +194,19 @@ const SourcePanel: React.FC<{
           </span>
         </div>
       </div>
+
+      {streamsPayload?.latlng && (
+        <>
+          <div className="pb-drawer__section-title">Карта</div>
+          <GpsMapView
+            latlng={streamsPayload.latlng}
+            hr={streamsPayload.hr}
+            elevation={streamsPayload.elevationM}
+            gpsQuality={normalizeGpsQuality(fact.gps_quality)}
+            height={280}
+          />
+        </>
+      )}
 
       {hasStreams && metas[0] && (
         <>
@@ -286,6 +314,7 @@ export const RunStreamsDrawer: React.FC<Props> = ({
             duration_sec: r.duration_sec,
             avg_hr: r.avg_hr,
             max_hr: r.max_hr,
+            gps_quality: r.gps_quality ?? null,   // ← новое
           }));
 
           // Фильтр: только источники, относящиеся к той же тренировке,

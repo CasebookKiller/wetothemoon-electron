@@ -6,12 +6,13 @@ import {
   ALL_INDEXES,
   CREATE_META,
   MIGRATION_V2_DODOFO,
-  MIGRATION_V3_RUN_STREAMS,   // ← добавили
-  MIGRATION_V5_FIT_ARCHIVE,   // ← добавьте
-  MIGRATION_V6_RUN_FACTS_START_TIME,   // ← добавьте
+  MIGRATION_V3_RUN_STREAMS,
+  MIGRATION_V5_FIT_ARCHIVE,
+  MIGRATION_V6_RUN_FACTS_START_TIME,
+  MIGRATION_V7_RUN_FACTS_GPS,
 } from './schema';
 
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 interface Migration {
   version: number;
@@ -89,7 +90,7 @@ const migrations: readonly Migration[] = [
       }
     },
   },
-    {
+  {
     version: 6,
     apply: (db) => {
       const cols = db
@@ -104,6 +105,28 @@ const migrations: readonly Migration[] = [
       db.exec(
         `CREATE INDEX IF NOT EXISTS idx_run_facts_date_start ON run_facts(date, start_time);`
       );
+    },
+  },
+  {
+    version: 7,
+    apply: (db) => {
+      const cols = db
+        .prepare(`PRAGMA table_info(run_facts)`)
+        .all() as { name: string }[];
+      const has = (n: string) => cols.some((c) => c.name === n);
+
+      if (!has('gps_quality')) {
+        db.exec(`ALTER TABLE run_facts ADD COLUMN gps_quality TEXT;`);
+        console.log('[Melange] v7: добавлена колонка run_facts.gps_quality');
+      }
+      if (!has('distance_source')) {
+        db.exec(`ALTER TABLE run_facts ADD COLUMN distance_source TEXT;`);
+        console.log('[Melange] v7: добавлена колонка run_facts.distance_source');
+      }
+      if (!has('gps_coverage_pct')) {
+        db.exec(`ALTER TABLE run_facts ADD COLUMN gps_coverage_pct REAL;`);
+        console.log('[Melange] v7: добавлена колонка run_facts.gps_coverage_pct');
+      }
     },
   },
 ];

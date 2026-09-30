@@ -290,3 +290,11 @@ export const MIGRATION_V6_RUN_FACTS_START_TIME: readonly string[] = [
   `ALTER TABLE run_facts ADD COLUMN start_time TEXT;`,
   `CREATE INDEX IF NOT EXISTS idx_run_facts_date_start ON run_facts(date, start_time);`,
 ];
+
+// ==================== Миграция v7: gps_quality + distance_source + gps_coverage_pct ====================
+
+export const MIGRATION_V7_RUN_FACTS_GPS: readonly string[] = [
+  `ALTER TABLE run_facts ADD COLUMN gps_quality TEXT;`,
+  `ALTER TABLE run_facts ADD COLUMN distance_source TEXT;`,
+  `ALTER TABLE run_facts ADD COLUMN gps_coverage_pct REAL;`,
+];

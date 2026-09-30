@@ -240,6 +240,9 @@ async function performImportFiles(
         durationS: workout.durationSec,
         avgHr: workout.summary.avgHr,
         maxHr: workout.summary.maxHr,
+        gpsQuality: workout.summary.gpsQuality,
+        distanceSource: workout.summary.distanceSource,
+        gpsCoveragePct: workout.summary.gpsCoveragePct,
         raw: {
           sport: workout.sport,
           summary: workout.summary,
@@ -1175,6 +1178,9 @@ export function registerPranaBinduHandlers(): void {
         durationS: workout.durationSec,
         avgHr: workout.summary.avgHr,
         maxHr: workout.summary.maxHr,
+        gpsQuality: workout.summary.gpsQuality,
+        distanceSource: workout.summary.distanceSource,
+        gpsCoveragePct: workout.summary.gpsCoveragePct,
         raw: {
           sport: workout.sport,
           summary: workout.summary,

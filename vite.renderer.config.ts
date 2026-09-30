@@ -36,6 +36,9 @@ export default defineConfig({
       },
     },
   ],
+  optimizeDeps: {
+    exclude: ['maplibre-gl'],
+  },
   server: {
     host: 'localhost',
     port: 5173,
