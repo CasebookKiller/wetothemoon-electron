@@ -611,33 +611,38 @@ export function registerPranaBinduHandlers(): void {
   // -------- Ручная синхронизация --------
   ipcMain.handle(
     'pb:sync-now',
-    async (_event, from: string, to: string) => {
+    async (
+      _event,
+      from: string,
+      to: string,
+      providerName?: string
+    ) => {
       if (!from || !to) {
-        return {
-          success: false,
-          error: 'from и to обязательны (YYYY-MM-DD)',
-        };
+        return { success: false, error: 'from и to обязательны (YYYY-MM-DD)' };
       }
       if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
-        return {
-          success: false,
-          error: 'Неверный формат даты. Ожидается YYYY-MM-DD',
-        };
+        return { success: false, error: 'Формат даты: YYYY-MM-DD' };
       }
       if (from > to) {
         return { success: false, error: 'from больше to' };
       }
 
+      // Провайдер по умолчанию — из sync_settings.source или dodofo
+      const name =
+        providerName ??
+        getSyncSettings(getMelange()).source ??
+        'dodofo';
+
       try {
-        const provider = getProvider('dodofo') as any;
+        const provider = getProvider(name) as any;
         if (!provider) {
-          return { success: false, error: 'Провайдер dodofo не зарегистрирован' };
+          return { success: false, error: `Провайдер «${name}» не зарегистрирован` };
+        }
+        if (!provider.capabilities?.workouts) {
+          return { success: false, error: `Провайдер «${name}» не поддерживает workouts` };
         }
         if (typeof provider.fetchWorkouts !== 'function') {
-          return {
-            success: false,
-            error: 'Провайдер dodofo не реализует fetchWorkouts',
-          };
+          return { success: false, error: `Провайдер «${name}» не реализует fetchWorkouts` };
         }
 
         const db = getMelange();
@@ -645,39 +650,96 @@ export function registerPranaBinduHandlers(): void {
 
         let added = 0;
         let updated = 0;
+        let streamsFetched = 0;
+        let streamsFailed = 0;
+
         for (const w of workouts) {
           const res = upsertRunFact(db, w);
-          if (res.inserted) added += 1;
-          else updated += 1;
+          if (res.inserted) added++;
+          else updated++;
+
+          // Для intervals.icu — сразу тянем FIT и потоки
+          if (
+            name === 'intervals-icu' &&
+            typeof provider.fetchUnifiedWorkout === 'function'
+          ) {
+            try {
+              const activityId = String(w.externalId ?? '').replace(
+                /^intervals-icu:/,
+                ''
+              );
+              const workout = await provider.fetchUnifiedWorkout(activityId);
+
+              const row = db
+                .prepare(`SELECT date FROM run_facts WHERE id = ?`)
+                .get(res.id) as { date: string } | undefined;
+              const dateForFile =
+                row?.date ?? workout.startTime.slice(0, 10);
+
+              upsertRunStreams(
+                db,
+                res.id,
+                'fit',
+                `fit:${activityId}`,
+                dateForFile,
+                workout.streams as unknown as Record<string, unknown>
+              );
+
+              // Обновим run_facts метаданными из FIT (distance, hr,
+              // gps_quality). Провайдер может отдавать менее точные
+              // числа из списка, чем из FIT-файла.
+              const summary = workout.summary;
+              db.prepare(
+                `UPDATE run_facts SET
+                   actual_km      = ?,
+                   avg_hr         = ?,
+                   max_hr         = ?,
+                   duration_sec   = ?,
+                   gps_quality    = ?,
+                   distance_source = ?,
+                   gps_coverage_pct = ?
+                 WHERE id = ?`
+              ).run(
+                Math.round((workout.distanceM / 1000) * 1000) / 1000,
+                summary.avgHr ?? null,
+                summary.maxHr ?? null,
+                Math.round(workout.durationSec),
+                summary.gpsQuality,
+                summary.distanceSource,
+                summary.gpsCoveragePct,
+                res.id
+              );
+
+              streamsFetched++;
+            } catch (e) {
+              streamsFailed++;
+              console.error(
+                `[Prana-Bindu] sync-now: не удалось загрузить потоки для ${w.externalId}:`,
+                (e as Error).message
+              );
+            }
+          }
         }
 
-        // last_sync_at / last_sync_status в updateSyncSettings не мапятся —
-        // если позже понадобится, добавим в syncRepo. Пока фиксируем dodofo-поля.
-        updateSyncSettings(db, {
-          dodofoLastSyncAt: new Date().toISOString(),
-          dodofoLastSyncStatus: 'ok',
-        });
-
         console.log(
-          `[Prana-Bindu] sync-now ${from}..${to}: +${added} ~${updated} (всего ${workouts.length})`
+          `[Prana-Bindu] sync-now (${name}) ${from}..${to}: ` +
+          `+${added} ~${updated} (всего ${workouts.length})` +
+          (streamsFetched || streamsFailed
+            ? `, streams: ${streamsFetched} ok / ${streamsFailed} err`
+            : '')
         );
 
         return {
           success: true,
+          provider: name,
           added,
           updated,
           skipped: 0,
           total: workouts.length,
+          streamsFetched,
+          streamsFailed,
         };
       } catch (e) {
-        try {
-          updateSyncSettings(getMelange(), {
-            dodofoLastSyncAt: new Date().toISOString(),
-            dodofoLastSyncStatus: 'error',
-          });
-        } catch {
-          // ignore
-        }
         return { success: false, error: (e as Error).message };
       }
     }

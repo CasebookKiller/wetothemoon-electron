@@ -666,8 +666,8 @@ try {
      
       listRunFacts: (from: string, to: string) =>
         ipcRenderer.invoke('pb:list-run-facts', from, to),
-      syncNow: (from: string, to: string) =>
-        ipcRenderer.invoke('pb:sync-now', from, to),
+      syncNow: (from: string, to: string, providerName?: string) =>
+        ipcRenderer.invoke('pb:sync-now', from, to, providerName),
       debugStreams: (runFactId: number, opts?: { writeFile?: boolean }) =>
         ipcRenderer.invoke('pb:debug-streams', runFactId, opts),
 
@@ -774,6 +774,8 @@ try {
 
       debugIcuWorkout: (id: string | number) =>
         ipcRenderer.invoke('pb:debug-icu-workout', id),
+
+
 
     },
 
