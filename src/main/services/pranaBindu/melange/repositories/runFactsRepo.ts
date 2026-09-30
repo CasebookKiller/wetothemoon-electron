@@ -129,6 +129,11 @@ export function upsertRunFact(
   const existing = getRunFactByExternalId(db, fact.source, fact.externalId);
 
   if (existing) {
+    // origin не перезаписываем, если уже задан.
+    // Origin — «откуда запись пришла впервые», он не должен меняться
+    // при повторных импортах того же файла из другой папки.
+    const nextOrigin = existing.origin ?? fact.origin ?? null;
+
     db.prepare(
       `UPDATE run_facts SET
         date         = ?,
@@ -151,7 +156,7 @@ export function upsertRunFact(
       fact.maxHr != null ? Math.round(fact.maxHr) : null,
       fact.durationS != null ? Math.round(fact.durationS) : null,
       fact.source,
-      fact.origin ?? null,
+      existing.origin ?? fact.origin ?? null,
       rawJson,
       existing.id
     );

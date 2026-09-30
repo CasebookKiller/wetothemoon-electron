@@ -1,6 +1,6 @@
 // src/preload.ts
 
-import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
+import { contextBridge, ipcRenderer, IpcRendererEvent, webUtils } from 'electron';
 import { FineTuningData, TrainingProgress } from './shared/types/types';
 
 try {
@@ -737,6 +737,14 @@ try {
       removeImportProgressListener: () => {
         ipcRenderer.removeAllListeners('pb:import-progress');
       },
+
+      pickFiles: (opts?: { multiple?: boolean }) =>
+        ipcRenderer.invoke('pb:pick-files', opts),
+      importFiles: (
+        paths: string[],
+        opts?: { origin?: string; skipImported?: boolean }
+      ) => ipcRenderer.invoke('pb:import-files', paths, opts),
+      getPathForFile: (file: File) => webUtils.getPathForFile(file),
 
     },
 

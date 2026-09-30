@@ -40,6 +40,16 @@ const MODULES = [
   { name: 'Spice', description: 'Аналитика, Google Fit, Zepp, dodofo' },
 ];
 
+const IMPORT_ORIGIN_OPTIONS = [
+  { label: 'Zepp / Amazfit', value: 'zepp-app' },
+  { label: 'Strava-архив', value: 'strava-archive' },
+  { label: 'Garmin Connect', value: 'garmin-connect' },
+  { label: 'Coros', value: 'coros' },
+  { label: 'Polar', value: 'polar' },
+  { label: 'Suunto', value: 'suunto' },
+  { label: 'Ручной импорт', value: 'manual-import' },
+];
+
 function toIsoDate(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -284,28 +294,25 @@ export const PranaBinduPage: React.FC = () => {
   // ==================== Загрузка потоков (map) ====================
 
   const loadStreamsMap = async (items: any[]) => {
-    console.log('[loadStreamsMap] start, items:', items.length);
     if (!api?.pb?.listRunStreamsBatch || items.length === 0) {
-      console.log('[loadStreamsMap] skip');
       setStreamsMap({});
       return;
     }
     try {
       const ids = items.map((x) => x.id);
-      console.log('[loadStreamsMap] ids:', ids);
-      const res = await api.pb.listRunStreamsBatch(ids);
-      console.log('[loadStreamsMap] res.success:', res?.success, 'keys:', Object.keys(res?.data ?? {}));
-      //if (res?.success) setStreamsMap(res.data ?? {});
-      if (res?.success) {
-        const raw = res.data ?? {};
-        const normalized: Record<number, any[]> = {};
-        for (const [k, v] of Object.entries(raw)) {
-          normalized[Number(k)] = v as any[];
+      const merged: Record<number, any[]> = {};
+      // Чанкуем по 500 — сервер режет массив, а нам нужны все.
+      const CHUNK = 500;
+      for (let i = 0; i < ids.length; i += CHUNK) {
+        const chunk = ids.slice(i, i + CHUNK);
+        const res = await api.pb.listRunStreamsBatch(chunk);
+        if (res?.success && res.data) {
+          Object.assign(merged, res.data);
         }
-        setStreamsMap(normalized);
       }
-    } catch (e) {
-      console.error('[loadStreamsMap] ERROR:', e);
+      setStreamsMap(merged);
+    } catch {
+      // ignore
     }
   };
 
@@ -323,6 +330,10 @@ export const PranaBinduPage: React.FC = () => {
     () => groupRunFacts(runFacts, streamsMap),
     [runFacts, streamsMap]
   );
+
+  const [dragActive, setDragActive] = useState(false);
+
+  const [importOrigin, setImportOrigin] = useState<string>('zepp-app');
 
   // ==================== Загрузка списка пробежек ====================
 
@@ -834,6 +845,81 @@ export const PranaBinduPage: React.FC = () => {
     }
   };
 
+  const runImportPaths = async (
+    paths: string[],
+    opts?: { origin?: string; skipImported?: boolean }
+  ) => {
+    if (!api?.pb?.importFiles) {
+      setArchiveError('electronAPI.pb.importFiles недоступен');
+      return;
+    }
+    if (paths.length === 0) return;
+
+    setArchiveUpdating(true);
+    setArchiveError('');
+    setArchiveResult(null);
+    try {
+      const res = await api.pb.importFiles(paths, {
+        origin: opts?.origin ?? 'manual-import',
+        skipImported: opts?.skipImported === true,
+      });
+      if (res.success) {
+        setArchiveResult({
+          imported: res.imported ?? 0,
+          updated: res.updated ?? 0,
+          skipped: res.skipped ?? 0,
+          failed: res.failed ?? 0,
+          total: res.total ?? 0,
+        });
+        await loadRunFacts();
+      } else {
+        setArchiveError(res.error ?? 'Ошибка импорта');
+      }
+    } catch (e) {
+      setArchiveError((e as Error).message);
+    } finally {
+      setArchiveUpdating(false);
+      setImportProgress(null);
+    }
+  };
+
+  const handlePickFiles = async () => {
+    if (!api?.pb?.pickFiles) return;
+    const res = await api.pb.pickFiles({ multiple: true });
+    if (!res?.success || !Array.isArray(res.paths)) return;
+    await runImportPaths(res.paths, { origin: importOrigin });
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+
+    const files = Array.from(e.dataTransfer?.files ?? []);
+    const paths: string[] = [];
+    for (const f of files) {
+      try {
+        const p = api.getPathForFile?.(f);
+        if (p && typeof p === 'string') paths.push(p);
+      } catch {
+        // ignore
+      }
+    }
+    await runImportPaths(paths, { origin: importOrigin });
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!dragActive) setDragActive(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+  };
+
   return (
     <div className="pb-page p-4">
       <div className="mb-4">
@@ -853,6 +939,9 @@ export const PranaBinduPage: React.FC = () => {
             </div>
           </div>
         ))}
+
+        {/* Сюда надо перенести панели, но здесь надо поработать над стилями, шириной и стилями панелей при расзмещении в решетке */}
+        
       </div>
 
       <Panel header="Профиль" className="shadow-5 mb-3 pb-panel">
@@ -961,98 +1050,123 @@ export const PranaBinduPage: React.FC = () => {
         )}
       </Panel>
 
-      <Panel header="FIT-архив" className="shadow-5 mb-3 pb-panel">
-        <div className="flex flex-column gap-2">
-          <label className="pb-label">Путь к папке с FIT-файлами Strava</label>
-          <div className="flex gap-2 flex-wrap align-items-center">
-            <span className="pb-archive-path" title={fitArchivePath || undefined}>
-              {fitArchivePath || <i>папка не выбрана</i>}
-            </span>
-            <Button
-              label={fitArchivePath ? 'Сменить папку' : 'Выбрать папку'}
-              icon="pi pi-folder-open"
-              className="pb-soft p-button-sm"
-              onClick={handleChangeArchiveFolder}
-              disabled={archiveUpdating}
-            />
-            <Button
-              label={archiveUpdating ? 'Обновление…' : 'Обновить архив'}
-              icon={archiveUpdating ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'}
-              className="pb p-button-sm"
-              onClick={handleUpdateFitArchive}
-              disabled={archiveUpdating}
-              tooltip={
-                fitArchivePath
-                  ? 'Перечитать все FIT-файлы, обновить существующие'
-                  : 'Выбрать папку и импортировать все FIT-файлы'
-              }
-            />
-          </div>
-          <small className="pb-hint">
-            При обновлении перечитываются все файлы. Существующие записи
-            обновляются (например, если в Strava изменили описание).
-          </small>
-        </div>
-
-        {archiveUpdating && importProgress && (
-          <div className="pb-import-progress">
-            <div className="pb-import-progress__header">
-              <span>
-                {importProgress.current} / {importProgress.total}
-                {' · '}
-                <code>{importProgress.filename}</code>
+      <div
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        className={`pb-archive-dropzone ${dragActive ? 'pb-archive-dropzone--active' : ''}`}
+      >
+        <Panel header="FIT-архив" className="shadow-5 mb-3 pb-panel">
+          <div className="flex flex-column gap-2">
+            <div className="pb-archive-origin">
+              <label className="pb-label">Откуда файлы</label>
+              <Dropdown
+                value={importOrigin}
+                options={IMPORT_ORIGIN_OPTIONS}
+                onChange={(e) => setImportOrigin(e.value)}
+                className="pb-archive-origin__dropdown"
+              />
+              <small className="pb-hint">
+                Метка источника сохраняется при первом импорте и не меняется
+                при повторных загрузках того же файла.
+              </small>
+            </div>
+          </div>  
+          <div className="flex flex-column gap-2">
+            <label className="pb-label">Путь к папке с FIT/TCX-файлами</label>
+            <div className="flex gap-2 flex-wrap align-items-center">
+              <span className="pb-archive-path" title={fitArchivePath || undefined}>
+                {fitArchivePath || <i>папка не выбрана</i>}
               </span>
               <Button
-                label="Отмена"
-                icon="pi pi-times"
+                label={fitArchivePath ? 'Сменить папку' : 'Выбрать папку'}
+                icon="pi pi-folder-open"
                 className="pb-soft p-button-sm"
-                onClick={handleCancelImport}
+                onClick={handleChangeArchiveFolder}
+                disabled={archiveUpdating}
+              />
+              <Button
+                label={archiveUpdating ? 'Обновление…' : 'Обновить архив'}
+                icon={archiveUpdating ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'}
+                className="pb p-button-sm"
+                onClick={handleUpdateFitArchive}
+                disabled={archiveUpdating}
+              />
+              <Button
+                label="Импортировать файлы"
+                icon="pi pi-upload"
+                className="pb-soft p-button-sm"
+                onClick={handlePickFiles}
+                disabled={archiveUpdating}
+                tooltip="Выбрать отдельные FIT/TCX файлы для импорта"
               />
             </div>
-            <ProgressBar
-              value={Math.round(
-                (importProgress.current / importProgress.total) * 100
-              )}
-              showValue={false}
-              style={{ height: '6px' }}
-            />
-            <div className="pb-import-progress__stats">
-              <span>+{importProgress.imported}</span>
-              <span>~{importProgress.updated}</span>
-              <span>·{importProgress.skipped}</span>
-              {importProgress.failed > 0 && (
-                <span className="pb-import-progress__fail">
-                  ✗{importProgress.failed}
-                </span>
-              )}
-            </div>
+            <small className="pb-hint">
+              Перетащите FIT/TCX файлы в эту панель, чтобы импортировать их
+              без выбора папки.
+            </small>
           </div>
-        )}
 
-        {archiveError && (
-          <Message severity="error" text={archiveError} className="w-full mt-2" />
-        )}
+          {archiveUpdating && importProgress && (
+            <div className="pb-import-progress">
+              <div className="pb-import-progress__header">
+                <span>
+                  {importProgress.current} / {importProgress.total}
+                  {' · '}
+                  <code>{importProgress.filename}</code>
+                </span>
+                <Button
+                  label="Отмена"
+                  icon="pi pi-times"
+                  className="pb-soft p-button-sm"
+                  onClick={handleCancelImport}
+                />
+              </div>
+              <ProgressBar
+                value={Math.round(
+                  (importProgress.current / importProgress.total) * 100
+                )}
+                showValue={false}
+                style={{ height: '6px' }}
+              />
+              <div className="pb-import-progress__stats">
+                <span>+{importProgress.imported}</span>
+                <span>~{importProgress.updated}</span>
+                <span>·{importProgress.skipped}</span>
+                {importProgress.failed > 0 && (
+                  <span className="pb-import-progress__fail">
+                    ✗{importProgress.failed}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
 
-        {archiveResult && (
-          <Message
-            severity={archiveResult.failed > 0 ? 'warn' : 'success'}
-            className="w-full mt-2"
-            content={
-              <span>
-                Добавлено <b>{archiveResult.imported}</b>
-                {' · '}обновлено <b>{archiveResult.updated}</b>
-                {archiveResult.skipped > 0 && (
-                  <> · пропущено <b>{archiveResult.skipped}</b></>
-                )}
-                {archiveResult.failed > 0 && (
-                  <> · ошибок <b>{archiveResult.failed}</b></>
-                )}
-                {' · '}всего файлов <b>{archiveResult.total}</b>
-              </span>
-            }
-          />
-        )}
-      </Panel>
+          {archiveError && (
+            <Message severity="error" text={archiveError} className="w-full mt-2" />
+          )}
+
+          {archiveResult && (
+            <Message
+              severity={archiveResult.failed > 0 ? 'warn' : 'success'}
+              className="w-full mt-2"
+              content={
+                <span>
+                  Добавлено <b>{archiveResult.imported}</b>
+                  {' · '}обновлено <b>{archiveResult.updated}</b>
+                  {archiveResult.skipped > 0 && (
+                    <> · пропущено <b>{archiveResult.skipped}</b></>
+                  )}
+                  {archiveResult.failed > 0 && (
+                    <> · ошибок <b>{archiveResult.failed}</b></>
+                  )}
+                  {' · '}всего файлов <b>{archiveResult.total}</b>
+                </span>
+              }
+            />
+          )}
+        </Panel>
+      </div>
 
       <Panel header="Синхронизация" className="shadow-5 mb-3 pb-panel">
         <div className="flex flex-column gap-3">

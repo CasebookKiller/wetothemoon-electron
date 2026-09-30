@@ -160,6 +160,141 @@ function detectSource(filePath: string): 'fit' | 'tcx' {
   throw new Error(`Не удалось определить источник: ${filePath}`);
 }
 
+interface ImportFilesResult {
+  imported: number;
+  updated: number;
+  skipped: number;
+  failed: number;
+  cancelled: boolean;
+  importedIds: number[];
+  updatedDates: string[];       // ← новое
+  errors: Array<{ file: string; error: string }>;
+}
+
+async function performImportFiles(
+  files: string[],
+  db: ReturnType<typeof getMelange>,
+  sendProgress: (payload: Record<string, unknown>) => void,
+  origin: string,
+  skipImported: boolean
+): Promise<ImportFilesResult> {
+  let imported = 0;
+  let updated = 0;
+  let skipped = 0;
+  let failed = 0;
+  let cancelled = false;
+  const errors: Array<{ file: string; error: string }> = [];
+  const importedIds: number[] = [];
+  const updatedDates: string[] = [];
+
+  for (let i = 0; i < files.length; i++) {
+    if (importFitCancelRequested) {
+      cancelled = true;
+      break;
+    }
+
+    const file = files[i];
+    const basename = path
+      .basename(file)
+      .replace(/\.(fit|tcx)(\.gz)?$/i, '');
+    const source = detectSource(file);
+    const externalId = `${source}:${basename}`;
+
+    if (skipImported) {
+      const existing = db
+        .prepare(
+          `SELECT id FROM run_facts WHERE source = ? AND external_id = ? LIMIT 1`
+        )
+        .get(source, externalId) as { id: number } | undefined;
+      if (existing) {
+        skipped++;
+        sendProgress({
+          current: i + 1,
+          total: files.length,
+          filename: path.basename(file),
+          imported,
+          updated,
+          skipped,
+          failed,
+        });
+        await new Promise((r) => setImmediate(r));
+        continue;
+      }
+    }
+
+    try {
+      const workout = await parseWorkoutFile(file, basename);
+
+      const startMs = new Date(workout.startTime).getTime();
+      const endTime = new Date(
+        startMs + workout.durationSec * 1000
+      ).toISOString();
+
+      const raw = {
+        externalId,
+        source: workout.source,
+        origin,
+        startTime: workout.startTime,
+        endTime,
+        distanceM: workout.distanceM,
+        durationS: workout.durationSec,
+        avgHr: workout.summary.avgHr,
+        maxHr: workout.summary.maxHr,
+        raw: {
+          sport: workout.sport,
+          summary: workout.summary,
+          validation: workout.validation,
+          lapCount: workout.laps?.length ?? 0,
+          importedFrom: file,
+        },
+      };
+
+      const { inserted, id: runFactId } = upsertRunFact(db, raw);
+
+      const row = db
+        .prepare(`SELECT date FROM run_facts WHERE id = ?`)
+        .get(runFactId) as { date: string } | undefined;
+      const dateForFile = row?.date ?? workout.startTime.slice(0, 10);
+
+      upsertRunStreams(
+        db,
+        runFactId,
+        workout.source,
+        externalId,
+        dateForFile,
+        workout.streams as unknown as Record<string, unknown>
+      );
+
+      if (inserted) imported++;
+      else {
+        updated++;
+        if (row?.date) updatedDates.push(row.date);
+      }
+      importedIds.push(runFactId);
+    } catch (e) {
+      failed++;
+      errors.push({
+        file: path.basename(file),
+        error: (e as Error).message,
+      });
+    }
+
+    sendProgress({
+      current: i + 1,
+      total: files.length,
+      filename: path.basename(file),
+      imported,
+      updated,
+      skipped,
+      failed,
+    });
+
+    await new Promise((r) => setImmediate(r));
+  }
+
+  return { imported, updated, skipped, failed, cancelled, importedIds, updatedDates, errors };
+}
+
 // ==================== dodofo token ====================
 
 /**
@@ -973,7 +1108,7 @@ export function registerPranaBinduHandlers(): void {
         // Защита от слишком большого IN-списка
         const ids = runFactIds
           .filter((x) => Number.isFinite(x))
-          .slice(0, 500);
+          .slice(0, 2000);
 
         if (ids.length === 0) {
           return { success: true, data: {} };
@@ -1197,6 +1332,106 @@ export function registerPranaBinduHandlers(): void {
     }
   );
 
+  // -------- Диалог выбора файлов --------
+  ipcMain.handle(
+    'pb:pick-files',
+    async (_event, opts?: { multiple?: boolean }) => {
+      try {
+        const res = await dialog.showOpenDialog({
+          properties:
+            opts?.multiple !== false
+              ? ['openFile', 'multiSelections']
+              : ['openFile'],
+          title: 'Выберите FIT или TCX файлы',
+          filters: [
+            { name: 'FIT / TCX', extensions: ['fit', 'tcx', 'gz'] },
+            { name: 'FIT', extensions: ['fit'] },
+            { name: 'TCX', extensions: ['tcx'] },
+            { name: 'Все файлы', extensions: ['*'] },
+          ],
+        });
+        if (res.canceled || res.filePaths.length === 0) {
+          return { success: false, canceled: true };
+        }
+        return { success: true, paths: res.filePaths };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+  // -------- Импорт конкретных файлов --------
+  ipcMain.handle(
+    'pb:import-files',
+    async (
+      _event,
+      filePaths: string[],
+      opts?: { origin?: string; skipImported?: boolean }
+    ) => {
+      try {
+        if (!Array.isArray(filePaths) || filePaths.length === 0) {
+          return { success: false, error: 'filePaths обязателен (массив)' };
+        }
+
+        // Фильтруем — оставляем только существующие .fit/.tcx/.gz
+        const files: string[] = [];
+        for (const p of filePaths) {
+          if (typeof p !== 'string') continue;
+          if (!fs.existsSync(p)) continue;
+          if (!/\.(fit|tcx)(\.gz)?$/i.test(p)) continue;
+          files.push(p);
+        }
+
+        if (files.length === 0) {
+          return {
+            success: false,
+            error: 'Не найдено ни одного FIT/TCX файла среди выбранных',
+          };
+        }
+
+        const origin = opts?.origin ?? 'manual-import';
+        const skipImported = opts?.skipImported === true;
+        const db = getMelange();
+
+        importFitCancelRequested = false;
+        const sender = _event.sender;
+        const sendProgress = (payload: Record<string, unknown>) => {
+          if (!sender.isDestroyed()) sender.send('pb:import-progress', payload);
+        };
+
+        const result = await performImportFiles(
+          files,
+          db,
+          sendProgress,
+          origin,
+          skipImported
+        );
+
+        console.log(
+          `[Prana-Bindu] import-files (${origin}): ` +
+          `imported=${result.imported}, updated=${result.updated}, ` +
+          `skipped=${result.skipped}, failed=${result.failed}, total=${files.length}`
+        );
+
+        return {
+          success: true,
+          origin,
+          imported: result.imported,
+          updated: result.updated,
+          skipped: result.skipped,
+          failed: result.failed,
+          cancelled: result.cancelled,
+          total: files.length,
+          importedIds: result.importedIds,
+          updatedDates: result.updatedDates.slice(0, 20),
+          errors: result.errors.slice(0, 20),
+        };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
   ipcMain.handle('pb:fit-archive-path-get', () => {
     try {
       return { success: true, path: getFitArchivePath(getMelange()) };
@@ -1252,144 +1487,40 @@ export function registerPranaBinduHandlers(): void {
         importFitCancelRequested = false;
         const sender = _event.sender;
         const sendProgress = (payload: Record<string, unknown>) => {
-          if (!sender.isDestroyed()) {
-            sender.send('pb:import-progress', payload);
-          }
+          if (!sender.isDestroyed()) sender.send('pb:import-progress', payload);
         };
 
-        let imported = 0;
-        let updated = 0;
-        let skipped = 0;
-        let failed = 0;
-        let cancelled = false;
-        const errors: Array<{ file: string; error: string }> = [];
-        const importedIds: number[] = [];
+        const result = await performImportFiles(
+          files,
+          db,
+          sendProgress,
+          origin,
+          skipImported
+        );
 
-        for (let i = 0; i < files.length; i++) {
-          if (importFitCancelRequested) {
-            cancelled = true;
-            break;
-          }
-
-          const file = files[i];
-          const basename = path
-            .basename(file)
-            .replace(/\.(fit|tcx)(\.gz)?$/i, '');
-          const source = detectSource(file);
-          const externalId = `${source}:${basename}`;
-
-          if (skipImported) {
-            const existing = db
-              .prepare(
-                `SELECT id FROM run_facts WHERE source = ? AND external_id = ? LIMIT 1`
-              )
-              .get(source, externalId) as { id: number } | undefined;
-            if (existing) {
-              skipped++;
-              sendProgress({
-                current: i + 1,
-                total: files.length,
-                filename: path.basename(file),
-                imported,
-                updated,
-                skipped,
-                failed,
-              });
-              await new Promise((r) => setImmediate(r));
-              continue;
-            }
-          }
-
-          try {
-            const workout = await parseWorkoutFile(file, basename);
-
-            const startMs = new Date(workout.startTime).getTime();
-            const endTime = new Date(
-              startMs + workout.durationSec * 1000
-            ).toISOString();
-
-            const raw = {
-              externalId,
-              source: workout.source,
-              origin,
-              startTime: workout.startTime,
-              endTime,
-              distanceM: workout.distanceM,
-              durationS: workout.durationSec,
-              avgHr: workout.summary.avgHr,
-              maxHr: workout.summary.maxHr,
-              raw: {
-                sport: workout.sport,
-                summary: workout.summary,
-                validation: workout.validation,
-                lapCount: workout.laps?.length ?? 0,
-                importedFrom: file,
-              },
-            };
-
-            const { inserted, id: runFactId } = upsertRunFact(db, raw);
-
-            const row = db
-              .prepare(`SELECT date FROM run_facts WHERE id = ?`)
-              .get(runFactId) as { date: string } | undefined;
-            const dateForFile = row?.date ?? workout.startTime.slice(0, 10);
-
-            upsertRunStreams(
-              db,
-              runFactId,
-              workout.source,
-              externalId,
-              dateForFile,
-              workout.streams as unknown as Record<string, unknown>
-            );
-
-            if (inserted) imported++;
-            else updated++;
-            importedIds.push(runFactId);
-          } catch (e) {
-            failed++;
-            errors.push({
-              file: path.basename(file),
-              error: (e as Error).message,
-            });
-          }
-
-          sendProgress({
-            current: i + 1,
-            total: files.length,
-            filename: path.basename(file),
-            imported,
-            updated,
-            skipped,
-            failed,
-          });
-
-          // Уступаем event loop — UI остаётся отзывчивым.
-          await new Promise((r) => setImmediate(r));
-        }
-
-        if (savePath && failed === 0) {
+        if (savePath && result.failed === 0 && !result.cancelled) {
           setFitArchivePath(db, dirPath);
         }
 
         console.log(
           `[Prana-Bindu] import-fit-dir (${origin}) ${dirPath}: ` +
-          `imported=${imported}, updated=${updated}, skipped=${skipped}, ` +
-          `failed=${failed}, total=${files.length}`
+          `imported=${result.imported}, updated=${result.updated}, ` +
+          `skipped=${result.skipped}, failed=${result.failed}, total=${files.length}`
         );
 
         return {
           success: true,
           origin,
           dirPath,
-          imported,
-          updated,
-          skipped,
-          failed,
-          cancelled,          // ← новое
+          imported: result.imported,
+          updated: result.updated,
+          skipped: result.skipped,
+          failed: result.failed,
+          cancelled: result.cancelled,
           total: files.length,
-          importedIds,
-          errors: errors.slice(0, 20),
+          importedIds: result.importedIds,
+          updatedDates: result.updatedDates.slice(0, 20),
+          errors: result.errors.slice(0, 20),
         };
       } catch (e) {
         return { success: false, error: (e as Error).message };

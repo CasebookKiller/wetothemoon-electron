@@ -1432,3 +1432,45 @@ span.pb-destructive {
   background: color-mix(in srgb, var(--pb-accent) 50%, transparent);
   border-radius: 4px;
 }
+/* ============================================================
+   Drag&drop зона FIT-архива
+   ============================================================ */
+
+.pb-archive-dropzone {
+  position: relative;
+  transition: all 0.15s ease;
+}
+
+.pb-archive-dropzone--active {
+  outline: 2px dashed var(--pb-accent);
+  outline-offset: -4px;
+  border-radius: 6px;
+}
+
+.pb-archive-dropzone--active::after {
+  content: 'Отпустите, чтобы импортировать';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--pb-accent) 12%, transparent);
+  color: var(--pb-accent);
+  font-weight: 600;
+  font-size: 1rem;
+  border-radius: 6px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.pb-archive-origin {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+}
+
+.pb-archive-origin__dropdown {
+  width: 16rem;
+  max-width: 100%;
+}
