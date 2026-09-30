@@ -1755,6 +1755,148 @@ export function registerPranaBinduHandlers(): void {
     }
   });
 
+    // -------- Разведка: intervals.icu activities --------
+  ipcMain.handle(
+    'pb:debug-icu-activities',
+    async (_event, from: string, to: string) => {
+      try {
+        const provider = getProvider('intervals-icu') as any;
+        if (!provider || typeof provider.debugActivities !== 'function') {
+          return { success: false, error: 'debugActivities не реализован' };
+        }
+        const t0 = Date.now();
+        const raw = await provider.debugActivities(from, to);
+        const dt = Date.now() - t0;
+        console.log(
+          '[Prana-Bindu] debug-icu-activities:',
+          JSON.stringify(raw).slice(0, 2000)
+        );
+        return { success: true, fetchMs: dt, data: raw };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+  // -------- Разведка: intervals.icu одна активность --------
+  ipcMain.handle(
+    'pb:debug-icu-activity',
+    async (_event, id: string | number) => {
+      try {
+        const provider = getProvider('intervals-icu') as any;
+        if (!provider || typeof provider.debugActivity !== 'function') {
+          return { success: false, error: 'debugActivity не реализован' };
+        }
+        const raw = await provider.debugActivity(id);
+        return { success: true, data: raw };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+  // -------- Разведка: intervals.icu streams --------
+  ipcMain.handle(
+    'pb:debug-icu-streams',
+    async (_event, id: string | number) => {
+      try {
+        const provider = getProvider('intervals-icu') as any;
+        if (!provider || typeof provider.debugStreams !== 'function') {
+          return { success: false, error: 'debugStreams не реализован' };
+        }
+        const raw = await provider.debugStreams(id);
+        return { success: true, data: raw };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+  // -------- Разведка: intervals.icu events (план) --------
+  ipcMain.handle(
+    'pb:debug-icu-events',
+    async (_event, from: string, to: string) => {
+      try {
+        const provider = getProvider('intervals-icu') as any;
+        if (!provider || typeof provider.debugEvents !== 'function') {
+          return { success: false, error: 'debugEvents не реализован' };
+        }
+        const raw = await provider.debugEvents(from, to);
+        return { success: true, data: raw };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+  ipcMain.handle(
+    'pb:debug-icu-workouts',
+    async (_event, from: string, to: string) => {
+      try {
+        const provider = getProvider('intervals-icu') as any;
+        if (!provider || typeof provider.fetchWorkouts !== 'function') {
+          return { success: false, error: 'fetchWorkouts не реализован' };
+        }
+        const workouts = await provider.fetchWorkouts(from, to);
+        return {
+          success: true,
+          total: workouts.length,
+          // Первые 3 для проверки
+          items: workouts.slice(0, 3).map((w: any) => ({
+            externalId: w.externalId,
+            source: w.source,
+            startTime: w.startTime,
+            endTime: w.endTime,
+            distanceM: w.distanceM,
+            durationS: w.durationS,
+            avgHr: w.avgHr,
+            maxHr: w.maxHr,
+          })),
+        };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+    ipcMain.handle(
+    'pb:debug-icu-workout',
+    async (_event, id: string | number) => {
+      try {
+        const provider = getProvider('intervals-icu') as any;
+        if (!provider || typeof provider.fetchUnifiedWorkout !== 'function') {
+          return { success: false, error: 'fetchUnifiedWorkout не реализован' };
+        }
+        const w = await provider.fetchUnifiedWorkout(id);
+        return {
+          success: true,
+          data: {
+            source: w.source,
+            externalId: w.externalId,
+            startTime: w.startTime,
+            durationSec: w.durationSec,
+            distanceM: w.distanceM,
+            sport: w.sport,
+            streamLengths: {
+              secT: w.streams.secT?.length ?? 0,
+              hr: w.streams.hr?.length ?? 0,
+              speedKmh: w.streams.speedKmh?.length ?? 0,
+              cadence: w.streams.cadence?.length ?? 0,
+              elevationM: w.streams.elevationM?.length ?? 0,
+              latlng: w.streams.latlng?.length ?? 0,
+              distM: w.streams.distM?.length ?? 0,
+            },
+            summary: w.summary,
+            validation: w.validation,
+            lapCount: w.laps?.length ?? 0,
+          },
+        };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
   console.log('[Prana-Bindu] IPC-хендлеры зарегистрированы (pb:*)');
 }
 

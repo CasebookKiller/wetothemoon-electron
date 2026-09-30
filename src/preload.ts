@@ -760,6 +760,20 @@ try {
         ipcRenderer.invoke('pb:intervals-setup', apiKey, athleteId),
       intervalsStatus: () => ipcRenderer.invoke('pb:intervals-status'),
 
+      debugIcuActivities: (from: string, to: string) =>
+        ipcRenderer.invoke('pb:debug-icu-activities', from, to),
+      debugIcuActivity: (id: string | number) =>
+        ipcRenderer.invoke('pb:debug-icu-activity', id),
+      debugIcuStreams: (id: string | number) =>
+        ipcRenderer.invoke('pb:debug-icu-streams', id),
+      debugIcuEvents: (from: string, to: string) =>
+        ipcRenderer.invoke('pb:debug-icu-events', from, to),
+
+      debugIcuWorkouts: (from: string, to: string) =>
+        ipcRenderer.invoke('pb:debug-icu-workouts', from, to),
+
+      debugIcuWorkout: (id: string | number) =>
+        ipcRenderer.invoke('pb:debug-icu-workout', id),
 
     },
 

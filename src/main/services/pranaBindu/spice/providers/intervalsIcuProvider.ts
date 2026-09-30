@@ -9,6 +9,12 @@ import type {
   ProviderCapabilities,
   RawWorkout,
 } from './types';
+import type {
+  UnifiedStreams,
+  UnifiedWorkout,
+} from '../parsers/types';
+import { parseFit } from '../parsers/fitParser';
+import { parseTcx } from '../parsers/tcxParser';
 
 const BASE = 'https://intervals.icu/api/v1';
 const TIMEOUT_MS = 20_000;
@@ -24,6 +30,111 @@ export class IntervalsApiError extends Error {
   }
 }
 
+/**
+ * intervals.icu отдаёт потоки массивом [{type, data}, ...].
+ * Преобразуем в объект с ключами, как в UnifiedStreams.
+ *
+ * Особенности:
+ *  - velocity_smooth — в м/с, переводим в км/ч;
+ *  - latlng может приходить как [lat1, lng1, lat2, lng2, ...]
+ *    (плоский массив) или как [[lat, lng], ...] (пары).
+ *    Нормализуем в пары.
+ */
+function mapIcuStreams(
+  raw: Array<{ type: string; data?: number[] | number[][] }> | null | undefined
+): UnifiedStreams {
+  const streams: UnifiedStreams = { secT: [] };
+  if (!Array.isArray(raw)) return streams;
+
+  const map = new Map<string, any[]>();
+  for (const s of raw) {
+    if (s && typeof s.type === 'string' && Array.isArray(s.data)) {
+      map.set(s.type, s.data);
+    }
+  }
+
+  const time = map.get('time');
+  if (Array.isArray(time) && time.length > 0) {
+    streams.secT = time as number[];
+  }
+
+  const hr = map.get('heartrate');
+  if (Array.isArray(hr) && hr.length > 0) {
+    streams.hr = hr.map((v) => (typeof v === 'number' ? Math.round(v) : null));
+  }
+
+  const dist = map.get('distance');
+  if (Array.isArray(dist) && dist.length > 0) {
+    streams.distM = dist.map((v) => (typeof v === 'number' ? v : 0));
+  }
+
+  const vel = map.get('velocity_smooth');
+  if (Array.isArray(vel) && vel.length > 0) {
+    streams.speedKmh = vel.map((v) =>
+      typeof v === 'number' ? Math.round(v * 3.6 * 100) / 100 : null
+    );
+  }
+
+  const cad = map.get('cadence');
+  if (Array.isArray(cad) && cad.length > 0) {
+    streams.cadence = cad.map((v) =>
+      typeof v === 'number' ? Math.round(v) : null
+    );
+  }
+
+  const alt = map.get('altitude');
+  if (Array.isArray(alt) && alt.length > 0) {
+    streams.elevationM = alt.map((v) =>
+      typeof v === 'number' ? Math.round(v * 10) / 10 : null
+    );
+  }
+
+  const latlng = map.get('latlng');
+  if (Array.isArray(latlng) && latlng.length > 0) {
+    // Может прийти двумя способами:
+    //  [[lat, lng], [lat, lng], ...]  → пары
+    //  [lat1, lng1, lat2, lng2, ...]  → плоский
+    const first = latlng[0];
+    if (Array.isArray(first)) {
+      streams.latlng = (latlng as [number, number][]).map((p) =>
+        Array.isArray(p) && p.length === 2 ? [p[0], p[1]] : null
+      );
+    } else {
+      // плоский: собираем по 2
+      const pairs: ([number, number] | null)[] = [];
+      for (let i = 0; i + 1 < latlng.length; i += 2) {
+        const lat = latlng[i];
+        const lng = latlng[i + 1];
+        if (typeof lat === 'number' && typeof lng === 'number') {
+          pairs.push([lat, lng]);
+        } else {
+          pairs.push(null);
+        }
+      }
+      streams.latlng = pairs;
+    }
+  }
+
+  return streams;
+}
+
+/**
+ * Определяет формат файла по первым байтам.
+ * FIT: байты 8–12 содержат ASCII ".FIT".
+ * TCX: начинается с "<?xml" и содержит "TrainingCenterDatabase".
+ */
+function sniffFormat(buf: Buffer): 'fit' | 'tcx' | 'unknown' {
+  if (buf.length >= 12) {
+    const header = buf.slice(8, 12).toString('ascii');
+    if (header === '.FIT') return 'fit';
+  }
+  const head = buf.slice(0, 500).toString('utf8').trim();
+  if (head.startsWith('<?xml') && head.includes('TrainingCenterDatabase')) {
+    return 'tcx';
+  }
+  return 'unknown';
+}
+
 interface Ctx {
   getApiKey: () => string | null;
   getAthleteId: () => string | null;
@@ -34,8 +145,8 @@ export class IntervalsIcuProvider implements ZeppDataProvider {
 
   readonly capabilities: ProviderCapabilities = {
     workouts: true,
-    streams: true,
-    thresholds: false,   // пока не проверили /me
+    streams: true,       // включим в шаге 2
+    thresholds: false,
     zones: false,
     wellness: true,
   };
@@ -85,6 +196,62 @@ export class IntervalsIcuProvider implements ZeppDataProvider {
     }
   }
 
+  /**
+   * Скачивает оригинальный файл (FIT/TCX) активности.
+   * GET /api/v1/activity/{id}/file
+   */
+  private async fetchFileBuffer(activityId: string | number): Promise<Buffer> {
+    const apiKey = this.ctx.getApiKey();
+    if (!apiKey) throw new Error('intervals.icu API key not configured');
+
+    const url = new URL(`${BASE}/activity/${activityId}/file`);
+    const auth = Buffer.from(`API_KEY:${apiKey}`).toString('base64');
+
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 60_000);
+
+    try {
+      const res = await fetch(url.toString(), {
+        headers: { Authorization: `Basic ${auth}` },
+        signal: ctrl.signal,
+      });
+
+      if (!res.ok) {
+        throw new IntervalsApiError(
+          `file ${res.status} ${res.statusText}`,
+          res.status
+        );
+      }
+
+      const arrayBuf = await res.arrayBuffer();
+      return Buffer.from(arrayBuf);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  /**
+   * Возвращает полный UnifiedWorkout для активности.
+   * Скачивает оригинальный FIT/TCX и парсит нашим парсером.
+   */
+  async fetchUnifiedWorkout(
+    activityId: string | number
+  ): Promise<UnifiedWorkout> {
+    const buf = await this.fetchFileBuffer(activityId);
+    const format = sniffFormat(buf);
+    const externalId = `intervals-icu:${activityId}`;
+
+    if (format === 'fit') {
+      return await parseFit(buf, { externalId });
+    }
+    if (format === 'tcx') {
+      return parseTcx(buf, { externalId });
+    }
+    throw new Error(
+      `Неизвестный формат файла от intervals.icu (id=${activityId})`
+    );
+  }
+
   async isAvailable(): Promise<ProviderCheckResult> {
     const apiKey = this.ctx.getApiKey();
     if (!apiKey) return { available: false, reason: 'API key не задан' };
@@ -127,12 +294,94 @@ export class IntervalsIcuProvider implements ZeppDataProvider {
   }
 
   /**
-   * Контракт ZeppDataProvider. Пока не мапим в RawWorkout — это
-   * отдельная задача (в intervals другая структура, есть name,
-   * type, distance, moving_time).
+   * Список активностей за период.
+   * GET /api/v1/athlete/{id}/activities?oldest=&newest=
+   *
+   * Фильтр: только беговые типы (`Run`, `TrailRun`, `VirtualRun`).
+   * Остальное (Ride, Walk, Swim) отсекаем на нашей стороне.
    */
-  async fetchWorkouts(_from: string, _to: string): Promise<RawWorkout[]> {
-    throw new Error('intervals-icu fetchWorkouts пока не реализован');
+  async fetchWorkouts(from: string, to: string): Promise<RawWorkout[]> {
+    const athleteId = this.ctx.getAthleteId() ?? '0';
+
+    const items = await this.request<any[]>(
+      `/athlete/${athleteId}/activities`,
+      { oldest: from, newest: to }
+    );
+
+    if (!Array.isArray(items)) return [];
+
+    const RUN_TYPES = new Set([
+      'run',
+      'trailrun',
+      'virtualrun',
+      'trail_run',
+      'virtual_run',
+      'indoorrun',
+      'indoor_run',
+    ]);
+
+    return items
+      .filter((a) => {
+        if (!a || typeof a !== 'object') return false;
+        if (!a.id) return false;
+        const t = String(a.type ?? '').toLowerCase().replace(/[\s_-]/g, '');
+        return RUN_TYPES.has(t) || t === 'run' || t.startsWith('run');
+      })
+      .map((a) => {
+        // start_date — UTC с 'Z', start_date_local — без TZ.
+        // Используем UTC, чтобы startTime был валидным ISO 8601.
+        // Локальную зону применим на уровне UI/репозитория.
+        const startTime: string = a.start_date ?? a.start_date_local;
+        // moving_time — активное время в движении (соответствует
+        // FIT total_timer_time и UnifiedWorkout.durationSec).
+        const durationS: number | undefined =
+          typeof a.moving_time === 'number' ? a.moving_time : undefined;
+                const endTime = new Date(
+          new Date(startTime).getTime() + (durationS ?? 0) * 1000
+        ).toISOString();
+
+        return {
+          externalId: `intervals-icu:${a.id}`,
+          source: 'intervals-icu',
+          origin: 'intervals-icu',
+          startTime,
+          endTime,
+          distanceM:
+            typeof a.distance === 'number' ? a.distance : undefined,
+          durationS,
+          avgHr:
+            typeof a.average_heartrate === 'number'
+              ? Math.round(a.average_heartrate)
+              : undefined,
+          maxHr:
+            typeof a.max_heartrate === 'number'
+              ? Math.round(a.max_heartrate)
+              : undefined,
+          raw: {
+            type: a.type,
+            name: a.name ?? null,
+            description: a.description ?? null,
+            device_name: a.device_name ?? null,
+            external_id_source: a.external_id ?? null,
+            icu_athlete_id: a.icu_athlete_id ?? null,
+            // Метаданные атлета на момент тренировки
+            lthr: a.lthr ?? null,
+            resting_hr: a.icu_resting_hr ?? null,
+            hr_zones: a.icu_hr_zones ?? null,
+            // Нагрузки (полезно для будущего анализа)
+            training_load: a.icu_training_load ?? null,
+            ctl: a.icu_ctl ?? null,
+            atl: a.icu_atl ?? null,
+            // Доп. агрегаты
+            total_elevation_gain: a.total_elevation_gain ?? null,
+            total_elevation_loss: a.total_elevation_loss ?? null,
+            average_cadence: a.average_cadence ?? null,
+            calories: a.calories ?? null,
+            // Пометка источника FIT внутри intervals
+            file_type: a.file_type ?? null,
+          } as unknown as RawWorkout['raw'],
+        };
+      });
   }
 
   /**
@@ -146,4 +395,58 @@ export class IntervalsIcuProvider implements ZeppDataProvider {
       newest: to,
     });
   }
+
+    /**
+   * Разведка: список активностей.
+   * GET /api/v1/athlete/{id}/activities?oldest=&newest=
+   */
+  async debugActivities(from: string, to: string): Promise<unknown> {
+    const athleteId = this.ctx.getAthleteId() ?? '0';
+    return this.request<unknown>(`/athlete/${athleteId}/activities`, {
+      oldest: from,
+      newest: to,
+    });
+  }
+
+  /**
+   * Разведка: детали активности.
+   * GET /api/v1/activity/{id}
+   */
+  async debugActivity(id: string | number): Promise<unknown> {
+    return this.request<unknown>(`/activity/${id}`);
+  }
+
+  /**
+   * Разведка: потоки активности.
+   * GET /api/v1/activity/{id}/streams?types=...
+   */
+  async debugStreams(id: string | number): Promise<unknown> {
+    return this.request<unknown>(`/activity/${id}/streams`, {
+      types: 'time,heartrate,distance,velocity_smooth,cadence,altitude,latlng',
+    });
+  }
+
+  /**
+   * Потоки активности в формате UnifiedStreams.
+   * Скачивает FIT/TCX и парсит — полный набор каналов
+   * (HR, каденс, GPS, высота, дистанция, скорость).
+   */
+  async fetchStreams(activityId: string | number): Promise<UnifiedStreams> {
+    const workout = await this.fetchUnifiedWorkout(activityId);
+    return workout.streams;
+  }
+
+  /**
+   * Разведка: календарь и план.
+   * GET /api/v1/athlete/{id}/events?oldest=&newest=
+   */
+  async debugEvents(from: string, to: string): Promise<unknown> {
+    const athleteId = this.ctx.getAthleteId() ?? '0';
+    return this.request<unknown[]>(`/athlete/${athleteId}/events`, {
+      oldest: from,
+      newest: to,
+    });
+  }
+
+
 }
