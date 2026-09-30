@@ -437,6 +437,11 @@ export const PranaBinduPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [syncFrom, syncTo]);
 
+  useEffect(() => {
+    document.body.setAttribute('data-module', 'prana-bindu');
+    return () => document.body.removeAttribute('data-module');
+  }, []);
+
   // ==================== Проверка доступности ====================
 
   const handleCheck = async () => {
@@ -1065,6 +1070,7 @@ export const PranaBinduPage: React.FC = () => {
                 options={IMPORT_ORIGIN_OPTIONS}
                 onChange={(e) => setImportOrigin(e.value)}
                 className="pb-archive-origin__dropdown"
+                panelClassName="pb-dropdown-panel"
               />
               <small className="pb-hint">
                 Метка источника сохраняется при первом импорте и не меняется
@@ -1178,6 +1184,7 @@ export const PranaBinduPage: React.FC = () => {
               options={PROVIDER_OPTIONS}
               onChange={(e) => setProvider(e.value)}
               className="w-full"
+              panelClassName="pb-dropdown-panel"
             />
           </div>
 

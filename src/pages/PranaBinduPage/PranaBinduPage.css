@@ -1,5 +1,10 @@
 /* src/pages/PranaBinduPage/PranaBinduPage.css */
 
+body[data-module='prana-bindu'] .p-dropdown-panel .p-dropdown-item.p-highlight {
+  background: rgba(212, 163, 115, 0.18) !important;
+  color: #d4a373 !important;
+}
+
 /* ============================================================
    Контейнер страницы
    ============================================================ */
@@ -1473,4 +1478,66 @@ span.pb-destructive {
 .pb-archive-origin__dropdown {
   width: 16rem;
   max-width: 100%;
+}
+
+/* ============================================================
+   Dropdown: подсветка выбранного элемента — в accent Prana-Bindu
+   ============================================================ */
+
+.pb-page .p-dropdown-panel .p-dropdown-items .p-dropdown-item.p-highlight {
+  background: color-mix(in srgb, var(--pb-accent) 18%, transparent) !important;
+  color: var(--pb-accent) !important;
+}
+
+.pb-page .p-dropdown-panel .p-dropdown-items .p-dropdown-item.p-highlight.p-focus {
+  background: color-mix(in srgb, var(--pb-accent) 28%, transparent) !important;
+  color: var(--pb-accent) !important;
+}
+
+/* Hover на невыбранном элементе — мягкая подсветка accent */
+.pb-page .p-dropdown-panel .p-dropdown-items .p-dropdown-item:not(.p-highlight):hover {
+  background: color-mix(in srgb, var(--pb-accent) 8%, transparent) !important;
+  color: var(--pb-accent) !important;
+}
+
+/* Кастомный скроллбар дропдауна */
+.pb-page .p-dropdown-panel .p-dropdown-items-wrapper {
+  scrollbar-width: thin;
+  scrollbar-color: var(--pb-accent) transparent;
+}
+
+.pb-page .p-dropdown-panel .p-dropdown-items-wrapper::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--pb-accent) 45%, transparent);
+  border-radius: 4px;
+}
+
+/* ============================================================
+   Dropdown: панель с опциями — в accent Prana-Bindu
+   Панель рендерится через portal в body, поэтому стилизуем
+   по классу, который добавляем через panelClassName.
+   ============================================================ */
+
+.pb-dropdown-panel .p-dropdown-items .p-dropdown-item.p-highlight {
+  background: color-mix(in srgb, var(--pb-accent) 18%, transparent) !important;
+  color: var(--pb-accent) !important;
+}
+
+.pb-dropdown-panel .p-dropdown-items .p-dropdown-item.p-highlight.p-focus {
+  background: color-mix(in srgb, var(--pb-accent) 28%, transparent) !important;
+  color: var(--pb-accent) !important;
+}
+
+.pb-dropdown-panel .p-dropdown-items .p-dropdown-item:not(.p-highlight):hover {
+  background: color-mix(in srgb, var(--pb-accent) 8%, transparent) !important;
+  color: var(--pb-accent) !important;
+}
+
+.pb-dropdown-panel .p-dropdown-items-wrapper {
+  scrollbar-width: thin;
+  scrollbar-color: var(--pb-accent) transparent;
+}
+
+.pb-dropdown-panel .p-dropdown-items-wrapper::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--pb-accent) 45%, transparent);
+  border-radius: 4px;
 }
