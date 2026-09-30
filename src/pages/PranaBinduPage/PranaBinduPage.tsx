@@ -55,6 +55,40 @@ function toIsoDate(d: Date): string {
 const SAME_WORKOUT_WINDOW_MIN = 30;
 const SAME_WORKOUT_WINDOW_MS = SAME_WORKOUT_WINDOW_MIN * 60 * 1000;
 
+const PB_RANGE_STORAGE_KEY = 'pb.syncRange';
+
+interface StoredRange {
+  from: string; // YYYY-MM-DD
+  to: string;   // YYYY-MM-DD
+}
+
+function loadStoredRange(): { from: Date; to: Date } | null {
+  try {
+    const raw = localStorage.getItem(PB_RANGE_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as StoredRange;
+    if (!parsed.from || !parsed.to) return null;
+    const from = new Date(parsed.from + 'T00:00:00');
+    const to = new Date(parsed.to + 'T00:00:00');
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return null;
+    return { from, to };
+  } catch {
+    return null;
+  }
+}
+
+function saveStoredRange(from: Date, to: Date): void {
+  try {
+    const payload: StoredRange = {
+      from: toIsoDate(from),
+      to: toIsoDate(to),
+    };
+    localStorage.setItem(PB_RANGE_STORAGE_KEY, JSON.stringify(payload));
+  } catch {
+    // ignore
+  }
+}
+
 function defaultSyncRange(): { from: Date; to: Date } {
   const to = new Date();
   const from = new Date();
@@ -192,7 +226,7 @@ export const PranaBinduPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
 
   // Синхронизация
-  const initialRange = defaultSyncRange();
+  const initialRange = loadStoredRange() ?? defaultSyncRange();
   const [syncFrom, setSyncFrom] = useState<Date>(initialRange.from);
   const [syncTo, setSyncTo] = useState<Date>(initialRange.to);
   const [syncing, setSyncing] = useState(false);
@@ -350,7 +384,7 @@ export const PranaBinduPage: React.FC = () => {
         // ignore
       }
     })();
-    loadRunFacts();
+    //loadRunFacts();
     loadProfile();   // ← добавил
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -379,6 +413,18 @@ export const PranaBinduPage: React.FC = () => {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Автосохранение диапазона
+  // Перезагружаем при смене диапазона (с дебаунсом 400 мс,
+  // чтобы не дёргать БД на каждое движение календаря)
+  useEffect(() => {
+    if (syncFrom && syncTo) saveStoredRange(syncFrom, syncTo);
+    const t = setTimeout(() => {
+      loadRunFacts();
+    }, 400);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [syncFrom, syncTo]);
 
   // ==================== Проверка доступности ====================
 
@@ -1048,6 +1094,28 @@ export const PranaBinduPage: React.FC = () => {
                 minDate={syncFrom ?? undefined}
                 maxDate={new Date()}
               />
+                            <Button
+                label="30 дней"
+                icon="pi pi-calendar"
+                className="pb-soft p-button-sm"
+                onClick={() => {
+                  const r = defaultSyncRange();
+                  setSyncFrom(r.from);
+                  setSyncTo(r.to);
+                }}
+                tooltip="Последние 30 дней"
+              />
+              <Button
+                label="За всё время"
+                icon="pi pi-calendar-plus"
+                className="pb-soft p-button-sm"
+                onClick={() => {
+                  // От 2020-01-01 (раньше первых данных) до сегодня
+                  setSyncFrom(new Date(2020, 0, 1));
+                  setSyncTo(new Date());
+                }}
+                tooltip="Показать всю историю тренировок"
+              />
               <Button
                 label={syncing ? 'Синхронизация...' : 'Синхронизировать'}
                 icon={syncing ? 'pi pi-spin pi-spinner' : 'pi pi-sync'}
@@ -1196,7 +1264,8 @@ export const PranaBinduPage: React.FC = () => {
           size="small"
           stripedRows
           scrollable
-          scrollHeight="420px"
+          scrollHeight="520px"
+          virtualScrollerOptions={{ itemSize: 38 }}
           emptyMessage="За выбранный период пробежек нет"
           className="p-datatable-sm"
           selectionMode="single"

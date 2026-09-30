@@ -1417,3 +1417,18 @@ span.pb-destructive {
 .pb-import-progress__fail {
   color: #ec3942;
 }
+
+/* Виртуализированный DataTable */
+.pb-page .p-datatable .p-virtualscroller {
+  scrollbar-width: thin;
+  scrollbar-color: var(--pb-accent) transparent;
+}
+
+.pb-page .p-datatable .p-virtualscroller::-webkit-scrollbar {
+  width: 8px;
+}
+
+.pb-page .p-datatable .p-virtualscroller::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--pb-accent) 50%, transparent);
+  border-radius: 4px;
+}
