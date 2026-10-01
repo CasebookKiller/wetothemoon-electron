@@ -1646,3 +1646,63 @@ span.pb-destructive {
   background: rgba(var(--pb-icu-red), 0.18);
   color: rgb(var(--pb-icu-red));
 }
+
+/* ============================================================
+   Подключения
+   ============================================================ */
+
+.pb-connections {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.pb-connections__block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--surface-border, rgba(255, 255, 255, 0.08));
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.pb-connections__block--collapsed {
+  opacity: 0.85;
+}
+
+.pb-connections__title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--pb-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.pb-connections__title .pi {
+  font-size: 0.9rem;
+}
+
+/* ============================================================
+   Wellness-таблица: скролл
+   ============================================================ */
+
+.pb-wellness-table--scrollable .pb-wellness-table__body {
+  max-height: 360px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--pb-accent) transparent;
+  padding-right: 0.25rem;
+}
+
+.pb-wellness-table--scrollable .pb-wellness-table__body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.pb-wellness-table--scrollable .pb-wellness-table__body::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--pb-accent) 45%, transparent);
+  border-radius: 4px;
+}

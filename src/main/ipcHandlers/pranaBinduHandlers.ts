@@ -982,7 +982,7 @@ export function registerPranaBinduHandlers(): void {
         applied.push(`resthr=${raw.resthr.value}`);
       }
       if (raw?.lthr?.value != null) {
-        patch.lthr = Number(raw.lthr.value);
+        patch.lactateThresholdHr = Number(raw.lthr.value);
         applied.push(`lthr=${raw.lthr.value}`);
       }
       if (raw?.hrmax?.value != null) {

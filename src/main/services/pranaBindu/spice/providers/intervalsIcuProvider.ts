@@ -146,7 +146,7 @@ export class IntervalsIcuProvider implements ZeppDataProvider {
   readonly capabilities: ProviderCapabilities = {
     workouts: true,
     streams: true,       // включим в шаге 2
-    thresholds: false,
+    thresholds: true,
     zones: false,
     wellness: true,
   };
@@ -279,6 +279,92 @@ export class IntervalsIcuProvider implements ZeppDataProvider {
       oldest: from,
       newest: to,
     });
+  }
+
+    /**
+   * Пороги атлета: LTHR, HRmax, RestHR.
+   *
+   * У ICU пороги живут в двух местах:
+   *  1. Профиль атлета (GET /athlete/{id}) — «текущие» значения.
+   *  2. В каждой активности — значения на момент её выполнения.
+   *
+   * Порядок:
+   *  1. Пробуем профиль атлета (текущее значение).
+   *  2. Если профиль пуст или не отдаёт нужные поля — берём из
+   *     последней активности, где они есть. Это даёт «порог на
+   *     сегодня» по мнению ICU.
+   *
+   * Возвращаем в формате dodofo-совместимом, чтобы pb:sync-thresholds
+   * не пришлось раздваивать.
+   */
+  async fetchThresholds(): Promise<{
+    lthr?: { value: number };
+    hrmax?: { value: number };
+    resthr?: { value: number };
+  }> {
+    const athleteId = this.ctx.getAthleteId() ?? '0';
+
+    // --- Вариант A: профиль атлета ---
+    try {
+      const profile = await this.request<any>(`/athlete/${athleteId}`);
+      const lthr =
+        profile?.lthr ??
+        profile?.icu_lthr ??
+        profile?.icu_run_lthr ??
+        null;
+      const hrmax =
+        profile?.athlete_max_hr ??
+        profile?.max_hr ??
+        profile?.icu_max_hr ??
+        null;
+      const resthr =
+        profile?.icu_resting_hr ??
+        profile?.resting_hr ??
+        null;
+
+      if (lthr != null && hrmax != null) {
+        return {
+          lthr: { value: Number(lthr) },
+          hrmax: { value: Number(hrmax) },
+          resthr: resthr != null ? { value: Number(resthr) } : undefined,
+        };
+      }
+    } catch {
+      // падаем на вариант B
+    }
+
+    // --- Вариант B: из последней активности с полями ---
+    const today = new Date();
+    const from = new Date();
+    from.setMonth(from.getMonth() - 3);
+    const fromIso = from.toISOString().slice(0, 10);
+    const toIso = today.toISOString().slice(0, 10);
+
+    const items = await this.request<any[]>(
+      `/athlete/${athleteId}/activities`,
+      { oldest: fromIso, newest: toIso }
+    );
+
+    if (!Array.isArray(items) || items.length === 0) {
+      throw new Error('Нет активностей ICU за последние 3 месяца');
+    }
+
+    // Берём первую (самую свежую) с заполненными порогами.
+    const withData = items.find(
+      (a) => a?.lthr != null && a?.icu_resting_hr != null
+    );
+    if (!withData) {
+      throw new Error('В последних активностях ICU нет данных о порогах');
+    }
+
+    return {
+      lthr: { value: Number(withData.lthr) },
+      hrmax:
+        withData.athlete_max_hr != null
+          ? { value: Number(withData.athlete_max_hr) }
+          : undefined,
+      resthr: { value: Number(withData.icu_resting_hr) },
+    };
   }
 
   /**
