@@ -671,12 +671,37 @@ try {
       debugStreams: (runFactId: number, opts?: { writeFile?: boolean }) =>
         ipcRenderer.invoke('pb:debug-streams', runFactId, opts),
 
-      syncRunStreams: (runFactId: number) =>
-        ipcRenderer.invoke('pb:sync-run-streams', runFactId),
       getRunStreamsMeta: (runFactId: number) =>
         ipcRenderer.invoke('pb:get-run-streams-meta', runFactId),
-      syncRunStreamsAll: (from: string, to: string, opts?: { onlyMissing?: boolean }) =>
-        ipcRenderer.invoke('pb:sync-run-streams-all', from, to, opts),
+      
+      syncRunStreams: (runFactId: number, providerName?: string) =>
+        ipcRenderer.invoke('pb:sync-run-streams', runFactId, providerName),
+
+      syncRunStreamsAll: (
+        from: string,
+        to: string,
+        opts?: { onlyMissing?: boolean; provider?: string }
+      ) => ipcRenderer.invoke('pb:sync-run-streams-all', from, to, opts),
+
+      syncCancel: () => ipcRenderer.invoke('pb:sync-cancel'),
+
+      onSyncProgress: (
+        cb: (data: {
+          current: number;
+          total: number;
+          runFactId: number;
+          externalId: string | null;
+          fetched: number;
+          skipped: number;
+          failed: number;
+        }) => void
+      ) => {
+        ipcRenderer.removeAllListeners('pb:sync-progress');
+        ipcRenderer.on('pb:sync-progress', (_e, data) => cb(data));
+      },
+      removeSyncProgressListener: () => {
+        ipcRenderer.removeAllListeners('pb:sync-progress');
+      },
 
       listRunStreamsBatch: (runFactIds: number[]) =>
         ipcRenderer.invoke('pb:list-run-streams-batch', runFactIds),

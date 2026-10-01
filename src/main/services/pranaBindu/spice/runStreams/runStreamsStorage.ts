@@ -35,20 +35,21 @@ function extractMeta(payload: RunStreamsPayload): {
   let pointCount = 0;
   const channels: string[] = [];
 
-  for (const [key, value] of Object.entries(payload)) {
+    for (const [key, value] of Object.entries(payload)) {
     if (!Array.isArray(value) || value.length === 0) continue;
 
-    // Массив числовой, если каждый элемент либо number, либо null/undefined.
-    // Так мы ловим и чистые number[], и (number|null)[] из FIT-парсера.
-    let numeric = true;
+    let kind: 'numeric' | 'latlng' | 'other' = 'numeric';
     for (const v of value) {
       if (v === null || v === undefined) continue;
-      if (typeof v !== 'number') {
-        numeric = false;
-        break;
-      }
+      if (typeof v === 'number') continue;
+      if (
+        Array.isArray(v) && v.length === 2 &&
+        typeof v[0] === 'number' && typeof v[1] === 'number'
+      ) { kind = 'latlng'; continue; }
+      kind = 'other';
+      break;
     }
-    if (!numeric) continue;
+    if (kind === 'other') continue;
 
     channels.push(key);
     if (value.length > pointCount) pointCount = value.length;

@@ -135,23 +135,22 @@ export function upsertRunFact(
     // origin не перезаписываем, если уже задан.
     // Origin — «откуда запись пришла впервые», он не должен меняться
     // при повторных импортах того же файла из другой папки.
-    const nextOrigin = existing.origin ?? fact.origin ?? null;
 
     db.prepare(
       `UPDATE run_facts SET
-        date         = ?,
-        start_time   = ?,
-        actual_km    = ?,
-        actual_pace  = ?,
-        avg_hr       = ?,
-        max_hr       = ?,
-        duration_sec = ?,
-        source       = ?,
-        origin       = ?,
-        gps_quality       = ?,
-        distance_source   = ?,
-        gps_coverage_pct  = ?,
-        raw_json     = ?
+        date              = ?,
+        start_time        = COALESCE(?, start_time),
+        actual_km         = COALESCE(?, actual_km),
+        actual_pace       = COALESCE(?, actual_pace),
+        avg_hr            = COALESCE(?, avg_hr),
+        max_hr            = COALESCE(?, max_hr),
+        duration_sec      = COALESCE(?, duration_sec),
+        source            = ?,
+        origin            = ?,
+        gps_quality       = COALESCE(?, gps_quality),
+        distance_source   = COALESCE(?, distance_source),
+        gps_coverage_pct  = COALESCE(?, gps_coverage_pct),
+        raw_json          = COALESCE(?, raw_json)
        WHERE id = ?`
     ).run(
       date,
@@ -190,11 +189,11 @@ export function upsertRunFact(
       fact.durationS != null ? Math.round(fact.durationS) : null,
       fact.source,
       fact.origin ?? null,
-      fact.gpsQuality ?? null,
-      fact.distanceSource ?? null,
-      fact.gpsCoveragePct ?? null,
-      fact.externalId,
-      rawJson
+      fact.externalId,                // ← external_id
+      rawJson,                        // ← raw_json
+      fact.gpsQuality ?? null,        // ← gps_quality
+      fact.distanceSource ?? null,    // ← distance_source
+      fact.gpsCoveragePct ?? null     // ← gps_coverage_pct
     );
 
   return { inserted: true, id: Number(info.lastInsertRowid) };

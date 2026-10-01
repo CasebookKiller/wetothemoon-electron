@@ -152,15 +152,24 @@ export function parseTcx(
   };
 
   // ===== Session (в TCX сессии нет — считаем) =====
-  const durationSec = lapsRaw.length
+  // durationSec: сумма TotalTimeSeconds из лапов.
+  // Если лапы есть, но время в них пусто (Strava-экспорты
+  // некоторых устройств) — падаем на диапазон secT.
+  let durationSec = lapsRaw.length
     ? lapsRaw.reduce((s, l) => s + (Number(l.TotalTimeSeconds) || 0), 0)
-    : secT.length
-    ? secT[secT.length - 1] - secT[0]
     : 0;
+  if (durationSec <= 0 && secT.length >= 2) {
+    durationSec = secT[secT.length - 1] - secT[0];
+  }
 
-  const distanceM = lapsRaw.length
+  // distanceM: сумма DistanceMeters из лапов.
+  // Если пусто — берём накопленное расстояние из trackpoint'ов.
+  let distanceM = lapsRaw.length
     ? lapsRaw.reduce((s, l) => s + (Number(l.DistanceMeters) || 0), 0)
-    : acc;
+    : 0;
+  if (distanceM <= 0) {
+    distanceM = acc;
+  }
 
   const hrValid = hr.filter((v): v is number => v != null);
   const avgHr = hrValid.length

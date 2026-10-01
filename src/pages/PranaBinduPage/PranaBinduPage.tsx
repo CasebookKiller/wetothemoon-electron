@@ -27,6 +27,7 @@ interface ProviderOption {
 
 const PROVIDER_OPTIONS: ProviderOption[] = [
   { label: 'dodofo (основной)', value: 'dodofo' },
+  { label: 'intervals.icu (активности + wellness)', value: 'intervals-icu' },
   { label: 'dofek-zepp (резерв)', value: 'dofek-zepp' },
   { label: 'zepp-mcp (не реализован)', value: 'zepp-mcp' },
   { label: 'zeppbridge (не реализован)', value: 'zeppbridge' },
@@ -348,6 +349,16 @@ export const PranaBinduPage: React.FC = () => {
 
   const [recoveryLogs, setRecoveryLogs] = useState<any[]>([]);
 
+  const [syncStreamsProgress, setSyncStreamsProgress] = useState<{
+    current: number;
+    total: number;
+    runFactId: number;
+    externalId: string | null;
+    fetched: number;
+    skipped: number;
+    failed: number;
+  } | null>(null);
+
   // ==================== Загрузка списка пробежек ====================
 
   const loadRunFacts = async (from?: Date, to?: Date) => {
@@ -448,6 +459,15 @@ export const PranaBinduPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (!api?.pb?.onSyncProgress) return;
+    api.pb.onSyncProgress((data: any) => setSyncStreamsProgress(data));
+    return () => {
+      api.pb.removeSyncProgressListener?.();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Автосохранение диапазона
   // Перезагружаем при смене диапазона (с дебаунсом 400 мс,
   // чтобы не дёргать БД на каждое движение календаря)
@@ -501,7 +521,8 @@ export const PranaBinduPage: React.FC = () => {
     try {
       const res = await api.pb.syncNow(
         toIsoDate(syncFrom),
-        toIsoDate(syncTo)
+        toIsoDate(syncTo),
+        provider                 // ← добавить
       );
       if (res.success) {
         setSyncResult({
@@ -522,7 +543,7 @@ export const PranaBinduPage: React.FC = () => {
 
   // ==================== Массовая заливка потоков ====================
 
-  const handleSyncAllStreams = async () => {
+    const handleSyncAllStreams = async () => {
     if (!api?.pb?.syncRunStreamsAll) {
       setStreamsAllError('electronAPI.pb.syncRunStreamsAll недоступен');
       return;
@@ -534,10 +555,12 @@ export const PranaBinduPage: React.FC = () => {
     setSyncingStreams(true);
     setStreamsAllError('');
     setStreamsAllResult(null);
+    setSyncStreamsProgress(null);
     try {
       const res = await api.pb.syncRunStreamsAll(
         toIsoDate(syncFrom),
-        toIsoDate(syncTo)
+        toIsoDate(syncTo),
+        { provider }             // ← добавили
       );
       if (res.success) {
         setStreamsAllResult({
@@ -554,6 +577,15 @@ export const PranaBinduPage: React.FC = () => {
       setStreamsAllError((e as Error).message);
     } finally {
       setSyncingStreams(false);
+      setSyncStreamsProgress(null);
+    }
+  };
+
+  const handleCancelSyncStreams = async () => {
+    try {
+      await api.pb.syncCancel?.();
+    } catch {
+      // ignore
     }
   };
 
@@ -721,6 +753,26 @@ export const PranaBinduPage: React.FC = () => {
               onClick={handleConnectZepp}
               disabled={loading || !email || !password}
             />
+            <Button
+              label={loading ? 'Проверка...' : 'Проверить доступность'}
+              icon={loading ? 'pi pi-spin pi-spinner' : 'pi pi-question-circle'}
+              className="pb-soft p-button-sm"
+              onClick={handleCheck}
+              disabled={loading}
+            />
+          </div>
+        </>
+      );
+    }
+
+    if (provider === 'intervals-icu') {
+      return (
+        <>
+          <small className="pb-hint">
+            intervals.icu подключён как источник активностей и wellness.
+            API-ключ и athlete ID настраиваются в панели «Wellness · intervals.icu».
+          </small>
+          <div className="flex gap-2 flex-wrap">
             <Button
               label={loading ? 'Проверка...' : 'Проверить доступность'}
               icon={loading ? 'pi pi-spin pi-spinner' : 'pi pi-question-circle'}
@@ -1609,6 +1661,40 @@ export const PranaBinduPage: React.FC = () => {
               className="w-full"
               content={<span>Wellness: {wellnessResult}</span>}
             />
+          )}
+
+          {syncingStreams && syncStreamsProgress && (
+            <div className="pb-import-progress">
+              <div className="pb-import-progress__header">
+                <span>
+                  {syncStreamsProgress.current} / {syncStreamsProgress.total}
+                  {' · '}
+                  <code>{syncStreamsProgress.externalId ?? '—'}</code>
+                </span>
+                <Button
+                  label="Отмена"
+                  icon="pi pi-times"
+                  className="pb-soft p-button-sm"
+                  onClick={handleCancelSyncStreams}
+                />
+              </div>
+              <ProgressBar
+                value={Math.round(
+                  (syncStreamsProgress.current / syncStreamsProgress.total) * 100
+                )}
+                showValue={false}
+                style={{ height: '6px' }}
+              />
+              <div className="pb-import-progress__stats">
+                <span>+{syncStreamsProgress.fetched}</span>
+                <span>·{syncStreamsProgress.skipped}</span>
+                {syncStreamsProgress.failed > 0 && (
+                  <span className="pb-import-progress__fail">
+                    ✗{syncStreamsProgress.failed}
+                  </span>
+                )}
+              </div>
+            </div>
           )}
 
           {streamsAllError && (
