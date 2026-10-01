@@ -1706,3 +1706,10 @@ span.pb-destructive {
   background: color-mix(in srgb, var(--pb-accent) 45%, transparent);
   border-radius: 4px;
 }
+
+.pb-profile__src {
+  font-size: 0.7rem;
+  color: var(--pb-accent);
+  opacity: 0.85;
+  letter-spacing: 0.02em;
+}

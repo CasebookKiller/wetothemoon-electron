@@ -502,6 +502,9 @@ export function registerPranaBinduHandlers(): void {
 
   ipcMain.handle('pb:update-profile', (_event, patch) => {
     try {
+      // Источник НЕ ставим здесь. Логика в updateProfile:
+      // — если значение изменилось, а source не передан → 'manual';
+      // — если значение не изменилось и source не передан → оставить как есть.
       const updated = updateProfile(getMelange(), patch);
       return { success: true, data: updated };
     } catch (e) {
@@ -974,19 +977,22 @@ export function registerPranaBinduHandlers(): void {
       const raw = await provider.fetchThresholds();
       const db = getMelange();
 
-      const patch: Record<string, number> = {};
+            const patch: Record<string, number | string> = {};
       const applied: string[] = [];
 
       if (raw?.resthr?.value != null) {
         patch.restingHr = Number(raw.resthr.value);
+        patch.restingHrSource = name;
         applied.push(`resthr=${raw.resthr.value}`);
       }
       if (raw?.lthr?.value != null) {
         patch.lactateThresholdHr = Number(raw.lthr.value);
+        patch.lthrSource = name;
         applied.push(`lthr=${raw.lthr.value}`);
       }
       if (raw?.hrmax?.value != null) {
         patch.maxHr = Number(raw.hrmax.value);
+        patch.maxHrSource = name;
         applied.push(`hrmax=${raw.hrmax.value}`);
       }
 

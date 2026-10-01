@@ -52,6 +52,10 @@ export interface ProfileRow {
   notes: string | null;
   created_at: string | null;
   updated_at: string | null;
+  // v10 — источник значения
+  lthr_source: string | null;
+  max_hr_source: string | null;
+  resting_hr_source: string | null;
 }
 
 export interface SyncSettingsRow {

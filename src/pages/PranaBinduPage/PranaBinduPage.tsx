@@ -221,6 +221,16 @@ function groupRunFacts(
     });
 }
 
+function labelForSource(src: string): string {
+  switch (src) {
+    case 'icu': return 'intervals.icu';
+    case 'dodofo': return 'dodofo';
+    case 'manual': return 'ручной ввод';
+    case 'computed': return 'расчёт';
+    default: return src;
+  }
+}
+
 export const PranaBinduPage: React.FC = () => {
   const api = (window as any).electronAPI;
 
@@ -322,6 +332,9 @@ export const PranaBinduPage: React.FC = () => {
     maxHr: number | null;
     lthr: number | null;
     restingHr: number | null;
+    lthrSource?: string | null;
+    maxHrSource?: string | null;
+    restingHrSource?: string | null;
   }>({ maxHr: null, lthr: null, restingHr: null });
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileError, setProfileError] = useState('');
@@ -393,6 +406,9 @@ export const PranaBinduPage: React.FC = () => {
           maxHr: d.maxHr ?? null,
           lthr: d.lactateThresholdHr ?? d.lthr ?? null,
           restingHr: d.restingHr ?? null,
+          lthrSource: d.lthrSource ?? null,
+          maxHrSource: d.maxHrSource ?? null,
+          restingHrSource: d.restingHrSource ?? null,
         });
       }
     } catch {
@@ -598,11 +614,10 @@ export const PranaBinduPage: React.FC = () => {
     setThresholdsError('');
     setThresholdsResult('');
     try {
-      const res = await api.pb.syncThresholds(provider);   // ← передаём текущий
+      const res = await api.pb.syncThresholds(provider);
       if (res.success) {
-        setThresholdsResult(
-          (res.applied ?? []).join(' · ') || 'обновлено'
-        );
+        setThresholdsResult((res.applied ?? []).join(' · ') || 'обновлено');
+        await loadProfile();          // ← добавить
       } else {
         setThresholdsError(res.error ?? 'Ошибка');
       }
@@ -1049,7 +1064,17 @@ export const PranaBinduPage: React.FC = () => {
               decrementButtonIcon="pi pi-minus"
               className="pb-debug__input"
             />
-            <small className="pb-hint">Максимальный пульс. dodofo не отдаёт — задайте вручную.</small>
+            <small className="pb-hint">
+              Максимальный пульс.
+              {profile.maxHrSource && (
+                <>
+                  {' '}
+                  <span className="pb-profile__src">
+                    источник: {labelForSource(profile.maxHrSource)}
+                  </span>
+                </>
+              )}
+            </small>
           </div>
 
           <div className="pb-profile__field">
@@ -1072,7 +1097,17 @@ export const PranaBinduPage: React.FC = () => {
               decrementButtonIcon="pi pi-minus"
               className="pb-debug__input"
             />
-            <small className="pb-hint">Лактатный порог. Ключевой параметр для зон.</small>
+            <small className="pb-hint">
+              Лактатный порог. Ключевой параметр для зон.
+              {profile.lthrSource && (
+                <>
+                  {' '}
+                  <span className="pb-profile__src">
+                    источник: {labelForSource(profile.lthrSource)}
+                  </span>
+                </>
+              )}
+            </small>
           </div>
 
           <div className="pb-profile__field">
@@ -1095,7 +1130,17 @@ export const PranaBinduPage: React.FC = () => {
               decrementButtonIcon="pi pi-minus"
               className="pb-debug__input"
             />
-            <small className="pb-hint">Пульс покоя. Подтягивается из dodofo.</small>
+            <small className="pb-hint">
+              Пульс покоя.
+              {profile.restingHrSource && (
+                <>
+                  {' '}
+                  <span className="pb-profile__src">
+                    источник: {labelForSource(profile.restingHrSource)}
+                  </span>
+                </>
+              )}
+            </small>
           </div>
         </div>
 

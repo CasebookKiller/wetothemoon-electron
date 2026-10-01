@@ -14,7 +14,7 @@ import {
   MIGRATION_V9_INTERVALS_ICU,
 } from './schema';
 
-export const SCHEMA_VERSION = 9;
+export const SCHEMA_VERSION = 10;
 
 interface Migration {
   version: number;
@@ -203,6 +203,28 @@ const migrations: readonly Migration[] = [
       }
 
       console.log('[Melange] v9: recovery_logs + sync_settings под intervals.icu');
+    },
+  },
+  {
+    version: 10,
+    apply: (db) => {
+      const cols = db
+        .prepare(`PRAGMA table_info(profile)`)
+        .all() as { name: string }[];
+      const has = (n: string) => cols.some((c) => c.name === n);
+
+      const addIfMissing: [string, string][] = [
+        ['lthr_source', 'TEXT'],
+        ['max_hr_source', 'TEXT'],
+        ['resting_hr_source', 'TEXT'],
+      ];
+
+      for (const [name, type] of addIfMissing) {
+        if (!has(name)) {
+          db.exec(`ALTER TABLE profile ADD COLUMN ${name} ${type};`);
+          console.log(`[Melange] v10: добавлена колонка profile.${name}`);
+        }
+      }
     },
   },
 ];

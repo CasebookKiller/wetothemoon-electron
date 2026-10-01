@@ -27,6 +27,10 @@ export interface Profile {
   lactateThresholdHr?: number;
   /** Целевая дата марафона, ISO (YYYY-MM-DD) */
   marathonDate?: string;
+  // v10 — источник значения: 'icu' | 'dodofo' | 'manual' | 'computed'
+  lthrSource?: string;
+  maxHrSource?: string;
+  restingHrSource?: string;
 }
 
 export type TrainingBlockType =
