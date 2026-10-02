@@ -787,6 +787,32 @@ export const PranaBinduPage: React.FC = () => {
     }
   };
 
+  const [syncingZones, setSyncingZones] = useState(false);
+  const [zonesResult, setZonesResult] = useState('');
+  const [zonesError, setZonesError] = useState('');
+
+  const handleSyncZones = async () => {
+    if (!api?.pb?.syncZones) return;
+    setSyncingZones(true);
+    setZonesError('');
+    setZonesResult('');
+    try {
+      const res = await api.pb.syncZones(provider);
+      if (res.success) {
+        setZonesResult(
+          Array.isArray(res.zones) ? res.zones.join(' · ') : 'обновлено'
+        );
+        await loadProfile();
+      } else {
+        setZonesError(res.error ?? 'Ошибка');
+      }
+    } catch (e) {
+      setZonesError((e as Error).message);
+    } finally {
+      setSyncingZones(false);
+    }
+  };
+
   // ==================== dodofo ====================
 
   const handleSaveDodofo = async () => {
@@ -1670,6 +1696,14 @@ export const PranaBinduPage: React.FC = () => {
                 }
               />
               <Button
+                label={syncingZones ? 'Зоны…' : 'Подтянуть зоны'}
+                icon={syncingZones ? 'pi pi-spin pi-spinner' : 'pi pi-chart-bar'}
+                className="pb-soft p-button-sm"
+                onClick={handleSyncZones}
+                disabled={syncingZones}
+                tooltip="Читает HR-зоны из последней активности ICU"
+              />
+              <Button
                 label={syncingWellness ? 'Wellness…' : 'Подтянуть wellness'}
                 icon={syncingWellness ? 'pi pi-spin pi-spinner' : 'pi pi-heart'}
                 className="pb-soft p-button-sm"
@@ -1771,6 +1805,16 @@ export const PranaBinduPage: React.FC = () => {
               severity="success"
               className="w-full"
               content={<span>Пороги обновлены: <b>{thresholdsResult}</b></span>}
+            />
+          )}
+          {zonesError && (
+            <Message severity="error" text={zonesError} className="w-full" />
+          )}
+          {zonesResult && (
+            <Message
+              severity="success"
+              className="w-full"
+              content={<span>HR-зоны: <b>{zonesResult}</b></span>}
             />
           )}
           {wellnessError && (

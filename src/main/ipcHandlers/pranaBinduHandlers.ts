@@ -1015,6 +1015,44 @@ export function registerPranaBinduHandlers(): void {
     }
   });
 
+  // -------- Подтянуть HR-зоны --------
+  ipcMain.handle('pb:sync-zones', async (_event, providerName?: string) => {
+    const name =
+      providerName ??
+      getSyncSettings(getMelange()).source ??
+      'intervals-icu';
+
+    try {
+      const provider = getProvider(name) as any;
+      if (!provider) {
+        return { success: false, error: `Провайдер «${name}» не зарегистрирован` };
+      }
+      if (typeof provider.fetchZones !== 'function') {
+        return { success: false, error: `Провайдер «${name}» не реализует fetchZones` };
+      }
+
+      const raw = await provider.fetchZones();
+      const zones = Array.isArray(raw?.hr_zones) ? raw.hr_zones : null;
+      if (!zones || zones.length === 0) {
+        return { success: false, error: `Провайдер «${name}» не отдал зоны` };
+      }
+
+      const db = getMelange();
+      const updated = updateProfile(db, {
+        hrZones: zones,
+        hrZonesSource: name,
+      });
+
+      console.log(
+        `[Prana-Bindu] sync-zones (${name}): [${zones.join(', ')}]`
+      );
+
+      return { success: true, provider: name, zones, data: updated };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
   // -------- Разведка: сырой ответ fetchZones --------
   ipcMain.handle('pb:debug-zones', async () => {
     try {

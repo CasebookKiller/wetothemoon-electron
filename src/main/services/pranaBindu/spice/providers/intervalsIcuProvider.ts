@@ -368,6 +368,40 @@ export class IntervalsIcuProvider implements ZeppDataProvider {
   }
 
   /**
+   * HR-зоны (7 границ) из последней активности, где они есть.
+   * В ICU активность содержит `icu_hr_zones` — массив верхних
+   * границ зон Z1..Z7.
+   */
+  async fetchZones(): Promise<{ hr_zones: number[] }> {
+    const athleteId = this.ctx.getAthleteId() ?? '0';
+
+    const today = new Date();
+    const from = new Date();
+    from.setMonth(from.getMonth() - 3);
+
+    const items = await this.request<any[]>(
+      `/athlete/${athleteId}/activities`,
+      {
+        oldest: from.toISOString().slice(0, 10),
+        newest: today.toISOString().slice(0, 10),
+      }
+    );
+
+    if (!Array.isArray(items) || items.length === 0) {
+      throw new Error('Нет активностей ICU за последние 3 месяца');
+    }
+
+    const withZones = items.find(
+      (a) => Array.isArray(a?.icu_hr_zones) && a.icu_hr_zones.length > 0
+    );
+    if (!withZones) {
+      throw new Error('В активностях ICU нет данных о HR-зонах');
+    }
+
+    return { hr_zones: withZones.icu_hr_zones as number[] };
+  }
+
+  /**
    * Активности за период.
    * GET /api/v1/athlete/{id}/activities?oldest=&newest=
    */

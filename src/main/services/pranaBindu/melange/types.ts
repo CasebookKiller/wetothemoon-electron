@@ -56,6 +56,8 @@ export interface ProfileRow {
   lthr_source: string | null;
   max_hr_source: string | null;
   resting_hr_source: string | null;
+  hr_zones_json: string | null;
+  hr_zones_source: string | null;
 }
 
 export interface SyncSettingsRow {

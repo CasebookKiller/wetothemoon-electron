@@ -820,6 +820,9 @@ try {
 
       debugZonesRaw: () => ipcRenderer.invoke('pb:debug-zones-raw'),
 
+      syncZones: (providerName?: string) =>
+        ipcRenderer.invoke('pb:sync-zones', providerName),
+
     },
 
   });

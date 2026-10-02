@@ -24,6 +24,56 @@ interface StreamsPayload {
 
 const ACCENT = '#d4a373';
 
+// Палитры зон: 5 или 7 цветов. Для остальных N — HSL-интерполяция
+// от синего (hue 220) к красному (hue 0).
+const ZONE_COLORS_5 = ['#3b82f6', '#10b981', '#eab308', '#f97316', '#ef4444'];
+const ZONE_COLORS_7 = [
+  '#3b82f6', // Z1 — синий
+  '#06b6d4', // Z2 — голубой
+  '#10b981', // Z3 — зелёный
+  '#eab308', // Z4 — жёлтый
+  '#f97316', // Z5 — оранжевый
+  '#ef4444', // Z6 — красный
+  '#b91c1c', // Z7 — тёмно-красный
+];
+
+function zonePalette(n: number): string[] {
+  if (n === 5) return ZONE_COLORS_5;
+  if (n === 7) return ZONE_COLORS_7;
+  const colors: string[] = [];
+  for (let i = 0; i < n; i++) {
+    const t = n === 1 ? 0 : i / (n - 1);
+    const hue = Math.round(220 - 220 * t); // 220 blue → 0 red
+    colors.push(`hsl(${hue}, 75%, 55%)`);
+  }
+  return colors;
+}
+
+/**
+ * Индекс зоны (0-based) по значению HR и массиву верхних границ.
+ * Если значение выше последней границы — относим к последней зоне.
+ */
+function zoneIndexFor(hr: number, zones: number[]): number {
+  for (let i = 0; i < zones.length; i++) {
+    if (hr <= zones[i]) return i;
+  }
+  return zones.length - 1;
+}
+
+/**
+ * Универсальный градиент по значению канала (min..max):
+ * синий (hue 220) → красный (hue 0).
+ */
+function gradientColor(v: number, min: number, max: number): string {
+  if (!Number.isFinite(v) || !Number.isFinite(min) || !Number.isFinite(max)) {
+    return '#d4a373';
+  }
+  const t = max > min ? (v - min) / (max - min) : 0.5;
+  const clamped = Math.max(0, Math.min(1, t));
+  const hue = Math.round(220 - 220 * clamped);
+  return `hsl(${hue}, 75%, 55%)`;
+}
+
 function fmtNum(v: number, digits = 1): string {
   if (!Number.isFinite(v)) return '—';
   return v.toFixed(digits);
@@ -187,20 +237,53 @@ export const RunStreamsChart: React.FC<Props> = ({
       flatWarning = `Стандартное отклонение ${stddev.toFixed(2)} — данные почти плоские. Возможно, источник сглаживает сигнал.`;
     }
 
-    const datasets: any[] = [
-      {
-        label: yChannel,
-        data: points,
-        borderColor: ACCENT,
-        backgroundColor: 'rgba(212, 163, 115, 0.12)',
-        tension: 0,
-        pointRadius: 0,
-        pointHoverRadius: 4,
-        borderWidth: 1.5,
-        fill: false,
-        spanGaps: false,
-      },
-    ];
+    const hrZones = Array.isArray(profile?.hrZones) ? profile.hrZones : null;
+    const isHrChart = yChannel === 'hr';
+    const zoneColors =
+      hrZones && hrZones.length > 0 ? zonePalette(hrZones.length) : null;
+
+    const mainDataset: any = {
+      label: yChannel,
+      data: points,
+      borderColor: ACCENT,
+      backgroundColor: 'rgba(212, 163, 115, 0.12)',
+      tension: 0,
+      pointRadius: 0,
+      pointHoverRadius: 4,
+      borderWidth: 1.5,
+      fill: false,
+      spanGaps: false,
+    };
+
+    // Окраска сегментов:
+    //  - hr → по зонам пульса (цвет = зона)
+    //  - остальные каналы → градиент синий→красный по min..max
+    if (isHrChart && hrZones && zoneColors) {
+      mainDataset.segment = {
+        borderColor: (ctx: any) => {
+          const y0 = ctx.p0?.parsed?.y;
+          const y1 = ctx.p1?.parsed?.y;
+          if (y0 == null || y1 == null) return ACCENT;
+          const avg = (y0 + y1) / 2;
+          const zi = zoneIndexFor(avg, hrZones);
+          return zoneColors[zi] ?? ACCENT;
+        },
+      };
+    } else {
+      // Градиент от синего (min) к красному (max).
+      // Статистики min/max уже посчитаны выше в этом useMemo.
+      mainDataset.segment = {
+        borderColor: (ctx: any) => {
+          const y0 = ctx.p0?.parsed?.y;
+          const y1 = ctx.p1?.parsed?.y;
+          if (y0 == null || y1 == null) return ACCENT;
+          const avg = (y0 + y1) / 2;
+          return gradientColor(avg, min, max);
+        },
+      };
+    }
+
+    const datasets: any[] = [mainDataset];
 
     // Пороговые линии для HR
     if (yChannel === 'hr' && profile) {
@@ -272,6 +355,15 @@ export const RunStreamsChart: React.FC<Props> = ({
           callbacks: {
             label: (ctx: any) => {
               const v = ctx.parsed.y;
+              // Если это HR-график и зоны известны — добавим зону.
+              if (
+                yChannel === 'hr' &&
+                Array.isArray(profile?.hrZones) &&
+                profile.hrZones.length > 0
+              ) {
+                const zi = zoneIndexFor(v, profile.hrZones);
+                return `${ctx.dataset.label}: ${fmtNum(v)} (Z${zi + 1})`;
+              }
               return `${ctx.dataset.label}: ${fmtNum(v)}`;
             },
           },

@@ -14,7 +14,7 @@ import {
   MIGRATION_V9_INTERVALS_ICU,
 } from './schema';
 
-export const SCHEMA_VERSION = 12;
+export const SCHEMA_VERSION = 13;
 
 interface Migration {
   version: number;
@@ -256,6 +256,24 @@ const migrations: readonly Migration[] = [
       if (!has('zepp_archive_path')) {
         db.exec(`ALTER TABLE sync_settings ADD COLUMN zepp_archive_path TEXT;`);
         console.log('[Melange] v12: добавлена колонка sync_settings.zepp_archive_path');
+      }
+    },
+  },
+  {
+    version: 13,
+    apply: (db) => {
+      const cols = db
+        .prepare(`PRAGMA table_info(profile)`)
+        .all() as { name: string }[];
+      const has = (n: string) => cols.some((c) => c.name === n);
+
+      if (!has('hr_zones_json')) {
+        db.exec(`ALTER TABLE profile ADD COLUMN hr_zones_json TEXT;`);
+        console.log('[Melange] v13: добавлена profile.hr_zones_json');
+      }
+      if (!has('hr_zones_source')) {
+        db.exec(`ALTER TABLE profile ADD COLUMN hr_zones_source TEXT;`);
+        console.log('[Melange] v13: добавлена profile.hr_zones_source');
       }
     },
   },

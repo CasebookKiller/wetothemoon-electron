@@ -31,6 +31,9 @@ export interface Profile {
   lthrSource?: string;
   maxHrSource?: string;
   restingHrSource?: string;
+  /** Границы HR-зон (последняя — верхняя). Из ICU: 7 значений. */
+  hrZones?: number[];
+  hrZonesSource?: string;
 }
 
 export type TrainingBlockType =
