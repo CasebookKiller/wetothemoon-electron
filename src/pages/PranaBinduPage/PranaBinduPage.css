@@ -2111,3 +2111,40 @@ body[data-module='prana-bindu'] .p-tooltip.p-tooltip-bottom .p-tooltip-arrow {
   color: var(--tg-theme-text-color, #f5f5f5);
   line-height: 1.2;
 }
+
+/* Чекбокс в фильтрах — компактный, accent-рамка, прозрачный фон */
+.pb-run-filters__radio .p-checkbox {
+  width: 1rem !important;
+  height: 1rem !important;
+}
+
+.pb-run-filters__radio .p-checkbox .p-checkbox-box {
+  width: 1rem !important;
+  height: 1rem !important;
+  border-radius: 2px !important;
+  border: 1px solid color-mix(in srgb, var(--pb-accent) 45%, transparent) !important;
+  background: transparent !important;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+.pb-run-filters__radio .p-checkbox .p-checkbox-box:hover {
+  border-color: var(--pb-accent) !important;
+}
+
+/* Галочка активна — рамка accent, внутри — accent-галочка, фон прозрачный */
+.pb-run-filters__radio .p-checkbox.p-highlight .p-checkbox-box {
+  background: transparent !important;
+  border-color: var(--pb-accent) !important;
+  color: var(--pb-accent) !important;
+}
+
+.pb-run-filters__radio .p-checkbox.p-highlight .p-checkbox-icon {
+  color: var(--pb-accent) !important;
+  width: 0.65rem !important;
+  height: 0.65rem !important;
+}
+
+/* Focus ring */
+.pb-run-filters__radio .p-checkbox.p-focus .p-checkbox-box {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pb-accent) 25%, transparent) !important;
+}

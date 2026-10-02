@@ -818,6 +818,8 @@ try {
       updateRunGroupName: (factIds: number[], userName: string | null) =>
         ipcRenderer.invoke('pb:update-run-group-name', factIds, userName),
 
+      debugZonesRaw: () => ipcRenderer.invoke('pb:debug-zones-raw'),
+
     },
 
   });

@@ -154,13 +154,14 @@ export const DodofoDebugDialog: React.FC<Props> = ({
     }
     setStreams({ loading: true, error: '', raw: null });
     try {
-      const res = await api.pb.getRunStreams(runFactId, 'dodofo');
+      // debugStreams дёргает dodofo API напрямую, не читает из БД.
+      const res = await api.pb.debugStreams(runFactId, { writeFile: false });
       if (res?.success) {
         setStreams({
           loading: false,
           error: '',
-          raw: res.payload,
-          meta: { sizeBytes: res.meta?.size_bytes },
+          raw: res.data,
+          meta: { fetchMs: res.fetchMs },
         });
       } else {
         setStreams({

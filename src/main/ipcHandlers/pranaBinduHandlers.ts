@@ -1034,6 +1034,30 @@ export function registerPranaBinduHandlers(): void {
     }
   });
 
+  // -------- Разведка: сырой ответ /me/zones (без обёртки провайдера) --------
+  ipcMain.handle('pb:debug-zones-raw', async () => {
+    try {
+      const token = getDodofoToken();
+      if (!token) return { success: false, error: 'token not configured' };
+
+      const url = 'https://dodofo.ru/api/v1/me/zones';
+      const res = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
+      });
+      const body = await res.text();
+      return {
+        success: res.ok,
+        status: res.status,
+        body: body.slice(0, 4000),
+      };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
   // -------- Разведка: парсинг FIT --------
   ipcMain.handle('pb:debug-parse-fit', async (_event, filePath: string) => {
     try {

@@ -68,7 +68,7 @@ function toIsoDate(d: Date): string {
  * если start_time отличается меньше чем на это окно.
  * Потом вынесем в настройки приложения.
  */
-const SAME_WORKOUT_WINDOW_MIN = 5;
+const SAME_WORKOUT_WINDOW_MIN = 30;
 const SAME_WORKOUT_WINDOW_MS = SAME_WORKOUT_WINDOW_MIN * 60 * 1000;
 
 const PB_RANGE_STORAGE_KEY = 'pb.syncRange';
@@ -180,6 +180,7 @@ interface GroupedRunFact {
   count: number;
   hasStreams: boolean;
   displayName: string;   // ← user_name ?? name
+  hasUserName: boolean;   // ← новое
 }
 
 function groupRunFacts(
@@ -249,13 +250,12 @@ function groupRunFacts(
       const anchorStartTime =
         sortedGroup.find((s) => s.start_time)?.start_time ?? null;
       const primary = sortedGroup[0];
-      // Берём user_name у любой записи группы (он может быть только на одной),
-      // затем name у любой (ICU/dodofo/strava-csv знают имена, fit/tcx — нет).
       const groupUserName =
         sortedGroup.find((s) => s.user_name)?.user_name ?? null;
       const groupName =
         sortedGroup.find((s) => s.name)?.name ?? null;
       const displayName = groupUserName ?? groupName ?? '—';
+      const hasUserName = !!groupUserName;
 
       return {
         date: group[0].date,
@@ -264,6 +264,7 @@ function groupRunFacts(
         primary: primary,
         items: sortedGroup,
         displayName: displayName,
+        hasUserName,   // ← новое
         count: sortedGroup.length,
         hasStreams,
       };
@@ -422,6 +423,7 @@ export const PranaBinduPage: React.FC = () => {
     if (filters.paceFrom.trim() || filters.paceTo.trim()) n++;
     if (filters.durFromMin != null || filters.durToMin != null) n++;
     if (filters.streamsMode !== 'all') n++;
+    if (filters.onlyUnnamed) n++;
     return n;
   }, [filters]);
 
@@ -485,6 +487,9 @@ export const PranaBinduPage: React.FC = () => {
 
       if (filters.streamsMode === 'with' && !g.hasStreams) return false;
       if (filters.streamsMode === 'without' && g.hasStreams) return false;
+
+      // Название: показываем только группы без user_name
+      if (filters.onlyUnnamed && g.hasUserName) return false;
 
       return true;
     });

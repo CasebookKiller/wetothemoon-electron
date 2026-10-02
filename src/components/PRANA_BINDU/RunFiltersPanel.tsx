@@ -6,6 +6,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Button } from 'primereact/button';
+import { Checkbox } from 'primereact/checkbox';
 import { InputText } from 'primereact/inputtext';
 import { InputNumber } from 'primereact/inputnumber';
 import { RadioButton } from 'primereact/radiobutton';
@@ -26,6 +27,8 @@ export interface RunFilters {
   durFromMin: number | null;
   durToMin: number | null;
   streamsMode: 'all' | 'with' | 'without';
+  /** Показывать только группы без user_name. */
+  onlyUnnamed: boolean;
 }
 
 const SOURCE_BADGES = [
@@ -49,6 +52,7 @@ export const EMPTY_FILTERS: RunFilters = {
   durFromMin: null,
   durToMin: null,
   streamsMode: 'all',
+  onlyUnnamed: false,
 };
 
 interface Props {
@@ -286,6 +290,24 @@ export const RunFiltersPanel: React.FC<Props> = ({
               ))}
             </div>
           </div>
+
+          {/* Название */}
+          <div className="pb-run-filters__row">
+            <label className="pb-label">Название</label>
+            <div className="pb-run-filters__radio-row">
+              <label className="pb-run-filters__radio">
+                <Checkbox
+                  inputId="only-unnamed"
+                  checked={filters.onlyUnnamed}
+                  onChange={(e) =>
+                    upd('onlyUnnamed', !!e.checked)
+                  }
+                />
+                <span>Только без нашего названия</span>
+              </label>
+            </div>
+          </div>
+          
         </div>
       )}
     </div>
