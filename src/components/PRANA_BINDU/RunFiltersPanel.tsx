@@ -4,7 +4,7 @@
 // Глупый компонент: получает filters + onChange, ничего не знает
 // про IPC и БД.
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from 'primereact/button';
 import { InputText } from 'primereact/inputtext';
 import { InputNumber } from 'primereact/inputnumber';
@@ -68,6 +68,29 @@ export const RunFiltersPanel: React.FC<Props> = ({
 }) => {
   const [expanded, setExpanded] = useState(defaultExpanded);
 
+  // Локальное значение инпута поиска. Наверх (в filters.nameQuery)
+  // уходит с задержкой, чтобы не пересчитывать filteredFacts
+  // и не ререндерить таблицу на каждый keystroke.
+  const [nameInput, setNameInput] = useState(filters.nameQuery);
+
+  // Синхронизация снаружи (например, при onReset).
+  useEffect(() => {
+    if (filters.nameQuery !== nameInput) {
+      setNameInput(filters.nameQuery);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.nameQuery]);
+
+  // Debounce: отдаём значение наверх через 300 мс тишины.
+  useEffect(() => {
+    if (nameInput === filters.nameQuery) return;
+    const t = setTimeout(() => {
+      onChange({ ...filters, nameQuery: nameInput });
+    }, 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nameInput]);
+
   const upd = <K extends keyof RunFilters>(key: K, value: RunFilters[K]) =>
     onChange({ ...filters, [key]: value });
 
@@ -106,8 +129,8 @@ export const RunFiltersPanel: React.FC<Props> = ({
             <span className="pb-run-filters__search-wrap">
               <i className="pi pi-search" />
               <InputText
-                value={filters.nameQuery}
-                onChange={(e) => upd('nameQuery', e.target.value)}
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
                 placeholder="Утренний, длинная, 1047…"
                 className="pb-run-filters__search"
               />
