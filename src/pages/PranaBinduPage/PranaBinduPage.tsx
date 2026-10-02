@@ -126,6 +126,7 @@ const SOURCE_PRIORITY: Record<string, number> = {
   tcx: 2,
   manual: 3,
   dodofo: 4,
+  'strava-csv': 5,
 };
 
 interface GroupedRunFact {
@@ -135,6 +136,7 @@ interface GroupedRunFact {
   primary: any;
   count: number;
   hasStreams: boolean;
+  displayName: string;   // ← user_name ?? name
 }
 
 function groupRunFacts(
@@ -203,12 +205,16 @@ function groupRunFacts(
       // Якорный start_time: берём первый непустой из группы
       const anchorStartTime =
         sortedGroup.find((s) => s.start_time)?.start_time ?? null;
+      const primary = sortedGroup[0];
+      const displayName =
+        primary.user_name ?? primary.name ?? '—';
 
       return {
         date: group[0].date,
         startTime: anchorStartTime,
         sources,
-        primary: sortedGroup[0],
+        primary: primary,
+        displayName: displayName,
         count: sortedGroup.length,
         hasStreams,
       };
@@ -1017,6 +1023,38 @@ export const PranaBinduPage: React.FC = () => {
     }
   };
 
+    const handleImportStravaCsv = async () => {
+    if (!api?.pb?.pickCsv || !api?.pb?.importStravaCsv) {
+      setArchiveError('electronAPI.pb.pickCsv / importStravaCsv недоступен');
+      return;
+    }
+    const picked = await api.pb.pickCsv();
+    if (!picked?.success || !picked.path) return;
+
+    setArchiveUpdating(true);
+    setArchiveError('');
+    setArchiveResult(null);
+    try {
+      const res = await api.pb.importStravaCsv(picked.path);
+      if (res.success) {
+        setArchiveResult({
+          imported: res.added ?? 0,
+          updated: res.updated ?? 0,
+          skipped: 0,
+          failed: res.failed ?? 0,
+          total: res.total ?? 0,
+        });
+        await loadRunFacts();
+      } else {
+        setArchiveError(res.error ?? 'Ошибка импорта');
+      }
+    } catch (e) {
+      setArchiveError((e as Error).message);
+    } finally {
+      setArchiveUpdating(false);
+    }
+  };
+
   return (
     <div className="pb-page p-4">
       <div className="mb-4">
@@ -1586,6 +1624,14 @@ export const PranaBinduPage: React.FC = () => {
                 disabled={archiveUpdating}
                 tooltip="Выбрать отдельные FIT/TCX файлы для импорта"
               />
+              <Button
+                label="Импорт Strava CSV"
+                icon="pi pi-file-import"
+                className="pb-soft p-button-sm"
+                onClick={handleImportStravaCsv}
+                disabled={archiveUpdating}
+                tooltip="Импортировать activities.csv из архива Strava"
+              />
             </div>
             <small className="pb-hint">
               Перетащите FIT/TCX файлы в эту панель, чтобы импортировать их
@@ -1793,6 +1839,11 @@ export const PranaBinduPage: React.FC = () => {
                 </span>
               );
             }}
+          />
+          <Column
+            header="Название"
+            style={{ width: '220px' }}
+            body={(r: GroupedRunFact) => r.displayName}
           />
           <Column
             header="Км"

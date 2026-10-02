@@ -799,7 +799,12 @@ try {
 
       debugIcuWorkout: (id: string | number) =>
         ipcRenderer.invoke('pb:debug-icu-workout', id),
+      updateRunFactName: (runFactId: number, userName: string | null) =>
+        ipcRenderer.invoke('pb:update-run-fact-name', runFactId, userName),
 
+      pickCsv: () => ipcRenderer.invoke('pb:pick-csv'),
+      importStravaCsv: (filePath: string) =>
+        ipcRenderer.invoke('pb:import-strava-csv', filePath),
 
 
     },

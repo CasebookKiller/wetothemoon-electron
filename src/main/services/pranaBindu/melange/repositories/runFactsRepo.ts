@@ -26,6 +26,8 @@ export interface RunFactRow {
   gps_quality: string | null;
   distance_source: string | null;
   gps_coverage_pct: number | null;
+  name: string | null;        // ← новое
+  user_name: string | null;   // ← новое
 }
 
 export interface UpsertResult {
@@ -150,6 +152,7 @@ export function upsertRunFact(
         gps_quality       = COALESCE(?, gps_quality),
         distance_source   = COALESCE(?, distance_source),
         gps_coverage_pct  = COALESCE(?, gps_coverage_pct),
+        name              = COALESCE(?, name),
         raw_json          = COALESCE(?, raw_json)
        WHERE id = ?`
     ).run(
@@ -165,6 +168,7 @@ export function upsertRunFact(
       fact.gpsQuality ?? null,
       fact.distanceSource ?? null,
       fact.gpsCoveragePct ?? null,
+      fact.name ?? null,
       rawJson,
       existing.id
     );
@@ -176,8 +180,9 @@ export function upsertRunFact(
       `INSERT INTO run_facts
          (date, start_time, actual_km, actual_pace, avg_hr, max_hr,
          duration_sec, source, origin, external_id, raw_json,
-         gps_quality, distance_source, gps_coverage_pct)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         gps_quality, distance_source, gps_coverage_pct,
+         name, user_name)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       date,
@@ -193,7 +198,9 @@ export function upsertRunFact(
       rawJson,                        // ← raw_json
       fact.gpsQuality ?? null,        // ← gps_quality
       fact.distanceSource ?? null,    // ← distance_source
-      fact.gpsCoveragePct ?? null     // ← gps_coverage_pct
+      fact.gpsCoveragePct ?? null,    // ← gps_coverage_pct
+      fact.name ?? null,              // ← name
+      null                            // ← user_name
     );
 
   return { inserted: true, id: Number(info.lastInsertRowid) };

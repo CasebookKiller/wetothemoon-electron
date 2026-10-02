@@ -1713,3 +1713,128 @@ span.pb-destructive {
   opacity: 0.85;
   letter-spacing: 0.02em;
 }
+
+/* ============================================================
+   Drawer: название тренировки (вариант B — шапка)
+   ============================================================ */
+
+.pb-drawer__names {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+  min-height: 1.9rem;
+}
+
+.pb-drawer__name-primary {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--tg-theme-text-color, #f5f5f5);
+  flex: 1 1 auto;
+  word-break: break-word;
+  line-height: 1.3;
+}
+
+.pb-drawer__name-original {
+  font-size: 0.75rem;
+  color: var(--tg-theme-hint-color, #708499);
+  margin: 0 0 0.75rem 0;
+  line-height: 1.3;
+}
+
+.pb-drawer__empty-inline {
+  color: var(--tg-theme-hint-color, #708499);
+  font-style: normal;
+  font-weight: 400;
+}
+
+/* Иконки-карандаш / галочка / крестик — маленькие, без рамки */
+.pb-drawer__name-edit.p-button {
+  min-width: auto !important;
+  width: 1.75rem !important;
+  height: 1.75rem !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 4px !important;
+  color: var(--pb-accent) !important;
+  box-shadow: none !important;
+  transition: background-color 0.15s ease;
+}
+
+.pb-drawer__name-edit.p-button:hover {
+  background: color-mix(in srgb, var(--pb-accent) 12%, transparent) !important;
+}
+
+.pb-drawer__name-edit.p-button:focus {
+  outline: none !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pb-accent) 30%, transparent) !important;
+}
+
+.pb-drawer__name-edit.p-button .p-button-icon {
+  font-size: 0.85rem;
+}
+
+/* Input в режиме редактирования — квадратные бордюры, как у остальных */
+.pb-drawer__name-input.p-inputtext {
+  flex: 1 1 auto;
+  height: 1.9rem !important;
+  padding: 0 0.6rem !important;
+  font-size: 0.9rem !important;
+  border-radius: 6px !important;
+  background: transparent !important;
+  color: var(--tg-theme-text-color, #f5f5f5) !important;
+  border: 1px solid var(--pb-accent) !important;
+  box-sizing: border-box;
+}
+
+.pb-drawer__name-input.p-inputtext:enabled:focus {
+  border-color: var(--pb-accent) !important;
+  box-shadow: 0 0 0 1px var(--pb-accent) !important;
+  outline: none !important;
+}
+
+.pb-drawer__name-input.p-inputtext::placeholder {
+  color: var(--tg-theme-hint-color, #708499);
+  opacity: 0.7;
+}
+
+/* Тултипы в drawer'е — не переносятся, прижаты влево */
+.pb-drawer .p-tooltip .p-tooltip-text {
+  white-space: nowrap;
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+}
+
+/* ============================================================
+   Тултипы Prana-Bindu — тёмный фон, accent-текст
+   ============================================================ */
+
+body[data-module='prana-bindu'] .p-tooltip .p-tooltip-text {
+  background: var(--tg-theme-secondary-bg-color, #232e3c);
+  color: var(--pb-accent, #d4a373);
+  font-size: 0.75rem;
+  padding: 0.3rem 0.6rem;
+  white-space: nowrap;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+/* Стрелка — в цвет accent, смотрит как отдельный акцент */
+body[data-module='prana-bindu'] .p-tooltip.p-tooltip-right .p-tooltip-arrow {
+  border-right-color: var(--pb-accent, #d4a373);
+}
+body[data-module='prana-bindu'] .p-tooltip.p-tooltip-left .p-tooltip-arrow {
+  border-left-color: var(--pb-accent, #d4a373);
+}
+body[data-module='prana-bindu'] .p-tooltip.p-tooltip-top .p-tooltip-arrow {
+  border-top-color: var(--pb-accent, #d4a373);
+}
+body[data-module='prana-bindu'] .p-tooltip.p-tooltip-bottom .p-tooltip-arrow {
+  border-bottom-color: var(--pb-accent, #d4a373);
+}
+
+.pb-source-badge--strava-csv {
+  background: rgba(192, 132, 252, 0.18);
+  color: #c084fc;
+}

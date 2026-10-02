@@ -50,6 +50,7 @@ import { DodofoProvider } from '../services/pranaBindu/spice/providers/dodofoPro
 import { IntervalsIcuProvider } from '../services/pranaBindu/spice/providers/intervalsIcuProvider';
 import { parseFit } from '../services/pranaBindu/spice/parsers/fitParser';
 import { parseTcx } from '../services/pranaBindu/spice/parsers/tcxParser';
+import { parseStravaCsv } from '../services/pranaBindu/spice/parsers/stravaCsvParser';
 
 // ==================== Регистрация провайдеров ====================
 
@@ -2092,6 +2093,99 @@ export function registerPranaBinduHandlers(): void {
       }
     }
   );
+
+  ipcMain.handle(
+    'pb:update-run-fact-name',
+    (_event, runFactId: number, userName: string | null) => {
+      try {
+        if (!Number.isFinite(runFactId)) {
+          return { success: false, error: 'runFactId обязателен' };
+        }
+        const db = getMelange();
+        const value = userName?.trim() || null;   // пустая строка → сброс
+        const info = db
+          .prepare(`UPDATE run_facts SET user_name = ? WHERE id = ?`)
+          .run(value, runFactId);
+        if (info.changes === 0) {
+          return { success: false, error: 'Запись не найдена' };
+        }
+        return { success: true, userName: value };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+  // -------- Диалог выбора CSV --------
+  ipcMain.handle('pb:pick-csv', async () => {
+    try {
+      const res = await dialog.showOpenDialog({
+        properties: ['openFile'],
+        title: 'Выберите activities.csv из архива Strava',
+        filters: [
+          { name: 'CSV', extensions: ['csv'] },
+          { name: 'Все файлы', extensions: ['*'] },
+        ],
+      });
+      if (res.canceled || res.filePaths.length === 0) {
+        return { success: false, canceled: true };
+      }
+      return { success: true, path: res.filePaths[0] };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  // -------- Импорт Strava activities.csv --------
+  ipcMain.handle('pb:import-strava-csv', async (_event, filePath: string) => {
+    try {
+      if (!filePath || typeof filePath !== 'string') {
+        return { success: false, error: 'filePath обязателен' };
+      }
+      if (!fs.existsSync(filePath)) {
+        return { success: false, error: `Файл не найден: ${filePath}` };
+      }
+
+      const buffer = fs.readFileSync(filePath);
+      const t0 = Date.now();
+      const workouts = parseStravaCsv(buffer);
+      const parseMs = Date.now() - t0;
+
+      const db = getMelange();
+      let added = 0;
+      let updated = 0;
+      let failed = 0;
+      const errors: Array<{ externalId: string; error: string }> = [];
+
+      for (const w of workouts) {
+        try {
+          const res = upsertRunFact(db, w);
+          if (res.inserted) added++;
+          else updated++;
+        } catch (e) {
+          failed++;
+          errors.push({ externalId: w.externalId, error: (e as Error).message });
+        }
+      }
+
+      console.log(
+        `[Prana-Bindu] import-strava-csv: +${added} ~${updated} ` +
+        `(всего ${workouts.length}, ${parseMs}ms, failed=${failed})`
+      );
+
+      return {
+        success: true,
+        added,
+        updated,
+        failed,
+        total: workouts.length,
+        parseMs,
+        errors: errors.slice(0, 20),
+      };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
 
   console.log('[Prana-Bindu] IPC-хендлеры зарегистрированы (pb:*)');
 }
