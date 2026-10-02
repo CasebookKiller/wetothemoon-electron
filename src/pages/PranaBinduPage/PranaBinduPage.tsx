@@ -68,7 +68,7 @@ function toIsoDate(d: Date): string {
  * если start_time отличается меньше чем на это окно.
  * Потом вынесем в настройки приложения.
  */
-const SAME_WORKOUT_WINDOW_MIN = 30;
+const SAME_WORKOUT_WINDOW_MIN = 5;
 const SAME_WORKOUT_WINDOW_MS = SAME_WORKOUT_WINDOW_MIN * 60 * 1000;
 
 const PB_RANGE_STORAGE_KEY = 'pb.syncRange';
