@@ -806,6 +806,17 @@ try {
       importStravaCsv: (filePath: string) =>
         ipcRenderer.invoke('pb:import-strava-csv', filePath),
 
+      zeppArchivePathGet: () =>
+        ipcRenderer.invoke('pb:zepp-archive-path-get'),
+      zeppArchivePathSet: (p: string | null) =>
+        ipcRenderer.invoke('pb:zepp-archive-path-set', p),
+      importZeppDir: (
+        dirPath: string,
+        opts?: { skipIfFileExists?: boolean; savePath?: boolean }
+      ) => ipcRenderer.invoke('pb:import-zepp-dir', dirPath, opts),
+
+      updateRunGroupName: (factIds: number[], userName: string | null) =>
+        ipcRenderer.invoke('pb:update-run-group-name', factIds, userName),
 
     },
 

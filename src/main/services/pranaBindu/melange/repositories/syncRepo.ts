@@ -200,3 +200,14 @@ export function getIntervalsAthleteId(db: DatabaseSync): string | null {
     .get() as { intervals_athlete_id: string | null } | undefined;
   return row?.intervals_athlete_id ?? null;
 }
+
+export function setZeppArchivePath(db: DatabaseSync, p: string | null): void {
+  db.prepare(`UPDATE sync_settings SET zepp_archive_path = ? WHERE id = 1`).run(p);
+}
+
+export function getZeppArchivePath(db: DatabaseSync): string | null {
+  const row = db
+    .prepare(`SELECT zepp_archive_path FROM sync_settings WHERE id = 1`)
+    .get() as { zepp_archive_path: string | null } | undefined;
+  return row?.zepp_archive_path ?? null;
+}

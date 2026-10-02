@@ -13,6 +13,11 @@ import {
   RunStreamsDrawer,
   type RunFactLite,
 } from '@/components/PRANA_BINDU/RunStreamsDrawer';
+import {
+  RunFiltersPanel,
+  type RunFilters,
+  EMPTY_FILTERS,
+} from '@/components/PRANA_BINDU/RunFiltersPanel';
 import { DodofoDebugDialog } from '@/components/PRANA_BINDU/DodofoDebugDialog';
 
 import './PranaBinduPage.css';
@@ -67,6 +72,33 @@ const SAME_WORKOUT_WINDOW_MIN = 30;
 const SAME_WORKOUT_WINDOW_MS = SAME_WORKOUT_WINDOW_MIN * 60 * 1000;
 
 const PB_RANGE_STORAGE_KEY = 'pb.syncRange';
+const PB_FILTERS_STORAGE_KEY = 'pb.filters.v1';
+
+function loadStoredFilters(): RunFilters {
+  try {
+    const raw = localStorage.getItem(PB_FILTERS_STORAGE_KEY);
+    if (!raw) return EMPTY_FILTERS;
+    const parsed = JSON.parse(raw) as Partial<RunFilters>;
+    return { ...EMPTY_FILTERS, ...parsed };
+  } catch {
+    return EMPTY_FILTERS;
+  }
+}
+
+function saveStoredFilters(f: RunFilters): void {
+  try {
+    localStorage.setItem(PB_FILTERS_STORAGE_KEY, JSON.stringify(f));
+  } catch {
+    // ignore
+  }
+}
+
+function parsePaceToSec(s: string | null | undefined): number | null {
+  if (!s) return null;
+  const m = String(s).trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return null;
+  return Number(m[1]) * 60 + Number(m[2]);
+}
 
 interface StoredRange {
   from: string; // YYYY-MM-DD
@@ -126,14 +158,25 @@ const SOURCE_PRIORITY: Record<string, number> = {
   tcx: 2,
   manual: 3,
   dodofo: 4,
-  'strava-csv': 5,
+  zepp: 5,
+  'strava-csv': 6
 };
+
+function sourceBadge(source: string | null, origin: string | null): string {
+  if (source === 'fit' || source === 'tcx') {
+    if (origin === 'zepp-app') return 'zepp';
+    if (origin === 'manual-import') return 'manual';
+    return source;
+  }
+  return source ?? '—';
+}
 
 interface GroupedRunFact {
   date: string;
   startTime: string | null;   // якорь группы
   sources: string[];
   primary: any;
+  items: any[];      // ← новое
   count: number;
   hasStreams: boolean;
   displayName: string;   // ← user_name ?? name
@@ -199,21 +242,27 @@ function groupRunFacts(
         if (pa !== pb) return pa - pb;
         return (a.id ?? 0) - (b.id ?? 0);
       });
-      const sources = sortedGroup.map((s) => s.source ?? '—');
+      const sources = sortedGroup.map((s) => sourceBadge(s.source, s.origin));
       const hasStreams = sortedGroup.some((s) => streamsMap[s.id]?.length);
 
       // Якорный start_time: берём первый непустой из группы
       const anchorStartTime =
         sortedGroup.find((s) => s.start_time)?.start_time ?? null;
       const primary = sortedGroup[0];
-      const displayName =
-        primary.user_name ?? primary.name ?? '—';
+      // Берём user_name у любой записи группы (он может быть только на одной),
+      // затем name у любой (ICU/dodofo/strava-csv знают имена, fit/tcx — нет).
+      const groupUserName =
+        sortedGroup.find((s) => s.user_name)?.user_name ?? null;
+      const groupName =
+        sortedGroup.find((s) => s.name)?.name ?? null;
+      const displayName = groupUserName ?? groupName ?? '—';
 
       return {
         date: group[0].date,
         startTime: anchorStartTime,
         sources,
         primary: primary,
+        items: sortedGroup,
         displayName: displayName,
         count: sortedGroup.length,
         hasStreams,
@@ -308,6 +357,13 @@ export const PranaBinduPage: React.FC = () => {
     failed: number;
   } | null>(null);
 
+  const [zeppArchivePath, setZeppArchivePath] = useState<string>('');
+  const [zeppUpdating, setZeppUpdating] = useState(false);
+  const [zeppResult, setZeppResult] = useState<{
+    imported: number; skipped: number; failed: number; total: number;
+  } | null>(null);
+  const [zeppError, setZeppError] = useState('');
+
   // ==================== Загрузка потоков (map) ====================
 
   const loadStreamsMap = async (items: any[]) => {
@@ -355,6 +411,87 @@ export const PranaBinduPage: React.FC = () => {
     [runFacts, streamsMap]
   );
 
+  const [filters, setFilters] = useState<RunFilters>(() => loadStoredFilters());
+  
+  const activeFilterCount = React.useMemo(() => {
+    let n = 0;
+    if (filters.nameQuery.trim()) n++;
+    if (filters.sources.length > 0) n++;
+    if (filters.kmFrom != null || filters.kmTo != null) n++;
+    if (filters.hrFrom != null || filters.hrTo != null) n++;
+    if (filters.paceFrom.trim() || filters.paceTo.trim()) n++;
+    if (filters.durFromMin != null || filters.durToMin != null) n++;
+    if (filters.streamsMode !== 'all') n++;
+    return n;
+  }, [filters]);
+
+  const filteredFacts = React.useMemo(() => {
+    const searchLower = filters.nameQuery.toLowerCase().trim();
+    const paceFromSec = parsePaceToSec(filters.paceFrom);
+    const paceToSec = parsePaceToSec(filters.paceTo);
+
+    return groupedFacts.filter((g) => {
+      // Источники: если выбраны — оставляем только группы,
+      // где есть любой из выбранных бейджей.
+      if (filters.sources.length > 0) {
+        const hit = g.sources.some((s) => filters.sources.includes(s));
+        if (!hit) return false;
+      }
+
+      // Поиск по названию
+      if (searchLower) {
+        let matched = false;
+        // displayName (единое название тренировки)
+        if (g.displayName.toLowerCase().includes(searchLower)) matched = true;
+        // провайдерские name — только в выбранных источниках
+        if (!matched && g.items) {
+          for (const it of g.items as any[]) {
+            const badge = sourceBadge(it.source, it.origin);
+            if (filters.sources.length > 0 && !filters.sources.includes(badge)) {
+              continue;
+            }
+            const nm = (it.name ?? '') as string;
+            if (nm && nm.toLowerCase().includes(searchLower)) {
+              matched = true;
+              break;
+            }
+          }
+        }
+        if (!matched) return false;
+      }
+
+      const km = g.primary.actual_km;
+      if (filters.kmFrom != null && (km == null || km < filters.kmFrom)) return false;
+      if (filters.kmTo != null && (km == null || km > filters.kmTo)) return false;
+
+      const hr = g.primary.avg_hr;
+      if (filters.hrFrom != null && (hr == null || hr < filters.hrFrom)) return false;
+      if (filters.hrTo != null && (hr == null || hr > filters.hrTo)) return false;
+
+      const paceSec = parsePaceToSec(g.primary.actual_pace);
+      if (paceFromSec != null && (paceSec == null || paceSec < paceFromSec)) return false;
+      if (paceToSec != null && (paceSec == null || paceSec > paceToSec)) return false;
+
+      const durMin =
+        g.primary.duration_sec != null ? g.primary.duration_sec / 60 : null;
+      if (
+        filters.durFromMin != null &&
+        (durMin == null || durMin < filters.durFromMin)
+      ) return false;
+      if (
+        filters.durToMin != null &&
+        (durMin == null || durMin > filters.durToMin)
+      ) return false;
+
+      if (filters.streamsMode === 'with' && !g.hasStreams) return false;
+      if (filters.streamsMode === 'without' && g.hasStreams) return false;
+
+      return true;
+    });
+  }, [groupedFacts, filters]);
+
+  const handleResetFilters = () => setFilters(EMPTY_FILTERS);
+
   const [dragActive, setDragActive] = useState(false);
 
   const [importOrigin, setImportOrigin] = useState<string>('zepp-app');
@@ -377,6 +514,7 @@ export const PranaBinduPage: React.FC = () => {
     skipped: number;
     failed: number;
   } | null>(null);
+
 
   // ==================== Загрузка списка пробежек ====================
 
@@ -440,6 +578,12 @@ export const PranaBinduPage: React.FC = () => {
       } catch {
         // ignore
       }
+    })();
+    (async () => {
+      try {
+        const res = await api.pb.zeppArchivePathGet?.();
+        if (res?.success && res.path) setZeppArchivePath(res.path);
+      } catch { /* ignore */ }
     })();
     (async () => {
       try {
@@ -507,6 +651,10 @@ export const PranaBinduPage: React.FC = () => {
     document.body.setAttribute('data-module', 'prana-bindu');
     return () => document.body.removeAttribute('data-module');
   }, []);
+
+  useEffect(() => {
+    saveStoredFilters(filters);
+  }, [filters]);
 
   // ==================== Проверка доступности ====================
 
@@ -1023,7 +1171,7 @@ export const PranaBinduPage: React.FC = () => {
     }
   };
 
-    const handleImportStravaCsv = async () => {
+  const handleImportStravaCsv = async () => {
     if (!api?.pb?.pickCsv || !api?.pb?.importStravaCsv) {
       setArchiveError('electronAPI.pb.pickCsv / importStravaCsv недоступен');
       return;
@@ -1052,6 +1200,67 @@ export const PranaBinduPage: React.FC = () => {
       setArchiveError((e as Error).message);
     } finally {
       setArchiveUpdating(false);
+    }
+  };
+
+  const handlePickZeppFolder = async (): Promise<string | null> => {
+    if (!api?.pb?.pickDirectory) return null;
+    const res = await api.pb.pickDirectory({
+      title: 'Выберите папку с FIT-файлами Zepp',
+      defaultPath: zeppArchivePath || undefined,
+    });
+    if (!res?.success || !res.path) return null;
+    return res.path;
+  };
+
+  const handleChangeZeppFolder = async () => {
+    const picked = await handlePickZeppFolder();
+    if (!picked) return;
+    setZeppArchivePath(picked);
+    try {
+      await api.pb.zeppArchivePathSet?.(picked);
+    } catch { /* ignore */ }
+  };
+
+  const handleUpdateZepp = async () => {
+    if (!api?.pb?.importZeppDir) {
+      setZeppError('electronAPI.pb.importZeppDir недоступен');
+      return;
+    }
+    setZeppUpdating(true);
+    setZeppError('');
+    setZeppResult(null);
+
+    try {
+      let target = zeppArchivePath;
+      if (!target) {
+        const picked = await handlePickZeppFolder();
+        if (!picked) { setZeppUpdating(false); return; }
+        target = picked;
+      }
+
+      const res = await api.pb.importZeppDir(target, {
+        skipIfFileExists: true,
+        savePath: true,
+      });
+
+      if (res.success) {
+        setZeppArchivePath(target);
+        setZeppResult({
+          imported: res.imported ?? 0,
+          skipped: res.skipped ?? 0,
+          failed: res.failed ?? 0,
+          total: res.total ?? 0,
+        });
+        await loadRunFacts();
+      } else {
+        setZeppError(res.error ?? 'Ошибка импорта');
+      }
+    } catch (e) {
+      setZeppError((e as Error).message);
+    } finally {
+      setZeppUpdating(false);
+      setImportProgress(null);
     }
   };
 
@@ -1697,6 +1906,125 @@ export const PranaBinduPage: React.FC = () => {
               }
             />
           )}
+                    <hr className="pb-sep" />
+
+          <div className="flex flex-column gap-2">
+            <label className="pb-label">Папка с FIT-файлами Zepp (Yandex.Disk)</label>
+            <div className="flex gap-2 flex-wrap align-items-center">
+              <span className="pb-archive-path" title={zeppArchivePath || undefined}>
+                {zeppArchivePath || <i>папка не выбрана</i>}
+              </span>
+              <Button
+                label={zeppArchivePath ? 'Сменить папку' : 'Выбрать папку'}
+                icon="pi pi-folder-open"
+                className="pb-soft p-button-sm"
+                onClick={handleChangeZeppFolder}
+                disabled={zeppUpdating}
+              />
+              <Button
+                label={zeppUpdating ? 'Обновление…' : 'Обновить Zepp'}
+                icon={zeppUpdating ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'}
+                className="pb p-button-sm"
+                onClick={handleUpdateZepp}
+                disabled={zeppUpdating}
+                tooltip="Импортировать только те тренировки, которых ещё нет"
+              />
+            </div>
+            <small className="pb-hint">
+              Тренировки, уже загруженные через Strava-архив (± 2 мин
+              по времени старта), будут пропущены.
+            </small>
+          </div>
+
+          {zeppUpdating && importProgress && (
+            <div className="pb-import-progress">
+              <div className="pb-import-progress__header">
+                <span>
+                  {importProgress.current} / {importProgress.total}
+                  {' · '}
+                  <code>{importProgress.filename}</code>
+                </span>
+                <Button
+                  label="Отмена"
+                  icon="pi pi-times"
+                  className="pb-soft p-button-sm"
+                  onClick={handleCancelImport}
+                />
+              </div>
+              <ProgressBar
+                value={Math.round(
+                  (importProgress.current / importProgress.total) * 100
+                )}
+                showValue={false}
+                style={{ height: '6px' }}
+              />
+              <div className="pb-import-progress__stats">
+                <span>+{importProgress.imported}</span>
+                <span>·{importProgress.skipped}</span>
+                {importProgress.failed > 0 && (
+                  <span className="pb-import-progress__fail">
+                    ✗{importProgress.failed}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {zeppUpdating && importProgress && (
+            <div className="pb-import-progress">
+              <div className="pb-import-progress__header">
+                <span>
+                  {importProgress.current} / {importProgress.total}
+                  {' · '}
+                  <code>{importProgress.filename}</code>
+                </span>
+                <Button
+                  label="Отмена"
+                  icon="pi pi-times"
+                  className="pb-soft p-button-sm"
+                  onClick={handleCancelImport}
+                />
+              </div>
+              <ProgressBar
+                value={Math.round(
+                  (importProgress.current / importProgress.total) * 100
+                )}
+                showValue={false}
+                style={{ height: '6px' }}
+              />
+              <div className="pb-import-progress__stats">
+                <span>+{importProgress.imported}</span>
+                <span>~{importProgress.updated}</span>
+                <span>·{importProgress.skipped}</span>
+                {importProgress.failed > 0 && (
+                  <span className="pb-import-progress__fail">
+                    ✗{importProgress.failed}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {zeppError && (
+            <Message severity="error" text={zeppError} className="w-full mt-2" />
+          )}
+
+          {zeppResult && (
+            <Message
+              severity={zeppResult.failed > 0 ? 'warn' : 'success'}
+              className="w-full mt-2"
+              content={
+                <span>
+                  Zepp: добавлено <b>{zeppResult.imported}</b>
+                  {' · '}пропущено <b>{zeppResult.skipped}</b>
+                  {zeppResult.failed > 0 && (
+                    <> · ошибок <b>{zeppResult.failed}</b></>
+                  )}
+                  {' · '}всего <b>{zeppResult.total}</b>
+                </span>
+              }
+            />
+          )}
         </Panel>
       </div>
 
@@ -1767,19 +2095,30 @@ export const PranaBinduPage: React.FC = () => {
       </Panel>
 
       <Panel
-        header={`Пробежки (${groupedFacts.length}${
-          groupedFacts.length !== runFacts.length
-            ? ` · ${runFacts.length} записей`
-            : ''
-        })`}
+        header={
+          activeFilterCount > 0
+            ? `Пробежки (${filteredFacts.length} из ${groupedFacts.length})`
+            : `Пробежки (${groupedFacts.length}${
+                groupedFacts.length !== runFacts.length
+                  ? ` · ${runFacts.length} записей`
+                  : ''
+              })`
+        }
         className="shadow-5 mb-3 pb-panel"
       >
         {factsError && (
           <Message severity="error" text={factsError} className="w-full mb-2" />
         )}
 
+        <RunFiltersPanel
+          filters={filters}
+          onChange={setFilters}
+          onReset={handleResetFilters}
+          activeCount={activeFilterCount}
+        />
+
         <DataTable
-          value={groupedFacts}
+          value={filteredFacts}
           loading={factsLoading}
           size="small"
           stripedRows

@@ -41,3 +41,8 @@ export type {
   RecoveryLogRow,
   RecoveryLogInput,
 } from './repositories/recoveryRepo';
+
+export {
+  setZeppArchivePath,
+  getZeppArchivePath,
+} from './repositories/syncRepo';

@@ -14,7 +14,7 @@ import {
   MIGRATION_V9_INTERVALS_ICU,
 } from './schema';
 
-export const SCHEMA_VERSION = 11;
+export const SCHEMA_VERSION = 12;
 
 interface Migration {
   version: number;
@@ -242,6 +242,20 @@ const migrations: readonly Migration[] = [
       if (!has('user_name')) {
         db.exec(`ALTER TABLE run_facts ADD COLUMN user_name TEXT;`);
         console.log('[Melange] v11: добавлена колонка run_facts.user_name');
+      }
+    },
+  },
+  {
+    version: 12,
+    apply: (db) => {
+      const cols = db
+        .prepare(`PRAGMA table_info(sync_settings)`)
+        .all() as { name: string }[];
+      const has = (n: string) => cols.some((c) => c.name === n);
+
+      if (!has('zepp_archive_path')) {
+        db.exec(`ALTER TABLE sync_settings ADD COLUMN zepp_archive_path TEXT;`);
+        console.log('[Melange] v12: добавлена колонка sync_settings.zepp_archive_path');
       }
     },
   },

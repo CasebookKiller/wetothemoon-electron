@@ -90,6 +90,7 @@ function fmtTime(iso: string): string {
 }
 
 function sourceLabel(f: RunFactLite): string {
+  if (f.source === 'fit' && f.origin === 'zepp-app') return 'zepp';
   if (f.source === 'fit' && f.origin) return `fit · ${f.origin}`;
   return f.source ?? '—';
 }
@@ -210,59 +211,10 @@ const SourcePanel: React.FC<{
         <span className="pb-source-panel__badge">{sourceLabel(fact)}</span>
       </div>
 
-      <div className="pb-drawer__names">
-        {!editingName ? (
-          <>
-            <span className="pb-drawer__name-primary">
-              {localUserName || fact.name || (
-                <span className="pb-drawer__empty-inline">Без названия</span>
-              )}
-            </span>
-            <Button
-              icon="pi pi-pencil"
-              text
-              className="pb-drawer__name-edit"
-              onClick={startEditName}
-              tooltip="Переименовать"
-              tooltipOptions={{ position: 'left' }}
-            />
-          </>
-        ) : (
-          <>
-            <InputText
-              value={userNameDraft}
-              onChange={(e) => setUserNameDraft(e.target.value)}
-              placeholder="Своё название (пусто = сброс)"
-              className="pb-drawer__name-input"
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') saveName();
-                if (e.key === 'Escape') cancelEditName();
-              }}
-            />
-            <Button
-              icon="pi pi-check"
-              text
-              className="pb-drawer__name-edit"
-              onClick={saveName}
-              tooltip="Сохранить"
-              tooltipOptions={{ position: 'left' }}
-            />
-            <Button
-              icon="pi pi-times"
-              text
-              className="pb-drawer__name-edit"
-              onClick={cancelEditName}
-              tooltip="Отмена"
-              tooltipOptions={{ position: 'left' }}
-            />
-          </>
-        )}
-      </div>
-
-      {localUserName && fact.name && (
-        <div className="pb-drawer__name-original">
-          провайдерское: {fact.name}
+      {fact.name && (
+        <div className="pb-drawer__provider-name">
+          <span className="pb-drawer__label">Провайдерское:</span>
+          <span className="pb-drawer__provider-value">{fact.name}</span>
         </div>
       )}
 
@@ -387,6 +339,10 @@ export const RunStreamsDrawer: React.FC<Props> = ({
   const [loadingFacts, setLoadingFacts] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
 
+  const [groupEditingName, setGroupEditingName] = useState(false);
+  const [groupUserNameDraft, setGroupUserNameDraft] = useState('');
+  const [groupUserName, setGroupUserName] = useState<string | null>(null);
+
   useEffect(() => {
     if (!visible || !runFact) return;
     setLoadingFacts(true);
@@ -442,7 +398,41 @@ export const RunStreamsDrawer: React.FC<Props> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, runFact?.date, runFact?.id, runFact?.start_time]);
 
+  useEffect(() => {
+    if (facts.length === 0) {
+      setGroupUserName(null);
+      return;
+    }
+    // Первое непустое user_name среди группы
+    const first = facts.find((f) => f.user_name)?.user_name ?? null;
+    setGroupUserName(first);
+  }, [facts]);
+
   const hasMulti = facts.length > 1;
+
+    const startGroupEditName = () => {
+    setGroupUserNameDraft(groupUserName ?? '');
+    setGroupEditingName(true);
+  };
+
+  const cancelGroupEditName = () => {
+    setGroupEditingName(false);
+    setGroupUserNameDraft('');
+  };
+
+  const saveGroupName = async () => {
+    const trimmed = groupUserNameDraft.trim() || null;
+    const ids = facts.map((f) => f.id);
+    const res = await api.pb.updateRunGroupName(ids, trimmed);
+    if (res?.success) {
+      setGroupUserName(trimmed);
+      setFacts((prev) => prev.map((f) => ({ ...f, user_name: trimmed })));
+      setGroupEditingName(false);
+      onAfterSync();
+    } else {
+      console.error('[RunStreamsDrawer] saveGroupName:', res?.error);
+    }
+  };
 
   return (
     <Sidebar
@@ -465,6 +455,93 @@ export const RunStreamsDrawer: React.FC<Props> = ({
         </div>
       </div>
 
+      {!loadingFacts && facts.length > 0 && (() => {
+        const activeFact = facts[activeIndex] ?? facts[0];
+        const providerName = activeFact?.name ?? null;
+        const canCopy = providerName != null;
+        return (
+        <div className="pb-drawer__group-name-row">
+          {!groupEditingName ? (
+            <>
+              <span className="pb-drawer__group-name">
+                {groupUserName || (
+                  <span className="pb-drawer__empty-inline">
+                    Без названия — задайте своё
+                  </span>
+                )}
+              </span>
+              {canCopy && (
+                <Button
+                  icon="pi pi-copy"
+                  text
+                  className="pb-drawer__name-edit"
+                  onClick={async () => {
+                    const ids = facts.map((f) => f.id);
+                    const res = await api.pb.updateRunGroupName(ids, providerName);
+                    if (res?.success) {
+                      setGroupUserName(providerName);
+                      setFacts((prev) =>
+                        prev.map((f) => ({ ...f, user_name: providerName }))
+                      );
+                      onAfterSync();
+                    } else {
+                      console.error('[RunStreamsDrawer] copy name:', res?.error);
+                    }
+                  }}
+                  tooltip={
+                    providerName === groupUserName
+                      ? `Уже скопировано из «${sourceLabel(activeFact)}»: ${providerName}`
+                      : activeFact
+                      ? `Скопировать из «${sourceLabel(activeFact)}»: ${providerName}`
+                      : 'Скопировать провайдерское название'
+                  }
+                  tooltipOptions={{ position: 'bottom' }}
+                />
+              )}
+              <Button
+                icon="pi pi-pencil"
+                text
+                className="pb-drawer__name-edit"
+                onClick={startGroupEditName}
+                tooltip="Переименовать тренировку"
+                tooltipOptions={{ position: 'bottom' }}
+              />
+            </>
+          ) : (
+            <>
+              <InputText
+                value={groupUserNameDraft}
+                onChange={(e) => setGroupUserNameDraft(e.target.value)}
+                placeholder="Название тренировки (пусто = сброс)"
+                className="pb-drawer__name-input"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') saveGroupName();
+                  if (e.key === 'Escape') cancelGroupEditName();
+                }}
+              />
+              <Button
+                icon="pi pi-check"
+                text
+                className="pb-drawer__name-edit"
+                onClick={saveGroupName}
+                tooltip="Сохранить"
+                tooltipOptions={{ position: 'bottom' }}
+              />
+              <Button
+                icon="pi pi-times"
+                text
+                className="pb-drawer__name-edit"
+                onClick={cancelGroupEditName}
+                tooltip="Отмена"
+                tooltipOptions={{ position: 'bottom' }}
+              />
+            </>
+          )}
+        </div>
+        );
+      })()}
+
       {loadingFacts && (
         <div className="pb-drawer__hint">Загрузка источников…</div>
       )}
@@ -477,6 +554,15 @@ export const RunStreamsDrawer: React.FC<Props> = ({
         <TabView
           activeIndex={activeIndex}
           onTabChange={(e) => setActiveIndex(e.index)}
+          onWheel={(e: React.WheelEvent<HTMLDivElement>) => {
+            const nav = (e.currentTarget as HTMLElement).querySelector(
+              '.p-tabview-nav'
+            ) as HTMLElement | null;
+            if (!nav) return;
+            if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+              nav.scrollLeft += e.deltaY;
+            }
+          }}
         >
           {facts.map((f) => (
             <TabPanel key={f.id} header={sourceLabel(f)}>

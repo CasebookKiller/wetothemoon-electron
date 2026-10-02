@@ -1282,12 +1282,32 @@ span.pb-destructive {
   background: transparent !important;
   border: none !important;
   border-bottom: 1px solid var(--surface-border, rgba(255, 255, 255, 0.1)) !important;
-  padding: 0;
+  padding: 0 0 4px 0;
   margin-bottom: 0.75rem;
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--pb-accent) 45%, transparent) transparent;
+}
+
+.pb-drawer .p-tabview .p-tabview-nav::-webkit-scrollbar {
+  height: 4px;
+}
+
+.pb-drawer .p-tabview .p-tabview-nav::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--pb-accent) 45%, transparent);
+  border-radius: 2px;
+}
+
+.pb-drawer .p-tabview .p-tabview-nav::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .pb-drawer .p-tabview .p-tabview-nav li {
   margin-right: 0.25rem;
+  flex-shrink: 0 !important;
 }
 
 .pb-drawer .p-tabview .p-tabview-nav li .p-tabview-nav-link {
@@ -1837,4 +1857,257 @@ body[data-module='prana-bindu'] .p-tooltip.p-tooltip-bottom .p-tooltip-arrow {
 .pb-source-badge--strava-csv {
   background: rgba(192, 132, 252, 0.18);
   color: #c084fc;
+}
+
+.pb-source-badge--zepp {
+  background: rgba(38, 198, 218, 0.18);
+  color: #26c6da;
+}
+
+/* ============================================================
+   Drawer: единое название тренировки над вкладками
+   ============================================================ */
+
+.pb-drawer__group-name-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--surface-border, rgba(255, 255, 255, 0.08));
+}
+
+.pb-drawer__group-name {
+  flex: 1 1 auto;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--tg-theme-text-color, #f5f5f5);
+  word-break: break-word;
+  line-height: 1.3;
+}
+
+/* Провайдерское название внутри вкладки — компактно */
+.pb-drawer__provider-name {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  margin-bottom: 0.5rem;
+  color: var(--tg-theme-hint-color, #708499);
+}
+
+.pb-drawer__provider-name .pb-drawer__label {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.8rem;
+  color: var(--tg-theme-hint-color, #708499);
+  min-width: auto;
+}
+
+.pb-drawer__provider-value {
+  color: var(--tg-theme-text-color, #f5f5f5);
+  word-break: break-word;
+}
+
+/* ============================================================
+   Панель фильтров для таблицы пробежек
+   ============================================================ */
+
+.pb-run-filters {
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--surface-border, rgba(255, 255, 255, 0.08));
+}
+
+.pb-run-filters__bar {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.pb-run-filters__body {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.pb-run-filters__row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+/* --- Поиск --- */
+
+.pb-run-filters__search-wrap {
+  position: relative;
+  display: inline-block;
+  height: 2.5rem;
+  max-width: 320px;
+}
+
+.pb-run-filters__search-wrap .pi-search {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--tg-theme-hint-color, #708499);
+  pointer-events: none;
+  z-index: 1;
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+.pb-run-filters__search.p-inputtext {
+  width: 100% !important;
+  height: 2.5rem !important;
+  padding: 0 0.75rem 0 2.2rem !important;
+  font-size: 0.85rem !important;
+  box-sizing: border-box;
+}
+
+/* --- Чипы-источники --- */
+
+.pb-run-filters__chips-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-top: 0.35rem;
+}
+
+.pb-run-filters__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.1rem 0.4rem 0.1rem 0.15rem;
+  border-radius: 4px;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid transparent;
+  transition: border-color 0.15s, background 0.15s, opacity 0.15s;
+  opacity: 0.5;
+}
+
+.pb-run-filters__chip:hover {
+  opacity: 0.85;
+}
+
+.pb-run-filters__chip.is-on {
+  opacity: 1;
+  background: color-mix(in srgb, var(--pb-accent) 8%, transparent);
+  border-color: color-mix(in srgb, var(--pb-accent) 30%, transparent);
+}
+
+.pb-run-filters__chip .pi-check {
+  font-size: 0.7rem;
+  color: var(--pb-accent);
+}
+
+.pb-run-filters__chip-clear {
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--pb-accent) 30%, transparent);
+  border-radius: 4px;
+  padding: 0.15rem 0.35rem;
+  cursor: pointer;
+  color: var(--pb-accent);
+  font-size: 0.7rem;
+  transition: background 0.15s;
+}
+
+.pb-run-filters__chip-clear:hover {
+  background: color-mix(in srgb, var(--pb-accent) 12%, transparent);
+}
+
+/* --- Числовые диапазоны --- */
+
+.pb-run-filters__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.9rem;
+}
+
+.pb-run-filters__range {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.pb-run-filters__num.p-inputnumber {
+  width: 5.5rem !important;
+}
+
+.pb-run-filters__num .p-inputnumber-input {
+  width: 100% !important;
+  height: 2.5rem !important;
+  padding: 0 0.6rem !important;
+  font-size: 0.85rem !important;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.pb-run-filters__pace.p-inputtext {
+  width: 5.5rem !important;
+  height: 2.5rem !important;
+  padding: 0 0.6rem !important;
+  font-size: 0.85rem !important;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+/* --- Radio buttons --- */
+
+.pb-run-filters__radio-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.pb-run-filters__radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+}
+
+.pb-run-filters__radio .p-radiobutton {
+  width: 1rem !important;
+  height: 1rem !important;
+}
+
+.pb-run-filters__radio .p-radiobutton .p-radiobutton-box {
+  width: 1rem !important;
+  height: 1rem !important;
+  border-width: 1px !important;
+  border-color: color-mix(in srgb, var(--pb-accent) 45%, transparent) !important;
+  background: transparent !important;
+  border-radius: 50% !important;
+}
+
+.pb-run-filters__radio .p-radiobutton .p-radiobutton-box:hover {
+  border-color: var(--pb-accent) !important;
+}
+
+.pb-run-filters__radio .p-radiobutton.p-highlight .p-radiobutton-box {
+  border-color: var(--pb-accent) !important;
+  background: transparent !important;
+}
+
+.pb-run-filters__radio .p-radiobutton.p-highlight .p-radiobutton-icon {
+  background: var(--pb-accent) !important;
+  width: 0.55rem !important;
+  height: 0.55rem !important;
+  border-radius: 50% !important;
+}
+
+.pb-run-filters__radio .p-radiobutton.p-focus .p-radiobutton-box {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pb-accent) 25%, transparent) !important;
+}
+
+.pb-run-filters__radio > span {
+  font-size: 0.8rem;
+  color: var(--tg-theme-text-color, #f5f5f5);
+  line-height: 1.2;
 }

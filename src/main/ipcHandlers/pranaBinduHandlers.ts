@@ -44,6 +44,8 @@ import {
   setIntervalsCredentials,
   getIntervalsApiKeyEncrypted,
   getIntervalsAthleteId as getIntervalsAthleteIdFromDb,
+  setZeppArchivePath,
+  getZeppArchivePath,
 } from '../services/pranaBindu/melange';
 
 import { DodofoProvider } from '../services/pranaBindu/spice/providers/dodofoProvider';
@@ -2116,6 +2118,32 @@ export function registerPranaBinduHandlers(): void {
     }
   );
 
+  ipcMain.handle(
+    'pb:update-run-group-name',
+    (_event, factIds: number[], userName: string | null) => {
+      try {
+        if (!Array.isArray(factIds) || factIds.length === 0) {
+          return { success: false, error: 'factIds обязателен (непустой массив)' };
+        }
+        const ids = factIds.filter((x) => Number.isFinite(x));
+        if (ids.length === 0) {
+          return { success: false, error: 'Нет валидных factIds' };
+        }
+        const value = userName?.trim() || null;
+        const db = getMelange();
+        const placeholders = ids.map(() => '?').join(',');
+        const info = db
+          .prepare(
+            `UPDATE run_facts SET user_name = ? WHERE id IN (${placeholders})`
+          )
+          .run(value, ...ids);
+        return { success: true, updated: info.changes, userName: value };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
   // -------- Диалог выбора CSV --------
   ipcMain.handle('pb:pick-csv', async () => {
     try {
@@ -2186,6 +2214,206 @@ export function registerPranaBinduHandlers(): void {
       return { success: false, error: (e as Error).message };
     }
   });
+
+  ipcMain.handle('pb:zepp-archive-path-get', () => {
+    try {
+      return { success: true, path: getZeppArchivePath(getMelange()) };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('pb:zepp-archive-path-set', (_event, p: string | null) => {
+    try {
+      setZeppArchivePath(getMelange(), p ?? null);
+      return { success: true };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  // -------- Импорт Zepp FIT из папки --------
+  ipcMain.handle(
+    'pb:import-zepp-dir',
+    async (
+      _event,
+      dirPath: string,
+      opts?: { skipIfFileExists?: boolean; savePath?: boolean }
+    ) => {
+      try {
+        if (!dirPath || typeof dirPath !== 'string') {
+          return { success: false, error: 'dirPath обязателен' };
+        }
+        if (!fs.existsSync(dirPath)) {
+          return { success: false, error: `Папка не найдена: ${dirPath}` };
+        }
+
+        const skipIfFileExists = opts?.skipIfFileExists !== false;
+        const savePath = opts?.savePath !== false;
+
+        const files: string[] = [];
+        const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+        for (const e of entries) {
+          if (e.isFile() && /\.(fit|tcx)(\.gz)?$/i.test(e.name)) {
+            files.push(path.join(dirPath, e.name));
+          }
+        }
+        if (files.length === 0) {
+          return { success: false, error: 'FIT-файлы не найдены' };
+        }
+
+        const db = getMelange();
+        //const WINDOW_MS = 2 * 60 * 1000;
+
+        let imported = 0;
+        let skipped = 0;
+        let failed = 0;
+        let updated = 0;
+        const errors: Array<{ file: string; error: string }> = [];
+        const importedIds: number[] = [];
+
+        importFitCancelRequested = false;
+        const sender = _event.sender;
+        const sendProgress = (payload: Record<string, unknown>) => {
+          if (!sender.isDestroyed()) sender.send('pb:import-progress', payload);
+        };
+
+        for (let i = 0; i < files.length; i++) {
+          if (importFitCancelRequested) break;
+          const file = files[i];
+          const filename = path.basename(file);
+
+          try {
+            const basename = filename.replace(/\.(fit|tcx)(\.gz)?$/i, '');
+            const source = detectSource(file);
+            const externalId = `${source}:${basename}`;
+
+            // 1. Сначала — дедуп по (source, external_id): файл уже импортировался.
+            const byExt = db
+              .prepare(`SELECT id FROM run_facts WHERE source = ? AND external_id = ? LIMIT 1`)
+              .get(source, externalId) as { id: number } | undefined;
+            if (byExt && skipIfFileExists) {
+              skipped++;
+              sendProgress({
+                current: i + 1, total: files.length, filename,
+                imported, updated, skipped, failed,
+              });
+              await new Promise((r) => setImmediate(r));
+              continue;
+            }
+
+            // 2. Парсим, получаем startTime.
+            const workout = await parseWorkoutFile(file, basename);
+
+            
+            /*// 3. Дедуп по времени: есть ли fit/tcx-запись с тем же start_time ± 2 мин.
+            if (skipIfFileExists) {
+              const day = workout.startTime.slice(0, 10);
+              const startMs = new Date(workout.startTime).getTime();
+              const candidates = db
+                .prepare(
+                  `SELECT id, start_time, source FROM run_facts
+                   WHERE date = ? AND start_time IS NOT NULL
+                     AND source IN ('fit','tcx')`
+                )
+                .all(day) as unknown as Array<{ id: number; start_time: string; source: string }>;
+
+              const dup = candidates.some(
+                (c) => Math.abs(new Date(c.start_time).getTime() - startMs) < WINDOW_MS
+              );
+              if (dup) {
+                skipped++;
+                sendProgress({
+                  current: i + 1, total: files.length, filename,
+                  imported, updated: 0, skipped, failed,
+                });
+                await new Promise((r) => setImmediate(r));
+                continue;
+              }
+            }*/
+
+            // 4. Импортируем.
+            const startMs2 = new Date(workout.startTime).getTime();
+            const endTime = new Date(startMs2 + workout.durationSec * 1000).toISOString();
+
+            const raw = {
+              externalId,
+              source: workout.source,
+              origin: 'zepp-app',
+              name: (workout as any).name,
+              startTime: workout.startTime,
+              endTime,
+              distanceM: workout.distanceM,
+              durationS: workout.durationSec,
+              avgHr: workout.summary.avgHr,
+              maxHr: workout.summary.maxHr,
+              gpsQuality: workout.summary.gpsQuality,
+              distanceSource: workout.summary.distanceSource,
+              gpsCoveragePct: workout.summary.gpsCoveragePct,
+              raw: {
+                sport: workout.sport,
+                summary: workout.summary,
+                validation: workout.validation,
+                lapCount: workout.laps?.length ?? 0,
+                importedFrom: file,
+              },
+            };
+
+            const { inserted, id: runFactId } = upsertRunFact(db, raw);
+
+            const row = db
+              .prepare(`SELECT date FROM run_facts WHERE id = ?`)
+              .get(runFactId) as { date: string } | undefined;
+            const dateForFile = row?.date ?? workout.startTime.slice(0, 10);
+
+            upsertRunStreams(
+              db,
+              runFactId,
+              workout.source,
+              externalId,
+              dateForFile,
+              workout.streams as unknown as Record<string, unknown>
+            );
+
+            if (inserted) imported++;
+            else updated++;
+            importedIds.push(runFactId);
+          } catch (e) {
+            failed++;
+            errors.push({ file: filename, error: (e as Error).message });
+          }
+
+          sendProgress({
+            current: i + 1, total: files.length, filename,
+            imported, updated: 0, skipped, failed,
+          });
+          await new Promise((r) => setImmediate(r));
+        }
+
+        if (savePath && failed === 0 && !importFitCancelRequested) {
+          setZeppArchivePath(db, dirPath);
+        }
+
+        console.log(
+          `[Prana-Bindu] import-zepp-dir: +${imported} ~${updated} skipped=${skipped} failed=${failed} (total=${files.length})`
+        );
+
+        return {
+          success: true,
+          imported,
+          updated,
+          skipped,
+          failed,
+          cancelled: importFitCancelRequested,
+          total: files.length,
+          importedIds,
+          errors: errors.slice(0, 20),
+        };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
 
   console.log('[Prana-Bindu] IPC-хендлеры зарегистрированы (pb:*)');
 }
