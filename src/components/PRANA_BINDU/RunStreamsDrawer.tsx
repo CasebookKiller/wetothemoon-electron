@@ -11,6 +11,7 @@ import { Sidebar } from 'primereact/sidebar';
 import { TabView, TabPanel } from 'primereact/tabview';
 import { RunStreamsChart } from './RunStreamsChart';
 import { GpsMapView } from './GpsMapView';
+import { InputText } from 'primereact/inputtext';
 
 /**
  * Порог, при котором две записи считаются одной тренировкой
@@ -26,6 +27,8 @@ export interface RunFactLite {
   start_time?: string | null;
   source: string | null;
   origin?: string | null;
+  name?: string | null;        // ← новое
+  user_name?: string | null;   // ← новое
   actual_km: number | null;
   actual_pace: string | null;
   duration_sec: number | null;
@@ -111,6 +114,14 @@ const SourcePanel: React.FC<{
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
 
+  const [localUserName, setLocalUserName] = useState<string | null>(
+    fact.user_name ?? null
+  );
+
+  useEffect(() => {
+    setLocalUserName(fact.user_name ?? null);
+  }, [fact.id, fact.user_name]);
+
   useEffect(() => {
     setLoading(true);
     setError('');
@@ -168,12 +179,94 @@ const SourcePanel: React.FC<{
 
   const hasStreams = metas.length > 0;
 
+  const [editingName, setEditingName] = useState(false);
+  const [userNameDraft, setUserNameDraft] = useState('');
+
+  const startEditName = () => {
+    setUserNameDraft(fact.user_name ?? '');
+    setEditingName(true);
+  };
+
+  const saveName = async () => {
+    const trimmed = userNameDraft.trim() || null;
+    const res = await api.pb.updateRunFactName(fact.id, trimmed);
+    if (res?.success) {
+      setLocalUserName(trimmed);
+      setEditingName(false);
+      onAfterSync();
+    } else {
+      setError(res?.error ?? 'Не удалось сохранить название');
+    }
+  };
+
+  const cancelEditName = () => {
+    setEditingName(false);
+    setUserNameDraft('');
+  };
+
   return (
     <div className="pb-source-panel">
       <div className="pb-source-panel__source">
         <span className="pb-source-panel__badge">{sourceLabel(fact)}</span>
       </div>
 
+      <div className="pb-drawer__names">
+        {!editingName ? (
+          <>
+            <span className="pb-drawer__name-primary">
+              {localUserName || fact.name || (
+                <span className="pb-drawer__empty-inline">Без названия</span>
+              )}
+            </span>
+            <Button
+              icon="pi pi-pencil"
+              text
+              className="pb-drawer__name-edit"
+              onClick={startEditName}
+              tooltip="Переименовать"
+              tooltipOptions={{ position: 'left' }}
+            />
+          </>
+        ) : (
+          <>
+            <InputText
+              value={userNameDraft}
+              onChange={(e) => setUserNameDraft(e.target.value)}
+              placeholder="Своё название (пусто = сброс)"
+              className="pb-drawer__name-input"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') saveName();
+                if (e.key === 'Escape') cancelEditName();
+              }}
+            />
+            <Button
+              icon="pi pi-check"
+              text
+              className="pb-drawer__name-edit"
+              onClick={saveName}
+              tooltip="Сохранить"
+              tooltipOptions={{ position: 'left' }}
+            />
+            <Button
+              icon="pi pi-times"
+              text
+              className="pb-drawer__name-edit"
+              onClick={cancelEditName}
+              tooltip="Отмена"
+              tooltipOptions={{ position: 'left' }}
+            />
+          </>
+        )}
+      </div>
+
+      {localUserName && fact.name && (
+        <div className="pb-drawer__name-original">
+          провайдерское: {fact.name}
+        </div>
+      )}
+
+      <div className="pb-drawer__section-title">Сводка</div>
       <div className="pb-drawer__summary">
         <div className="pb-drawer__row">
           <span className="pb-drawer__label">Дистанция</span>
@@ -309,6 +402,8 @@ export const RunStreamsDrawer: React.FC<Props> = ({
             start_time: r.start_time ?? null,
             source: r.source,
             origin: r.origin ?? null,
+            name: r.name ?? null,            // ← добавить
+            user_name: r.user_name ?? null,  // ← добавить
             actual_km: r.actual_km,
             actual_pace: r.actual_pace,
             duration_sec: r.duration_sec,

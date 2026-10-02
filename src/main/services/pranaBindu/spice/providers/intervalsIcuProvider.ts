@@ -430,6 +430,7 @@ export class IntervalsIcuProvider implements ZeppDataProvider {
           externalId: `intervals-icu:${a.id}`,
           source: 'intervals-icu',
           origin: 'intervals-icu',
+          name: typeof a.name === 'string' ? a.name : undefined,   // ← добавить
           startTime,
           endTime,
           distanceM:

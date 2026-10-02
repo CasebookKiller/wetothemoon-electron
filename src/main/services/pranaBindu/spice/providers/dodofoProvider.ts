@@ -34,6 +34,7 @@ function activityToRawWorkout(a: DodofoActivity): RawWorkout {
   return {
     externalId: `dodofo:${a.id}`,
     source: 'dodofo',
+    name: typeof a.name === 'string' ? a.name : undefined,   // ← добавить
     startTime,
     endTime,
     distanceM:

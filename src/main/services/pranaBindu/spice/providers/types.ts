@@ -17,6 +17,7 @@ export interface RawWorkout {
   distanceSource?: string;     // ← новое
   gpsCoveragePct?: number;     // ← новое
   raw?: unknown;
+  name?: string;
 }
 
 export interface ProviderCheckResult {
