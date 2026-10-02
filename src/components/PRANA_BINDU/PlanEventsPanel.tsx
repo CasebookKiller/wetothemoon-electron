@@ -1,0 +1,189 @@
+// src/components/PRANA_BINDU/PlanEventsPanel.tsx
+//
+// Панель «План» — мини-таблица событий из plan_events.
+// Глупый компонент: получает events + callbacks, ничего не знает
+// про IPC.
+
+import React from 'react';
+import { Button } from 'primereact/button';
+import { Column } from 'primereact/column';
+import { DataTable } from 'primereact/datatable';
+import { Message } from 'primereact/message';
+import { Panel } from 'primereact/panel';
+
+export interface PlanEventLite {
+  id: number;
+  externalId: string;
+  date: string;
+  startTime?: string;
+  category: string;
+  sport?: string;
+  name: string;
+  plannedLoad?: number;
+  durationSec?: number;
+  distanceM?: number;
+  steps?: Array<unknown>;
+  pairedActivityId?: number;
+}
+
+interface Props {
+  events: PlanEventLite[];
+  loading: boolean;
+  syncing: boolean;
+  clearing: boolean;
+  error: string;
+  syncResult: string;
+  onSync: () => void;
+  onClear: () => void;
+  onOpenEvent: (event: PlanEventLite) => void;
+}
+
+function fmtDistance(m?: number): string {
+  if (m == null) return '—';
+  return `${(m / 1000).toFixed(m >= 1000 ? 1 : 2)} км`;
+}
+
+function fmtDuration(sec?: number): string {
+  if (sec == null || sec <= 0) return '—';
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  if (h > 0) return `${h}ч ${String(m).padStart(2, '0')}м`;
+  return `${m}м`;
+}
+
+function sportBadge(sport?: string): { label: string; cls: string } {
+  if (!sport) return { label: '—', cls: '' };
+  const s = sport.toLowerCase();
+  if (s.includes('run')) return { label: 'run', cls: 'pb-source-badge--tcx' };
+  if (s.includes('workout') || s.includes('weight')) {
+    return { label: 'big-6', cls: 'pb-source-badge--manual' };
+  }
+  if (s.includes('ride') || s.includes('bike')) {
+    return { label: 'ride', cls: 'pb-source-badge--dodofo' };
+  }
+  return { label: sport, cls: '' };
+}
+
+export const PlanEventsPanel: React.FC<Props> = ({
+  events,
+  loading,
+  syncing,
+  clearing,
+  error,
+  syncResult,
+  onSync,
+  onClear,
+  onOpenEvent,
+}) => {
+  return (
+    <Panel
+      header={`План (${events.length})`}
+      className="shadow-5 mb-3 pb-panel"
+    >
+      <div className="pb-plan__toolbar">
+        <Button
+          label={syncing ? 'Обновление…' : 'Обновить из ICU'}
+          icon={syncing ? 'pi pi-spin pi-spinner' : 'pi pi-cloud-download'}
+          className="pb p-button-sm"
+          onClick={onSync}
+          disabled={syncing || clearing}
+        />
+        <Button
+          label={clearing ? 'Очистка…' : 'Очистить'}
+          icon={clearing ? 'pi pi-spin pi-spinner' : 'pi pi-trash'}
+          className="pb-destructive-soft p-button-sm"
+          onClick={onClear}
+          disabled={syncing || clearing || events.length === 0}
+          tooltip="Удалить план за выбранный диапазон"
+        />
+      </div>
+
+      {error && (
+        <Message severity="error" text={error} className="w-full mt-2 mb-2" />
+      )}
+      {syncResult && (
+        <Message
+          severity="success"
+          text={syncResult}
+          className="w-full mt-2 mb-2"
+        />
+      )}
+
+      <DataTable
+        value={events}
+        loading={loading}
+        size="small"
+        stripedRows
+        scrollable
+        scrollHeight="360px"
+        virtualScrollerOptions={{ itemSize: 34 }}
+        emptyMessage="Плана нет за выбранный период. Нажмите «Обновить из ICU»."
+        className="p-datatable-sm"
+        selectionMode="single"
+        onRowClick={(e) => onOpenEvent(e.data as PlanEventLite)}
+      >
+        <Column
+          field="date"
+          header="Дата"
+          style={{ width: '110px' }}
+          body={(r: PlanEventLite) => r.date}
+        />
+        <Column
+          header="Спорт"
+          style={{ width: '90px' }}
+          body={(r: PlanEventLite) => {
+            const { label, cls } = sportBadge(r.sport);
+            return (
+              <span className={`pb-source-badge ${cls}`}>{label}</span>
+            );
+          }}
+        />
+        <Column
+          field="name"
+          header="Название"
+          style={{ width: '220px' }}
+          body={(r: PlanEventLite) => r.name}
+        />
+        <Column
+          header="Шаги"
+          style={{ width: '70px' }}
+          body={(r: PlanEventLite) =>
+            r.steps && r.steps.length > 0 ? String(r.steps.length) : '—'
+          }
+        />
+        <Column
+          header="Дистанция"
+          style={{ width: '100px' }}
+          body={(r: PlanEventLite) => fmtDistance(r.distanceM)}
+        />
+        <Column
+          header="Время"
+          style={{ width: '90px' }}
+          body={(r: PlanEventLite) => fmtDuration(r.durationSec)}
+        />
+        <Column
+          header="Нагрузка"
+          style={{ width: '90px' }}
+          body={(r: PlanEventLite) =>
+            r.plannedLoad != null ? Math.round(r.plannedLoad) : '—'
+          }
+        />
+        <Column
+          header="Факт"
+          style={{ width: '80px', textAlign: 'center' }}
+          body={(r: PlanEventLite) =>
+            r.pairedActivityId ? (
+              <i
+                className="pi pi-check-circle"
+                style={{ color: '#6fbf73' }}
+                title={`Связано с run_fact #${r.pairedActivityId}`}
+              />
+            ) : (
+              <i className="pi pi-minus" style={{ opacity: 0.25 }} />
+            )
+          }
+        />
+      </DataTable>
+    </Panel>
+  );
+};

@@ -25,6 +25,13 @@ import { InputNumber } from 'primereact/inputnumber';
 
 import { ProgressBar } from 'primereact/progressbar';
 
+
+import {
+  PlanEventsPanel,
+  type PlanEventLite,
+} from '@/components/PRANA_BINDU/PlanEventsPanel';
+import { PlanEventDrawer } from '@/components/PRANA_BINDU/PlanEventDrawer';
+
 interface ProviderOption {
   label: string;
   value: string;
@@ -510,6 +517,15 @@ export const PranaBinduPage: React.FC = () => {
 
   const [recoveryLogs, setRecoveryLogs] = useState<any[]>([]);
 
+  const [planEvents, setPlanEvents] = useState<PlanEventLite[]>([]);
+  const [planLoading, setPlanLoading] = useState(false);
+  const [planSyncing, setPlanSyncing] = useState(false);
+  const [planClearing, setPlanClearing] = useState(false);
+  const [planError, setPlanError] = useState('');
+  const [planSyncResult, setPlanSyncResult] = useState('');
+  const [selectedPlanEvent, setSelectedPlanEvent] = useState<PlanEventLite | null>(null);
+  const [planDrawerVisible, setPlanDrawerVisible] = useState(false);
+
   const [syncStreamsProgress, setSyncStreamsProgress] = useState<{
     current: number;
     total: number;
@@ -647,6 +663,7 @@ export const PranaBinduPage: React.FC = () => {
     const t = setTimeout(() => {
       loadRunFacts();
       loadRecoveryLogs();
+      loadPlanEvents();     // ← добавить
     }, 400);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1202,6 +1219,83 @@ export const PranaBinduPage: React.FC = () => {
     }
   };
 
+    const loadPlanEvents = async (from?: Date, to?: Date) => {
+    if (!api?.pb?.listPlanEvents) return;
+    setPlanLoading(true);
+    setPlanError('');
+    try {
+      const f = toIsoDate(from ?? syncFrom);
+      const t = toIsoDate(to ?? syncTo);
+      const res = await api.pb.listPlanEvents(f, t);
+      if (res?.success) {
+        setPlanEvents(res.items ?? []);
+      } else {
+        setPlanError(res?.error ?? 'Ошибка загрузки плана');
+      }
+    } catch (e) {
+      setPlanError((e as Error).message);
+    } finally {
+      setPlanLoading(false);
+    }
+  };
+
+  const handleSyncPlan = async () => {
+    if (!api?.pb?.syncPlan) return;
+    setPlanSyncing(true);
+    setPlanError('');
+    setPlanSyncResult('');
+    try {
+      const res = await api.pb.syncPlan(
+        toIsoDate(syncFrom),
+        toIsoDate(syncTo)
+      );
+      if (res.success) {
+        setPlanSyncResult(
+          `+${res.added} · ~${res.updated} · связанных: ${res.linked ?? 0}`
+        );
+        await loadPlanEvents();
+      } else {
+        setPlanError(res.error ?? 'Ошибка синхронизации');
+      }
+    } catch (e) {
+      setPlanError((e as Error).message);
+    } finally {
+      setPlanSyncing(false);
+    }
+  };
+
+  const handleClearPlan = async () => {
+    if (!api?.pb?.clearPlan) return;
+    const confirmed = window.confirm(
+      'Удалить все события плана за выбранный диапазон?'
+    );
+    if (!confirmed) return;
+    setPlanClearing(true);
+    setPlanError('');
+    setPlanSyncResult('');
+    try {
+      const res = await api.pb.clearPlan(
+        toIsoDate(syncFrom),
+        toIsoDate(syncTo)
+      );
+      if (res.success) {
+        setPlanSyncResult(`Удалено: ${res.deleted ?? 0}`);
+        await loadPlanEvents();
+      } else {
+        setPlanError(res.error ?? 'Ошибка очистки');
+      }
+    } catch (e) {
+      setPlanError((e as Error).message);
+    } finally {
+      setPlanClearing(false);
+    }
+  };
+
+  const handleOpenPlanEvent = (event: PlanEventLite) => {
+    setSelectedPlanEvent(event);
+    setPlanDrawerVisible(true);
+  };
+
   const handleImportStravaCsv = async () => {
     if (!api?.pb?.pickCsv || !api?.pb?.importStravaCsv) {
       setArchiveError('electronAPI.pb.pickCsv / importStravaCsv недоступен');
@@ -1615,7 +1709,6 @@ export const PranaBinduPage: React.FC = () => {
                 showIcon
                 className="pb-cal"
                 minDate={syncFrom ?? undefined}
-                maxDate={new Date()}
               />
               <Button
                 label="30 дней"
@@ -1635,6 +1728,32 @@ export const PranaBinduPage: React.FC = () => {
                   setSyncFrom(new Date(2020, 0, 1));
                   setSyncTo(new Date());
                 }}
+              />
+                            <Button
+                label="+30 дней"
+                icon="pi pi-calendar"
+                className="pb-soft p-button-sm"
+                onClick={() => {
+                  const now = new Date();
+                  const to = new Date();
+                  to.setDate(to.getDate() + 30);
+                  setSyncFrom(now);
+                  setSyncTo(to);
+                }}
+                tooltip="Текущий месяц + следующий"
+              />
+              <Button
+                label="+90 дней"
+                icon="pi pi-calendar-plus"
+                className="pb-soft p-button-sm"
+                onClick={() => {
+                  const now = new Date();
+                  const to = new Date();
+                  to.setDate(to.getDate() + 90);
+                  setSyncFrom(now);
+                  setSyncTo(to);
+                }}
+                tooltip="Ближайший квартал"
               />
             </div>
           </div>
@@ -2143,6 +2262,18 @@ export const PranaBinduPage: React.FC = () => {
         )}
       </Panel>
 
+      <PlanEventsPanel
+        events={planEvents}
+        loading={planLoading}
+        syncing={planSyncing}
+        clearing={planClearing}
+        error={planError}
+        syncResult={planSyncResult}
+        onSync={handleSyncPlan}
+        onClear={handleClearPlan}
+        onOpenEvent={handleOpenPlanEvent}
+      />
+
       <Panel
         header={
           activeFilterCount > 0
@@ -2291,6 +2422,12 @@ export const PranaBinduPage: React.FC = () => {
         runFact={selectedFact}
         onHide={() => setDrawerVisible(false)}
         onAfterSync={() => loadRunFacts()}
+      />
+
+      <PlanEventDrawer
+        visible={planDrawerVisible}
+        event={selectedPlanEvent}
+        onHide={() => setPlanDrawerVisible(false)}
       />
     </div>
   );
