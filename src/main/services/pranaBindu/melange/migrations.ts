@@ -14,7 +14,7 @@ import {
   MIGRATION_V9_INTERVALS_ICU,
 } from './schema';
 
-export const SCHEMA_VERSION = 14;
+export const SCHEMA_VERSION = 15;
 
 interface Migration {
   version: number;
@@ -297,6 +297,37 @@ const migrations: readonly Migration[] = [
         db.exec(`ALTER TABLE profile ADD COLUMN pace_zones_source TEXT;`);
         console.log('[Melange] v14: добавлена profile.pace_zones_source');
       }
+    },
+  },
+  {
+    version: 15,
+    apply: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS plan_events (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          external_id TEXT UNIQUE NOT NULL,
+          date TEXT NOT NULL,
+          start_time TEXT,
+          end_time TEXT,
+          category TEXT NOT NULL,
+          sport TEXT,
+          name TEXT NOT NULL,
+          description TEXT,
+          planned_load REAL,
+          duration_sec INTEGER,
+          distance_m REAL,
+          icu_workout_json TEXT,
+          raw_json TEXT,
+          paired_activity_id INTEGER,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (paired_activity_id) REFERENCES run_facts(id)
+        );
+      `);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_plan_events_date ON plan_events(date);`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_plan_events_category ON plan_events(category);`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_plan_events_paired ON plan_events(paired_activity_id);`);
+      console.log('[Melange] v15: создана таблица plan_events');
     },
   },
 ];

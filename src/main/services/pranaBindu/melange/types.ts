@@ -98,3 +98,23 @@ export interface MetaRow {
 
 // (существующие: MovementsRow, ProgressionsRow, UserMovementStateRow,
 //  RecoveryLogsRow — оставить как есть)
+
+export interface PlanEventRow {
+  id: number;
+  external_id: string;
+  date: string;
+  start_time: string | null;
+  end_time: string | null;
+  category: string;
+  sport: string | null;
+  name: string;
+  description: string | null;
+  planned_load: number | null;
+  duration_sec: number | null;
+  distance_m: number | null;
+  icu_workout_json: string | null;
+  raw_json: string | null;
+  paired_activity_id: number | null;
+  created_at: string;
+  updated_at: string;
+}

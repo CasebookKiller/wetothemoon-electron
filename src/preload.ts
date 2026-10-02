@@ -823,6 +823,13 @@ try {
       syncZones: (providerName?: string) =>
         ipcRenderer.invoke('pb:sync-zones', providerName),
 
+      syncPlan: (from: string, to: string) =>
+        ipcRenderer.invoke('pb:sync-plan', from, to),
+      listPlanEvents: (from: string, to: string) =>
+        ipcRenderer.invoke('pb:list-plan-events', from, to),
+      clearPlan: (from: string, to: string) =>
+        ipcRenderer.invoke('pb:clear-plan', from, to),
+
     },
 
   });

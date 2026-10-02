@@ -46,6 +46,10 @@ import {
   getIntervalsAthleteId as getIntervalsAthleteIdFromDb,
   setZeppArchivePath,
   getZeppArchivePath,
+  upsertPlanEvent,
+  listPlanEvents,
+  deletePlanEventsRange,
+  linkPlanEventToActivity,
 } from '../services/pranaBindu/melange';
 
 import { DodofoProvider } from '../services/pranaBindu/spice/providers/dodofoProvider';
@@ -2494,6 +2498,133 @@ export function registerPranaBinduHandlers(): void {
           importedIds,
           errors: errors.slice(0, 20),
         };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+  // -------- Синхронизация плана из intervals.icu --------
+  ipcMain.handle(
+    'pb:sync-plan',
+    async (_event, from: string, to: string) => {
+      if (!from || !to) {
+        return { success: false, error: 'from и to обязательны' };
+      }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+        return { success: false, error: 'Формат даты: YYYY-MM-DD' };
+      }
+      if (from > to) {
+        return { success: false, error: 'from больше to' };
+      }
+
+      try {
+        const provider = getProvider('intervals-icu') as any;
+        if (!provider) {
+          return { success: false, error: 'Провайдер intervals-icu не зарегистрирован' };
+        }
+        if (typeof provider.fetchPlanEvents !== 'function') {
+          return { success: false, error: 'fetchPlanEvents не реализован' };
+        }
+
+        const db = getMelange();
+        const events = await provider.fetchPlanEvents(from, to);
+
+        let added = 0;
+        let updated = 0;
+        let failed = 0;
+        const errors: Array<{ externalId: string; error: string }> = [];
+
+        for (const ev of events) {
+          try {
+            const res = upsertPlanEvent(db, ev);
+            if (res.inserted) added++;
+            else updated++;
+          } catch (e) {
+            failed++;
+            errors.push({ externalId: ev.externalId, error: (e as Error).message });
+          }
+        }
+
+        // Связь план↔факт: для каждого события WORKOUT, если есть
+        // run_facts за ту же дату с совпадающим спортом (Run),
+        // линкуем на первый найденный. Ручной override — отдельно.
+        const runSport = (s?: string | null) =>
+          s && /run|бег/i.test(s) ? 'run' : null;
+
+        let linked = 0;
+        const linkedEvents = db
+          .prepare(
+            `SELECT id, date, sport FROM plan_events
+             WHERE date >= ? AND date <= ? AND category = 'WORKOUT'
+               AND paired_activity_id IS NULL`
+          )
+          .all(from, to) as unknown as Array<{
+            id: number; date: string; sport: string | null;
+          }>;
+
+        for (const pe of linkedEvents) {
+          if (!runSport(pe.sport)) continue;
+          const fact = db
+            .prepare(
+              `SELECT id FROM run_facts
+               WHERE date = ?
+               ORDER BY id ASC LIMIT 1`
+            )
+            .get(pe.date) as { id: number } | undefined;
+          if (fact) {
+            linkPlanEventToActivity(db, pe.id, fact.id);
+            linked++;
+          }
+        }
+
+        console.log(
+          `[Prana-Bindu] sync-plan (intervals-icu) ${from}..${to}: ` +
+          `+${added} ~${updated} linked=${linked} (всего ${events.length}, failed=${failed})`
+        );
+
+        return {
+          success: true,
+          provider: 'intervals-icu',
+          added,
+          updated,
+          failed,
+          linked,
+          total: events.length,
+          errors: errors.slice(0, 20),
+        };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+  // -------- Список событий плана за период --------
+  ipcMain.handle(
+    'pb:list-plan-events',
+    (_event, from: string, to: string) => {
+      try {
+        if (!from || !to) {
+          return { success: false, error: 'from и to обязательны' };
+        }
+        const rows = listPlanEvents(getMelange(), from, to);
+        return { success: true, items: rows, total: rows.length };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+  // -------- Удалить план за период --------
+  ipcMain.handle(
+    'pb:clear-plan',
+    (_event, from: string, to: string) => {
+      try {
+        if (!from || !to) {
+          return { success: false, error: 'from и to обязательны' };
+        }
+        const n = deletePlanEventsRange(getMelange(), from, to);
+        return { success: true, deleted: n };
       } catch (e) {
         return { success: false, error: (e as Error).message };
       }

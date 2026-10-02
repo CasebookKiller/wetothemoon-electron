@@ -16,6 +16,8 @@ import type {
 import { parseFit } from '../parsers/fitParser';
 import { parseTcx } from '../parsers/tcxParser';
 
+import type { PlanEvent, PlanCategory, WorkoutStep } from '../../core/types';
+
 const BASE = 'https://intervals.icu/api/v1';
 const TIMEOUT_MS = 20_000;
 
@@ -547,7 +549,87 @@ export class IntervalsIcuProvider implements ZeppDataProvider {
     });
   }
 
-    /**
+  /**
+   * План тренировок из календаря ICU.
+   * Маппинг ICU event → PlanEvent.
+   *
+   * Особенности формата:
+   *  - `id` числовой, используем как external_id.
+   *  - `start_date_local` без Z — это локальное время.
+   *    Храним как есть в `startTime` (с пометкой local:),
+   *    `date` = первые 10 символов.
+   *  - `workout_doc.steps` — массив шагов с hr/pace/power/distance/duration.
+   *  - `workout_doc.zoneTimes` — предсказание времени в зонах.
+   */
+  async fetchPlanEvents(from: string, to: string): Promise<PlanEvent[]> {
+    const athleteId = this.ctx.getAthleteId() ?? '0';
+    const items = await this.request<any[]>(
+      `/athlete/${athleteId}/events`,
+      { oldest: from, newest: to }
+    );
+
+    if (!Array.isArray(items)) return [];
+
+    return items.map((e): PlanEvent => {
+      const startLocal = typeof e?.start_date_local === 'string'
+        ? e.start_date_local
+        : null;
+      const endLocal = typeof e?.end_date_local === 'string'
+        ? e.end_date_local
+        : null;
+      const date = startLocal ? startLocal.slice(0, 10) : '';
+
+      const doc = e?.workout_doc ?? {};
+      const stepsRaw: any[] = Array.isArray(doc.steps) ? doc.steps : [];
+      const steps: WorkoutStep[] = stepsRaw.map((s) => ({
+        type: typeof s?.type === 'string' ? s.type : undefined,
+        duration: typeof s?.duration === 'number' ? s.duration : undefined,
+        distance: typeof s?.distance === 'number' ? s.distance : undefined,
+        hrZone: typeof s?.hr?.value === 'number' ? s.hr.value : undefined,
+        paceZone: typeof s?.pace?.value === 'number' ? s.pace.value : undefined,
+        powerZone: typeof s?.power?.value === 'number' ? s.power.value : undefined,
+        reps: typeof s?.reps === 'number' ? s.reps : undefined,
+        raw: s,
+      }));
+
+      const zoneTimes = Array.isArray(doc.zoneTimes)
+        ? doc.zoneTimes.map((z: any) => ({
+            zone: String(z?.id ?? ''),
+            secs: Number(z?.secs ?? 0),
+          }))
+        : undefined;
+
+      return {
+        externalId: `intervals-icu-event:${e.id}`,
+        date,
+        // Для плана startTime храним в ISO без сдвига (это local-время
+        // из календаря). UI будет показывать как есть.
+        startTime: startLocal ? `${startLocal}Z` : undefined,
+        endTime: endLocal ? `${endLocal}Z` : undefined,
+        category: (e?.category as PlanCategory) ?? 'WORKOUT',
+        sport: typeof e?.type === 'string' ? e.type : undefined,
+        name: typeof e?.name === 'string' ? e.name : '(без названия)',
+        description: typeof e?.description === 'string' ? e.description : undefined,
+        plannedLoad: typeof e?.icu_training_load === 'number'
+          ? e.icu_training_load
+          : undefined,
+        durationSec: typeof doc?.duration === 'number' && doc.duration > 0
+          ? doc.duration
+          : (typeof e?.moving_time === 'number' ? e.moving_time : undefined),
+        distanceM: typeof doc?.distance === 'number' && doc.distance > 0
+          ? doc.distance
+          : (typeof e?.distance === 'number' && e.distance > 0 ? e.distance : undefined),
+        steps,
+        zoneTimes,
+        pairedActivityId: typeof e?.paired_activity_id === 'number'
+          ? e.paired_activity_id
+          : undefined,
+        raw: e,
+      };
+    });
+  }
+
+  /**
    * Разведка: список активностей.
    * GET /api/v1/athlete/{id}/activities?oldest=&newest=
    */

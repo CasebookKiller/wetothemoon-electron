@@ -56,3 +56,43 @@ export interface TrainingBlock {
   targetZone?: HeartRateZone;
   notes?: string;
 }
+
+export type PlanCategory = 'WORKOUT' | 'PLAN' | 'TARGET' | 'NOTE' | 'RACE';
+
+export interface WorkoutStep {
+  /** 'Warmup' | 'Interval' | 'Cooldown' | 'Recovery' | ... */
+  type?: string;
+  /** Длительность в секундах. */
+  duration?: number;
+  /** Дистанция в метрах. */
+  distance?: number;
+  /** Целевая зона пульса (1-based). */
+  hrZone?: number;
+  /** Целевая зона темпа (1-based). */
+  paceZone?: number;
+  /** Целевая зона мощности (1-based). */
+  powerZone?: number;
+  /** Количество повторов. */
+  reps?: number;
+  /** Исходный шаг, как пришёл от ICU. */
+  raw: unknown;
+}
+
+export interface PlanEvent {
+  id?: number;
+  externalId: string;
+  date: string;               // YYYY-MM-DD
+  startTime?: string;         // ISO 8601 UTC, если задано
+  endTime?: string;
+  category: PlanCategory;
+  sport?: string;             // 'Run' | 'Workout' | ...
+  name: string;
+  description?: string;
+  plannedLoad?: number;
+  durationSec?: number;
+  distanceM?: number;
+  steps?: WorkoutStep[];
+  zoneTimes?: Array<{ zone: string; secs: number }>;
+  pairedActivityId?: number;
+  raw?: unknown;
+}

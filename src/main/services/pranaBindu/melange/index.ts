@@ -46,3 +46,12 @@ export {
   setZeppArchivePath,
   getZeppArchivePath,
 } from './repositories/syncRepo';
+
+export {
+  upsertPlanEvent,
+  listPlanEvents,
+  getPlanEventByExternalId,
+  linkPlanEventToActivity,
+  deletePlanEventsRange,
+} from './repositories/planEventsRepo';
+export type { UpsertPlanEventResult } from './repositories/planEventsRepo';
