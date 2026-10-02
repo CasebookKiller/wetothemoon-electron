@@ -258,6 +258,11 @@ export const RunStreamsChart: React.FC<Props> = ({
     // Окраска сегментов:
     //  - hr → по зонам пульса (цвет = зона)
     //  - остальные каналы → градиент синий→красный по min..max
+        const paceZones = Array.isArray(profile?.paceZonesKmh) ? profile.paceZonesKmh : null;
+    const isSpeedChart = yChannel === 'speedKmh';
+    const paceZoneColors =
+      paceZones && paceZones.length > 0 ? zonePalette(paceZones.length) : null;
+
     if (isHrChart && hrZones && zoneColors) {
       mainDataset.segment = {
         borderColor: (ctx: any) => {
@@ -269,9 +274,18 @@ export const RunStreamsChart: React.FC<Props> = ({
           return zoneColors[zi] ?? ACCENT;
         },
       };
+    } else if (isSpeedChart && paceZones && paceZoneColors) {
+      mainDataset.segment = {
+        borderColor: (ctx: any) => {
+          const y0 = ctx.p0?.parsed?.y;
+          const y1 = ctx.p1?.parsed?.y;
+          if (y0 == null || y1 == null) return ACCENT;
+          const avg = (y0 + y1) / 2;
+          const zi = zoneIndexFor(avg, paceZones);
+          return paceZoneColors[zi] ?? ACCENT;
+        },
+      };
     } else {
-      // Градиент от синего (min) к красному (max).
-      // Статистики min/max уже посчитаны выше в этом useMemo.
       mainDataset.segment = {
         borderColor: (ctx: any) => {
           const y0 = ctx.p0?.parsed?.y;
@@ -362,6 +376,14 @@ export const RunStreamsChart: React.FC<Props> = ({
                 profile.hrZones.length > 0
               ) {
                 const zi = zoneIndexFor(v, profile.hrZones);
+                return `${ctx.dataset.label}: ${fmtNum(v)} (Z${zi + 1})`;
+              }
+              if (
+                yChannel === 'speedKmh' &&
+                Array.isArray(profile?.paceZonesKmh) &&
+                profile.paceZonesKmh.length > 0
+              ) {
+                const zi = zoneIndexFor(v, profile.paceZonesKmh);
                 return `${ctx.dataset.label}: ${fmtNum(v)} (Z${zi + 1})`;
               }
               return `${ctx.dataset.label}: ${fmtNum(v)}`;

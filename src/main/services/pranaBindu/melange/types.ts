@@ -58,6 +58,10 @@ export interface ProfileRow {
   resting_hr_source: string | null;
   hr_zones_json: string | null;
   hr_zones_source: string | null;
+  // v14
+  pace_zones_json: string | null;
+  threshold_pace_ms: number | null;
+  pace_zones_source: string | null;
 }
 
 export interface SyncSettingsRow {

@@ -34,6 +34,11 @@ export interface Profile {
   /** Границы HR-зон (последняя — верхняя). Из ICU: 7 значений. */
   hrZones?: number[];
   hrZonesSource?: string;
+    /** Границы pace-зон в км/ч (верхние). Из ICU: 7 значений. */
+  paceZonesKmh?: number[];
+  /** Пороговая скорость, м/с (как в ICU). */
+  thresholdPaceMs?: number;
+  paceZonesSource?: string;
 }
 
 export type TrainingBlockType =

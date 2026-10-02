@@ -14,7 +14,7 @@ import {
   MIGRATION_V9_INTERVALS_ICU,
 } from './schema';
 
-export const SCHEMA_VERSION = 13;
+export const SCHEMA_VERSION = 14;
 
 interface Migration {
   version: number;
@@ -274,6 +274,28 @@ const migrations: readonly Migration[] = [
       if (!has('hr_zones_source')) {
         db.exec(`ALTER TABLE profile ADD COLUMN hr_zones_source TEXT;`);
         console.log('[Melange] v13: добавлена profile.hr_zones_source');
+      }
+    },
+  },
+  {
+    version: 14,
+    apply: (db) => {
+      const cols = db
+        .prepare(`PRAGMA table_info(profile)`)
+        .all() as { name: string }[];
+      const has = (n: string) => cols.some((c) => c.name === n);
+
+      if (!has('pace_zones_json')) {
+        db.exec(`ALTER TABLE profile ADD COLUMN pace_zones_json TEXT;`);
+        console.log('[Melange] v14: добавлена profile.pace_zones_json');
+      }
+      if (!has('threshold_pace_ms')) {
+        db.exec(`ALTER TABLE profile ADD COLUMN threshold_pace_ms REAL;`);
+        console.log('[Melange] v14: добавлена profile.threshold_pace_ms');
+      }
+      if (!has('pace_zones_source')) {
+        db.exec(`ALTER TABLE profile ADD COLUMN pace_zones_source TEXT;`);
+        console.log('[Melange] v14: добавлена profile.pace_zones_source');
       }
     },
   },

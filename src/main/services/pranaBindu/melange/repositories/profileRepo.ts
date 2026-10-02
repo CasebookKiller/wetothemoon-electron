@@ -26,6 +26,18 @@ function rowToDomain(row: ProfileRow): Profile {
         })()
       : undefined,
     hrZonesSource: row.hr_zones_source ?? undefined,
+        paceZonesKmh: row.pace_zones_json
+      ? (() => {
+          try {
+            const parsed = JSON.parse(row.pace_zones_json);
+            return Array.isArray(parsed) ? parsed : undefined;
+          } catch {
+            return undefined;
+          }
+        })()
+      : undefined,
+    thresholdPaceMs: row.threshold_pace_ms ?? undefined,
+    paceZonesSource: row.pace_zones_source ?? undefined,
   };
 }
 
@@ -86,6 +98,21 @@ export function updateProfile(db: DatabaseSync, patch: Partial<Profile>): Profil
     }
   }
 
+  let paceZonesJson = current?.pace_zones_json ?? null;
+  let paceZonesSource = current?.pace_zones_source ?? null;
+  let thresholdPaceMs = current?.threshold_pace_ms ?? null;
+  if (patch.paceZonesKmh !== undefined) {
+    if (!patch.paceZonesKmh || patch.paceZonesKmh.length === 0) {
+      paceZonesJson = null;
+      paceZonesSource = null;
+      thresholdPaceMs = null;
+    } else {
+      paceZonesJson = JSON.stringify(patch.paceZonesKmh);
+      paceZonesSource = patch.paceZonesSource ?? 'manual';
+      thresholdPaceMs = patch.thresholdPaceMs ?? current?.threshold_pace_ms ?? null;
+    }
+  }
+
   const merged = {
     age: patch.age ?? current?.age ?? null,
     max_hr: maxHr.value,
@@ -99,6 +126,9 @@ export function updateProfile(db: DatabaseSync, patch: Partial<Profile>): Profil
     updated_at: now,
     hr_zones_json: zonesJson,
     hr_zones_source: zonesSource,
+    pace_zones_json: paceZonesJson,
+    pace_zones_source: paceZonesSource,
+    threshold_pace_ms: thresholdPaceMs,
   };
 
   if (!current) {
@@ -106,13 +136,15 @@ export function updateProfile(db: DatabaseSync, patch: Partial<Profile>): Profil
       `INSERT INTO profile (id, age, max_hr, lthr, resting_hr, weight_kg,
         goal_marathon_date, lthr_source, max_hr_source, resting_hr_source,
         hr_zones_json, hr_zones_source,
+        pace_zones_json, pace_zones_source, threshold_pace_ms,
         created_at, updated_at)
-       VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       merged.age, merged.max_hr, merged.lthr, merged.resting_hr,
       merged.weight_kg, merged.goal_marathon_date,
       merged.lthr_source, merged.max_hr_source, merged.resting_hr_source,
       merged.hr_zones_json, merged.hr_zones_source,
+      merged.pace_zones_json, merged.pace_zones_source, merged.threshold_pace_ms,
       now, now
     );
   } else {
@@ -122,6 +154,7 @@ export function updateProfile(db: DatabaseSync, patch: Partial<Profile>): Profil
         goal_marathon_date = ?,
         lthr_source = ?, max_hr_source = ?, resting_hr_source = ?,
         hr_zones_json = ?, hr_zones_source = ?,
+        pace_zones_json = ?, pace_zones_source = ?, threshold_pace_ms = ?,
         updated_at = ?
        WHERE id = 1`
     ).run(
@@ -129,6 +162,7 @@ export function updateProfile(db: DatabaseSync, patch: Partial<Profile>): Profil
       merged.weight_kg, merged.goal_marathon_date,
       merged.lthr_source, merged.max_hr_source, merged.resting_hr_source,
       merged.hr_zones_json, merged.hr_zones_source,
+      merged.pace_zones_json, merged.pace_zones_source, merged.threshold_pace_ms,
       now
     );
   }

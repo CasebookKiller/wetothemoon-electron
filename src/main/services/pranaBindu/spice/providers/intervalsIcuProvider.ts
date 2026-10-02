@@ -372,9 +372,12 @@ export class IntervalsIcuProvider implements ZeppDataProvider {
    * В ICU активность содержит `icu_hr_zones` — массив верхних
    * границ зон Z1..Z7.
    */
-  async fetchZones(): Promise<{ hr_zones: number[] }> {
+  async fetchZones(): Promise<{
+    hr_zones: number[] | null;
+    pace_zones_kmh: number[] | null;
+    threshold_pace_ms: number | null;
+  }> {
     const athleteId = this.ctx.getAthleteId() ?? '0';
-
     const today = new Date();
     const from = new Date();
     from.setMonth(from.getMonth() - 3);
@@ -391,14 +394,41 @@ export class IntervalsIcuProvider implements ZeppDataProvider {
       throw new Error('Нет активностей ICU за последние 3 месяца');
     }
 
-    const withZones = items.find(
+    // HR-зоны: последняя активность с непустым icu_hr_zones.
+    const hrSource = items.find(
       (a) => Array.isArray(a?.icu_hr_zones) && a.icu_hr_zones.length > 0
     );
-    if (!withZones) {
-      throw new Error('В активностях ICU нет данных о HR-зонах');
+    const hr_zones = hrSource ? (hrSource.icu_hr_zones as number[]) : null;
+
+    // Pace-зоны: последняя активность с заполненными threshold_pace
+    // и pace_zones.
+    const paceSource = items.find(
+      (a) =>
+        typeof a?.threshold_pace === 'number' &&
+        a.threshold_pace > 0 &&
+        Array.isArray(a?.pace_zones) &&
+        a.pace_zones.length > 0
+    );
+
+    let pace_zones_kmh: number[] | null = null;
+    let threshold_pace_ms: number | null = null;
+    if (paceSource) {
+      threshold_pace_ms = paceSource.threshold_pace as number;
+      // pace_zones — проценты от threshold_pace (в скорости).
+      // Переводим в км/ч: threshold_pace_ms × pct/100 × 3.6
+      pace_zones_kmh = (paceSource.pace_zones as number[]).map((pct) => {
+        const v = threshold_pace_ms! * (pct / 100) * 3.6;
+        // 999% и выше — оставляем как большую верхнюю границу,
+        // но не бесконечность, чтобы сериализация JSON не рвала.
+        return Math.round(v * 100) / 100;
+      });
     }
 
-    return { hr_zones: withZones.icu_hr_zones as number[] };
+    if (!hr_zones && !pace_zones_kmh) {
+      throw new Error('В активностях ICU нет данных о зонах');
+    }
+
+    return { hr_zones, pace_zones_kmh, threshold_pace_ms };
   }
 
   /**

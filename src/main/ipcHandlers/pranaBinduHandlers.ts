@@ -1032,22 +1032,45 @@ export function registerPranaBinduHandlers(): void {
       }
 
       const raw = await provider.fetchZones();
-      const zones = Array.isArray(raw?.hr_zones) ? raw.hr_zones : null;
-      if (!zones || zones.length === 0) {
+      const hrZones = Array.isArray(raw?.hr_zones) ? raw.hr_zones : null;
+      const paceZonesKmh = Array.isArray(raw?.pace_zones_kmh)
+        ? raw.pace_zones_kmh
+        : null;
+      const thresholdPaceMs =
+        typeof raw?.threshold_pace_ms === 'number'
+          ? raw.threshold_pace_ms
+          : undefined;
+
+      if (!hrZones && !paceZonesKmh) {
         return { success: false, error: `Провайдер «${name}» не отдал зоны` };
       }
 
       const db = getMelange();
-      const updated = updateProfile(db, {
-        hrZones: zones,
-        hrZonesSource: name,
-      });
+      const patch: Record<string, unknown> = {};
+      if (hrZones) {
+        patch.hrZones = hrZones;
+        patch.hrZonesSource = name;
+      }
+      if (paceZonesKmh) {
+        patch.paceZonesKmh = paceZonesKmh;
+        patch.paceZonesSource = name;
+        patch.thresholdPaceMs = thresholdPaceMs;
+      }
+
+      const updated = updateProfile(db, patch as any);
 
       console.log(
-        `[Prana-Bindu] sync-zones (${name}): [${zones.join(', ')}]`
+        `[Prana-Bindu] sync-zones (${name}): hr=[${hrZones?.join(', ') ?? '—'}], ` +
+        `pace=[${paceZonesKmh?.join(', ') ?? '—'}] км/ч`
       );
 
-      return { success: true, provider: name, zones, data: updated };
+      return {
+        success: true,
+        provider: name,
+        hr_zones: hrZones,
+        pace_zones_kmh: paceZonesKmh,
+        data: updated,
+      };
     } catch (e) {
       return { success: false, error: (e as Error).message };
     }
