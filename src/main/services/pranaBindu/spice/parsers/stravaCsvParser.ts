@@ -33,8 +33,6 @@ const MONTHS_RU: Record<string, number> = {
   дек: 12,
 };
 
-const MOSCOW_OFFSET_HOURS = 3;
-
 export interface ParseStravaCsvOptions {
   /** Тип активности для фильтра. По умолчанию — «Бег». */
   sportFilter?: string;
@@ -64,9 +62,8 @@ function parseStravaDate(s: string | undefined): string | null {
   const min = Number(m[5]);
   const sec = Number(m[6]);
 
-  // CSV хранит локальное московское время. Переводим в UTC:
-  // вычитаем 3 часа из часовой компоненты.
-  const utcMs = Date.UTC(year, month - 1, day, hour - MOSCOW_OFFSET_HOURS, min, sec);
+  // CSV Strava хранит UTC (совпадает с time у ICU и FIT).
+  const utcMs = Date.UTC(year, month - 1, day, hour, min, sec);
   return new Date(utcMs).toISOString();
 }
 
