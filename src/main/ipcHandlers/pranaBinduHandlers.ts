@@ -1880,7 +1880,11 @@ export function registerPranaBinduHandlers(): void {
     }
   );
 
-  // -------- Подтянуть wellness из dodofo --------
+  // -------- Подтянуть wellness (мульти-провайдер) --------
+  // Если providerName передан — синкает только его.
+  // Если undefined — синкает ВСЕХ провайдеров с capabilities.wellness.
+  // upsertRecoveryLog мержит поля по date — data из ICU и dodofo
+  // дополняют друг друга (ICU: ctl/atl/ramp, dodofo: сон/шаги/фазы).
   ipcMain.handle(
     'pb:sync-wellness',
     async (_event, providerName: string | undefined, from: string, to: string) => {
@@ -1889,70 +1893,125 @@ export function registerPranaBinduHandlers(): void {
         return { success: false, error: 'Формат даты: YYYY-MM-DD' };
       }
 
-      const name = providerName ?? 'intervals-icu';
-      try {
-        const provider = getProvider(name) as any;
-        if (!provider) return { success: false, error: `Провайдер «${name}» не зарегистрирован` };
-        if (!provider.capabilities?.wellness) {
-          return { success: false, error: `Провайдер «${name}» не поддерживает wellness` };
-        }
-        if (typeof provider.fetchWellness !== 'function') {
-          return { success: false, error: `Провайдер «${name}» не реализует fetchWellness` };
-        }
-
-        const raw = await provider.fetchWellness(from, to);
-        const days: any[] = Array.isArray(raw) ? raw : (raw?.days ?? []);
-
-        const db = getMelange();
-        let added = 0;
-        let updated = 0;
-
-        for (const day of days) {
-          if (!day?.id && !day?.date) continue;
-          const date = day.id ?? day.date;
-
-          const res = upsertRecoveryLog(db, {
-            date,
-            resting_hr: day.restingHR ?? day.resting_hr,
-            hrv: day.hrv ?? day.hrv_ms,
-            hrv_sdnn: day.hrvSDNN,
-            sleep_hours: day.sleepSecs != null
-              ? Math.round((day.sleepSecs / 3600) * 100) / 100
-              : day.sleep_hours,
-            sleep_score: day.sleepScore,
-            sleep_quality: day.sleepQuality,
-            steps: day.steps,
-            weight_kg: day.weight,
-            ctl: day.ctl,
-            atl: day.atl,
-            ramp_rate: day.rampRate,
-            readiness: day.readiness,
-            soreness: day.soreness,
-            fatigue: day.fatigue,
-            stress: day.stress,
-            mood: day.mood,
-            motivation: day.motivation,
-            injury: day.injury,
-            avg_sleeping_hr: day.avgSleepingHR,
-            baevsky_si: day.baevskySI,
-            sp_o2: day.spO2,
-            systolic: day.systolic,
-            diastolic: day.diastolic,
-            raw_json: JSON.stringify(day),
-          });
-
-          if (res.inserted) added++;
-          else updated++;
-        }
-
-        console.log(
-          `[Prana-Bindu] sync-wellness (${name}) ${from}..${to}: +${added} ~${updated} (всего ${days.length})`
-        );
-
-        return { success: true, provider: name, added, updated, total: days.length };
-      } catch (e) {
-        return { success: false, error: (e as Error).message };
+      // Собираем список провайдеров
+      let providerNames: string[];
+      if (providerName) {
+        providerNames = [providerName];
+      } else {
+        providerNames = listProviders()
+          .filter((p) => (p.capabilities as any)?.wellness)
+          .map((p) => p.name);
+        // Приоритет: сначала ICU (ctl/atl), потом dodofo (сон/шаги)
+        providerNames.sort((a, b) => {
+          if (a === 'intervals-icu') return -1;
+          if (b === 'intervals-icu') return 1;
+          if (a === 'dodofo') return -1;
+          if (b === 'dodofo') return 1;
+          return 0;
+        });
       }
+
+      const db = getMelange();
+      let totalAdded = 0;
+      let totalUpdated = 0;
+      let totalDays = 0;
+      const perProvider: Array<{ provider: string; added: number; updated: number; total: number; error?: string }> = [];
+
+      for (const name of providerNames) {
+        try {
+          const provider = getProvider(name) as any;
+          if (!provider) {
+            perProvider.push({ provider: name, added: 0, updated: 0, total: 0, error: 'не зарегистрирован' });
+            continue;
+          }
+          if (!provider.capabilities?.wellness) {
+            perProvider.push({ provider: name, added: 0, updated: 0, total: 0, error: 'не поддерживает wellness' });
+            continue;
+          }
+          if (typeof provider.fetchWellness !== 'function') {
+            perProvider.push({ provider: name, added: 0, updated: 0, total: 0, error: 'fetchWellness не реализован' });
+            continue;
+          }
+
+          const raw = await provider.fetchWellness(from, to);
+          const days: any[] = Array.isArray(raw) ? raw : (raw?.days ?? []);
+
+          let added = 0;
+          let updated = 0;
+
+          for (const day of days) {
+            if (!day?.id && !day?.date) continue;
+            const date = day.id ?? day.date;
+
+            // Универсальный маппинг: camelCase (ICU) ?? snake_case (dodofo)
+            const res = upsertRecoveryLog(db, {
+              date,
+              resting_hr: day.restingHR ?? day.resting_hr,
+              hrv: day.hrv ?? day.hrv_ms,
+              hrv_sdnn: day.hrvSDNN ?? day.hrv_sdnn,
+              sleep_hours: day.sleepSecs != null
+                ? Math.round((day.sleepSecs / 3600) * 100) / 100
+                : (day.sleep_hours ?? day.sleepHours),
+              sleep_score: day.sleepScore ?? day.sleep_score,
+              sleep_quality: day.sleepQuality ?? day.sleep_quality,
+              sleep_total_min: day.sleep_total_min ?? day.sleepTotalMin,
+              deep_min: day.deep_min ?? day.deepMin,
+              rem_min: day.rem_min ?? day.remMin,
+              light_min: day.light_min ?? day.lightMin,
+              awake_min: day.awake_min ?? day.awakeMin,
+              steps: day.steps,
+              weight_kg: day.weight ?? day.weight_kg,
+              vo2max: day.vo2max,
+              body_battery_charged: day.body_battery_charged ?? day.bodyBatteryCharged,
+              body_battery_drained: day.body_battery_drained ?? day.bodyBatteryDrained,
+              stress_avg: day.stress_avg ?? day.stressAvg,
+              sp_o2: day.spo2_avg_pct ?? day.spO2,
+              ctl: day.ctl,
+              atl: day.atl,
+              ramp_rate: day.rampRate ?? day.ramp_rate,
+              readiness: day.readiness,
+              soreness: day.soreness,
+              fatigue: day.fatigue,
+              stress: day.stress,
+              mood: day.mood,
+              motivation: day.motivation,
+              injury: day.injury,
+              avg_sleeping_hr: day.avgSleepingHR ?? day.avg_sleeping_hr,
+              baevsky_si: day.baevskySI ?? day.baevsky_si,
+              systolic: day.systolic,
+              diastolic: day.diastolic,
+              auto_source: day.auto_source ?? day.autoSource ?? name,
+              raw_json: JSON.stringify(day),
+            });
+
+            if (res.inserted) added++;
+            else updated++;
+          }
+
+          totalAdded += added;
+          totalUpdated += updated;
+          totalDays += days.length;
+
+          console.log(
+            `[Prana-Bindu] sync-wellness (${name}) ${from}..${to}: +${added} ~${updated} (всего ${days.length})`
+          );
+
+          perProvider.push({ provider: name, added, updated, total: days.length });
+        } catch (e) {
+          const msg = (e as Error).message;
+          console.error(`[Prana-Bindu] sync-wellness (${name}) error:`, msg);
+          perProvider.push({ provider: name, added: 0, updated: 0, total: 0, error: msg });
+        }
+      }
+
+      return {
+        success: true,
+        provider: providerName ?? 'all',
+        added: totalAdded,
+        updated: totalUpdated,
+        total: totalDays,
+        perProvider,
+      };
     }
   );
 

@@ -32,6 +32,8 @@ import {
 } from '@/components/PRANA_BINDU/PlanEventsPanel';
 import { PlanEventDrawer } from '@/components/PRANA_BINDU/PlanEventDrawer';
 
+import { WorkoutTemplatesDialog } from '@/components/PRANA_BINDU/WorkoutTemplatesDialog';
+
 interface ProviderOption {
   label: string;
   value: string;
@@ -518,6 +520,7 @@ export const PranaBinduPage: React.FC = () => {
   const [recoveryLogs, setRecoveryLogs] = useState<any[]>([]);
 
   const [planEvents, setPlanEvents] = useState<PlanEventLite[]>([]);
+  const [templatesVisible, setTemplatesVisible] = useState(false);
   const [planLoading, setPlanLoading] = useState(false);
   const [planSyncing, setPlanSyncing] = useState(false);
   const [planClearing, setPlanClearing] = useState(false);
@@ -1136,6 +1139,7 @@ export const PranaBinduPage: React.FC = () => {
     setWellnessResult('');
     try {
       const res = await api.pb.syncWellness(
+        undefined,
         toIsoDate(syncFrom),
         toIsoDate(syncTo)
       );
@@ -1143,6 +1147,7 @@ export const PranaBinduPage: React.FC = () => {
         setWellnessResult(
           `Добавлено ${res.added} · обновлено ${res.updated} · всего ${res.total}`
         );
+        await loadRecoveryLogs();
       } else {
         setWellnessError(res.error ?? 'Ошибка');
       }
@@ -1189,7 +1194,7 @@ export const PranaBinduPage: React.FC = () => {
     setWellnessResult('');
     try {
       const res = await api.pb.syncWellness(
-        'intervals-icu',
+        undefined,                    // ← мультирежим: все провайдеры с wellness
         toIsoDate(syncFrom),
         toIsoDate(syncTo)
       );
@@ -1827,11 +1832,9 @@ export const PranaBinduPage: React.FC = () => {
                 icon={syncingWellness ? 'pi pi-spin pi-spinner' : 'pi pi-heart'}
                 className="pb-soft p-button-sm"
                 onClick={handleSyncWellnessNew}
-                disabled={syncingWellness || !providerCaps?.wellness || !syncFrom || !syncTo}
+                disabled={syncingWellness || !syncFrom || !syncTo}
                 tooltip={
-                  !providerCaps?.wellness
-                    ? `Провайдер «${provider}» не поддерживает wellness`
-                    : 'Сон, HRV, пульс покоя'
+                  'Сон, HRV, пульс покоя (из intervals.icu и dodofo)'
                 }
               />
               <Button
@@ -2272,6 +2275,7 @@ export const PranaBinduPage: React.FC = () => {
         onSync={handleSyncPlan}
         onClear={handleClearPlan}
         onOpenEvent={handleOpenPlanEvent}
+        onOpenTemplates={() => setTemplatesVisible(true)}
       />
 
       <Panel
@@ -2428,6 +2432,11 @@ export const PranaBinduPage: React.FC = () => {
         visible={planDrawerVisible}
         event={selectedPlanEvent}
         onHide={() => setPlanDrawerVisible(false)}
+      />
+
+      <WorkoutTemplatesDialog
+        visible={templatesVisible}
+        onHide={() => setTemplatesVisible(false)}
       />
     </div>
   );

@@ -53,7 +53,7 @@ export class DodofoProvider implements ZeppDataProvider {
     workouts: true,
     streams: true,
     thresholds: true,   // только resthr, но метод реализован
-    zones: true,        // метод реализован, но ответ пустой (не ошибка)
+    zones: false,        // метод реализован, но ответ пустой (не ошибка)
     wellness: true    // TODO: реализуем в блоке wellness
   };
 
