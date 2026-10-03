@@ -2262,3 +2262,461 @@ body[data-module='prana-bindu'] .p-tooltip.p-tooltip-bottom .p-tooltip-arrow {
   color: var(--pb-accent);
   margin-right: 0.25rem;
 }
+
+/* ============================================================
+   Библиотека шаблонов: диалог в стиле Prana-Bindu
+   ============================================================ */
+
+.pb-templates-dialog .p-dialog-header {
+  background: var(--tg-theme-section-bg-color, #1e2a38);
+  color: var(--pb-accent);
+  border: none !important;
+  border-bottom: 1px solid var(--surface-border, rgba(255, 255, 255, 0.08)) !important;
+  padding: 0.75rem 1rem;
+}
+
+.pb-templates-dialog .p-dialog-header .p-dialog-title {
+  color: var(--pb-accent) !important;
+  font-weight: 600;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* Иконки в шапке — видимы всегда, accent-цвет */
+.pb-templates-dialog .p-dialog-header .p-dialog-header-icons {
+  display: flex !important;
+  gap: 0.25rem;
+  opacity: 1 !important;
+}
+
+/* ============================================================
+   Иконки в шапке диалога — жёстко перебиваем PrimeReact
+   ============================================================ */
+
+/* Кнопка */
+.pb-templates-dialog .p-dialog-header .p-dialog-header-icons button.p-dialog-header-icon,
+.pb-templates-dialog .p-dialog-header .p-dialog-header-icons button.p-dialog-header-maximize,
+.pb-templates-dialog .p-dialog-header .p-dialog-header-icons button.p-dialog-header-close,
+.pb-templates-dialog .p-dialog-header button.p-link {
+  color: var(--pb-accent) !important;
+  background: transparent !important;
+  border: none !important;
+  width: 2rem !important;
+  height: 2rem !important;
+  min-width: 2rem !important;
+  padding: 0 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 6px !important;
+  transition: background-color 0.15s ease;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.pb-templates-dialog .p-dialog-header .p-dialog-header-icons button:hover {
+  background: color-mix(in srgb, var(--pb-accent) 16%, transparent) !important;
+  color: var(--pb-accent) !important;
+}
+
+/* Иконка (svg) внутри кнопки */
+.pb-templates-dialog .p-dialog-header .p-dialog-header-icons button svg,
+.pb-templates-dialog .p-dialog-header .p-dialog-header-icons button svg.p-icon,
+.pb-templates-dialog .p-dialog-header .p-dialog-header-icons button .p-dialog-header-maximize-icon,
+.pb-templates-dialog .p-dialog-header .p-dialog-header-icons button .p-dialog-header-close-icon {
+  width: 14px !important;
+  height: 14px !important;
+  display: block !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  color: var(--pb-accent) !important;
+  fill: var(--pb-accent) !important;
+}
+
+/* Path внутри svg */
+.pb-templates-dialog .p-dialog-header .p-dialog-header-icons button svg path {
+  fill: var(--pb-accent) !important;
+  color: var(--pb-accent) !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.pb-templates-dialog .p-dialog-content {
+  padding: 0.75rem 1rem 1rem 1rem !important;
+  background: var(--tg-theme-bg-color, #17212b);
+  color: var(--tg-theme-text-color, #f5f5f5);
+}
+
+/* Диалог: ограничение по высоте + flex-раскладка внутри */
+.pb-templates-dialog.p-dialog {
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+}
+
+.pb-templates-dialog.p-dialog-maximized {
+  max-height: 100vh;
+  height: 100vh;
+}
+
+.pb-templates-dialog .p-dialog-content {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0.75rem 1rem 0.75rem 1rem !important;
+  background: var(--tg-theme-bg-color, #17212b);
+  color: var(--tg-theme-text-color, #f5f5f5);
+}
+
+/* Тело: скроллится ТОЛЬКО список. Превью — фиксированная высота,
+   внутренний <pre> без прокрутки, растягивается по доступному месту. */
+.pb-templates__body {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 0.75rem;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+}
+
+.pb-templates__list {
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+  border: 1px solid var(--surface-border, rgba(255, 255, 255, 0.08));
+  border-radius: 6px;
+  padding: 0.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--pb-accent) transparent;
+}
+
+.pb-templates__list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.pb-templates__list::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--pb-accent) 50%, transparent);
+  border-radius: 4px;
+}
+
+.pb-templates__list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.pb-templates__preview {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+  min-height: 0;   /* важно: позволяет дочерним элементам сжиматься */
+}
+
+.pb-templates__preview-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex: 0 0 auto;
+}
+
+.pb-templates__preview-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--tg-theme-text-color, #f5f5f5);
+}
+
+.pb-templates__preview-desc {
+  font-size: 0.8rem;
+  color: var(--tg-theme-hint-color, #708499);
+  margin-top: 0.15rem;
+}
+
+/* <pre> растягивается на всё свободное место, но НЕ прокручивается
+   (у нас короткие тексты, должны помещаться). */
+.pb-templates__code {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--surface-border, rgba(255, 255, 255, 0.08));
+  border-radius: 6px;
+  padding: 0.75rem;
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--tg-theme-text-color, #f5f5f5);
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+}
+
+.pb-templates__empty {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--tg-theme-hint-color, #708499);
+  font-size: 0.85rem;
+}
+
+/* Зазор у Message внизу */
+.pb-templates__preview > .p-inline-message {
+  flex: 0 0 auto;
+  margin-bottom: 0.25rem;
+}
+
+/* --- Список шаблонов: элементы --- */
+
+.pb-templates__item,
+.pb-templates-dialog .pb-templates__item {
+  text-align: left;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  border-radius: 4px !important;
+  padding: 0.55rem 0.7rem !important;
+  cursor: pointer;
+  color: var(--tg-theme-text-color, #f5f5f5) !important;
+  transition: background 0.15s, border-color 0.15s;
+  font: inherit;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.pb-templates__item:hover {
+  background: rgba(255, 255, 255, 0.03) !important;
+}
+
+.pb-templates__item.is-active {
+  background: color-mix(in srgb, var(--pb-accent) 10%, transparent) !important;
+  border-color: color-mix(in srgb, var(--pb-accent) 35%, transparent) !important;
+}
+
+.pb-templates__item.is-active .pb-templates__item-name {
+  color: var(--pb-accent) !important;
+}
+
+/* --- Поиск: иконка лупы + accent-граница --- */
+
+/* --- Поиск: иконка + accent-граница --- */
+
+.pb-templates__search-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 2.5rem;
+  flex: 1 1 240px;
+  max-width: 360px;
+}
+
+/* Иконка внутри p-input-icon-left (PrimeReact-обёртка) */
+.pb-templates__search-wrap .pi-search,
+.pb-templates__search-wrap.p-input-icon-left > .pi-search {
+  position: absolute !important;
+  left: 0.75rem !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  color: var(--tg-theme-hint-color, #708499) !important;
+  pointer-events: none;
+  z-index: 2;
+  font-size: 0.9rem;
+  line-height: 1;
+  margin-top: 0 !important;
+}
+
+.pb-templates__search.p-inputtext {
+  width: 100% !important;
+  height: 2.5rem !important;
+  padding: 0 0.75rem 0 2.2rem !important;
+  font-size: 0.85rem !important;
+  box-sizing: border-box;
+  border-radius: 6px !important;
+  background: var(--tg-theme-bg-color, #17212b) !important;
+  border: 1px solid var(--surface-border, rgba(255, 255, 255, 0.15)) !important;
+  color: var(--tg-theme-text-color, #f5f5f5) !important;
+}
+
+.pb-templates__search.p-inputtext:enabled:hover {
+  border-color: var(--pb-accent) !important;
+}
+
+.pb-templates__search.p-inputtext:enabled:focus {
+  border-color: var(--pb-accent) !important;
+  box-shadow: 0 0 0 1px var(--pb-accent) !important;
+  outline: none !important;
+}
+
+.pb-templates__search.p-inputtext {
+  width: 100% !important;
+  height: 2.5rem !important;
+  padding: 0 0.75rem 0 2.2rem !important;
+  font-size: 0.85rem !important;
+  box-sizing: border-box;
+  border-radius: 6px !important;
+  background: var(--tg-theme-bg-color, #17212b) !important;
+  border: 1px solid var(--surface-border, rgba(255, 255, 255, 0.15)) !important;
+  color: var(--tg-theme-text-color, #f5f5f5) !important;
+}
+
+.pb-templates__search.p-inputtext:enabled:hover {
+  border-color: var(--pb-accent) !important;
+}
+
+.pb-templates__search.p-inputtext:enabled:focus {
+  border-color: var(--pb-accent) !important;
+  box-shadow: 0 0 0 1px var(--pb-accent) !important;
+  outline: none !important;
+}
+
+/* Убираем большой отступ снизу */
+.pb-templates-dialog .p-dialog-content {
+  padding: 0.75rem 1rem 0.5rem 1rem !important;
+  background: var(--tg-theme-bg-color, #17212b);
+  color: var(--tg-theme-text-color, #f5f5f5);
+}
+
+/* Message внизу — минимальный отступ */
+.pb-templates__preview > .p-inline-message {
+  margin: 0 !important;
+  flex: 0 0 auto;
+}
+
+.pb-templates__toolbar {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+/* Дропдаун категории — высота и стиль как у поиска */
+.pb-templates__cat.p-dropdown,
+.pb-templates__cat.p-inputwrapper {
+  width: 240px !important;
+  height: 2.5rem !important;
+  min-height: 2.5rem !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  border-radius: 6px !important;
+  border: 1px solid var(--surface-border, rgba(255, 255, 255, 0.15)) !important;
+  background: var(--tg-theme-bg-color, #17212b) !important;
+  box-sizing: border-box;
+}
+
+.pb-templates__cat.p-dropdown:not(.p-disabled):hover {
+  border-color: var(--pb-accent) !important;
+}
+
+.pb-templates__cat.p-dropdown:not(.p-disabled).p-focus {
+  border-color: var(--pb-accent) !important;
+  box-shadow: 0 0 0 1px var(--pb-accent) !important;
+}
+
+.pb-templates__cat.p-dropdown .p-dropdown-label,
+.pb-templates__cat.p-dropdown .p-inputtext.p-dropdown-label {
+  height: 2.5rem !important;
+  padding: 0 0.75rem !important;
+  display: flex !important;
+  align-items: center !important;
+  font-size: 0.85rem !important;
+  background: transparent !important;
+  border: none !important;
+  color: var(--tg-theme-text-color, #f5f5f5) !important;
+  line-height: 1 !important;
+}
+
+.pb-templates__cat.p-dropdown .p-dropdown-trigger {
+  width: 2.5rem !important;
+  height: 2.5rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: var(--pb-accent) !important;
+  background: transparent !important;
+}
+
+.pb-templates__cat.p-dropdown .p-dropdown-trigger svg,
+.pb-templates__cat.p-dropdown .p-dropdown-trigger svg path {
+  fill: var(--pb-accent) !important;
+  color: var(--pb-accent) !important;
+}
+
+/* Заголовок превью с бейджем «проверено» */
+.pb-templates__preview-title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.pb-templates__verified {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-weight: 600;
+  color: #6fbf73;
+  background: rgba(111, 191, 115, 0.12);
+  border-radius: 3px;
+  vertical-align: middle;
+}
+
+/* Блок «Как использовать» */
+.pb-templates__usage {
+  flex: 0 0 auto;
+  padding: 0.6rem 0.75rem;
+  border-left: 2px solid var(--pb-accent);
+  background: color-mix(in srgb, var(--pb-accent) 5%, transparent);
+  border-radius: 0 4px 4px 0;
+}
+
+.pb-templates__usage-title {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--pb-accent);
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.pb-templates__usage-title .pi {
+  font-size: 0.75rem;
+}
+
+.pb-templates__usage-text {
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--tg-theme-text-color, #f5f5f5);
+}
+
+.pb-templates__usage-text > div {
+  margin-bottom: 0.25rem;
+}
+
+.pb-templates__usage-text > div:last-child {
+  margin-bottom: 0;
+}
+
+/* Отступ между блоком шаблона и «Как использовать» */
+.pb-templates__preview > .pb-templates__code {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.pb-templates-dialog.p-dialog-maximized .p-dialog-content {
+  width: 100%;
+}

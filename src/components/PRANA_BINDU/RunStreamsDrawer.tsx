@@ -18,7 +18,7 @@ import { InputText } from 'primereact/inputtext';
  * из разных источников (не утро+вечер).
  * Синхронизировано с PranaBinduPage.tsx.
  */
-const SAME_WORKOUT_WINDOW_MIN = 5;
+const SAME_WORKOUT_WINDOW_MIN = 30;
 const SAME_WORKOUT_WINDOW_MS = SAME_WORKOUT_WINDOW_MIN * 60 * 1000;
 
 export interface RunFactLite {

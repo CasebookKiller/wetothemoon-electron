@@ -36,6 +36,7 @@ interface Props {
   onSync: () => void;
   onClear: () => void;
   onOpenEvent: (event: PlanEventLite) => void;
+  onOpenTemplates: () => void;
 }
 
 function fmtDistance(m?: number): string {
@@ -74,6 +75,7 @@ export const PlanEventsPanel: React.FC<Props> = ({
   onSync,
   onClear,
   onOpenEvent,
+  onOpenTemplates,
 }) => {
   return (
     <Panel
@@ -95,6 +97,14 @@ export const PlanEventsPanel: React.FC<Props> = ({
           onClick={onClear}
           disabled={syncing || clearing || events.length === 0}
           tooltip="Удалить план за выбранный диапазон"
+        />
+        <Button
+          label="Библиотека"
+          icon="pi pi-book"
+          className="pb-soft p-button-sm"
+          onClick={onOpenTemplates}
+          disabled={syncing || clearing}
+          tooltip="Готовые шаблоны тренировок для конструктора ICU"
         />
       </div>
 
