@@ -34,6 +34,8 @@ import { PlanEventDrawer } from '@/components/PRANA_BINDU/PlanEventDrawer';
 
 import { WorkoutTemplatesDialog } from '@/components/PRANA_BINDU/WorkoutTemplatesDialog';
 
+import { WellnessDrawer, type RecoveryLogLite } from '@/components/PRANA_BINDU/WellnessDrawer';
+
 interface ProviderOption {
   label: string;
   value: string;
@@ -518,6 +520,8 @@ export const PranaBinduPage: React.FC = () => {
   const [intervalsInfo, setIntervalsInfo] = useState('');
 
   const [recoveryLogs, setRecoveryLogs] = useState<any[]>([]);
+  const [selectedRecovery, setSelectedRecovery] = useState<RecoveryLogLite | null>(null);
+  const [wellnessDrawerVisible, setWellnessDrawerVisible] = useState(false);
 
   const [planEvents, setPlanEvents] = useState<PlanEventLite[]>([]);
   const [templatesVisible, setTemplatesVisible] = useState(false);
@@ -2235,7 +2239,15 @@ export const PranaBinduPage: React.FC = () => {
                     : '';
 
                 return (
-                  <div key={r.date} className="pb-wellness-table__row">
+                  <div
+                    key={r.date}
+                    className="pb-wellness-table__row pb-wellness-table__row--clickable"
+                    onClick={() => {
+                      setSelectedRecovery(r as RecoveryLogLite);
+                      setWellnessDrawerVisible(true);
+                    }}
+                    title="Открыть полную карточку дня"
+                  >
                     <span className="pb-wellness-table__date">
                       {r.date}
                     </span>
@@ -2437,6 +2449,12 @@ export const PranaBinduPage: React.FC = () => {
       <WorkoutTemplatesDialog
         visible={templatesVisible}
         onHide={() => setTemplatesVisible(false)}
+      />
+
+      <WellnessDrawer
+        visible={wellnessDrawerVisible}
+        log={selectedRecovery}
+        onHide={() => setWellnessDrawerVisible(false)}
       />
     </div>
   );

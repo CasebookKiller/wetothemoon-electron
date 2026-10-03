@@ -2720,3 +2720,20 @@ body[data-module='prana-bindu'] .p-tooltip.p-tooltip-bottom .p-tooltip-arrow {
 .pb-templates-dialog.p-dialog-maximized .p-dialog-content {
   width: 100%;
 }
+
+/* Строки wellness-таблицы — кликабельные */
+.pb-wellness-table__row--clickable {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  border-radius: 3px;
+}
+
+.pb-wellness-table__row--clickable:hover {
+  background: color-mix(in srgb, var(--pb-accent) 8%, transparent);
+}
+
+/* Бейдж источника в шапке wellness-drawer */
+.pb-drawer__title .pb-source-badge {
+  margin-left: 0.5rem;
+  font-size: 0.65rem;
+}
