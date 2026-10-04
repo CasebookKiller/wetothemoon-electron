@@ -36,6 +36,10 @@ import { WorkoutTemplatesDialog } from '@/components/PRANA_BINDU/WorkoutTemplate
 
 import { WellnessDrawer, type RecoveryLogLite } from '@/components/PRANA_BINDU/WellnessDrawer';
 
+import { YearCalendar } from '@/components/COMMON/YearCalendar/YearCalendar';
+
+import { CalendarPanel } from '@/components/COMMON/CalendarPanel/CalendarPanel';
+
 interface ProviderOption {
   label: string;
   value: string;
@@ -375,6 +379,8 @@ export const PranaBinduPage: React.FC = () => {
     imported: number; skipped: number; failed: number; total: number;
   } | null>(null);
   const [zeppError, setZeppError] = useState('');
+
+
 
   // ==================== Загрузка потоков (map) ====================
 
@@ -1190,30 +1196,66 @@ export const PranaBinduPage: React.FC = () => {
     }
   };
 
-  const handleSyncWellnessNew = async () => {
-    if (!api?.pb?.syncWellness) return;
-    if (!syncFrom || !syncTo) { setWellnessError('Укажите обе даты'); return; }
-    setSyncingWellness(true);
-    setWellnessError('');
-    setWellnessResult('');
-    try {
-      const res = await api.pb.syncWellness(
-        undefined,                    // ← мультирежим: все провайдеры с wellness
-        toIsoDate(syncFrom),
-        toIsoDate(syncTo)
-      );
-      if (res.success) {
-        setWellnessResult(`Добавлено ${res.added} · обновлено ${res.updated} · всего ${res.total}`);
-        await loadRecoveryLogs();    // ← добавили
-      } else {
-        setWellnessError(res.error ?? 'Ошибка');
-      }
-    } catch (e) {
-      setWellnessError((e as Error).message);
-    } finally {
-      setSyncingWellness(false);
+const handleSyncWellnessNew = async () => {
+  if (!api?.pb?.syncWellness) return;
+  if (!syncFrom || !syncTo) {
+    setWellnessError('Укажите обе даты');
+    return;
+  }
+  setSyncingWellness(true);
+  setWellnessError('');
+  setWellnessResult('');
+  try {
+    const res = await api.pb.syncWellness(
+      undefined, // мультирежим: все провайдеры с wellness
+      toIsoDate(syncFrom),
+      toIsoDate(syncTo)
+    );
+
+    if (!res.success) {
+      setWellnessError(res.error ?? 'Ошибка');
+      return;
     }
-  };
+
+    const perProvider: Array<{
+      provider: string;
+      added: number;
+      updated: number;
+      total: number;
+      error?: string;
+    }> = res.perProvider ?? [];
+
+    const errors = perProvider.filter((p) => p.error);
+    const ok = perProvider.filter((p) => !p.error);
+
+    const summary = `Добавлено ${res.added} · обновлено ${res.updated} · всего ${res.total}`;
+
+    if (errors.length > 0) {
+      const errLines = errors
+        .map((p) => `${p.provider}: ${p.error}`)
+        .join('; ');
+      // Показываем и сводку, и ошибки.
+      setWellnessError(
+        `${summary}. Ошибки — ${errLines}`
+      );
+    }
+
+    if (ok.length > 0) {
+      const okLines = ok
+        .map((p) => `${p.provider}: +${p.added} ~${p.updated}`)
+        .join(' · ');
+      setWellnessResult(`${summary} · ${okLines}`);
+    } else if (errors.length === 0) {
+      setWellnessResult(summary);
+    }
+
+    await loadRecoveryLogs();
+  } catch (e) {
+    setWellnessError((e as Error).message);
+  } finally {
+    setSyncingWellness(false);
+  }
+};
 
   const loadRecoveryLogs = async () => {
     if (!api?.pb?.listRecoveryLogs) return;
@@ -1228,7 +1270,7 @@ export const PranaBinduPage: React.FC = () => {
     }
   };
 
-    const loadPlanEvents = async (from?: Date, to?: Date) => {
+  const loadPlanEvents = async (from?: Date, to?: Date) => {
     if (!api?.pb?.listPlanEvents) return;
     setPlanLoading(true);
     setPlanError('');
@@ -1247,6 +1289,7 @@ export const PranaBinduPage: React.FC = () => {
       setPlanLoading(false);
     }
   };
+
 
   const handleSyncPlan = async () => {
     if (!api?.pb?.syncPlan) return;
@@ -1397,6 +1440,36 @@ export const PranaBinduPage: React.FC = () => {
       setImportProgress(null);
     }
   };
+
+  const handleLoadCalendarRange = React.useCallback(
+    async (from: string, to: string) => {
+      const planDays = new Set<string>();
+      const factDays = new Set<string>();
+      if (!api?.pb?.listPlanEvents || !api?.pb?.listRunFacts) {
+        return { planDays, factDays };
+      }
+      try {
+        const [planRes, factRes] = await Promise.all([
+          api.pb.listPlanEvents(from, to),
+          api.pb.listRunFacts(from, to),
+        ]);
+        if (planRes?.success) {
+          for (const e of planRes.items ?? []) {
+            if (e.date) planDays.add(String(e.date).slice(0, 10));
+          }
+        }
+        if (factRes?.success) {
+          for (const e of factRes.items ?? []) {
+            if (e.date) factDays.add(String(e.date).slice(0, 10));
+          }
+        }
+      } catch {
+        // ignore
+      }
+      return { planDays, factDays };
+    },
+    [api]
+  );
 
   return (
     <div className="pb-page p-4">
@@ -1738,7 +1811,7 @@ export const PranaBinduPage: React.FC = () => {
                   setSyncTo(new Date());
                 }}
               />
-                            <Button
+              <Button
                 label="+30 дней"
                 icon="pi pi-calendar"
                 className="pb-soft p-button-sm"
@@ -2081,7 +2154,7 @@ export const PranaBinduPage: React.FC = () => {
               }
             />
           )}
-                    <hr className="pb-sep" />
+          <hr className="pb-sep" />
 
           <div className="flex flex-column gap-2">
             <label className="pb-label">Папка с FIT-файлами Zepp (Yandex.Disk)</label>
@@ -2275,6 +2348,10 @@ export const PranaBinduPage: React.FC = () => {
             </div>
           </div>
         )}
+      </Panel>
+
+      <Panel header="Календарь" className="shadow-5 mb-3 pb-panel">
+        <CalendarPanel loadRange={handleLoadCalendarRange} />
       </Panel>
 
       <PlanEventsPanel
