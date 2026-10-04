@@ -681,5 +681,164 @@ export class IntervalsIcuProvider implements ZeppDataProvider {
     });
   }
 
+    /**
+   * Разведка: создать тестовое событие через POST /events.
+   * Цель — понять требуемый формат и права API-ключа.
+   * После разведки метод можно удалить.
+   */
+  async debugCreateEvent(testDate: string): Promise<any> {
+    const athleteId = this.ctx.getAthleteId() ?? '0';
+
+    const body = {
+      category: 'WORKOUT',
+      start_date_local: `${testDate}T09:00:00`,
+      type: 'Run',
+      name: 'TEST — можно удалить',
+      description: '- 5m Z1 Pace',
+      moving_time: 300,
+    };
+
+    const apiKey = this.ctx.getApiKey();
+    if (!apiKey) throw new Error('API key не задан');
+
+    const url = `${BASE}/athlete/${athleteId}/events`;
+    const auth = Buffer.from(`API_KEY:${apiKey}`).toString('base64');
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${auth}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+
+    const text = await res.text();
+    return {
+      status: res.status,
+      ok: res.ok,
+      body: text.slice(0, 2000),
+    };
+  }
+
+  /**
+   * Создать новое событие в календаре ICU.
+   * Возвращает созданное событие (с числовым id).
+   *
+   * Из тела ICU реально использует:
+   *   - category   ('WORKOUT' | 'PLAN' | 'NOTE' | 'TARGET' | 'RACE')
+   *   - start_date_local  (YYYY-MM-DDTHH:MM:SS, без Z)
+   *   - type       (спорт: 'Run', 'Workout', ...)
+   *   - name       (обязательно, отображается в календаре)
+   *   - description (текстовое описание для конструктора)
+   *
+   * Всё остальное (steps, duration, distance, zoneTimes) ICU
+   * парсит сам из description.
+   */
+  async createEvent(payload: {
+    category: string;
+    start_date_local: string;
+    type: string;
+    name: string;
+    description?: string;
+  }): Promise<any> {
+    const athleteId = this.ctx.getAthleteId() ?? '0';
+    const apiKey = this.ctx.getApiKey();
+    if (!apiKey) throw new Error('API key не задан');
+
+    const url = `${BASE}/athlete/${athleteId}/events`;
+    const auth = Buffer.from(`API_KEY:${apiKey}`).toString('base64');
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${auth}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new IntervalsApiError(
+        `POST events ${res.status} ${res.statusText}`,
+        res.status,
+        body.slice(0, 500)
+      );
+    }
+
+    return await res.json();
+  }
+
+  /**
+   * Обновить существующее событие (PUT).
+   * Все поля обязательны — ICU перезаписывает объект целиком.
+   */
+  async updateEvent(
+    eventId: string | number,
+    payload: {
+      category: string;
+      start_date_local: string;
+      type: string;
+      name: string;
+      description?: string;
+    }
+  ): Promise<any> {
+    const athleteId = this.ctx.getAthleteId() ?? '0';
+    const apiKey = this.ctx.getApiKey();
+    if (!apiKey) throw new Error('API key не задан');
+
+    const url = `${BASE}/athlete/${athleteId}/events/${eventId}`;
+    const auth = Buffer.from(`API_KEY:${apiKey}`).toString('base64');
+
+    const res = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Basic ${auth}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new IntervalsApiError(
+        `PUT events/${eventId} ${res.status} ${res.statusText}`,
+        res.status,
+        body.slice(0, 500)
+      );
+    }
+
+    return await res.json();
+  }
+
+  /**
+   * Удалить событие из календаря ICU.
+   * ICU возвращает 200 с пустым телом или 204.
+   */
+  async deleteEvent(eventId: string | number): Promise<boolean> {
+    const athleteId = this.ctx.getAthleteId() ?? '0';
+    const apiKey = this.ctx.getApiKey();
+    if (!apiKey) throw new Error('API key не задан');
+
+    const url = `${BASE}/athlete/${athleteId}/events/${eventId}`;
+    const auth = Buffer.from(`API_KEY:${apiKey}`).toString('base64');
+
+    const res = await fetch(url, {
+      method: 'DELETE',
+      headers: { Authorization: `Basic ${auth}` },
+    });
+
+    if (!res.ok && res.status !== 404) {
+      const body = await res.text().catch(() => '');
+      throw new IntervalsApiError(
+        `DELETE events/${eventId} ${res.status} ${res.statusText}`,
+        res.status,
+        body.slice(0, 500)
+      );
+    }
+
+    return true;
+  }
 
 }

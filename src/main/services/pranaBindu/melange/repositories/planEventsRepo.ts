@@ -19,9 +19,11 @@ function rowToDomain(row: PlanEventRow): PlanEvent {
           type: s?.type ?? undefined,
           duration: typeof s?.duration === 'number' ? s.duration : undefined,
           distance: typeof s?.distance === 'number' ? s.distance : undefined,
-          hrZone: s?.hr?.value ?? undefined,
-          paceZone: s?.pace?.value ?? undefined,
-          powerZone: s?.power?.value ?? undefined,
+          // Универсальный fallback: ICU-формат (hr.value) или уже
+          // разобранный (hrZone) — на случай двойного маппинга.
+          hrZone: s?.hr?.value ?? s?.hrZone ?? undefined,
+          paceZone: s?.pace?.value ?? s?.paceZone ?? undefined,
+          powerZone: s?.power?.value ?? s?.powerZone ?? undefined,
           reps: typeof s?.reps === 'number' ? s.reps : undefined,
           raw: s,
         }));
@@ -186,4 +188,77 @@ export function deletePlanEventsRange(
     .prepare(`DELETE FROM plan_events WHERE date >= ? AND date <= ?`)
     .run(from, to);
   return Number(info.changes);
+}
+
+/** Локальное обновление полей события (не трогает external_id). */
+export function updatePlanEventLocally(
+  db: DatabaseSync,
+  id: number,
+  patch: Partial<Pick<PlanEvent, 'date' | 'startTime' | 'endTime' | 'category' | 'sport' | 'name' | 'description'>>
+): void {
+  const now = new Date().toISOString();
+  const sets: string[] = [];
+  const values: any[] = [];
+
+  if (patch.date !== undefined) { sets.push('date = ?'); values.push(patch.date); }
+  if (patch.startTime !== undefined) { sets.push('start_time = ?'); values.push(patch.startTime); }
+  if (patch.endTime !== undefined) { sets.push('end_time = ?'); values.push(patch.endTime); }
+  if (patch.category !== undefined) { sets.push('category = ?'); values.push(patch.category); }
+  if (patch.sport !== undefined) { sets.push('sport = ?'); values.push(patch.sport); }
+  if (patch.name !== undefined) { sets.push('name = ?'); values.push(patch.name); }
+  if (patch.description !== undefined) { sets.push('description = ?'); values.push(patch.description); }
+
+  if (sets.length === 0) return;
+
+  sets.push('updated_at = ?'); values.push(now);
+  values.push(id);
+
+  db.prepare(
+    `UPDATE plan_events SET ${sets.join(', ')} WHERE id = ?`
+  ).run(...values);
+}
+
+/** Локальное удаление события по id. */
+export function deletePlanEventLocally(
+  db: DatabaseSync,
+  id: number
+): boolean {
+  const info = db.prepare(`DELETE FROM plan_events WHERE id = ?`).run(id);
+  return Number(info.changes) > 0;
+}
+
+/** Создание локального события (без внешнего id). */
+export function createPlanEventLocally(
+  db: DatabaseSync,
+  payload: {
+    date: string;
+    startTime?: string;
+    category: string;
+    sport?: string;
+    name: string;
+    description?: string;
+  }
+): number {
+  const now = new Date().toISOString();
+  const info = db.prepare(
+    `INSERT INTO plan_events
+       (external_id, date, start_time, end_time, category, sport, name,
+        description, planned_load, duration_sec, distance_m,
+        icu_workout_json, raw_json, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, NULL, ?, ?)`
+  ).run(
+    // external_id = локальный маркер, чтобы UNIQUE не страдал.
+    // Формат: local:<unixtime>-<rand>
+    `local:${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    payload.date,
+    payload.startTime ?? `${payload.date}T09:00:00`,
+    null,
+    payload.category,
+    payload.sport ?? null,
+    payload.name,
+    payload.description ?? null,
+    now,
+    now
+  );
+  return Number(info.lastInsertRowid);
 }

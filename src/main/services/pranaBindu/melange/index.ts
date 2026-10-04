@@ -53,5 +53,8 @@ export {
   getPlanEventByExternalId,
   linkPlanEventToActivity,
   deletePlanEventsRange,
+  updatePlanEventLocally,
+  deletePlanEventLocally,
+  createPlanEventLocally,
 } from './repositories/planEventsRepo';
 export type { UpsertPlanEventResult } from './repositories/planEventsRepo';

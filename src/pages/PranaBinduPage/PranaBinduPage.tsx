@@ -2444,6 +2444,9 @@ export const PranaBinduPage: React.FC = () => {
         visible={planDrawerVisible}
         event={selectedPlanEvent}
         onHide={() => setPlanDrawerVisible(false)}
+        onSaved={() => {
+          void loadPlanEvents();
+        }}
       />
 
       <WorkoutTemplatesDialog

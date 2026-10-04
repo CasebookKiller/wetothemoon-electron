@@ -830,6 +830,21 @@ try {
       clearPlan: (from: string, to: string) =>
         ipcRenderer.invoke('pb:clear-plan', from, to),
 
+      debugIcuCreateEvent: (testDate: string) =>
+        ipcRenderer.invoke('pb:debug-icu-create-event', testDate),
+
+      pushPlanEvent: (planEventId: number) =>
+        ipcRenderer.invoke('pb:push-plan-event', planEventId),
+      deletePlanEventRemote: (planEventId: number) =>
+        ipcRenderer.invoke('pb:delete-plan-event-remote', planEventId),
+
+      updatePlanEventLocally: (id: number, patch: any) =>
+        ipcRenderer.invoke('pb:update-plan-event-locally', id, patch),
+      deletePlanEventLocally: (id: number) =>
+        ipcRenderer.invoke('pb:delete-plan-event-locally', id),
+      createPlanEventLocally: (payload: any) =>
+        ipcRenderer.invoke('pb:create-plan-event-locally', payload),
+
     },
 
   });

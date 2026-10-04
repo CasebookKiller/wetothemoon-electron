@@ -57,6 +57,7 @@ import { IntervalsIcuProvider } from '../services/pranaBindu/spice/providers/int
 import { parseFit } from '../services/pranaBindu/spice/parsers/fitParser';
 import { parseTcx } from '../services/pranaBindu/spice/parsers/tcxParser';
 import { parseStravaCsv } from '../services/pranaBindu/spice/parsers/stravaCsvParser';
+import { createPlanEventLocally, deletePlanEventLocally, updatePlanEventLocally } from '../services/pranaBindu/melange/repositories/planEventsRepo';
 
 // ==================== Регистрация провайдеров ====================
 
@@ -2170,6 +2171,185 @@ export function registerPranaBinduHandlers(): void {
         }
         const raw = await provider.debugEvents(from, to);
         return { success: true, data: raw };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+  // -------- Разведка: создать тестовое событие в ICU --------
+  ipcMain.handle(
+    'pb:debug-icu-create-event',
+    async (_event, testDate: string) => {
+      try {
+        const provider = getProvider('intervals-icu') as any;
+        if (!provider) {
+          return { success: false, error: 'Провайдер не зарегистрирован' };
+        }
+        if (typeof provider.debugCreateEvent !== 'function') {
+          return { success: false, error: 'debugCreateEvent не реализован' };
+        }
+        const raw = await provider.debugCreateEvent(testDate);
+        return { success: true, data: raw };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+    // -------- Push локального plan_event в ICU --------
+  ipcMain.handle(
+    'pb:push-plan-event',
+    async (_event, planEventId: number) => {
+      try {
+        if (!Number.isFinite(planEventId)) {
+          return { success: false, error: 'planEventId обязателен' };
+        }
+        const provider = getProvider('intervals-icu') as any;
+        if (!provider?.createEvent) {
+          return { success: false, error: 'createEvent не реализован' };
+        }
+
+        const db = getMelange();
+        const row = db
+          .prepare(`SELECT * FROM plan_events WHERE id = ?`)
+          .get(planEventId) as any;
+        if (!row) {
+          return { success: false, error: `plan_event #${planEventId} не найден` };
+        }
+
+        // Если уже синкан — это update, иначе create.
+        const existingExtId = row.external_id as string | null;
+        const isUpdate = !!existingExtId && existingExtId.startsWith('intervals-icu-event:');
+        const remoteId = isUpdate
+          ? existingExtId!.replace('intervals-icu-event:', '')
+          : null;
+
+        const payload = {
+          category: row.category ?? 'WORKOUT',
+          start_date_local: row.start_time
+            ? row.start_time.slice(0, 19)   // YYYY-MM-DDTHH:MM:SS
+            : `${row.date}T09:00:00`,
+          type: row.sport ?? 'Run',
+          name: row.name ?? 'Workout',
+          description: row.description ?? '',
+        };
+
+        const result = isUpdate
+          ? await provider.updateEvent(remoteId!, payload)
+          : await provider.createEvent(payload);
+
+        const newExtId = `intervals-icu-event:${result.id}`;
+
+        db.prepare(
+          `UPDATE plan_events SET
+             external_id = ?, description = ?, updated_at = ?
+           WHERE id = ?`
+        ).run(newExtId, result.description ?? payload.description, new Date().toISOString(), planEventId);
+
+        console.log(
+          `[Prana-Bindu] push-plan-event #${planEventId} → ICU id=${result.id} (${isUpdate ? 'update' : 'create'})`
+        );
+
+        return {
+          success: true,
+          action: isUpdate ? 'updated' : 'created',
+          externalId: newExtId,
+          icuId: result.id,
+        };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+  // -------- Локальное обновление plan_event --------
+  ipcMain.handle(
+    'pb:update-plan-event-locally',
+    (_event, id: number, patch: any) => {
+      try {
+        if (!Number.isFinite(id)) {
+          return { success: false, error: 'id обязателен' };
+        }
+        updatePlanEventLocally(getMelange(), id, patch ?? {});
+        return { success: true };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+  // -------- Локальное удаление plan_event --------
+  ipcMain.handle(
+    'pb:delete-plan-event-locally',
+    (_event, id: number) => {
+      try {
+        if (!Number.isFinite(id)) {
+          return { success: false, error: 'id обязателен' };
+        }
+        const ok = deletePlanEventLocally(getMelange(), id);
+        return { success: ok };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+  // -------- Локальное создание plan_event --------
+  ipcMain.handle(
+    'pb:create-plan-event-locally',
+    (_event, payload: any) => {
+      try {
+        if (!payload?.date || !payload?.name) {
+          return { success: false, error: 'date и name обязательны' };
+        }
+        const id = createPlanEventLocally(getMelange(), {
+          date: payload.date,
+          startTime: payload.startTime,
+          category: payload.category ?? 'WORKOUT',
+          sport: payload.sport ?? 'Run',
+          name: payload.name,
+          description: payload.description,
+        });
+        return { success: true, id };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+  // -------- Удалить event из ICU (без удаления локально) --------
+  ipcMain.handle(
+    'pb:delete-plan-event-remote',
+    async (_event, planEventId: number) => {
+      try {
+        if (!Number.isFinite(planEventId)) {
+          return { success: false, error: 'planEventId обязателен' };
+        }
+        const provider = getProvider('intervals-icu') as any;
+        if (!provider?.deleteEvent) {
+          return { success: false, error: 'deleteEvent не реализован' };
+        }
+
+        const db = getMelange();
+        const row = db
+          .prepare(`SELECT external_id FROM plan_events WHERE id = ?`)
+          .get(planEventId) as { external_id: string | null } | undefined;
+        if (!row) {
+          return { success: false, error: `plan_event #${planEventId} не найден` };
+        }
+        if (!row.external_id?.startsWith('intervals-icu-event:')) {
+          return { success: true, note: 'Не связано с ICU, нечего удалять' };
+        }
+
+        const remoteId = row.external_id.replace('intervals-icu-event:', '');
+        await provider.deleteEvent(remoteId);
+
+        db.prepare(
+          `UPDATE plan_events SET external_id = NULL, updated_at = ? WHERE id = ?`
+        ).run(new Date().toISOString(), planEventId);
+
+        return { success: true, icuId: remoteId };
       } catch (e) {
         return { success: false, error: (e as Error).message };
       }
