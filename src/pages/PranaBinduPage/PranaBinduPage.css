@@ -2214,6 +2214,32 @@ body[data-module='prana-bindu'] .p-tooltip.p-tooltip-bottom .p-tooltip-arrow {
   word-break: break-word;
 }
 
+/* ============================================================
+   Textarea в режиме редактирования текста конструктора
+   ============================================================ */
+
+.pb-plan-event__description-input.p-inputtextarea,
+.pb-plan-event__description-input {
+  width: 100% !important;
+  min-height: 14rem;
+  box-sizing: border-box;
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--tg-theme-text-color, #f5f5f5) !important;
+  background: rgba(0, 0, 0, 0.2) !important;
+  padding: 0.6rem 0.75rem !important;
+  border-radius: 6px !important;
+  border: 1px solid var(--surface-border, rgba(255, 255, 255, 0.1)) !important;
+  resize: vertical;
+}
+
+.pb-plan-event__description-input.p-inputtextarea:enabled:focus {
+  border-color: var(--pb-accent) !important;
+  box-shadow: 0 0 0 1px var(--pb-accent) !important;
+  outline: none !important;
+}
+
 .pb-plan-event__steps {
   display: flex;
   flex-direction: column;
@@ -2736,4 +2762,112 @@ body[data-module='prana-bindu'] .p-tooltip.p-tooltip-bottom .p-tooltip-arrow {
 .pb-drawer__title .pb-source-badge {
   margin-left: 0.5rem;
   font-size: 0.65rem;
+}
+/* ============================================================
+   Таймлайн шагов: адаптивный, без скролла
+   ============================================================ */
+
+.pb-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin: 0.5rem 0;
+}
+
+.pb-timeline__headline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 1.6rem;
+  gap: 0.5rem;
+}
+
+.pb-timeline__hover-info {
+  font-size: 0.78rem;
+  color: var(--tg-theme-text-color, #f5f5f5);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pb-timeline__hover-info b {
+  color: var(--pb-accent);
+  font-weight: 600;
+}
+
+.pb-timeline__hover-sep {
+  color: var(--tg-theme-hint-color, #708499);
+  opacity: 0.6;
+}
+
+.pb-timeline__zone-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  padding: 0.05rem 0.4rem;
+  border-radius: 3px;
+  line-height: 1.3;
+  min-width: 1.6rem;
+}
+
+.pb-timeline__track {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  width: 100%;
+  border: 1px solid var(--surface-border, rgba(255,255,255,0.08));
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 0.35rem 0.4rem;
+  overflow: hidden;
+  cursor: crosshair;
+  box-sizing: border-box;
+}
+
+.pb-timeline__step {
+  display: flex;
+  align-items: flex-end;
+  height: 100%;
+  min-width: 2px;
+}
+
+.pb-timeline__bar {
+  width: 100%;
+  border-radius: 2px 2px 0 0;
+  opacity: 0.92;
+  transition: filter 0.1s ease, opacity 0.1s ease;
+}
+
+.pb-timeline__step.is-hovered .pb-timeline__bar {
+  filter: brightness(1.2);
+  opacity: 1;
+}
+
+/* Вертикальный маркер под мышью */
+.pb-timeline__marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--pb-accent);
+  box-shadow: 0 0 4px color-mix(in srgb, var(--pb-accent) 50%, transparent);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.pb-timeline--empty {
+  padding: 1rem;
+  text-align: center;
+  color: var(--tg-theme-hint-color, #708499);
+  font-size: 0.8rem;
+}
+
+.pb-timeline__step {
+  min-width: 2px;   /* было 2px — увеличь до 3px, если 2 не хватает */
 }

@@ -1,16 +1,21 @@
 // src/components/PRANA_BINDU/PlanEventDrawer.tsx
-//
-// Drawer с деталями события плана: описание конструктора,
-// разобранные шаги, zoneTimes.
 
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Sidebar } from 'primereact/sidebar';
+import { Button } from 'primereact/button';
+import { InputText } from 'primereact/inputtext';
+import { InputTextarea } from 'primereact/inputtextarea';
+import { Message } from 'primereact/message';
+import { Dialog } from 'primereact/dialog';
+import { WorkoutTimeline, type TimelineStep } from './WorkoutTimeline';
 import type { PlanEventLite } from './PlanEventsPanel';
+import { parseWorkoutText } from '@/main/services/pranaBindu/mentat/workoutParser';
 
 interface Props {
   visible: boolean;
   event: PlanEventLite | null;
   onHide: () => void;
+  onSaved: () => void;
 }
 
 interface StepShape {
@@ -21,15 +26,20 @@ interface StepShape {
   paceZone?: number;
   powerZone?: number;
   reps?: number;
+  label?: string;
 }
 
-function fmtDuration(sec?: number): string {
-  if (sec == null || sec <= 0) return '';
-  const h = Math.floor(sec / 3600);
-  const m = Math.floor((sec % 3600) / 60);
-  const s = Math.round(sec % 60);
-  if (h > 0) return `${h}ч ${String(m).padStart(2, '0')}м`;
-  if (m > 0) return `${m}:${String(s).padStart(2, '0')}`;
+function fmtSec(s: number): string {
+  if (s >= 3600) {
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    return `${h}ч ${String(m).padStart(2, '0')}м`;
+  }
+  if (s >= 60) {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return sec > 0 ? `${m}:${String(sec).padStart(2, '0')}` : `${m}м`;
+  }
   return `${s}с`;
 }
 
@@ -39,43 +49,256 @@ function fmtDistance(m?: number): string {
   return `${Math.round(m)} м`;
 }
 
-function stepLine(s: StepShape, i: number): string {
-  const parts: string[] = [];
-  if (s.type) parts.push(s.type);
-  if (s.reps) parts.push(`×${s.reps}`);
-  if (s.distance) parts.push(fmtDistance(s.distance));
-  if (s.duration) parts.push(fmtDuration(s.duration));
-  const targets: string[] = [];
-  if (s.hrZone) targets.push(`HR Z${s.hrZone}`);
-  if (s.paceZone) targets.push(`Pace Z${s.paceZone}`);
-  if (s.powerZone) targets.push(`Power Z${s.powerZone}`);
-  if (targets.length > 0) parts.push(targets.join(' · '));
-  return parts.join(' · ') || `шаг ${i + 1}`;
+/** Приводит любое представление зоны к числу 1..7. */
+function parseZoneValue(v: any): number | undefined {
+  if (v == null) return undefined;
+  if (typeof v === 'number' && Number.isFinite(v) && v > 0) return v;
+  if (typeof v === 'string') {
+    const m = v.trim().match(/^Z?(\d+)$/i);
+    if (m) {
+      const n = Number(m[1]);
+      return n > 0 ? n : undefined;
+    }
+  }
+  return undefined;
+}
+
+function extractZone(s: any): number | undefined {
+  return (
+    parseZoneValue(s?.hrZone) ??
+    parseZoneValue(s?.paceZone) ??
+    parseZoneValue(s?.powerZone) ??
+    parseZoneValue(s?.hr?.value) ??
+    parseZoneValue(s?.pace?.value) ??
+    parseZoneValue(s?.power?.value) ??
+    parseZoneValue(s?.target?.value) ??
+    parseZoneValue(s?.target?.zone) ??
+    parseZoneValue(s?.zone) ??
+    undefined
+  );
+}
+
+function extractLabel(s: any, fallback: string): string {
+  return s?.label ?? s?.type ?? s?.text ?? fallback;
+}
+
+/**
+ * Разворачивает шаги в плоский список для таймлайна.
+ *
+ * Логика:
+ *  - Шаг с reps > 0 и вложенными raw.steps → разворачиваем reps раз,
+ *    каждый вложенный шаг становится колонкой.
+ *  - Шаг с вложенными raw.steps без reps → просто вставляем вложенные.
+ *  - Обычный шаг → одна колонка.
+ */
+function stepsToTimeline(steps: StepShape[]): TimelineStep[] {
+  const out: TimelineStep[] = [];
+
+  const pushOne = (s: any, fallbackLabel: string) => {
+    let durationSec = s?.duration ?? 0;
+    if (!durationSec && s?.distance) {
+      durationSec = Math.round(s.distance / 2.22);
+    }
+    if (!durationSec) durationSec = 60;
+    out.push({
+      label: extractLabel(s, fallbackLabel),
+      durationSec,
+      zone: extractZone(s),
+    });
+  };
+
+  for (let i = 0; i < steps.length; i++) {
+    const s: any = steps[i];
+    const fallback = `Шаг ${i + 1}`;
+
+    // Достаём вложенные шаги — могут быть в s.raw.steps (после rowToDomain)
+    // или в s.raw.raw.steps (двойная обёртка). Проверяем оба.
+    const nested: any[] | undefined =
+      (Array.isArray(s?.raw?.steps) && s.raw.steps) ||
+      (Array.isArray(s?.raw?.raw?.steps) && s.raw.raw.steps) ||
+      undefined;
+
+    const reps = typeof s?.reps === 'number' && s.reps > 0 ? s.reps : 0;
+
+    if (nested && nested.length > 0) {
+      const repeat = reps > 0 ? reps : 1;
+      for (let r = 0; r < repeat; r++) {
+        for (let k = 0; k < nested.length; k++) {
+          pushOne(nested[k], `${fallbackLabelOr(fallback, s)} #${k + 1}`);
+        }
+      }
+    } else {
+      pushOne(s, fallback);
+    }
+  }
+
+  return out;
+}
+
+function fallbackLabelOr(fallback: string, s: any): string {
+  return s?.text ?? s?.type ?? fallback;
 }
 
 export const PlanEventDrawer: React.FC<Props> = ({
   visible,
   event,
   onHide,
+  onSaved,
 }) => {
+  const api = (window as any).electronAPI;
+
+  const [editMode, setEditMode] = useState(false);
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [pushing, setPushing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);   // ← сюда
+  const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
+
+  useEffect(() => {
+    if (!event) return;
+    setName(event.name ?? '');
+    setDescription((event as any).description ?? '');
+    setEditMode(false);
+    setError('');
+    setInfo('');
+  }, [event?.id, visible]);
+
+  // Steps: если из ICU — берём из event.steps, иначе парсим текст.
+  const timelineSteps: TimelineStep[] = useMemo(() => {
+    if (!event) return [];
+
+    // 1. Если у события уже есть разобранные steps (sync из ICU) —
+    //    используем их. Это точнее, чем наш парсер.
+    const es = event.steps as StepShape[] | undefined;
+    if (es && es.length > 0) {
+      return stepsToTimeline(es);
+    }
+
+    // 2. Иначе — парсим текст нашим парсером.
+    const parsed = parseWorkoutText(description ?? '');
+    return parsed.flatSteps
+      .filter((s) => s.durationSec != null || s.distanceM != null)
+      .map((s, i) => {
+        let durationSec = s.durationSec ?? 0;
+        if (!durationSec && s.distanceM) {
+          durationSec = Math.round(s.distanceM / 2.22);
+        }
+        if (!durationSec) durationSec = 60;
+        return {
+          label: s.label || `Шаг ${i + 1}`,
+          durationSec,
+          zone: s.zone,
+        };
+      });
+  }, [event?.steps, description]);
+
   if (!event) return null;
 
-  const steps = (event.steps as StepShape[] | undefined) ?? [];
-  const zoneTimes = (event as any).zoneTimes as
-    | Array<{ zone: string; secs: number }>
-    | undefined;
+  const isRemote = (event.externalId ?? '').startsWith('intervals-icu-event:');
 
-  const startTime = event.startTime ?? '';
-  const timeOnly = startTime.length >= 16 ? startTime.slice(11, 16) : '';
+  // --- Сохранить локально ---
+  const handleSaveLocal = async () => {
+    setSaving(true);
+    setError('');
+    setInfo('');
+    try {
+      const res = await api.pb.updatePlanEventLocally(event.id, {
+        name: name.trim(),
+        description,
+      });
+      if (res?.success) {
+        setInfo('Сохранено локально');
+        setEditMode(false);
+        onSaved();
+      } else {
+        setError(res?.error ?? 'Ошибка сохранения');
+      }
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // --- Push в ICU ---
+  const handlePush = async () => {
+    setPushing(true);
+    setError('');
+    setInfo('');
+    try {
+      // Сначала сохраняем локально, чтобы текст точно попал в plan_events.
+      if (editMode) {
+        await api.pb.updatePlanEventLocally(event.id, {
+          name: name.trim(),
+          description,
+        });
+      }
+      const res = await api.pb.pushPlanEvent(event.id);
+      if (res?.success) {
+        setInfo(
+          res.action === 'created'
+            ? `Создано в ICU (id ${res.icuId})`
+            : `Обновлено в ICU (id ${res.icuId})`
+        );
+        setEditMode(false);
+        onSaved();
+      } else {
+        setError(res?.error ?? 'Ошибка push');
+      }
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setPushing(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    setError('');
+    setInfo('');
+    try {
+      // Если событие связано с ICU — сначала удаляем удалённо.
+      if (isRemote) {
+        const r = await api.pb.deletePlanEventRemote(event.id);
+        if (!r?.success) {
+          setError(r?.error ?? 'Не удалось удалить из ICU');
+          setDeleting(false);
+          setConfirmDelete(false);
+          return;
+        }
+      }
+      const r = await api.pb.deletePlanEventLocally(event.id);
+      if (r?.success) {
+        onSaved();
+        onHide();
+      } else {
+        setError(r?.error ?? 'Не удалось удалить локально');
+      }
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
+  };
+
+  const timeOnly =
+    event.startTime && event.startTime.length >= 16
+      ? event.startTime.slice(11, 16)
+      : '';
 
   return (
     <Sidebar
       visible={visible}
       position="right"
       onHide={onHide}
-      style={{ width: '520px', maxWidth: '96vw' }}
+      style={{ width: '640px', maxWidth: '96vw' }}
       className="pb-drawer"
     >
+      {/* Header */}
       <div className="pb-drawer__header">
         <div className="pb-drawer__title">
           <i className="pi pi-calendar pb-drawer__icon" />
@@ -83,11 +306,48 @@ export const PlanEventDrawer: React.FC<Props> = ({
           {timeOnly && timeOnly !== '00:00' && (
             <span className="pb-drawer__count"> {timeOnly}</span>
           )}
+          {isRemote && (
+            <span className="pb-source-badge pb-source-badge--intervals-icu">
+              ICU #{event.externalId.replace('intervals-icu-event:', '')}
+            </span>
+          )}
         </div>
+        <Button
+          icon="pi pi-trash"
+          text
+          className="pb-drawer__name-edit"
+          onClick={() => setConfirmDelete(true)}
+          disabled={deleting}
+          tooltip="Удалить"
+          tooltipOptions={{ position: 'left' }}
+        />
       </div>
 
-      <div className="pb-plan-event__name">{event.name}</div>
+      {/* Название */}
+      <div className="pb-plan-event__name-edit">
+        {!editMode ? (
+          <>
+            <span className="pb-plan-event__name">{event.name}</span>
+            <Button
+              icon="pi pi-pencil"
+              text
+              className="pb-drawer__name-edit"
+              onClick={() => setEditMode(true)}
+              tooltip="Редактировать"
+              tooltipOptions={{ position: 'left' }}
+            />
+          </>
+        ) : (
+          <InputText
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="pb-plan-event__name-input"
+            placeholder="Название"
+          />
+        )}
+      </div>
 
+      {/* Мета */}
       <div className="pb-plan-event__meta">
         {event.sport && (
           <span className="pb-source-badge pb-source-badge--tcx">
@@ -104,7 +364,7 @@ export const PlanEventDrawer: React.FC<Props> = ({
         )}
         {event.durationSec != null && event.durationSec > 0 && (
           <span className="pb-plan-event__chip">
-            <i className="pi pi-clock" /> {fmtDuration(event.durationSec)}
+            <i className="pi pi-clock" /> {fmtSec(event.durationSec)}
           </span>
         )}
         {event.plannedLoad != null && (
@@ -114,61 +374,119 @@ export const PlanEventDrawer: React.FC<Props> = ({
         )}
       </div>
 
-      {event.pairedActivityId && (
-        <div className="pb-plan-event__paired">
-          <i className="pi pi-check-circle" /> Связано с тренировкой
-          #{event.pairedActivityId}
-        </div>
-      )}
-
-      {/* Описание — обычно это текст конструктора ICU */}
-      {(event as any).description && (
+      {/* Таймлайн */}
+      {(() => {
+        console.log('[PlanEventDrawer] timelineSteps:', timelineSteps);
+        console.log('[PlanEventDrawer] description:', description);
+        console.log('[PlanEventDrawer] event.steps:', event.steps);
+        return null;
+      })()}
+      {timelineSteps.length > 0 && (
         <>
-          <div className="pb-drawer__section-title">Описание</div>
-          <pre className="pb-plan-event__description">
-            {(event as any).description.trim()}
-          </pre>
+          <div className="pb-drawer__section-title">Таймлайн</div>
+          <WorkoutTimeline steps={timelineSteps} />
         </>
       )}
 
-      {/* Шаги */}
-      <div className="pb-drawer__section-title">
-        Шаги {steps.length > 0 && (
-          <span className="pb-drawer__count">({steps.length})</span>
+      {/* Текст конструктора */}
+      <div className="pb-drawer__section-title">Текст конструктора</div>
+      {!editMode ? (
+        <pre className="pb-plan-event__description">
+          {description?.trim() || '(пусто)'}
+        </pre>
+      ) : (
+        <InputTextarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          rows={12}
+          autoResize
+          className="pb-plan-event__description-input"
+          placeholder={'Например:\nWarmup\n- 2km Z2 Pace\n\nMain Set\n- 5km Z3 Pace'}
+        />
+      )}
+
+      {/* Сообщения */}
+      {error && (
+        <Message severity="error" text={error} className="w-full mt-2" />
+      )}
+      {info && (
+        <Message severity="success" text={info} className="w-full mt-2" />
+      )}
+
+      {/* Кнопки действий */}
+      <div className="pb-drawer__actions">
+        {editMode ? (
+          <>
+            <Button
+              label={saving ? 'Сохранение…' : 'Сохранить локально'}
+              icon={saving ? 'pi pi-spin pi-spinner' : 'pi pi-save'}
+              className="pb-soft p-button-sm"
+              onClick={handleSaveLocal}
+              disabled={saving || pushing}
+            />
+            <Button
+              label={pushing ? 'Отправка…' : 'Отправить в ICU'}
+              icon={pushing ? 'pi pi-spin pi-spinner' : 'pi pi-cloud-upload'}
+              className="pb p-button-sm"
+              onClick={handlePush}
+              disabled={saving || pushing || !description.trim()}
+            />
+            <Button
+              label="Отмена"
+              icon="pi pi-times"
+              className="pb-soft p-button-sm"
+              onClick={() => {
+                setEditMode(false);
+                setName(event.name);
+                setDescription((event as any).description ?? '');
+              }}
+              disabled={saving || pushing}
+            />
+          </>
+        ) : (
+          <>
+            <Button
+              label={pushing ? 'Отправка…' : isRemote ? 'Обновить в ICU' : 'Отправить в ICU'}
+              icon={pushing ? 'pi pi-spin pi-spinner' : 'pi pi-cloud-upload'}
+              className="pb p-button-sm"
+              onClick={handlePush}
+              disabled={pushing || deleting || !description.trim()}
+            />
+          </>
         )}
       </div>
-      {steps.length === 0 ? (
-        <div className="pb-drawer__empty">
-          У события нет структурированных шагов.
-        </div>
-      ) : (
-        <div className="pb-plan-event__steps">
-          {steps.map((s, i) => (
-            <div key={i} className="pb-plan-event__step">
-              <span className="pb-plan-event__step-num">{i + 1}</span>
-              <span className="pb-plan-event__step-text">{stepLine(s, i)}</span>
-            </div>
-          ))}
-        </div>
-      )}
 
-      {/* zoneTimes — предсказание времени в зонах */}
-      {zoneTimes && zoneTimes.some((z) => z.secs > 0) && (
-        <>
-          <div className="pb-drawer__section-title">
-            Время в зонах (предсказание)
+      {/* Confirm delete */}
+      <Dialog
+        visible={confirmDelete}
+        onHide={() => setConfirmDelete(false)}
+        header="Удалить событие?"
+        style={{ width: '420px' }}
+        modal
+        className="pb-debug-dialog"
+      >
+        <div className="pb-debug__body">
+          <div>
+            Удалить «{event.name}»{isRemote ? ' и из ICU' : ''}?
           </div>
-          <div className="pb-plan-event__zones">
-            {zoneTimes
-              .filter((z) => z.secs > 0)
-              .map((z) => (
-                <span key={z.zone} className="pb-plan-event__zone">
-                  <b>{z.zone}</b> {fmtDuration(z.secs)}
-                </span>
-              ))}
+          <div className="flex gap-2 justify-content-end mt-3">
+            <Button
+              label="Отмена"
+              icon="pi pi-times"
+              className="pb-soft p-button-sm"
+              onClick={() => setConfirmDelete(false)}
+              disabled={deleting}
+            />
+            <Button
+              label={deleting ? 'Удаление…' : 'Удалить'}
+              icon={deleting ? 'pi pi-spin pi-spinner' : 'pi pi-trash'}
+              className="pb-destructive p-button-sm"
+              onClick={handleDelete}
+              disabled={deleting}
+            />
           </div>
-        </>
-      )}
+        </div>
+      </Dialog>
     </Sidebar>
   );
 };
