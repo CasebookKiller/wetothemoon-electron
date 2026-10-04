@@ -1,0 +1,137 @@
+/* ============================================================
+   Годовой календарь: 12 мини-месяцев + точки-маркеры
+   ============================================================ */
+
+.common-year-cal {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  width: 100%;
+}
+
+@media (max-width: 900px) {
+  .common-year-cal {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .common-year-cal {
+    grid-template-columns: 1fr;
+  }
+}
+
+.common-year-cal__month {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  padding: 0.4rem 0.5rem 0.5rem 0.5rem;
+}
+
+.common-year-cal__month-title {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--pb-accent, #d4a373);
+  font-weight: 600;
+  margin-bottom: 0.3rem;
+  text-align: center;
+}
+
+.common-year-cal__dow {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  margin-bottom: 0.15rem;
+}
+
+.common-year-cal__dow-cell {
+  font-size: 0.6rem;
+  color: rgba(255, 255, 255, 0.4);
+  text-align: center;
+}
+
+.common-year-cal__grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+}
+
+.common-year-cal__cell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1 / 1;
+  min-height: 1.4rem;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.65rem;
+  font-family: inherit;
+  border-radius: 3px;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.1s, color 0.1s;
+}
+
+.common-year-cal__cell:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.common-year-cal__cell--empty {
+  cursor: default;
+  visibility: hidden;
+}
+
+.common-year-cal__day-num {
+  position: relative;
+  z-index: 1;
+  line-height: 1;
+}
+
+/* Точка-маркер под числом */
+.common-year-cal__marker {
+  position: absolute;
+  bottom: 1px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: transparent;
+}
+
+/* План — teal */
+.common-year-cal__cell.has-plan .common-year-cal__marker {
+  background: #009e80;
+}
+
+.common-year-cal__cell.has-plan {
+  color: rgba(0, 158, 128, 0.95);
+}
+
+/* Факт — green */
+.common-year-cal__cell.has-fact .common-year-cal__marker {
+  background: #009e00;
+}
+
+.common-year-cal__cell.has-fact {
+  color: rgba(0, 158, 0, 0.95);
+}
+
+/* Оба — линейный градиент teal/green */
+.common-year-cal__cell.has-both .common-year-cal__marker {
+  background: linear-gradient(
+    to right,
+    #009e80 0 50%,
+    #009e00 50% 100%
+  );
+  width: 5px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.common-year-cal__cell.has-both {
+  color: rgba(255, 255, 255, 0.95);
+  font-weight: 600;
+}
