@@ -2871,3 +2871,21 @@ body[data-module='prana-bindu'] .p-tooltip.p-tooltip-bottom .p-tooltip-arrow {
 .pb-timeline__step {
   min-width: 2px;   /* было 2px — увеличь до 3px, если 2 не хватает */
 }
+
+/* ============================================================
+   Библиотека шаблонов: превью таймлайна над <pre>
+   ============================================================ */
+
+.pb-templates__timeline {
+  flex: 0 0 auto;
+  margin: 0 0 0.5rem 0;
+}
+
+.pb-templates__timeline .pb-timeline__hover-info {
+  font-size: 0.75rem;
+}
+
+/* Внутри диалога трек ниже, чем в drawer'е */
+.pb-templates__timeline .pb-timeline__track {
+  min-height: 60px;
+}

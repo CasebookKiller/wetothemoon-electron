@@ -15,6 +15,8 @@ import {
   type WorkoutTemplate,
   type TemplateCategory,
 } from '@/main/services/pranaBindu/mentat/workoutTemplates';
+import { WorkoutTimeline, type TimelineStep } from './WorkoutTimeline';
+import { parseWorkoutText } from '@/main/services/pranaBindu/mentat/workoutParser';
 
 interface Props {
   visible: boolean;
@@ -53,6 +55,25 @@ export const WorkoutTemplatesDialog: React.FC<Props> = ({
       );
     });
   }, [category, query]);
+
+  const previewTimeline: TimelineStep[] = useMemo(() => {
+    if (!selected) return [];
+    const parsed = parseWorkoutText(selected.text);
+    return parsed.flatSteps
+      .filter((s) => s.durationSec != null || s.distanceM != null)
+      .map((s, i) => {
+        let durationSec = s.durationSec ?? 0;
+        if (!durationSec && s.distanceM) {
+          durationSec = Math.round(s.distanceM / 2.22);
+        }
+        if (!durationSec) durationSec = 60;
+        return {
+          label: s.label || `Шаг ${i + 1}`,
+          durationSec,
+          zone: s.zone,
+        };
+      });
+  }, [selected]);
 
   const handleCopy = async () => {
     if (!selected) return;
@@ -134,7 +155,6 @@ export const WorkoutTemplatesDialog: React.FC<Props> = ({
         </div>
 
         {/* Справа — текст */}
-                {/* Справа — текст */}
         <div className="pb-templates__preview">
           {!selected ? (
             <div className="pb-templates__empty">
@@ -172,6 +192,11 @@ export const WorkoutTemplatesDialog: React.FC<Props> = ({
 
               {/* Сам шаблон — самый крупный элемент */}
               <pre className="pb-templates__code">{selected.text}</pre>
+              {previewTimeline.length > 0 && (
+                <div className="pb-templates__timeline">
+                  <WorkoutTimeline steps={previewTimeline} height={90} />
+                </div>
+              )}
 
               {/* Как использовать */}
               {selected.usage && (
