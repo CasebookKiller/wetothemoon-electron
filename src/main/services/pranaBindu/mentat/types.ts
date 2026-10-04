@@ -69,7 +69,13 @@ export interface ParsedWorkout {
   flatSteps: WorkoutStep[];
 }
 
-export type ExerciseCategory = 'wade' | 'cali' | 'runner';
+export type ExerciseCategory =
+  | 'wade'
+  | 'cali'
+  | 'runner'
+  | 'core'
+  | 'posture'
+  | 'weightloss';
 
 export interface CatalogLevel {
   level: number;

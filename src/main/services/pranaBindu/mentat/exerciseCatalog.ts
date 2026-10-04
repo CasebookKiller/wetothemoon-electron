@@ -321,6 +321,126 @@ export const RUNNER_LUNGE: CatalogEntry = {
   ],
 };
 
+// ==================== Кор (L1..L10) ====================
+
+export const CORE_DRAGONFLAG: CatalogEntry = {
+  key: 'core-dragonflag',
+  label: 'Кор: прогрессия драконьего флага',
+  icuName: 'Dragon Flag',
+  category: 'core',
+  levels: [
+    { level: 1, name: 'Dead Bug', hint: 'Поясница прижата, руки/ноги попеременно' },
+    { level: 2, name: 'Hollow Body Hold', hint: 'Носки оттянуты, поясница на полу' },
+    { level: 3, name: 'Hollow Rock', hint: 'Качание в hollow, поясница не отрывается' },
+    { level: 4, name: 'Lying Leg Raise', hint: 'Прямые ноги до 90°, без раскачки' },
+    { level: 5, name: 'V-Up', hint: 'Одновременный подъём корпуса и ног' },
+    { level: 6, name: 'Dragon Flag Negative', hint: 'Только опускание, медленно' },
+    { level: 7, name: 'Dragon Flag Tuck', hint: 'Сгруппированный, колени к груди' },
+    { level: 8, name: 'Dragon Flag One-Leg', hint: 'Одна нога прямая, вторая согнута' },
+    { level: 9, name: 'Dragon Flag Half', hint: 'Половина амплитуды, прямая' },
+    { level: 10, name: 'Dragon Flag Full', hint: 'Полный флаг, тело прямой линией' },
+  ],
+};
+
+export const CORE_ANTIEXT = {
+  key: 'core-antiext',
+  label: 'Кор: анти-экстензия на колесе',
+  icuName: 'Ab Wheel',
+  category: 'core' as const,
+  levels: [
+    { level: 1, name: 'Kneeling Plank Hold', hint: 'Стойка на коленях, без колеса' },
+    { level: 2, name: 'Short Rollout', hint: 'Колесо на 30 см от колен' },
+    { level: 3, name: 'Half Rollout', hint: 'До половины амплитуды' },
+    { level: 4, name: 'Full Rollout Kneeling', hint: 'Полная амплитуда с колен' },
+    { level: 5, name: 'Rollout with Pause', hint: 'Пауза 2 сек в нижней точке' },
+    { level: 6, name: 'Rollout + Return', hint: 'Медленный возврат без прогиба' },
+    { level: 7, name: 'Weighted Rollout', hint: 'С весом на спине' },
+    { level: 8, name: 'Standing Negative', hint: 'Только негатив со стойки' },
+    { level: 9, name: 'Standing Half Rollout', hint: 'Половина стоя' },
+    { level: 10, name: 'Standing Full Rollout', hint: 'Полный роллаут стоя' },
+  ],
+} as CatalogEntry;
+
+// ==================== Осанка (L1..L10) ====================
+
+export const POSTURE_UPPER: CatalogEntry = {
+  key: 'posture-upper',
+  label: 'Осанка: верх спины',
+  icuName: 'Posture Upper',
+  category: 'posture',
+  levels: [
+    { level: 1, name: 'Chin Tucks', hint: 'Подбородок к шее, без напряжения' },
+    { level: 2, name: 'Wall Angels', hint: 'Лопатки прижаты к стене' },
+    { level: 3, name: 'Prone Y-Raises', hint: 'Лёжа, руки в Y, подъём лопаток' },
+    { level: 4, name: 'Prone T-Raises', hint: 'Руки в T, лопатки к центру' },
+    { level: 5, name: 'Prone W-Raises', hint: 'Руки в W, сжатие лопаток' },
+    { level: 6, name: 'Superman Hold', hint: 'Одновременно руки и ноги' },
+    { level: 7, name: 'Prone Cobra', hint: 'Плавный подъём корпуса, лопатки вместе' },
+    { level: 8, name: 'Cat-Cow Flow', hint: 'Плавные перекаты, дыхание с движением' },
+    { level: 9, name: 'Bird Dog Hold', hint: 'Противоположные рука/нога, 5 сек' },
+    { level: 10, name: 'Banded Face Pulls', hint: 'С резинкой, лопатки к центру' },
+  ],
+};
+
+export const POSTURE_FULL: CatalogEntry = {
+  key: 'posture-full',
+  label: 'Осанка: комплекс',
+  icuName: 'Posture Full',
+  category: 'posture',
+  levels: [
+    { level: 1, name: 'Wall Stand', hint: 'Стоять у стены 30 сек' },
+    { level: 2, name: 'Wall Slide', hint: 'Руки вверх по стене' },
+    { level: 3, name: 'Chest Opener', hint: 'Раскрытие грудного отдела' },
+    { level: 4, name: 'Doorway Stretch', hint: 'Растяжка груди в проёме' },
+    { level: 5, name: 'Hip Flexor Stretch', hint: 'Стоя на одном колене' },
+    { level: 6, name: 'Thoracic Extension', hint: 'На валике, руки назад' },
+    { level: 7, name: 'Prone Press-Up', hint: 'Маккензи, мягкая экстензия' },
+    { level: 8, name: 'Quadruped T-Spine', hint: 'Ротация в упоре на четвереньках' },
+    { level: 9, name: 'Standing Overhead Reach', hint: 'Руки вверх без прогиба' },
+    { level: 10, name: 'Full Posture Flow', hint: 'Все элементы в потоке' },
+  ],
+};
+
+// ==================== Жиросжигание / HIIT (L1..L10) ====================
+
+export const WEIGHTLOSS_HIIT: CatalogEntry = {
+  key: 'weightloss-hiit',
+  label: 'HIIT: базовые кардио',
+  icuName: 'HIIT Basic',
+  category: 'weightloss',
+  levels: [
+    { level: 1, name: 'Jumping Jacks', hint: 'Прыжки ноги-руки' },
+    { level: 2, name: 'High Knees', hint: 'Бег на месте с высоким коленом' },
+    { level: 3, name: 'Mountain Climbers', hint: 'Планка + поочерёдные ноги' },
+    { level: 4, name: 'Bear Crawl', hint: 'Ходьба на четвереньках' },
+    { level: 5, name: 'Jump Squats', hint: 'Присед с прыжком' },
+    { level: 6, name: 'Shadow Boxing', hint: 'Бой с тенью, работа рук' },
+    { level: 7, name: 'Jump Rope', hint: 'Скакалка, ровный ритм' },
+    { level: 8, name: 'Tuck Jumps', hint: 'Прыжки с подтяжкой колен' },
+    { level: 9, name: 'Burpees', hint: 'Прыжок-планка-прыжок' },
+    { level: 10, name: 'Burpee + Push-up', hint: 'Burpee с отжиманием' },
+  ],
+};
+
+export const WEIGHTLOSS_BODYWEIGHT: CatalogEntry = {
+  key: 'weightloss-bw',
+  label: 'HIIT: силовое тело',
+  icuName: 'HIIT Strength',
+  category: 'weightloss',
+  levels: [
+    { level: 1, name: 'Bodyweight Squat', hint: 'Полный присед, руки вперёд' },
+    { level: 2, name: 'Reverse Lunge', hint: 'Шаг назад, колено к полу' },
+    { level: 3, name: 'Push-up', hint: 'Полные отжимания' },
+    { level: 4, name: 'Glute Bridge', hint: 'Мостик на плечах' },
+    { level: 5, name: 'Plank Hold', hint: 'Классическая планка' },
+    { level: 6, name: 'Split Squat', hint: 'Статический выпад' },
+    { level: 7, name: 'Pike Push-up', hint: 'Складка, руки на полу' },
+    { level: 8, name: 'Single-Leg Glute Bridge', hint: 'Мостик на одной ноге' },
+    { level: 9, name: 'Pistol Squat (neg)', hint: 'Негатив пистолетика' },
+    { level: 10, name: 'Full Body Circuit', hint: 'Все элементы в круге' },
+  ],
+};
+
 // ==================== Сводный каталог прогрессий ====================
 
 export const PROGRESSIONS_CATALOG: CatalogEntry[] = [
@@ -343,6 +463,15 @@ export const PROGRESSIONS_CATALOG: CatalogEntry[] = [
   RUNNER_CALF,
   RUNNER_ANTICORE,
   RUNNER_LUNGE,
+  // Core
+  CORE_DRAGONFLAG,
+  CORE_ANTIEXT,
+  // Posture
+  POSTURE_UPPER,
+  POSTURE_FULL,
+  // Weight-loss
+  WEIGHTLOSS_HIIT,
+  WEIGHTLOSS_BODYWEIGHT,
 ];
 
 // ==================== Упражнения без уровней (named) ====================
@@ -413,6 +542,26 @@ export const NAMED_EXERCISES: NamedExercise[] = [
     hint: 'Пешком назад к старту', defaultDuration: '100mtr', defaultZone: 1 },
   { key: 'rest', category: 'run-basic', label: 'Rest', icuName: 'Rest',
     hint: 'Отдых', defaultDuration: '60s', defaultZone: 1 },
+
+  // --- СБУ: расширение ---
+  { key: 'straight-leg-bound', category: 'drill', label: 'Straight-Leg Bound',
+    icuName: 'Straight-Leg Bound', hint: 'Отталкивание прямой ногой',
+    defaultDuration: '30mtr', defaultZone: 1 },
+  { key: 'sl-hops-l', category: 'drill', label: 'Single-Leg Hops L',
+    icuName: 'Single-Leg Hops L', hint: 'Прыжки на левой',
+    defaultDuration: '20mtr', defaultZone: 1 },
+  { key: 'sl-hops-r', category: 'drill', label: 'Single-Leg Hops R',
+    icuName: 'Single-Leg Hops R', hint: 'Прыжки на правой',
+    defaultDuration: '20mtr', defaultZone: 1 },
+  { key: 'fast-feet', category: 'drill', label: 'Fast Feet',
+    icuName: 'Fast Feet', hint: 'Максимальная частота, короткий шаг',
+    defaultDuration: '20mtr', defaultZone: 1 },
+  { key: 'wall-drill', category: 'drill', label: 'Wall Drill',
+    icuName: 'Wall Drill', hint: 'У стены, работа бёдра',
+    defaultDuration: '30s', defaultZone: 1 },
+  { key: 'marching-high-knees', category: 'drill', label: 'Marching High Knees',
+    icuName: 'Marching High Knees', hint: 'Медленно, акцент на осанке',
+    defaultDuration: '20mtr', defaultZone: 1 },
 ];
 
 // ==================== Утилиты поиска ====================
