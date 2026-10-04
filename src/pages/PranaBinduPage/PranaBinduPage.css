@@ -2834,7 +2834,7 @@ body[data-module='prana-bindu'] .p-tooltip.p-tooltip-bottom .p-tooltip-arrow {
   display: flex;
   align-items: flex-end;
   height: 100%;
-  min-width: 2px;
+  min-width: 3px;
 }
 
 .pb-timeline__bar {
@@ -2866,10 +2866,6 @@ body[data-module='prana-bindu'] .p-tooltip.p-tooltip-bottom .p-tooltip-arrow {
   text-align: center;
   color: var(--tg-theme-hint-color, #708499);
   font-size: 0.8rem;
-}
-
-.pb-timeline__step {
-  min-width: 2px;   /* было 2px — увеличь до 3px, если 2 не хватает */
 }
 
 /* ============================================================
@@ -3187,4 +3183,112 @@ body[data-module='prana-bindu'] .p-tooltip.p-tooltip-bottom .p-tooltip-arrow {
   color: var(--tg-theme-text-color, #f5f5f5);
   font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
   font-size: 0.75rem;
+}
+
+/* ============================================================
+   Годовой календарь: тулбар
+   ============================================================ */
+
+.pb-year-cal__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.pb-year-cal__year {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--pb-accent);
+  min-width: 3.5rem;
+  text-align: center;
+}
+
+.pb-year-cal__spinner {
+  color: var(--pb-accent);
+}
+
+.pb-year-cal__legend {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  vertical-align: middle;
+  margin-right: 0.15rem;
+}
+
+.pb-year-cal__legend--plan {
+  background: #009e80;
+}
+
+.pb-year-cal__legend--fact {
+  background: var(--pb-accent)!important;
+}
+
+/* Факт — прана-бинду */
+.common-year-cal__cell.has-fact .common-year-cal__marker {
+  background: var(--pb-accent)!important;
+}
+
+.common-year-cal__cell.has-fact {
+  color: rgb(212, 163, 115, 0.95)!important;
+}
+
+/* Оба — линейный градиент teal/green */
+.common-year-cal__cell.has-both .common-year-cal__marker {
+  background: linear-gradient(
+    to right,
+    #009e80 0 50%,
+    var(--pb-accent) 50% 100%
+  )!important;
+  width: 5px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+
+/* ============================================================
+   Календари: override цвета «факта» на песочный accent модуля.
+   COMMON-дефолт — зелёный (#009e00). Здесь только Prana-Bindu.
+   ============================================================ */
+
+/* --- Легенда в тулбаре CalendarPanel --- */
+.pb-page .common-cal-panel__dot--fact {
+  background: var(--pb-accent) !important;
+}
+
+/* --- Годовой календарь --- */
+.pb-page .common-year-cal__cell.has-fact .common-year-cal__marker {
+  background: var(--pb-accent) !important;
+}
+
+.pb-page .common-year-cal__cell.has-fact {
+  color: rgb(212, 163, 115, 0.95) !important;
+}
+
+.pb-page .common-year-cal__cell.has-both .common-year-cal__marker {
+  background: linear-gradient(
+    to right,
+    #009e80 0 50%,
+    var(--pb-accent) 50% 100%
+  ) !important;
+  width: 5px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+/* --- Квартальный / месячный календарь --- */
+.pb-page .common-quarter-cal__mark--fact.is-on {
+  background: var(--pb-accent) !important;
+}
+
+/* --- Лента дней (DateStrip) --- */
+.pb-page .common-date-strip__mark--fact.is-on {
+  background: var(--pb-accent) !important;
+}
+
+/* --- Легенда годового календаря (старый тулбар) --- */
+.pb-page .pb-year-cal__legend--fact {
+  background: var(--pb-accent) !important;
 }

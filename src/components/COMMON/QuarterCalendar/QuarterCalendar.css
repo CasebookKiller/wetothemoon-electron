@@ -1,0 +1,137 @@
+/* ============================================================
+   Квартальный (и месячный) календарь: N месяцев в ряд
+   ============================================================ */
+
+.common-quarter-cal {
+  display: grid;
+  grid-template-columns: repeat(var(--q-month-count, 3), minmax(0, 1fr));
+  gap: 1rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+@media (max-width: 900px) {
+  .common-quarter-cal {
+    grid-template-columns: 1fr;
+  }
+}
+
+.common-quarter-cal__month {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem 0.75rem 0.75rem;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.common-quarter-cal__month-title {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--pb-accent, #d4a373);
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  text-align: center;
+}
+
+.common-quarter-cal__dow {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  margin-bottom: 0.3rem;
+}
+
+.common-quarter-cal__dow-cell {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.4);
+  text-align: center;
+  min-width: 0;
+}
+
+.common-quarter-cal__grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 3px;
+  min-width: 0;
+}
+
+.common-quarter-cal__cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: space-between;
+  height: 2.6rem;
+  min-width: 0;
+  border: 1px solid transparent;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.78rem;
+  font-family: inherit;
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 0.2rem 0.25rem 0.2rem 0.3rem;
+  box-sizing: border-box;
+  transition: background 0.1s, border-color 0.1s;
+}
+
+.common-quarter-cal__cell:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.common-quarter-cal__cell--empty {
+  cursor: default;
+  visibility: hidden;
+}
+
+.common-quarter-cal__day-num {
+  line-height: 1;
+  align-self: flex-start;
+}
+
+.common-quarter-cal__marks {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  margin-top: auto;
+}
+
+.common-quarter-cal__mark {
+  display: block;
+  width: 100%;
+  height: 3px;
+  border-radius: 1px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.common-quarter-cal__mark--plan.is-on {
+  background: #009e80;   /* teal — дефолт COMMON */
+}
+
+.common-quarter-cal__mark--fact.is-on {
+  background: #009e00;   /* green — дефолт COMMON, модуль может override */
+}
+
+/* Один месяц — ячейка крупнее, потому что сетка шире */
+.common-quarter-cal[style*="--q-month-count: 1"] .common-quarter-cal__cell,
+.common-quarter-cal--single .common-quarter-cal__cell {
+  height: 4rem;
+  font-size: 0.95rem;
+}
+
+.common-quarter-cal[style*="--q-month-count: 1"] .common-quarter-cal__day-num,
+.common-quarter-cal--single .common-quarter-cal__day-num {
+  font-size: 0.95rem;
+  padding-left: 0.25rem;
+  padding-top: 0.1rem;
+}
+
+.common-quarter-cal[style*="--q-month-count: 1"] .common-quarter-cal__mark,
+.common-quarter-cal--single .common-quarter-cal__mark {
+  height: 4px;
+}
