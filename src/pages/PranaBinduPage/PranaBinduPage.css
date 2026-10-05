@@ -351,8 +351,17 @@ span.pb-destructive {
    Prana-Bindu: календари, кнопки, разделители — в стиле AuditLogTab
    ============================================================ */
 
-.pb-page {
+/* CSS-переменные модуля Prana-Bindu.
+   Основное определение — на body[data-module], чтобы переменные
+   были доступны внутри порталов (drawer'ы, диалоги), которые
+   рендерятся вне .pb-page.
+   Дублируем на .pb-page и .pb-drawer — на случай первого рендера
+   до установки data-module и для порталов PrimeReact. */
+body[data-module='prana-bindu'],
+.pb-page,
+.pb-drawer {
   --pb-accent: var(--pb-accent-color, #d4a373);
+  --pb-icu-red: 224, 90, 90;
 }
 
 /* --- Разделитель между подключением и синхронизацией --- */
@@ -1656,10 +1665,6 @@ span.pb-destructive {
 .pb-source-badge--intervals-icu {
   background: rgba(224, 90, 90, 0.18);
   color: #e05a5a;
-}
-
-.pb-page {
-  --pb-icu-red: 224, 90, 90;
 }
 
 .pb-source-badge--intervals-icu {
@@ -3291,4 +3296,144 @@ body[data-module='prana-bindu'] .p-tooltip.p-tooltip-bottom .p-tooltip-arrow {
 /* --- Легенда годового календаря (старый тулбар) --- */
 .pb-page .pb-year-cal__legend--fact {
   background: var(--pb-accent) !important;
+}
+
+/* ============================================================
+   DayDrawer + views (PlanEventView, RunFactView, WellnessView)
+   ============================================================ */
+
+.pb-day-drawer .p-tabview-nav {
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 1px solid var(--surface-border, rgba(255, 255, 255, 0.1)) !important;
+  padding: 0 0 4px 0;
+  margin-bottom: 0.75rem;
+}
+
+.pb-day-drawer .p-tabview-nav li .p-tabview-nav-link {
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 2px solid transparent !important;
+  border-radius: 0 !important;
+  color: var(--tg-theme-hint-color, #708499) !important;
+  font-size: 0.85rem;
+  padding: 0.5rem 0.75rem;
+}
+
+.pb-day-drawer .p-tabview-nav li.p-highlight .p-tabview-nav-link {
+  color: var(--pb-accent) !important;
+  border-bottom: 2px solid var(--pb-accent) !important;
+}
+
+.pb-day-drawer .p-tabview-panels {
+  background: transparent !important;
+  padding: 0 !important;
+}
+
+.pb-day-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  background: color-mix(in srgb, var(--pb-accent) 6%, transparent);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  color: var(--tg-theme-text-color, #f5f5f5);
+  margin-bottom: 0.5rem;
+}
+
+.pb-day-summary--empty {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.pb-day-summary__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.pb-day-summary__item .pi {
+  font-size: 0.85rem;
+  color: var(--pb-accent);
+}
+
+.pb-day-summary__item--dim {
+  color: var(--tg-theme-hint-color, #708499);
+  font-size: 0.75rem;
+}
+
+.pb-day-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.pb-day-list__item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.6rem 0.75rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--surface-border, rgba(255, 255, 255, 0.08));
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  transition: background 0.1s, border-color 0.1s;
+}
+
+.pb-day-list__item:hover {
+  background: color-mix(in srgb, var(--pb-accent) 6%, transparent);
+  border-color: color-mix(in srgb, var(--pb-accent) 35%, transparent);
+}
+
+.pb-day-list__item-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--tg-theme-text-color, #f5f5f5);
+}
+
+.pb-day-list__item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--tg-theme-hint-color, #708499);
+}
+
+.pb-plan-event-view__back {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--surface-border, rgba(255, 255, 255, 0.08));
+}
+
+.pb-plan-event-view__date {
+  margin-left: auto;
+  font-size: 0.85rem;
+  color: var(--tg-theme-hint-color, #708499);
+}
+
+.pb-run-fact-view {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Бейджи источников внутри плитки дня */
+.pb-day-list__item .pb-source-badges {
+  display: inline-flex;
+  gap: 0.25rem;
+  margin-left: 0.25rem;
+}
+
+.pb-day-list__item .pb-source-badge {
+  font-size: 0.65rem;
+  padding: 0.05rem 0.35rem;
 }
