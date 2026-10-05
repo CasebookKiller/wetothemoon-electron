@@ -3583,3 +3583,69 @@ body[data-module='prana-bindu'] .p-tooltip.p-tooltip-bottom .p-tooltip-arrow {
 .pb-mirror-delete-dialog__summary b {
   color: var(--pb-accent);
 }
+
+.pb-mirror-delete-dialog__warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  margin-bottom: 0.75rem;
+  background: color-mix(in srgb, #e8a838 10%, transparent);
+  border: 1px solid color-mix(in srgb, #e8a838 35%, transparent);
+  border-radius: 6px;
+  color: #e8a838;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.pb-mirror-delete-dialog__warning .pi {
+  font-size: 1rem;
+  flex: 0 0 auto;
+  margin-top: 0.1rem;
+}
+
+.pb-mirror-delete-dialog__warning b {
+  color: #e8a838;
+}
+
+/* ============================================================
+   Чекбоксы в MirrorDeleteDialog — в стиле фильтров пробежек:
+   компактные, accent-рамка, прозрачный фон, accent-галочка.
+   ============================================================ */
+
+.pb-mirror-delete-dialog .p-checkbox {
+  width: 1rem !important;
+  height: 1rem !important;
+  flex: 0 0 auto;
+}
+
+.pb-mirror-delete-dialog .p-checkbox .p-checkbox-box {
+  width: 1rem !important;
+  height: 1rem !important;
+  border-radius: 2px !important;
+  border: 1px solid color-mix(in srgb, var(--pb-accent) 45%, transparent) !important;
+  background: transparent !important;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+.pb-mirror-delete-dialog .p-checkbox .p-checkbox-box:hover {
+  border-color: var(--pb-accent) !important;
+}
+
+/* Отмечено — прозрачный фон, accent-рамка, accent-галочка */
+.pb-mirror-delete-dialog .p-checkbox.p-highlight .p-checkbox-box {
+  background: transparent !important;
+  border-color: var(--pb-accent) !important;
+  color: var(--pb-accent) !important;
+}
+
+.pb-mirror-delete-dialog .p-checkbox.p-highlight .p-checkbox-icon {
+  color: var(--pb-accent) !important;
+  width: 0.65rem !important;
+  height: 0.65rem !important;
+}
+
+/* Focus ring */
+.pb-mirror-delete-dialog .p-checkbox.p-focus .p-checkbox-box {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pb-accent) 25%, transparent) !important;
+}
