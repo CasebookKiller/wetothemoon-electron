@@ -53,6 +53,8 @@ import {
   type StaleCandidate,
 } from '@/components/PRANA_BINDU/MirrorDeleteDialog';
 
+import { FullWeek } from '@/components/PRANA_BINDU/FullWeek';
+
 interface ProviderOption {
   label: string;
   value: string;
@@ -1515,1091 +1517,1116 @@ const handleSyncWellnessNew = async () => {
   };
 
   return (
-    <div className="pb-page p-4">
-      <div className="mb-4">
-        <h1 className="pb-title">
-          <i className="pi pi-wave-pulse pb-title-icon" />
-          Prana-Bindu
-        </h1>
-        <p className="pb-subtitle">Тренировки тела: бег и сила</p>
-      </div>
-
-      <div className="grid mb-3">
-        {MODULES.map((m) => (
-          <div key={m.name} className="col-12 md:col-6 lg:col-4 p-2">
-            <div className="surface-card p-3 shadow-2 border-round h-full">
-              <div className="pb-module-name">{m.name}</div>
-              <div className="pb-module-desc">{m.description}</div>
-            </div>
-          </div>
-        ))}
-
-        {/* Сюда надо перенести панели, но здесь надо поработать над стилями, шириной и стилями панелей при расзмещении в решетке */}
-        
-      </div>
-
-      {/* ==================== ПРОФИЛЬ ==================== */}
-      <Panel header="Профиль" className="shadow-5 mb-3 pb-panel">
-        <div className="pb-profile__grid">
-          <div className="pb-profile__field">
-            <label className="pb-label" htmlFor="pb-profile-hrmax">
-              HRmax
-              {!profile.maxHr && <span className="pb-profile__missing">не задан</span>}
-            </label>
-            <InputNumber
-              inputId="pb-profile-hrmax"
-              value={profile.maxHr}
-              onValueChange={(e) =>
-                setProfile((p) => ({ ...p, maxHr: e.value ?? null }))
-              }
-              placeholder="напр. 178"
-              min={100}
-              max={230}
-              showButtons
-              buttonLayout="horizontal"
-              incrementButtonIcon="pi pi-plus"
-              decrementButtonIcon="pi pi-minus"
-              className="pb-debug__input"
-            />
-            <small className="pb-hint">
-              Максимальный пульс.
-              {profile.maxHrSource && (
-                <>
-                  {' '}
-                  <span className="pb-profile__src">
-                    источник: {labelForSource(profile.maxHrSource)}
-                  </span>
-                </>
-              )}
-            </small>
-          </div>
-
-          <div className="pb-profile__field">
-            <label className="pb-label" htmlFor="pb-profile-lthr">
-              LTHR
-              {!profile.lthr && <span className="pb-profile__missing">не задан</span>}
-            </label>
-            <InputNumber
-              inputId="pb-profile-lthr"
-              value={profile.lthr}
-              onValueChange={(e) =>
-                setProfile((p) => ({ ...p, lthr: e.value ?? null }))
-              }
-              placeholder="напр. 165"
-              min={80}
-              max={220}
-              showButtons
-              buttonLayout="horizontal"
-              incrementButtonIcon="pi pi-plus"
-              decrementButtonIcon="pi pi-minus"
-              className="pb-debug__input"
-            />
-            <small className="pb-hint">
-              Лактатный порог. Ключевой параметр для зон.
-              {profile.lthrSource && (
-                <>
-                  {' '}
-                  <span className="pb-profile__src">
-                    источник: {labelForSource(profile.lthrSource)}
-                  </span>
-                </>
-              )}
-            </small>
-          </div>
-
-          <div className="pb-profile__field">
-            <label className="pb-label" htmlFor="pb-profile-resthr">
-              RestHR
-              {!profile.restingHr && <span className="pb-profile__missing">не задан</span>}
-            </label>
-            <InputNumber
-              inputId="pb-profile-resthr"
-              value={profile.restingHr}
-              onValueChange={(e) =>
-                setProfile((p) => ({ ...p, restingHr: e.value ?? null }))
-              }
-              placeholder="напр. 48"
-              min={30}
-              max={120}
-              showButtons
-              buttonLayout="horizontal"
-              incrementButtonIcon="pi pi-plus"
-              decrementButtonIcon="pi pi-minus"
-              className="pb-debug__input"
-            />
-            <small className="pb-hint">
-              Пульс покоя.
-              {profile.restingHrSource && (
-                <>
-                  {' '}
-                  <span className="pb-profile__src">
-                    источник: {labelForSource(profile.restingHrSource)}
-                  </span>
-                </>
-              )}
-            </small>
-          </div>
-        </div>
-
-        <div className="pb-profile__actions">
-          <Button
-            label={
-              profileSaving
-                ? 'Сохранение…'
-                : profileSaved
-                ? 'Сохранено'
-                : 'Сохранить'
-            }
-            icon={
-              profileSaving
-                ? 'pi pi-spin pi-spinner'
-                : profileSaved
-                ? 'pi pi-check'
-                : 'pi pi-save'
-            }
-            className="pb p-button-sm"
-            onClick={handleSaveProfile}
-            disabled={profileSaving}
-          />
-          <Button
-            label="Перечитать"
-            icon="pi pi-refresh"
-            className="pb-soft p-button-sm"
-            onClick={loadProfile}
-            disabled={profileSaving}
-          />
-        </div>
-
-        {profileError && (
-          <Message severity="error" text={profileError} className="w-full mt-2" />
-        )}
-      </Panel>
-
-      {/* ==================== ПОДКЛЮЧЕНИЯ ==================== */}
-      <Panel header="Подключения" className="shadow-5 mb-3 pb-panel">
-        <div className="pb-connections">
-          {/* --- dodofo --- */}
-          <div className="pb-connections__block">
-            <div className="pb-connections__title">
-              <i className="pi pi-link" /> dodofo
-              {hasDodofoToken && (
-                <span className="pb-label-ok">✓ сохранён</span>
-              )}
-            </div>
-            <div className="flex flex-column gap-2">
-              <InputText
-                id="pb-dodofo-token"
-                value={dodofoToken}
-                onChange={(e) => setDodofoToken(e.target.value)}
-                placeholder="dodofo_..."
-                className="w-full"
-              />
-              <small className="pb-hint">
-                Токен создаётся в профиле dodofo.ru. Хранится
-                зашифрованным через safeStorage.
-              </small>
-              <div className="flex gap-2 flex-wrap">
-                <Button
-                  label={loading ? 'Сохранение...' : 'Сохранить токен'}
-                  icon={loading ? 'pi pi-spin pi-spinner' : 'pi pi-save'}
-                  className="pb p-button-sm"
-                  onClick={handleSaveDodofo}
-                  disabled={loading || !dodofoToken.trim()}
-                />
-                <Button
-                  label={loading ? 'Проверка...' : 'Проверить'}
-                  icon={loading ? 'pi pi-spin pi-spinner' : 'pi pi-question-circle'}
-                  className="pb-soft p-button-sm"
-                  onClick={handleCheck}
-                  disabled={loading}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* --- intervals.icu --- */}
-          <div className="pb-connections__block">
-            <div className="pb-connections__title">
-              <i className="pi pi-heart" /> intervals.icu
-              {intervalsHasKey && (
-                <span className="pb-label-ok">✓ сохранён</span>
-              )}
-            </div>
-            <div className="flex flex-column gap-2">
-              <InputText
-                type="password"
-                value={intervalsApiKey}
-                onChange={(e) => setIntervalsApiKey(e.target.value)}
-                placeholder={
-                  intervalsHasKey
-                    ? '•••••••• (оставьте пустым)'
-                    : 'ваш ключ из Settings → Developer'
-                }
-                className="w-full"
-              />
-              <InputText
-                value={intervalsAthleteId}
-                onChange={(e) => setIntervalsAthleteId(e.target.value)}
-                placeholder="i123456 — athlete id (или пусто для «self»)"
-                className="w-full"
-              />
-              <small className="pb-hint">
-                API-ключ: intervals.icu → Settings → Developer.
-                Athlete ID — из URL интерфейса, необязательно.
-              </small>
-              <div className="flex gap-2 flex-wrap">
-                <Button
-                  label={intervalsSaving ? 'Сохранение…' : 'Сохранить ключ'}
-                  icon={intervalsSaving ? 'pi pi-spin pi-spinner' : 'pi pi-save'}
-                  className="pb p-button-sm"
-                  onClick={handleIntervalsSave}
-                  disabled={
-                    intervalsSaving ||
-                    (!intervalsApiKey.trim() && !intervalsHasKey)
-                  }
-                />
-              </div>
-              {intervalsError && (
-                <Message severity="error" text={intervalsError} className="w-full" />
-              )}
-              {intervalsInfo && (
-                <Message severity="success" text={intervalsInfo} className="w-full" />
-              )}
-            </div>
-          </div>
-
-          {/* --- Zepp (резерв) --- */}
-          <div className="pb-connections__block pb-connections__block--collapsed">
-            <div className="pb-connections__title">
-              <i className="pi pi-mobile" /> Zepp (резерв)
-            </div>
-            <div className="flex flex-column gap-2">
-              <InputText
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                className="w-full"
-              />
-              <InputText
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full"
-              />
-              <small className="pb-hint">
-                Резервный способ. Основной — dodofo и intervals.icu.
-              </small>
-              <div className="flex gap-2 flex-wrap">
-                <Button
-                  label={loading ? 'Подключение...' : 'Подключить'}
-                  icon={loading ? 'pi pi-spin pi-spinner' : 'pi pi-sign-in'}
-                  className="pb p-button-sm"
-                  onClick={handleConnectZepp}
-                  disabled={loading || !email || !password}
-                />
-              </div>
-            </div>
-          </div>
-
-          {status && (
-            <div className="pb-status">
-              <code>{status}</code>
-            </div>
-          )}
-        </div>
-      </Panel>
-
-      {/* ==================== СИНХРОНИЗАЦИЯ (API) ==================== */}
-      <Panel header="Синхронизация (API)" className="shadow-5 mb-3 pb-panel">
-        <div className="flex flex-column gap-3">
-          <div className="flex flex-column gap-2">
-            <label className="pb-label">Диапазон</label>
-            <div className="flex gap-2 flex-wrap align-items-center">
-              <Calendar
-                value={syncFrom}
-                onChange={(e) => setSyncFrom(e.value as Date)}
-                dateFormat="dd.mm.yy"
-                placeholder="С"
-                showIcon
-                className="pb-cal"
-                maxDate={syncTo ?? undefined}
-              />
-              <span className="pb-hint">—</span>
-              <Calendar
-                value={syncTo}
-                onChange={(e) => setSyncTo(e.value as Date)}
-                dateFormat="dd.mm.yy"
-                placeholder="По"
-                showIcon
-                className="pb-cal"
-                minDate={syncFrom ?? undefined}
-              />
-              <Button
-                label="30 дней"
-                icon="pi pi-calendar"
-                className="pb-soft p-button-sm"
-                onClick={() => {
-                  const r = defaultSyncRange();
-                  setSyncFrom(r.from);
-                  setSyncTo(r.to);
-                }}
-              />
-              <Button
-                label="За всё время"
-                icon="pi pi-calendar-plus"
-                className="pb-soft p-button-sm"
-                onClick={() => {
-                  setSyncFrom(new Date(2020, 0, 1));
-                  setSyncTo(new Date());
-                }}
-              />
-              <Button
-                label="+30 дней"
-                icon="pi pi-calendar"
-                className="pb-soft p-button-sm"
-                onClick={() => {
-                  const now = new Date();
-                  const to = new Date();
-                  to.setDate(to.getDate() + 30);
-                  setSyncFrom(now);
-                  setSyncTo(to);
-                }}
-                tooltip="Текущий месяц + следующий"
-              />
-              <Button
-                label="+90 дней"
-                icon="pi pi-calendar-plus"
-                className="pb-soft p-button-sm"
-                onClick={() => {
-                  const now = new Date();
-                  const to = new Date();
-                  to.setDate(to.getDate() + 90);
-                  setSyncFrom(now);
-                  setSyncTo(to);
-                }}
-                tooltip="Ближайший квартал"
-              />
-            </div>
-          </div>
-
-          <div className="flex flex-column gap-2">
-            <label htmlFor="pb-provider" className="pb-label">
-              Провайдер
-            </label>
-            <Dropdown
-              inputId="pb-provider"
-              value={provider}
-              options={PROVIDER_OPTIONS}
-              onChange={(e) => setProvider(e.value)}
-              className="w-full"
-              panelClassName="pb-dropdown-panel"
-            />
-            {renderProviderForm()}
-          </div>
-
-          <hr className="pb-sep" />
-
-          <div className="flex flex-column gap-2">
-            <label className="pb-label">Операции</label>
-            <div className="flex gap-2 flex-wrap align-items-center">
-              <Button
-                label={syncing ? 'Синхронизация...' : 'Синхронизировать'}
-                icon={syncing ? 'pi pi-spin pi-spinner' : 'pi pi-sync'}
-                className="pb p-button-sm"
-                onClick={handleSync}
-                disabled={syncing || !providerCaps?.workouts || !syncFrom || !syncTo}
-                tooltip={
-                  !providerCaps?.workouts
-                    ? `Провайдер «${provider}» не поддерживает список тренировок`
-                    : 'Получить список активностей'
-                }
-              />
-              <Button
-                label={syncingStreams ? 'Потоки…' : 'Залить потоки'}
-                icon={syncingStreams ? 'pi pi-spin pi-spinner' : 'pi pi-cloud-download'}
-                className="pb-soft p-button-sm"
-                onClick={handleSyncAllStreams}
-                disabled={syncingStreams || !providerCaps?.streams || !syncFrom || !syncTo}
-                tooltip={
-                  !providerCaps?.streams
-                    ? `Провайдер «${provider}» не поддерживает потоки`
-                    : 'Загрузить FIT + потоки за выбранный период'
-                }
-              />
-              <Button
-                label={syncingThresholds ? 'Пороги…' : 'Подтянуть пороги'}
-                icon={syncingThresholds ? 'pi pi-spin pi-spinner' : 'pi pi-sliders-h'}
-                className="pb-soft p-button-sm"
-                onClick={handleSyncThresholds}
-                disabled={syncingThresholds || !providerCaps?.thresholds}
-                tooltip={
-                  !providerCaps?.thresholds
-                    ? `Провайдер «${provider}» не поддерживает пороги`
-                    : 'Забрать пороги в профиль'
-                }
-              />
-              <Button
-                label={syncingZones ? 'Зоны…' : 'Подтянуть зоны'}
-                icon={syncingZones ? 'pi pi-spin pi-spinner' : 'pi pi-chart-bar'}
-                className="pb-soft p-button-sm"
-                onClick={handleSyncZones}
-                disabled={syncingZones}
-                tooltip="Читает HR-зоны из последней активности ICU"
-              />
-              <Button
-                label={syncingWellness ? 'Wellness…' : 'Подтянуть wellness (ICU + dodofo)'}
-                icon={syncingWellness ? 'pi pi-spin pi-spinner' : 'pi pi-heart'}
-                className="pb-soft p-button-sm"
-                onClick={handleSyncWellnessNew}
-                disabled={syncingWellness || !syncFrom || !syncTo}
-                tooltip={
-                  'Сон, HRV, пульс покоя (из intervals.icu и dodofo)'
-                }
-              />
-              <Button
-                label="Отладка"
-                icon="pi pi-code"
-                className="pb-soft p-button-sm"
-                onClick={() => setDebugVisible(true)}
-                tooltip="Сырые ответы провайдеров API"
-              />
-            </div>
-            <small className="pb-hint">
-              Повторный запуск за тот же период не создаёт дубликаты —
-              обновляет существующие записи.
-            </small>
-          </div>
-
-          {syncingStreams && syncStreamsProgress && (
-            <div className="pb-import-progress">
-              <div className="pb-import-progress__header">
-                <span>
-                  {syncStreamsProgress.current} / {syncStreamsProgress.total}
-                  {' · '}
-                  <code>{syncStreamsProgress.externalId ?? '—'}</code>
-                </span>
-                <Button
-                  label="Отмена"
-                  icon="pi pi-times"
-                  className="pb-soft p-button-sm"
-                  onClick={handleCancelSyncStreams}
-                />
-              </div>
-              <ProgressBar
-                value={Math.round(
-                  (syncStreamsProgress.current / syncStreamsProgress.total) * 100
-                )}
-                showValue={false}
-                style={{ height: '6px' }}
-              />
-              <div className="pb-import-progress__stats">
-                <span>+{syncStreamsProgress.fetched}</span>
-                <span>·{syncStreamsProgress.skipped}</span>
-                {syncStreamsProgress.failed > 0 && (
-                  <span className="pb-import-progress__fail">
-                    ✗{syncStreamsProgress.failed}
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-
-          {syncError && (
-            <Message severity="error" text={syncError} className="w-full" />
-          )}
-          {syncResult && (
-            <Message
-              severity={syncResult.added > 0 ? 'success' : 'info'}
-              className="w-full"
-              content={
-                <span>
-                  Добавлено: <b>{syncResult.added}</b>
-                  {' · '}Обновлено: <b>{syncResult.updated}</b>
-                  {' · '}Всего из источника: <b>{syncResult.total}</b>
-                </span>
-              }
-            />
-          )}
-          {streamsAllError && (
-            <Message severity="error" text={streamsAllError} className="w-full" />
-          )}
-          {streamsAllResult && (
-            <Message
-              severity={streamsAllResult.failed > 0 ? 'warn' : 'info'}
-              className="w-full"
-              content={
-                <span>
-                  Потоки: загружено <b>{streamsAllResult.fetched}</b>
-                  {' · '}пропущено <b>{streamsAllResult.skipped}</b>
-                  {streamsAllResult.failed > 0 && (
-                    <> · ошибок <b>{streamsAllResult.failed}</b></>
-                  )}
-                </span>
-              }
-            />
-          )}
-          {thresholdsError && (
-            <Message severity="error" text={thresholdsError} className="w-full" />
-          )}
-          {thresholdsResult && (
-            <Message
-              severity="success"
-              className="w-full"
-              content={<span>Пороги обновлены: <b>{thresholdsResult}</b></span>}
-            />
-          )}
-          {zonesError && (
-            <Message severity="error" text={zonesError} className="w-full" />
-          )}
-          {zonesResult && (
-            <Message
-              severity="success"
-              className="w-full"
-              content={<span>HR-зоны: <b>{zonesResult}</b></span>}
-            />
-          )}
-          {wellnessError && (
-            <Message severity="error" text={wellnessError} className="w-full" />
-          )}
-          {wellnessResult && (
-            <Message
-              severity="success"
-              className="w-full"
-              content={<span>Wellness: {wellnessResult}</span>}
-            />
-          )}
-        </div>
-      </Panel>
-
-      {/* ==================== ИМПОРТ ФАЙЛОВ ==================== */}
-      <div
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        className={`pb-archive-dropzone ${dragActive ? 'pb-archive-dropzone--active' : ''}`}
-      >
-        <Panel header="Импорт файлов" className="shadow-5 mb-3 pb-panel">
-          <div className="flex flex-column gap-2">
-            <div className="pb-archive-origin">
-              <label className="pb-label">Откуда файлы</label>
-              <Dropdown
-                value={importOrigin}
-                options={IMPORT_ORIGIN_OPTIONS}
-                onChange={(e) => setImportOrigin(e.value)}
-                className="pb-archive-origin__dropdown"
-                panelClassName="pb-dropdown-panel"
-              />
-              <small className="pb-hint">
-                Метка источника сохраняется при первом импорте и не меняется
-                при повторных загрузках того же файла.
-              </small>
-            </div>
-          </div>
-          <div className="flex flex-column gap-2">
-            <label className="pb-label">Путь к папке с FIT/TCX-файлами</label>
-            <div className="flex gap-2 flex-wrap align-items-center">
-              <span className="pb-archive-path" title={fitArchivePath || undefined}>
-                {fitArchivePath || <i>папка не выбрана</i>}
-              </span>
-              <Button
-                label={fitArchivePath ? 'Сменить папку' : 'Выбрать папку'}
-                icon="pi pi-folder-open"
-                className="pb-soft p-button-sm"
-                onClick={handleChangeArchiveFolder}
-                disabled={archiveUpdating}
-              />
-              <Button
-                label={archiveUpdating ? 'Обновление…' : 'Обновить архив'}
-                icon={archiveUpdating ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'}
-                className="pb p-button-sm"
-                onClick={handleUpdateFitArchive}
-                disabled={archiveUpdating}
-              />
-              <Button
-                label="Импортировать файлы"
-                icon="pi pi-upload"
-                className="pb-soft p-button-sm"
-                onClick={handlePickFiles}
-                disabled={archiveUpdating}
-                tooltip="Выбрать отдельные FIT/TCX файлы для импорта"
-              />
-              <Button
-                label="Импорт Strava CSV"
-                icon="pi pi-file-import"
-                className="pb-soft p-button-sm"
-                onClick={handleImportStravaCsv}
-                disabled={archiveUpdating}
-                tooltip="Импортировать activities.csv из архива Strava"
-              />
-            </div>
-            <small className="pb-hint">
-              Перетащите FIT/TCX файлы в эту панель, чтобы импортировать их
-              без выбора папки.
-            </small>
-          </div>
-
-          {archiveUpdating && importProgress && (
-            <div className="pb-import-progress">
-              <div className="pb-import-progress__header">
-                <span>
-                  {importProgress.current} / {importProgress.total}
-                  {' · '}
-                  <code>{importProgress.filename}</code>
-                </span>
-                <Button
-                  label="Отмена"
-                  icon="pi pi-times"
-                  className="pb-soft p-button-sm"
-                  onClick={handleCancelImport}
-                />
-              </div>
-              <ProgressBar
-                value={Math.round(
-                  (importProgress.current / importProgress.total) * 100
-                )}
-                showValue={false}
-                style={{ height: '6px' }}
-              />
-              <div className="pb-import-progress__stats">
-                <span>+{importProgress.imported}</span>
-                <span>~{importProgress.updated}</span>
-                <span>·{importProgress.skipped}</span>
-                {importProgress.failed > 0 && (
-                  <span className="pb-import-progress__fail">
-                    ✗{importProgress.failed}
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-
-          {archiveError && (
-            <Message severity="error" text={archiveError} className="w-full mt-2" />
-          )}
-
-          {archiveResult && (
-            <Message
-              severity={archiveResult.failed > 0 ? 'warn' : 'success'}
-              className="w-full mt-2"
-              content={
-                <span>
-                  Добавлено <b>{archiveResult.imported}</b>
-                  {' · '}обновлено <b>{archiveResult.updated}</b>
-                  {archiveResult.skipped > 0 && (
-                    <> · пропущено <b>{archiveResult.skipped}</b></>
-                  )}
-                  {archiveResult.failed > 0 && (
-                    <> · ошибок <b>{archiveResult.failed}</b></>
-                  )}
-                  {' · '}всего файлов <b>{archiveResult.total}</b>
-                </span>
-              }
-            />
-          )}
-          <hr className="pb-sep" />
-
-          <div className="flex flex-column gap-2">
-            <label className="pb-label">Папка с FIT-файлами Zepp (Yandex.Disk)</label>
-            <div className="flex gap-2 flex-wrap align-items-center">
-              <span className="pb-archive-path" title={zeppArchivePath || undefined}>
-                {zeppArchivePath || <i>папка не выбрана</i>}
-              </span>
-              <Button
-                label={zeppArchivePath ? 'Сменить папку' : 'Выбрать папку'}
-                icon="pi pi-folder-open"
-                className="pb-soft p-button-sm"
-                onClick={handleChangeZeppFolder}
-                disabled={zeppUpdating}
-              />
-              <Button
-                label={zeppUpdating ? 'Обновление…' : 'Обновить Zepp'}
-                icon={zeppUpdating ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'}
-                className="pb p-button-sm"
-                onClick={handleUpdateZepp}
-                disabled={zeppUpdating}
-                tooltip="Импортировать только те тренировки, которых ещё нет"
-              />
-            </div>
-            <small className="pb-hint">
-              Тренировки, уже загруженные через Strava-архив (± 2 мин
-              по времени старта), будут пропущены.
-            </small>
-          </div>
-
-          {zeppUpdating && importProgress && (
-            <div className="pb-import-progress">
-              <div className="pb-import-progress__header">
-                <span>
-                  {importProgress.current} / {importProgress.total}
-                  {' · '}
-                  <code>{importProgress.filename}</code>
-                </span>
-                <Button
-                  label="Отмена"
-                  icon="pi pi-times"
-                  className="pb-soft p-button-sm"
-                  onClick={handleCancelImport}
-                />
-              </div>
-              <ProgressBar
-                value={Math.round(
-                  (importProgress.current / importProgress.total) * 100
-                )}
-                showValue={false}
-                style={{ height: '6px' }}
-              />
-              <div className="pb-import-progress__stats">
-                <span>+{importProgress.imported}</span>
-                <span>·{importProgress.skipped}</span>
-                {importProgress.failed > 0 && (
-                  <span className="pb-import-progress__fail">
-                    ✗{importProgress.failed}
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-
-          {zeppUpdating && importProgress && (
-            <div className="pb-import-progress">
-              <div className="pb-import-progress__header">
-                <span>
-                  {importProgress.current} / {importProgress.total}
-                  {' · '}
-                  <code>{importProgress.filename}</code>
-                </span>
-                <Button
-                  label="Отмена"
-                  icon="pi pi-times"
-                  className="pb-soft p-button-sm"
-                  onClick={handleCancelImport}
-                />
-              </div>
-              <ProgressBar
-                value={Math.round(
-                  (importProgress.current / importProgress.total) * 100
-                )}
-                showValue={false}
-                style={{ height: '6px' }}
-              />
-              <div className="pb-import-progress__stats">
-                <span>+{importProgress.imported}</span>
-                <span>~{importProgress.updated}</span>
-                <span>·{importProgress.skipped}</span>
-                {importProgress.failed > 0 && (
-                  <span className="pb-import-progress__fail">
-                    ✗{importProgress.failed}
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-
-          {zeppError && (
-            <Message severity="error" text={zeppError} className="w-full mt-2" />
-          )}
-
-          {zeppResult && (
-            <Message
-              severity={zeppResult.failed > 0 ? 'warn' : 'success'}
-              className="w-full mt-2"
-              content={
-                <span>
-                  Zepp: добавлено <b>{zeppResult.imported}</b>
-                  {' · '}пропущено <b>{zeppResult.skipped}</b>
-                  {zeppResult.failed > 0 && (
-                    <> · ошибок <b>{zeppResult.failed}</b></>
-                  )}
-                  {' · '}всего <b>{zeppResult.total}</b>
-                </span>
-              }
-            />
-          )}
-        </Panel>
-      </div>
-
-      {/* ==================== WELLNESS (таблица) ==================== */}
-      <Panel header="Wellness · intervals.icu" className="shadow-5 mb-3 pb-panel">
-        {recoveryLogs.length === 0 ? (
-          <small className="pb-hint">
-            Нет данных за выбранный диапазон. Нажмите «Подтянуть wellness»
-            в панели «Синхронизация (API)».
-          </small>
-        ) : (
-          <div className="pb-wellness-table pb-wellness-table--scrollable">
-            <div className="pb-wellness-table__header">
-              <span>Дата</span>
-              <span title="Пульс покоя">RHR</span>
-              <span title="Сон, часов">Сон</span>
-              <span title="Sleep score">Score</span>
-              <span title="Шаги">Шаги</span>
-              <span title="Chronic Training Load">CTL</span>
-              <span title="Acute Training Load">ATL</span>
-            </div>
-            <div className="pb-wellness-table__body">
-              {recoveryLogs.map((r) => {
-                const avgRhr =
-                  recoveryLogs.filter((x) => x.resting_hr != null).reduce(
-                    (a, x) => a + x.resting_hr,
-                    0
-                  ) /
-                  (recoveryLogs.filter((x) => x.resting_hr != null).length || 1);
-                const rhrCls =
-                  r.resting_hr == null
-                    ? ''
-                    : r.resting_hr <= avgRhr - 2
-                    ? 'pb-wellness-table__val--good'
-                    : r.resting_hr >= avgRhr + 3
-                    ? 'pb-wellness-table__val--warn'
-                    : '';
-
-                return (
-                  <div
-                    key={r.date}
-                    className="pb-wellness-table__row pb-wellness-table__row--clickable"
-                    onClick={() => {
-                      setSelectedRecovery(r as RecoveryLogLite);
-                      setWellnessDrawerVisible(true);
-                    }}
-                    title="Открыть полную карточку дня"
-                  >
-                    <span className="pb-wellness-table__date">
-                      {r.date}
-                    </span>
-                    <span className={`pb-wellness-table__val ${rhrCls}`}>
-                      {r.resting_hr ?? '—'}
-                    </span>
-                    <span className="pb-wellness-table__val">
-                      {r.sleep_hours != null ? r.sleep_hours.toFixed(1) : '—'}
-                    </span>
-                    <span className="pb-wellness-table__val">
-                      {r.sleep_score ?? '—'}
-                    </span>
-                    <span className="pb-wellness-table__val">
-                      {r.steps != null ? r.steps.toLocaleString('ru-RU') : '—'}
-                    </span>
-                    <span className="pb-wellness-table__val pb-wellness-table__val--dim">
-                      {r.ctl != null ? r.ctl.toFixed(1) : '—'}
-                    </span>
-                    <span className="pb-wellness-table__val pb-wellness-table__val--dim">
-                      {r.atl != null ? r.atl.toFixed(1) : '—'}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </Panel>
-
-      <Panel header="Календарь" className="shadow-5 mb-3 pb-panel">
-        <CalendarPanel
-          loadRange={handleLoadCalendarRange}
-          onDayClick={(d) => setDayDrawerDate(d)}
-        />
-      </Panel>
-
-      <PlanEventsPanel
-        events={planEvents}
-        loading={planLoading}
-        syncing={planSyncing}
-        clearing={planClearing}
-        error={planError}
-        syncResult={planSyncResult}
-        onSync={handleSyncPlan}
-        onClear={handleClearPlan}
-        onOpenEvent={handleOpenPlanEvent}
-        onOpenTemplates={() => setTemplatesVisible(true)}
-      />
-
-      <Panel
-        header={
-          activeFilterCount > 0
-            ? `Пробежки (${filteredFacts.length} из ${groupedFacts.length})`
-            : `Пробежки (${groupedFacts.length}${
-                groupedFacts.length !== runFacts.length
-                  ? ` · ${runFacts.length} записей`
-                  : ''
-              })`
-        }
-        className="shadow-5 mb-3 pb-panel"
-      >
-        {factsError && (
-          <Message severity="error" text={factsError} className="w-full mb-2" />
-        )}
-
-        <RunFiltersPanel
-          filters={filters}
-          onChange={setFilters}
-          onReset={handleResetFilters}
-          activeCount={activeFilterCount}
-        />
-
-        <DataTable
-          value={filteredFacts}
-          loading={factsLoading}
-          size="small"
-          stripedRows
-          scrollable
-          scrollHeight="520px"
-          virtualScrollerOptions={{ itemSize: 38 }}
-          emptyMessage="За выбранный период пробежек нет"
-          className="p-datatable-sm"
-          selectionMode="single"
-          onRowClick={(e) => {
-            const g = e.data as GroupedRunFact;
+    <div className="pb-page-root">
+      <FullWeek
+        onDayClick={(d) => setDayDrawerDate(d)}
+        onOpenPlanEvent={(id) => {
+          const ev = planEvents.find((p) => p.id === id) ?? null;
+          if (ev) {
+            setSelectedPlanEvent(ev);
+            setPlanDrawerVisible(true);
+          }
+        }}
+        onOpenRunFact={(id) => {
+          const fact = runFacts.find((r) => r.id === id) ?? null;
+          if (fact) {
             setSelectedFact({
-              ...(g.primary as RunFactLite),
-              start_time: g.startTime,
+              ...(fact as RunFactLite),
+              start_time: fact.start_time,
             });
             setDrawerVisible(true);
-          }}
-        >
-          <Column
-            header=""
-            style={{ width: '40px', textAlign: 'center' }}
-            body={(r: GroupedRunFact) =>
-              r.hasStreams ? (
-                <i
-                  className="pi pi-chart-line"
-                  style={{ color: 'var(--pb-accent)' }}
-                  title="Есть потоки"
-                />
-              ) : (
-                <i
-                  className="pi pi-minus"
-                  style={{ opacity: 0.25 }}
-                  title="Потоков нет"
-                />
-              )
-            }
-          />
-          <Column
-            field="date"
-            header="Дата"
-            sortable
-            style={{ width: '140px' }}
-            body={(r: GroupedRunFact) => {
-              let time = '';
-              if (r.startTime) {
-                const t = new Date(r.startTime);
-                if (!Number.isNaN(t.getTime())) {
-                  time = ` ${String(t.getHours()).padStart(2, '0')}:${String(
-                    t.getMinutes()
-                  ).padStart(2, '0')}`;
+          }
+        }}
+      />
+
+      <div className="pb-page p-4">
+        <div className="mb-4">
+          <h1 className="pb-title">
+            <i className="pi pi-wave-pulse pb-title-icon" />
+            Prana-Bindu
+          </h1>
+          <p className="pb-subtitle">Тренировки тела: бег и сила</p>
+        </div>
+
+        <div className="grid mb-3">
+          {MODULES.map((m) => (
+            <div key={m.name} className="col-12 md:col-6 lg:col-4 p-2">
+              <div className="surface-card p-3 shadow-2 border-round h-full">
+                <div className="pb-module-name">{m.name}</div>
+                <div className="pb-module-desc">{m.description}</div>
+              </div>
+            </div>
+          ))}
+
+          {/* Сюда надо перенести панели, но здесь надо поработать над стилями, шириной и стилями панелей при расзмещении в решетке */}
+          
+        </div>
+
+        {/* ==================== ПРОФИЛЬ ==================== */}
+        <Panel header="Профиль" className="shadow-5 mb-3 pb-panel">
+          <div className="pb-profile__grid">
+            <div className="pb-profile__field">
+              <label className="pb-label" htmlFor="pb-profile-hrmax">
+                HRmax
+                {!profile.maxHr && <span className="pb-profile__missing">не задан</span>}
+              </label>
+              <InputNumber
+                inputId="pb-profile-hrmax"
+                value={profile.maxHr}
+                onValueChange={(e) =>
+                  setProfile((p) => ({ ...p, maxHr: e.value ?? null }))
                 }
+                placeholder="напр. 178"
+                min={100}
+                max={230}
+                showButtons
+                buttonLayout="horizontal"
+                incrementButtonIcon="pi pi-plus"
+                decrementButtonIcon="pi pi-minus"
+                className="pb-debug__input"
+              />
+              <small className="pb-hint">
+                Максимальный пульс.
+                {profile.maxHrSource && (
+                  <>
+                    {' '}
+                    <span className="pb-profile__src">
+                      источник: {labelForSource(profile.maxHrSource)}
+                    </span>
+                  </>
+                )}
+              </small>
+            </div>
+
+            <div className="pb-profile__field">
+              <label className="pb-label" htmlFor="pb-profile-lthr">
+                LTHR
+                {!profile.lthr && <span className="pb-profile__missing">не задан</span>}
+              </label>
+              <InputNumber
+                inputId="pb-profile-lthr"
+                value={profile.lthr}
+                onValueChange={(e) =>
+                  setProfile((p) => ({ ...p, lthr: e.value ?? null }))
+                }
+                placeholder="напр. 165"
+                min={80}
+                max={220}
+                showButtons
+                buttonLayout="horizontal"
+                incrementButtonIcon="pi pi-plus"
+                decrementButtonIcon="pi pi-minus"
+                className="pb-debug__input"
+              />
+              <small className="pb-hint">
+                Лактатный порог. Ключевой параметр для зон.
+                {profile.lthrSource && (
+                  <>
+                    {' '}
+                    <span className="pb-profile__src">
+                      источник: {labelForSource(profile.lthrSource)}
+                    </span>
+                  </>
+                )}
+              </small>
+            </div>
+
+            <div className="pb-profile__field">
+              <label className="pb-label" htmlFor="pb-profile-resthr">
+                RestHR
+                {!profile.restingHr && <span className="pb-profile__missing">не задан</span>}
+              </label>
+              <InputNumber
+                inputId="pb-profile-resthr"
+                value={profile.restingHr}
+                onValueChange={(e) =>
+                  setProfile((p) => ({ ...p, restingHr: e.value ?? null }))
+                }
+                placeholder="напр. 48"
+                min={30}
+                max={120}
+                showButtons
+                buttonLayout="horizontal"
+                incrementButtonIcon="pi pi-plus"
+                decrementButtonIcon="pi pi-minus"
+                className="pb-debug__input"
+              />
+              <small className="pb-hint">
+                Пульс покоя.
+                {profile.restingHrSource && (
+                  <>
+                    {' '}
+                    <span className="pb-profile__src">
+                      источник: {labelForSource(profile.restingHrSource)}
+                    </span>
+                  </>
+                )}
+              </small>
+            </div>
+          </div>
+
+          <div className="pb-profile__actions">
+            <Button
+              label={
+                profileSaving
+                  ? 'Сохранение…'
+                  : profileSaved
+                  ? 'Сохранено'
+                  : 'Сохранить'
               }
-              return (
-                <span title={`Источников: ${r.count}`}>
-                  {r.date}
-                  {time}
-                </span>
-              );
-            }}
-          />
-          <Column
-            header="Название"
-            style={{ width: '220px' }}
-            body={(r: GroupedRunFact) => r.displayName}
-          />
-          <Column
-            header="Км"
-            sortable
-            sortField="primary.actual_km"
-            style={{ width: '80px' }}
-            body={(r: GroupedRunFact) => fmtKm(r.primary.actual_km)}
-          />
-          <Column
-            header="Темп"
-            style={{ width: '80px' }}
-            body={(r: GroupedRunFact) => r.primary.actual_pace ?? '—'}
-          />
-          <Column
-            header="Время"
-            style={{ width: '100px' }}
-            body={(r: GroupedRunFact) => fmtDuration(r.primary.duration_sec)}
-          />
-          <Column
-            header="Ср. пульс"
-            style={{ width: '100px' }}
-            body={(r: GroupedRunFact) => r.primary.avg_hr ?? '—'}
-          />
-          <Column
-            header="Макс. пульс"
-            style={{ width: '110px' }}
-            body={(r: GroupedRunFact) => r.primary.max_hr ?? '—'}
-          />
-          <Column
-            header="Источники"
-            style={{ width: '160px' }}
-            body={(r: GroupedRunFact) => (
-              <div className="pb-source-badges">
-                {r.sources.map((s, i) => (
-                  <span
-                    key={`${r.date}-${s}-${i}`}
-                    className={`pb-source-badge pb-source-badge--${s}`}
-                    title={s}
-                  >
-                    {s}
-                  </span>
-                ))}
+              icon={
+                profileSaving
+                  ? 'pi pi-spin pi-spinner'
+                  : profileSaved
+                  ? 'pi pi-check'
+                  : 'pi pi-save'
+              }
+              className="pb p-button-sm"
+              onClick={handleSaveProfile}
+              disabled={profileSaving}
+            />
+            <Button
+              label="Перечитать"
+              icon="pi pi-refresh"
+              className="pb-soft p-button-sm"
+              onClick={loadProfile}
+              disabled={profileSaving}
+            />
+          </div>
+
+          {profileError && (
+            <Message severity="error" text={profileError} className="w-full mt-2" />
+          )}
+        </Panel>
+
+        {/* ==================== ПОДКЛЮЧЕНИЯ ==================== */}
+        <Panel header="Подключения" className="shadow-5 mb-3 pb-panel">
+          <div className="pb-connections">
+            {/* --- dodofo --- */}
+            <div className="pb-connections__block">
+              <div className="pb-connections__title">
+                <i className="pi pi-link" /> dodofo
+                {hasDodofoToken && (
+                  <span className="pb-label-ok">✓ сохранён</span>
+                )}
+              </div>
+              <div className="flex flex-column gap-2">
+                <InputText
+                  id="pb-dodofo-token"
+                  value={dodofoToken}
+                  onChange={(e) => setDodofoToken(e.target.value)}
+                  placeholder="dodofo_..."
+                  className="w-full"
+                />
+                <small className="pb-hint">
+                  Токен создаётся в профиле dodofo.ru. Хранится
+                  зашифрованным через safeStorage.
+                </small>
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    label={loading ? 'Сохранение...' : 'Сохранить токен'}
+                    icon={loading ? 'pi pi-spin pi-spinner' : 'pi pi-save'}
+                    className="pb p-button-sm"
+                    onClick={handleSaveDodofo}
+                    disabled={loading || !dodofoToken.trim()}
+                  />
+                  <Button
+                    label={loading ? 'Проверка...' : 'Проверить'}
+                    icon={loading ? 'pi pi-spin pi-spinner' : 'pi pi-question-circle'}
+                    className="pb-soft p-button-sm"
+                    onClick={handleCheck}
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* --- intervals.icu --- */}
+            <div className="pb-connections__block">
+              <div className="pb-connections__title">
+                <i className="pi pi-heart" /> intervals.icu
+                {intervalsHasKey && (
+                  <span className="pb-label-ok">✓ сохранён</span>
+                )}
+              </div>
+              <div className="flex flex-column gap-2">
+                <InputText
+                  type="password"
+                  value={intervalsApiKey}
+                  onChange={(e) => setIntervalsApiKey(e.target.value)}
+                  placeholder={
+                    intervalsHasKey
+                      ? '•••••••• (оставьте пустым)'
+                      : 'ваш ключ из Settings → Developer'
+                  }
+                  className="w-full"
+                />
+                <InputText
+                  value={intervalsAthleteId}
+                  onChange={(e) => setIntervalsAthleteId(e.target.value)}
+                  placeholder="i123456 — athlete id (или пусто для «self»)"
+                  className="w-full"
+                />
+                <small className="pb-hint">
+                  API-ключ: intervals.icu → Settings → Developer.
+                  Athlete ID — из URL интерфейса, необязательно.
+                </small>
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    label={intervalsSaving ? 'Сохранение…' : 'Сохранить ключ'}
+                    icon={intervalsSaving ? 'pi pi-spin pi-spinner' : 'pi pi-save'}
+                    className="pb p-button-sm"
+                    onClick={handleIntervalsSave}
+                    disabled={
+                      intervalsSaving ||
+                      (!intervalsApiKey.trim() && !intervalsHasKey)
+                    }
+                  />
+                </div>
+                {intervalsError && (
+                  <Message severity="error" text={intervalsError} className="w-full" />
+                )}
+                {intervalsInfo && (
+                  <Message severity="success" text={intervalsInfo} className="w-full" />
+                )}
+              </div>
+            </div>
+
+            {/* --- Zepp (резерв) --- */}
+            <div className="pb-connections__block pb-connections__block--collapsed">
+              <div className="pb-connections__title">
+                <i className="pi pi-mobile" /> Zepp (резерв)
+              </div>
+              <div className="flex flex-column gap-2">
+                <InputText
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  className="w-full"
+                />
+                <InputText
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full"
+                />
+                <small className="pb-hint">
+                  Резервный способ. Основной — dodofo и intervals.icu.
+                </small>
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    label={loading ? 'Подключение...' : 'Подключить'}
+                    icon={loading ? 'pi pi-spin pi-spinner' : 'pi pi-sign-in'}
+                    className="pb p-button-sm"
+                    onClick={handleConnectZepp}
+                    disabled={loading || !email || !password}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {status && (
+              <div className="pb-status">
+                <code>{status}</code>
               </div>
             )}
+          </div>
+        </Panel>
+
+        {/* ==================== СИНХРОНИЗАЦИЯ (API) ==================== */}
+        <Panel header="Синхронизация (API)" className="shadow-5 mb-3 pb-panel">
+          <div className="flex flex-column gap-3">
+            <div className="flex flex-column gap-2">
+              <label className="pb-label">Диапазон</label>
+              <div className="flex gap-2 flex-wrap align-items-center">
+                <Calendar
+                  value={syncFrom}
+                  onChange={(e) => setSyncFrom(e.value as Date)}
+                  dateFormat="dd.mm.yy"
+                  placeholder="С"
+                  showIcon
+                  className="pb-cal"
+                  maxDate={syncTo ?? undefined}
+                />
+                <span className="pb-hint">—</span>
+                <Calendar
+                  value={syncTo}
+                  onChange={(e) => setSyncTo(e.value as Date)}
+                  dateFormat="dd.mm.yy"
+                  placeholder="По"
+                  showIcon
+                  className="pb-cal"
+                  minDate={syncFrom ?? undefined}
+                />
+                <Button
+                  label="30 дней"
+                  icon="pi pi-calendar"
+                  className="pb-soft p-button-sm"
+                  onClick={() => {
+                    const r = defaultSyncRange();
+                    setSyncFrom(r.from);
+                    setSyncTo(r.to);
+                  }}
+                />
+                <Button
+                  label="За всё время"
+                  icon="pi pi-calendar-plus"
+                  className="pb-soft p-button-sm"
+                  onClick={() => {
+                    setSyncFrom(new Date(2020, 0, 1));
+                    setSyncTo(new Date());
+                  }}
+                />
+                <Button
+                  label="+30 дней"
+                  icon="pi pi-calendar"
+                  className="pb-soft p-button-sm"
+                  onClick={() => {
+                    const now = new Date();
+                    const to = new Date();
+                    to.setDate(to.getDate() + 30);
+                    setSyncFrom(now);
+                    setSyncTo(to);
+                  }}
+                  tooltip="Текущий месяц + следующий"
+                />
+                <Button
+                  label="+90 дней"
+                  icon="pi pi-calendar-plus"
+                  className="pb-soft p-button-sm"
+                  onClick={() => {
+                    const now = new Date();
+                    const to = new Date();
+                    to.setDate(to.getDate() + 90);
+                    setSyncFrom(now);
+                    setSyncTo(to);
+                  }}
+                  tooltip="Ближайший квартал"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-column gap-2">
+              <label htmlFor="pb-provider" className="pb-label">
+                Провайдер
+              </label>
+              <Dropdown
+                inputId="pb-provider"
+                value={provider}
+                options={PROVIDER_OPTIONS}
+                onChange={(e) => setProvider(e.value)}
+                className="w-full"
+                panelClassName="pb-dropdown-panel"
+              />
+              {renderProviderForm()}
+            </div>
+
+            <hr className="pb-sep" />
+
+            <div className="flex flex-column gap-2">
+              <label className="pb-label">Операции</label>
+              <div className="flex gap-2 flex-wrap align-items-center">
+                <Button
+                  label={syncing ? 'Синхронизация...' : 'Синхронизировать'}
+                  icon={syncing ? 'pi pi-spin pi-spinner' : 'pi pi-sync'}
+                  className="pb p-button-sm"
+                  onClick={handleSync}
+                  disabled={syncing || !providerCaps?.workouts || !syncFrom || !syncTo}
+                  tooltip={
+                    !providerCaps?.workouts
+                      ? `Провайдер «${provider}» не поддерживает список тренировок`
+                      : 'Получить список активностей'
+                  }
+                />
+                <Button
+                  label={syncingStreams ? 'Потоки…' : 'Залить потоки'}
+                  icon={syncingStreams ? 'pi pi-spin pi-spinner' : 'pi pi-cloud-download'}
+                  className="pb-soft p-button-sm"
+                  onClick={handleSyncAllStreams}
+                  disabled={syncingStreams || !providerCaps?.streams || !syncFrom || !syncTo}
+                  tooltip={
+                    !providerCaps?.streams
+                      ? `Провайдер «${provider}» не поддерживает потоки`
+                      : 'Загрузить FIT + потоки за выбранный период'
+                  }
+                />
+                <Button
+                  label={syncingThresholds ? 'Пороги…' : 'Подтянуть пороги'}
+                  icon={syncingThresholds ? 'pi pi-spin pi-spinner' : 'pi pi-sliders-h'}
+                  className="pb-soft p-button-sm"
+                  onClick={handleSyncThresholds}
+                  disabled={syncingThresholds || !providerCaps?.thresholds}
+                  tooltip={
+                    !providerCaps?.thresholds
+                      ? `Провайдер «${provider}» не поддерживает пороги`
+                      : 'Забрать пороги в профиль'
+                  }
+                />
+                <Button
+                  label={syncingZones ? 'Зоны…' : 'Подтянуть зоны'}
+                  icon={syncingZones ? 'pi pi-spin pi-spinner' : 'pi pi-chart-bar'}
+                  className="pb-soft p-button-sm"
+                  onClick={handleSyncZones}
+                  disabled={syncingZones}
+                  tooltip="Читает HR-зоны из последней активности ICU"
+                />
+                <Button
+                  label={syncingWellness ? 'Wellness…' : 'Подтянуть wellness (ICU + dodofo)'}
+                  icon={syncingWellness ? 'pi pi-spin pi-spinner' : 'pi pi-heart'}
+                  className="pb-soft p-button-sm"
+                  onClick={handleSyncWellnessNew}
+                  disabled={syncingWellness || !syncFrom || !syncTo}
+                  tooltip={
+                    'Сон, HRV, пульс покоя (из intervals.icu и dodofo)'
+                  }
+                />
+                <Button
+                  label="Отладка"
+                  icon="pi pi-code"
+                  className="pb-soft p-button-sm"
+                  onClick={() => setDebugVisible(true)}
+                  tooltip="Сырые ответы провайдеров API"
+                />
+              </div>
+              <small className="pb-hint">
+                Повторный запуск за тот же период не создаёт дубликаты —
+                обновляет существующие записи.
+              </small>
+            </div>
+
+            {syncingStreams && syncStreamsProgress && (
+              <div className="pb-import-progress">
+                <div className="pb-import-progress__header">
+                  <span>
+                    {syncStreamsProgress.current} / {syncStreamsProgress.total}
+                    {' · '}
+                    <code>{syncStreamsProgress.externalId ?? '—'}</code>
+                  </span>
+                  <Button
+                    label="Отмена"
+                    icon="pi pi-times"
+                    className="pb-soft p-button-sm"
+                    onClick={handleCancelSyncStreams}
+                  />
+                </div>
+                <ProgressBar
+                  value={Math.round(
+                    (syncStreamsProgress.current / syncStreamsProgress.total) * 100
+                  )}
+                  showValue={false}
+                  style={{ height: '6px' }}
+                />
+                <div className="pb-import-progress__stats">
+                  <span>+{syncStreamsProgress.fetched}</span>
+                  <span>·{syncStreamsProgress.skipped}</span>
+                  {syncStreamsProgress.failed > 0 && (
+                    <span className="pb-import-progress__fail">
+                      ✗{syncStreamsProgress.failed}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {syncError && (
+              <Message severity="error" text={syncError} className="w-full" />
+            )}
+            {syncResult && (
+              <Message
+                severity={syncResult.added > 0 ? 'success' : 'info'}
+                className="w-full"
+                content={
+                  <span>
+                    Добавлено: <b>{syncResult.added}</b>
+                    {' · '}Обновлено: <b>{syncResult.updated}</b>
+                    {' · '}Всего из источника: <b>{syncResult.total}</b>
+                  </span>
+                }
+              />
+            )}
+            {streamsAllError && (
+              <Message severity="error" text={streamsAllError} className="w-full" />
+            )}
+            {streamsAllResult && (
+              <Message
+                severity={streamsAllResult.failed > 0 ? 'warn' : 'info'}
+                className="w-full"
+                content={
+                  <span>
+                    Потоки: загружено <b>{streamsAllResult.fetched}</b>
+                    {' · '}пропущено <b>{streamsAllResult.skipped}</b>
+                    {streamsAllResult.failed > 0 && (
+                      <> · ошибок <b>{streamsAllResult.failed}</b></>
+                    )}
+                  </span>
+                }
+              />
+            )}
+            {thresholdsError && (
+              <Message severity="error" text={thresholdsError} className="w-full" />
+            )}
+            {thresholdsResult && (
+              <Message
+                severity="success"
+                className="w-full"
+                content={<span>Пороги обновлены: <b>{thresholdsResult}</b></span>}
+              />
+            )}
+            {zonesError && (
+              <Message severity="error" text={zonesError} className="w-full" />
+            )}
+            {zonesResult && (
+              <Message
+                severity="success"
+                className="w-full"
+                content={<span>HR-зоны: <b>{zonesResult}</b></span>}
+              />
+            )}
+            {wellnessError && (
+              <Message severity="error" text={wellnessError} className="w-full" />
+            )}
+            {wellnessResult && (
+              <Message
+                severity="success"
+                className="w-full"
+                content={<span>Wellness: {wellnessResult}</span>}
+              />
+            )}
+          </div>
+        </Panel>
+
+        {/* ==================== ИМПОРТ ФАЙЛОВ ==================== */}
+        <div
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          className={`pb-archive-dropzone ${dragActive ? 'pb-archive-dropzone--active' : ''}`}
+        >
+          <Panel header="Импорт файлов" className="shadow-5 mb-3 pb-panel">
+            <div className="flex flex-column gap-2">
+              <div className="pb-archive-origin">
+                <label className="pb-label">Откуда файлы</label>
+                <Dropdown
+                  value={importOrigin}
+                  options={IMPORT_ORIGIN_OPTIONS}
+                  onChange={(e) => setImportOrigin(e.value)}
+                  className="pb-archive-origin__dropdown"
+                  panelClassName="pb-dropdown-panel"
+                />
+                <small className="pb-hint">
+                  Метка источника сохраняется при первом импорте и не меняется
+                  при повторных загрузках того же файла.
+                </small>
+              </div>
+            </div>
+            <div className="flex flex-column gap-2">
+              <label className="pb-label">Путь к папке с FIT/TCX-файлами</label>
+              <div className="flex gap-2 flex-wrap align-items-center">
+                <span className="pb-archive-path" title={fitArchivePath || undefined}>
+                  {fitArchivePath || <i>папка не выбрана</i>}
+                </span>
+                <Button
+                  label={fitArchivePath ? 'Сменить папку' : 'Выбрать папку'}
+                  icon="pi pi-folder-open"
+                  className="pb-soft p-button-sm"
+                  onClick={handleChangeArchiveFolder}
+                  disabled={archiveUpdating}
+                />
+                <Button
+                  label={archiveUpdating ? 'Обновление…' : 'Обновить архив'}
+                  icon={archiveUpdating ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'}
+                  className="pb p-button-sm"
+                  onClick={handleUpdateFitArchive}
+                  disabled={archiveUpdating}
+                />
+                <Button
+                  label="Импортировать файлы"
+                  icon="pi pi-upload"
+                  className="pb-soft p-button-sm"
+                  onClick={handlePickFiles}
+                  disabled={archiveUpdating}
+                  tooltip="Выбрать отдельные FIT/TCX файлы для импорта"
+                />
+                <Button
+                  label="Импорт Strava CSV"
+                  icon="pi pi-file-import"
+                  className="pb-soft p-button-sm"
+                  onClick={handleImportStravaCsv}
+                  disabled={archiveUpdating}
+                  tooltip="Импортировать activities.csv из архива Strava"
+                />
+              </div>
+              <small className="pb-hint">
+                Перетащите FIT/TCX файлы в эту панель, чтобы импортировать их
+                без выбора папки.
+              </small>
+            </div>
+
+            {archiveUpdating && importProgress && (
+              <div className="pb-import-progress">
+                <div className="pb-import-progress__header">
+                  <span>
+                    {importProgress.current} / {importProgress.total}
+                    {' · '}
+                    <code>{importProgress.filename}</code>
+                  </span>
+                  <Button
+                    label="Отмена"
+                    icon="pi pi-times"
+                    className="pb-soft p-button-sm"
+                    onClick={handleCancelImport}
+                  />
+                </div>
+                <ProgressBar
+                  value={Math.round(
+                    (importProgress.current / importProgress.total) * 100
+                  )}
+                  showValue={false}
+                  style={{ height: '6px' }}
+                />
+                <div className="pb-import-progress__stats">
+                  <span>+{importProgress.imported}</span>
+                  <span>~{importProgress.updated}</span>
+                  <span>·{importProgress.skipped}</span>
+                  {importProgress.failed > 0 && (
+                    <span className="pb-import-progress__fail">
+                      ✗{importProgress.failed}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {archiveError && (
+              <Message severity="error" text={archiveError} className="w-full mt-2" />
+            )}
+
+            {archiveResult && (
+              <Message
+                severity={archiveResult.failed > 0 ? 'warn' : 'success'}
+                className="w-full mt-2"
+                content={
+                  <span>
+                    Добавлено <b>{archiveResult.imported}</b>
+                    {' · '}обновлено <b>{archiveResult.updated}</b>
+                    {archiveResult.skipped > 0 && (
+                      <> · пропущено <b>{archiveResult.skipped}</b></>
+                    )}
+                    {archiveResult.failed > 0 && (
+                      <> · ошибок <b>{archiveResult.failed}</b></>
+                    )}
+                    {' · '}всего файлов <b>{archiveResult.total}</b>
+                  </span>
+                }
+              />
+            )}
+            <hr className="pb-sep" />
+
+            <div className="flex flex-column gap-2">
+              <label className="pb-label">Папка с FIT-файлами Zepp (Yandex.Disk)</label>
+              <div className="flex gap-2 flex-wrap align-items-center">
+                <span className="pb-archive-path" title={zeppArchivePath || undefined}>
+                  {zeppArchivePath || <i>папка не выбрана</i>}
+                </span>
+                <Button
+                  label={zeppArchivePath ? 'Сменить папку' : 'Выбрать папку'}
+                  icon="pi pi-folder-open"
+                  className="pb-soft p-button-sm"
+                  onClick={handleChangeZeppFolder}
+                  disabled={zeppUpdating}
+                />
+                <Button
+                  label={zeppUpdating ? 'Обновление…' : 'Обновить Zepp'}
+                  icon={zeppUpdating ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'}
+                  className="pb p-button-sm"
+                  onClick={handleUpdateZepp}
+                  disabled={zeppUpdating}
+                  tooltip="Импортировать только те тренировки, которых ещё нет"
+                />
+              </div>
+              <small className="pb-hint">
+                Тренировки, уже загруженные через Strava-архив (± 2 мин
+                по времени старта), будут пропущены.
+              </small>
+            </div>
+
+            {zeppUpdating && importProgress && (
+              <div className="pb-import-progress">
+                <div className="pb-import-progress__header">
+                  <span>
+                    {importProgress.current} / {importProgress.total}
+                    {' · '}
+                    <code>{importProgress.filename}</code>
+                  </span>
+                  <Button
+                    label="Отмена"
+                    icon="pi pi-times"
+                    className="pb-soft p-button-sm"
+                    onClick={handleCancelImport}
+                  />
+                </div>
+                <ProgressBar
+                  value={Math.round(
+                    (importProgress.current / importProgress.total) * 100
+                  )}
+                  showValue={false}
+                  style={{ height: '6px' }}
+                />
+                <div className="pb-import-progress__stats">
+                  <span>+{importProgress.imported}</span>
+                  <span>·{importProgress.skipped}</span>
+                  {importProgress.failed > 0 && (
+                    <span className="pb-import-progress__fail">
+                      ✗{importProgress.failed}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {zeppUpdating && importProgress && (
+              <div className="pb-import-progress">
+                <div className="pb-import-progress__header">
+                  <span>
+                    {importProgress.current} / {importProgress.total}
+                    {' · '}
+                    <code>{importProgress.filename}</code>
+                  </span>
+                  <Button
+                    label="Отмена"
+                    icon="pi pi-times"
+                    className="pb-soft p-button-sm"
+                    onClick={handleCancelImport}
+                  />
+                </div>
+                <ProgressBar
+                  value={Math.round(
+                    (importProgress.current / importProgress.total) * 100
+                  )}
+                  showValue={false}
+                  style={{ height: '6px' }}
+                />
+                <div className="pb-import-progress__stats">
+                  <span>+{importProgress.imported}</span>
+                  <span>~{importProgress.updated}</span>
+                  <span>·{importProgress.skipped}</span>
+                  {importProgress.failed > 0 && (
+                    <span className="pb-import-progress__fail">
+                      ✗{importProgress.failed}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {zeppError && (
+              <Message severity="error" text={zeppError} className="w-full mt-2" />
+            )}
+
+            {zeppResult && (
+              <Message
+                severity={zeppResult.failed > 0 ? 'warn' : 'success'}
+                className="w-full mt-2"
+                content={
+                  <span>
+                    Zepp: добавлено <b>{zeppResult.imported}</b>
+                    {' · '}пропущено <b>{zeppResult.skipped}</b>
+                    {zeppResult.failed > 0 && (
+                      <> · ошибок <b>{zeppResult.failed}</b></>
+                    )}
+                    {' · '}всего <b>{zeppResult.total}</b>
+                  </span>
+                }
+              />
+            )}
+          </Panel>
+        </div>
+
+        {/* ==================== WELLNESS (таблица) ==================== */}
+        <Panel header="Wellness · intervals.icu" className="shadow-5 mb-3 pb-panel">
+          {recoveryLogs.length === 0 ? (
+            <small className="pb-hint">
+              Нет данных за выбранный диапазон. Нажмите «Подтянуть wellness»
+              в панели «Синхронизация (API)».
+            </small>
+          ) : (
+            <div className="pb-wellness-table pb-wellness-table--scrollable">
+              <div className="pb-wellness-table__header">
+                <span>Дата</span>
+                <span title="Пульс покоя">RHR</span>
+                <span title="Сон, часов">Сон</span>
+                <span title="Sleep score">Score</span>
+                <span title="Шаги">Шаги</span>
+                <span title="Chronic Training Load">CTL</span>
+                <span title="Acute Training Load">ATL</span>
+              </div>
+              <div className="pb-wellness-table__body">
+                {recoveryLogs.map((r) => {
+                  const avgRhr =
+                    recoveryLogs.filter((x) => x.resting_hr != null).reduce(
+                      (a, x) => a + x.resting_hr,
+                      0
+                    ) /
+                    (recoveryLogs.filter((x) => x.resting_hr != null).length || 1);
+                  const rhrCls =
+                    r.resting_hr == null
+                      ? ''
+                      : r.resting_hr <= avgRhr - 2
+                      ? 'pb-wellness-table__val--good'
+                      : r.resting_hr >= avgRhr + 3
+                      ? 'pb-wellness-table__val--warn'
+                      : '';
+
+                  return (
+                    <div
+                      key={r.date}
+                      className="pb-wellness-table__row pb-wellness-table__row--clickable"
+                      onClick={() => {
+                        setSelectedRecovery(r as RecoveryLogLite);
+                        setWellnessDrawerVisible(true);
+                      }}
+                      title="Открыть полную карточку дня"
+                    >
+                      <span className="pb-wellness-table__date">
+                        {r.date}
+                      </span>
+                      <span className={`pb-wellness-table__val ${rhrCls}`}>
+                        {r.resting_hr ?? '—'}
+                      </span>
+                      <span className="pb-wellness-table__val">
+                        {r.sleep_hours != null ? r.sleep_hours.toFixed(1) : '—'}
+                      </span>
+                      <span className="pb-wellness-table__val">
+                        {r.sleep_score ?? '—'}
+                      </span>
+                      <span className="pb-wellness-table__val">
+                        {r.steps != null ? r.steps.toLocaleString('ru-RU') : '—'}
+                      </span>
+                      <span className="pb-wellness-table__val pb-wellness-table__val--dim">
+                        {r.ctl != null ? r.ctl.toFixed(1) : '—'}
+                      </span>
+                      <span className="pb-wellness-table__val pb-wellness-table__val--dim">
+                        {r.atl != null ? r.atl.toFixed(1) : '—'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </Panel>
+
+        <Panel header="Календарь" className="shadow-5 mb-3 pb-panel">
+          <CalendarPanel
+            loadRange={handleLoadCalendarRange}
+            onDayClick={(d) => setDayDrawerDate(d)}
           />
-        </DataTable>
-      </Panel>
+        </Panel>
 
-      <DodofoDebugDialog
-        visible={debugVisible}
-        onHide={() => setDebugVisible(false)}
-        initialRunFactId={selectedFact?.id ?? null}
-      />
+        <PlanEventsPanel
+          events={planEvents}
+          loading={planLoading}
+          syncing={planSyncing}
+          clearing={planClearing}
+          error={planError}
+          syncResult={planSyncResult}
+          onSync={handleSyncPlan}
+          onClear={handleClearPlan}
+          onOpenEvent={handleOpenPlanEvent}
+          onOpenTemplates={() => setTemplatesVisible(true)}
+        />
 
-      <RunStreamsDrawer
-        visible={drawerVisible}
-        runFact={selectedFact}
-        onHide={() => setDrawerVisible(false)}
-        onAfterSync={() => loadRunFacts()}
-      />
+        <Panel
+          header={
+            activeFilterCount > 0
+              ? `Пробежки (${filteredFacts.length} из ${groupedFacts.length})`
+              : `Пробежки (${groupedFacts.length}${
+                  groupedFacts.length !== runFacts.length
+                    ? ` · ${runFacts.length} записей`
+                    : ''
+                })`
+          }
+          className="shadow-5 mb-3 pb-panel"
+        >
+          {factsError && (
+            <Message severity="error" text={factsError} className="w-full mb-2" />
+          )}
 
-      <PlanEventDrawer
-        visible={planDrawerVisible}
-        event={selectedPlanEvent}
-        onHide={() => setPlanDrawerVisible(false)}
-        onSaved={() => {
-          void loadPlanEvents();
-        }}
-      />
+          <RunFiltersPanel
+            filters={filters}
+            onChange={setFilters}
+            onReset={handleResetFilters}
+            activeCount={activeFilterCount}
+          />
 
-      <MirrorDeleteDialog
-        visible={mirrorDialogVisible}
-        candidates={mirrorCandidates}
-        busy={mirrorBusy}
-        onCancel={() => setMirrorDialogVisible(false)}
-        onApply={handleMirrorApply}
-      />
+          <DataTable
+            value={filteredFacts}
+            loading={factsLoading}
+            size="small"
+            stripedRows
+            scrollable
+            scrollHeight="520px"
+            virtualScrollerOptions={{ itemSize: 38 }}
+            emptyMessage="За выбранный период пробежек нет"
+            className="p-datatable-sm"
+            selectionMode="single"
+            onRowClick={(e) => {
+              const g = e.data as GroupedRunFact;
+              setSelectedFact({
+                ...(g.primary as RunFactLite),
+                start_time: g.startTime,
+              });
+              setDrawerVisible(true);
+            }}
+          >
+            <Column
+              header=""
+              style={{ width: '40px', textAlign: 'center' }}
+              body={(r: GroupedRunFact) =>
+                r.hasStreams ? (
+                  <i
+                    className="pi pi-chart-line"
+                    style={{ color: 'var(--pb-accent)' }}
+                    title="Есть потоки"
+                  />
+                ) : (
+                  <i
+                    className="pi pi-minus"
+                    style={{ opacity: 0.25 }}
+                    title="Потоков нет"
+                  />
+                )
+              }
+            />
+            <Column
+              field="date"
+              header="Дата"
+              sortable
+              style={{ width: '140px' }}
+              body={(r: GroupedRunFact) => {
+                let time = '';
+                if (r.startTime) {
+                  const t = new Date(r.startTime);
+                  if (!Number.isNaN(t.getTime())) {
+                    time = ` ${String(t.getHours()).padStart(2, '0')}:${String(
+                      t.getMinutes()
+                    ).padStart(2, '0')}`;
+                  }
+                }
+                return (
+                  <span title={`Источников: ${r.count}`}>
+                    {r.date}
+                    {time}
+                  </span>
+                );
+              }}
+            />
+            <Column
+              header="Название"
+              style={{ width: '220px' }}
+              body={(r: GroupedRunFact) => r.displayName}
+            />
+            <Column
+              header="Км"
+              sortable
+              sortField="primary.actual_km"
+              style={{ width: '80px' }}
+              body={(r: GroupedRunFact) => fmtKm(r.primary.actual_km)}
+            />
+            <Column
+              header="Темп"
+              style={{ width: '80px' }}
+              body={(r: GroupedRunFact) => r.primary.actual_pace ?? '—'}
+            />
+            <Column
+              header="Время"
+              style={{ width: '100px' }}
+              body={(r: GroupedRunFact) => fmtDuration(r.primary.duration_sec)}
+            />
+            <Column
+              header="Ср. пульс"
+              style={{ width: '100px' }}
+              body={(r: GroupedRunFact) => r.primary.avg_hr ?? '—'}
+            />
+            <Column
+              header="Макс. пульс"
+              style={{ width: '110px' }}
+              body={(r: GroupedRunFact) => r.primary.max_hr ?? '—'}
+            />
+            <Column
+              header="Источники"
+              style={{ width: '160px' }}
+              body={(r: GroupedRunFact) => (
+                <div className="pb-source-badges">
+                  {r.sources.map((s, i) => (
+                    <span
+                      key={`${r.date}-${s}-${i}`}
+                      className={`pb-source-badge pb-source-badge--${s}`}
+                      title={s}
+                    >
+                      {s}
+                    </span>
+                  ))}
+                </div>
+              )}
+            />
+          </DataTable>
+        </Panel>
 
-      <WorkoutTemplatesDialog
-        visible={templatesVisible}
-        onHide={() => setTemplatesVisible(false)}
-      />
+        <DodofoDebugDialog
+          visible={debugVisible}
+          onHide={() => setDebugVisible(false)}
+          initialRunFactId={selectedFact?.id ?? null}
+        />
 
-      <DayDrawer
-        visible={!!dayDrawerDate}
-        date={dayDrawerDate}
-        onHide={() => setDayDrawerDate(null)}
-        onAfterChange={() => {
-          void loadPlanEvents();
-          void loadRunFacts();
-        }}
-      />
+        <RunStreamsDrawer
+          visible={drawerVisible}
+          runFact={selectedFact}
+          onHide={() => setDrawerVisible(false)}
+          onAfterSync={() => loadRunFacts()}
+        />
 
-      <WellnessDrawer
-        visible={wellnessDrawerVisible}
-        log={selectedRecovery}
-        onHide={() => setWellnessDrawerVisible(false)}
-      />
+        <PlanEventDrawer
+          visible={planDrawerVisible}
+          event={selectedPlanEvent}
+          onHide={() => setPlanDrawerVisible(false)}
+          onSaved={() => {
+            void loadPlanEvents();
+          }}
+        />
+
+        <MirrorDeleteDialog
+          visible={mirrorDialogVisible}
+          candidates={mirrorCandidates}
+          rangeFrom={toIsoDate(syncFrom)}
+          rangeTo={toIsoDate(syncTo)}
+          busy={mirrorBusy}
+          onCancel={() => setMirrorDialogVisible(false)}
+          onApply={handleMirrorApply}
+        />
+
+        <WorkoutTemplatesDialog
+          visible={templatesVisible}
+          onHide={() => setTemplatesVisible(false)}
+        />
+
+        <DayDrawer
+          visible={!!dayDrawerDate}
+          date={dayDrawerDate}
+          onHide={() => setDayDrawerDate(null)}
+          onAfterChange={() => {
+            void loadPlanEvents();
+            void loadRunFacts();
+          }}
+        />
+
+        <WellnessDrawer
+          visible={wellnessDrawerVisible}
+          log={selectedRecovery}
+          onHide={() => setWellnessDrawerVisible(false)}
+        />
+      </div>
     </div>
   );
 };
