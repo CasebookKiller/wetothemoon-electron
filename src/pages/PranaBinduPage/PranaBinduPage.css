@@ -3442,3 +3442,144 @@ body[data-module='prana-bindu'] .p-tooltip.p-tooltip-bottom .p-tooltip-arrow {
   font-size: 0.65rem;
   padding: 0.05rem 0.35rem;
 }
+
+/* ============================================================
+   DeletePlanEventDialog
+   ============================================================ */
+
+.pb-delete-plan-dialog__question {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--tg-theme-text-color, #f5f5f5);
+}
+
+.pb-delete-plan-dialog__hint {
+  margin-top: 0.25rem;
+}
+
+.pb-delete-plan-dialog__options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.pb-delete-plan-dialog__option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.6rem 0.75rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--surface-border, rgba(255, 255, 255, 0.08));
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s;
+}
+
+.pb-delete-plan-dialog__option:hover {
+  background: color-mix(in srgb, var(--pb-accent) 6%, transparent);
+}
+
+.pb-delete-plan-dialog__option.is-selected {
+  border-color: var(--pb-accent);
+  background: color-mix(in srgb, var(--pb-accent) 8%, transparent);
+}
+
+.pb-delete-plan-dialog__option input[type='radio'] {
+  margin-top: 0.2rem;
+  accent-color: var(--pb-accent);
+}
+
+.pb-delete-plan-dialog__option-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.pb-delete-plan-dialog__option-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--tg-theme-text-color, #f5f5f5);
+}
+
+.pb-delete-plan-dialog__option-desc {
+  font-size: 0.75rem;
+  color: var(--tg-theme-hint-color, #708499);
+  line-height: 1.35;
+}
+
+/* ============================================================
+   MirrorDeleteDialog
+   ============================================================ */
+
+.pb-mirror-delete-dialog__hint {
+  margin-bottom: 0.75rem;
+  line-height: 1.4;
+}
+
+.pb-mirror-delete-dialog__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 45vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--pb-accent) transparent;
+  padding-right: 0.25rem;
+}
+
+.pb-mirror-delete-dialog__row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.6rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--surface-border, rgba(255, 255, 255, 0.08));
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.pb-mirror-delete-dialog__row.is-delete {
+  border-color: color-mix(in srgb, #ec3942 35%, transparent);
+}
+
+.pb-mirror-delete-dialog__row.is-keep {
+  border-color: color-mix(in srgb, #6fbf73 35%, transparent);
+}
+
+.pb-mirror-delete-dialog__date {
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  font-size: 0.78rem;
+  color: var(--pb-accent);
+  flex: 0 0 auto;
+}
+
+.pb-mirror-delete-dialog__name {
+  flex: 1 1 auto;
+  font-size: 0.85rem;
+  color: var(--tg-theme-text-color, #f5f5f5);
+}
+
+.pb-mirror-delete-dialog__action {
+  margin-left: auto;
+  font-size: 0.72rem;
+  flex: 0 0 auto;
+}
+
+.pb-mirror-delete-dialog__row.is-delete .pb-mirror-delete-dialog__action {
+  color: #ec3942;
+}
+
+.pb-mirror-delete-dialog__row.is-keep .pb-mirror-delete-dialog__action {
+  color: #6fbf73;
+}
+
+.pb-mirror-delete-dialog__summary {
+  margin-top: 0.6rem;
+  font-size: 0.8rem;
+  color: var(--tg-theme-hint-color, #708499);
+}
+
+.pb-mirror-delete-dialog__summary b {
+  color: var(--pb-accent);
+}

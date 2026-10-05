@@ -57,7 +57,7 @@ import { IntervalsIcuProvider } from '../services/pranaBindu/spice/providers/int
 import { parseFit } from '../services/pranaBindu/spice/parsers/fitParser';
 import { parseTcx } from '../services/pranaBindu/spice/parsers/tcxParser';
 import { parseStravaCsv } from '../services/pranaBindu/spice/parsers/stravaCsvParser';
-import { createPlanEventLocally, deletePlanEventLocally, updatePlanEventLocally } from '../services/pranaBindu/melange/repositories/planEventsRepo';
+import { createPlanEventLocally, deletePlanEventLocally, deletePlanEventsByIds, findStaleIcuEvents, setLocalKeep, updatePlanEventLocally } from '../services/pranaBindu/melange/repositories/planEventsRepo';
 
 // ==================== Регистрация провайдеров ====================
 
@@ -2785,9 +2785,7 @@ export function registerPranaBinduHandlers(): void {
           }
         }
 
-        // Связь план↔факт: для каждого события WORKOUT, если есть
-        // run_facts за ту же дату с совпадающим спортом (Run),
-        // линкуем на первый найденный. Ручной override — отдельно.
+        // Связь план↔факт
         const runSport = (s?: string | null) =>
           s && /run|бег/i.test(s) ? 'run' : null;
 
@@ -2817,9 +2815,18 @@ export function registerPranaBinduHandlers(): void {
           }
         }
 
+        // Mirror: список локальных ICU-событий, которых нет в ICU
+        // и которые пользователь не «закрепил» (local_keep = 0).
+        // НЕ удаляем автоматически — UI покажет диалог.
+        const icuIds = new Set<string>(
+          events.map((e: { externalId: string }) => e.externalId)
+        );
+        const staleCandidates = findStaleIcuEvents(db, from, to, icuIds);
+
         console.log(
           `[Prana-Bindu] sync-plan (intervals-icu) ${from}..${to}: ` +
-          `+${added} ~${updated} linked=${linked} (всего ${events.length}, failed=${failed})`
+          `+${added} ~${updated} linked=${linked} stale=${staleCandidates.length} ` +
+          `(всего ${events.length}, failed=${failed})`
         );
 
         return {
@@ -2830,6 +2837,7 @@ export function registerPranaBinduHandlers(): void {
           failed,
           linked,
           total: events.length,
+          staleCandidates,
           errors: errors.slice(0, 20),
         };
       } catch (e) {
@@ -2854,6 +2862,38 @@ export function registerPranaBinduHandlers(): void {
     }
   );
 
+  // -------- Установить/сбросить local_keep для группы событий --------
+  ipcMain.handle(
+    'pb:plan-events-set-keep',
+    (_event, ids: number[], keep: boolean) => {
+      try {
+        if (!Array.isArray(ids)) {
+          return { success: false, error: 'ids должен быть массивом' };
+        }
+        const n = setLocalKeep(getMelange(), ids, !!keep);
+        return { success: true, updated: n };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+  // -------- Удалить группу событий по id --------
+  ipcMain.handle(
+    'pb:plan-events-delete-bulk',
+    (_event, ids: number[]) => {
+      try {
+        if (!Array.isArray(ids)) {
+          return { success: false, error: 'ids должен быть массивом' };
+        }
+        const n = deletePlanEventsByIds(getMelange(), ids);
+        return { success: true, deleted: n };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+  
   // -------- Удалить план за период --------
   ipcMain.handle(
     'pb:clear-plan',

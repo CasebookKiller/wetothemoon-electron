@@ -56,5 +56,8 @@ export {
   updatePlanEventLocally,
   deletePlanEventLocally,
   createPlanEventLocally,
+  setLocalKeep,
+  deletePlanEventsByIds,
+  findStaleIcuEvents,
 } from './repositories/planEventsRepo';
 export type { UpsertPlanEventResult } from './repositories/planEventsRepo';

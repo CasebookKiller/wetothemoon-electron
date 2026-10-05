@@ -14,7 +14,7 @@ import {
   MIGRATION_V9_INTERVALS_ICU,
 } from './schema';
 
-export const SCHEMA_VERSION = 15;
+export const SCHEMA_VERSION = 16;
 
 interface Migration {
   version: number;
@@ -327,10 +327,27 @@ const migrations: readonly Migration[] = [
       db.exec(`CREATE INDEX IF NOT EXISTS idx_plan_events_date ON plan_events(date);`);
       db.exec(`CREATE INDEX IF NOT EXISTS idx_plan_events_category ON plan_events(category);`);
       db.exec(`CREATE INDEX IF NOT EXISTS idx_plan_events_paired ON plan_events(paired_activity_id);`);
-      console.log('[Melange] v15: создана таблица plan_events');
+            console.log('[Melange] v15: создана таблица plan_events');
+    },
+  },
+  {
+    version: 16,
+    apply: (db) => {
+      const cols = db
+        .prepare(`PRAGMA table_info(plan_events)`)
+        .all() as { name: string }[];
+      const has = (n: string) => cols.some((c) => c.name === n);
+
+      if (!has('local_keep')) {
+        db.exec(
+          `ALTER TABLE plan_events ADD COLUMN local_keep INTEGER NOT NULL DEFAULT 0;`
+        );
+        console.log('[Melange] v16: добавлена plan_events.local_keep');
+      }
     },
   },
 ];
+  
 
 function getCurrentVersion(db: DatabaseSync): number {
   const row = db

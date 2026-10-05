@@ -48,6 +48,11 @@ import {
   type GroupedRunFact,
 } from '@/components/PRANA_BINDU/utils/groupRunFacts';
 
+import {
+  MirrorDeleteDialog,
+  type StaleCandidate,
+} from '@/components/PRANA_BINDU/MirrorDeleteDialog';
+
 interface ProviderOption {
   label: string;
   value: string;
@@ -559,6 +564,9 @@ export const PranaBinduPage: React.FC = () => {
     failed: number;
   } | null>(null);
 
+  const [mirrorCandidates, setMirrorCandidates] = useState<StaleCandidate[]>([]);
+  const [mirrorDialogVisible, setMirrorDialogVisible] = useState(false);
+  const [mirrorBusy, setMirrorBusy] = useState(false);
 
   // ==================== Загрузка списка пробежек ====================
 
@@ -1316,6 +1324,12 @@ const handleSyncWellnessNew = async () => {
           `+${res.added} · ~${res.updated} · связанных: ${res.linked ?? 0}`
         );
         await loadPlanEvents();
+
+        const stale: StaleCandidate[] = res.staleCandidates ?? [];
+        if (stale.length > 0) {
+          setMirrorCandidates(stale);
+          setMirrorDialogVisible(true);
+        }
       } else {
         setPlanError(res.error ?? 'Ошибка синхронизации');
       }
@@ -1480,6 +1494,25 @@ const handleSyncWellnessNew = async () => {
     },
     [api]
   );
+
+  const handleMirrorApply = async (
+    deleteIds: number[],
+    keepIds: number[]
+  ) => {
+    setMirrorBusy(true);
+    try {
+      if (keepIds.length > 0) {
+        await api.pb.planEventsSetKeep(keepIds, true);
+      }
+      if (deleteIds.length > 0) {
+        await api.pb.planEventsDeleteBulk(deleteIds);
+      }
+      setMirrorDialogVisible(false);
+      await loadPlanEvents();
+    } finally {
+      setMirrorBusy(false);
+    }
+  };
 
   return (
     <div className="pb-page p-4">
@@ -2537,6 +2570,14 @@ const handleSyncWellnessNew = async () => {
         onSaved={() => {
           void loadPlanEvents();
         }}
+      />
+
+      <MirrorDeleteDialog
+        visible={mirrorDialogVisible}
+        candidates={mirrorCandidates}
+        busy={mirrorBusy}
+        onCancel={() => setMirrorDialogVisible(false)}
+        onApply={handleMirrorApply}
       />
 
       <WorkoutTemplatesDialog

@@ -845,6 +845,11 @@ try {
       createPlanEventLocally: (payload: any) =>
         ipcRenderer.invoke('pb:create-plan-event-locally', payload),
 
+      planEventsSetKeep: (ids: number[], keep: boolean) =>
+        ipcRenderer.invoke('pb:plan-events-set-keep', ids, keep),
+      planEventsDeleteBulk: (ids: number[]) =>
+        ipcRenderer.invoke('pb:plan-events-delete-bulk', ids),
+
     },
 
   });

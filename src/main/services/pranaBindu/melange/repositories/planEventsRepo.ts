@@ -118,8 +118,8 @@ export function upsertPlanEvent(
     `INSERT INTO plan_events
       (external_id, date, start_time, end_time, category, sport, name,
        description, planned_load, duration_sec, distance_m,
-       icu_workout_json, raw_json, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       icu_workout_json, raw_json, local_keep, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`
   ).run(
     event.externalId,
     event.date,
@@ -261,4 +261,68 @@ export function createPlanEventLocally(
     now
   );
   return Number(info.lastInsertRowid);
+}
+
+/** Установить/сбросить флаг local_keep для группы событий. */
+export function setLocalKeep(
+  db: DatabaseSync,
+  ids: number[],
+  keep: boolean
+): number {
+  if (ids.length === 0) return 0;
+  const placeholders = ids.map(() => '?').join(',');
+  const info = db
+    .prepare(
+      `UPDATE plan_events SET local_keep = ?, updated_at = ?
+       WHERE id IN (${placeholders})`
+    )
+    .run(keep ? 1 : 0, new Date().toISOString(), ...ids);
+  return Number(info.changes);
+}
+
+/** Удалить группу событий по id. */
+export function deletePlanEventsByIds(
+  db: DatabaseSync,
+  ids: number[]
+): number {
+  if (ids.length === 0) return 0;
+  const placeholders = ids.map(() => '?').join(',');
+  const info = db
+    .prepare(`DELETE FROM plan_events WHERE id IN (${placeholders})`)
+    .run(...ids);
+  return Number(info.changes);
+}
+
+/**
+ * Найти локальные ICU-события за диапазон, которых нет в ICU
+ * (по external_id) и у которых local_keep = 0.
+ */
+export function findStaleIcuEvents(
+  db: DatabaseSync,
+  from: string,
+  to: string,
+  icuExternalIds: Set<string>
+): Array<{ id: number; date: string; name: string; sport: string | null }> {
+  const rows = db
+    .prepare(
+      `SELECT id, date, name, sport, external_id FROM plan_events
+       WHERE date >= ? AND date <= ?
+         AND external_id LIKE 'intervals-icu-event:%'
+         AND local_keep = 0`
+    )
+    .all(from, to) as unknown as Array<{
+      id: number;
+      date: string;
+      name: string;
+      sport: string | null;
+      external_id: string;
+    }>;
+  return rows
+    .filter((r) => !icuExternalIds.has(r.external_id))
+    .map((r) => ({
+      id: r.id,
+      date: r.date,
+      name: r.name,
+      sport: r.sport,
+    }));
 }
