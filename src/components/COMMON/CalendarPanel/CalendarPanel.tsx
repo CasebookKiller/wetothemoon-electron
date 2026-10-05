@@ -17,6 +17,7 @@ interface Props {
     from: string,
     to: string
   ) => Promise<{ planDays: Set<string>; factDays: Set<string> }>;
+  onDayClick?: (date: string) => void;
   className?: string;
 }
 
@@ -37,7 +38,11 @@ function quarterLabel(year: number, startMonth: number): string {
   return `Q${Math.floor(startMonth / 3) + 1} ${year}`;
 }
 
-export const CalendarPanel: React.FC<Props> = ({ loadRange, className }) => {
+export const CalendarPanel: React.FC<Props> = ({
+  loadRange,
+  onDayClick,
+  className,
+}) => {
   const today = useMemo(() => new Date(), []);
 
   const [mode, setMode] = useState<CalendarMode>('year');
@@ -195,6 +200,7 @@ export const CalendarPanel: React.FC<Props> = ({ loadRange, className }) => {
             year={year}
             planDays={planDays}
             factDays={factDays}
+            onDayClick={onDayClick}
           />
         )}
         {mode === 'quarter' && (
@@ -204,6 +210,7 @@ export const CalendarPanel: React.FC<Props> = ({ loadRange, className }) => {
             monthCount={3}
             planDays={planDays}
             factDays={factDays}
+            onDayClick={onDayClick}
           />
         )}
         {mode === 'month' && (
@@ -213,6 +220,7 @@ export const CalendarPanel: React.FC<Props> = ({ loadRange, className }) => {
             monthCount={1}
             planDays={planDays}
             factDays={factDays}
+            onDayClick={onDayClick}
           />
         )}
         {mode === 'week' && (

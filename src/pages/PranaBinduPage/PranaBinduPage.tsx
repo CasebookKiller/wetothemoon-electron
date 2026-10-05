@@ -40,14 +40,22 @@ import { YearCalendar } from '@/components/COMMON/YearCalendar/YearCalendar';
 
 import { CalendarPanel } from '@/components/COMMON/CalendarPanel/CalendarPanel';
 
+import { DayDrawer } from '@/components/PRANA_BINDU/DayDrawer';
+
+import {
+  groupRunFacts,
+  sourceBadge,
+  type GroupedRunFact,
+} from '@/components/PRANA_BINDU/utils/groupRunFacts';
+
 interface ProviderOption {
   label: string;
   value: string;
 }
 
 const PROVIDER_OPTIONS: ProviderOption[] = [
-  { label: 'dodofo (основной)', value: 'dodofo' },
-  { label: 'intervals.icu (активности + wellness)', value: 'intervals-icu' },
+  { label: 'dodofo (активности)', value: 'dodofo' },
+  { label: 'intervals.icu (активности + события)', value: 'intervals-icu' },
   { label: 'dofek-zepp (резерв)', value: 'dofek-zepp' },
   { label: 'zepp-mcp (не реализован)', value: 'zepp-mcp' },
   { label: 'zeppbridge (не реализован)', value: 'zeppbridge' },
@@ -83,8 +91,8 @@ function toIsoDate(d: Date): string {
  * если start_time отличается меньше чем на это окно.
  * Потом вынесем в настройки приложения.
  */
-const SAME_WORKOUT_WINDOW_MIN = 30;
-const SAME_WORKOUT_WINDOW_MS = SAME_WORKOUT_WINDOW_MIN * 60 * 1000;
+//const SAME_WORKOUT_WINDOW_MIN = 30;
+//const SAME_WORKOUT_WINDOW_MS = SAME_WORKOUT_WINDOW_MIN * 60 * 1000;
 
 const PB_RANGE_STORAGE_KEY = 'pb.syncRange';
 const PB_FILTERS_STORAGE_KEY = 'pb.filters.v1';
@@ -168,6 +176,7 @@ function fmtDuration(sec: number | null | undefined): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+/*
 const SOURCE_PRIORITY: Record<string, number> = {
   fit: 1,
   tcx: 2,
@@ -175,18 +184,18 @@ const SOURCE_PRIORITY: Record<string, number> = {
   dodofo: 4,
   zepp: 5,
   'strava-csv': 6
-};
+};*/
 
-function sourceBadge(source: string | null, origin: string | null): string {
+/*function sourceBadge(source: string | null, origin: string | null): string {
   if (source === 'fit' || source === 'tcx') {
     if (origin === 'zepp-app') return 'zepp';
     if (origin === 'manual-import') return 'manual';
     return source;
   }
   return source ?? '—';
-}
+}*/
 
-interface GroupedRunFact {
+/*interface GroupedRunFact {
   date: string;
   startTime: string | null;   // якорь группы
   sources: string[];
@@ -196,9 +205,9 @@ interface GroupedRunFact {
   hasStreams: boolean;
   displayName: string;   // ← user_name ?? name
   hasUserName: boolean;   // ← новое
-}
+}*/
 
-function groupRunFacts(
+/*function groupRunFacts(
   items: any[],
   streamsMap: Record<number, any[]>
 ): GroupedRunFact[] {
@@ -290,7 +299,7 @@ function groupRunFacts(
       const sb = b.startTime ?? '';
       return sb.localeCompare(sa);
     });
-}
+}*/
 
 function labelForSource(src: string): string {
   switch (src) {
@@ -537,6 +546,7 @@ export const PranaBinduPage: React.FC = () => {
   const [planError, setPlanError] = useState('');
   const [planSyncResult, setPlanSyncResult] = useState('');
   const [selectedPlanEvent, setSelectedPlanEvent] = useState<PlanEventLite | null>(null);
+  const [dayDrawerDate, setDayDrawerDate] = useState<string | null>(null);
   const [planDrawerVisible, setPlanDrawerVisible] = useState(false);
 
   const [syncStreamsProgress, setSyncStreamsProgress] = useState<{
@@ -1905,7 +1915,7 @@ const handleSyncWellnessNew = async () => {
                 tooltip="Читает HR-зоны из последней активности ICU"
               />
               <Button
-                label={syncingWellness ? 'Wellness…' : 'Подтянуть wellness'}
+                label={syncingWellness ? 'Wellness…' : 'Подтянуть wellness (ICU + dodofo)'}
                 icon={syncingWellness ? 'pi pi-spin pi-spinner' : 'pi pi-heart'}
                 className="pb-soft p-button-sm"
                 onClick={handleSyncWellnessNew}
@@ -2351,7 +2361,10 @@ const handleSyncWellnessNew = async () => {
       </Panel>
 
       <Panel header="Календарь" className="shadow-5 mb-3 pb-panel">
-        <CalendarPanel loadRange={handleLoadCalendarRange} />
+        <CalendarPanel
+          loadRange={handleLoadCalendarRange}
+          onDayClick={(d) => setDayDrawerDate(d)}
+        />
       </Panel>
 
       <PlanEventsPanel
@@ -2529,6 +2542,16 @@ const handleSyncWellnessNew = async () => {
       <WorkoutTemplatesDialog
         visible={templatesVisible}
         onHide={() => setTemplatesVisible(false)}
+      />
+
+      <DayDrawer
+        visible={!!dayDrawerDate}
+        date={dayDrawerDate}
+        onHide={() => setDayDrawerDate(null)}
+        onAfterChange={() => {
+          void loadPlanEvents();
+          void loadRunFacts();
+        }}
       />
 
       <WellnessDrawer

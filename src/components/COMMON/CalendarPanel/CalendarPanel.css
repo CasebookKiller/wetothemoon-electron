@@ -1,0 +1,109 @@
+/* ============================================================
+   CalendarPanel — контейнер календарей (год / квартал / неделя)
+   ============================================================ */
+
+.common-cal-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.common-cal-panel__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.common-cal-panel__modes {
+  display: inline-flex;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  overflow: hidden;
+  height: 2.5rem;
+}
+
+.common-cal-panel__modes button {
+  background: transparent;
+  border: none;
+  color: var(--tg-theme-hint-color, #708499);
+  padding: 0 0.9rem;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.82rem;
+  transition: background 0.15s, color 0.15s;
+}
+
+.common-cal-panel__modes button:hover {
+  background: color-mix(in srgb, var(--pb-accent) 8%, transparent);
+  color: var(--pb-accent);
+}
+
+.common-cal-panel__modes button.is-active {
+  background: color-mix(in srgb, var(--pb-accent) 15%, transparent);
+  color: var(--pb-accent);
+  font-weight: 600;
+}
+
+.common-cal-panel__nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.common-cal-panel__label {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--pb-accent);
+  min-width: 6rem;
+  text-align: center;
+}
+
+.common-cal-panel__spin {
+  color: var(--pb-accent);
+}
+
+.common-cal-panel__legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-left: auto;
+}
+
+.common-cal-panel__dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.common-cal-panel__dot--plan { background: #009e80; }
+.common-cal-panel__dot--fact { background: var(--pb-accent, #d4a373); }
+
+.common-cal-panel__sep {
+  margin: 0 0.2rem;
+  opacity: 0.5;
+}
+
+.common-cal-panel__body {
+  min-height: 12rem;
+}
+
+.common-cal-panel__stub {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 3rem 1rem;
+  color: var(--tg-theme-hint-color, #708499);
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+
+.common-cal-panel__stub i {
+  font-size: 1.5rem;
+  color: var(--pb-accent);
+  opacity: 0.6;
+}
