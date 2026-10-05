@@ -3288,6 +3288,11 @@ body[data-module='prana-bindu'] .p-tooltip.p-tooltip-bottom .p-tooltip-arrow {
   background: var(--pb-accent) !important;
 }
 
+/* --- MiniWeek: override цвета факта --- */
+.pb-page .common-mini-week__mark--fact.is-on {
+  background: var(--pb-accent) !important;
+}
+
 /* --- Лента дней (DateStrip) --- */
 .pb-page .common-date-strip__mark--fact.is-on {
   background: var(--pb-accent) !important;

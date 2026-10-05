@@ -1,0 +1,91 @@
+/* ============================================================
+   MiniWeek — компактная неделя для CalendarPanel
+   ============================================================ */
+
+.common-mini-week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.4rem;
+  width: 100%;
+}
+
+@media (max-width: 700px) {
+  .common-mini-week {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.common-mini-week__day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  min-height: 7rem;
+  padding: 0.5rem 0.4rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  transition: background 0.1s, border-color 0.1s;
+  box-sizing: border-box;
+}
+
+.common-mini-week__day:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.common-mini-week__day.is-today {
+  border-color: var(--pb-accent, #d4a373);
+}
+
+.common-mini-week__dow {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.common-mini-week__day.is-today .common-mini-week__dow {
+  color: var(--pb-accent, #d4a373);
+}
+
+.common-mini-week__num {
+  font-size: 1.6rem;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--tg-theme-text-color, #f5f5f5);
+}
+
+.common-mini-week__month {
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.common-mini-week__marks {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  margin-top: auto;
+  padding: 0 0.1rem;
+}
+
+.common-mini-week__mark {
+  display: block;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* COMMON-дефолты. Модуль может override через .pb-page. */
+.common-mini-week__mark--plan.is-on {
+  background: #009e80;
+}
+
+.common-mini-week__mark--fact.is-on {
+  background: #009e00;
+}

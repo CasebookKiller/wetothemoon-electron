@@ -1,13 +1,13 @@
 // src/components/COMMON/CalendarPanel/CalendarPanel.tsx
 //
 // Контейнер календарей: [Год] [Квартал] [Месяц] [Неделя].
-// Пока год / квартал / месяц; недельный — заглушка.
 // Данные подгружает через переданный loadRange callback.
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { Button } from 'primereact/button';
 import { YearCalendar } from '../YearCalendar/YearCalendar';
 import { QuarterCalendar } from '../QuarterCalendar/QuarterCalendar';
+import { MiniWeek } from '../MiniWeek/MiniWeek';
 import './CalendarPanel.css';
 
 export type CalendarMode = 'year' | 'quarter' | 'month' | 'week';
@@ -26,8 +26,30 @@ const MONTH_NAMES = [
   'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь',
 ];
 
+const MONTH_SHORT = [
+  'янв', 'фев', 'мар', 'апр', 'мая', 'июн',
+  'июл', 'авг', 'сен', 'окт', 'ноя', 'дек',
+];
+
 function pad2(n: number): string {
   return String(n).padStart(2, '0');
+}
+
+function toIso(d: Date): string {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+function parseIso(s: string): Date {
+  const [y, m, d] = s.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+/** Понедельник недели, в которую попадает дата. */
+function mondayOf(d: Date): Date {
+  const r = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const dow = (r.getDay() + 6) % 7; // Пн = 0
+  r.setDate(r.getDate() - dow);
+  return r;
 }
 
 function quarterStartMonth(month: number): number {
@@ -36,6 +58,21 @@ function quarterStartMonth(month: number): number {
 
 function quarterLabel(year: number, startMonth: number): string {
   return `Q${Math.floor(startMonth / 3) + 1} ${year}`;
+}
+
+function fmtWeekRange(fromIso: string, toIsoStr: string): string {
+  const f = parseIso(fromIso);
+  const t = parseIso(toIsoStr);
+  const fm = MONTH_SHORT[f.getMonth()];
+  const tm = MONTH_SHORT[t.getMonth()];
+
+  if (f.getFullYear() !== t.getFullYear()) {
+    return `${f.getDate()} ${fm} ${f.getFullYear()} – ${t.getDate()} ${tm} ${t.getFullYear()}`;
+  }
+  if (f.getMonth() === t.getMonth()) {
+    return `${f.getDate()} – ${t.getDate()} ${fm} ${t.getFullYear()}`;
+  }
+  return `${f.getDate()} ${fm} – ${t.getDate()} ${tm} ${t.getFullYear()}`;
 }
 
 export const CalendarPanel: React.FC<Props> = ({
@@ -60,6 +97,11 @@ export const CalendarPanel: React.FC<Props> = ({
   const [mYear, setMYear] = useState(today.getFullYear());
   const [mMonth, setMMonth] = useState(today.getMonth());
 
+  // Неделя — ISO понедельника недели
+  const [wStartIso, setWStartIso] = useState<string>(
+    () => toIso(mondayOf(new Date()))
+  );
+
   const [planDays, setPlanDays] = useState<Set<string>>(new Set());
   const [factDays, setFactDays] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
@@ -76,6 +118,12 @@ export const CalendarPanel: React.FC<Props> = ({
         to: `${mYear}-${pad2(mMonth + 1)}-${pad2(lastDay)}`,
       };
     }
+    if (mode === 'week') {
+      const s = parseIso(wStartIso);
+      const e = new Date(s);
+      e.setDate(e.getDate() + 6);
+      return { from: wStartIso, to: toIso(e) };
+    }
     // quarter
     const m1 = qStartMonth;
     const m2 = qStartMonth + 2;
@@ -84,7 +132,7 @@ export const CalendarPanel: React.FC<Props> = ({
       from: `${qYear}-${pad2(m1 + 1)}-01`,
       to: `${qYear}-${pad2(m2 + 1)}-${pad2(lastDay)}`,
     };
-  }, [mode, year, qYear, qStartMonth, mYear, mMonth]);
+  }, [mode, year, qYear, qStartMonth, mYear, mMonth, wStartIso]);
 
   useEffect(() => {
     let alive = true;
@@ -120,6 +168,10 @@ export const CalendarPanel: React.FC<Props> = ({
       if (m > 11) { m = 0; y += 1; }
       setMMonth(m);
       setMYear(y);
+    } else if (mode === 'week') {
+      const d = parseIso(wStartIso);
+      d.setDate(d.getDate() + dir * 7);
+      setWStartIso(toIso(d));
     }
   };
 
@@ -127,10 +179,12 @@ export const CalendarPanel: React.FC<Props> = ({
     if (mode === 'year') return String(year);
     if (mode === 'quarter') return quarterLabel(qYear, qStartMonth);
     if (mode === 'month') return `${MONTH_NAMES[mMonth]} ${mYear}`;
-    return 'Неделя';
-  }, [mode, year, qYear, qStartMonth, mYear, mMonth]);
-
-  const canShift = mode !== 'week';
+    // week
+    const s = parseIso(wStartIso);
+    const e = new Date(s);
+    e.setDate(e.getDate() + 6);
+    return fmtWeekRange(wStartIso, toIso(e));
+  }, [mode, year, qYear, qStartMonth, mYear, mMonth, wStartIso]);
 
   return (
     <div className={`common-cal-panel ${className ?? ''}`}>
@@ -171,7 +225,7 @@ export const CalendarPanel: React.FC<Props> = ({
             icon="pi pi-chevron-left"
             className="pb-soft p-button-sm"
             onClick={() => shift(-1)}
-            disabled={!canShift || loading}
+            disabled={loading}
             tooltip="Назад"
           />
           <span className="common-cal-panel__label">{headerLabel}</span>
@@ -179,7 +233,7 @@ export const CalendarPanel: React.FC<Props> = ({
             icon="pi pi-chevron-right"
             className="pb-soft p-button-sm"
             onClick={() => shift(1)}
-            disabled={!canShift || loading}
+            disabled={loading}
             tooltip="Вперёд"
           />
           {loading && (
@@ -224,13 +278,12 @@ export const CalendarPanel: React.FC<Props> = ({
           />
         )}
         {mode === 'week' && (
-          <div className="common-cal-panel__stub">
-            <i className="pi pi-calendar" />
-            <span>
-              Недельный календарь появится позже — сейчас год, квартал
-              и месяц.
-            </span>
-          </div>
+          <MiniWeek
+            weekStart={wStartIso}
+            planDays={planDays}
+            factDays={factDays}
+            onDayClick={onDayClick}
+          />
         )}
       </div>
     </div>
