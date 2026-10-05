@@ -6,10 +6,13 @@ import { Button } from 'primereact/button';
 import { InputText } from 'primereact/inputtext';
 import { InputTextarea } from 'primereact/inputtextarea';
 import { Message } from 'primereact/message';
-import { Dialog } from 'primereact/dialog';
 import { WorkoutTimeline, type TimelineStep } from './WorkoutTimeline';
 import type { PlanEventLite } from './PlanEventsPanel';
 import { parseWorkoutText } from '@/main/services/pranaBindu/mentat/workoutParser';
+import {
+  DeletePlanEventDialog,
+  type DeleteScope,
+} from './DeletePlanEventDialog';
 
 interface Props {
   visible: boolean;
@@ -255,23 +258,22 @@ export const PlanEventDrawer: React.FC<Props> = ({
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = async (scope: DeleteScope) => {
     setDeleting(true);
     setError('');
     setInfo('');
     try {
-      // Если событие связано с ICU — сначала удаляем удалённо.
-      if (isRemote) {
+      if (scope === 'both' && isRemote) {
         const r = await api.pb.deletePlanEventRemote(event.id);
         if (!r?.success) {
           setError(r?.error ?? 'Не удалось удалить из ICU');
           setDeleting(false);
-          setConfirmDelete(false);
           return;
         }
       }
       const r = await api.pb.deletePlanEventLocally(event.id);
       if (r?.success) {
+        setConfirmDelete(false);
         onSaved();
         onHide();
       } else {
@@ -281,7 +283,6 @@ export const PlanEventDrawer: React.FC<Props> = ({
       setError((e as Error).message);
     } finally {
       setDeleting(false);
-      setConfirmDelete(false);
     }
   };
 
@@ -456,37 +457,19 @@ export const PlanEventDrawer: React.FC<Props> = ({
         )}
       </div>
 
-      {/* Confirm delete */}
-      <Dialog
+      <DeletePlanEventDialog
         visible={confirmDelete}
-        onHide={() => setConfirmDelete(false)}
-        header="Удалить событие?"
-        style={{ width: '420px' }}
-        modal
-        className="pb-debug-dialog"
-      >
-        <div className="pb-debug__body">
-          <div>
-            Удалить «{event.name}»{isRemote ? ' и из ICU' : ''}?
-          </div>
-          <div className="flex gap-2 justify-content-end mt-3">
-            <Button
-              label="Отмена"
-              icon="pi pi-times"
-              className="pb-soft p-button-sm"
-              onClick={() => setConfirmDelete(false)}
-              disabled={deleting}
-            />
-            <Button
-              label={deleting ? 'Удаление…' : 'Удалить'}
-              icon={deleting ? 'pi pi-spin pi-spinner' : 'pi pi-trash'}
-              className="pb-destructive p-button-sm"
-              onClick={handleDelete}
-              disabled={deleting}
-            />
-          </div>
-        </div>
-      </Dialog>
+        eventName={event.name}
+        isRemote={isRemote}
+        remoteId={
+          isRemote
+            ? event.externalId.replace('intervals-icu-event:', '')
+            : null
+        }
+        busy={deleting}
+        onCancel={() => setConfirmDelete(false)}
+        onDelete={handleDelete}
+      />
     </Sidebar>
   );
 };

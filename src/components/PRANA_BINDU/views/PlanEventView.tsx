@@ -8,10 +8,13 @@ import { Button } from 'primereact/button';
 import { InputText } from 'primereact/inputtext';
 import { InputTextarea } from 'primereact/inputtextarea';
 import { Message } from 'primereact/message';
-import { Dialog } from 'primereact/dialog';
 import { WorkoutTimeline, type TimelineStep } from '../WorkoutTimeline';
 import type { PlanEventLite } from '../PlanEventsPanel';
 import { parseWorkoutText } from '@/main/services/pranaBindu/mentat/workoutParser';
+import {
+  DeletePlanEventDialog,
+  type DeleteScope,
+} from '../DeletePlanEventDialog';
 
 interface Props {
   event: PlanEventLite;
@@ -197,21 +200,32 @@ export const PlanEventView: React.FC<Props> = ({ event, onBack, onChanged }) => 
     finally { setPushing(false); }
   };
 
-  const handleDelete = async () => {
-    setDeleting(true); setError(''); setInfo('');
+  const handleDelete = async (scope: DeleteScope) => {
+    setDeleting(true);
+    setError('');
+    setInfo('');
     try {
-      if (isRemote) {
+      if (scope === 'both' && isRemote) {
         const r = await api.pb.deletePlanEventRemote(event.id);
         if (!r?.success) {
           setError(r?.error ?? 'Не удалось удалить из ICU');
-          setDeleting(false); setConfirmDelete(false); return;
+          setDeleting(false);
+          return;
         }
       }
       const r = await api.pb.deletePlanEventLocally(event.id);
-      if (r?.success) { onChanged(); onBack(); }
-      else setError(r?.error ?? 'Не удалось удалить локально');
-    } catch (e) { setError((e as Error).message); }
-    finally { setDeleting(false); setConfirmDelete(false); }
+      if (r?.success) {
+        setConfirmDelete(false);
+        onChanged();
+        onBack();
+      } else {
+        setError(r?.error ?? 'Не удалось удалить локально');
+      }
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const timeOnly = event.startTime && event.startTime.length >= 16
@@ -359,29 +373,19 @@ export const PlanEventView: React.FC<Props> = ({ event, onBack, onChanged }) => 
         )}
       </div>
 
-      <Dialog
+      <DeletePlanEventDialog
         visible={confirmDelete}
-        onHide={() => setConfirmDelete(false)}
-        header="Удалить событие?"
-        style={{ width: '420px' }}
-        modal
-        className="pb-debug-dialog"
-      >
-        <div className="pb-debug__body">
-          <div>Удалить «{event.name}»{isRemote ? ' и из ICU' : ''}?</div>
-          <div className="flex gap-2 justify-content-end mt-3">
-            <Button label="Отмена" icon="pi pi-times" className="pb-soft p-button-sm"
-              onClick={() => setConfirmDelete(false)} disabled={deleting} />
-            <Button
-              label={deleting ? 'Удаление…' : 'Удалить'}
-              icon={deleting ? 'pi pi-spin pi-spinner' : 'pi pi-trash'}
-              className="pb-destructive p-button-sm"
-              onClick={handleDelete}
-              disabled={deleting}
-            />
-          </div>
-        </div>
-      </Dialog>
+        eventName={event.name}
+        isRemote={isRemote}
+        remoteId={
+          isRemote
+            ? event.externalId.replace('intervals-icu-event:', '')
+            : null
+        }
+        busy={deleting}
+        onCancel={() => setConfirmDelete(false)}
+        onDelete={handleDelete}
+      />
     </div>
   );
 };
