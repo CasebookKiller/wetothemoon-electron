@@ -3779,8 +3779,10 @@ body[data-module='prana-bindu'] .p-tooltip.p-tooltip-bottom .p-tooltip-arrow {
   justify-content: center !important;
 }
 
-/* Откреплено: та же кнопка выходит из потока и позиционируется
-   по координатам из inline-стиля (top/left). */
+/* Откреплено: та же кнопка выходит из потока.
+   top / left намеренно НЕ задаём — браузер возьмёт
+   «static position» (место кнопки в слоте тулбара)
+   и зафиксирует его относительно viewport. */
 .pb-full-week__pin-btn.is-floating.p-button {
   position: fixed;
   z-index: 100;

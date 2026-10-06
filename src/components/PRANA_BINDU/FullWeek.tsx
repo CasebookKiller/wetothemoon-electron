@@ -1,18 +1,33 @@
 // src/components/PRANA_BINDU/FullWeek.tsx
 //
 // Sticky-полоса недели на всю ширину окна. 7 ячеек по дням,
-// сегодня в центре при первом рендере. В ячейке: дата, wellness
-// (DaySummary), список плана, список факта.
+// сегодня в центре при первом рендере.
 //
-// Самодостаточен: сам грузит plan_events / run_facts / recovery_logs
-// за видимый диапазон через IPC. UI-события прокидывает наружу
-// через onDayClick / onOpenPlanEvent / onOpenRunFact.
+// Навигация: ← → (клавиатура), Shift+колесо / горизонтальный
+// тачпад-скролл, кнопки.
+//
+// Замок:
+//   pinned=true  — вся панель зафиксирована к верху viewport.
+//   pinned=false — панель уезжает со скроллом.
+//
+// Кнопка замка всегда доступна: пока панель видна, она в тулбаре;
+// если панель уехала из viewport — в левом верхнем углу окна
+// появляется floating-копия. Клик по любой из них прикрепляет
+// панель обратно и прокручивает к ней.
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { Button } from 'primereact/button';
 import { DaySummary } from './DaySummary';
 import type { RecoveryLogLite } from './WellnessDrawer';
 import { groupRunFacts, type GroupedRunFact } from './utils/groupRunFacts';
+import { LogWorkoutSessionDialog } from './LogWorkoutSessionDialog';
 
 interface Props {
   onDayClick?: (date: string) => void;
@@ -93,12 +108,6 @@ function fmtDuration(sec: number | null | undefined): string {
   return h > 0 ? `${h}ч${String(m).padStart(2, '0')}` : `${m}м`;
 }
 
-/*function sourceBadge(source: string | null, origin?: string | null): string {
-  if (source === 'fit' && origin === 'zepp-app') return 'zepp';
-  if (source === 'fit' && origin) return 'fit';
-  return source ?? '—';
-}*/
-
 export const FullWeek: React.FC<Props> = ({
   onDayClick,
   onOpenPlanEvent,
@@ -131,31 +140,39 @@ export const FullWeek: React.FC<Props> = ({
     }
   });
 
+  const [logDate, setLogDate] = useState<string | null>(null);
+  //const [pinPos, setPinPos] = useState<{ top: number; left: number } | null>(
+  //  null
+  //);
+
+  // Ссылки
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const gridRef = useRef<HTMLDivElement | null>(null);
+  const lastShiftRef = useRef(0);
+  const pinSlotRef = useRef<HTMLDivElement | null>(null);
+
+  // Сохранение настроек
   useEffect(() => {
     try {
       localStorage.setItem(
         'pb.fullweek.collapsed',
         collapsed ? '1' : '0'
       );
-    } catch {
-      /* ignore */
-    }
+    } catch { /* ignore */ }
   }, [collapsed]);
 
   useEffect(() => {
     try {
       localStorage.setItem('pb.fullweek.pinned', pinned ? '1' : '0');
-    } catch {
-      /* ignore */
-    }
+    } catch { /* ignore */ }
   }, [pinned]);
 
-  // Видимый диапазон — центр ±3
+  // Диапазон — центр ±3
   const range = useMemo(() => {
     return { from: addDays(centerIso, -3), to: addDays(centerIso, 3) };
   }, [centerIso]);
 
-  // Загрузка данных под диапазон
+  // Загрузка
   useEffect(() => {
     if (!api?.pb?.listPlanEvents) return;
     let alive = true;
@@ -185,7 +202,107 @@ export const FullWeek: React.FC<Props> = ({
     };
   }, [range.from, range.to, api]);
 
-  // Собираем 7 ячеек
+  // Сдвиг
+  const shift = useCallback((dir: -1 | 1) => {
+    setCenterIso((iso) => addDays(iso, dir));
+  }, []);
+
+  // Сдвиг с throttle — плавнее, чем было
+  const shiftThrottled = useCallback(
+    (dir: -1 | 1) => {
+      const now = Date.now();
+      if (now - lastShiftRef.current < 100) return;
+      lastShiftRef.current = now;
+      shift(dir);
+    },
+    [shift]
+  );
+
+  const goToday = useCallback(() => setCenterIso(todayIso), [todayIso]);
+
+  // Переключение замка: при прикреплении — прокрутка к панели
+  const togglePin = useCallback(() => {
+    setPinned((prev) => {
+      const next = !prev;
+      if (next) {
+        requestAnimationFrame(() => {
+          const el = rootRef.current;
+          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+      }
+      return next;
+    });
+  }, []);
+
+  // Если приложение стартует с pinned=false (сохранено в localStorage),
+  // измеряем слот один раз после монтирования, чтобы floating-кнопка
+  // встала ровно на его место.
+  //useLayoutEffect(() => {
+  //  if (pinned) return;
+  //  const slot = pinSlotRef.current;
+  //  if (!slot) return;
+  //  const r = slot.getBoundingClientRect();
+  //  setPinPos({ top: r.top, left: r.left });
+  //  // eslint-disable-next-line react-hooks/exhaustive-deps
+  //}, []);
+
+  // Горячие клавиши ← →
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+
+      const target = e.target as HTMLElement | null;
+      if (target) {
+        const tag = target.tagName;
+        if (
+          tag === 'INPUT' ||
+          tag === 'TEXTAREA' ||
+          target.isContentEditable
+        ) {
+          return;
+        }
+      }
+
+      const anyVisible = (sel: string) =>
+        Array.from(document.querySelectorAll(sel)).some((el) => {
+          const s = getComputedStyle(el as HTMLElement);
+          return s.display !== 'none' && s.visibility !== 'hidden';
+        });
+      if (anyVisible('.p-dialog')) return;
+      if (anyVisible('.p-sidebar')) return;
+
+      e.preventDefault();
+      shift(e.key === 'ArrowLeft' ? -1 : 1);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [shift]);
+
+  // Колесо мыши / тачпад
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    const grid = gridRef.current;
+    if (
+      grid &&
+      e.target instanceof HTMLElement &&
+      grid.contains(e.target) &&
+      grid.scrollWidth > grid.clientWidth + 4
+    ) {
+      return;
+    }
+
+    const horiz = Math.abs(e.deltaX) > Math.abs(e.deltaY);
+    if (horiz) {
+      if (Math.abs(e.deltaX) < 4) return;
+      e.preventDefault();
+      shiftThrottled(e.deltaX > 0 ? 1 : -1);
+    } else if (e.shiftKey) {
+      e.preventDefault();
+      shiftThrottled(e.deltaY > 0 ? 1 : -1);
+    }
+  };
+
+  // Ячейки
   const cells: DayCellData[] = useMemo(() => {
     const planByDate = new Map<string, PlanEventLite[]>();
     for (const p of plans) {
@@ -194,8 +311,6 @@ export const FullWeek: React.FC<Props> = ({
       planByDate.set(p.date, list);
     }
 
-    // Группируем пробежки: одна тренировка — одна плитка,
-    // источники собираются в массив.
     const allGroups = groupRunFacts(facts, {});
     const factByDate = new Map<string, GroupedRunFact[]>();
     for (const g of allGroups) {
@@ -212,7 +327,7 @@ export const FullWeek: React.FC<Props> = ({
     return Array.from({ length: 7 }, (_, i) => {
       const iso = addDays(centerIso, i - 3);
       const d = parseIso(iso);
-      const dowIdx = (d.getDay() + 6) % 7; // Пн = 0
+      const dowIdx = (d.getDay() + 6) % 7;
       return {
         iso,
         dowShort: DOW_SHORT[dowIdx],
@@ -226,34 +341,32 @@ export const FullWeek: React.FC<Props> = ({
     });
   }, [centerIso, plans, facts, wellness, todayIso]);
 
-  const shift = (dir: -1 | 1) => {
-    setCenterIso((iso) => addDays(iso, dir));
-  };
-
-  const goToday = () => setCenterIso(todayIso);
-
   return (
     <div
+      ref={rootRef}
       className={[
         'pb-full-week',
         collapsed ? 'is-collapsed' : '',
-        pinned ? '' : 'is-unpinned',
+        pinned ? 'is-pinned' : 'is-unpinned',
         className ?? '',
       ]
         .filter(Boolean)
         .join(' ')}
+      onWheel={handleWheel}
     >
       {/* Toolbar */}
-      <div className="pb-full-week__toolbar">
-        <Button
-          icon={pinned ? 'pi pi-lock' : 'pi pi-lock-open'}
-          className="pb-soft p-button-sm"
-          onClick={() => setPinned((v) => !v)}
-          tooltip={
-            pinned ? 'Открепить от верха' : 'Прикрепить к верху'
-          }
-          tooltipOptions={{ position: 'bottom' }}
-        />
+            <div className="pb-full-week__toolbar">
+        <div className="pb-full-week__pin-slot" ref={pinSlotRef}>
+          <Button
+            icon={pinned ? 'pi pi-lock' : 'pi pi-lock-open'}
+            className={`pb-soft p-button-sm pb-full-week__pin-btn ${
+              !pinned ? 'is-floating' : ''
+            }`}
+            onClick={togglePin}
+            tooltip={pinned ? 'Открепить от верха' : 'Прикрепить к верху'}
+            tooltipOptions={{ position: 'bottom' }}
+          />
+        </div>
         <Button
           icon={collapsed ? 'pi pi-angle-down' : 'pi pi-angle-up'}
           className="pb-soft p-button-sm"
@@ -265,7 +378,7 @@ export const FullWeek: React.FC<Props> = ({
           icon="pi pi-chevron-left"
           className="pb-soft p-button-sm"
           onClick={() => shift(-1)}
-          tooltip="На день назад"
+          tooltip="На день назад (←)"
           tooltipOptions={{ position: 'bottom' }}
         />
         <Button
@@ -279,7 +392,7 @@ export const FullWeek: React.FC<Props> = ({
           icon="pi pi-chevron-right"
           className="pb-soft p-button-sm"
           onClick={() => shift(1)}
-          tooltip="На день вперёд"
+          tooltip="На день вперёд (→)"
           tooltipOptions={{ position: 'bottom' }}
         />
 
@@ -309,125 +422,142 @@ export const FullWeek: React.FC<Props> = ({
 
       {/* 7 ячеек */}
       {!collapsed && (
-        <div className="pb-full-week__grid">
-        {cells.map((c) => (
-          <div
-            key={c.iso}
-            className={`pb-full-week__day ${
-              c.isToday ? 'is-today' : ''
-            } ${c.iso === centerIso ? 'is-center' : ''}`}
-          >
-            <button
-              type="button"
-              className="pb-full-week__head"
-              onClick={
-                onDayClick ? () => onDayClick(c.iso) : undefined
-              }
+        <div className="pb-full-week__grid" ref={gridRef}>
+          {cells.map((c) => (
+            <div
+              key={c.iso}
+              className={`pb-full-week__day ${
+                c.isToday ? 'is-today' : ''
+              } ${c.iso === centerIso ? 'is-center' : ''}`}
             >
-              <span className="pb-full-week__dow">{c.dowShort}</span>
-              <span className="pb-full-week__num">{c.dayNum}</span>
-              <span className="pb-full-week__month">{c.monthShort}</span>
-            </button>
-
-            {/* Wellness */}
-            <DaySummary log={c.wellness} />
-
-            {/* План */}
-            {c.plans.length > 0 && (
-              <div className="pb-full-week__section">
-                <div className="pb-full-week__section-title">План</div>
-                <div className="pb-full-week__items">
-                  {c.plans.slice(0, 4).map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      className="pb-full-week__item pb-full-week__item--plan"
-                      onClick={
-                        onOpenPlanEvent
-                          ? () => onOpenPlanEvent(p.id)
-                          : undefined
-                      }
-                    >
-                      <span className="pb-full-week__item-name">
-                        {p.name}
-                      </span>
-                      <span className="pb-full-week__item-meta">
-                        {p.sport && <span>{p.sport}</span>}
-                        {p.distanceM != null && p.distanceM > 0 && (
-                          <span>{fmtKm(p.distanceM / 1000)} км</span>
-                        )}
-                        {p.durationSec != null && p.durationSec > 0 && (
-                          <span>{fmtDuration(p.durationSec)}</span>
-                        )}
-                      </span>
-                    </button>
-                  ))}
-                  {c.plans.length > 4 && (
-                    <span className="pb-full-week__more pb-hint">
-                      +{c.plans.length - 4} ещё
-                    </span>
-                  )}
-                </div>
+              <div className="pb-full-week__day-head-row">
+                <button
+                  type="button"
+                  className="pb-full-week__head"
+                  onClick={onDayClick ? () => onDayClick(c.iso) : undefined}
+                >
+                  <span className="pb-full-week__dow">{c.dowShort}</span>
+                  <span className="pb-full-week__num">{c.dayNum}</span>
+                  <span className="pb-full-week__month">{c.monthShort}</span>
+                </button>
+                <Button
+                  icon="pi pi-plus"
+                  text
+                  className="pb-full-week__log-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setLogDate(c.iso);
+                  }}
+                  tooltip="Записать факт"
+                  tooltipOptions={{ position: 'top' }}
+                />
               </div>
-            )}
 
-            {/* Факт */}
-            {c.factGroups.length > 0 && (
-              <div className="pb-full-week__section">
-                <div className="pb-full-week__section-title">Факт</div>
-                <div className="pb-full-week__items">
-                  {c.factGroups.slice(0, 3).map((g) => (
-                    <button
-                      key={`${g.date}-${g.startTime ?? 'notime'}-${g.primary.id}`}
-                      type="button"
-                      className="pb-full-week__item pb-full-week__item--fact"
-                      onClick={
-                        onOpenRunFact
-                          ? () => onOpenRunFact(g.primary.id)
-                          : undefined
-                      }
-                    >
-                      <span className="pb-full-week__item-name">
-                        {g.displayName}
-                      </span>
-                      <span className="pb-full-week__item-meta">
-                        <span className="pb-full-week__dots">
-                          {g.sources.map((s, i) => (
-                            <span
-                              key={`${s}-${i}`}
-                              className={`pb-source-dot pb-source-dot--${s}`}
-                              title={s}
-                            />
-                          ))}
+              <DaySummary log={c.wellness} />
+
+              {c.plans.length > 0 && (
+                <div className="pb-full-week__section">
+                  <div className="pb-full-week__section-title">План</div>
+                  <div className="pb-full-week__items">
+                    {c.plans.slice(0, 4).map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        className="pb-full-week__item pb-full-week__item--plan"
+                        onClick={
+                          onOpenPlanEvent
+                            ? () => onOpenPlanEvent(p.id)
+                            : undefined
+                        }
+                      >
+                        <span className="pb-full-week__item-name">
+                          {p.name}
                         </span>
-                        <span>{fmtKm(g.primary.actual_km)} км</span>
-                        {g.primary.avg_hr != null && (
-                          <span>{Math.round(g.primary.avg_hr)} bpm</span>
-                        )}
+                        <span className="pb-full-week__item-meta">
+                          {p.sport && <span>{p.sport}</span>}
+                          {p.distanceM != null && p.distanceM > 0 && (
+                            <span>{fmtKm(p.distanceM / 1000)} км</span>
+                          )}
+                          {p.durationSec != null && p.durationSec > 0 && (
+                            <span>{fmtDuration(p.durationSec)}</span>
+                          )}
+                        </span>
+                      </button>
+                    ))}
+                    {c.plans.length > 4 && (
+                      <span className="pb-full-week__more pb-hint">
+                        +{c.plans.length - 4} ещё
                       </span>
-                    </button>
-                  ))}
-                  {c.factGroups.length > 3 && (
-                    <span className="pb-full-week__more pb-hint">
-                      +{c.factGroups.length - 3} ещё
-                    </span>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Пусто */}
-            {c.plans.length === 0 &&
-              c.factGroups.length === 0 &&
-              !c.wellness && (
-                <div className="pb-full-week__empty pb-hint">
-                  Нет данных
+                    )}
+                  </div>
                 </div>
               )}
-          </div>
-        ))}
+
+              {c.factGroups.length > 0 && (
+                <div className="pb-full-week__section">
+                  <div className="pb-full-week__section-title">Факт</div>
+                  <div className="pb-full-week__items">
+                    {c.factGroups.slice(0, 3).map((g) => (
+                      <button
+                        key={`${g.date}-${g.startTime ?? 'notime'}-${g.primary.id}`}
+                        type="button"
+                        className="pb-full-week__item pb-full-week__item--fact"
+                        onClick={
+                          onOpenRunFact
+                            ? () => onOpenRunFact(g.primary.id)
+                            : undefined
+                        }
+                      >
+                        <span className="pb-full-week__item-name">
+                          {g.displayName}
+                        </span>
+                        <span className="pb-full-week__item-meta">
+                          <span className="pb-full-week__dots">
+                            {g.sources.map((s, i) => (
+                              <span
+                                key={`${s}-${i}`}
+                                className={`pb-source-dot pb-source-dot--${s}`}
+                                title={s}
+                              />
+                            ))}
+                          </span>
+                          <span>{fmtKm(g.primary.actual_km)} км</span>
+                          {g.primary.avg_hr != null && (
+                            <span>{Math.round(g.primary.avg_hr)} bpm</span>
+                          )}
+                        </span>
+                      </button>
+                    ))}
+                    {c.factGroups.length > 3 && (
+                      <span className="pb-full-week__more pb-hint">
+                        +{c.factGroups.length - 3} ещё
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {c.plans.length === 0 &&
+                c.factGroups.length === 0 &&
+                !c.wellness && (
+                  <div className="pb-full-week__empty pb-hint">
+                    Нет данных
+                  </div>
+                )}
+            </div>
+          ))}
         </div>
       )}
+
+      <LogWorkoutSessionDialog
+        visible={!!logDate}
+        planEvent={null}
+        freeDate={logDate}
+        onHide={() => setLogDate(null)}
+        onSaved={() => {
+          setLogDate(null);
+        }}
+      />
     </div>
   );
 };
