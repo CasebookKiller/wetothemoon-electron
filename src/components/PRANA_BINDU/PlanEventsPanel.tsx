@@ -24,6 +24,8 @@ export interface PlanEventLite {
   distanceM?: number;
   steps?: Array<unknown>;
   pairedActivityId?: number;
+  generatorCategory?: string | null;
+  generatorProgramKey?: string | null;
 }
 
 interface Props {
@@ -52,12 +54,23 @@ function fmtDuration(sec?: number): string {
   return `${m}м`;
 }
 
-function sportBadge(sport?: string): { label: string; cls: string } {
+function sportBadge(
+  sport?: string,
+  generatorCategory?: string | null
+): { label: string; cls: string } {
+  // Сгенерированные программы: показываем категорию генератора.
+  if (generatorCategory) {
+    return {
+      label: generatorCategory,
+      cls: 'pb-source-badge--manual',
+    };
+  }
+
   if (!sport) return { label: '—', cls: '' };
   const s = sport.toLowerCase();
   if (s.includes('run')) return { label: 'run', cls: 'pb-source-badge--tcx' };
   if (s.includes('workout') || s.includes('weight')) {
-    return { label: 'big-6', cls: 'pb-source-badge--manual' };
+    return { label: 'workout', cls: 'pb-source-badge--manual' };
   }
   if (s.includes('ride') || s.includes('bike')) {
     return { label: 'ride', cls: 'pb-source-badge--dodofo' };
@@ -142,7 +155,7 @@ export const PlanEventsPanel: React.FC<Props> = ({
           header="Спорт"
           style={{ width: '90px' }}
           body={(r: PlanEventLite) => {
-            const { label, cls } = sportBadge(r.sport);
+            const { label, cls } = sportBadge(r.sport, r.generatorCategory);
             return (
               <span className={`pb-source-badge ${cls}`}>{label}</span>
             );

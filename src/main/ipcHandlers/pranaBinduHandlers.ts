@@ -1,7 +1,5 @@
 // src/main/ipcHandlers/pranaBinduHandlers.ts
 
-// src/main/ipcHandlers/pranaBinduHandlers.ts
-
 import fs from 'fs';
 import path from 'path';
 import zlib from 'zlib';
@@ -50,6 +48,7 @@ import {
   listPlanEvents,
   deletePlanEventsRange,
   linkPlanEventToActivity,
+  deleteGeneratedEvents,
 } from '../services/pranaBindu/melange';
 
 import { DodofoProvider } from '../services/pranaBindu/spice/providers/dodofoProvider';
@@ -58,7 +57,12 @@ import { parseFit } from '../services/pranaBindu/spice/parsers/fitParser';
 import { parseTcx } from '../services/pranaBindu/spice/parsers/tcxParser';
 import { parseStravaCsv } from '../services/pranaBindu/spice/parsers/stravaCsvParser';
 import { createPlanEventLocally, deletePlanEventLocally, deletePlanEventsByIds, findStaleIcuEvents, setLocalKeep, updatePlanEventLocally } from '../services/pranaBindu/melange/repositories/planEventsRepo';
-
+import { ALL_PROGRAMS, findProgram } from '../services/pranaBindu/mentat/programs';
+import {
+  buildProgramPreview,
+  buildEventText,
+} from '../services/pranaBindu/mentat/wadeProgramGenerator';
+import type { MovementState } from '../services/pranaBindu/mentat/wadeProgramGenerator';
 // ==================== Регистрация провайдеров ====================
 
 let providersRegistered = false;
@@ -2318,6 +2322,187 @@ export function registerPranaBinduHandlers(): void {
     }
   );
 
+  // -------- Генерация программы Уэйда / Runner / Cali / Prehab --------
+  ipcMain.handle(
+    'pb:generate-program',
+    async (
+      _event,
+      params: {
+        programKey: string;
+        states: Record<string, MovementState>;
+        from: string;
+        weeks: number;
+        conflictPolicy: 'skip' | 'append' | 'replace';
+        target: 'local' | 'local+icu';
+      }
+    ) => {
+      try {
+        if (!params?.programKey) {
+          return { success: false, error: 'programKey обязателен' };
+        }
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(params.from)) {
+          return { success: false, error: 'from должен быть YYYY-MM-DD' };
+        }
+        if (!Number.isFinite(params.weeks) || params.weeks <= 0) {
+          return { success: false, error: 'weeks должен быть > 0' };
+        }
+
+        const program = findProgram(params.programKey);
+        if (!program) {
+          return { success: false, error: `Программа '${params.programKey}' не найдена` };
+        }
+
+        const db = getMelange();
+
+        // Диапазон генерации
+        const startIso = params.from;
+        const endD = new Date(startIso + 'T00:00:00');
+        endD.setDate(endD.getDate() + params.weeks * 7 - 1);
+        const endIso = `${endD.getFullYear()}-${String(endD.getMonth() + 1).padStart(2, '0')}-${String(endD.getDate()).padStart(2, '0')}`;
+
+        // Replace — удаляем ранее сгенерированное этой программой
+        let removed = 0;
+        if (params.conflictPolicy === 'replace') {
+          removed = deleteGeneratedEvents(db, startIso, endIso, {
+            programKey: program.key,
+          });
+        }
+
+        // Превью
+        const preview = buildProgramPreview({
+          program,
+          states: params.states ?? {},
+          from: startIso,
+          weeks: params.weeks,
+        });
+
+        let created = 0;
+        let skipped = 0;
+        let pushed = 0;
+        let failed = 0;
+        const errors: Array<{ date: string; error: string }> = [];
+        const createdIds: number[] = [];
+
+        for (const ev of preview) {
+          // Проверка конфликта
+          const existing = db
+            .prepare(
+              `SELECT COUNT(*) AS cnt FROM plan_events WHERE date = ?`
+            )
+            .get(ev.date) as { cnt: number };
+          const hasConflict = existing.cnt > 0;
+
+          if (hasConflict && params.conflictPolicy === 'skip') {
+            skipped++;
+            continue;
+          }
+
+          const t = buildEventText(program.name, ev.dayLabel, ev.lines);
+          try {
+            const id = createPlanEventLocally(db, {
+              date: ev.date,
+              startTime: `${ev.date}T09:00:00`,
+              category: 'WORKOUT',
+              sport: program.category === 'runner' ? 'run' : 'workout',
+              name: t.name,
+              description: t.description,
+              generatorCategory: program.category,
+              generatorProgramKey: program.key,
+            });
+            created++;
+            createdIds.push(id);
+          } catch (e) {
+            failed++;
+            errors.push({ date: ev.date, error: (e as Error).message });
+          }
+        }
+
+        // Push в ICU, если нужно
+        if (params.target === 'local+icu' && createdIds.length > 0) {
+          const provider = getProvider('intervals-icu') as any;
+          if (!provider?.createEvent) {
+            failed += createdIds.length;
+            errors.push({ date: '', error: 'createEvent не реализован' });
+          } else {
+            for (const id of createdIds) {
+              try {
+                const row = db
+                  .prepare(`SELECT * FROM plan_events WHERE id = ?`)
+                  .get(id) as any;
+                if (!row) continue;
+
+                const payload = {
+                  category: row.category ?? 'WORKOUT',
+                  start_date_local: row.start_time
+                    ? row.start_time.slice(0, 19)
+                    : `${row.date}T09:00:00`,
+                  type: row.sport ?? 'Workout',
+                  name: row.name ?? 'Workout',
+                  description: row.description ?? '',
+                };
+                const result = await provider.createEvent(payload);
+                const newExtId = `intervals-icu-event:${result.id}`;
+                db.prepare(
+                  `UPDATE plan_events SET external_id = ?, updated_at = ? WHERE id = ?`
+                ).run(newExtId, new Date().toISOString(), id);
+                pushed++;
+              } catch (e) {
+                failed++;
+                errors.push({ date: '', error: (e as Error).message });
+              }
+            }
+          }
+        }
+
+        console.log(
+          `[Prana-Bindu] generate-program ${program.key} ${startIso}..${endIso}: ` +
+          `removed=${removed}, created=${created}, pushed=${pushed}, ` +
+          `skipped=${skipped}, failed=${failed}`
+        );
+
+        return {
+          success: true,
+          programKey: program.key,
+          range: { from: startIso, to: endIso },
+          removed,
+          created,
+          pushed,
+          skipped,
+          failed,
+          errors: errors.slice(0, 20),
+        };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+  // -------- Удалить сгенерированные события --------
+  ipcMain.handle(
+    'pb:plan-events-delete-generated',
+    (
+      _event,
+      params: {
+        from: string;
+        to: string;
+        category?: string;
+        programKey?: string;
+      }
+    ) => {
+      try {
+        const n = deleteGeneratedEvents(
+          getMelange(),
+          params.from,
+          params.to,
+          { category: params.category, programKey: params.programKey }
+        );
+        return { success: true, deleted: n };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
   // -------- Удалить event из ICU (без удаления локально) --------
   ipcMain.handle(
     'pb:delete-plan-event-remote',
@@ -2893,7 +3078,7 @@ export function registerPranaBinduHandlers(): void {
       }
     }
   );
-  
+
   // -------- Удалить план за период --------
   ipcMain.handle(
     'pb:clear-plan',
