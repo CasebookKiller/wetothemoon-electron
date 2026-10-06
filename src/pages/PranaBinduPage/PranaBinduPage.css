@@ -4470,3 +4470,7 @@ body[data-module='prana-bindu'] .pb-templates-dialog .p-dialog-header-maximize {
   font-size: 0.85rem;
   line-height: 1;
 }
+
+.pb-timeline__step + .pb-timeline__step .pb-timeline__bar {
+  border-left: 1px solid color-mix(in srgb, var(--tg-theme-bg-color, #17212b) 70%, transparent);
+}

@@ -121,6 +121,25 @@ function stepsToTimeline(steps: StepShape[]): TimelineStep[] {
   return out;
 }
 
+function sportBadge(
+  sport?: string,
+  generatorCategory?: string | null
+): { label: string; cls: string } {
+  if (generatorCategory) {
+    return { label: generatorCategory, cls: 'pb-source-badge--manual' };
+  }
+  if (!sport) return { label: '—', cls: '' };
+  const s = sport.toLowerCase();
+  if (s.includes('run')) return { label: 'run', cls: 'pb-source-badge--tcx' };
+  if (s.includes('workout') || s.includes('weight')) {
+    return { label: 'workout', cls: 'pb-source-badge--manual' };
+  }
+  if (s.includes('ride') || s.includes('bike')) {
+    return { label: 'ride', cls: 'pb-source-badge--dodofo' };
+  }
+  return { label: sport, cls: '' };
+}
+
 export const PlanEventView: React.FC<Props> = ({ event, onBack, onChanged }) => {
   const api = (window as any).electronAPI;
 
@@ -286,10 +305,19 @@ export const PlanEventView: React.FC<Props> = ({ event, onBack, onChanged }) => 
       </div>
 
       <div className="pb-plan-event__meta">
-        {event.sport && (
-          <span className="pb-source-badge pb-source-badge--tcx">{event.sport}</span>
+        {(() => {
+          const badge = sportBadge(event.sport, event.generatorCategory);
+          return badge.label && badge.label !== '—' ? (
+            <span className={`pb-source-badge ${badge.cls}`}>
+              {badge.label}
+            </span>
+          ) : null;
+        })()}
+        {event.category && event.category !== 'WORKOUT' && (
+          <span className="pb-source-badge pb-source-badge--manual">
+            {event.category.toLowerCase()}
+          </span>
         )}
-        <span className="pb-source-badge pb-source-badge--manual">{event.category}</span>
         {event.distanceM != null && event.distanceM > 0 && (
           <span className="pb-plan-event__chip">
             <i className="pi pi-map-marker" /> {fmtDistance(event.distanceM)}
