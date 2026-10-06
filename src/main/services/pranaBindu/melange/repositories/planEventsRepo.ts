@@ -19,18 +19,22 @@ function rowToDomain(row: PlanEventRow): PlanEvent {
           type: s?.type ?? undefined,
           duration: typeof s?.duration === 'number' ? s.duration : undefined,
           distance: typeof s?.distance === 'number' ? s.distance : undefined,
-          // Универсальный fallback: ICU-формат (hr.value) или уже
-          // разобранный (hrZone) — на случай двойного маппинга.
           hrZone: s?.hr?.value ?? s?.hrZone ?? undefined,
           paceZone: s?.pace?.value ?? s?.paceZone ?? undefined,
           powerZone: s?.power?.value ?? s?.powerZone ?? undefined,
-          reps: typeof s?.reps === 'number' ? s.reps : undefined,
+          sets: typeof s?.sets === 'number' ? s.sets : undefined,
+          reps:
+            typeof s?.reps === 'number' || Array.isArray(s?.reps)
+              ? s.reps
+              : undefined,
           raw: s,
         }));
       }
       if (Array.isArray(parsed?.zoneTimes)) {
         zoneTimes = parsed.zoneTimes.map((z: any) => ({
-          zone: String(z?.id ?? ''),
+          // В JSON может быть как 'id' (после ICU), так и 'zone'
+          // (после нашего генератора). Читаем оба.
+          zone: String(z?.id ?? z?.zone ?? ''),
           secs: Number(z?.secs ?? 0),
         }));
       }
@@ -54,6 +58,8 @@ function rowToDomain(row: PlanEventRow): PlanEvent {
     distanceM: row.distance_m ?? undefined,
     steps,
     zoneTimes,
+    generatorCategory: (row.generator_category as any) ?? undefined,
+    generatorProgramKey: row.generator_program_key ?? undefined,
     pairedActivityId: row.paired_activity_id ?? undefined,
     raw: row.raw_json ? safeParse(row.raw_json) : undefined,
   };
@@ -118,8 +124,10 @@ export function upsertPlanEvent(
     `INSERT INTO plan_events
       (external_id, date, start_time, end_time, category, sport, name,
        description, planned_load, duration_sec, distance_m,
-       icu_workout_json, raw_json, local_keep, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`
+       icu_workout_json, raw_json, local_keep,
+       generator_category, generator_program_key,
+       created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`
   ).run(
     event.externalId,
     event.date,
@@ -134,6 +142,8 @@ export function upsertPlanEvent(
     event.distanceM ?? null,
     workoutJson,
     rawJson,
+    event.generatorCategory ?? null,
+    event.generatorProgramKey ?? null,
     now,
     now
   );
@@ -237,18 +247,22 @@ export function createPlanEventLocally(
     sport?: string;
     name: string;
     description?: string;
+    plannedLoad?: number;
+    generatorCategory?: string;
+    generatorProgramKey?: string;
+    icuWorkoutJson?: string;   // ← новое
   }
 ): number {
   const now = new Date().toISOString();
-  const info = db.prepare(
+    const info = db.prepare(
     `INSERT INTO plan_events
        (external_id, date, start_time, end_time, category, sport, name,
         description, planned_load, duration_sec, distance_m,
-        icu_workout_json, raw_json, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, NULL, ?, ?)`
+        icu_workout_json, raw_json, local_keep,
+        generator_category, generator_program_key,
+        created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, NULL, 0, ?, ?, ?, ?)`
   ).run(
-    // external_id = локальный маркер, чтобы UNIQUE не страдал.
-    // Формат: local:<unixtime>-<rand>
     `local:${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     payload.date,
     payload.startTime ?? `${payload.date}T09:00:00`,
@@ -257,6 +271,10 @@ export function createPlanEventLocally(
     payload.sport ?? null,
     payload.name,
     payload.description ?? null,
+    payload.plannedLoad ?? null,
+    payload.icuWorkoutJson ?? null,
+    payload.generatorCategory ?? null,
+    payload.generatorProgramKey ?? null,
     now,
     now
   );
@@ -325,4 +343,129 @@ export function findStaleIcuEvents(
       name: r.name,
       sport: r.sport,
     }));
+}
+
+/**
+ * Удалить локальные сгенерированные события в диапазоне.
+ * Если programKey задан — только для этой программы.
+ * Если category задан — только для этой категории.
+ * События из ICU (external_id LIKE 'intervals-icu-event:%') не трогаются.
+ */
+export function deleteGeneratedEvents(
+  db: DatabaseSync,
+  from: string,
+  to: string,
+  opts?: { category?: string; programKey?: string }
+): number {
+  const conds: string[] = [
+    `date >= ?`,
+    `date <= ?`,
+    `generator_category IS NOT NULL`,
+  ];
+  const params: any[] = [from, to];
+
+  if (opts?.category) {
+    conds.push(`generator_category = ?`);
+    params.push(opts.category);
+  }
+  if (opts?.programKey) {
+    conds.push(`generator_program_key = ?`);
+    params.push(opts.programKey);
+  }
+
+  const info = db
+    .prepare(`DELETE FROM plan_events WHERE ${conds.join(' AND ')}`)
+    .run(...params);
+  return Number(info.changes);
+}
+
+export interface PlanEventForDelete {
+  id: number;
+  date: string;
+  name: string;
+  sport: string | null;
+  externalId: string;
+  origin: 'generated' | 'manual-local' | 'icu' | 'other';
+  generatorCategory: string | null;
+  generatorProgramKey: string | null;
+}
+
+/**
+ * Список событий для массового удаления по фильтру.
+ * origins:
+ *  - 'generated'    — сгенерированные программами (generator_category IS NOT NULL)
+ *  - 'manual-local' — созданные вручную локально (external_id LIKE 'local:%' и generator_category IS NULL)
+ *  - 'icu'          — из intervals.icu (external_id LIKE 'intervals-icu-event:%')
+ */
+export function listPlanEventsForDelete(
+  db: DatabaseSync,
+  from: string,
+  to: string,
+  opts?: {
+    categories?: string[];
+    origins?: Array<'generated' | 'manual-local' | 'icu'>;
+  }
+): PlanEventForDelete[] {
+  const conds: string[] = [`date >= ?`, `date <= ?`];
+  const params: any[] = [from, to];
+
+  if (opts?.categories && opts.categories.length > 0) {
+    const ph = opts.categories.map(() => '?').join(',');
+    conds.push(`generator_category IN (${ph})`);
+    params.push(...opts.categories);
+  }
+
+  const origins = opts?.origins ?? ['generated', 'manual-local'];
+  const originConds: string[] = [];
+  if (origins.includes('generated')) {
+    originConds.push(`generator_category IS NOT NULL`);
+  }
+  if (origins.includes('manual-local')) {
+    originConds.push(
+      `(generator_category IS NULL AND external_id LIKE 'local:%')`
+    );
+  }
+  if (origins.includes('icu')) {
+    originConds.push(`external_id LIKE 'intervals-icu-event:%'`);
+  }
+  if (originConds.length > 0) {
+    conds.push(`(${originConds.join(' OR ')})`);
+  } else {
+    return [];
+  }
+
+  const rows = db
+    .prepare(
+      `SELECT id, date, name, sport, external_id,
+              generator_category, generator_program_key
+       FROM plan_events
+       WHERE ${conds.join(' AND ')}
+       ORDER BY date ASC, id ASC`
+    )
+    .all(...params) as unknown as Array<{
+      id: number;
+      date: string;
+      name: string;
+      sport: string | null;
+      external_id: string;
+      generator_category: string | null;
+      generator_program_key: string | null;
+    }>;
+
+  return rows.map((r) => {
+    let origin: PlanEventForDelete['origin'] = 'other';
+    if (r.generator_category) origin = 'generated';
+    else if (r.external_id.startsWith('intervals-icu-event:')) origin = 'icu';
+    else if (r.external_id.startsWith('local:')) origin = 'manual-local';
+    return {
+      id: r.id,
+      date: r.date,
+      name: r.name,
+      sport: r.sport,
+      externalId: r.external_id,
+      origin,
+      generatorCategory: r.generator_category,
+      generatorProgramKey: r.generator_program_key,
+    };
+  });
 }

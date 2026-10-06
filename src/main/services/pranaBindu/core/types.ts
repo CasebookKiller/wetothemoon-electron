@@ -3,6 +3,8 @@
  * Пульсовые зоны, профиль, тренировочные блоки.
  */
 
+import { ProgramCategory } from '../mentat/types';
+
 export type HeartRateZone = 1 | 2 | 3 | 4 | 5;
 
 export interface ZoneDefinition {
@@ -72,8 +74,10 @@ export interface WorkoutStep {
   paceZone?: number;
   /** Целевая зона мощности (1-based). */
   powerZone?: number;
+  /** Количество подходов. */
+  sets?: number;
   /** Количество повторов. */
-  reps?: number;
+  reps?: number | number[];
   /** Исходный шаг, как пришёл от ICU. */
   raw: unknown;
 }
@@ -95,4 +99,8 @@ export interface PlanEvent {
   zoneTimes?: Array<{ zone: string; secs: number }>;
   pairedActivityId?: number;
   raw?: unknown;
+  /** Категория генератора, если событие создано генератором программ. */
+  generatorCategory?: ProgramCategory | null;
+  /** Ключ программы-генератора ('new-blood', 'prehab-feet', …). */
+  generatorProgramKey?: string | null;
 }

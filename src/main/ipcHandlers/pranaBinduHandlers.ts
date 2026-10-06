@@ -56,13 +56,14 @@ import { IntervalsIcuProvider } from '../services/pranaBindu/spice/providers/int
 import { parseFit } from '../services/pranaBindu/spice/parsers/fitParser';
 import { parseTcx } from '../services/pranaBindu/spice/parsers/tcxParser';
 import { parseStravaCsv } from '../services/pranaBindu/spice/parsers/stravaCsvParser';
-import { createPlanEventLocally, deletePlanEventLocally, deletePlanEventsByIds, findStaleIcuEvents, setLocalKeep, updatePlanEventLocally } from '../services/pranaBindu/melange/repositories/planEventsRepo';
+import { createPlanEventLocally, deletePlanEventLocally, deletePlanEventsByIds, findStaleIcuEvents, listPlanEventsForDelete, setLocalKeep, updatePlanEventLocally } from '../services/pranaBindu/melange/repositories/planEventsRepo';
 import { ALL_PROGRAMS, findProgram } from '../services/pranaBindu/mentat/programs';
 import {
   buildProgramPreview,
   buildEventText,
 } from '../services/pranaBindu/mentat/wadeProgramGenerator';
 import type { MovementState } from '../services/pranaBindu/mentat/wadeProgramGenerator';
+import { parseWorkoutText } from '../services/pranaBindu/mentat/workoutParser';
 // ==================== Регистрация провайдеров ====================
 
 let providersRegistered = false;
@@ -2398,6 +2399,55 @@ export function registerPranaBinduHandlers(): void {
           }
 
           const t = buildEventText(program.name, ev.dayLabel, ev.lines);
+
+          // Разбираем description в структуру steps + zoneTimes.
+          // Так в таблице «План» появится количество шагов,
+          // а в drawer'е — таймлайн без ожидания sync.
+          let icuWorkoutJson: string | undefined;
+          try {
+            const parsed = parseWorkoutText(t.description);
+            const workoutSteps = parsed.flatSteps.map((s) => ({
+              duration: s.durationSec,
+              distance: s.distanceM,
+              hrZone:
+                s.zoneTarget === 'hr' ? s.zone : undefined,
+              paceZone:
+                !s.zoneTarget || s.zoneTarget === 'pace'
+                  ? s.zone
+                  : undefined,
+              powerZone:
+                s.zoneTarget === 'power' ? s.zone : undefined,
+              sets: s.sets,
+              reps: s.reps,
+              label: s.label,
+              raw: s.raw,
+            }));
+
+            const zoneMap = new Map<number, number>();
+            for (const s of parsed.flatSteps) {
+              if (s.zone && s.durationSec) {
+                zoneMap.set(
+                  s.zone,
+                  (zoneMap.get(s.zone) ?? 0) + s.durationSec
+                );
+              }
+            }
+            const zoneTimes = Array.from({ length: 7 }, (_, i) => ({
+              zone: `Z${i + 1}`,
+              secs: zoneMap.get(i + 1) ?? 0,
+            }));
+
+            icuWorkoutJson = JSON.stringify({
+              steps: workoutSteps,
+              zoneTimes,
+            });
+          } catch (e) {
+            console.warn(
+              `[Prana-Bindu] generate-program: parse error for ${ev.date}:`,
+              (e as Error).message
+            );
+          }
+
           try {
             const id = createPlanEventLocally(db, {
               date: ev.date,
@@ -2408,6 +2458,7 @@ export function registerPranaBinduHandlers(): void {
               description: t.description,
               generatorCategory: program.category,
               generatorProgramKey: program.key,
+              icuWorkoutJson,
             });
             created++;
             createdIds.push(id);
@@ -3073,6 +3124,38 @@ export function registerPranaBinduHandlers(): void {
         }
         const n = deletePlanEventsByIds(getMelange(), ids);
         return { success: true, deleted: n };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+  // -------- Список событий для массового удаления --------
+  ipcMain.handle(
+    'pb:list-plan-events-for-delete',
+    (
+      _event,
+      params: {
+        from: string;
+        to: string;
+        categories?: string[];
+        origins?: Array<'generated' | 'manual-local' | 'icu'>;
+      }
+    ) => {
+      try {
+        if (!params?.from || !params?.to) {
+          return { success: false, error: 'from и to обязательны' };
+        }
+        const items = listPlanEventsForDelete(
+          getMelange(),
+          params.from,
+          params.to,
+          {
+            categories: params.categories,
+            origins: params.origins,
+          }
+        );
+        return { success: true, items };
       } catch (e) {
         return { success: false, error: (e as Error).message };
       }
