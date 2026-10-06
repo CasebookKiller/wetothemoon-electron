@@ -18,6 +18,7 @@ import {
 import { WorkoutTimeline, type TimelineStep } from './WorkoutTimeline';
 import { parseWorkoutText } from '@/main/services/pranaBindu/mentat/workoutParser';
 import { ExerciseCatalog } from './ExerciseCatalog';
+import { WadeProgramsPanel } from './WadeProgramsPanel';
 
 interface Props {
   visible: boolean;
@@ -33,7 +34,7 @@ export const WorkoutTemplatesDialog: React.FC<Props> = ({
   const [selected, setSelected] = useState<WorkoutTemplate | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const [mode, setMode] = useState<'templates' | 'catalog'>('templates');
+  const [mode, setMode] = useState<'templates' | 'catalog' | 'programs'>('templates');
   const [lastCopied, setLastCopied] = useState('');
 
   const handleCatalogCopy = async (line: string) => {
@@ -106,7 +107,7 @@ export const WorkoutTemplatesDialog: React.FC<Props> = ({
       onHide={onHide}
       header={
         <span className="p-dialog-title pb-templates__title">
-          <i className="pi pi-book" /> Библиотека шаблонов
+          <i className="pi pi-book" /> Упражнения
         </span>
       }
       style={{ width: '960px', maxWidth: '96vw' }}
@@ -129,6 +130,13 @@ export const WorkoutTemplatesDialog: React.FC<Props> = ({
             onClick={() => setMode('catalog')}
           >
             Каталог
+          </button>
+          <button
+            type="button"
+            className={mode === 'programs' ? 'is-active' : ''}
+            onClick={() => setMode('programs')}
+          >
+            Программы
           </button>
         </div>
 
@@ -157,7 +165,7 @@ export const WorkoutTemplatesDialog: React.FC<Props> = ({
         )}
       </div>
 
-      {mode === 'templates' ? (
+      {mode === 'templates' && (
         <div className="pb-templates__body">
           {/* Слева — список */}
           <div className="pb-templates__list">
@@ -266,7 +274,9 @@ export const WorkoutTemplatesDialog: React.FC<Props> = ({
             )}
           </div>
         </div>
-      ) : (
+      )}
+
+      {mode === 'catalog' && (
         <div className="pb-catalog__body">
           <ExerciseCatalog onCopy={handleCatalogCopy} />
           {lastCopied && (
@@ -276,7 +286,13 @@ export const WorkoutTemplatesDialog: React.FC<Props> = ({
           )}
         </div>
       )}
-    
+
+      {mode === 'programs' && (
+        <div className="pb-catalog__body">
+          <WadeProgramsPanel />
+        </div>
+      )}
+
     </Dialog>
   );
 };

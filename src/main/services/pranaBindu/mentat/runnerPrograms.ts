@@ -104,32 +104,4 @@ export const RUNNER_PROGRAMS: ProgramSpec[] = [
       },
     ],
   },
-
-    // ==================== Feet & Calf ====================
-  {
-    key: 'runner-feet',
-    category: 'runner',
-    name: 'Feet & Calf',
-    nameRu: 'Стопы и голень',
-    description:
-      'Профилактика болей в стопах и ахилле. Укрепление голени, ' +
-      'свода стопы, мелкой моторики пальцев.',
-    usage:
-      '3 раза в неделю после лёгкого бега. Медленно, с фокусом на ' +
-      'качество, а не на объём. Никогда не через боль.',
-    weeklySchedule: [0, null, 0, null, 0, null, null],
-    days: [
-      {
-        label: 'Feet',
-        movementKeys: [
-          'tibialis-raises',
-          'short-foot',
-          'toe-yoga',
-          'sl-hops-l',
-          'sl-hops-r',
-          'ankling',
-        ],
-      },
-    ],
-  },
 ];

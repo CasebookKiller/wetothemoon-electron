@@ -115,6 +115,23 @@ export interface PlanEventRow {
   icu_workout_json: string | null;
   raw_json: string | null;
   paired_activity_id: number | null;
+  generator_category: string | null;
+  generator_program_key: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WorkoutSessionRow {
+  id: number;
+  date: string;
+  start_time: string | null;
+  plan_event_id: number | null;
+  program_key: string | null;
+  generator_category: string | null;
+  exercises_json: string;
+  rpe: number | null;
+  is_test: number;
+  notes: string | null;
   created_at: string;
   updated_at: string;
 }

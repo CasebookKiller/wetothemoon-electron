@@ -13,6 +13,7 @@ import {
   DeletePlanEventDialog,
   type DeleteScope,
 } from './DeletePlanEventDialog';
+import { LogWorkoutSessionDialog } from './LogWorkoutSessionDialog';
 
 interface Props {
   visible: boolean;
@@ -178,6 +179,7 @@ export const PlanEventDrawer: React.FC<Props> = ({
   const [confirmDelete, setConfirmDelete] = useState(false);   // ← сюда
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
+  const [logVisible, setLogVisible] = useState(false);
 
   useEffect(() => {
     if (!event) return;
@@ -471,6 +473,13 @@ export const PlanEventDrawer: React.FC<Props> = ({
         ) : (
           <>
             <Button
+              label="Записать результат"
+              icon="pi pi-check-square"
+              className="pb-soft p-button-sm"
+              onClick={() => setLogVisible(true)}
+              disabled={pushing || deleting}
+            />
+            <Button
               label={pushing ? 'Отправка…' : isRemote ? 'Обновить в ICU' : 'Отправить в ICU'}
               icon={pushing ? 'pi pi-spin pi-spinner' : 'pi pi-cloud-upload'}
               className="pb p-button-sm"
@@ -493,6 +502,15 @@ export const PlanEventDrawer: React.FC<Props> = ({
         busy={deleting}
         onCancel={() => setConfirmDelete(false)}
         onDelete={handleDelete}
+      />
+
+      <LogWorkoutSessionDialog
+        visible={logVisible}
+        planEvent={event}
+        onHide={() => setLogVisible(false)}
+        onSaved={() => {
+          onSaved();
+        }}
       />
     </Sidebar>
   );

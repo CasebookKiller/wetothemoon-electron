@@ -15,6 +15,7 @@ import {
   DeletePlanEventDialog,
   type DeleteScope,
 } from '../DeletePlanEventDialog';
+import { LogWorkoutSessionDialog } from '../LogWorkoutSessionDialog';
 
 interface Props {
   event: PlanEventLite;
@@ -152,6 +153,7 @@ export const PlanEventView: React.FC<Props> = ({ event, onBack, onChanged }) => 
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
+  const [logVisible, setLogVisible] = useState(false);
 
   useEffect(() => {
     setName(event.name ?? '');
@@ -391,13 +393,22 @@ export const PlanEventView: React.FC<Props> = ({ event, onBack, onChanged }) => 
             />
           </>
         ) : (
-          <Button
-            label={pushing ? 'Отправка…' : isRemote ? 'Обновить в ICU' : 'Отправить в ICU'}
-            icon={pushing ? 'pi pi-spin pi-spinner' : 'pi pi-cloud-upload'}
-            className="pb p-button-sm"
-            onClick={handlePush}
-            disabled={pushing || deleting || !description.trim()}
-          />
+          <>
+            <Button
+              label="Записать результат"
+              icon="pi pi-check-square"
+              className="pb-soft p-button-sm"
+              onClick={() => setLogVisible(true)}
+              disabled={pushing || deleting}
+            />
+            <Button
+              label={pushing ? 'Отправка…' : isRemote ? 'Обновить в ICU' : 'Отправить в ICU'}
+              icon={pushing ? 'pi pi-spin pi-spinner' : 'pi pi-cloud-upload'}
+              className="pb p-button-sm"
+              onClick={handlePush}
+              disabled={pushing || deleting || !description.trim()}
+            />
+          </>
         )}
       </div>
 
@@ -413,6 +424,15 @@ export const PlanEventView: React.FC<Props> = ({ event, onBack, onChanged }) => 
         busy={deleting}
         onCancel={() => setConfirmDelete(false)}
         onDelete={handleDelete}
+      />
+
+      <LogWorkoutSessionDialog
+        visible={logVisible}
+        planEvent={event}
+        onHide={() => setLogVisible(false)}
+        onSaved={() => {
+          onChanged();
+        }}
       />
     </div>
   );

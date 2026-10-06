@@ -850,6 +850,27 @@ try {
       planEventsDeleteBulk: (ids: number[]) =>
         ipcRenderer.invoke('pb:plan-events-delete-bulk', ids),
 
+      generateProgram: (params: any) =>
+        ipcRenderer.invoke('pb:generate-program', params),
+      planEventsDeleteGenerated: (params: any) =>
+        ipcRenderer.invoke('pb:plan-events-delete-generated', params),
+
+      listPlanEventsForDelete: (params: any) =>
+        ipcRenderer.invoke('pb:list-plan-events-for-delete', params),
+
+      createWorkoutSession: (payload: any) =>
+        ipcRenderer.invoke('pb:create-workout-session', payload),
+      updateWorkoutSession: (id: number, patch: any) =>
+        ipcRenderer.invoke('pb:update-workout-session', id, patch),
+      getWorkoutSession: (id: number) =>
+        ipcRenderer.invoke('pb:get-workout-session', id),
+      listWorkoutSessions: (from: string, to: string) =>
+        ipcRenderer.invoke('pb:list-workout-sessions', from, to),
+      listWorkoutSessionsForPlanEvent: (planEventId: number) =>
+        ipcRenderer.invoke('pb:list-workout-sessions-for-plan-event', planEventId),
+      deleteWorkoutSession: (id: number) =>
+        ipcRenderer.invoke('pb:delete-workout-session', id),
+
     },
 
   });

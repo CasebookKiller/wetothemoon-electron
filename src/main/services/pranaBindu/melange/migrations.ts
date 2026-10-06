@@ -14,7 +14,7 @@ import {
   MIGRATION_V9_INTERVALS_ICU,
 } from './schema';
 
-export const SCHEMA_VERSION = 16;
+export const SCHEMA_VERSION = 18;
 
 interface Migration {
   version: number;
@@ -344,6 +344,59 @@ const migrations: readonly Migration[] = [
         );
         console.log('[Melange] v16: добавлена plan_events.local_keep');
       }
+    },
+  },
+  {
+    version: 17,
+    apply: (db) => {
+      const cols = db
+        .prepare(`PRAGMA table_info(plan_events)`)
+        .all() as { name: string }[];
+      const has = (n: string) => cols.some((c) => c.name === n);
+
+      if (!has('generator_category')) {
+        db.exec(`ALTER TABLE plan_events ADD COLUMN generator_category TEXT;`);
+        console.log('[Melange] v17: добавлена plan_events.generator_category');
+      }
+      if (!has('generator_program_key')) {
+        db.exec(`ALTER TABLE plan_events ADD COLUMN generator_program_key TEXT;`);
+        console.log('[Melange] v17: добавлена plan_events.generator_program_key');
+      }
+      db.exec(
+        `CREATE INDEX IF NOT EXISTS idx_plan_events_generator
+         ON plan_events(generator_category, date);`
+      );
+    },
+  },
+  {
+    version: 18,
+    apply: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS workout_sessions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          date TEXT NOT NULL,
+          start_time TEXT,
+          plan_event_id INTEGER,
+          program_key TEXT,
+          generator_category TEXT,
+          exercises_json TEXT NOT NULL,
+          rpe INTEGER,
+          is_test INTEGER NOT NULL DEFAULT 0,
+          notes TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (plan_event_id) REFERENCES plan_events(id)
+        );
+      `);
+      db.exec(
+        `CREATE INDEX IF NOT EXISTS idx_workout_sessions_date
+         ON workout_sessions(date);`
+      );
+      db.exec(
+        `CREATE INDEX IF NOT EXISTS idx_workout_sessions_plan
+         ON workout_sessions(plan_event_id);`
+      );
+      console.log('[Melange] v18: создана таблица workout_sessions');
     },
   },
 ];

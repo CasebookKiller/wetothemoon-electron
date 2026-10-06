@@ -6,15 +6,18 @@ import React, { useEffect, useState } from 'react';
 import { Sidebar } from 'primereact/sidebar';
 import { TabView, TabPanel } from 'primereact/tabview';
 import { Message } from 'primereact/message';
+import { Button } from 'primereact/button';
 import { DaySummary } from './DaySummary';
 import { PlanEventView } from './views/PlanEventView';
 import { WellnessView } from './views/WellnessView';
 import { RunFactView } from './views/RunFactView';
-import { groupRunFacts, type GroupedRunFact } from './utils/groupRunFacts';
+import { LogWorkoutSessionDialog } from './LogWorkoutSessionDialog';
 import type { PlanEventLite } from './PlanEventsPanel';
 import type { RecoveryLogLite as WellnessLogLite } from './WellnessDrawer';
 import type { RecoveryLogLite as SummaryLogLite } from './DaySummary';
 import type { RunFactLite } from './RunStreamsDrawer';
+import { groupRunFacts, type GroupedRunFact } from './utils/groupRunFacts';
+import type { WorkoutSession, SessionExercise } from '@/main/services/pranaBindu/core/types';
 
 interface Props {
   visible: boolean;
@@ -43,6 +46,20 @@ function sourceLabel(f: RunFactLite): string {
   return f.source ?? '—';
 }
 
+/** Краткая строка для одного упражнения из workout_session. */
+function exerciseSummary(ex: SessionExercise): string {
+  if (ex.skipped || !ex.actualSets || ex.actualSets.length === 0) {
+    return '— пропущено';
+  }
+  const allSame = ex.actualSets.every((v) => v === ex.actualSets![0]);
+  if (allSame) {
+    return `${ex.actualSets.length}×${ex.actualSets[0]}${
+      ex.isTimeBased ? 'с' : ''
+    }`;
+  }
+  return ex.actualSets.join(' / ');
+}
+
 export const DayDrawer: React.FC<Props> = ({
   visible,
   date,
@@ -52,7 +69,8 @@ export const DayDrawer: React.FC<Props> = ({
   const api = (window as any).electronAPI;
 
   const [plans, setPlans] = useState<PlanEventLite[]>([]);
-  const [factGroups, setFactGroups] = useState<GroupedRunFact[]>([]);
+  const [facts, setFacts] = useState<RunFactLite[]>([]);
+  const [sessions, setSessions] = useState<WorkoutSession[]>([]);
   const [wellness, setWellness] = useState<WellnessLogLite | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -60,25 +78,30 @@ export const DayDrawer: React.FC<Props> = ({
   const [planView, setPlanView] = useState<PlanEventLite | null>(null);
   const [factView, setFactView] = useState<RunFactLite | null>(null);
 
+  // Диалог ввода факта: с планом или свободный
+  const [logTarget, setLogTarget] = useState<PlanEventLite | null>(null);
+  const [logVisible, setLogVisible] = useState(false);
+  const [freeLogVisible, setFreeLogVisible] = useState(false);
+
   const reload = async () => {
     if (!date) return;
     setLoading(true);
     setError('');
     try {
-      const [pRes, rRes, wRes] = await Promise.all([
+      const [pRes, rRes, wRes, sRes] = await Promise.all([
         api.pb.listPlanEvents(date, date),
         api.pb.listRunFacts(date, date),
         api.pb.listRecoveryLogs(date, date),
+        api.pb.listWorkoutSessions(date, date),
       ]);
       if (pRes?.success) setPlans(pRes.items ?? []);
       else setPlans([]);
-      if (rRes?.success) {
-        setFactGroups(groupRunFacts(rRes.items ?? [], {}));
-      } else {
-        setFactGroups([]);
-      }
+      if (rRes?.success) setFacts(rRes.items ?? []);
+      else setFacts([]);
       if (wRes?.success) setWellness((wRes.items ?? [])[0] ?? null);
       else setWellness(null);
+      if (sRes?.success) setSessions(sRes.items ?? []);
+      else setSessions([]);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -89,7 +112,8 @@ export const DayDrawer: React.FC<Props> = ({
   useEffect(() => {
     if (!visible || !date) {
       setPlans([]);
-      setFactGroups([]);
+      setFacts([]);
+      setSessions([]);
       setWellness(null);
       setPlanView(null);
       setFactView(null);
@@ -105,6 +129,11 @@ export const DayDrawer: React.FC<Props> = ({
     void reload();
     onAfterChange();
   };
+
+  const factGroups = React.useMemo(
+    () => groupRunFacts(facts, {}),
+    [facts]
+  );
 
   return (
     <Sidebar
@@ -128,6 +157,7 @@ export const DayDrawer: React.FC<Props> = ({
 
       {!loading && (
         <TabView className="pb-day-drawer__tabs">
+          {/* ПЛАН */}
           <TabPanel header={`План${plans.length ? ` · ${plans.length}` : ''}`}>
             {planView ? (
               <PlanEventView
@@ -140,11 +170,18 @@ export const DayDrawer: React.FC<Props> = ({
             ) : (
               <div className="pb-day-list">
                 {plans.map((p) => (
-                  <button
+                  <div
                     key={p.id}
-                    type="button"
-                    className="pb-day-list__item"
+                    className="pb-day-list__item pb-day-list__item--with-action"
                     onClick={() => setPlanView(p)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setPlanView(p);
+                      }
+                    }}
                   >
                     <div className="pb-day-list__item-title">
                       {p.name}
@@ -168,68 +205,200 @@ export const DayDrawer: React.FC<Props> = ({
                         <span>{Math.round(p.plannedLoad)} TSS</span>
                       )}
                     </div>
-                  </button>
+                    <Button
+                      icon="pi pi-check"
+                      text
+                      className="pb-day-list__log-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setLogTarget(p);
+                        setLogVisible(true);
+                      }}
+                      tooltip="Записать результат"
+                      tooltipOptions={{ position: 'left' }}
+                    />
+                  </div>
                 ))}
               </div>
             )}
           </TabPanel>
 
-          <TabPanel header={`Факт${factGroups.length ? ` · ${factGroups.length}` : ''}`}>
+          {/* ФАКТ */}
+          <TabPanel
+            header={`Факт${
+              factGroups.length + sessions.length
+                ? ` · ${factGroups.length + sessions.length}`
+                : ''
+            }`}
+          >
             {factView ? (
               <RunFactView
                 fact={factView}
                 onBack={() => setFactView(null)}
                 onChanged={handleChanged}
               />
-            ) : factGroups.length === 0 ? (
-              <div className="pb-drawer__empty">Нет тренировок за этот день.</div>
             ) : (
-              <div className="pb-day-list">
-                {factGroups.map((g, idx) => (
-                  <button
-                    key={`${g.date}-${g.startTime ?? 'notime'}-${idx}`}
-                    type="button"
-                    className="pb-day-list__item"
-                    onClick={() => {
-                      setFactView({
-                        ...(g.primary as RunFactLite),
-                        start_time: g.startTime,
-                      });
-                    }}
-                  >
-                    <div className="pb-day-list__item-title">
-                      {g.displayName}
-                      <span className="pb-source-badges">
-                        {g.sources.map((s, i) => (
-                          <span
-                            key={`${s}-${i}`}
-                            className={`pb-source-badge pb-source-badge--${s}`}
-                          >
-                            {s}
-                          </span>
-                        ))}
-                      </span>
+              <>
+                {/* Тулбар: счётчик слева, кнопка справа */}
+                <div className="pb-day-fact__toolbar">
+                  <span className="pb-day-fact__toolbar-count pb-hint">
+                    {sessions.length + factGroups.length > 0
+                      ? `${sessions.length + factGroups.length} запис${
+                          sessions.length + factGroups.length === 1 ? 'ь' : 'и'
+                        }`
+                      : 'Пусто'}
+                  </span>
+                  <Button
+                    label="Записать"
+                    icon="pi pi-plus"
+                    className="pb-soft p-button-sm"
+                    onClick={() => setFreeLogVisible(true)}
+                  />
+                </div>
+
+                {/* Силовые факты (workout_sessions) */}
+                {sessions.length > 0 && (
+                  <div className="pb-day-fact__section">
+                    <div className="pb-day-fact__section-title">
+                      Упражнения
                     </div>
-                    <div className="pb-day-list__item-meta">
-                      {g.startTime && g.startTime.length >= 16 && (
-                        <span>{g.startTime.slice(11, 16)}</span>
-                      )}
-                      <span>{fmtKm(g.primary.actual_km)} км</span>
-                      <span>{g.primary.actual_pace ?? '—'}</span>
-                      <span>{fmtDuration(g.primary.duration_sec)}</span>
-                      <span>{g.primary.avg_hr ?? '—'} bpm</span>
+                    <div className="pb-day-list">
+                      {sessions.map((s) => (
+                        <div
+                          key={s.id}
+                          className="pb-day-list__item pb-day-list__item--session"
+                        >
+                          <div className="pb-day-list__item-title">
+                            {s.programKey
+                              ? `Программа: ${s.programKey}`
+                              : 'Свободная сессия'}
+                            {s.isTest && (
+                              <span className="pb-source-badge pb-source-badge--dodofo">
+                                тест
+                              </span>
+                            )}
+                            {s.generatorCategory && (
+                              <span className="pb-source-badge pb-source-badge--manual">
+                                {s.generatorCategory}
+                              </span>
+                            )}
+                          </div>
+                          <div className="pb-day-fact__session-list">
+                            {s.exercises.map((ex, i) => (
+                              <div
+                                key={i}
+                                className="pb-day-fact__ex-row"
+                              >
+                                <span className="pb-day-fact__ex-key">
+                                  {ex.movementKey}
+                                </span>
+                                {ex.level != null && (
+                                  <span className="pb-day-fact__ex-lvl">
+                                    L{ex.level}
+                                  </span>
+                                )}
+                                <span className="pb-day-fact__ex-actual">
+                                  {exerciseSummary(ex)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="pb-day-list__item-meta">
+                            {s.rpe != null && <span>RPE {s.rpe}</span>}
+                            {s.notes && (
+                              <span title={s.notes}>{s.notes}</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  </button>
-                ))}
-              </div>
+                  </div>
+                )}
+
+                {/* Пробежки (run_facts) */}
+                {factGroups.length > 0 && (
+                  <div className="pb-day-fact__section">
+                    <div className="pb-day-fact__section-title">
+                      Пробежки
+                    </div>
+                    <div className="pb-day-list">
+                      {factGroups.map((g, idx) => (
+                        <button
+                          key={`${g.date}-${g.startTime ?? 'notime'}-${idx}`}
+                          type="button"
+                          className="pb-day-list__item"
+                          onClick={() => {
+                            setFactView({
+                              ...(g.primary as RunFactLite),
+                              start_time: g.startTime,
+                            });
+                          }}
+                        >
+                          <div className="pb-day-list__item-title">
+                            {g.displayName}
+                            <span className="pb-source-badges">
+                              {g.sources.map((s, i) => (
+                                <span
+                                  key={`${s}-${i}`}
+                                  className={`pb-source-badge pb-source-badge--${s}`}
+                                >
+                                  {s}
+                                </span>
+                              ))}
+                            </span>
+                          </div>
+                          <div className="pb-day-list__item-meta">
+                            {g.startTime && g.startTime.length >= 16 && (
+                              <span>{g.startTime.slice(11, 16)}</span>
+                            )}
+                            <span>{fmtKm(g.primary.actual_km)} км</span>
+                            <span>{g.primary.actual_pace ?? '—'}</span>
+                            <span>{fmtDuration(g.primary.duration_sec)}</span>
+                            <span>{g.primary.avg_hr ?? '—'} bpm</span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Совсем пусто */}
+                {sessions.length === 0 && factGroups.length === 0 && (
+                  <div className="pb-drawer__empty">
+                    Нет тренировок за этот день. Можно записать факт
+                    вручную — кнопка выше.
+                  </div>
+                )}
+              </>
             )}
           </TabPanel>
 
+          {/* WELLNESS */}
           <TabPanel header="Wellness">
             <WellnessView log={wellness} />
           </TabPanel>
         </TabView>
       )}
+
+      {/* Диалог записи факта для конкретного плана */}
+      <LogWorkoutSessionDialog
+        visible={logVisible}
+        planEvent={logTarget}
+        onHide={() => {
+          setLogVisible(false);
+          setLogTarget(null);
+        }}
+        onSaved={handleChanged}
+      />
+
+      {/* Диалог записи свободного факта (без плана) */}
+      <LogWorkoutSessionDialog
+        visible={freeLogVisible}
+        planEvent={null}
+        freeDate={date}
+        onHide={() => setFreeLogVisible(false)}
+        onSaved={handleChanged}
+      />
     </Sidebar>
   );
 };

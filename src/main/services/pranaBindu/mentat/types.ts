@@ -77,7 +77,8 @@ export type ExerciseCategory =
   | 'runner'
   | 'core'
   | 'posture'
-  | 'weightloss';
+  | 'weightloss'
+  | 'prehab';
 
 export interface CatalogLevel {
   level: number;
@@ -102,7 +103,12 @@ export interface CatalogEntry {
 }
 
 /** Категория упражнения без прогрессии (не имеет W/L). */
-export type NamedExerciseCategory = 'drill' | 'plyo' | 'warmup' | 'run-basic';
+export type NamedExerciseCategory =
+  | 'drill'
+  | 'plyo'
+  | 'warmup'
+  | 'run-basic'
+  | 'prehab';
 
 /** Именованное упражнение без уровней — только cue. */
 export interface NamedExercise {
@@ -124,7 +130,7 @@ export interface NamedExercise {
 
 // ==================== Программы (универсальные) ====================
 
-export type ProgramCategory = 'wade' | 'runner' | 'cali';
+export type ProgramCategory = 'wade' | 'runner' | 'cali' | 'prehab';
 
 export interface ProgramDaySpec {
   label: string;

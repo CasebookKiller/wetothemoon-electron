@@ -59,5 +59,18 @@ export {
   setLocalKeep,
   deletePlanEventsByIds,
   findStaleIcuEvents,
+  deleteGeneratedEvents
 } from './repositories/planEventsRepo';
 export type { UpsertPlanEventResult } from './repositories/planEventsRepo';
+export {
+  createWorkoutSession,
+  updateWorkoutSession,
+  getWorkoutSession,
+  listWorkoutSessions,
+  listWorkoutSessionsForPlanEvent,
+  deleteWorkoutSession,
+} from './repositories/workoutSessionsRepo';
+export type {
+  CreateWorkoutSessionInput,
+  UpdateWorkoutSessionPatch,
+} from './repositories/workoutSessionsRepo';

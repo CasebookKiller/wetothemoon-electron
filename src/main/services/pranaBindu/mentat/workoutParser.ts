@@ -31,6 +31,8 @@ const RE_DURATION_TOKEN = /(\d+(?:\.\d+)?)\s*(h|mtr|km|m|s)\b/gi;
 const RE_ZONE = /\bZ(\d)\b(?:\s*(HR|Pace|Power))?/i;
 const RE_FREERIDE = /\bfreeride\b/i;
 const RE_PREFIX = /\b([WL])(\d{1,2})\b/;
+const RE_SETS_UNIFORM = /\b(\d+)\s*[x×]\s*(\d+)\b/i;                // 3x30
+const RE_SETS_VARIED  = /\[(\d+(?:\s*,\s*\d+)*)\]/;       // [10,8,6]
 
 // ==================== Главная функция ====================
 
@@ -185,6 +187,42 @@ export function parseStepLine(line: string): WorkoutStep | null {
     rest = rest.replace(RE_FREERIDE, '').replace(/\s+/g, ' ').trim();
   }
 
+  // 4.5. Извлекаем sets × reps.
+  let sets: number | undefined;
+  let reps: number | number[] | undefined;
+
+  const variedMatch = rest.match(RE_SETS_VARIED);
+  if (variedMatch) {
+    const values = variedMatch[1]
+      .split(',')
+      .map((v) => Number(v.trim()))
+      .filter((n) => Number.isFinite(n) && n > 0);
+    if (values.length > 0) {
+      reps = values;
+      sets = values.length;
+      rest =
+        rest.slice(0, variedMatch.index) +
+        ' ' +
+        rest.slice(variedMatch.index! + variedMatch[0].length);
+      rest = rest.replace(/\s+/g, ' ').trim();
+    }
+  } else {
+    const uniformMatch = rest.match(RE_SETS_UNIFORM);
+    if (uniformMatch) {
+      const s = Number(uniformMatch[1]);
+      const r = Number(uniformMatch[2]);
+      if (s > 0 && r > 0) {
+        sets = s;
+        reps = r;
+        rest =
+          rest.slice(0, uniformMatch.index) +
+          ' ' +
+          rest.slice(uniformMatch.index! + uniformMatch[0].length);
+        rest = rest.replace(/\s+/g, ' ').trim();
+      }
+    }
+  }
+
   // 5. Ищем префикс W/L.
   let prefixKind: StepPrefixKind | undefined;
   let prefixLevel: number | undefined;
@@ -220,5 +258,7 @@ export function parseStepLine(line: string): WorkoutStep | null {
     zone,
     zoneTarget,
     raw,
+    sets,
+    reps,
   };
 }

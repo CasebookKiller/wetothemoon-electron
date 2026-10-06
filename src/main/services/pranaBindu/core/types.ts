@@ -104,3 +104,46 @@ export interface PlanEvent {
   /** Ключ программы-генератора ('new-blood', 'prehab-feet', …). */
   generatorProgramKey?: string | null;
 }
+
+// ==================== Факт выполнения тренировки ====================
+
+/**
+ * Одно упражнение внутри фактической сессии.
+ * «actualSets» — массив выполненных повторов (или секунд для
+ * time-based): [12, 10, 8] = 3 подхода; [15] = 1 подход.
+ */
+export interface SessionExercise {
+  movementKey: string;
+  level?: number;
+  rung?: number;
+  /** Что было в плане: '2×15', '3×30', '[10,8,6]', '30s'. */
+  target?: string;
+  /** Фактические подходы: повторы или секунды (если isTimeBased). */
+  actualSets?: number[];
+  /** true — упражнение измеряется в секундах (планка, стойка). */
+  isTimeBased?: boolean;
+  /** Пользователь пропустил упражнение. */
+  skipped?: boolean;
+  /** Дополнительная заметка по конкретному упражнению. */
+  note?: string;
+}
+
+/**
+ * Сессия факта. Может быть привязана к plan_events (тренировка по
+ * плану) или быть свободной (пользователь записал то, что делал
+ * сам). isTest=true — это проверка уровня, не сессия.
+ */
+export interface WorkoutSession {
+  id: number;
+  date: string;
+  startTime?: string | null;
+  planEventId?: number | null;
+  programKey?: string | null;
+  generatorCategory?: string | null;
+  exercises: SessionExercise[];
+  rpe?: number | null;
+  isTest: boolean;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}

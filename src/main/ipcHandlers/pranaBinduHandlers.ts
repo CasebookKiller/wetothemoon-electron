@@ -49,6 +49,12 @@ import {
   deletePlanEventsRange,
   linkPlanEventToActivity,
   deleteGeneratedEvents,
+  createWorkoutSession,
+  updateWorkoutSession,
+  getWorkoutSession,
+  listWorkoutSessions,
+  listWorkoutSessionsForPlanEvent,
+  deleteWorkoutSession,
 } from '../services/pranaBindu/melange';
 
 import { DodofoProvider } from '../services/pranaBindu/spice/providers/dodofoProvider';
@@ -2548,6 +2554,96 @@ export function registerPranaBinduHandlers(): void {
           { category: params.category, programKey: params.programKey }
         );
         return { success: true, deleted: n };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+  // -------- Факт: создать сессию --------
+  ipcMain.handle(
+    'pb:create-workout-session',
+    (_event, payload: any) => {
+      try {
+        if (!payload?.date || !Array.isArray(payload?.exercises)) {
+          return { success: false, error: 'date и exercises обязательны' };
+        }
+        const id = createWorkoutSession(getMelange(), payload);
+        return { success: true, id };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+  // -------- Факт: обновить сессию --------
+  ipcMain.handle(
+    'pb:update-workout-session',
+    (_event, id: number, patch: any) => {
+      try {
+        if (!Number.isFinite(id)) {
+          return { success: false, error: 'id обязателен' };
+        }
+        const ok = updateWorkoutSession(getMelange(), id, patch ?? {});
+        return { success: ok };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+  // -------- Факт: получить сессию по id --------
+  ipcMain.handle(
+    'pb:get-workout-session',
+    (_event, id: number) => {
+      try {
+        const s = getWorkoutSession(getMelange(), id);
+        return { success: true, data: s };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+  // -------- Факт: список за период --------
+  ipcMain.handle(
+    'pb:list-workout-sessions',
+    (_event, from: string, to: string) => {
+      try {
+        const items = listWorkoutSessions(getMelange(), from, to);
+        return { success: true, items };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+  // -------- Факт: сессии конкретного plan_event --------
+  ipcMain.handle(
+    'pb:list-workout-sessions-for-plan-event',
+    (_event, planEventId: number) => {
+      try {
+        if (!Number.isFinite(planEventId)) {
+          return { success: false, error: 'planEventId обязателен' };
+        }
+        const items = listWorkoutSessionsForPlanEvent(
+          getMelange(),
+          planEventId
+        );
+        return { success: true, items };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+  // -------- Факт: удалить сессию --------
+  ipcMain.handle(
+    'pb:delete-workout-session',
+    (_event, id: number) => {
+      try {
+        const ok = deleteWorkoutSession(getMelange(), id);
+        return { success: ok };
       } catch (e) {
         return { success: false, error: (e as Error).message };
       }

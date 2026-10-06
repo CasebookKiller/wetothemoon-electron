@@ -55,6 +55,8 @@ import {
 
 import { FullWeek } from '@/components/PRANA_BINDU/FullWeek';
 
+import { DeleteGeneratedDialog } from '@/components/PRANA_BINDU/DeleteGeneratedDialog';
+
 interface ProviderOption {
   label: string;
   value: string;
@@ -396,7 +398,7 @@ export const PranaBinduPage: React.FC = () => {
   } | null>(null);
   const [zeppError, setZeppError] = useState('');
 
-
+  const [massDeleteVisible, setMassDeleteVisible] = useState(false);
 
   // ==================== Загрузка потоков (map) ====================
 
@@ -2433,6 +2435,7 @@ const handleSyncWellnessNew = async () => {
           syncResult={planSyncResult}
           onSync={handleSyncPlan}
           onClear={handleClearPlan}
+          onMassDelete={() => setMassDeleteVisible(true)}
           onOpenEvent={handleOpenPlanEvent}
           onOpenTemplates={() => setTemplatesVisible(true)}
         />
@@ -2590,7 +2593,13 @@ const handleSyncWellnessNew = async () => {
         <PlanEventDrawer
           visible={planDrawerVisible}
           event={selectedPlanEvent}
-          onHide={() => setPlanDrawerVisible(false)}
+          onHide={() => {
+            setPlanDrawerVisible(false);
+            requestAnimationFrame(() => {
+              const el = document.activeElement;
+              if (el instanceof HTMLElement) el.blur();
+            });
+          }}
           onSaved={() => {
             void loadPlanEvents();
           }}
@@ -2606,6 +2615,16 @@ const handleSyncWellnessNew = async () => {
           onApply={handleMirrorApply}
         />
 
+        <DeleteGeneratedDialog
+          visible={massDeleteVisible}
+          defaultFrom={syncFrom}
+          defaultTo={syncTo}
+          onHide={() => setMassDeleteVisible(false)}
+          onAfterDelete={() => {
+            void loadPlanEvents();
+          }}
+        />
+
         <WorkoutTemplatesDialog
           visible={templatesVisible}
           onHide={() => setTemplatesVisible(false)}
@@ -2614,7 +2633,15 @@ const handleSyncWellnessNew = async () => {
         <DayDrawer
           visible={!!dayDrawerDate}
           date={dayDrawerDate}
-          onHide={() => setDayDrawerDate(null)}
+          onHide={() => {
+            setDayDrawerDate(null);
+            // Снимаем фокус с кнопки-даты, чтобы после закрытия не
+            // осталась focus-рамка (PrimeReact возвращает фокус на триггер).
+            requestAnimationFrame(() => {
+              const el = document.activeElement;
+              if (el instanceof HTMLElement) el.blur();
+            });
+          }}
           onAfterChange={() => {
             void loadPlanEvents();
             void loadRunFacts();
@@ -2627,6 +2654,8 @@ const handleSyncWellnessNew = async () => {
           onHide={() => setWellnessDrawerVisible(false)}
         />
       </div>
+
+      
     </div>
   );
 };
