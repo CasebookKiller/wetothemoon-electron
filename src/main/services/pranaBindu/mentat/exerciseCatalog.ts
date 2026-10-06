@@ -653,13 +653,13 @@ export const NAMED_EXERCISES: NamedExercise[] = [
     defaultDuration: '60s', defaultZone: 1 },
 
   // --- Стопы / голень / ахилл (новое) ---
-  { key: 'tibialis-raises', category: 'warmup', label: 'Tibialis Raises', nameRu: 'Подъёмы носков на себя',
+  { key: 'tibialis-raises', category: 'prehab', label: 'Tibialis Raises', nameRu: 'Подъёмы носков на себя',
     icuName: 'Tibialis Raises', hint: 'Передняя большеберцовая, профилактика ахилла',
     defaultDuration: '30s', defaultZone: 1 },
-  { key: 'toe-yoga', category: 'warmup', label: 'Toe Yoga', nameRu: 'Йога пальцев стопы',
+  { key: 'toe-yoga', category: 'prehab', label: 'Toe Yoga', nameRu: 'Йога пальцев стопы',
     icuName: 'Toe Yoga', hint: 'Разведение и сведение пальцев',
     defaultDuration: '30s', defaultZone: 1 },
-  { key: 'short-foot', category: 'warmup', label: 'Short Foot', nameRu: 'Сокращение стопы',
+  { key: 'short-foot', category: 'prehab', label: 'Short Foot', nameRu: 'Сокращение стопы',
     icuName: 'Short Foot', hint: 'Свод стопы без поджатия пальцев',
     defaultDuration: '30s', defaultZone: 1 },
 
@@ -673,6 +673,36 @@ export const NAMED_EXERCISES: NamedExercise[] = [
   { key: 'mountain-climbers', category: 'warmup', label: 'Mountain Climbers', nameRu: 'Альпинист',
     icuName: 'Mountain Climbers', hint: 'Планка + попеременный подвод колен',
     defaultDuration: '30s', defaultZone: 3 },
+
+      // --- Prehab: стопы / голень / ахилл ---
+  { key: 'eccentric-heel-drop', category: 'prehab', label: 'Eccentric Heel Drop', nameRu: 'Эксцентрическое опускание на пятку',
+    icuName: 'Eccentric Heel Drop', hint: 'Протокол Альфредасона для ахилла',
+    defaultDuration: '30s', defaultZone: 1 },
+
+  // --- Prehab: колени / ягодичные ---
+  { key: 'terminal-knee-extension', category: 'prehab', label: 'Terminal Knee Extension', nameRu: 'Разгибание колена с резинкой',
+    icuName: 'Terminal Knee Extension', hint: 'VMO, стабилизация колена',
+    defaultDuration: '30s', defaultZone: 1 },
+  { key: 'clamshells', category: 'prehab', label: 'Clamshells', nameRu: 'Раскрытие бедра (ракушка)',
+    icuName: 'Clamshells', hint: 'Ягодичная, стабилизация таза',
+    defaultDuration: '30s', defaultZone: 1 },
+  { key: 'wall-sit', category: 'prehab', label: 'Wall Sit', nameRu: 'Стульчик у стены',
+    icuName: 'Wall Sit', hint: 'Изометрия квадрицепса',
+    defaultDuration: '30s', defaultZone: 1 },
+  { key: 'step-downs', category: 'prehab', label: 'Step-Downs', nameRu: 'Спуск с платформы',
+    icuName: 'Step-Downs', hint: 'Контроль колена при спуске',
+    defaultDuration: '30s', defaultZone: 1 },
+
+  // --- Prehab: спина / осанка ---
+  { key: 'cat-cow', category: 'prehab', label: 'Cat-Cow', nameRu: 'Кошка-корова',
+    icuName: 'Cat-Cow', hint: 'Мобильность позвоночника',
+    defaultDuration: '30s', defaultZone: 1 },
+  { key: 'superman-hold', category: 'prehab', label: 'Superman Hold', nameRu: 'Супермен',
+    icuName: 'Superman Hold', hint: 'Разгибатели спины',
+    defaultDuration: '30s', defaultZone: 1 },
+  { key: 'hip-flexor-stretch', category: 'prehab', label: 'Hip Flexor Stretch', nameRu: 'Растяжка сгибателей бедра',
+    icuName: 'Hip Flexor Stretch', hint: 'Подвздошно-поясничная, компенсация сидения',
+    defaultDuration: '30s', defaultZone: 1 },
 ];
 
 // ==================== Утилиты поиска ====================
