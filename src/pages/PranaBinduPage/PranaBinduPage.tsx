@@ -57,6 +57,10 @@ import { FullWeek } from '@/components/PRANA_BINDU/FullWeek';
 
 import { DeleteGeneratedDialog } from '@/components/PRANA_BINDU/DeleteGeneratedDialog';
 
+import { CheckReminderDialog } from '@/components/PRANA_BINDU/CheckReminderDialog';
+import { ExerciseCategory } from '@/main/services/pranaBindu/mentat/types';
+import { PROGRESSIONS_CATALOG } from '@/main/services/pranaBindu/mentat/exerciseCatalog';
+
 interface ProviderOption {
   label: string;
   value: string;
@@ -320,6 +324,73 @@ function labelForSource(src: string): string {
   }
 }
 
+const REMINDER_HIDDEN_KEY = 'pb.checkReminder.hidden';
+const REMINDER_LAST_SHOWN_KEY = 'pb.checkReminder.lastShown';
+const REMINDER_CATEGORIES_KEY = 'pb.checkReminder.categories';
+const REMINDER_STALE_DAYS = 28;
+
+/** Движение с флагом — есть ли у него reps-ladder для теста. */
+interface TrackableMovement {
+  key: string;
+  label: string;
+  category: ExerciseCategory;
+  hasLadder: boolean;
+}
+
+/** Все прогрессии каталога. Ladder может быть пустым. */
+const TRACKABLE_MOVEMENTS: TrackableMovement[] =
+  PROGRESSIONS_CATALOG.map((e) => ({
+    key: e.key,
+    label: e.label,
+    category: e.category,
+    hasLadder: e.levels.some((l) => l.benchmarkLadder?.length),
+  }));
+
+/** Все категории, в которых есть прогрессии. */
+const ALL_TRACKABLE_CATEGORIES: ExerciseCategory[] = Array.from(
+  new Set(TRACKABLE_MOVEMENTS.map((m) => m.category))
+);
+
+/** Счётчики по категориям: всего движений / тестируемых. */
+const CATEGORY_COUNTS: Record<
+  string,
+  { total: number; testable: number }
+> = (() => {
+  const out: Record<string, { total: number; testable: number }> = {};
+  for (const m of TRACKABLE_MOVEMENTS) {
+    const c = m.category;
+    if (!out[c]) out[c] = { total: 0, testable: 0 };
+    out[c].total++;
+    if (m.hasLadder) out[c].testable++;
+  }
+  return out;
+})();
+
+function loadReminderCategories(): Set<ExerciseCategory> {
+  try {
+    const raw = localStorage.getItem(REMINDER_CATEGORIES_KEY);
+    if (!raw) return new Set(['wade']);
+    const arr = JSON.parse(raw) as string[];
+    const valid = arr.filter((c): c is ExerciseCategory =>
+      ALL_TRACKABLE_CATEGORIES.includes(c as ExerciseCategory)
+    );
+    return valid.length > 0 ? new Set(valid) : new Set(['wade']);
+  } catch {
+    return new Set(['wade']);
+  }
+}
+
+function saveReminderCategories(set: Set<ExerciseCategory>): void {
+  try {
+    localStorage.setItem(
+      REMINDER_CATEGORIES_KEY,
+      JSON.stringify(Array.from(set))
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
 export const PranaBinduPage: React.FC = () => {
   const api = (window as any).electronAPI;
 
@@ -572,6 +643,15 @@ export const PranaBinduPage: React.FC = () => {
   const [mirrorDialogVisible, setMirrorDialogVisible] = useState(false);
   const [mirrorBusy, setMirrorBusy] = useState(false);
 
+  const [reminderVisible, setReminderVisible] = useState(false);
+  const [reminderCategories, setReminderCategories] = useState<Set<ExerciseCategory>>(
+    () => loadReminderCategories()
+  );
+  const [reminderDue, setReminderDue] = useState<string[]>([]);
+  const [templatesInitialMode, setTemplatesInitialMode] = useState<
+    'templates' | 'catalog' | 'programs' | undefined
+  >(undefined);
+
   // ==================== Загрузка списка пробежек ====================
 
   const loadRunFacts = async (from?: Date, to?: Date) => {
@@ -615,6 +695,103 @@ export const PranaBinduPage: React.FC = () => {
       // ignore
     }
   };
+
+  useEffect(() => {
+    (async () => {
+      try {
+        // 1. Отключено пользователем?
+        if (localStorage.getItem(REMINDER_HIDDEN_KEY) === '1') return;
+
+        // 2. Уже показывали сегодня?
+        const today = new Date();
+        const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        const lastShown = localStorage.getItem(REMINDER_LAST_SHOWN_KEY);
+        if (lastShown === todayIso) return;
+
+        // 3. Загружаем реальные тесты за последние 60 дней.
+        const from = new Date();
+        from.setDate(from.getDate() - 60);
+        const fromIso = `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, '0')}-${String(from.getDate()).padStart(2, '0')}`;
+        const res = await api.pb.listWorkoutSessions(fromIso, todayIso);
+        const lastTestAt: Record<string, number> = {};
+        if (res?.success) {
+          for (const s of res.items ?? []) {
+            if (!s.isTest) continue;
+            const created = new Date(s.createdAt).getTime();
+            if (!Number.isFinite(created)) continue;
+            for (const ex of s.exercises ?? []) {
+              const key = ex.movementKey;
+              if (!key) continue;
+              if (!lastTestAt[key] || lastTestAt[key] < created) {
+                lastTestAt[key] = created;
+              }
+            }
+          }
+        }
+
+        // 4. Кого пора проверить (фильтр по активным категориям)?
+        const staleCutoff = Date.now() - REMINDER_STALE_DAYS * 86400 * 1000;
+        const due: string[] = [];
+        for (const m of TRACKABLE_MOVEMENTS) {
+          if (!reminderCategories.has(m.category)) continue;
+          if (!m.hasLadder) continue;
+          const t = lastTestAt[m.key];
+          if (!t || t < staleCutoff) {
+            due.push(m.label);
+          }
+        }
+
+        if (due.length > 0) {
+          setReminderDue(due);
+          setReminderVisible(true);
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!reminderVisible) return;
+    // Пересчитать список due при изменении категорий.
+    (async () => {
+      try {
+        const today = new Date();
+        const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        const from = new Date();
+        from.setDate(from.getDate() - 60);
+        const fromIso = `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, '0')}-${String(from.getDate()).padStart(2, '0')}`;
+        const res = await api.pb.listWorkoutSessions(fromIso, todayIso);
+        const lastTestAt: Record<string, number> = {};
+        if (res?.success) {
+          for (const s of res.items ?? []) {
+            if (!s.isTest) continue;
+            const created = new Date(s.createdAt).getTime();
+            if (!Number.isFinite(created)) continue;
+            for (const ex of s.exercises ?? []) {
+              if (!ex.movementKey) continue;
+              if (!lastTestAt[ex.movementKey] || lastTestAt[ex.movementKey] < created) {
+                lastTestAt[ex.movementKey] = created;
+              }
+            }
+          }
+        }
+        const staleCutoff = Date.now() - REMINDER_STALE_DAYS * 86400 * 1000;
+        const due: string[] = [];
+        for (const m of TRACKABLE_MOVEMENTS) {
+          if (!reminderCategories.has(m.category)) continue;
+          if (!m.hasLadder) continue;
+          const t = lastTestAt[m.key];
+          if (!t || t < staleCutoff) due.push(m.label);
+        }
+        setReminderDue(due);
+      } catch {
+        /* ignore */
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reminderCategories]);
 
   // Загрузка токена + пробежек при монтировании
   useEffect(() => {
@@ -1516,6 +1693,43 @@ const handleSyncWellnessNew = async () => {
     } finally {
       setMirrorBusy(false);
     }
+  };
+
+  const handleReminderCheckNow = () => {
+    try {
+      const today = new Date();
+      const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      localStorage.setItem(REMINDER_LAST_SHOWN_KEY, todayIso);
+    } catch { /* ignore */ }
+    setReminderVisible(false);
+    setTemplatesInitialMode('programs');
+    setTemplatesVisible(true);
+  };
+
+  const handleReminderLater = () => {
+    try {
+      const today = new Date();
+      const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      localStorage.setItem(REMINDER_LAST_SHOWN_KEY, todayIso);
+    } catch { /* ignore */ }
+    setReminderVisible(false);
+  };
+
+  const handleReminderNever = () => {
+    try {
+      localStorage.setItem(REMINDER_HIDDEN_KEY, '1');
+    } catch { /* ignore */ }
+    setReminderVisible(false);
+  };
+
+  const handleToggleReminderCategory = (c: ExerciseCategory) => {
+    setReminderCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(c)) next.delete(c);
+      else next.add(c);
+      saveReminderCategories(next);
+      return next;
+    });
   };
 
   return (
@@ -2627,7 +2841,13 @@ const handleSyncWellnessNew = async () => {
 
         <WorkoutTemplatesDialog
           visible={templatesVisible}
-          onHide={() => setTemplatesVisible(false)}
+          initialMode={templatesInitialMode}
+          onHide={() => {
+            setTemplatesVisible(false);
+            // Сброс, чтобы при следующем открытии через «Упражнения»
+            // из панели «План» мы не навязывали вкладку «Программы».
+            setTemplatesInitialMode(undefined);
+          }}
         />
 
         <DayDrawer
@@ -2655,7 +2875,17 @@ const handleSyncWellnessNew = async () => {
         />
       </div>
 
-      
+      <CheckReminderDialog
+        visible={reminderVisible}
+        dueMovements={reminderDue}
+        categories={reminderCategories}
+        categoryCounts={CATEGORY_COUNTS}
+        onToggleCategory={handleToggleReminderCategory}
+        onCheckNow={handleReminderCheckNow}
+        onLater={handleReminderLater}
+        onNever={handleReminderNever}
+      />
+
     </div>
   );
 };
