@@ -1427,6 +1427,138 @@ export function registerPranaBinduHandlers(): void {
     }
   );
 
+  // -------- Сводка нагрузки по дням (для превью программ Mentat) --------
+  // Возвращает: { baseline28, days: { [date]: { planned, actual, total } } }
+  // - planned: сумма plan_events.planned_load за день, где sport ~ run
+  // - actual:  сумма training_load из run_facts (raw_json.raw.training_load
+  //            для dodofo, raw_json.raw.training_load для ICU — оба попадают
+  //            сюда); для FIT/TCX без training_load — 0
+  // - baseline28: медиана суточных сумм actual за 28 дней ДО from,
+  //               только по дням с ненулевой нагрузкой
+  ipcMain.handle(
+    'pb:day-load-summary',
+    (_event, from: string, to: string) => {
+      try {
+        if (!from || !to) {
+          return { success: false, error: 'from и to обязательны' };
+        }
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+          return { success: false, error: 'Формат даты: YYYY-MM-DD' };
+        }
+
+        const db = getMelange();
+
+        // 1. Planned — только беговые события (sport содержит 'run').
+        const planRows = db
+          .prepare(
+            `SELECT date, SUM(planned_load) AS total
+             FROM plan_events
+             WHERE date >= ? AND date <= ?
+               AND planned_load IS NOT NULL
+               AND planned_load > 0
+               AND (sport IS NULL OR sport = '' OR LOWER(sport) LIKE '%run%')
+             GROUP BY date`
+          )
+          .all(from, to) as unknown as Array<{ date: string; total: number }>;
+
+        // 2. Actual — парсим raw_json у run_facts.
+        const factRows = db
+          .prepare(
+            `SELECT date, raw_json FROM run_facts
+             WHERE date >= ? AND date <= ?`
+          )
+          .all(from, to) as unknown as Array<{
+            date: string;
+            raw_json: string | null;
+          }>;
+
+        function extractLoad(rawJson: string | null): number {
+          if (!rawJson) return 0;
+          try {
+            const parsed = JSON.parse(rawJson);
+            const v =
+              parsed?.raw?.training_load ??
+              parsed?.raw?.icu_training_load ??
+              0;
+            return typeof v === 'number' && v > 0 ? v : 0;
+          } catch {
+            return 0;
+          }
+        }
+
+        const dayActual: Record<string, number> = {};
+        for (const r of factRows) {
+          const v = extractLoad(r.raw_json);
+          if (v > 0) dayActual[r.date] = (dayActual[r.date] ?? 0) + v;
+        }
+
+        // 3. Собираем ответ по запрошенному диапазону.
+        const days: Record<string, { planned: number; actual: number; total: number }> = {};
+
+        // Засеваем дни из planned.
+        for (const r of planRows) {
+          days[r.date] = {
+            planned: Math.round((r.total ?? 0) * 10) / 10,
+            actual: 0,
+            total: 0,
+          };
+        }
+        // Добавляем actual.
+        for (const [date, v] of Object.entries(dayActual)) {
+          if (!days[date]) {
+            days[date] = { planned: 0, actual: 0, total: 0 };
+          }
+          days[date].actual = Math.round(v * 10) / 10;
+        }
+        // Считаем total.
+        for (const d of Object.values(days)) {
+          d.total = Math.round((d.planned + d.actual) * 10) / 10;
+        }
+
+        // 4. Baseline28 — медиана суточных сумм за 28 дней ДО from,
+        //    считаем только дни с actual > 0.
+        const fromDate = new Date(from + 'T00:00:00');
+        const baseFrom = new Date(fromDate);
+        baseFrom.setDate(baseFrom.getDate() - 28);
+        const pad = (n: number) => String(n).padStart(2, '0');
+        const baseFromIso = `${baseFrom.getFullYear()}-${pad(
+          baseFrom.getMonth() + 1
+        )}-${pad(baseFrom.getDate())}`;
+
+        const baseRows = db
+          .prepare(
+            `SELECT date, raw_json FROM run_facts
+             WHERE date >= ? AND date < ?`
+          )
+          .all(baseFromIso, from) as unknown as Array<{
+            date: string;
+            raw_json: string | null;
+          }>;
+
+        const baseDay: Record<string, number> = {};
+        for (const r of baseRows) {
+          const v = extractLoad(r.raw_json);
+          if (v > 0) baseDay[r.date] = (baseDay[r.date] ?? 0) + v;
+        }
+        const baseValues = Object.values(baseDay).filter((v) => v > 0);
+
+        let baseline28: number | null = null;
+        if (baseValues.length > 0) {
+          const sorted = [...baseValues].sort((a, b) => a - b);
+          const mid = Math.floor(sorted.length / 2);
+          baseline28 =
+            sorted.length % 2 === 0
+              ? Math.round(((sorted[mid - 1] + sorted[mid]) / 2) * 10) / 10
+              : Math.round(sorted[mid] * 10) / 10;
+        }
+
+        return { success: true, baseline28, days };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
   // -------- Метаданные потоков для набора run_fact_id (для таблицы) --------
   ipcMain.handle(
     'pb:list-run-streams-batch',
@@ -1995,7 +2127,15 @@ export function registerPranaBinduHandlers(): void {
               baevsky_si: day.baevskySI ?? day.baevsky_si,
               systolic: day.systolic,
               diastolic: day.diastolic,
-              auto_source: day.auto_source ?? day.autoSource ?? name,
+              // v20 — энергия (dodofo отдаёт, раньше теряли).
+              calories_active:
+                day.calories_active ?? day.caloriesActive ?? null,
+              calories_total:
+                day.calories_total ?? day.caloriesTotal ?? null,
+              body_fat_pct: day.body_fat_pct ?? day.bodyFatPct ?? null,
+              // ВСЕГДА наше имя провайдера. Чужой источник (zepp/huawei)
+              // остаётся в raw_json — для тех, кому нужно.
+              auto_source: name,
               raw_json: JSON.stringify(day),
             });
 

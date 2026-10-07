@@ -47,6 +47,29 @@ function Section({ title, rows }: { title: string; rows: RowDef[] }) {
   );
 }
 
+/** Источники за день — из sources_json, fallback на auto_source. */
+function parseSources(log: RecoveryLogLite): string[] {
+  if (log.sources_json) {
+    try {
+      const p = JSON.parse(log.sources_json);
+      if (Array.isArray(p)) {
+        const items = p.filter((x): x is string => typeof x === 'string');
+        if (items.length > 0) return items;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return log.auto_source ? [log.auto_source] : [];
+}
+
+function sourceBadgeClass(name: string): string {
+  if (name === 'intervals-icu') return 'pb-source-badge--intervals-icu';
+  if (name === 'dodofo') return 'pb-source-badge--dodofo';
+  if (name === 'zepp' || name === 'zepp-app') return 'pb-source-badge--zepp';
+  return 'pb-source-badge--manual';
+}
+
 export const WellnessView: React.FC<Props> = ({ log }) => {
   if (!log) {
     return (
@@ -58,6 +81,23 @@ export const WellnessView: React.FC<Props> = ({ log }) => {
 
   return (
     <div className="pb-wellness-view">
+      {/* Бейджи источников — над секциями */}
+      {parseSources(log).length > 0 && (
+        <div
+          className="pb-wellness-view__sources"
+          style={{ marginBottom: '0.5rem', display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}
+        >
+          {parseSources(log).map((s, i) => (
+            <span
+              key={`${s}-${i}`}
+              className={`pb-source-badge ${sourceBadgeClass(s)}`}
+            >
+              {s}
+            </span>
+          ))}
+        </div>
+      )}
+
       <Section
         title="Сон"
         rows={[
@@ -104,6 +144,35 @@ export const WellnessView: React.FC<Props> = ({ log }) => {
           { label: 'Stress avg', value: fmtInt(log.stress_avg) },
         ]}
       />
+
+      {/* ЭНЕРГИЯ (v20 — dodofo) */}
+      <Section
+        title="Энергия"
+        rows={[
+          {
+            label: 'Активные калории',
+            value:
+              log.calories_active != null
+                ? `${Math.round(log.calories_active).toLocaleString('ru-RU')} ккал`
+                : '—',
+          },
+          {
+            label: 'Калории всего',
+            value:
+              log.calories_total != null
+                ? `${Math.round(log.calories_total).toLocaleString('ru-RU')} ккал`
+                : '—',
+          },
+          {
+            label: 'Body fat',
+            value:
+              log.body_fat_pct != null
+                ? `${log.body_fat_pct.toFixed(1)} %`
+                : '—',
+          },
+        ]}
+      />
+
       <Section
         title="Самочувствие"
         rows={[
