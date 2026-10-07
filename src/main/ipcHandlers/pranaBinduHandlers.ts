@@ -58,6 +58,7 @@ import {
   getExerciseProgress,
   listExerciseProgress,
   setExerciseProgress,
+  setLastAutoSync,
 } from '../services/pranaBindu/melange';
 
 import { DodofoProvider } from '../services/pranaBindu/spice/providers/dodofoProvider';
@@ -546,16 +547,16 @@ export function registerPranaBinduHandlers(): void {
   });
 
   ipcMain.handle('pb:sync-settings-update', (_event, patch) => {
-    try {
-      // Защита: через этот канал секреты не принимаем.
-      // Для секретов — pb:zepp-connect.
-      const { zeppAppToken, zeppCredentials, ...safePatch } = patch ?? {};
-      const updated = updateSyncSettings(getMelange(), safePatch);
-      return { success: true, data: updated };
-    } catch (e) {
-      return { success: false, error: (e as Error).message };
-    }
-  });
+  try {
+    // Защита: через этот канал секреты не принимаем.
+    // Для секретов — pb:zepp-connect.
+    const { zeppAppToken, zeppCredentials, ...safePatch } = patch ?? {};
+    const updated = updateSyncSettings(getMelange(), safePatch);
+    return { success: true, data: updated };
+  } catch (e) {
+    return { success: false, error: (e as Error).message };
+  }
+});
 
   // -------- Проверка доступности провайдера --------
   ipcMain.handle('pb:zepp-check-provider', async (_event, name: string) => {
@@ -3265,6 +3266,231 @@ export function registerPranaBinduHandlers(): void {
       }
     }
   );
+
+  // -------- Автосинхронизация при старте --------
+  // Вызывается один раз из рендера при монтировании PranaBinduPage.
+  // Проверяет mode='auto' + auto_on_start=1 + антидребезг (6ч).
+  // Синкает workouts за 7 дней по всем провайдерам с capabilities.workouts,
+  // и wellness за те же 7 дней в мультипровайдерном режиме.
+  // Async: не блокирует UI, всё в фоне.
+  ipcMain.handle('pb:auto-sync-on-start', async () => {
+    try {
+      const db = getMelange();
+      const settings = getSyncSettings(db);
+
+      // Единственный флаг — autoOnStart. Поле mode оставлено
+      // для совместимости с v5-схемой, но UI рулит чекбоксом.
+      if (!settings.autoOnStart) {
+        return { success: true, skipped: 'disabled' };
+      }
+
+      const intervalMin = settings.autoIntervalMin ?? 360;
+      const last = settings.lastSyncAt
+        ? new Date(settings.lastSyncAt).getTime()
+        : 0;
+      const now = Date.now();
+      const elapsedMin = last > 0 ? Math.floor((now - last) / 60000) : null;
+
+      if (last > 0 && now - last < intervalMin * 60_000) {
+        return {
+          success: true,
+          skipped: 'cooldown',
+          elapsedMin,
+          intervalMin,
+          lastSyncAt: settings.lastSyncAt,
+        };
+      }
+
+      // --- 1. Workouts за 7 дней ---
+      const to = new Date();
+      const from = new Date();
+      from.setDate(from.getDate() - 7);
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const iso = (d: Date) =>
+        `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      const fromIso = iso(from);
+      const toIso = iso(to);
+
+      const workoutProviders = listProviders().filter(
+        (p) => p.capabilities?.workouts && typeof p.fetchWorkouts === 'function'
+      );
+
+      const workoutsSummary: Array<{
+        provider: string;
+        added: number;
+        updated: number;
+        error?: string;
+      }> = [];
+
+      for (const provider of workoutProviders) {
+        try {
+          const items = await (provider as any).fetchWorkouts(fromIso, toIso);
+          let added = 0;
+          let updated = 0;
+          for (const w of items) {
+            const res = upsertRunFact(db, w);
+            if (res.inserted) added++;
+            else updated++;
+          }
+          workoutsSummary.push({
+            provider: provider.name,
+            added,
+            updated,
+          });
+          console.log(
+            `[Prana-Bindu] auto-sync workouts (${provider.name}) ${fromIso}..${toIso}: +${added} ~${updated}`
+          );
+        } catch (e) {
+          const msg = (e as Error).message;
+          workoutsSummary.push({
+            provider: provider.name,
+            added: 0,
+            updated: 0,
+            error: msg,
+          });
+          console.warn(
+            `[Prana-Bindu] auto-sync workouts (${provider.name}) error:`,
+            msg
+          );
+        }
+      }
+
+      // --- 2. Wellness за 7 дней (все провайдеры с capabilities.wellness) ---
+      const wellnessProviders = listProviders()
+        .filter((p) => p.capabilities?.wellness)
+        .map((p) => p.name)
+        .sort((a, b) => {
+          if (a === 'intervals-icu') return -1;
+          if (b === 'intervals-icu') return 1;
+          if (a === 'dodofo') return -1;
+          if (b === 'dodofo') return 1;
+          return 0;
+        });
+
+      let wellnessAdded = 0;
+      let wellnessUpdated = 0;
+      const wellnessSummary: Array<{
+        provider: string;
+        added: number;
+        updated: number;
+        error?: string;
+      }> = [];
+
+      for (const name of wellnessProviders) {
+        try {
+          const provider = getProvider(name) as any;
+          if (!provider || typeof provider.fetchWellness !== 'function') {
+            continue;
+          }
+          const raw = await provider.fetchWellness(fromIso, toIso);
+          const days: any[] = Array.isArray(raw) ? raw : raw?.days ?? [];
+          let added = 0;
+          let updated = 0;
+          for (const day of days) {
+            if (!day?.id && !day?.date) continue;
+            const date = day.id ?? day.date;
+            const res = upsertRecoveryLog(db, {
+              date,
+              resting_hr: day.restingHR ?? day.resting_hr,
+              hrv: day.hrv ?? day.hrv_ms,
+              hrv_sdnn: day.hrvSDNN ?? day.hrv_sdnn,
+              sleep_hours:
+                day.sleepSecs != null
+                  ? Math.round((day.sleepSecs / 3600) * 100) / 100
+                  : day.sleep_hours ?? day.sleepHours,
+              sleep_score: day.sleepScore ?? day.sleep_score,
+              sleep_quality: day.sleepQuality ?? day.sleep_quality,
+              sleep_total_min: day.sleep_total_min ?? day.sleepTotalMin,
+              deep_min: day.deep_min ?? day.deepMin,
+              rem_min: day.rem_min ?? day.remMin,
+              light_min: day.light_min ?? day.lightMin,
+              awake_min: day.awake_min ?? day.awakeMin,
+              steps: day.steps,
+              weight_kg: day.weight ?? day.weight_kg,
+              vo2max: day.vo2max,
+              body_battery_charged:
+                day.body_battery_charged ?? day.bodyBatteryCharged,
+              body_battery_drained:
+                day.body_battery_drained ?? day.bodyBatteryDrained,
+              stress_avg: day.stress_avg ?? day.stressAvg,
+              sp_o2: day.spo2_avg_pct ?? day.spO2,
+              ctl: day.ctl,
+              atl: day.atl,
+              ramp_rate: day.rampRate ?? day.ramp_rate,
+              readiness: day.readiness,
+              soreness: day.soreness,
+              fatigue: day.fatigue,
+              stress: day.stress,
+              mood: day.mood,
+              motivation: day.motivation,
+              injury: day.injury,
+              avg_sleeping_hr:
+                day.avgSleepingHR ?? day.avg_sleeping_hr,
+              baevsky_si: day.baevskySI ?? day.baevsky_si,
+              systolic: day.systolic,
+              diastolic: day.diastolic,
+              calories_active:
+                day.calories_active ?? day.caloriesActive ?? null,
+              calories_total:
+                day.calories_total ?? day.caloriesTotal ?? null,
+              body_fat_pct: day.body_fat_pct ?? day.bodyFatPct ?? null,
+              auto_source: name,
+              raw_json: JSON.stringify(day),
+            });
+            if (res.inserted) added++;
+            else updated++;
+          }
+          wellnessAdded += added;
+          wellnessUpdated += updated;
+          wellnessSummary.push({ provider: name, added, updated });
+          console.log(
+            `[Prana-Bindu] auto-sync wellness (${name}) ${fromIso}..${toIso}: +${added} ~${updated}`
+          );
+        } catch (e) {
+          const msg = (e as Error).message;
+          wellnessSummary.push({
+            provider: name,
+            added: 0,
+            updated: 0,
+            error: msg,
+          });
+          console.warn(
+            `[Prana-Bindu] auto-sync wellness (${name}) error:`,
+            msg
+          );
+        }
+      }
+
+      // --- 3. Обновляем last_sync_at / last_sync_status ---
+      const totalErrors =
+        workoutsSummary.filter((w) => w.error).length +
+        wellnessSummary.filter((w) => w.error).length;
+      const status =
+        totalErrors === 0
+          ? 'ok'
+          : totalErrors ===
+            workoutsSummary.length + wellnessSummary.length
+          ? 'error'
+          : 'partial';
+      setLastAutoSync(db, status);
+
+      return {
+        success: true,
+        ran: true,
+        from: fromIso,
+        to: toIso,
+        workouts: workoutsSummary,
+        wellness: {
+          added: wellnessAdded,
+          updated: wellnessUpdated,
+          perProvider: wellnessSummary,
+        },
+      };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
 
   // -------- Синхронизация плана из intervals.icu --------
   ipcMain.handle(
