@@ -17,7 +17,6 @@ import type {
 } from '@/main/services/pranaBindu/mentat/types';
 import {
   buildProgramPreview,
-  buildEventText,
   listProgramProgressions,
   type MovementState,
 } from '@/main/services/pranaBindu/mentat/wadeProgramGenerator';
@@ -69,6 +68,10 @@ export const WadeProgramsPanel: React.FC<Props> = ({ className }) => {
   const [genResult, setGenResult] = useState('');
   const [genError, setGenError] = useState('');
   const [checkVisible, setCheckVisible] = useState(false);
+  const [dayLoad, setDayLoad] = useState<
+    Record<string, { planned: number; actual: number; total: number }>
+  >({});
+  const [baseline28, setBaseline28] = useState<number | null>(null);
 
   const programsForCat = useMemo(
     () => listProgramsByCategory(category),
@@ -144,6 +147,52 @@ export const WadeProgramsPanel: React.FC<Props> = ({ className }) => {
       }),
     [program, states, weeks]
   );
+
+  // Подгружаем нагрузку по дням, которые попадут в preview.
+  useEffect(() => {
+    if (preview.length === 0) {
+      setDayLoad({});
+      setBaseline28(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const from = preview[0].date;
+        const to = preview[preview.length - 1].date;
+        const res = await (window as any).electronAPI?.pb?.dayLoadSummary(
+          from,
+          to
+        );
+        if (cancelled) return;
+        if (res?.success) {
+          setDayLoad(res.days ?? {});
+          setBaseline28(res.baseline28 ?? null);
+        } else {
+          setDayLoad({});
+          setBaseline28(null);
+        }
+      } catch {
+        if (!cancelled) {
+          setDayLoad({});
+          setBaseline28(null);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [preview]);
+
+  const severityFor = (
+    total: number,
+    baseline: number | null
+  ): '' | 'warn' | 'high' => {
+    if (!baseline || baseline <= 0) return '';
+    if (total > baseline * 2.5) return 'high';
+    if (total > baseline * 1.5) return 'warn';
+    return '';
+  };
 
   const persistState = async (mk: string, st: MovementState) => {
     try {
@@ -335,9 +384,16 @@ export const WadeProgramsPanel: React.FC<Props> = ({ className }) => {
             <div className="pb-drawer__empty">Нет событий</div>
           ) : (
             preview.map((ev) => {
-              const t = buildEventText(program.name, ev.dayLabel, ev.lines);
+              const ld = dayLoad[ev.date];
+              const total = ld ? ld.total : 0;
+              const sev = severityFor(total, baseline28);
               return (
-                <div key={ev.date} className="pb-wade-programs__event">
+                <div
+                  key={ev.date}
+                  className={`pb-wade-programs__event${
+                    sev ? ` is-${sev}` : ''
+                  }`}
+                >
                   <div className="pb-wade-programs__event-head">
                     <span className="pb-wade-programs__event-date">
                       {ev.date}
@@ -345,10 +401,35 @@ export const WadeProgramsPanel: React.FC<Props> = ({ className }) => {
                     <span className="pb-wade-programs__event-label">
                       {ev.dayLabel}
                     </span>
+                    {total > 0 && (
+                      <span
+                        className="pb-wade-programs__event-tss"
+                        title={
+                          `План бега: ${(ld?.planned ?? 0).toFixed(0)} TSS\n` +
+                          `Факт бега: ${(ld?.actual ?? 0).toFixed(0)} TSS` +
+                          (baseline28 != null
+                            ? `\nМедиана за 28 дней: ${baseline28.toFixed(0)} TSS`
+                            : '')
+                        }
+                      >
+                        TSS {total.toFixed(0)}
+                      </span>
+                    )}
                   </div>
-                  <pre className="pb-wade-programs__event-body">
-                    {t.description}
-                  </pre>
+                  <div className="pb-wade-programs__event-body">
+                    {ev.lineDetails.map((ld, i) => (
+                      <div key={i} className="pb-wade-programs__line">
+                        <span className="pb-wade-programs__line-icu">
+                          {ld.icu}
+                        </span>
+                        {ld.ru && (
+                          <span className="pb-wade-programs__line-ru">
+                            {ld.ru}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               );
             })

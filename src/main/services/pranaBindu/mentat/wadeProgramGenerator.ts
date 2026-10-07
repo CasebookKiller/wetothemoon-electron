@@ -18,10 +18,29 @@ export interface MovementState {
   rung: number;
 }
 
+/** Одна строка preview: ICU-строка + метаданные для UI. */
+export interface ProgramPreviewLine {
+  /** Чистая строка в ICU-формате — то, что уйдёт в календарь. */
+  icu: string;
+  /** Английское имя уровня (или icuName для named). */
+  en: string;
+  /** Русское имя уровня (level.nameRu) или null. */
+  ru: string | null;
+  /** 'W3' / 'L5' для прогрессий; null для named. */
+  levelTag: string | null;
+  /** '30s' / '1×10' / '1×5' — ступень rung. */
+  rung: string | null;
+  /** Зона ICU (1..7) или null. */
+  zone: number | null;
+}
+
 export interface ProgramPreviewEvent {
   date: string;
   dayLabel: string;
+  /** ICU-строки: то, что уйдёт в календарь (join('\n')). */
   lines: string[];
+  /** Структурированные данные для UI preview. */
+  lineDetails: ProgramPreviewLine[];
 }
 
 // ==================== Вспомогательные ====================
@@ -78,7 +97,7 @@ function pickDayIndex(
 function buildLine(
   movementKey: string,
   state: MovementState | undefined
-): string | null {
+): ProgramPreviewLine | null {
   // 1. Прогрессия?
   const prog = findProgressionsByKey(movementKey);
   if (prog) {
@@ -95,12 +114,18 @@ function buildLine(
     // Не дублируем: пишем "- Wall Headstands W1 30s Z1 Pace".
     const isTimeBased = /^\d+\s*s$/.test(rungStr);
 
-    if (isTimeBased) {
-      return `- ${lvl.name} ${prefix}${state.level} ${rungStr} Z${zone} Pace`;
-    }
+    const icu = isTimeBased
+      ? `- ${lvl.name} ${prefix}${state.level} ${rungStr} Z${zone} Pace`
+      : `- ${lvl.name} ${prefix}${state.level} ${rungStr} 30s Z${zone} Pace`;
 
-    // Rep-based ladder (1×10, [10,8,6]) — reps + duration 30s.
-    return `- ${lvl.name} ${prefix}${state.level} ${rungStr} 30s Z${zone} Pace`;
+    return {
+      icu,
+      en: lvl.name,
+      ru: lvl.nameRu ?? null,
+      levelTag: `${prefix}${state.level}`,
+      rung: rungStr,
+      zone,
+    };
   }
 
   // 2. Named-упражнение (drill / plyo / warmup / run-basic)?
@@ -108,7 +133,14 @@ function buildLine(
   if (named) {
     const dur = named.defaultDuration ?? '30s';
     const zone = named.defaultZone ?? 1;
-    return `- ${named.icuName} ${dur} Z${zone} Pace`;
+    return {
+      icu: `- ${named.icuName} ${dur} Z${zone} Pace`,
+      en: named.icuName,
+      ru: null,
+      levelTag: null,
+      rung: dur,
+      zone,
+    };
   }
 
   return null;
@@ -139,13 +171,17 @@ export function buildProgramPreview(
     if (!dayDef) continue;
 
     const lines: string[] = [];
+    const lineDetails: ProgramPreviewLine[] = [];
     for (const mk of dayDef.movementKeys) {
       const line = buildLine(mk, states[mk]);
-      if (line) lines.push(line);
+      if (line) {
+        lines.push(line.icu);
+        lineDetails.push(line);
+      }
     }
     if (lines.length === 0) continue;
 
-    out.push({ date, dayLabel: dayDef.label, lines });
+    out.push({ date, dayLabel: dayDef.label, lines, lineDetails });
   }
 
   return out;
