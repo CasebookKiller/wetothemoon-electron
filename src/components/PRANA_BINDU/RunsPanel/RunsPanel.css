@@ -1,0 +1,300 @@
+/* src/components/PRANA_BINDU/RunsPanel/RunsPanel.css */
+
+/* --- Тулбар: фильтры слева, переключатель справа --- */
+
+.pb-runs-panel__toolbar {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.pb-runs-panel__toolbar > .pb-run-filters {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+/* --- Переключатель вида --- */
+
+.pb-runs-view-switch {
+  display: inline-flex;
+  border: 1px solid color-mix(in srgb, var(--pb-accent) 35%, transparent);
+  border-radius: 6px;
+  overflow: hidden;
+  height: 2.5rem;
+  flex: 0 0 auto;
+}
+
+.pb-runs-view-switch button {
+  background: transparent;
+  border: none;
+  color: var(--tg-theme-hint-color, #708499);
+  padding: 0 0.7rem;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: background 0.15s, color 0.15s;
+}
+
+.pb-runs-view-switch button:hover {
+  background: color-mix(in srgb, var(--pb-accent) 8%, transparent);
+  color: var(--pb-accent);
+}
+
+.pb-runs-view-switch button.is-active {
+  background: color-mix(in srgb, var(--pb-accent) 15%, transparent);
+  color: var(--pb-accent);
+  font-weight: 600;
+}
+
+.pb-runs-view-switch button .pi {
+  font-size: 0.85rem;
+}
+
+/* --- Заголовок дня (группированный вид) --- */
+
+.pb-runs-day-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  background: color-mix(in srgb, var(--pb-accent) 7%, transparent);
+  border-radius: 4px;
+}
+
+.pb-runs-day-header__icon {
+  color: var(--pb-accent);
+  font-size: 0.85rem;
+  align-self: center;
+}
+
+.pb-runs-day-header__date {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--tg-theme-text-color, #f5f5f5);
+  letter-spacing: 0.01em;
+}
+
+.pb-runs-day-header__dow {
+  font-size: 0.78rem;
+  color: var(--tg-theme-hint-color, #708499);
+}
+
+.pb-runs-day-header__count {
+  margin-left: auto;
+  font-size: 0.72rem;
+  color: var(--pb-accent);
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+}
+
+/* Заголовок группы — ячейка на всю ширину, без PrimeReact-паддингов */
+.pb-runs-table .p-datatable-tbody > tr.p-rowgroup-header > td {
+  padding: 0 !important;
+  background: transparent !important;
+  border: none !important;
+}
+
+/* Верхний отступ у заголовка (кроме первого) */
+.pb-runs-table .p-datatable-tbody > tr.p-rowgroup-header:not(:first-child) > td {
+  padding-top: 0.55rem !important;
+}
+
+/* Строка данных сразу под заголовком — без верхнего бордера */
+.pb-runs-table .p-datatable-tbody > tr.p-rowgroup-header + tr > td {
+  border-top: none !important;
+}
+
+/* Время в группированном виде — моно */
+.pb-runs-time {
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  font-size: 0.78rem;
+  color: var(--pb-accent);
+}
+
+/* ============================================================
+   Оптимизация скролла для группированного вида:
+   виртуализация выключена (rowGroupMode=subheader), но
+   браузер может пропускать layout/paint для строк за
+   пределами вьюпорта через content-visibility.
+   Работает в Chromium (Electron), критично для 1500+ строк.
+   ============================================================ */
+
+.pb-runs-table .p-datatable-tbody > tr > td {
+  content-visibility: auto;
+  contain-intrinsic-size: 42px;
+}
+
+.pb-runs-table .p-datatable-tbody > tr.p-rowgroup-header > td {
+  content-visibility: visible;
+  contain-intrinsic-size: auto;
+}
+
+/* ============================================================
+   Обёртка таблицы — фиксированная высота, чтобы при смене
+   страницы пагинации контейнер не «дышал» (не прыгал).
+   ============================================================ */
+
+.pb-runs-table-wrap {
+  height: 620px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.pb-runs-table-wrap .p-datatable {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.pb-runs-table-wrap .p-datatable .p-datatable-wrapper {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* ============================================================
+   Пагинатор в стиле Prana-Bindu — компактный, accent-цвет
+   ============================================================ */
+
+.pb-runs-table .p-paginator,
+.pb-page .p-paginator {
+  background: transparent !important;
+  border: none !important;
+  border-top: 1px solid var(--surface-border, rgba(255, 255, 255, 0.08)) !important;
+  padding: 0.35rem 0.4rem !important;
+  gap: 0.15rem;
+  font-size: 0.78rem;
+  color: var(--tg-theme-text-color, #f5f5f5);
+  min-height: auto !important;
+  flex-wrap: wrap;
+}
+
+/* Кнопки-элементы (first / prev / next / last / страницы) */
+.pb-runs-table .p-paginator .p-paginator-element,
+.pb-page .p-paginator .p-paginator-element {
+  min-width: 1.7rem !important;
+  width: 1.7rem !important;
+  height: 1.7rem !important;
+  padding: 0 !important;
+  border-radius: 4px !important;
+  color: var(--pb-accent) !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 0.78rem;
+}
+
+.pb-runs-table .p-paginator .p-paginator-element:hover,
+.pb-page .p-paginator .p-paginator-element:hover {
+  background: color-mix(in srgb, var(--pb-accent) 12%, transparent) !important;
+  border-color: var(--pb-accent) !important;
+  color: var(--pb-accent) !important;
+}
+
+.pb-runs-table .p-paginator .p-paginator-element:focus,
+.pb-page .p-paginator .p-paginator-element:focus {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pb-accent) 30%, transparent) !important;
+  outline: none !important;
+}
+
+/* Активная страница — заливка accent, тёмный текст */
+.pb-runs-table .p-paginator .p-paginator-element.p-highlight,
+.pb-page .p-paginator .p-paginator-element.p-highlight {
+  background: var(--pb-accent) !important;
+  color: var(--tg-theme-bg-color, #17212b) !important;
+  border-color: var(--pb-accent) !important;
+}
+
+/* Disabled — приглушённый accent, без hover-эффекта */
+.pb-runs-table .p-paginator .p-paginator-element.p-disabled,
+.pb-page .p-paginator .p-paginator-element.p-disabled {
+  opacity: 0.35 !important;
+  cursor: not-allowed !important;
+}
+
+.pb-runs-table .p-paginator .p-paginator-element.p-disabled:hover,
+.pb-page .p-paginator .p-paginator-element.p-disabled:hover {
+  background: transparent !important;
+  border-color: transparent !important;
+}
+
+/* Иконки в кнопках — accent через currentColor */
+.pb-runs-table .p-paginator .p-paginator-element svg,
+.pb-page .p-paginator .p-paginator-element svg {
+  width: 0.7rem !important;
+  height: 0.7rem !important;
+  fill: currentColor !important;
+}
+
+/* --- Rows per page dropdown --- */
+
+.pb-runs-table .p-paginator .p-dropdown,
+.pb-page .p-paginator .p-dropdown {
+  height: 1.7rem !important;
+  min-height: 1.7rem !important;
+  border: 1px solid color-mix(in srgb, var(--pb-accent) 40%, transparent) !important;
+  background: transparent !important;
+  border-radius: 4px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+}
+
+.pb-runs-table .p-paginator .p-dropdown:hover,
+.pb-page .p-paginator .p-dropdown:hover {
+  border-color: var(--pb-accent) !important;
+}
+
+.pb-runs-table .p-paginator .p-dropdown .p-dropdown-label,
+.pb-page .p-paginator .p-dropdown .p-dropdown-label {
+  font-size: 0.76rem !important;
+  padding: 0 0.45rem !important;
+  height: 1.7rem !important;
+  line-height: 1.7rem !important;
+  display: flex !important;
+  align-items: center !important;
+  background: transparent !important;
+  color: var(--tg-theme-text-color, #f5f5f5) !important;
+}
+
+.pb-runs-table .p-paginator .p-dropdown .p-dropdown-trigger,
+.pb-page .p-paginator .p-dropdown .p-dropdown-trigger {
+  width: 1.5rem !important;
+  color: var(--pb-accent) !important;
+  background: transparent !important;
+}
+
+.pb-runs-table .p-paginator .p-dropdown .p-dropdown-trigger svg,
+.pb-page .p-paginator .p-dropdown .p-dropdown-trigger svg {
+  width: 0.7rem !important;
+  height: 0.7rem !important;
+  fill: var(--pb-accent) !important;
+}
+
+/* --- Current page report --- */
+
+.pb-runs-table .p-paginator .p-paginator-current,
+.pb-page .p-paginator .p-paginator-current {
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace !important;
+  font-size: 0.72rem !important;
+  color: var(--tg-theme-hint-color, #708499) !important;
+  padding: 0 0.45rem !important;
+  margin-left: 0.35rem !important;
+  white-space: nowrap;
+}
+
+/* Pages (обёртка номеров) */
+.pb-runs-table .p-paginator .p-paginator-pages,
+.pb-page .p-paginator .p-paginator-pages {
+  display: inline-flex;
+  gap: 0.15rem;
+}
