@@ -18,6 +18,8 @@ import type { RecoveryLogLite as SummaryLogLite } from './DaySummary';
 import type { RunFactLite } from './RunStreamsDrawer';
 import { groupRunFacts, type GroupedRunFact } from './utils/groupRunFacts';
 import type { WorkoutSession, SessionExercise } from '@/main/services/pranaBindu/core/types';
+import { CATEGORY_LABELS } from '@/main/services/pranaBindu/mentat/programs';
+import { findProgressionsByKey } from '@/main/services/pranaBindu/mentat/exerciseCatalog';
 
 interface Props {
   visible: boolean;
@@ -277,11 +279,14 @@ export const DayDrawer: React.FC<Props> = ({
                                 тест
                               </span>
                             )}
-                            {s.generatorCategory && (
-                              <span className="pb-source-badge pb-source-badge--manual">
-                                {s.generatorCategory}
-                              </span>
-                            )}
+                            {s.generatorCategory &&
+                              CATEGORY_LABELS[s.generatorCategory as keyof typeof CATEGORY_LABELS] && (
+                                <span className="pb-source-badge pb-source-badge--manual">
+                                  {CATEGORY_LABELS[
+                                    s.generatorCategory as keyof typeof CATEGORY_LABELS
+                                  ]}
+                                </span>
+                              )}
                           </div>
                           <div className="pb-day-fact__session-list">
                             {s.exercises.map((ex, i) => (
@@ -290,7 +295,7 @@ export const DayDrawer: React.FC<Props> = ({
                                 className="pb-day-fact__ex-row"
                               >
                                 <span className="pb-day-fact__ex-key">
-                                  {ex.movementKey}
+                                  {findProgressionsByKey(ex.movementKey)?.label ?? ex.movementKey}
                                 </span>
                                 {ex.level != null && (
                                   <span className="pb-day-fact__ex-lvl">
