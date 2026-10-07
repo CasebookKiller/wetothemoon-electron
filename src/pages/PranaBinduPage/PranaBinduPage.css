@@ -4359,16 +4359,123 @@ body[data-module='prana-bindu'] .p-tooltip.p-tooltip-bottom .p-tooltip-arrow {
 
 /* ============================================================
    Порталы PrimeReact: диалоги рендерятся вне .pb-page,
-   поэтому CSS-переменные задаём явно.
+   поэтому CSS-переменные задаём явно + перебиваем
+   голубую подсветку PrimeReact-темы на accent Prana-Bindu.
    ============================================================ */
 
 .pb-debug-dialog,
 .pb-templates-dialog,
 .pb-log-workout-dialog,
 .pb-delete-plan-dialog,
-.pb-mirror-delete-dialog {
+.pb-mirror-delete-dialog,
+.pb-check-level-dialog {
   --pb-accent: var(--pb-accent-color, #d4a373);
   --pb-icu-red: 224, 90, 90;
+}
+
+/* -------- InputText / InputNumber / InputTextarea / Dropdown
+   внутри наших диалогов: accent-рамка при hover и focus,
+   никаких синих вспышек. -------- */
+
+.pb-debug-dialog .p-inputtext:enabled:hover,
+.pb-templates-dialog .p-inputtext:enabled:hover,
+.pb-log-workout-dialog .p-inputtext:enabled:hover,
+.pb-delete-plan-dialog .p-inputtext:enabled:hover,
+.pb-mirror-delete-dialog .p-inputtext:enabled:hover,
+.pb-check-level-dialog .p-inputtext:enabled:hover,
+.pb-debug-dialog .p-inputtextarea:enabled:hover,
+.pb-log-workout-dialog .p-inputtextarea:enabled:hover,
+.pb-check-level-dialog .p-inputtextarea:enabled:hover,
+.pb-debug-dialog .p-inputnumber-input:enabled:hover,
+.pb-log-workout-dialog .p-inputnumber-input:enabled:hover,
+.pb-check-level-dialog .p-inputnumber-input:enabled:hover {
+  border-color: var(--pb-accent) !important;
+}
+
+.pb-debug-dialog .p-inputtext:enabled:focus,
+.pb-templates-dialog .p-inputtext:enabled:focus,
+.pb-log-workout-dialog .p-inputtext:enabled:focus,
+.pb-delete-plan-dialog .p-inputtext:enabled:focus,
+.pb-mirror-delete-dialog .p-inputtext:enabled:focus,
+.pb-check-level-dialog .p-inputtext:enabled:focus,
+.pb-debug-dialog .p-inputtextarea:enabled:focus,
+.pb-log-workout-dialog .p-inputtextarea:enabled:focus,
+.pb-check-level-dialog .p-inputtextarea:enabled:focus,
+.pb-debug-dialog .p-inputnumber-input:enabled:focus,
+.pb-log-workout-dialog .p-inputnumber-input:enabled:focus,
+.pb-check-level-dialog .p-inputnumber-input:enabled:focus {
+  border-color: var(--pb-accent) !important;
+  box-shadow: 0 0 0 1px var(--pb-accent) !important;
+  outline: none !important;
+}
+
+/* -------- Dropdown: граница, фокус, hover -------- */
+
+.pb-debug-dialog .p-dropdown:not(.p-disabled):hover,
+.pb-templates-dialog .p-dropdown:not(.p-disabled):hover,
+.pb-log-workout-dialog .p-dropdown:not(.p-disabled):hover,
+.pb-delete-plan-dialog .p-dropdown:not(.p-disabled):hover,
+.pb-mirror-delete-dialog .p-dropdown:not(.p-disabled):hover,
+.pb-check-level-dialog .p-dropdown:not(.p-disabled):hover {
+  border-color: var(--pb-accent) !important;
+}
+
+.pb-debug-dialog .p-dropdown:not(.p-disabled).p-focus,
+.pb-templates-dialog .p-dropdown:not(.p-disabled).p-focus,
+.pb-log-workout-dialog .p-dropdown:not(.p-disabled).p-focus,
+.pb-delete-plan-dialog .p-dropdown:not(.p-disabled).p-focus,
+.pb-mirror-delete-dialog .p-dropdown:not(.p-disabled).p-focus,
+.pb-check-level-dialog .p-dropdown:not(.p-disabled).p-focus {
+  border-color: var(--pb-accent) !important;
+  box-shadow: 0 0 0 1px var(--pb-accent) !important;
+  outline: none !important;
+}
+
+/* Dropdown в состоянии "открыт" — тоже accent */
+.pb-debug-dialog .p-dropdown.p-inputwrapper-focus,
+.pb-log-workout-dialog .p-dropdown.p-inputwrapper-focus,
+.pb-check-level-dialog .p-dropdown.p-inputwrapper-focus {
+  border-color: var(--pb-accent) !important;
+  box-shadow: 0 0 0 1px var(--pb-accent) !important;
+}
+
+/* Иконка триггера дропдауна — accent */
+.pb-debug-dialog .p-dropdown .p-dropdown-trigger,
+.pb-templates-dialog .p-dropdown .p-dropdown-trigger,
+.pb-log-workout-dialog .p-dropdown .p-dropdown-trigger,
+.pb-delete-plan-dialog .p-dropdown .p-dropdown-trigger,
+.pb-mirror-delete-dialog .p-dropdown .p-dropdown-trigger,
+.pb-check-level-dialog .p-dropdown .p-dropdown-trigger {
+  color: var(--pb-accent) !important;
+}
+
+.pb-debug-dialog .p-dropdown .p-dropdown-trigger svg,
+.pb-log-workout-dialog .p-dropdown .p-dropdown-trigger svg,
+.pb-check-level-dialog .p-dropdown .p-dropdown-trigger svg {
+  fill: var(--pb-accent) !important;
+  color: var(--pb-accent) !important;
+}
+
+/* -------- InputNumber кнопки +/−: accent в фокусе -------- */
+
+.pb-debug-dialog .p-inputnumber-button:focus,
+.pb-log-workout-dialog .p-inputnumber-button:focus,
+.pb-check-level-dialog .p-inputnumber-button:focus {
+  box-shadow: 0 0 0 1px var(--pb-accent) !important;
+  outline: none !important;
+}
+
+/* -------- Checkbox / RadioButton: accent -------- */
+
+.pb-debug-dialog .p-checkbox.p-focus .p-checkbox-box,
+.pb-debug-dialog .p-radiobutton.p-focus .p-radiobutton-box,
+.pb-log-workout-dialog .p-checkbox.p-focus .p-checkbox-box,
+.pb-log-workout-dialog .p-radiobutton.p-focus .p-radiobutton-box,
+.pb-check-level-dialog .p-checkbox.p-focus .p-checkbox-box,
+.pb-check-level-dialog .p-radiobutton.p-focus .p-radiobutton-box,
+.pb-mirror-delete-dialog .p-checkbox.p-focus .p-checkbox-box {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pb-accent) 25%, transparent) !important;
+  border-color: var(--pb-accent) !important;
 }
 
 /* ============================================================
@@ -4825,4 +4932,111 @@ body[data-module='prana-bindu'] .pb-templates-dialog .p-dialog-header-maximize {
   font-size: 0.72rem;
   color: var(--pb-accent);
   flex: 0 0 auto;
+}
+
+/* ============================================================
+   CheckLevelDialog
+   ============================================================ */
+
+.pb-check-level-dialog__row {
+  display: grid;
+  grid-template-columns: 6rem 1fr;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.pb-check-level-dialog__label {
+  font-size: 0.82rem;
+  color: var(--tg-theme-hint-color, #708499);
+}
+
+.pb-check-level-dialog__value {
+  font-size: 0.85rem;
+  color: var(--tg-theme-text-color, #f5f5f5);
+}
+
+.pb-check-level-dialog__ladder {
+  padding: 0.5rem 0.6rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 6px;
+  margin-bottom: 0.6rem;
+}
+
+.pb-check-level-dialog__rung {
+  display: inline-block;
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  font-size: 0.75rem;
+  padding: 0.1rem 0.5rem;
+  margin-right: 0.35rem;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--tg-theme-hint-color, #708499);
+}
+
+.pb-check-level-dialog__rung.is-current {
+  background: color-mix(in srgb, var(--pb-accent) 15%, transparent);
+  color: var(--pb-accent);
+  font-weight: 600;
+}
+
+.pb-check-level-dialog__dd.p-dropdown {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 2rem;
+  min-height: 2rem;
+  font-size: 0.82rem;
+}
+
+.pb-check-level-dialog__dd.p-dropdown .p-dropdown-label {
+  padding: 0 0.5rem;
+  display: flex;
+  align-items: center;
+  font-size: 0.82rem;
+}
+
+.pb-check-level-dialog__input.p-inputtext {
+  width: 100% !important;
+  height: 2rem !important;
+  padding: 0 0.5rem !important;
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  font-size: 0.82rem !important;
+  box-sizing: border-box;
+}
+
+.pb-check-level-dialog__input.p-inputtext:enabled:focus {
+  border-color: var(--pb-accent) !important;
+  box-shadow: 0 0 0 1px var(--pb-accent) !important;
+  outline: none !important;
+}
+
+.pb-check-level-dialog__result {
+  margin-top: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.pb-check-level-dialog__result-line {
+  font-size: 0.85rem;
+  color: var(--tg-theme-text-color, #f5f5f5);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.pb-check-level-dialog__result-line--success {
+  color: #6fbf73;
+}
+
+.pb-check-level-dialog__result-line .pi {
+  font-size: 0.9rem;
+}
+
+/* Дропдаун уровня — компактный */
+.pb-check-level-dialog__ladder .pb-check-level-dialog__dd.p-dropdown {
+  max-width: 5.5rem;
 }
