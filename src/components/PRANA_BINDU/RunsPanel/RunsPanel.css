@@ -157,6 +157,27 @@
 .pb-runs-table-wrap .p-datatable .p-datatable-wrapper {
   flex: 1 1 auto;
   min-height: 0;
+  /* Скроллбар в стиле плоской версии (.p-virtualscroller) */
+  scrollbar-width: thin;
+  scrollbar-color: var(--pb-accent) transparent;
+}
+
+.pb-runs-table-wrap .p-datatable .p-datatable-wrapper::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.pb-runs-table-wrap .p-datatable .p-datatable-wrapper::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--pb-accent) 50%, transparent);
+  border-radius: 4px;
+}
+
+.pb-runs-table-wrap .p-datatable .p-datatable-wrapper::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--pb-accent) 75%, transparent);
+}
+
+.pb-runs-table-wrap .p-datatable .p-datatable-wrapper::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 /* ============================================================
@@ -297,4 +318,121 @@
 .pb-page .p-paginator .p-paginator-pages {
   display: inline-flex;
   gap: 0.15rem;
+}
+
+/* ============================================================
+   Обёртка таблицы — фиксированная высота, прогрессивная подгрузка
+   ============================================================ */
+
+.pb-runs-table-wrap {
+  height: 680px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.pb-runs-table-wrap .p-datatable {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.pb-runs-table-wrap .p-datatable .p-datatable-wrapper {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* ============================================================
+   Футер «показано N из M» + кнопка «Показать ещё»
+   ============================================================ */
+
+.pb-runs-more {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem 0.2rem 0.6rem;
+  border-top: 1px solid var(--surface-border, rgba(255, 255, 255, 0.08));
+}
+
+.pb-runs-more__counter {
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  font-size: 0.72rem;
+  color: var(--tg-theme-hint-color, #708499);
+}
+
+.pb-runs-more__end {
+  font-size: 0.72rem;
+  color: var(--tg-theme-hint-color, #708499);
+  opacity: 0.6;
+  font-style: italic;
+}
+
+.pb-runs-more__btn.p-button {
+  min-width: auto !important;
+  height: 1.9rem !important;
+  padding: 0 0.7rem !important;
+  font-size: 0.75rem !important;
+  border-radius: 4px !important;
+}
+
+.pb-runs-more__btn.p-button .p-button-icon {
+  font-size: 0.7rem !important;
+}
+
+/* Заголовок дня — те же стили, что были */
+.pb-runs-day-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  background: color-mix(in srgb, var(--pb-accent) 7%, transparent);
+  border-radius: 4px;
+}
+
+.pb-runs-day-header__icon {
+  color: var(--pb-accent);
+  font-size: 0.85rem;
+  align-self: center;
+}
+
+.pb-runs-day-header__date {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--tg-theme-text-color, #f5f5f5);
+  letter-spacing: 0.01em;
+}
+
+.pb-runs-day-header__dow {
+  font-size: 0.78rem;
+  color: var(--tg-theme-hint-color, #708499);
+}
+
+.pb-runs-day-header__count {
+  margin-left: auto;
+  font-size: 0.72rem;
+  color: var(--pb-accent);
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+}
+
+.pb-runs-table .p-datatable-tbody > tr.p-rowgroup-header > td {
+  padding: 0 !important;
+  background: transparent !important;
+  border: none !important;
+}
+
+.pb-runs-table .p-datatable-tbody > tr.p-rowgroup-header:not(:first-child) > td {
+  padding-top: 0.55rem !important;
+}
+
+.pb-runs-table .p-datatable-tbody > tr.p-rowgroup-header + tr > td {
+  border-top: none !important;
+}
+
+.pb-runs-time {
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  font-size: 0.78rem;
+  color: var(--pb-accent);
 }
