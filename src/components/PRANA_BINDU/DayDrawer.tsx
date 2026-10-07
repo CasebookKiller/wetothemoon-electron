@@ -289,24 +289,35 @@ export const DayDrawer: React.FC<Props> = ({
                               )}
                           </div>
                           <div className="pb-day-fact__session-list">
-                            {s.exercises.map((ex, i) => (
-                              <div
-                                key={i}
-                                className="pb-day-fact__ex-row"
-                              >
-                                <span className="pb-day-fact__ex-key">
-                                  {findProgressionsByKey(ex.movementKey)?.label ?? ex.movementKey}
-                                </span>
-                                {ex.level != null && (
-                                  <span className="pb-day-fact__ex-lvl">
-                                    L{ex.level}
+                            {s.exercises.map((ex, i) => {
+                              const prog = findProgressionsByKey(ex.movementKey);
+                              const lvl = prog?.levels.find((l) => l.level === ex.level);
+                              // Wade → W<N>, остальные категории (runner/cali/core/posture/hiit) → L<N>.
+                              const prefix = prog?.category === 'wade' ? 'W' : 'L';
+                              const label = lvl?.name ?? prog?.label ?? ex.movementKey;
+                              const lvlTag = ex.level != null ? `${prefix}${ex.level}` : null;
+                              const lvlRu = lvl?.nameRu ?? null;
+
+                              return (
+                                <div key={i} className="pb-day-fact__ex-row">
+                                  <span className="pb-day-fact__ex-key">
+                                    {label}
+                                    {lvlTag && (
+                                      <>
+                                        {' '}
+                                        <span className="pb-day-fact__ex-lvl">{lvlTag}</span>
+                                      </>
+                                    )}
                                   </span>
-                                )}
-                                <span className="pb-day-fact__ex-actual">
-                                  {exerciseSummary(ex)}
-                                </span>
-                              </div>
-                            ))}
+                                  {lvlRu && (
+                                    <span className="pb-day-fact__ex-lvl-ru">{lvlRu}</span>
+                                  )}
+                                  <span className="pb-day-fact__ex-actual">
+                                    {exerciseSummary(ex)}
+                                  </span>
+                                </div>
+                              );
+                            })}
                           </div>
                           <div className="pb-day-list__item-meta">
                             {s.rpe != null && <span>RPE {s.rpe}</span>}
