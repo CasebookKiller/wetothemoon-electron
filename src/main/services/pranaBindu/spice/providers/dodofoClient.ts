@@ -91,6 +91,7 @@ export interface DodofoAuthor {
   username?: string;
 }
 
+// ← этот интерфейс был раньше, он нужен как есть:
 export interface DodofoActivity {
   id: number;
   name: string;
@@ -108,6 +109,31 @@ export interface DodofoActivity {
   max_speed_kmh: number | null;
   avg_hr: number | null;
   sport_type?: string;
+}
+
+export interface DodofoAuthor {
+  id: number;
+  name: string;
+  has_avatar: boolean;
+  username?: string;
+}
+
+// ← это добавляем СЛЕДОМ, не вместо:
+export interface DodofoHiddenEndpoints {
+  km: number;
+  head_end_index: number;
+  tail_start_index: number;
+}
+
+export interface DodofoActivityFull extends DodofoActivity {
+  polyline?: [number, number][] | null;
+  elevation_profile?: [number, number][] | null;
+  hide_endpoints?: boolean;
+  hidden_endpoints?: DodofoHiddenEndpoints | null;
+  device?: string | null;
+  training_load?: number;
+  visibility?: string;
+  quality_warning?: string | null;
 }
 
 export interface DodofoActivitiesResponse {
@@ -136,6 +162,7 @@ export interface DodofoZoneTime {
 }
 
 export interface DodofoStreams {
+  // --- Поля публичного контракта ---
   dist_m: number[];
   sec_t?: number[];
   speed_kmh: number[];
@@ -146,4 +173,21 @@ export interface DodofoStreams {
   power_zones?: DodofoZoneTime[];
   eftp_watts?: number;
   summary?: Record<string, unknown> | null;
+
+  // --- Приватные расширения полного API (в публичный контракт
+  //     не входят; dodofo может убрать их без предупреждения) ---
+  /** Таймстемпы точек полилинии, 1 Гц (0..duration). */
+  poly_sec_t?: number[];
+  /** Сжатый профиль высот [[dist_m, elev_m], …]. */
+  elevation_track_segments?: [number, number][];
+  /** HR в контрольных точках (секунда → пульс). */
+  hr_curve?: Record<string, number>;
+  /** 'spm' и т.п. */
+  cadence_unit?: string;
+  /** Максимум пульса за заезд. */
+  max_hr_bpm?: number;
+
+  // --- Добавляем сами: GPS из карточки заезда ---
+  /** [[lat, lng], …] — из Activity.polyline. Заполняется в fetchStreams. */
+  latlng?: [number, number][] | null;
 }

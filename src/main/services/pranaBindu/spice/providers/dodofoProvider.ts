@@ -11,6 +11,7 @@ import {
   DodofoApiError,
   type DodofoActivitiesResponse,
   type DodofoActivity,
+  type DodofoActivityFull,   // ← добавить
   type DodofoThresholdsResponse,
   type DodofoStreams,
 } from './dodofoClient';
@@ -138,13 +139,50 @@ export class DodofoProvider implements ZeppDataProvider {
    * Потоки одной активности (пульс, темп, зоны Коггана).
    * Боевое использование — 07_SPICE.
    */
+  /**
+   * Потоки одной активности.
+   *
+   * /streams отдаёт только числовые каналы — GPS там нет (публичный
+   * контракт: dist_m, sec_t, speed_kmh, hr, power_w, cadence_rpm, …).
+   * GPS-трек лежит в карточке заезда — Activity.polyline:
+   * [[lat, lng], …]. Поэтому после /streams делаем второй запрос
+   * к /activities/{id} и склеиваем polyline → streams.latlng.
+   *
+   * Падение второго запроса не критично: логируем и возвращаем потоки
+   * без GPS (карта просто не появится, графики продолжат работать).
+   */
   async fetchStreams(activityId: number): Promise<DodofoStreams> {
     const token = this.getToken();
     if (!token) throw new Error('dodofo token not configured');
-    return await dodofoRequest<DodofoStreams>(
+
+    // 1. Числовые каналы.
+    const streams = await dodofoRequest<DodofoStreams>(
       `/api/v1/activities/${activityId}/streams`,
       token
     );
+
+    // 2. Карточка — оттуда polyline.
+    let polyline: [number, number][] | null = null;
+    try {
+      const activity = await dodofoRequest<DodofoActivityFull>(
+        `/api/v1/activities/${activityId}`,
+        token
+      );
+      if (Array.isArray(activity?.polyline) && activity.polyline.length > 0) {
+        polyline = activity.polyline;
+      }
+    } catch (e) {
+      // Карточка недоступна — не роняем весь sync.
+      console.warn(
+        `[dodofo] fetchStreams: карточка ${activityId} не получена:`,
+        (e as Error).message
+      );
+    }
+
+    if (polyline) {
+      return { ...streams, latlng: polyline };
+    }
+    return streams;
   }
 
   /**
