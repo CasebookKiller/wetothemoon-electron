@@ -74,3 +74,10 @@ export type {
   CreateWorkoutSessionInput,
   UpdateWorkoutSessionPatch,
 } from './repositories/workoutSessionsRepo';
+export {
+  getExerciseProgress,
+  listExerciseProgress,
+  setExerciseProgress,
+  deleteExerciseProgress,
+} from './repositories/exerciseProgressRepo';
+export type { ExerciseProgress } from './repositories/exerciseProgressRepo';

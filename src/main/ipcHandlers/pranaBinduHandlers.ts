@@ -55,6 +55,9 @@ import {
   listWorkoutSessions,
   listWorkoutSessionsForPlanEvent,
   deleteWorkoutSession,
+  getExerciseProgress,
+  listExerciseProgress,
+  setExerciseProgress,
 } from '../services/pranaBindu/melange';
 
 import { DodofoProvider } from '../services/pranaBindu/spice/providers/dodofoProvider';
@@ -2644,6 +2647,54 @@ export function registerPranaBinduHandlers(): void {
       try {
         const ok = deleteWorkoutSession(getMelange(), id);
         return { success: ok };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+  // -------- Прогресс по движению --------
+  ipcMain.handle(
+    'pb:get-exercise-progress',
+    (_event, movementKey: string) => {
+      try {
+        if (!movementKey) {
+          return { success: false, error: 'movementKey обязателен' };
+        }
+        const data = getExerciseProgress(getMelange(), movementKey);
+        return { success: true, data };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+  ipcMain.handle('pb:list-exercise-progress', () => {
+    try {
+      const items = listExerciseProgress(getMelange());
+      return { success: true, items };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle(
+    'pb:set-exercise-progress',
+    (_event, movementKey: string, level: number, rung: number) => {
+      try {
+        if (!movementKey) {
+          return { success: false, error: 'movementKey обязателен' };
+        }
+        if (!Number.isFinite(level) || !Number.isFinite(rung)) {
+          return { success: false, error: 'level и rung должны быть числами' };
+        }
+        const data = setExerciseProgress(
+          getMelange(),
+          movementKey,
+          Math.round(level),
+          Math.round(rung)
+        );
+        return { success: true, data };
       } catch (e) {
         return { success: false, error: (e as Error).message };
       }

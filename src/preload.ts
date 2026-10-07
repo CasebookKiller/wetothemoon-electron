@@ -871,6 +871,13 @@ try {
       deleteWorkoutSession: (id: number) =>
         ipcRenderer.invoke('pb:delete-workout-session', id),
 
+      getExerciseProgress: (movementKey: string) =>
+        ipcRenderer.invoke('pb:get-exercise-progress', movementKey),
+      listExerciseProgress: () =>
+        ipcRenderer.invoke('pb:list-exercise-progress'),
+      setExerciseProgress: (movementKey: string, level: number, rung: number) =>
+        ipcRenderer.invoke('pb:set-exercise-progress', movementKey, level, rung),
+
     },
 
   });

@@ -14,7 +14,7 @@ import {
   MIGRATION_V9_INTERVALS_ICU,
 } from './schema';
 
-export const SCHEMA_VERSION = 18;
+export const SCHEMA_VERSION = 19;
 
 interface Migration {
   version: number;
@@ -399,8 +399,21 @@ const migrations: readonly Migration[] = [
       console.log('[Melange] v18: создана таблица workout_sessions');
     },
   },
+  {
+    version: 19,
+    apply: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS exercise_progress (
+          movement_key TEXT PRIMARY KEY,
+          current_level INTEGER NOT NULL DEFAULT 1,
+          current_rung INTEGER NOT NULL DEFAULT 1,
+          updated_at TEXT NOT NULL
+        );
+      `);
+      console.log('[Melange] v19: создана таблица exercise_progress');
+    },
+  },
 ];
-  
 
 function getCurrentVersion(db: DatabaseSync): number {
   const row = db

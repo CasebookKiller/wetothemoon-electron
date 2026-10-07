@@ -135,3 +135,10 @@ export interface WorkoutSessionRow {
   created_at: string;
   updated_at: string;
 }
+
+export interface ExerciseProgressRow {
+  movement_key: string;
+  current_level: number;
+  current_rung: number;
+  updated_at: string;
+}
