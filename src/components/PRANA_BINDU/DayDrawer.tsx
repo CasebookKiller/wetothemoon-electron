@@ -390,7 +390,7 @@ export const DayDrawer: React.FC<Props> = ({
           </TabPanel>
 
           {/* WELLNESS */}
-          <TabPanel header="Wellness">
+          <TabPanel header="Здоровье">
             <WellnessView log={wellness} />
           </TabPanel>
         </TabView>

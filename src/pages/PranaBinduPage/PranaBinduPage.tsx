@@ -2214,7 +2214,7 @@ const handleSyncWellnessNew = async () => {
                   tooltip="Читает HR-зоны из последней активности ICU"
                 />
                 <Button
-                  label={syncingWellness ? 'Wellness…' : 'Подтянуть wellness (ICU + dodofo)'}
+                  label={syncingWellness ? 'Здоровье…' : 'Подтянуть Здоровье (ICU + dodofo)'}
                   icon={syncingWellness ? 'pi pi-spin pi-spinner' : 'pi pi-heart'}
                   className="pb-soft p-button-sm"
                   onClick={handleSyncWellnessNew}
@@ -2340,7 +2340,7 @@ const handleSyncWellnessNew = async () => {
               <Message
                 severity="success"
                 className="w-full"
-                content={<span>Wellness: {wellnessResult}</span>}
+                content={<span>Здоровье: {wellnessResult}</span>}
               />
             )}
           </div>
@@ -2594,10 +2594,10 @@ const handleSyncWellnessNew = async () => {
         </div>
 
         {/* ==================== WELLNESS (таблица) ==================== */}
-        <Panel header="Wellness · intervals.icu" className="shadow-5 mb-3 pb-panel">
+        <Panel header="Здоровье" className="shadow-5 mb-3 pb-panel">
           {recoveryLogs.length === 0 ? (
             <small className="pb-hint">
-              Нет данных за выбранный диапазон. Нажмите «Подтянуть wellness»
+              Нет данных за выбранный диапазон. Нажмите «Подтянуть Здоровье»
               в панели «Синхронизация (API)».
             </small>
           ) : (

@@ -46,7 +46,7 @@ export const DaySummary: React.FC<Props> = ({ log, className }) => {
   if (!log) {
     return (
       <div className={`pb-day-summary pb-day-summary--empty ${className ?? ''}`}>
-        <span className="pb-hint">Нет данных wellness за этот день</span>
+        <span className="pb-hint">Нет данных о здоровье за этот день</span>
       </div>
     );
   }
