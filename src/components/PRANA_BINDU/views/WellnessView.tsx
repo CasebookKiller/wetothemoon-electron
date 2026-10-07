@@ -102,46 +102,46 @@ export const WellnessView: React.FC<Props> = ({ log }) => {
         title="Сон"
         rows={[
           { label: 'Продолжительность', value: log.sleep_hours != null ? `${fmtNum(log.sleep_hours)} ч` : '—' },
-          { label: 'Sleep score', value: fmtInt(log.sleep_score) },
-          { label: 'Total time', value: fmtMin(log.sleep_total_min) },
-          { label: 'Deep', value: fmtMin(log.deep_min) },
-          { label: 'REM', value: fmtMin(log.rem_min) },
-          { label: 'Light', value: fmtMin(log.light_min) },
-          { label: 'Awake', value: fmtMin(log.awake_min) },
-          { label: 'Sleep quality', value: fmtInt(log.sleep_quality) },
+          { label: 'Оценка сна',        value: fmtInt(log.sleep_score) },
+          { label: 'Общее время',       value: fmtMin(log.sleep_total_min) },
+          { label: 'Глубокий',          value: fmtMin(log.deep_min) },
+          { label: 'REM',               value: fmtMin(log.rem_min) },
+          { label: 'Лёгкий',            value: fmtMin(log.light_min) },
+          { label: 'Бодрствование',     value: fmtMin(log.awake_min) },
+          { label: 'Качество сна',      value: fmtInt(log.sleep_quality) },
         ]}
       />
       <Section
         title="Сердце"
         rows={[
-          { label: 'Resting HR', value: fmtInt(log.resting_hr) },
-          { label: 'HRV', value: fmtInt(log.hrv) },
-          { label: 'HRV SDNN', value: fmtNum(log.hrv_sdnn) },
-          { label: 'Avg sleeping HR', value: fmtInt(log.avg_sleeping_hr) },
-          { label: 'SpO₂', value: log.sp_o2 != null ? `${log.sp_o2}%` : '—' },
-          { label: 'Systolic / Diastolic', value: log.systolic != null && log.diastolic != null ? `${log.systolic}/${log.diastolic}` : '—' },
-          { label: 'Baevsky SI', value: fmtNum(log.baevsky_si, 2) },
+          { label: 'Пульс покоя',       value: fmtInt(log.resting_hr) },
+          { label: 'HRV',               value: fmtInt(log.hrv) },
+          { label: 'SDNN',              value: fmtNum(log.hrv_sdnn) },
+          { label: 'Ср. пульс во сне',  value: fmtInt(log.avg_sleeping_hr) },
+          { label: 'SpO₂',              value: log.sp_o2 != null ? `${log.sp_o2}%` : '—' },
+          { label: 'Давление',          value: log.systolic != null && log.diastolic != null ? `${log.systolic}/${log.diastolic}` : '—' },
+          { label: 'Индекс Баевского',  value: fmtNum(log.baevsky_si, 2) },
         ]}
       />
       <Section
         title="Нагрузка"
         rows={[
-          { label: 'CTL (fitness)', value: fmtNum(log.ctl) },
-          { label: 'ATL (fatigue)', value: fmtNum(log.atl) },
-          { label: 'Ramp rate', value: fmtNum(log.ramp_rate, 2) },
-          { label: 'Readiness', value: fmtInt(log.readiness) },
+          { label: 'CTL (форма)',       value: fmtNum(log.ctl) },
+          { label: 'ATL (усталость)',   value: fmtNum(log.atl) },
+          { label: 'Скорость роста',    value: fmtNum(log.ramp_rate, 2) },
+          { label: 'Готовность',        value: fmtInt(log.readiness) },
         ]}
       />
       <Section
         title="Тело"
         rows={[
-          { label: 'Вес', value: log.weight_kg != null ? `${fmtNum(log.weight_kg)} кг` : '—' },
-          { label: 'Шаги', value: log.steps != null ? log.steps.toLocaleString('ru-RU') : '—' },
-          { label: 'VO2max', value: fmtNum(log.vo2max, 1) },
+          { label: 'Вес',           value: log.weight_kg != null ? `${fmtNum(log.weight_kg)} кг` : '—' },
+          { label: 'Шаги',          value: log.steps != null ? log.steps.toLocaleString('ru-RU') : '—' },
+          { label: 'VO2max',        value: fmtNum(log.vo2max, 1) },
           { label: 'Body battery', value: log.body_battery_charged != null || log.body_battery_drained != null
             ? `+${fmtInt(log.body_battery_charged)} / −${fmtInt(log.body_battery_drained)}`
             : '—' },
-          { label: 'Stress avg', value: fmtInt(log.stress_avg) },
+          { label: 'Средний стресс', value: fmtInt(log.stress_avg) },
         ]}
       />
 
@@ -163,25 +163,24 @@ export const WellnessView: React.FC<Props> = ({ log }) => {
                 ? `${Math.round(log.calories_total).toLocaleString('ru-RU')} ккал`
                 : '—',
           },
-          {
-            label: 'Body fat',
+          { 
+            label: 'Жир',
             value:
-              log.body_fat_pct != null
-                ? `${log.body_fat_pct.toFixed(1)} %`
-                : '—',
-          },
+              log.body_fat_pct != null 
+                ? `${log.body_fat_pct.toFixed(1)} %` 
+                : '—' },
         ]}
       />
 
       <Section
         title="Самочувствие"
         rows={[
-          { label: 'Soreness', value: fmtInt(log.soreness) },
-          { label: 'Fatigue', value: fmtInt(log.fatigue) },
-          { label: 'Stress', value: fmtInt(log.stress) },
-          { label: 'Mood', value: fmtInt(log.mood) },
-          { label: 'Motivation', value: fmtInt(log.motivation) },
-          { label: 'Injury', value: fmtInt(log.injury) },
+          { label: 'Крепатура',    value: fmtInt(log.soreness) },
+          { label: 'Усталость',    value: fmtInt(log.fatigue) },
+          { label: 'Стресс',       value: fmtInt(log.stress) },
+          { label: 'Настроение',   value: fmtInt(log.mood) },
+          { label: 'Мотивация',    value: fmtInt(log.motivation) },
+          { label: 'Боль',         value: fmtInt(log.injury) },
         ]}
       />
     </div>

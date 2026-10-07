@@ -42,6 +42,11 @@ export interface RecoveryLogLite {
   sp_o2: number | null;
   systolic: number | null;
   diastolic: number | null;
+  // v20
+  sources_json: string | null;
+  calories_active: number | null;
+  calories_total: number | null;
+  body_fat_pct: number | null;
 }
 
 interface Props {
@@ -99,6 +104,33 @@ function Section({
   );
 }
 
+/**
+ * Источники за день — парсим sources_json, при отсутствии падаем
+ * на legacy-поле auto_source (старые записи до v20).
+ */
+function parseSources(log: RecoveryLogLite): string[] {
+  if (log.sources_json) {
+    try {
+      const p = JSON.parse(log.sources_json);
+      if (Array.isArray(p)) {
+        const items = p.filter((x): x is string => typeof x === 'string');
+        if (items.length > 0) return items;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return log.auto_source ? [log.auto_source] : [];
+}
+
+/** CSS-класс бейджа — берём из общего набора sourceBadge. */
+function sourceBadgeClass(name: string): string {
+  if (name === 'intervals-icu') return 'pb-source-badge--intervals-icu';
+  if (name === 'dodofo') return 'pb-source-badge--dodofo';
+  if (name === 'zepp' || name === 'zepp-app') return 'pb-source-badge--zepp';
+  return 'pb-source-badge--manual';
+}
+
 export const WellnessDrawer: React.FC<Props> = ({
   visible,
   log,
@@ -118,11 +150,14 @@ export const WellnessDrawer: React.FC<Props> = ({
         <div className="pb-drawer__title">
           <i className="pi pi-heart pb-drawer__icon" />
           {log.date}
-          {log.auto_source && (
-            <span className="pb-source-badge pb-source-badge--manual">
-              {log.auto_source}
+          {parseSources(log).map((s, i) => (
+            <span
+              key={`${s}-${i}`}
+              className={`pb-source-badge ${sourceBadgeClass(s)}`}
+            >
+              {s}
             </span>
-          )}
+          ))}
         </div>
       </div>
 
@@ -131,13 +166,13 @@ export const WellnessDrawer: React.FC<Props> = ({
         title="Сон"
         rows={[
           { label: 'Продолжительность', value: log.sleep_hours != null ? `${fmtNum(log.sleep_hours)} ч` : '—' },
-          { label: 'Sleep score', value: fmtInt(log.sleep_score) },
-          { label: 'Total time', value: fmtMin(log.sleep_total_min) },
-          { label: 'Deep', value: fmtMin(log.deep_min) },
-          { label: 'REM', value: fmtMin(log.rem_min) },
-          { label: 'Light', value: fmtMin(log.light_min) },
-          { label: 'Awake', value: fmtMin(log.awake_min) },
-          { label: 'Sleep quality', value: fmtInt(log.sleep_quality) },
+          { label: 'Оценка сна',        value: fmtInt(log.sleep_score) },
+          { label: 'Общее время',       value: fmtMin(log.sleep_total_min) },
+          { label: 'Глубокий',          value: fmtMin(log.deep_min) },
+          { label: 'REM',               value: fmtMin(log.rem_min) },
+          { label: 'Лёгкий',            value: fmtMin(log.light_min) },
+          { label: 'Бодрствование',     value: fmtMin(log.awake_min) },
+          { label: 'Качество сна',      value: fmtInt(log.sleep_quality) },
         ]}
       />
 
@@ -145,13 +180,13 @@ export const WellnessDrawer: React.FC<Props> = ({
       <Section
         title="Сердце"
         rows={[
-          { label: 'Resting HR', value: fmtInt(log.resting_hr) },
-          { label: 'HRV', value: fmtInt(log.hrv) },
-          { label: 'HRV SDNN', value: fmtNum(log.hrv_sdnn) },
-          { label: 'Avg sleeping HR', value: fmtInt(log.avg_sleeping_hr) },
-          { label: 'SpO₂', value: log.sp_o2 != null ? `${log.sp_o2}%` : '—' },
-          { label: 'Systolic / Diastolic', value: log.systolic != null && log.diastolic != null ? `${log.systolic}/${log.diastolic}` : '—' },
-          { label: 'Baevsky SI', value: fmtNum(log.baevsky_si, 2) },
+          { label: 'Пульс покоя',       value: fmtInt(log.resting_hr) },
+          { label: 'HRV',               value: fmtInt(log.hrv) },
+          { label: 'SDNN',              value: fmtNum(log.hrv_sdnn) },
+          { label: 'Ср. пульс во сне',  value: fmtInt(log.avg_sleeping_hr) },
+          { label: 'SpO₂',              value: log.sp_o2 != null ? `${log.sp_o2}%` : '—' },
+          { label: 'Давление',          value: log.systolic != null && log.diastolic != null ? `${log.systolic}/${log.diastolic}` : '—' },
+          { label: 'Индекс Баевского',  value: fmtNum(log.baevsky_si, 2) },
         ]}
       />
 
@@ -159,10 +194,10 @@ export const WellnessDrawer: React.FC<Props> = ({
       <Section
         title="Нагрузка"
         rows={[
-          { label: 'CTL (fitness)', value: fmtNum(log.ctl) },
-          { label: 'ATL (fatigue)', value: fmtNum(log.atl) },
-          { label: 'Ramp rate', value: fmtNum(log.ramp_rate, 2) },
-          { label: 'Readiness', value: fmtInt(log.readiness) },
+          { label: 'CTL (форма)',       value: fmtNum(log.ctl) },
+          { label: 'ATL (усталость)',   value: fmtNum(log.atl) },
+          { label: 'Скорость роста',    value: fmtNum(log.ramp_rate, 2) },
+          { label: 'Готовность',        value: fmtInt(log.readiness) },
         ]}
       />
 
@@ -170,13 +205,40 @@ export const WellnessDrawer: React.FC<Props> = ({
       <Section
         title="Тело"
         rows={[
-          { label: 'Вес', value: log.weight_kg != null ? `${fmtNum(log.weight_kg)} кг` : '—' },
-          { label: 'Шаги', value: log.steps != null ? log.steps.toLocaleString('ru-RU') : '—' },
-          { label: 'VO2max', value: fmtNum(log.vo2max, 1) },
+          { label: 'Вес',           value: log.weight_kg != null ? `${fmtNum(log.weight_kg)} кг` : '—' },
+          { label: 'Шаги',          value: log.steps != null ? log.steps.toLocaleString('ru-RU') : '—' },
+          { label: 'VO2max',        value: fmtNum(log.vo2max, 1) },
           { label: 'Body battery', value: log.body_battery_charged != null || log.body_battery_drained != null
             ? `+${fmtInt(log.body_battery_charged)} / −${fmtInt(log.body_battery_drained)}`
             : '—' },
-          { label: 'Stress avg', value: fmtInt(log.stress_avg) },
+          { label: 'Средний стресс', value: fmtInt(log.stress_avg) },
+        ]}
+      />
+
+      {/* ЭНЕРГИЯ (v20 — dodofo) */}
+      <Section
+        title="Энергия"
+        rows={[
+          {
+            label: 'Активные калории',
+            value:
+              log.calories_active != null
+                ? `${Math.round(log.calories_active).toLocaleString('ru-RU')} ккал`
+                : '—',
+          },
+          {
+            label: 'Калории всего',
+            value:
+              log.calories_total != null
+                ? `${Math.round(log.calories_total).toLocaleString('ru-RU')} ккал`
+                : '—',
+          },
+          { 
+            label: 'Жир',
+            value:
+              log.body_fat_pct != null 
+                ? `${log.body_fat_pct.toFixed(1)} %` 
+                : '—' },
         ]}
       />
 
@@ -184,14 +246,21 @@ export const WellnessDrawer: React.FC<Props> = ({
       <Section
         title="Самочувствие"
         rows={[
-          { label: 'Soreness', value: fmtInt(log.soreness) },
-          { label: 'Fatigue', value: fmtInt(log.fatigue) },
-          { label: 'Stress', value: fmtInt(log.stress) },
-          { label: 'Mood', value: fmtInt(log.mood) },
-          { label: 'Motivation', value: fmtInt(log.motivation) },
-          { label: 'Injury', value: fmtInt(log.injury) },
+          { label: 'Крепатура',    value: fmtInt(log.soreness) },
+          { label: 'Усталость',    value: fmtInt(log.fatigue) },
+          { label: 'Стресс',       value: fmtInt(log.stress) },
+          { label: 'Настроение',   value: fmtInt(log.mood) },
+          { label: 'Мотивация',    value: fmtInt(log.motivation) },
+          { label: 'Боль',         value: fmtInt(log.injury) },
         ]}
       />
+
+
+
+
+
+
+
     </Sidebar>
   );
 };
