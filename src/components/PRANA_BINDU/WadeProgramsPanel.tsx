@@ -26,6 +26,7 @@ import { Dialog } from 'primereact/dialog';
 import { InputNumber } from 'primereact/inputnumber';
 import { RadioButton } from 'primereact/radiobutton';
 import { Message } from 'primereact/message';
+import { CheckLevelDialog } from './CheckLevelDialog';
 
 const CATEGORIES: ProgramCategory[] = ['wade', 'runner', 'cali', 'prehab'];
 
@@ -67,6 +68,8 @@ export const WadeProgramsPanel: React.FC<Props> = ({ className }) => {
   const [generating, setGenerating] = useState(false);
   const [genResult, setGenResult] = useState('');
   const [genError, setGenError] = useState('');
+  const [checkVisible, setCheckVisible] = useState(false);
+
   const programsForCat = useMemo(
     () => listProgramsByCategory(category),
     [category]
@@ -83,19 +86,45 @@ export const WadeProgramsPanel: React.FC<Props> = ({ className }) => {
   // Какие прогрессии есть в программе → показать «Мои уровни».
   const progKeys = useMemo(() => listProgramProgressions(program), [program]);
 
-  // Добавляем дефолтное состояние для новых ключей.
+  // Загружаем прогресс из БД + заполняем дефолтом новые ключи.
   useEffect(() => {
-    setStates((prev) => {
-      const next = { ...prev };
-      let changed = false;
-      for (const k of progKeys) {
-        if (!next[k]) {
-          next[k] = { level: 1, rung: 1 };
-          changed = true;
+    (async () => {
+      try {
+        const res = await (window as any).electronAPI.pb.listExerciseProgress();
+        const fromDb: Record<string, MovementState> = {};
+        if (res?.success) {
+          for (const p of res.items ?? []) {
+            fromDb[p.movementKey] = {
+              level: p.currentLevel,
+              rung: p.currentRung,
+            };
+          }
         }
+        setStates((prev) => {
+          const next = { ...prev };
+          let changed = false;
+          for (const k of progKeys) {
+            if (fromDb[k]) {
+              if (
+                !next[k] ||
+                next[k].level !== fromDb[k].level ||
+                next[k].rung !== fromDb[k].rung
+              ) {
+                next[k] = fromDb[k];
+                changed = true;
+              }
+            } else if (!next[k]) {
+              next[k] = { level: 1, rung: 1 };
+              changed = true;
+            }
+          }
+          return changed ? next : prev;
+        });
+      } catch {
+        /* ignore */
       }
-      return changed ? next : prev;
-    });
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [progKeys]);
 
   // При смене категории — переключаем программу на первую из списка.
@@ -116,11 +145,32 @@ export const WadeProgramsPanel: React.FC<Props> = ({ className }) => {
     [program, states, weeks]
   );
 
-  const updateLevel = (mk: string, level: number) => {
-    setStates((prev) => ({ ...prev, [mk]: { ...prev[mk], level } }));
+  const persistState = async (mk: string, st: MovementState) => {
+    try {
+      await (window as any).electronAPI.pb.setExerciseProgress(
+        mk,
+        st.level,
+        st.rung
+      );
+    } catch {
+      /* ignore */
+    }
   };
+
+  const updateLevel = (mk: string, level: number) => {
+    setStates((prev) => {
+      const next = { ...prev, [mk]: { ...prev[mk], level } };
+      void persistState(mk, next[mk]);
+      return next;
+    });
+  };
+
   const updateRung = (mk: string, rung: number) => {
-    setStates((prev) => ({ ...prev, [mk]: { ...prev[mk], rung } }));
+    setStates((prev) => {
+      const next = { ...prev, [mk]: { ...prev[mk], rung } };
+      void persistState(mk, next[mk]);
+      return next;
+    });
   };
 
   return (
@@ -257,6 +307,15 @@ export const WadeProgramsPanel: React.FC<Props> = ({ className }) => {
             panelClassName="pb-dropdown-panel"
           />
           <span className="pb-hint">{preview.length} событий</span>
+        </div>
+        <div className="pb-wade-programs__toolbar">
+          <Button
+            label="Проверить уровень"
+            icon="pi pi-verified"
+            className="pb-soft p-button-sm"
+            disabled={progKeys.length === 0}
+            onClick={() => setCheckVisible(true)}
+          />
           <Button
             label="Сгенерировать план"
             icon="pi pi-check"
@@ -417,6 +476,35 @@ export const WadeProgramsPanel: React.FC<Props> = ({ className }) => {
           </div>
         </div>
       </Dialog>
+
+      <CheckLevelDialog
+        visible={checkVisible}
+        movementKeys={progKeys}
+        onHide={() => setCheckVisible(false)}
+        onSaved={() => {
+          (async () => {
+            try {
+              const res = await (window as any).electronAPI.pb.listExerciseProgress();
+              if (res?.success) {
+                const fromDb: Record<string, MovementState> = {};
+                for (const p of res.items ?? []) {
+                  fromDb[p.movementKey] = {
+                    level: p.currentLevel,
+                    rung: p.currentRung,
+                  };
+                }
+                setStates((prev) => {
+                  const next = { ...prev };
+                  for (const k of Object.keys(fromDb)) next[k] = fromDb[k];
+                  return next;
+                });
+              }
+            } catch {
+              /* ignore */
+            }
+          })();
+        }}
+      />
 
     </div>
   );
