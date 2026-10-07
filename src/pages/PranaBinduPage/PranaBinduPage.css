@@ -5127,10 +5127,81 @@ body[data-module='prana-bindu'] .pb-debug-dialog .p-dialog-header-close svg path
   margin-bottom: 0.75rem;
 }
 
-/* Чип в напоминании — disabled-состояние */
+/* Чип в напоминании — disabled-состояние.
+   PrimeReact добавляет .p-disabled { opacity: 0.6 } — перебиваем,
+   чтобы общая непрозрачность осталась 1, а «выключенность»
+   читалась через цвет текста и более бледную рамку. */
 .pb-check-reminder-dialog__chips .pb-catalog__chip.is-disabled,
-.pb-check-reminder-dialog__chips .pb-catalog__chip:disabled {
-  opacity: 0.4;
+.pb-check-reminder-dialog__chips .pb-catalog__chip:disabled,
+.pb-check-reminder-dialog__chips .pb-catalog__chip.p-disabled {
+  opacity: 1 !important;
   cursor: not-allowed;
-  border-color: color-mix(in srgb, var(--pb-accent) 15%, transparent);
+  background: rgba(255, 255, 255, 0.03) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  color: rgba(255, 255, 255, 0.55) !important;
+  font-weight: 400;
+}
+
+.pb-check-reminder-dialog__chips .pb-catalog__chip.is-disabled:hover,
+.pb-check-reminder-dialog__chips .pb-catalog__chip:disabled:hover {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  color: rgba(255, 255, 255, 0.55) !important;
+}
+
+/* ============================================================
+   Чекбокс с подписью — общий паттерн Prana-Bindu.
+   .pb-check-row      — layout (label + gap + курсор).
+   .pb-checkbox-dark  — визуал: прозрачный фон, accent-рамка,
+                        accent-галочка, никакой заливки при
+                        p-highlight. Перебивает общее правило
+                        .pb-page .p-checkbox.p-highlight.
+   ============================================================ */
+
+.pb-check-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  color: var(--tg-theme-text-color, #f5f5f5);
+  cursor: pointer;
+  user-select: none;
+}
+
+.pb-check-row > span {
+  line-height: 1.2;
+}
+
+.pb-page .pb-checkbox-dark .p-checkbox .p-checkbox-box,
+.pb-checkbox-dark .p-checkbox .p-checkbox-box {
+  width: 1rem !important;
+  height: 1rem !important;
+  border-radius: 2px !important;
+  border: 1px solid color-mix(in srgb, var(--pb-accent) 45%, transparent) !important;
+  background: transparent !important;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+.pb-page .pb-checkbox-dark .p-checkbox .p-checkbox-box:hover,
+.pb-checkbox-dark .p-checkbox .p-checkbox-box:hover {
+  border-color: var(--pb-accent) !important;
+}
+
+.pb-page .pb-checkbox-dark .p-checkbox.p-highlight .p-checkbox-box,
+.pb-checkbox-dark .p-checkbox.p-highlight .p-checkbox-box {
+  background: transparent !important;
+  border-color: var(--pb-accent) !important;
+  color: var(--pb-accent) !important;
+}
+
+.pb-page .pb-checkbox-dark .p-checkbox.p-highlight .p-checkbox-icon,
+.pb-checkbox-dark .p-checkbox.p-highlight .p-checkbox-icon {
+  color: var(--pb-accent) !important;
+  width: 0.65rem !important;
+  height: 0.65rem !important;
+}
+
+.pb-page .pb-checkbox-dark .p-checkbox.p-focus .p-checkbox-box,
+.pb-checkbox-dark .p-checkbox.p-focus .p-checkbox-box {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pb-accent) 25%, transparent) !important;
 }

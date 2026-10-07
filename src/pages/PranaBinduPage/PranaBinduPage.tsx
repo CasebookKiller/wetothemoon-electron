@@ -60,6 +60,7 @@ import { DeleteGeneratedDialog } from '@/components/PRANA_BINDU/DeleteGeneratedD
 import { CheckReminderDialog } from '@/components/PRANA_BINDU/CheckReminderDialog';
 import { ExerciseCategory } from '@/main/services/pranaBindu/mentat/types';
 import { PROGRESSIONS_CATALOG } from '@/main/services/pranaBindu/mentat/exerciseCatalog';
+import { Checkbox } from 'primereact/checkbox';
 
 interface ProviderOption {
   label: string;
@@ -437,6 +438,15 @@ export const PranaBinduPage: React.FC = () => {
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [selectedFact, setSelectedFact] = useState<RunFactLite | null>(null);
   const [syncingStreams, setSyncingStreams] = useState(false);
+  /** Тумблер «Перезалить существующие» — влияет на onlyMissing
+   *  в syncRunStreamsAll. Сохраняется в localStorage (по умолчанию выкл). */
+  const [overwriteStreams, setOverwriteStreams] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('pb.syncOverwriteStreams') === '1';
+    } catch {
+      return false;
+    }
+  });
   const [streamsAllResult, setStreamsAllResult] = useState<{
     fetched: number;
     skipped: number;
@@ -965,7 +975,7 @@ export const PranaBinduPage: React.FC = () => {
       const res = await api.pb.syncRunStreamsAll(
         toIsoDate(syncFrom),
         toIsoDate(syncTo),
-        { provider }             // ← добавили
+        { provider, onlyMissing: !overwriteStreams }
       );
       if (res.success) {
         setStreamsAllResult({
@@ -2167,6 +2177,22 @@ const handleSyncWellnessNew = async () => {
                       : 'Загрузить FIT + потоки за выбранный период'
                   }
                 />
+                <label className="pb-check-row pb-checkbox-dark">
+                  <Checkbox
+                    inputId="pb-overwrite-streams"
+                    checked={overwriteStreams}
+                    onChange={(e) => {
+                      const v = !!e.checked;
+                      setOverwriteStreams(v);
+                      try {
+                        localStorage.setItem('pb.syncOverwriteStreams', v ? '1' : '0');
+                      } catch { /* ignore */ }
+                    }}
+                  />
+                  <span title="Перезаписать .msgpack у фактов, у которых потоки уже сохранены. Нужно, чтобы подтянуть GPS в старые dodofo-записи.">
+                    Перезалить
+                  </span>
+                </label>
                 <Button
                   label={syncingThresholds ? 'Пороги…' : 'Подтянуть пороги'}
                   icon={syncingThresholds ? 'pi pi-spin pi-spinner' : 'pi pi-sliders-h'}
@@ -2269,13 +2295,21 @@ const handleSyncWellnessNew = async () => {
                 severity={streamsAllResult.failed > 0 ? 'warn' : 'info'}
                 className="w-full"
                 content={
-                  <span>
-                    Потоки: загружено <b>{streamsAllResult.fetched}</b>
-                    {' · '}пропущено <b>{streamsAllResult.skipped}</b>
-                    {streamsAllResult.failed > 0 && (
-                      <> · ошибок <b>{streamsAllResult.failed}</b></>
+                  <div>
+                    <span>
+                      Потоки: загружено <b>{streamsAllResult.fetched}</b>
+                      {' · '}пропущено <b>{streamsAllResult.skipped}</b>
+                      {streamsAllResult.failed > 0 && (
+                        <> · ошибок <b>{streamsAllResult.failed}</b></>
+                      )}
+                    </span>
+                    {streamsAllResult.skipped > 0 && !overwriteStreams && (
+                      <div className="pb-hint" style={{ marginTop: '0.4rem' }}>
+                        Часть потоков уже была в БД и не обновлялась. Включите
+                        «Перезалить существующие», чтобы перекачать с GPS.
+                      </div>
                     )}
-                  </span>
+                  </div>
                 }
               />
             )}
