@@ -38,6 +38,7 @@
 /* Перебиваем дефолтный padding PrimeReact-хедера для этой Panel */
 .pb-training-tabs-panel .p-panel-header {
   padding: 0.6rem 1rem !important;
+  font-size: var(--app-font-size);
 }
 
 /* На всякий случай — для внутренней обёртки */
