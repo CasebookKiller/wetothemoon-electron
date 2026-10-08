@@ -3,7 +3,7 @@
 // Модалка с библиотекой шаблонов тренировок для ICU.
 // Слева — список с фильтром по категории. Справа — текст + копирование.
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Button } from 'primereact/button';
 import { Dialog } from 'primereact/dialog';
 import { Dropdown } from 'primereact/dropdown';
@@ -23,11 +23,13 @@ import { WadeProgramsPanel } from './WadeProgramsPanel';
 interface Props {
   visible: boolean;
   onHide: () => void;
+  initialMode?: 'templates' | 'catalog' | 'programs';
 }
 
 export const WorkoutTemplatesDialog: React.FC<Props> = ({
   visible,
   onHide,
+  initialMode,
 }) => {
   const [category, setCategory] = useState<TemplateCategory | 'all'>('all');
   const [query, setQuery] = useState('');
@@ -36,6 +38,12 @@ export const WorkoutTemplatesDialog: React.FC<Props> = ({
 
   const [mode, setMode] = useState<'templates' | 'catalog' | 'programs'>('templates');
   const [lastCopied, setLastCopied] = useState('');
+
+  useEffect(() => {
+    if (visible && initialMode) {
+      setMode(initialMode);
+    }
+  }, [visible, initialMode]);
 
   const handleCatalogCopy = async (line: string) => {
     try {
@@ -47,16 +55,21 @@ export const WorkoutTemplatesDialog: React.FC<Props> = ({
     }
   };
 
-  const categoryOptions = useMemo(
-    () => [
-      { label: 'Все категории', value: 'all' },
-      ...(Object.keys(CATEGORY_LABELS) as TemplateCategory[]).map((c) => ({
-        label: CATEGORY_LABELS[c],
-        value: c,
-      })),
-    ],
-    []
-  );
+  const categoryOptions = useMemo(() => {
+    // Показываем только те категории, в которых есть хотя бы один шаблон.
+    // Иначе пустые категории (например, 'strength-big6' — там пока
+    // нет ни одного шаблона Wade Big-6) мусорят в фильтре.
+    const present = new Set(WORKOUT_TEMPLATES.map((t) => t.category));
+    return [
+      { label: 'Все категории', value: 'all' as const },
+      ...(Object.keys(CATEGORY_LABELS) as TemplateCategory[])
+        .filter((c) => present.has(c))
+        .map((c) => ({
+          label: CATEGORY_LABELS[c],
+          value: c,
+        })),
+    ];
+  }, []);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
