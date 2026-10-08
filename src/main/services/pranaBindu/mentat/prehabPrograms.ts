@@ -117,4 +117,61 @@ export const PREHAB_PROGRAMS: ProgramSpec[] = [
       },
     ],
   },
+
+    // ==================== Mobility ====================
+  {
+    key: 'prehab-mobility',
+    category: 'prehab',
+    name: 'Mobility',
+    nameRu: 'Мобильность',
+    description:
+      'Раскрытие тазобедренных суставов и позвоночника. Растяжки ' +
+      'для поддержания амплитуды, особенно при сидячей работе.',
+    usage:
+      'Ежедневно или через день, 10–15 минут. По 30 секунд на ' +
+      'упражнение. Не через боль, спокойное дыхание.',
+    weeklySchedule: [0, null, 0, null, 0, null, null],
+    days: [
+      {
+        label: 'Mobility',
+        movementKeys: [
+          'pigeon',
+          'butterfly',
+          'pancake',
+          'frog-stretch',
+          'spiderman-stretch',
+          'spiderman-stretch-rotation',
+          'seated-forward-bend',
+        ],
+      },
+    ],
+  },
+
+  // ==================== Shoulders & Spine ====================
+  {
+    key: 'prehab-shoulders',
+    category: 'prehab',
+    name: 'Shoulders & Spine',
+    nameRu: 'Плечи и осанка',
+    description:
+      'Компенсация сидячей работы: раскрытие грудного отдела, ' +
+      'мобильность плеч, укрепление задней дельты и лопаточных мышц.',
+    usage:
+      '3 раза в неделю. Медленный контроль, без резких движений. ' +
+      'Хорошо ставится перед силовой тренировкой как разогрев.',
+    weeklySchedule: [null, 0, null, 0, null, 0, null],
+    days: [
+      {
+        label: 'Shoulders',
+        movementKeys: [
+          'thoracic-rotation',
+          'band-pull-apart',
+          'wall-slide',
+          'sleeper-stretch',
+          'cat-cow',
+        ],
+      },
+    ],
+  },
+  
 ];
