@@ -58,7 +58,7 @@ export const WORKOUT_TEMPLATES: WorkoutTemplate[] = [
     usage: `Вся тренировка — один блок на 60 минут. HR — зона 1 (легко), Pace — зона 2.
 Замени Z1/Z2 на конкретный темп (например, 8:00/km), если не настроены зоны.`,
     text: `Recovery Run
-- 60m Z1 HR Z2 Pace`,
+- 60m Z1 HR`,
     verified: true,
   },
   {
@@ -68,7 +68,7 @@ export const WORKOUT_TEMPLATES: WorkoutTemplate[] = [
     description: 'Лёгкий аэробный бег.',
     usage: `Один блок 60 минут. Пульс и темп — зона 2. Обычная аэробная работа.`,
     text: `Easy Run
-- 60m Z2 HR Z2 Pace`,
+- 60m Z2 HR`,
     verified: true,
   },
 
@@ -81,7 +81,7 @@ export const WORKOUT_TEMPLATES: WorkoutTemplate[] = [
     description: 'Выносливость по времени.',
     usage: `Один блок 1 час 30 минут. Ровный аэробный бег в Z2.`,
     text: `Long Run
-- 1h30m Z2 HR Z2 Pace`,
+- 1h30m Z2 HR`,
     verified: true,
   },
   {
