@@ -1,4 +1,4 @@
-// src/components/PRANA_BINDU/views/WellnessView.tsx
+// src/components/PRANA_BINDU/VIEWS/WellnessView.tsx
 //
 // Полная карточка recovery_log без Sidebar — для вкладки в DayDrawer.
 

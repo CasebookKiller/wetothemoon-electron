@@ -8,18 +8,20 @@ import { TabView, TabPanel } from 'primereact/tabview';
 import { Message } from 'primereact/message';
 import { Button } from 'primereact/button';
 import { DaySummary } from './DaySummary';
-import { PlanEventView } from './views/PlanEventView';
-import { WellnessView } from './views/WellnessView';
-import { RunFactView } from './views/RunFactView';
+import { PlanEventView } from './VIEWS/PlanEventView';
+import { WellnessView } from './VIEWS/WellnessView';
+import { RunFactView } from './VIEWS/RunFactView';
 import { LogWorkoutSessionDialog } from './LogWorkoutSessionDialog';
 import type { PlanEventLite } from './PlanEventsPanel';
 import type { RecoveryLogLite as WellnessLogLite } from './WellnessDrawer';
 import type { RecoveryLogLite as SummaryLogLite } from './DaySummary';
 import type { RunFactLite } from './RunStreamsDrawer';
-import { groupRunFacts, type GroupedRunFact } from './utils/groupRunFacts';
+import { groupRunFacts, type GroupedRunFact } from './UTILS/groupRunFacts';
 import type { WorkoutSession, SessionExercise } from '@/main/services/pranaBindu/core/types';
 import { CATEGORY_LABELS } from '@/main/services/pranaBindu/mentat/programs';
 import { findProgressionsByKey } from '@/main/services/pranaBindu/mentat/exerciseCatalog';
+import { useEquivalencesMap } from './HOOKS/useEquivalencesMap';
+
 
 interface Props {
   visible: boolean;
@@ -136,6 +138,7 @@ export const DayDrawer: React.FC<Props> = ({
     () => groupRunFacts(facts, {}),
     [facts]
   );
+  const { lookupByTarget } = useEquivalencesMap();
 
   return (
     <Sidebar
@@ -297,6 +300,13 @@ export const DayDrawer: React.FC<Props> = ({
                               const label = lvl?.name ?? prog?.label ?? ex.movementKey;
                               const lvlTag = ex.level != null ? `${prefix}${ex.level}` : null;
                               const lvlRu = lvl?.nameRu ?? null;
+                              const eqHints = prog
+                                ? lookupByTarget(
+                                    prog.category,
+                                    ex.movementKey,
+                                    ex.level
+                                  )
+                                : [];
 
                               return (
                                 <div key={i} className="pb-day-fact__ex-row">
@@ -311,6 +321,16 @@ export const DayDrawer: React.FC<Props> = ({
                                   </span>
                                   {lvlRu && (
                                     <span className="pb-day-fact__ex-lvl-ru">{lvlRu}</span>
+                                  )}
+                                  {eqHints.length > 0 && (
+                                    <span
+                                      className="pb-exercise-equiv"
+                                      title={`≈ ${eqHints
+                                        .map((h) => h.fullLabel)
+                                        .join('\n≈ ')}`}
+                                    >
+                                      ≈ {eqHints.map((h) => h.label).join(', ')}
+                                    </span>
                                   )}
                                   <span className="pb-day-fact__ex-actual">
                                     {exerciseSummary(ex)}

@@ -3,8 +3,6 @@
 import React, { useEffect, useState } from 'react';
 import { Button } from 'primereact/button';
 import { Calendar } from 'primereact/calendar';
-import { Column } from 'primereact/column';
-import { DataTable } from 'primereact/datatable';
 import { Dropdown } from 'primereact/dropdown';
 import { InputText } from 'primereact/inputtext';
 import { Message } from 'primereact/message';
@@ -14,10 +12,11 @@ import {
   type RunFactLite,
 } from '@/components/PRANA_BINDU/RunStreamsDrawer';
 import {
-  RunFiltersPanel,
   type RunFilters,
   EMPTY_FILTERS,
-} from '@/components/PRANA_BINDU/RunFiltersPanel';
+} from '@/components/PRANA_BINDU/RunsPanel/RunFiltersPanel';
+import { RunsPanel } from '@/components/PRANA_BINDU/RunsPanel/RunsPanel';
+import { fmtKm, fmtDuration } from '@/components/PRANA_BINDU/RunsPanel/utils';
 import { DodofoDebugDialog } from '@/components/PRANA_BINDU/DodofoDebugDialog';
 
 import './PranaBinduPage.css';
@@ -46,7 +45,7 @@ import {
   groupRunFacts,
   sourceBadge,
   type GroupedRunFact,
-} from '@/components/PRANA_BINDU/utils/groupRunFacts';
+} from '@/components/PRANA_BINDU/UTILS/groupRunFacts';
 
 import {
   MirrorDeleteDialog,
@@ -176,11 +175,13 @@ function defaultSyncRange(): { from: Date; to: Date } {
   return { from, to };
 }
 
+/*
 function fmtKm(v: number | null | undefined): string {
   if (v == null) return '—';
   return v.toFixed(2);
-}
+}*/
 
+/*
 function fmtDuration(sec: number | null | undefined): string {
   if (sec == null) return '—';
   const h = Math.floor(sec / 3600);
@@ -188,7 +189,7 @@ function fmtDuration(sec: number | null | undefined): string {
   const s = sec % 60;
   if (h > 0) return `${h}ч ${String(m).padStart(2, '0')}м`;
   return `${m}:${String(s).padStart(2, '0')}`;
-}
+}*/
 
 /*
 const SOURCE_PRIORITY: Record<string, number> = {
@@ -2706,40 +2707,6 @@ export const PranaBinduPage: React.FC = () => {
                 />
                 <div className="pb-import-progress__stats">
                   <span>+{importProgress.imported}</span>
-                  <span>·{importProgress.skipped}</span>
-                  {importProgress.failed > 0 && (
-                    <span className="pb-import-progress__fail">
-                      ✗{importProgress.failed}
-                    </span>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {zeppUpdating && importProgress && (
-              <div className="pb-import-progress">
-                <div className="pb-import-progress__header">
-                  <span>
-                    {importProgress.current} / {importProgress.total}
-                    {' · '}
-                    <code>{importProgress.filename}</code>
-                  </span>
-                  <Button
-                    label="Отмена"
-                    icon="pi pi-times"
-                    className="pb-soft p-button-sm"
-                    onClick={handleCancelImport}
-                  />
-                </div>
-                <ProgressBar
-                  value={Math.round(
-                    (importProgress.current / importProgress.total) * 100
-                  )}
-                  showValue={false}
-                  style={{ height: '6px' }}
-                />
-                <div className="pb-import-progress__stats">
-                  <span>+{importProgress.imported}</span>
                   <span>~{importProgress.updated}</span>
                   <span>·{importProgress.skipped}</span>
                   {importProgress.failed > 0 && (
@@ -2869,142 +2836,22 @@ export const PranaBinduPage: React.FC = () => {
           onOpenTemplates={() => setTemplatesVisible(true)}
         />
 
-        <Panel
-          header={
-            activeFilterCount > 0
-              ? `Пробежки (${filteredFacts.length} из ${groupedFacts.length})`
-              : `Пробежки (${groupedFacts.length}${
-                  groupedFacts.length !== runFacts.length
-                    ? ` · ${runFacts.length} записей`
-                    : ''
-                })`
-          }
-          className="shadow-5 mb-3 pb-panel"
-        >
-          {factsError && (
-            <Message severity="error" text={factsError} className="w-full mb-2" />
-          )}
-
-          <RunFiltersPanel
-            filters={filters}
-            onChange={setFilters}
-            onReset={handleResetFilters}
-            activeCount={activeFilterCount}
-          />
-
-          <DataTable
-            value={filteredFacts}
-            loading={factsLoading}
-            size="small"
-            stripedRows
-            scrollable
-            scrollHeight="520px"
-            virtualScrollerOptions={{ itemSize: 38 }}
-            emptyMessage="За выбранный период пробежек нет"
-            className="p-datatable-sm"
-            selectionMode="single"
-            onRowClick={(e) => {
-              const g = e.data as GroupedRunFact;
-              setSelectedFact({
-                ...(g.primary as RunFactLite),
-                start_time: g.startTime,
-              });
-              setDrawerVisible(true);
-            }}
-          >
-            <Column
-              header=""
-              style={{ width: '40px', textAlign: 'center' }}
-              body={(r: GroupedRunFact) =>
-                r.hasStreams ? (
-                  <i
-                    className="pi pi-chart-line"
-                    style={{ color: 'var(--pb-accent)' }}
-                    title="Есть потоки"
-                  />
-                ) : (
-                  <i
-                    className="pi pi-minus"
-                    style={{ opacity: 0.25 }}
-                    title="Потоков нет"
-                  />
-                )
-              }
-            />
-            <Column
-              field="date"
-              header="Дата"
-              sortable
-              style={{ width: '140px' }}
-              body={(r: GroupedRunFact) => {
-                let time = '';
-                if (r.startTime) {
-                  const t = new Date(r.startTime);
-                  if (!Number.isNaN(t.getTime())) {
-                    time = ` ${String(t.getHours()).padStart(2, '0')}:${String(
-                      t.getMinutes()
-                    ).padStart(2, '0')}`;
-                  }
-                }
-                return (
-                  <span title={`Источников: ${r.count}`}>
-                    {r.date}
-                    {time}
-                  </span>
-                );
-              }}
-            />
-            <Column
-              header="Название"
-              style={{ width: '220px' }}
-              body={(r: GroupedRunFact) => r.displayName}
-            />
-            <Column
-              header="Км"
-              sortable
-              sortField="primary.actual_km"
-              style={{ width: '80px' }}
-              body={(r: GroupedRunFact) => fmtKm(r.primary.actual_km)}
-            />
-            <Column
-              header="Темп"
-              style={{ width: '80px' }}
-              body={(r: GroupedRunFact) => r.primary.actual_pace ?? '—'}
-            />
-            <Column
-              header="Время"
-              style={{ width: '100px' }}
-              body={(r: GroupedRunFact) => fmtDuration(r.primary.duration_sec)}
-            />
-            <Column
-              header="Ср. пульс"
-              style={{ width: '100px' }}
-              body={(r: GroupedRunFact) => r.primary.avg_hr ?? '—'}
-            />
-            <Column
-              header="Макс. пульс"
-              style={{ width: '110px' }}
-              body={(r: GroupedRunFact) => r.primary.max_hr ?? '—'}
-            />
-            <Column
-              header="Источники"
-              style={{ width: '160px' }}
-              body={(r: GroupedRunFact) => (
-                <div className="pb-source-badges">
-                  {r.sources.map((s, i) => (
-                    <span
-                      key={`${r.date}-${s}-${i}`}
-                      className={`pb-source-badge pb-source-badge--${s}`}
-                      title={s}
-                    >
-                      {s}
-                    </span>
-                  ))}
-                </div>
-              )}
-            />
-          </DataTable>
-        </Panel>
+        <RunsPanel
+          items={filteredFacts}
+          loading={factsLoading}
+          error={factsError}
+          filteredCount={filteredFacts.length}
+          totalCount={groupedFacts.length}
+          rawCount={runFacts.length}
+          filters={filters}
+          onFiltersChange={setFilters}
+          onResetFilters={handleResetFilters}
+          activeFilterCount={activeFilterCount}
+          onOpenFact={(fact) => {
+            setSelectedFact(fact);
+            setDrawerVisible(true);
+          }}
+        />
 
         <DodofoDebugDialog
           visible={debugVisible}

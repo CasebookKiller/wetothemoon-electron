@@ -1,4 +1,4 @@
-// src/components/PRANA_BINDU/views/RunFactView.tsx
+// src/components/PRANA_BINDU/VIEWS/RunFactView.tsx
 //
 // Полная карточка пробежки без Sidebar — для вкладки «Факт» в DayDrawer.
 // Функциональность идентична RunStreamsDrawer: группировка источников
@@ -143,6 +143,16 @@ const SourcePanel: React.FC<{
         const reload = await api.pb.getRunStreamsMeta(fact.id);
         if (reload?.success) setMetas(reload.items ?? []);
         const p = await api.pb.getRunStreams(fact.id, res.source ?? metas[0]?.source);
+        console.log('[SourcePanel] sync result:', {
+          fromSync: { source: res.source, pointCount: res.pointCount },
+          payload: {
+            success: p?.success,
+            keys: Object.keys(p?.payload ?? {}),
+            hasLatlng: 'latlng' in (p?.payload ?? {}),
+            latlngLen: Array.isArray(p?.payload?.latlng) ? p.payload.latlng.length : null,
+          },
+          error: p?.error,
+        });
         if (p?.success) setStreamsPayload(p.payload);
         onAfterSync();
       } else {
@@ -192,10 +202,11 @@ const SourcePanel: React.FC<{
         </div>
       </div>
 
-      {streamsPayload?.latlng && (
+      {streamsPayload?.latlng && streamsPayload.latlng.length > 1 && (
         <>
           <div className="pb-drawer__section-title">Карта</div>
           <GpsMapView
+            key={`map-${fact.id}-${metas[0]?.fetched_at ?? 'init'}`}
             latlng={streamsPayload.latlng}
             hr={streamsPayload.hr}
             elevation={streamsPayload.elevationM}

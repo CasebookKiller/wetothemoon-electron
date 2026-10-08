@@ -1,4 +1,4 @@
-// src/components/PRANA_BINDU/views/PlanEventView.tsx
+// src/components/PRANA_BINDU/VIEWS/PlanEventView.tsx
 //
 // Полная карточка plan_event без Sidebar — для вкладки в DayDrawer.
 // Функциональность идентична PlanEventDrawer.

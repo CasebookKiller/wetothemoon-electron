@@ -21,6 +21,7 @@ import {
   type MovementState,
 } from '@/main/services/pranaBindu/mentat/wadeProgramGenerator';
 import { findProgressionsByKey } from '@/main/services/pranaBindu/mentat/exerciseCatalog';
+import { useEquivalencesMap } from './HOOKS/useEquivalencesMap';
 import { Dialog } from 'primereact/dialog';
 import { InputNumber } from 'primereact/inputnumber';
 import { RadioButton } from 'primereact/radiobutton';
@@ -147,6 +148,8 @@ export const WadeProgramsPanel: React.FC<Props> = ({ className }) => {
       }),
     [program, states, weeks]
   );
+
+  const { lookupByTarget } = useEquivalencesMap();
 
   // Подгружаем нагрузку по дням, которые попадут в preview.
   useEffect(() => {
@@ -328,6 +331,23 @@ export const WadeProgramsPanel: React.FC<Props> = ({ className }) => {
                                   </span>
                                 </>
                               )}
+                              {(() => {
+                                const eqHints = entry
+                                  ? lookupByTarget(entry.category, mk, st.level)
+                                  : [];
+                                if (eqHints.length === 0) return null;
+                                return (
+                                  <span
+                                    className="pb-exercise-equiv"
+                                    title={`≈ ${eqHints
+                                      .map((h) => h.fullLabel)
+                                      .join('\n≈ ')}`}
+                                  >
+                                    {' · ≈ '}
+                                    {eqHints.map((h) => h.label).join(', ')}
+                                  </span>
+                                );
+                              })()}
                             </span>
                           )}
                         </>

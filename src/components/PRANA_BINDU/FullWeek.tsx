@@ -26,7 +26,7 @@ import React, {
 import { Button } from 'primereact/button';
 import { DaySummary } from './DaySummary';
 import type { RecoveryLogLite } from './WellnessDrawer';
-import { groupRunFacts, type GroupedRunFact } from './utils/groupRunFacts';
+import { groupRunFacts, type GroupedRunFact } from './UTILS/groupRunFacts';
 import { LogWorkoutSessionDialog } from './LogWorkoutSessionDialog';
 
 interface Props {
