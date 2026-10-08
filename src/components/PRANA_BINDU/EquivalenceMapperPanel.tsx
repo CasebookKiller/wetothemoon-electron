@@ -18,11 +18,36 @@ import {
   THENICS_CATALOG,
   findThenicsByKey,
   type ThenicsEntry,
+  type ThenicsLevel,
 } from '@/main/services/pranaBindu/mentat/thenicsCatalog';
 import {
   PROGRESSIONS_CATALOG,
   findProgressionsByKey,
 } from '@/main/services/pranaBindu/mentat/exerciseCatalog';
+
+const LEVELS: ThenicsLevel[] = [
+  'Beginner',
+  'Intermediate',
+  'Advanced',
+  'Pro',
+];
+
+const LEVEL_LABELS: Record<ThenicsLevel, string> = {
+  Beginner: 'Beginner',
+  Intermediate: 'Intermediate',
+  Advanced: 'Advanced',
+  Pro: 'Pro',
+};
+
+/** Группы мышц, которые встречаются в THENICS_CATALOG. */
+const MUSCLE_GROUPS = [
+  'Arms',
+  'Back',
+  'Chest',
+  'Abs',
+  'Legs',
+  'Shoulders',
+];
 
 const TARGET_CATEGORIES = [
   { label: 'Wade (Big-6)', value: 'wade' },
@@ -62,6 +87,13 @@ export const EquivalenceMapperPanel: React.FC<Props> = ({
   const [query, setQuery] = useState('');
   const [onlyUnmapped, setOnlyUnmapped] = useState(false);
 
+  const [levelFilter, setLevelFilter] = useState<Set<ThenicsLevel>>(
+    () => new Set()
+  );
+  const [muscleFilter, setMuscleFilter] = useState<Set<string>>(
+    () => new Set()
+  );
+
   const [targetCategory, setTargetCategory] = useState<string>('wade');
   const [targetKey, setTargetKey] = useState<string | null>(null);
   const [targetLevel, setTargetLevel] = useState<number | null>(null);
@@ -96,9 +128,15 @@ export const EquivalenceMapperPanel: React.FC<Props> = ({
     return THENICS_CATALOG.filter((e) => {
       if (q && !e.name.toLowerCase().includes(q)) return false;
       if (onlyUnmapped && mappedKeys.has(e.key)) return false;
+      if (levelFilter.size > 0 && !levelFilter.has(e.level)) return false;
+      if (muscleFilter.size > 0) {
+        const muscles = e.muscles ?? [];
+        const hit = muscles.some((m) => muscleFilter.has(m));
+        if (!hit) return false;
+      }
       return true;
     });
-  }, [query, onlyUnmapped, mappedKeys]);
+  }, [query, onlyUnmapped, mappedKeys, levelFilter, muscleFilter]);
 
   const selectedEntry: ThenicsEntry | undefined = selectedKey
     ? findThenicsByKey(selectedKey)
@@ -204,6 +242,37 @@ export const EquivalenceMapperPanel: React.FC<Props> = ({
     }
   };
 
+  const toggleLevel = (lvl: ThenicsLevel) => {
+    setLevelFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(lvl)) next.delete(lvl);
+      else next.add(lvl);
+      return next;
+    });
+  };
+
+  const toggleMuscle = (m: string) => {
+    setMuscleFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(m)) next.delete(m);
+      else next.add(m);
+      return next;
+    });
+  };
+
+  const resetFilters = () => {
+    setLevelFilter(new Set());
+    setMuscleFilter(new Set());
+    setQuery('');
+    setOnlyUnmapped(false);
+  };
+
+  const hasActiveFilters =
+    query.trim() !== '' ||
+    onlyUnmapped ||
+    levelFilter.size > 0 ||
+    muscleFilter.size > 0;
+
   const targetProgLabel = targetKey
     ? findProgressionsByKey(targetKey)?.label ?? targetKey
     : '';
@@ -239,6 +308,55 @@ export const EquivalenceMapperPanel: React.FC<Props> = ({
           />
           <span>Только неразмеченные</span>
         </label>
+        {hasActiveFilters && (
+          <Button
+            label="Сбросить"
+            icon="pi pi-filter-slash"
+            className="pb-soft p-button-sm pb-equiv__reset-btn"
+            onClick={resetFilters}
+            tooltip="Сбросить все фильтры"
+          />
+        )}
+      </div>
+
+      {/* Фильтры: уровни и мышцы */}
+      <div className="pb-equiv__filters">
+        <div className="pb-equiv__filter-row">
+          <span className="pb-equiv__filter-label">Уровень:</span>
+          {LEVELS.map((lvl) => {
+            const on = levelFilter.has(lvl);
+            return (
+              <button
+                key={lvl}
+                type="button"
+                className={`pb-equiv__filter-chip pb-equiv__filter-chip--${lvl.toLowerCase()}${
+                  on ? ' is-on' : ''
+                }`}
+                onClick={() => toggleLevel(lvl)}
+                title={on ? `Убрать ${lvl}` : `Только ${lvl}`}
+              >
+                {LEVEL_LABELS[lvl]}
+              </button>
+            );
+          })}
+        </div>
+        <div className="pb-equiv__filter-row">
+          <span className="pb-equiv__filter-label">Мышцы:</span>
+          {MUSCLE_GROUPS.map((m) => {
+            const on = muscleFilter.has(m);
+            return (
+              <button
+                key={m}
+                type="button"
+                className={`pb-equiv__filter-chip${on ? ' is-on' : ''}`}
+                onClick={() => toggleMuscle(m)}
+                title={on ? `Убрать ${m}` : `Только ${m}`}
+              >
+                {m}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Split */}

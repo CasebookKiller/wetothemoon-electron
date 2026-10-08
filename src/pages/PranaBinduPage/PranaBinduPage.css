@@ -5288,6 +5288,86 @@ body[data-module='prana-bindu'] .pb-debug-dialog .p-dialog-header-close svg path
   flex: 0 0 auto;
 }
 
+/* --- Фильтры: уровни и мышцы --- */
+
+.pb-equiv__filters {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  flex: 0 0 auto;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--surface-border, rgba(255, 255, 255, 0.08));
+}
+
+.pb-equiv__filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.pb-equiv__filter-label {
+  font-size: 0.75rem;
+  color: var(--tg-theme-hint-color, #708499);
+  min-width: 4.5rem;
+}
+
+.pb-equiv__filter-chip {
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--pb-accent) 30%, transparent);
+  border-radius: 4px;
+  color: var(--tg-theme-hint-color, #708499);
+  padding: 0.15rem 0.55rem;
+  font: inherit;
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.pb-equiv__filter-chip:hover {
+  color: var(--pb-accent);
+  border-color: var(--pb-accent);
+}
+
+.pb-equiv__filter-chip.is-on {
+  background: color-mix(in srgb, var(--pb-accent) 15%, transparent);
+  color: var(--pb-accent);
+  border-color: var(--pb-accent);
+  font-weight: 600;
+}
+
+/* Цветовые вариации по уровню (совпадают с тегами в карточке) */
+.pb-equiv__filter-chip--beginner.is-on {
+  background: rgba(111, 191, 115, 0.15);
+  color: #6fbf73;
+  border-color: #6fbf73;
+}
+
+.pb-equiv__filter-chip--intermediate.is-on {
+  background: rgba(232, 168, 56, 0.15);
+  color: #e8a838;
+  border-color: #e8a838;
+}
+
+.pb-equiv__filter-chip--advanced.is-on {
+  background: rgba(236, 57, 66, 0.15);
+  color: #ec3942;
+  border-color: #ec3942;
+}
+
+.pb-equiv__filter-chip--pro.is-on {
+  background: color-mix(in srgb, var(--pb-accent) 20%, transparent);
+  color: var(--pb-accent);
+  border-color: var(--pb-accent);
+}
+
+.pb-equiv__reset-btn.p-button {
+  min-width: auto !important;
+  height: 2rem !important;
+  padding: 0 0.7rem !important;
+  font-size: 0.75rem !important;
+}
+
 .pb-equiv__spacer {
   flex: 1 1 auto;
 }
