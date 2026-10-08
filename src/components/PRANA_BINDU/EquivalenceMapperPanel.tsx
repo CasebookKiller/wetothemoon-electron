@@ -258,7 +258,12 @@ export const EquivalenceMapperPanel: React.FC<Props> = ({
                   onClick={() => setSelectedKey(e.key)}
                 >
                   <div className="pb-equiv__item-body">
-                    <div className="pb-equiv__item-name">{e.name}</div>
+                    <div className="pb-equiv__item-name">
+                      {e.name}
+                      {e.nameRu && (
+                        <span className="pb-equiv__item-name-ru"> · {e.nameRu}</span>
+                      )}
+                    </div>
                     <div className="pb-equiv__item-meta">
                       <span className={`pb-equiv__lvl pb-equiv__lvl--${e.level.toLowerCase()}`}>
                         {e.level}

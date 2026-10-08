@@ -5391,6 +5391,11 @@ body[data-module='prana-bindu'] .pb-debug-dialog .p-dialog-header-close svg path
   white-space: nowrap;
 }
 
+.pb-equiv__item-name-ru {
+  font-weight: 400;
+  color: var(--tg-theme-hint-color, #708499);
+}
+
 .pb-equiv__item.is-active .pb-equiv__item-name {
   color: var(--pb-accent);
 }
