@@ -5555,3 +5555,18 @@ body[data-module='prana-bindu'] .pb-debug-dialog .p-dialog-header-close svg path
   min-width: 0;
   flex: 0 1 auto;
 }
+
+.pb-day-fact__ex-time {
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  font-size: 0.72rem;
+  color: var(--tg-theme-hint-color, #708499);
+  flex: 0 0 auto;
+  min-width: 2.6rem;
+}
+
+/* Бейдж «тест» на строке упражнения — компактный */
+.pb-day-fact__ex-row .pb-source-badge {
+  font-size: 0.6rem;
+  padding: 0.05rem 0.35rem;
+  flex: 0 0 auto;
+}

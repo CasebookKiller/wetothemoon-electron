@@ -138,6 +138,30 @@ export const DayDrawer: React.FC<Props> = ({
     () => groupRunFacts(facts, {}),
     [facts]
   );
+    // Программные сессии (programKey != null) — отдельные карточки.
+  // Свободные (programKey == null) — все в одну «Свободную сессию»,
+  // упражнения плоским списком, отсортированным по createdAt.
+  const programSessions = React.useMemo(
+    () => sessions.filter((s) => s.programKey != null),
+    [sessions]
+  );
+  const freeSessions = React.useMemo(
+    () =>
+      sessions
+        .filter((s) => s.programKey == null)
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+    [sessions]
+  );
+  const freeExercises = React.useMemo(
+    () =>
+      freeSessions.flatMap((s) =>
+        s.exercises.map((ex) => ({
+          ex,
+          session: s,
+        }))
+      ),
+    [freeSessions]
+  );
   const { lookupByTarget } = useEquivalencesMap();
 
   return (
@@ -268,37 +292,44 @@ export const DayDrawer: React.FC<Props> = ({
                       Упражнения
                     </div>
                     <div className="pb-day-list">
-                      {sessions.map((s) => (
+                      {/* 1. Программные сессии — каждая отдельно */}
+                      {programSessions.map((s) => (
                         <div
                           key={s.id}
                           className="pb-day-list__item pb-day-list__item--session"
                         >
                           <div className="pb-day-list__item-title">
-                            {s.programKey
-                              ? `Программа: ${s.programKey}`
-                              : 'Свободная сессия'}
+                            {`Программа: ${s.programKey}`}
                             {s.isTest && (
                               <span className="pb-source-badge pb-source-badge--dodofo">
                                 тест
                               </span>
                             )}
                             {s.generatorCategory &&
-                              CATEGORY_LABELS[s.generatorCategory as keyof typeof CATEGORY_LABELS] && (
+                              CATEGORY_LABELS[
+                                s.generatorCategory as keyof typeof CATEGORY_LABELS
+                              ] && (
                                 <span className="pb-source-badge pb-source-badge--manual">
-                                  {CATEGORY_LABELS[
-                                    s.generatorCategory as keyof typeof CATEGORY_LABELS
-                                  ]}
+                                  {
+                                    CATEGORY_LABELS[
+                                      s.generatorCategory as keyof typeof CATEGORY_LABELS
+                                    ]
+                                  }
                                 </span>
                               )}
                           </div>
                           <div className="pb-day-fact__session-list">
                             {s.exercises.map((ex, i) => {
                               const prog = findProgressionsByKey(ex.movementKey);
-                              const lvl = prog?.levels.find((l) => l.level === ex.level);
-                              // Wade → W<N>, остальные категории (runner/cali/core/posture/hiit) → L<N>.
-                              const prefix = prog?.category === 'wade' ? 'W' : 'L';
-                              const label = lvl?.name ?? prog?.label ?? ex.movementKey;
-                              const lvlTag = ex.level != null ? `${prefix}${ex.level}` : null;
+                              const lvl = prog?.levels.find(
+                                (l) => l.level === ex.level
+                              );
+                              const prefix =
+                                prog?.category === 'wade' ? 'W' : 'L';
+                              const label =
+                                lvl?.name ?? prog?.label ?? ex.movementKey;
+                              const lvlTag =
+                                ex.level != null ? `${prefix}${ex.level}` : null;
                               const lvlRu = lvl?.nameRu ?? null;
                               const eqHints = prog
                                 ? lookupByTarget(
@@ -309,18 +340,25 @@ export const DayDrawer: React.FC<Props> = ({
                                 : [];
 
                               return (
-                                <div key={i} className="pb-day-fact__ex-row">
+                                <div
+                                  key={i}
+                                  className="pb-day-fact__ex-row"
+                                >
                                   <span className="pb-day-fact__ex-key">
                                     {label}
                                     {lvlTag && (
                                       <>
                                         {' '}
-                                        <span className="pb-day-fact__ex-lvl">{lvlTag}</span>
+                                        <span className="pb-day-fact__ex-lvl">
+                                          {lvlTag}
+                                        </span>
                                       </>
                                     )}
                                   </span>
                                   {lvlRu && (
-                                    <span className="pb-day-fact__ex-lvl-ru">{lvlRu}</span>
+                                    <span className="pb-day-fact__ex-lvl-ru">
+                                      {lvlRu}
+                                    </span>
                                   )}
                                   {eqHints.length > 0 && (
                                     <span
@@ -329,7 +367,10 @@ export const DayDrawer: React.FC<Props> = ({
                                         .map((h) => h.fullLabel)
                                         .join('\n≈ ')}`}
                                     >
-                                      ≈ {eqHints.map((h) => h.label).join(', ')}
+                                      ≈{' '}
+                                      {eqHints
+                                        .map((h) => h.label)
+                                        .join(', ')}
                                     </span>
                                   )}
                                   <span className="pb-day-fact__ex-actual">
@@ -347,6 +388,123 @@ export const DayDrawer: React.FC<Props> = ({
                           </div>
                         </div>
                       ))}
+
+                      {/* 2. Свободные сессии — одна карточка на день */}
+                      {freeExercises.length > 0 && (
+                        <div className="pb-day-list__item pb-day-list__item--session">
+                          <div className="pb-day-list__item-title">
+                            {`Свободная сессия${
+                              freeExercises.length > 1
+                                ? ` · ${freeExercises.length} упражнения`
+                                : ''
+                            }`}
+                          </div>
+                          <div className="pb-day-fact__session-list">
+                            {freeExercises.map(({ ex, session }, i) => {
+                              const prog = findProgressionsByKey(ex.movementKey);
+                              const lvl = prog?.levels.find(
+                                (l) => l.level === ex.level
+                              );
+                              const prefix =
+                                prog?.category === 'wade' ? 'W' : 'L';
+                              const label =
+                                lvl?.name ?? prog?.label ?? ex.movementKey;
+                              const lvlTag =
+                                ex.level != null ? `${prefix}${ex.level}` : null;
+                              const lvlRu = lvl?.nameRu ?? null;
+                              const eqHints = prog
+                                ? lookupByTarget(
+                                    prog.category,
+                                    ex.movementKey,
+                                    ex.level
+                                  )
+                                : [];
+
+                              // HH:MM из createdAt сессии.
+                              let timeStr = '';
+                              try {
+                                const d = new Date(session.createdAt);
+                                if (!Number.isNaN(d.getTime())) {
+                                  timeStr = `${String(d.getHours()).padStart(
+                                    2,
+                                    '0'
+                                  )}:${String(d.getMinutes()).padStart(2, '0')}`;
+                                }
+                              } catch {
+                                /* ignore */
+                              }
+
+                              return (
+                                <div
+                                  key={i}
+                                  className="pb-day-fact__ex-row"
+                                >
+                                  {timeStr && (
+                                    <span className="pb-day-fact__ex-time">
+                                      {timeStr}
+                                    </span>
+                                  )}
+                                  <span className="pb-day-fact__ex-key">
+                                    {label}
+                                    {lvlTag && (
+                                      <>
+                                        {' '}
+                                        <span className="pb-day-fact__ex-lvl">
+                                          {lvlTag}
+                                        </span>
+                                      </>
+                                    )}
+                                  </span>
+                                  {lvlRu && (
+                                    <span className="pb-day-fact__ex-lvl-ru">
+                                      {lvlRu}
+                                    </span>
+                                  )}
+                                  {eqHints.length > 0 && (
+                                    <span
+                                      className="pb-exercise-equiv"
+                                      title={`≈ ${eqHints
+                                        .map((h) => h.fullLabel)
+                                        .join('\n≈ ')}`}
+                                    >
+                                      ≈{' '}
+                                      {eqHints
+                                        .map((h) => h.label)
+                                        .join(', ')}
+                                    </span>
+                                  )}
+                                  {session.isTest && (
+                                    <span className="pb-source-badge pb-source-badge--dodofo">
+                                      тест
+                                    </span>
+                                  )}
+                                  <span className="pb-day-fact__ex-actual">
+                                    {exerciseSummary(ex)}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                          {/* Общий notes, если у всех одинаковые (например, «Проверка уровня») */}
+                          {(() => {
+                            const notes = Array.from(
+                              new Set(
+                                freeSessions
+                                  .map((s) => s.notes)
+                                  .filter((n): n is string => !!n)
+                              )
+                            );
+                            if (notes.length === 0) return null;
+                            return (
+                              <div className="pb-day-list__item-meta">
+                                {notes.map((n) => (
+                                  <span key={n}>{n}</span>
+                                ))}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
