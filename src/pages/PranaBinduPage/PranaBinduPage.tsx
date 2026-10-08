@@ -59,6 +59,11 @@ import {
   type ProfilePanelHandle,
 } from '@/components/PRANA_BINDU/PANELS/ProfilePanel/ProfilePanel';
 
+import {
+  ConnectionsPanel,
+} from '@/components/PRANA_BINDU/PANELS/ConnectionsPanel/ConnectionsPanel';
+import { AutoSyncPanel } from '@/components/PRANA_BINDU/PANELS/AutoSyncPanel/AutoSyncPanel';
+
 import { DeleteGeneratedDialog } from '@/components/PRANA_BINDU/DeleteGeneratedDialog';
 
 import { CheckReminderDialog } from '@/components/PRANA_BINDU/CheckReminderDialog';
@@ -400,8 +405,8 @@ export const PranaBinduPage: React.FC = () => {
     wellness: boolean;
   } | null>(null);
   
-  const [status, setStatus] = useState<string>('');
-  const [loading, setLoading] = useState(false);
+  //const [status, setStatus] = useState<string>('');
+  //const [loading, setLoading] = useState(false);
 
   // Синхронизация
   const initialRange = loadStoredRange() ?? defaultSyncRange();
@@ -416,12 +421,12 @@ export const PranaBinduPage: React.FC = () => {
   const [syncError, setSyncError] = useState<string>('');
 
   // dodofo
-  const [dodofoToken, setDodofoToken] = useState('');
-  const [hasDodofoToken, setHasDodofoToken] = useState(false);
+  //const [dodofoToken, setDodofoToken] = useState('');
+  //const [hasDodofoToken, setHasDodofoToken] = useState(false);
 
   // Zepp (резерв)
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  //const [email, setEmail] = useState('');
+  //const [password, setPassword] = useState('');
 
   // Таблица пробежек
   const [runFacts, setRunFacts] = useState<any[]>([]);
@@ -507,17 +512,6 @@ export const PranaBinduPage: React.FC = () => {
   const [syncingWellness, setSyncingWellness] = useState(false);
   const [wellnessResult, setWellnessResult] = useState<string>('');
   const [wellnessError, setWellnessError] = useState('');
-
-  // Автосинхронизация
-  const [autoSyncOnStart, setAutoSyncOnStart] = useState(false);
-  const [autoSyncIntervalMin, setAutoSyncIntervalMin] = useState(360);
-  const [autoSyncLastAt, setAutoSyncLastAt] = useState<string | null>(null);
-  const [autoSyncLastStatus, setAutoSyncLastStatus] = useState<string | null>(
-    null
-  );
-  const [autoSyncRunning, setAutoSyncRunning] = useState(false);
-  const [autoSyncResult, setAutoSyncResult] = useState<string>('');
-  const [autoSyncError, setAutoSyncError] = useState('');
 
   const groupedFacts = React.useMemo(
     () => groupRunFacts(runFacts, streamsMap),
@@ -613,12 +607,12 @@ export const PranaBinduPage: React.FC = () => {
 
   const [importOrigin, setImportOrigin] = useState<string>('zepp-app');
 
-  const [intervalsApiKey, setIntervalsApiKey] = useState('');
-  const [intervalsAthleteId, setIntervalsAthleteId] = useState('');
-  const [intervalsHasKey, setIntervalsHasKey] = useState(false);
-  const [intervalsSaving, setIntervalsSaving] = useState(false);
-  const [intervalsError, setIntervalsError] = useState('');
-  const [intervalsInfo, setIntervalsInfo] = useState('');
+  //const [intervalsApiKey, setIntervalsApiKey] = useState('');
+  //const [intervalsAthleteId, setIntervalsAthleteId] = useState('');
+  //const [intervalsHasKey, setIntervalsHasKey] = useState(false);
+  //const [intervalsSaving, setIntervalsSaving] = useState(false);
+  //const [intervalsError, setIntervalsError] = useState('');
+  //const [intervalsInfo, setIntervalsInfo] = useState('');
 
   const [recoveryLogs, setRecoveryLogs] = useState<any[]>([]);
   const [selectedRecovery, setSelectedRecovery] = useState<RecoveryLogLite | null>(null);
@@ -779,50 +773,9 @@ export const PranaBinduPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reminderCategories]);
 
-  // Загрузка токена + пробежек при монтировании
-  useEffect(() => {
-    (async () => {
-      if (!api?.pb?.dodofoTokenStatus) return;
-      try {
-        const res = await api.pb.dodofoTokenStatus();
-        if (res?.success) setHasDodofoToken(!!res.hasToken);
-      } catch {
-        // ignore
-      }
-    })();
-    (async () => {
-      try {
-        const res = await api.pb.fitArchivePathGet?.();
-        if (res?.success && res.path) setFitArchivePath(res.path);
-      } catch {
-        // ignore
-      }
-    })();
-    (async () => {
-      try {
-        const res = await api.pb.zeppArchivePathGet?.();
-        if (res?.success && res.path) setZeppArchivePath(res.path);
-      } catch { /* ignore */ }
-    })();
-    (async () => {
-      try {
-        const r = await api.pb.intervalsStatus?.();
-        if (r?.success) {
-          setIntervalsHasKey(!!r.hasApiKey);
-          setIntervalsAthleteId(r.athleteId ?? '');
-        }
-      } catch { /* ignore */ }
-    })();
-    //loadRunFacts();
-    
-    loadRecoveryLogs();
-    loadSyncSettings();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // Сброс статуса при смене провайдера
   useEffect(() => {
-    setStatus('');
+    //setStatus('');
     (async () => {
       if (!api?.pb?.providerCapabilities) return;
       try {
@@ -879,7 +832,7 @@ export const PranaBinduPage: React.FC = () => {
 
   // ==================== Проверка доступности ====================
 
-  const handleCheck = async () => {
+  /*const handleCheck = async () => {
     if (!api?.pb) {
       setStatus('electronAPI.pb недоступен — модуль ещё не собран');
       return;
@@ -894,7 +847,7 @@ export const PranaBinduPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  };*/
 
   // ==================== Синхронизация тренировок ====================
 
@@ -1031,7 +984,7 @@ export const PranaBinduPage: React.FC = () => {
 
   // ==================== dodofo ====================
 
-  const handleSaveDodofo = async () => {
+  /*const handleSaveDodofo = async () => {
     if (!api?.pb) {
       setStatus('electronAPI.pb недоступен');
       return;
@@ -1056,11 +1009,11 @@ export const PranaBinduPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  };*/
 
   // ==================== Zepp (резерв) ====================
 
-  const handleConnectZepp = async () => {
+  /*const handleConnectZepp = async () => {
     if (!api?.pb) {
       setStatus('electronAPI.pb недоступен');
       return;
@@ -1086,7 +1039,7 @@ export const PranaBinduPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  };*/
 
   // ==================== Рендер формы по провайдеру ====================
 
@@ -1325,7 +1278,7 @@ export const PranaBinduPage: React.FC = () => {
     }
   };
 
-  const handleIntervalsSave = async () => {
+  /*const handleIntervalsSave = async () => {
     if (!api?.pb?.intervalsSetup) return;
     if (!intervalsApiKey.trim() && !intervalsHasKey) {
       setIntervalsError('API key обязателен');
@@ -1351,7 +1304,7 @@ export const PranaBinduPage: React.FC = () => {
     } finally {
       setIntervalsSaving(false);
     }
-  };
+  };*/
 
   const handleSyncWellnessNew = async () => {
     if (!api?.pb?.syncWellness) return;
@@ -1424,101 +1377,6 @@ export const PranaBinduPage: React.FC = () => {
       if (res?.success) setRecoveryLogs(res.items ?? []);
     } catch {
       // ignore
-    }
-  };
-
-  const loadSyncSettings = async () => {
-    if (!api?.pb?.syncSettingsGet) return;
-    try {
-      const res = await api.pb.syncSettingsGet();
-      if (res?.success) {
-        const d = res.data ?? {};
-        setAutoSyncOnStart(!!d.autoOnStart);
-        setAutoSyncIntervalMin(
-          typeof d.autoIntervalMin === 'number' ? d.autoIntervalMin : 360
-        );
-        setAutoSyncLastAt(d.lastSyncAt ?? null);
-        setAutoSyncLastStatus(d.lastSyncStatus ?? null);
-      }
-    } catch {
-      /* ignore */
-    }
-  };
-
-  // Автосинхронизация при старте окна. Один раз за монтирование.
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await api.pb.autoSyncOnStart?.();
-        if (res?.success && res.ran) {
-          console.log('[Prana-Bindu] auto-sync при старте:', res);
-          // Обновим видимые данные — они могли поменяться.
-          await loadRunFacts();
-          await loadRecoveryLogs();
-          await loadSyncSettings();
-        }
-      } catch {
-        /* ignore */
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const persistAutoSync = async (patch: {
-    autoOnStart?: boolean;
-    autoIntervalMin?: number | null;
-  }) => {
-    if (!api?.pb?.syncSettingsUpdate) return;
-    try {
-      // mode синхронизируем с autoOnStart — поле устаревшее,
-      // но пусть будет консистентно с чекбоксом.
-      const payload: Record<string, unknown> = { ...patch };
-      if (patch.autoOnStart !== undefined) {
-        payload.mode = patch.autoOnStart ? 'auto' : 'manual';
-      }
-      const res = await api.pb.syncSettingsUpdate(payload);
-      if (!res?.success) {
-        setAutoSyncError(res?.error ?? 'Не удалось сохранить');
-        setTimeout(() => setAutoSyncError(''), 3000);
-      }
-    } catch (e) {
-      setAutoSyncError((e as Error).message);
-      setTimeout(() => setAutoSyncError(''), 3000);
-    }
-  };
-
-  const handleRunAutoSyncNow = async () => {
-    if (!api?.pb?.autoSyncOnStart) return;
-    setAutoSyncRunning(true);
-    setAutoSyncError('');
-    setAutoSyncResult('');
-    try {
-      const res = await api.pb.autoSyncOnStart();
-      if (res?.success) {
-        if (res.skipped === 'disabled') {
-          setAutoSyncResult('Автосинхронизация выключена — пропущено.');
-        } else if (res.skipped === 'cooldown') {
-          setAutoSyncResult(
-            `Пропущено (прошло ${res.elapsedMin} мин из ${res.intervalMin}).`
-          );
-        } else if (res.ran) {
-          const wTotal = (res.workouts ?? []).reduce(
-            (s: number, w: any) => s + (w.added ?? 0) + (w.updated ?? 0),
-            0
-          );
-          const well = res.wellness?.added ?? 0;
-          setAutoSyncResult(
-            `Готово: workouts ${wTotal}, wellness +${well}.`
-          );
-        }
-        await loadSyncSettings();
-      } else {
-        setAutoSyncError(res?.error ?? 'Ошибка');
-      }
-    } catch (e) {
-      setAutoSyncError((e as Error).message);
-    } finally {
-      setAutoSyncRunning(false);
     }
   };
 
@@ -1834,214 +1692,7 @@ export const PranaBinduPage: React.FC = () => {
         <ProfilePanel ref={profilePanelRef} />
 
         {/* ==================== ПОДКЛЮЧЕНИЯ ==================== */}
-        <Panel header="Подключения" className="shadow-5 mb-3 pb-panel">
-          <div className="pb-connections">
-            {/* --- dodofo --- */}
-            <div className="pb-connections__block">
-              <div className="pb-connections__title">
-                <i className="pi pi-link" /> dodofo
-                {hasDodofoToken && (
-                  <span className="pb-label-ok">✓ сохранён</span>
-                )}
-              </div>
-              <div className="flex flex-column gap-2">
-                <InputText
-                  id="pb-dodofo-token"
-                  value={dodofoToken}
-                  onChange={(e) => setDodofoToken(e.target.value)}
-                  placeholder="dodofo_..."
-                  className="w-full"
-                />
-                <small className="pb-hint">
-                  Токен создаётся в профиле dodofo.ru. Хранится
-                  зашифрованным через safeStorage.
-                </small>
-                <div className="flex gap-2 flex-wrap">
-                  <Button
-                    label={loading ? 'Сохранение...' : 'Сохранить токен'}
-                    icon={loading ? 'pi pi-spin pi-spinner' : 'pi pi-save'}
-                    className="pb p-button-sm"
-                    onClick={handleSaveDodofo}
-                    disabled={loading || !dodofoToken.trim()}
-                  />
-                  <Button
-                    label={loading ? 'Проверка...' : 'Проверить'}
-                    icon={loading ? 'pi pi-spin pi-spinner' : 'pi pi-question-circle'}
-                    className="pb-soft p-button-sm"
-                    onClick={handleCheck}
-                    disabled={loading}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* --- intervals.icu --- */}
-            <div className="pb-connections__block">
-              <div className="pb-connections__title">
-                <i className="pi pi-heart" /> intervals.icu
-                {intervalsHasKey && (
-                  <span className="pb-label-ok">✓ сохранён</span>
-                )}
-              </div>
-              <div className="flex flex-column gap-2">
-                <InputText
-                  type="password"
-                  value={intervalsApiKey}
-                  onChange={(e) => setIntervalsApiKey(e.target.value)}
-                  placeholder={
-                    intervalsHasKey
-                      ? '•••••••• (оставьте пустым)'
-                      : 'ваш ключ из Settings → Developer'
-                  }
-                  className="w-full"
-                />
-                <InputText
-                  value={intervalsAthleteId}
-                  onChange={(e) => setIntervalsAthleteId(e.target.value)}
-                  placeholder="i123456 — athlete id (или пусто для «self»)"
-                  className="w-full"
-                />
-                <small className="pb-hint">
-                  API-ключ: intervals.icu → Settings → Developer.
-                  Athlete ID — из URL интерфейса, необязательно.
-                </small>
-                <div className="flex gap-2 flex-wrap">
-                  <Button
-                    label={intervalsSaving ? 'Сохранение…' : 'Сохранить ключ'}
-                    icon={intervalsSaving ? 'pi pi-spin pi-spinner' : 'pi pi-save'}
-                    className="pb p-button-sm"
-                    onClick={handleIntervalsSave}
-                    disabled={
-                      intervalsSaving ||
-                      (!intervalsApiKey.trim() && !intervalsHasKey)
-                    }
-                  />
-                </div>
-                {intervalsError && (
-                  <Message severity="error" text={intervalsError} className="w-full" />
-                )}
-                {intervalsInfo && (
-                  <Message severity="success" text={intervalsInfo} className="w-full" />
-                )}
-              </div>
-            </div>
-
-            {/* --- Zepp (резерв) --- */}
-            <div className="pb-connections__block pb-connections__block--collapsed">
-              <div className="pb-connections__title">
-                <i className="pi pi-mobile" /> Zepp (резерв)
-              </div>
-              <div className="flex flex-column gap-2">
-                <InputText
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  className="w-full"
-                />
-                <InputText
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full"
-                />
-                <small className="pb-hint">
-                  Резервный способ. Основной — dodofo и intervals.icu.
-                </small>
-                <div className="flex gap-2 flex-wrap">
-                  <Button
-                    label={loading ? 'Подключение...' : 'Подключить'}
-                    icon={loading ? 'pi pi-spin pi-spinner' : 'pi pi-sign-in'}
-                    className="pb p-button-sm"
-                    onClick={handleConnectZepp}
-                    disabled={loading || !email || !password}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* --- Автосинхронизация --- */}
-            <div className="pb-connections__block">
-              <div className="pb-connections__title">
-                <i className="pi pi-sync" /> Автосинхронизация
-                {autoSyncLastAt && (
-                  <span className="pb-label-ok" style={{ marginLeft: 'auto' }}>
-                    {autoSyncLastStatus === 'error'
-                      ? 'ошибка'
-                      : autoSyncLastStatus === 'partial'
-                      ? 'частично'
-                      : 'ок'}
-                  </span>
-                )}
-              </div>
-              <div className="flex flex-column gap-2">
-                <label className="pb-check-row pb-checkbox-dark">
-                  <Checkbox
-                    inputId="pb-auto-on-start"
-                    checked={autoSyncOnStart}
-                    onChange={(e) => {
-                      const v = !!e.checked;
-                      setAutoSyncOnStart(v);
-                      void persistAutoSync({ autoOnStart: v });
-                    }}
-                  />
-                  <span>Синхронизировать workouts и здоровье при старте окна</span>
-                </label>
-                <small className="pb-hint">
-                  Забирает workouts и wellness за последние 7 дней. Антидребезг —
-                  не чаще раза в {Math.round(autoSyncIntervalMin / 60)} ч.
-                  Стримы и план не трогает (это ручные операции).
-                </small>
-
-                {autoSyncLastAt && (
-                  <small className="pb-hint">
-                    Последняя: {new Date(autoSyncLastAt).toLocaleString('ru-RU')}
-                  </small>
-                )}
-
-                {autoSyncResult && (
-                  <Message
-                    severity="success"
-                    text={autoSyncResult}
-                    className="w-full"
-                  />
-                )}
-                {autoSyncError && (
-                  <Message
-                    severity="error"
-                    text={autoSyncError}
-                    className="w-full"
-                  />
-                )}
-
-                <div className="flex gap-2 flex-wrap">
-                  <Button
-                    label={
-                      autoSyncRunning
-                        ? 'Синхронизация…'
-                        : 'Синхронизировать сейчас'
-                    }
-                    icon={
-                      autoSyncRunning
-                        ? 'pi pi-spin pi-spinner'
-                        : 'pi pi-play'
-                    }
-                    className="pb-soft p-button-sm"
-                    onClick={handleRunAutoSyncNow}
-                    disabled={autoSyncRunning}
-                    tooltip="Запустить те же операции, что делает автосинхронизация — независимо от чекбокса и кулдауна"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {status && (
-              <div className="pb-status">
-                <code>{status}</code>
-              </div>
-            )}
-          </div>
-        </Panel>
+        <ConnectionsPanel />
 
         {/* ==================== СИНХРОНИЗАЦИЯ (API) ==================== */}
         <Panel header="Синхронизация (API)" className="shadow-5 mb-3 pb-panel">
@@ -2326,6 +1977,14 @@ export const PranaBinduPage: React.FC = () => {
                 content={<span>Здоровье: {wellnessResult}</span>}
               />
             )}
+
+            <hr className="pb-sep" />
+            <AutoSyncPanel
+              onAfterSync={async () => {
+                await loadRunFacts();
+                await loadRecoveryLogs();
+              }}
+            />
           </div>
         </Panel>
 
