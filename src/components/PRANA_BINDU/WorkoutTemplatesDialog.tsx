@@ -19,11 +19,12 @@ import { WorkoutTimeline, type TimelineStep } from './WorkoutTimeline';
 import { parseWorkoutText } from '@/main/services/pranaBindu/mentat/workoutParser';
 import { ExerciseCatalog } from './ExerciseCatalog';
 import { WadeProgramsPanel } from './WadeProgramsPanel';
+import { EquivalenceMapperPanel } from './EquivalenceMapperPanel';
 
 interface Props {
   visible: boolean;
   onHide: () => void;
-  initialMode?: 'templates' | 'catalog' | 'programs';
+  initialMode?: 'templates' | 'catalog' | 'programs' | 'equivalences';
 }
 
 export const WorkoutTemplatesDialog: React.FC<Props> = ({
@@ -36,7 +37,9 @@ export const WorkoutTemplatesDialog: React.FC<Props> = ({
   const [selected, setSelected] = useState<WorkoutTemplate | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const [mode, setMode] = useState<'templates' | 'catalog' | 'programs'>('templates');
+  const [mode, setMode] = useState<
+    'templates' | 'catalog' | 'programs' | 'equivalences'
+  >('templates');
   const [lastCopied, setLastCopied] = useState('');
 
   useEffect(() => {
@@ -150,6 +153,13 @@ export const WorkoutTemplatesDialog: React.FC<Props> = ({
             onClick={() => setMode('programs')}
           >
             Программы
+          </button>
+          <button
+            type="button"
+            className={mode === 'equivalences' ? 'is-active' : ''}
+            onClick={() => setMode('equivalences')}
+          >
+            Соответствия
           </button>
         </div>
 
@@ -303,6 +313,12 @@ export const WorkoutTemplatesDialog: React.FC<Props> = ({
       {mode === 'programs' && (
         <div className="pb-catalog__body">
           <WadeProgramsPanel />
+        </div>
+      )}
+
+      {mode === 'equivalences' && (
+        <div className="pb-catalog__body">
+          <EquivalenceMapperPanel />
         </div>
       )}
 
