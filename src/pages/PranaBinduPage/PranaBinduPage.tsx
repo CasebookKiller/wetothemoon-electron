@@ -1,12 +1,6 @@
 // src/pages/PranaBinduPage/PranaBinduPage.tsx
 
 import React, { useEffect, useState } from 'react';
-import { Button } from 'primereact/button';
-import { Calendar } from 'primereact/calendar';
-import { Dropdown } from 'primereact/dropdown';
-import { InputText } from 'primereact/inputtext';
-import { Message } from 'primereact/message';
-import { Panel } from 'primereact/panel';
 import {
   RunStreamsDrawer,
   type RunFactLite,
@@ -16,15 +10,9 @@ import {
   EMPTY_FILTERS,
 } from '@/components/PRANA_BINDU/PANELS/RunsPanel/RunFiltersPanel';
 import { RunsPanel } from '@/components/PRANA_BINDU/PANELS/RunsPanel/RunsPanel';
-import { fmtKm, fmtDuration } from '@/components/PRANA_BINDU/PANELS/RunsPanel/utils';
 import { DodofoDebugDialog } from '@/components/PRANA_BINDU/DodofoDebugDialog';
 
 import './PranaBinduPage.css';
-import { InputNumber } from 'primereact/inputnumber';
-
-import { ProgressBar } from 'primereact/progressbar';
-
-
 import {
   PlanEventsPanel,
   type PlanEventLite,
@@ -33,10 +21,6 @@ import { PlanEventDrawer } from '@/components/PRANA_BINDU/PlanEventDrawer';
 
 import { WorkoutTemplatesDialog } from '@/components/PRANA_BINDU/WorkoutTemplatesDialog';
 
-import { WellnessDrawer, type RecoveryLogLite } from '@/components/PRANA_BINDU/WellnessDrawer';
-
-import { YearCalendar } from '@/components/COMMON/YearCalendar/YearCalendar';
-
 import { CalendarPanel } from '@/components/COMMON/CalendarPanel/CalendarPanel';
 
 import { DayDrawer } from '@/components/PRANA_BINDU/DayDrawer';
@@ -44,7 +28,6 @@ import { DayDrawer } from '@/components/PRANA_BINDU/DayDrawer';
 import {
   groupRunFacts,
   sourceBadge,
-  type GroupedRunFact,
 } from '@/components/PRANA_BINDU/UTILS/groupRunFacts';
 
 import {
@@ -62,39 +45,25 @@ import {
 import {
   ConnectionsPanel,
 } from '@/components/PRANA_BINDU/PANELS/ConnectionsPanel/ConnectionsPanel';
-import { AutoSyncPanel } from '@/components/PRANA_BINDU/PANELS/AutoSyncPanel/AutoSyncPanel';
 
 import { DeleteGeneratedDialog } from '@/components/PRANA_BINDU/DeleteGeneratedDialog';
 
 import { CheckReminderDialog } from '@/components/PRANA_BINDU/CheckReminderDialog';
 import { ExerciseCategory } from '@/main/services/pranaBindu/mentat/types';
 import { PROGRESSIONS_CATALOG } from '@/main/services/pranaBindu/mentat/exerciseCatalog';
-import { Checkbox } from 'primereact/checkbox';
 
 import { ImportPanel } from '@/components/PRANA_BINDU/PANELS/ImportPanel/ImportPanel';
 
 import {
   TrainingTabs,
-  type TrainingTab,
 } from '@/components/PRANA_BINDU/PANELS/TrainingTabs/TrainingTabs';
 
-interface ProviderOption {
-  label: string;
-  value: string;
-}
+import { SyncPanel } from '@/components/PRANA_BINDU/PANELS/SyncPanel/SyncPanel';
 
 import {
   WellnessPanel,
   type WellnessPanelHandle,
 } from '@/components/PRANA_BINDU/PANELS/WellnessPanel/WellnessPanel';
-
-const PROVIDER_OPTIONS: ProviderOption[] = [
-  { label: 'dodofo (активности)', value: 'dodofo' },
-  { label: 'intervals.icu (активности + события)', value: 'intervals-icu' },
-  { label: 'dofek-zepp (резерв)', value: 'dofek-zepp' },
-  { label: 'zepp-mcp (не реализован)', value: 'zepp-mcp' },
-  { label: 'zeppbridge (не реализован)', value: 'zeppbridge' },
-];
 
 const MODULES = [
   { name: 'Stillsuit', description: 'Марафон: пульс, темп, экономичность' },
@@ -116,8 +85,6 @@ function toIsoDate(d: Date): string {
  * если start_time отличается меньше чем на это окно.
  * Потом вынесем в настройки приложения.
  */
-//const SAME_WORKOUT_WINDOW_MIN = 30;
-//const SAME_WORKOUT_WINDOW_MS = SAME_WORKOUT_WINDOW_MIN * 60 * 1000;
 
 const PB_RANGE_STORAGE_KEY = 'pb.syncRange';
 const PB_FILTERS_STORAGE_KEY = 'pb.filters.v1';
@@ -186,147 +153,6 @@ function defaultSyncRange(): { from: Date; to: Date } {
   from.setDate(from.getDate() - 30);
   return { from, to };
 }
-
-/*
-function fmtKm(v: number | null | undefined): string {
-  if (v == null) return '—';
-  return v.toFixed(2);
-}*/
-
-/*
-function fmtDuration(sec: number | null | undefined): string {
-  if (sec == null) return '—';
-  const h = Math.floor(sec / 3600);
-  const m = Math.floor((sec % 3600) / 60);
-  const s = sec % 60;
-  if (h > 0) return `${h}ч ${String(m).padStart(2, '0')}м`;
-  return `${m}:${String(s).padStart(2, '0')}`;
-}*/
-
-/*
-const SOURCE_PRIORITY: Record<string, number> = {
-  fit: 1,
-  tcx: 2,
-  manual: 3,
-  dodofo: 4,
-  zepp: 5,
-  'strava-csv': 6
-};*/
-
-/*function sourceBadge(source: string | null, origin: string | null): string {
-  if (source === 'fit' || source === 'tcx') {
-    if (origin === 'zepp-app') return 'zepp';
-    if (origin === 'manual-import') return 'manual';
-    return source;
-  }
-  return source ?? '—';
-}*/
-
-/*interface GroupedRunFact {
-  date: string;
-  startTime: string | null;   // якорь группы
-  sources: string[];
-  primary: any;
-  items: any[];      // ← новое
-  count: number;
-  hasStreams: boolean;
-  displayName: string;   // ← user_name ?? name
-  hasUserName: boolean;   // ← новое
-}*/
-
-/*function groupRunFacts(
-  items: any[],
-  streamsMap: Record<number, any[]>
-): GroupedRunFact[] {
-  if (items.length === 0) return [];
-
-  // 1. Сортировка: по дате, потом по start_time (null — в конец)
-  const sorted = [...items].sort((a, b) => {
-    if (a.date !== b.date) return a.date.localeCompare(b.date);
-    const sa = a.start_time ?? '9999-12-31T23:59:59Z';
-    const sb = b.start_time ?? '9999-12-31T23:59:59Z';
-    return sa.localeCompare(sb);
-  });
-
-  // 2. Группировка: подряд идущие записи с одной датой.
-  //    Если хотя бы у одной в группе нет start_time — считаем её той же тренировкой.
-  const groups: any[][] = [];
-  for (const it of sorted) {
-    const last = groups[groups.length - 1];
-
-    if (last && last.length > 0) {
-      const anchor = last[0];
-      const sameDate = anchor.date === it.date;
-
-      if (sameDate) {
-        const anchorMs = anchor.start_time
-          ? new Date(anchor.start_time).getTime()
-          : null;
-        const itMs = it.start_time
-          ? new Date(it.start_time).getTime()
-          : null;
-
-        // Одна тренировка, если:
-        //  a) хотя бы у одной нет start_time
-        //  b) или времена в пределах окна
-        const noTime = anchorMs == null || itMs == null;
-        const withinWindow =
-          anchorMs != null &&
-          itMs != null &&
-          Math.abs(itMs - anchorMs) <= SAME_WORKOUT_WINDOW_MS;
-
-        if (noTime || withinWindow) {
-          last.push(it);
-          continue;
-        }
-      }
-    }
-
-    groups.push([it]);
-  }
-
-  // 3. Из каждой группы — GroupedRunFact
-  return groups
-    .map((group) => {
-      const sortedGroup = [...group].sort((a, b) => {
-        const pa = SOURCE_PRIORITY[a.source ?? ''] ?? 99;
-        const pb = SOURCE_PRIORITY[b.source ?? ''] ?? 99;
-        if (pa !== pb) return pa - pb;
-        return (a.id ?? 0) - (b.id ?? 0);
-      });
-      const sources = sortedGroup.map((s) => sourceBadge(s.source, s.origin));
-      const hasStreams = sortedGroup.some((s) => streamsMap[s.id]?.length);
-
-      // Якорный start_time: берём первый непустой из группы
-      const anchorStartTime =
-        sortedGroup.find((s) => s.start_time)?.start_time ?? null;
-      const primary = sortedGroup[0];
-      const groupUserName =
-        sortedGroup.find((s) => s.user_name)?.user_name ?? null;
-      const groupName =
-        sortedGroup.find((s) => s.name)?.name ?? null;
-      const displayName = groupUserName ?? groupName ?? '—';
-      const hasUserName = !!groupUserName;
-
-      return {
-        date: group[0].date,
-        startTime: anchorStartTime,
-        sources,
-        primary: primary,
-        items: sortedGroup,
-        displayName: displayName,
-        hasUserName,   // ← новое
-        count: sortedGroup.length,
-        hasStreams,
-      };
-    })
-    .sort((a, b) => {
-      if (a.date !== b.date) return b.date.localeCompare(a.date);
-      const sa = a.startTime ?? '';
-      const sb = b.startTime ?? '';
-      return sb.localeCompare(sa);
-    });
-}*/
 
 const REMINDER_HIDDEN_KEY = 'pb.checkReminder.hidden';
 const REMINDER_LAST_SHOWN_KEY = 'pb.checkReminder.lastShown';
@@ -398,37 +224,10 @@ function saveReminderCategories(set: Set<ExerciseCategory>): void {
 export const PranaBinduPage: React.FC = () => {
   const api = (window as any).electronAPI;
 
-  const [provider, setProvider] = useState<string>('dodofo');
-  const [providerCaps, setProviderCaps] = useState<{
-    workouts: boolean;
-    streams: boolean;
-    thresholds: boolean;
-    zones: boolean;
-    wellness: boolean;
-  } | null>(null);
-  
-  //const [status, setStatus] = useState<string>('');
-  //const [loading, setLoading] = useState(false);
-
   // Синхронизация
   const initialRange = loadStoredRange() ?? defaultSyncRange();
   const [syncFrom, setSyncFrom] = useState<Date>(initialRange.from);
   const [syncTo, setSyncTo] = useState<Date>(initialRange.to);
-  const [syncing, setSyncing] = useState(false);
-  const [syncResult, setSyncResult] = useState<{
-    added: number;
-    updated: number;
-    total: number;
-  } | null>(null);
-  const [syncError, setSyncError] = useState<string>('');
-
-  // dodofo
-  //const [dodofoToken, setDodofoToken] = useState('');
-  //const [hasDodofoToken, setHasDodofoToken] = useState(false);
-
-  // Zepp (резерв)
-  //const [email, setEmail] = useState('');
-  //const [password, setPassword] = useState('');
 
   // Таблица пробежек
   const [runFacts, setRunFacts] = useState<any[]>([]);
@@ -440,28 +239,7 @@ export const PranaBinduPage: React.FC = () => {
   const [streamsMap, setStreamsMap] = useState<Record<number, any[]>>({});
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [selectedFact, setSelectedFact] = useState<RunFactLite | null>(null);
-  const [syncingStreams, setSyncingStreams] = useState(false);
-  /** Тумблер «Перезалить существующие» — влияет на onlyMissing
-   *  в syncRunStreamsAll. Сохраняется в localStorage (по умолчанию выкл). */
-  const [overwriteStreams, setOverwriteStreams] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('pb.syncOverwriteStreams') === '1';
-    } catch {
-      return false;
-    }
-  });
-  const [streamsAllResult, setStreamsAllResult] = useState<{
-    fetched: number;
-    skipped: number;
-    failed: number;
-    total: number;
-  } | null>(null);
-  const [streamsAllError, setStreamsAllError] = useState('');
-
-  const [syncingThresholds, setSyncingThresholds] = useState(false);
-  const [thresholdsResult, setThresholdsResult] = useState<string>('');
-  const [thresholdsError, setThresholdsError] = useState('');
-
+  
   // Debug
   const [debugVisible, setDebugVisible] = useState(false);
 
@@ -494,10 +272,6 @@ export const PranaBinduPage: React.FC = () => {
 
   const profilePanelRef = React.useRef<ProfilePanelHandle>(null);
   const wellnessPanelRef = React.useRef<WellnessPanelHandle>(null);
-
-  const [syncingWellness, setSyncingWellness] = useState(false);
-  const [wellnessResult, setWellnessResult] = useState<string>('');
-  const [wellnessError, setWellnessError] = useState('');
 
   const groupedFacts = React.useMemo(
     () => groupRunFacts(runFacts, streamsMap),
@@ -599,16 +373,6 @@ export const PranaBinduPage: React.FC = () => {
   const [selectedPlanEvent, setSelectedPlanEvent] = useState<PlanEventLite | null>(null);
   const [dayDrawerDate, setDayDrawerDate] = useState<string | null>(null);
   const [planDrawerVisible, setPlanDrawerVisible] = useState(false);
-
-  const [syncStreamsProgress, setSyncStreamsProgress] = useState<{
-    current: number;
-    total: number;
-    runFactId: number;
-    externalId: string | null;
-    fetched: number;
-    skipped: number;
-    failed: number;
-  } | null>(null);
 
   const [mirrorCandidates, setMirrorCandidates] = useState<StaleCandidate[]>([]);
   const [mirrorDialogVisible, setMirrorDialogVisible] = useState(false);
@@ -744,31 +508,6 @@ export const PranaBinduPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reminderCategories]);
 
-  // Сброс статуса при смене провайдера
-  useEffect(() => {
-    //setStatus('');
-    (async () => {
-      if (!api?.pb?.providerCapabilities) return;
-      try {
-        const res = await api.pb.providerCapabilities(provider);
-        if (res?.success) setProviderCaps(res.data);
-        else setProviderCaps(null);
-      } catch {
-        setProviderCaps(null);
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [provider]);
-
-  useEffect(() => {
-    if (!api?.pb?.onSyncProgress) return;
-    api.pb.onSyncProgress((data: any) => setSyncStreamsProgress(data));
-    return () => {
-      api.pb.removeSyncProgressListener?.();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // Автосохранение диапазона
   // Перезагружаем при смене диапазона (с дебаунсом 400 мс,
   // чтобы не дёргать БД на каждое движение календаря)
@@ -791,377 +530,6 @@ export const PranaBinduPage: React.FC = () => {
   useEffect(() => {
     saveStoredFilters(filters);
   }, [filters]);
-
-  // ==================== Проверка доступности ====================
-
-  /*const handleCheck = async () => {
-    if (!api?.pb) {
-      setStatus('electronAPI.pb недоступен — модуль ещё не собран');
-      return;
-    }
-    setLoading(true);
-    setStatus('');
-    try {
-      const res = await api.pb.zeppCheckProvider(provider);
-      setStatus(JSON.stringify(res));
-    } catch (e) {
-      setStatus(`Ошибка: ${(e as Error).message}`);
-    } finally {
-      setLoading(false);
-    }
-  };*/
-
-  // ==================== Синхронизация тренировок ====================
-
-  const handleSync = async () => {
-    if (!api?.pb?.syncNow) {
-      setSyncError('electronAPI.pb.syncNow недоступен');
-      return;
-    }
-    if (!syncFrom || !syncTo) {
-      setSyncError('Укажите обе даты');
-      return;
-    }
-    setSyncing(true);
-    setSyncError('');
-    setSyncResult(null);
-    try {
-      const res = await api.pb.syncNow(
-        toIsoDate(syncFrom),
-        toIsoDate(syncTo),
-        provider                 // ← добавить
-      );
-      if (res.success) {
-        setSyncResult({
-          added: res.added ?? 0,
-          updated: res.updated ?? 0,
-          total: res.total ?? 0,
-        });
-        await loadRunFacts();
-      } else {
-        setSyncError(res.error ?? 'Неизвестная ошибка');
-      }
-    } catch (e) {
-      setSyncError((e as Error).message);
-    } finally {
-      setSyncing(false);
-    }
-  };
-
-  // ==================== Массовая заливка потоков ====================
-
-    const handleSyncAllStreams = async () => {
-    if (!api?.pb?.syncRunStreamsAll) {
-      setStreamsAllError('electronAPI.pb.syncRunStreamsAll недоступен');
-      return;
-    }
-    if (!syncFrom || !syncTo) {
-      setStreamsAllError('Укажите обе даты');
-      return;
-    }
-    setSyncingStreams(true);
-    setStreamsAllError('');
-    setStreamsAllResult(null);
-    setSyncStreamsProgress(null);
-    try {
-      const res = await api.pb.syncRunStreamsAll(
-        toIsoDate(syncFrom),
-        toIsoDate(syncTo),
-        { provider, onlyMissing: !overwriteStreams }
-      );
-      if (res.success) {
-        setStreamsAllResult({
-          fetched: res.fetched ?? 0,
-          skipped: res.skipped ?? 0,
-          failed: res.failed ?? 0,
-          total: res.total ?? 0,
-        });
-        await loadRunFacts();
-      } else {
-        setStreamsAllError(res.error ?? 'Ошибка');
-      }
-    } catch (e) {
-      setStreamsAllError((e as Error).message);
-    } finally {
-      setSyncingStreams(false);
-      setSyncStreamsProgress(null);
-    }
-  };
-
-  const handleCancelSyncStreams = async () => {
-    try {
-      await api.pb.syncCancel?.();
-    } catch {
-      // ignore
-    }
-  };
-
-  // ==================== Синхронизация порогов ====================
-
-  const handleSyncThresholds = async () => {
-    if (!api?.pb?.syncThresholds) return;
-    setSyncingThresholds(true);
-    setThresholdsError('');
-    setThresholdsResult('');
-    try {
-      const res = await api.pb.syncThresholds(provider);
-      if (res.success) {
-        setThresholdsResult((res.applied ?? []).join(' · ') || 'обновлено');
-        await profilePanelRef.current?.reload();
-      } else {
-        setThresholdsError(res.error ?? 'Ошибка');
-      }
-    } catch (e) {
-      setThresholdsError((e as Error).message);
-    } finally {
-      setSyncingThresholds(false);
-    }
-  };
-
-  const [syncingZones, setSyncingZones] = useState(false);
-  const [zonesResult, setZonesResult] = useState('');
-  const [zonesError, setZonesError] = useState('');
-
-  const handleSyncZones = async () => {
-    if (!api?.pb?.syncZones) return;
-    setSyncingZones(true);
-    setZonesError('');
-    setZonesResult('');
-    try {
-      const res = await api.pb.syncZones(provider);
-      if (res.success) {
-        setZonesResult(
-          Array.isArray(res.zones) ? res.zones.join(' · ') : 'обновлено'
-        );
-        await profilePanelRef.current?.reload();
-      } else {
-        setZonesError(res.error ?? 'Ошибка');
-      }
-    } catch (e) {
-      setZonesError((e as Error).message);
-    } finally {
-      setSyncingZones(false);
-    }
-  };
-
-  // ==================== dodofo ====================
-
-  /*const handleSaveDodofo = async () => {
-    if (!api?.pb) {
-      setStatus('electronAPI.pb недоступен');
-      return;
-    }
-    if (!dodofoToken.trim()) {
-      setStatus('Введите токен dodofo');
-      return;
-    }
-    setLoading(true);
-    setStatus('Сохранение токена...');
-    try {
-      const res = await api.pb.dodofoConnect(dodofoToken.trim());
-      if (res.success) {
-        setStatus('Токен сохранён и проверен');
-        setHasDodofoToken(true);
-        setDodofoToken('');
-      } else {
-        setStatus(`Ошибка: ${res.error}`);
-      }
-    } catch (e) {
-      setStatus(`Ошибка: ${(e as Error).message}`);
-    } finally {
-      setLoading(false);
-    }
-  };*/
-
-  // ==================== Zepp (резерв) ====================
-
-  /*const handleConnectZepp = async () => {
-    if (!api?.pb) {
-      setStatus('electronAPI.pb недоступен');
-      return;
-    }
-    if (!email || !password) {
-      setStatus('Введите email и пароль');
-      return;
-    }
-    setLoading(true);
-    setStatus('Подключение...');
-    try {
-      const res = await api.pb.zeppConnect(email, password);
-      if (res.success) {
-        setStatus(
-          `Успех: userId=${res.userId}, authHost=${res.authHost}, dataHost=${res.dataHost}`
-        );
-        setPassword('');
-      } else {
-        setStatus(`Ошибка: ${res.error}`);
-      }
-    } catch (e) {
-      setStatus(`Ошибка: ${(e as Error).message}`);
-    } finally {
-      setLoading(false);
-    }
-  };*/
-
-  // ==================== Рендер формы по провайдеру ====================
-
-  const renderProviderForm = () => {
-    if (provider === 'dodofo') {
-      return (
-        <small className="pb-hint">
-          dodofo — основной агрегатор. Токен задаётся в панели
-          «Подключения» выше.
-        </small>
-      );
-    }
-
-    if (provider === 'intervals-icu') {
-      return (
-        <small className="pb-hint">
-          intervals.icu подключён как источник активностей и wellness.
-          API-ключ и athlete ID — в панели «Подключения» выше.
-        </small>
-      );
-    }
-
-    if (provider === 'dofek-zepp') {
-      return (
-        <small className="pb-hint">
-          dofek-zepp — резервный провайдер Zepp. Логин и пароль —
-          в панели «Подключения» выше.
-        </small>
-      );
-    }
-
-    return (
-      <small className="pb-hint">
-        Провайдер «{provider}» пока не реализован.
-        Используй dodofo или intervals-icu.
-      </small>
-    );
-  };
-
-  const handleSyncWellness = async () => {
-    if (!api?.pb?.syncWellness) {
-      setWellnessError('electronAPI.pb.syncWellness недоступен');
-      return;
-    }
-    if (!syncFrom || !syncTo) {
-      setWellnessError('Укажите обе даты');
-      return;
-    }
-    setSyncingWellness(true);
-    setWellnessError('');
-    setWellnessResult('');
-    try {
-      const res = await api.pb.syncWellness(
-        undefined,
-        toIsoDate(syncFrom),
-        toIsoDate(syncTo)
-      );
-      if (res.success) {
-        setWellnessResult(
-          `Добавлено ${res.added} · обновлено ${res.updated} · всего ${res.total}`
-        );
-        await wellnessPanelRef.current?.reload();
-      } else {
-        setWellnessError(res.error ?? 'Ошибка');
-      }
-    } catch (e) {
-      setWellnessError((e as Error).message);
-    } finally {
-      setSyncingWellness(false);
-    }
-  };
-
-  /*const handleIntervalsSave = async () => {
-    if (!api?.pb?.intervalsSetup) return;
-    if (!intervalsApiKey.trim() && !intervalsHasKey) {
-      setIntervalsError('API key обязателен');
-      return;
-    }
-    setIntervalsSaving(true);
-    setIntervalsError('');
-    setIntervalsInfo('');
-    try {
-      const res = await api.pb.intervalsSetup(
-        intervalsApiKey.trim(),
-        intervalsAthleteId.trim()
-      );
-      if (res.success) {
-        setIntervalsHasKey(true);
-        setIntervalsApiKey('');
-        setIntervalsInfo('Ключ сохранён и проверен');
-      } else {
-        setIntervalsError(res.error ?? 'Ошибка');
-      }
-    } catch (e) {
-      setIntervalsError((e as Error).message);
-    } finally {
-      setIntervalsSaving(false);
-    }
-  };*/
-
-  const handleSyncWellnessNew = async () => {
-    if (!api?.pb?.syncWellness) return;
-    if (!syncFrom || !syncTo) {
-      setWellnessError('Укажите обе даты');
-      return;
-    }
-    setSyncingWellness(true);
-    setWellnessError('');
-    setWellnessResult('');
-    try {
-      const res = await api.pb.syncWellness(
-        undefined, // мультирежим: все провайдеры с wellness
-        toIsoDate(syncFrom),
-        toIsoDate(syncTo)
-      );
-
-      if (!res.success) {
-        setWellnessError(res.error ?? 'Ошибка');
-        return;
-      }
-
-      const perProvider: Array<{
-        provider: string;
-        added: number;
-        updated: number;
-        total: number;
-        error?: string;
-      }> = res.perProvider ?? [];
-
-      const errors = perProvider.filter((p) => p.error);
-      const ok = perProvider.filter((p) => !p.error);
-
-      const summary = `Добавлено ${res.added} · обновлено ${res.updated} · всего ${res.total}`;
-
-      if (errors.length > 0) {
-        const errLines = errors
-          .map((p) => `${p.provider}: ${p.error}`)
-          .join('; ');
-        // Показываем и сводку, и ошибки.
-        setWellnessError(
-          `${summary}. Ошибки — ${errLines}`
-        );
-      }
-
-      if (ok.length > 0) {
-        const okLines = ok
-          .map((p) => `${p.provider}: +${p.added} ~${p.updated}`)
-          .join(' · ');
-        setWellnessResult(`${summary} · ${okLines}`);
-      } else if (errors.length === 0) {
-        setWellnessResult(summary);
-      }
-
-      await wellnessPanelRef.current?.reload();
-    } catch (e) {
-      setWellnessError((e as Error).message);
-    } finally {
-      setSyncingWellness(false);
-    }
-  };
 
   const loadPlanEvents = async (from?: Date, to?: Date) => {
     if (!api?.pb?.listPlanEvents) return;
@@ -1385,298 +753,25 @@ export const PranaBinduPage: React.FC = () => {
         <ConnectionsPanel />
 
         {/* ==================== СИНХРОНИЗАЦИЯ (API) ==================== */}
-        <Panel header="Синхронизация (API)" className="shadow-5 mb-3 pb-panel">
-          <div className="flex flex-column gap-3">
-            <div className="flex flex-column gap-2">
-              <label className="pb-label">Диапазон</label>
-              <div className="flex gap-2 flex-wrap align-items-center">
-                <Calendar
-                  value={syncFrom}
-                  onChange={(e) => setSyncFrom(e.value as Date)}
-                  dateFormat="dd.mm.yy"
-                  placeholder="С"
-                  showIcon
-                  className="pb-cal"
-                  maxDate={syncTo ?? undefined}
-                />
-                <span className="pb-hint">—</span>
-                <Calendar
-                  value={syncTo}
-                  onChange={(e) => setSyncTo(e.value as Date)}
-                  dateFormat="dd.mm.yy"
-                  placeholder="По"
-                  showIcon
-                  className="pb-cal"
-                  minDate={syncFrom ?? undefined}
-                />
-                <Button
-                  label="30 дней"
-                  icon="pi pi-calendar"
-                  className="pb-soft p-button-sm"
-                  onClick={() => {
-                    const r = defaultSyncRange();
-                    setSyncFrom(r.from);
-                    setSyncTo(r.to);
-                  }}
-                />
-                <Button
-                  label="За всё время"
-                  icon="pi pi-calendar-plus"
-                  className="pb-soft p-button-sm"
-                  onClick={() => {
-                    setSyncFrom(new Date(2020, 0, 1));
-                    setSyncTo(new Date());
-                  }}
-                />
-                <Button
-                  label="+30 дней"
-                  icon="pi pi-calendar"
-                  className="pb-soft p-button-sm"
-                  onClick={() => {
-                    const now = new Date();
-                    const to = new Date();
-                    to.setDate(to.getDate() + 30);
-                    setSyncFrom(now);
-                    setSyncTo(to);
-                  }}
-                  tooltip="Текущий месяц + следующий"
-                />
-                <Button
-                  label="+90 дней"
-                  icon="pi pi-calendar-plus"
-                  className="pb-soft p-button-sm"
-                  onClick={() => {
-                    const now = new Date();
-                    const to = new Date();
-                    to.setDate(to.getDate() + 90);
-                    setSyncFrom(now);
-                    setSyncTo(to);
-                  }}
-                  tooltip="Ближайший квартал"
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-column gap-2">
-              <label htmlFor="pb-provider" className="pb-label">
-                Провайдер
-              </label>
-              <Dropdown
-                inputId="pb-provider"
-                value={provider}
-                options={PROVIDER_OPTIONS}
-                onChange={(e) => setProvider(e.value)}
-                className="w-full"
-                panelClassName="pb-dropdown-panel"
-              />
-              {renderProviderForm()}
-            </div>
-
-            <hr className="pb-sep" />
-
-            <div className="flex flex-column gap-2">
-              <label className="pb-label">Операции</label>
-              <div className="flex gap-2 flex-wrap align-items-center">
-                <Button
-                  label={syncing ? 'Синхронизация...' : 'Синхронизировать'}
-                  icon={syncing ? 'pi pi-spin pi-spinner' : 'pi pi-sync'}
-                  className="pb p-button-sm"
-                  onClick={handleSync}
-                  disabled={syncing || !providerCaps?.workouts || !syncFrom || !syncTo}
-                  tooltip={
-                    !providerCaps?.workouts
-                      ? `Провайдер «${provider}» не поддерживает список тренировок`
-                      : 'Получить список активностей'
-                  }
-                />
-                <Button
-                  label={syncingStreams ? 'Потоки…' : 'Залить потоки'}
-                  icon={syncingStreams ? 'pi pi-spin pi-spinner' : 'pi pi-cloud-download'}
-                  className="pb-soft p-button-sm"
-                  onClick={handleSyncAllStreams}
-                  disabled={syncingStreams || !providerCaps?.streams || !syncFrom || !syncTo}
-                  tooltip={
-                    !providerCaps?.streams
-                      ? `Провайдер «${provider}» не поддерживает потоки`
-                      : 'Загрузить FIT + потоки за выбранный период'
-                  }
-                />
-                <label className="pb-check-row pb-checkbox-dark">
-                  <Checkbox
-                    inputId="pb-overwrite-streams"
-                    checked={overwriteStreams}
-                    onChange={(e) => {
-                      const v = !!e.checked;
-                      setOverwriteStreams(v);
-                      try {
-                        localStorage.setItem('pb.syncOverwriteStreams', v ? '1' : '0');
-                      } catch { /* ignore */ }
-                    }}
-                  />
-                  <span title="Перезаписать .msgpack у фактов, у которых потоки уже сохранены. Нужно, чтобы подтянуть GPS в старые dodofo-записи.">
-                    Перезалить
-                  </span>
-                </label>
-                <Button
-                  label={syncingThresholds ? 'Пороги…' : 'Подтянуть пороги'}
-                  icon={syncingThresholds ? 'pi pi-spin pi-spinner' : 'pi pi-sliders-h'}
-                  className="pb-soft p-button-sm"
-                  onClick={handleSyncThresholds}
-                  disabled={syncingThresholds || !providerCaps?.thresholds}
-                  tooltip={
-                    !providerCaps?.thresholds
-                      ? `Провайдер «${provider}» не поддерживает пороги`
-                      : 'Забрать пороги в профиль'
-                  }
-                />
-                <Button
-                  label={syncingZones ? 'Зоны…' : 'Подтянуть зоны'}
-                  icon={syncingZones ? 'pi pi-spin pi-spinner' : 'pi pi-chart-bar'}
-                  className="pb-soft p-button-sm"
-                  onClick={handleSyncZones}
-                  disabled={syncingZones}
-                  tooltip="Читает HR-зоны из последней активности ICU"
-                />
-                <Button
-                  label={syncingWellness ? 'Здоровье…' : 'Подтянуть Здоровье (ICU + dodofo)'}
-                  icon={syncingWellness ? 'pi pi-spin pi-spinner' : 'pi pi-heart'}
-                  className="pb-soft p-button-sm"
-                  onClick={handleSyncWellnessNew}
-                  disabled={syncingWellness || !syncFrom || !syncTo}
-                  tooltip={
-                    'Сон, HRV, пульс покоя (из intervals.icu и dodofo)'
-                  }
-                />
-                <Button
-                  label="Отладка"
-                  icon="pi pi-code"
-                  className="pb-soft p-button-sm"
-                  onClick={() => setDebugVisible(true)}
-                  tooltip="Сырые ответы провайдеров API"
-                />
-              </div>
-              <small className="pb-hint">
-                Повторный запуск за тот же период не создаёт дубликаты —
-                обновляет существующие записи.
-              </small>
-            </div>
-
-            {syncingStreams && syncStreamsProgress && (
-              <div className="pb-import-progress">
-                <div className="pb-import-progress__header">
-                  <span>
-                    {syncStreamsProgress.current} / {syncStreamsProgress.total}
-                    {' · '}
-                    <code>{syncStreamsProgress.externalId ?? '—'}</code>
-                  </span>
-                  <Button
-                    label="Отмена"
-                    icon="pi pi-times"
-                    className="pb-soft p-button-sm"
-                    onClick={handleCancelSyncStreams}
-                  />
-                </div>
-                <ProgressBar
-                  value={Math.round(
-                    (syncStreamsProgress.current / syncStreamsProgress.total) * 100
-                  )}
-                  showValue={false}
-                  style={{ height: '6px' }}
-                />
-                <div className="pb-import-progress__stats">
-                  <span>+{syncStreamsProgress.fetched}</span>
-                  <span>·{syncStreamsProgress.skipped}</span>
-                  {syncStreamsProgress.failed > 0 && (
-                    <span className="pb-import-progress__fail">
-                      ✗{syncStreamsProgress.failed}
-                    </span>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {syncError && (
-              <Message severity="error" text={syncError} className="w-full" />
-            )}
-            {syncResult && (
-              <Message
-                severity={syncResult.added > 0 ? 'success' : 'info'}
-                className="w-full"
-                content={
-                  <span>
-                    Добавлено: <b>{syncResult.added}</b>
-                    {' · '}Обновлено: <b>{syncResult.updated}</b>
-                    {' · '}Всего из источника: <b>{syncResult.total}</b>
-                  </span>
-                }
-              />
-            )}
-            {streamsAllError && (
-              <Message severity="error" text={streamsAllError} className="w-full" />
-            )}
-            {streamsAllResult && (
-              <Message
-                severity={streamsAllResult.failed > 0 ? 'warn' : 'info'}
-                className="w-full"
-                content={
-                  <div>
-                    <span>
-                      Потоки: загружено <b>{streamsAllResult.fetched}</b>
-                      {' · '}пропущено <b>{streamsAllResult.skipped}</b>
-                      {streamsAllResult.failed > 0 && (
-                        <> · ошибок <b>{streamsAllResult.failed}</b></>
-                      )}
-                    </span>
-                    {streamsAllResult.skipped > 0 && !overwriteStreams && (
-                      <div className="pb-hint" style={{ marginTop: '0.4rem' }}>
-                        Часть потоков уже была в БД и не обновлялась. Включите
-                        «Перезалить существующие», чтобы перекачать с GPS.
-                      </div>
-                    )}
-                  </div>
-                }
-              />
-            )}
-            {thresholdsError && (
-              <Message severity="error" text={thresholdsError} className="w-full" />
-            )}
-            {thresholdsResult && (
-              <Message
-                severity="success"
-                className="w-full"
-                content={<span>Пороги обновлены: <b>{thresholdsResult}</b></span>}
-              />
-            )}
-            {zonesError && (
-              <Message severity="error" text={zonesError} className="w-full" />
-            )}
-            {zonesResult && (
-              <Message
-                severity="success"
-                className="w-full"
-                content={<span>HR-зоны: <b>{zonesResult}</b></span>}
-              />
-            )}
-            {wellnessError && (
-              <Message severity="error" text={wellnessError} className="w-full" />
-            )}
-            {wellnessResult && (
-              <Message
-                severity="success"
-                className="w-full"
-                content={<span>Здоровье: {wellnessResult}</span>}
-              />
-            )}
-
-            <hr className="pb-sep" />
-            <AutoSyncPanel
-              onAfterSync={async () => {
-                await loadRunFacts();
-                await wellnessPanelRef.current?.reload();
-              }}
-            />
-          </div>
-        </Panel>
+        <SyncPanel
+          from={syncFrom}
+          to={syncTo}
+          onFromChange={setSyncFrom}
+          onToChange={setSyncTo}
+          onOpenDebug={() => setDebugVisible(true)}
+          onAfterSync={async () => {
+            await loadRunFacts();
+          }}
+          onAfterThresholds={async () => {
+            await profilePanelRef.current?.reload();
+          }}
+          onAfterZones={async () => {
+            await profilePanelRef.current?.reload();
+          }}
+          onAfterWellness={async () => {
+            await wellnessPanelRef.current?.reload();
+          }}
+        />
 
         {/* ==================== ИМПОРТ ФАЙЛОВ ==================== */}
         <ImportPanel onAfterImport={loadRunFacts} />
