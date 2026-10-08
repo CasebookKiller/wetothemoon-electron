@@ -897,6 +897,17 @@ try {
         ipcRenderer.invoke('pb:equivalences-list-for', source, sourceKey),
       setEquivalence: (input: any) =>
         ipcRenderer.invoke('pb:equivalences-set', input),
+      equivalencesForTarget: (
+        target: string,
+        targetKey: string,
+        targetLevel: string | null
+      ) =>
+        ipcRenderer.invoke(
+          'pb:equivalences-for-target',
+          target,
+          targetKey,
+          targetLevel
+        ),
       deleteEquivalence: (id: number) =>
         ipcRenderer.invoke('pb:equivalences-delete', id),
 

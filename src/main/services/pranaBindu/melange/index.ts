@@ -92,7 +92,9 @@ export type { ExerciseProgress } from './repositories/exerciseProgressRepo';
 export {
   listEquivalences,
   listEquivalencesFor,
+  listEquivalencesForTarget,
   setEquivalence,
   deleteEquivalence,
 } from './repositories/equivalencesRepo';
 export type { Equivalence, EquivalenceInput } from './repositories/equivalencesRepo';
+

@@ -86,6 +86,8 @@ export interface CatalogLevel {
   hint?: string;
   /** Русское название уровня (для UI). */
   nameRu?: string;
+  /** Явные синонимы name (Full Bridge → Full Bridges). Только точно. */
+  aliases?: string[];
   /** Ladder: 3 ступени внутри уровня (rung 1/2/3). */
   benchmarkLadder?: string[];
   /** Сколько раз повторить всю ladder целиком. По умолчанию 1. */
@@ -94,12 +96,19 @@ export interface CatalogLevel {
   source?: string;
 }
 
+
 export interface CatalogEntry {
   key: string;
   label: string;
   icuName: string;
   category: ExerciseCategory;
   levels: CatalogLevel[];
+  /**
+   * Явные синонимы icuName / level.name для реверс-маппинга.
+   * Например: Bridges → ['Bridge', 'Back Bridge', 'Full Bridge'].
+   * Не fuzzy — только точное совпадение после lower().
+   */
+  aliases?: string[];
 }
 
 /** Категория упражнения без прогрессии (не имеет W/L). */
@@ -126,6 +135,12 @@ export interface NamedExercise {
   defaultDuration?: string;
   /** Дефолт для автодополнения. Обычно 1. */
   defaultZone?: number;
+  /**
+   * Явные синонимы icuName / level.name для реверс-маппинга.
+   * Например: Bridges → ['Bridge', 'Back Bridge', 'Full Bridge'].
+   * Не fuzzy — только точное совпадение после lower().
+   */
+  aliases?: string[];
 }
 
 // ==================== Программы (универсальные) ====================

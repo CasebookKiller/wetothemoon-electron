@@ -57,6 +57,7 @@ import {
   deleteWorkoutSession,
   listEquivalences,
   listEquivalencesFor,
+  listEquivalencesForTarget,
   setEquivalence,
   deleteEquivalence,
   setLastAutoSync,
@@ -2850,6 +2851,34 @@ export function registerPranaBinduHandlers(): void {
       return { success: false, error: (e as Error).message };
     }
   });
+
+  ipcMain.handle(
+    'pb:equivalences-for-target',
+    (
+      _event,
+      target: string,
+      targetKey: string,
+      targetLevel: string | null
+    ) => {
+      try {
+        if (!target || !targetKey) {
+          return {
+            success: false,
+            error: 'target и targetKey обязательны',
+          };
+        }
+        const items = listEquivalencesForTarget(
+          getMelange(),
+          target,
+          targetKey,
+          targetLevel ?? null
+        );
+        return { success: true, items };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
 
   ipcMain.handle('pb:equivalences-delete', (_event, id: number) => {
     try {

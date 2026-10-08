@@ -80,6 +80,7 @@ export const WADE_PULLUP: CatalogEntry = {
     { level: 1, name: 'Vertical Pulls', nameRu: 'Вертикальные подтягивания',
       benchmarkLadder: ['1x10', '2x25', '3x40'], source: 'wade' },
     { level: 2, name: 'Horizontal Pulls', nameRu: 'Горизонтальные подтягивания',
+      aliases: ['Body Row', 'Australian Pull-ups'],
       benchmarkLadder: ['1x10', '2x20', '3x30'], source: 'wade' },
     { level: 3, name: 'Jackknife Pull-ups', nameRu: 'Подтягивания складной нож',
       benchmarkLadder: ['1x10', '2x15', '3x20'], source: 'wade' },
@@ -115,6 +116,7 @@ export const WADE_LEGRAISE: CatalogEntry = {
     { level: 4, name: 'Flat Straight Leg Raises', nameRu: 'Подъёмы прямых ног из положения лёжа',
       benchmarkLadder: ['1x8', '2x15', '3x25'], source: 'wade' },
     { level: 5, name: 'Hanging Knee Raises', nameRu: 'Подтягивание коленей в висе',
+      aliases: ['Bar Knee Raises'],
       benchmarkLadder: ['1x5', '2x10', '2x20'], source: 'wade' },
     { level: 6, name: 'Hanging Bent Raises', nameRu: 'Подъёмы согнутых ног в висе',
       benchmarkLadder: ['1x5', '2x10', '2x15'], source: 'wade' },
@@ -197,6 +199,7 @@ export const CALI_DIPS: CatalogEntry = {
   category: 'cali',
   levels: [
     { level: 1, name: 'Bench Dips', nameRu: 'Отжимания от скамьи',
+      aliases: ['Bench Dip'],
       benchmarkLadder: ['1x10', '2x15', '3x20'], source: 'startbw' },
     { level: 2, name: 'Short Bench Dips', nameRu: 'Короткие от скамьи',
       benchmarkLadder: ['1x10', '2x15', '3x20'], source: 'startbw' },

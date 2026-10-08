@@ -143,3 +143,31 @@ export function deleteEquivalence(db: DatabaseSync, id: number): boolean {
   const info = db.prepare(`DELETE FROM equivalences WHERE id = ?`).run(id);
   return info.changes > 0;
 }
+
+/**
+ * Все соответствия для конкретного target-движения и уровня.
+ * Используется в UI: при показе exercise из workout_sessions
+ * находим «≈ Thenics X (Beginner)».
+ */
+export function listEquivalencesForTarget(
+  db: DatabaseSync,
+  target: string,
+  targetKey: string,
+  targetLevel: string | null
+): Equivalence[] {
+  const rows = db
+    .prepare(
+      `SELECT * FROM equivalences
+       WHERE target = ? AND target_key = ?
+         AND (? IS NULL OR target_level IS ? OR target_level = ?)
+       ORDER BY source, source_key`
+    )
+    .all(
+      target,
+      targetKey,
+      targetLevel,
+      targetLevel,
+      targetLevel
+    ) as unknown as EquivalenceRow[];
+  return rows.map(rowToDomain);
+}
