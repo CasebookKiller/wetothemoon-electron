@@ -45,6 +45,11 @@ export interface RecoveryLogRow {
   sp_o2: number | null;
   systolic: number | null;
   diastolic: number | null;
+  // v20 — источники и энергия
+  sources_json: string | null;
+  calories_active: number | null;
+  calories_total: number | null;
+  body_fat_pct: number | null;
 }
 
 export interface RecoveryLogInput {
@@ -84,6 +89,10 @@ export interface RecoveryLogInput {
   sp_o2?: number | null;
   systolic?: number | null;
   diastolic?: number | null;
+  // v20 — энергия (dodofo). sources_json заполняется в upsert автоматически.
+  calories_active?: number | null;
+  calories_total?: number | null;
+  body_fat_pct?: number | null;
 }
 
 // ==================== Утилиты ====================
@@ -162,7 +171,31 @@ export function upsertRecoveryLog(
     sp_o2: intOrNull(input.sp_o2),
     systolic: intOrNull(input.systolic),
     diastolic: intOrNull(input.diastolic),
+    // v20
+    calories_active: intOrNull(input.calories_active),
+    calories_total: intOrNull(input.calories_total),
+    body_fat_pct: realOrNull(input.body_fat_pct),
   };
+
+  // sources_json — аккумулируем: старые источники не теряем,
+  // новые добавляем (ICU первым → dodofo вторым, порядок не важен).
+  const prevSources: string[] = (() => {
+    if (!existing?.sources_json) return [];
+    try {
+      const parsed = JSON.parse(existing.sources_json);
+      return Array.isArray(parsed)
+        ? parsed.filter((x): x is string => typeof x === 'string')
+        : [];
+    } catch {
+      return [];
+    }
+  })();
+  const nextSources = [...prevSources];
+  if (input.auto_source && !nextSources.includes(input.auto_source)) {
+    nextSources.push(input.auto_source);
+  }
+  const sourcesJsonStr =
+    nextSources.length > 0 ? JSON.stringify(nextSources) : null;
 
   if (existing) {
     // Не затираем null'ом — оставляем предыдущее значение
@@ -184,7 +217,9 @@ export function upsertRecoveryLog(
         readiness = ?, soreness = ?, fatigue = ?, stress = ?,
         mood = ?, motivation = ?, injury = ?,
         avg_sleeping_hr = ?, hrv_sdnn = ?, baevsky_si = ?,
-        sp_o2 = ?, systolic = ?, diastolic = ?
+        sp_o2 = ?, systolic = ?, diastolic = ?,
+        sources_json = ?, calories_active = ?, calories_total = ?,
+        body_fat_pct = ?
        WHERE id = ?`
     ).run(
       asSql(merged.sleep_hours),
@@ -221,6 +256,10 @@ export function upsertRecoveryLog(
       asSql(merged.sp_o2),
       asSql(merged.systolic),
       asSql(merged.diastolic),
+      asSql(sourcesJsonStr),
+      asSql(merged.calories_active),
+      asSql(merged.calories_total),
+      asSql(merged.body_fat_pct),
       existing.id
     );
 
@@ -236,9 +275,11 @@ export function upsertRecoveryLog(
        stress_avg, auto_source, raw_json,
        ctl, atl, ramp_rate, readiness, soreness, fatigue, stress,
        mood, motivation, injury, avg_sleeping_hr, hrv_sdnn,
-       baevsky_si, sp_o2, systolic, diastolic)
+       baevsky_si, sp_o2, systolic, diastolic,
+       sources_json, calories_active, calories_total, body_fat_pct)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-             ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+             ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+             ?, ?, ?, ?)`
   ).run(
     input.date,
     asSql(v.sleep_hours),
@@ -274,7 +315,11 @@ export function upsertRecoveryLog(
     asSql(v.baevsky_si),
     asSql(v.sp_o2),
     asSql(v.systolic),
-    asSql(v.diastolic)
+    asSql(v.diastolic),
+    asSql(sourcesJsonStr),
+    asSql(v.calories_active),
+    asSql(v.calories_total),
+    asSql(v.body_fat_pct)
   );
 
   return { inserted: true, id: Number(info.lastInsertRowid) };

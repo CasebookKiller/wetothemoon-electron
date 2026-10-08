@@ -11,6 +11,10 @@ function rowToDomain(row: SyncSettingsRow): SyncSettings {
   return {
     source: (row.source as SyncSettings['source']) ?? undefined,
     mode: (row.mode as SyncSettings['mode']) ?? 'manual',
+    autoOnStart: row.auto_on_start === 1,
+    autoIntervalMin: row.auto_interval_min ?? null,
+    lastSyncAt: row.last_sync_at ?? undefined,
+    lastSyncStatus: row.last_sync_status ?? undefined,
     zeppProvider: row.zepp_provider ?? undefined,
     zeppFallbackProvider: row.zepp_fallback_provider ?? undefined,
     zeppAuthHost: row.zepp_auth_host ?? undefined,
@@ -52,6 +56,16 @@ export function updateSyncSettings(
   const merged = {
     source: patch.source ?? current.source,
     mode: patch.mode ?? current.mode,
+    auto_on_start:
+      patch.autoOnStart != null
+        ? patch.autoOnStart
+          ? 1
+          : 0
+        : current.auto_on_start,
+    auto_interval_min:
+      patch.autoIntervalMin !== undefined
+        ? patch.autoIntervalMin
+        : current.auto_interval_min,
     zepp_provider: patch.zeppProvider ?? current.zepp_provider,
     zepp_fallback_provider:
       patch.zeppFallbackProvider ?? current.zepp_fallback_provider,
@@ -72,6 +86,7 @@ export function updateSyncSettings(
   db.prepare(
     `UPDATE sync_settings SET
       source = ?, mode = ?,
+      auto_on_start = ?, auto_interval_min = ?,
       zepp_provider = ?, zepp_fallback_provider = ?,
       zepp_auth_host = ?, zepp_data_host = ?,
       zepp_user_id = ?,
@@ -82,6 +97,8 @@ export function updateSyncSettings(
   ).run(
     merged.source,
     merged.mode,
+    merged.auto_on_start,
+    merged.auto_interval_min,
     merged.zepp_provider,
     merged.zepp_fallback_provider,
     merged.zepp_auth_host,
@@ -210,4 +227,21 @@ export function getZeppArchivePath(db: DatabaseSync): string | null {
     .prepare(`SELECT zepp_archive_path FROM sync_settings WHERE id = 1`)
     .get() as { zepp_archive_path: string | null } | undefined;
   return row?.zepp_archive_path ?? null;
+}
+
+/**
+ * Записать итог автосинхронизации: время и статус.
+ * Используется IPC `pb:auto-sync-on-start`.
+ */
+export function setLastAutoSync(
+  db: DatabaseSync,
+  status: string,
+  at: string = new Date().toISOString()
+): void {
+  db.prepare(
+    `UPDATE sync_settings SET
+       last_sync_at = ?,
+       last_sync_status = ?
+     WHERE id = 1`
+  ).run(at, status);
 }

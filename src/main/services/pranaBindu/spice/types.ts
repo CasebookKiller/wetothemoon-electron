@@ -15,6 +15,12 @@ export type SyncMode = 'manual' | 'auto';
 export interface SyncSettings {
   source?: SyncSource;
   mode: SyncMode;
+  // Автосинхронизация (v5-колонки, используем сейчас)
+  autoOnStart?: boolean;
+  /** Антидребезг: не чаще раза в N минут. null/undefined → 360 (6ч). */
+  autoIntervalMin?: number | null;
+  lastSyncAt?: string;
+  lastSyncStatus?: string;
   zeppProvider?: string;
   zeppFallbackProvider?: string;
   zeppAuthHost?: string;
