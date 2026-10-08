@@ -6,11 +6,6 @@ export { seed } from './seed';
 // Репозитории — экспортируем явно, не через repositories/index.ts
 export * from './repositories/profileRepo';
 export * from './repositories/syncRepo';
-export {
-  setIntervalsCredentials,
-  getIntervalsApiKeyEncrypted,
-  getIntervalsAthleteId,
-} from './repositories/syncRepo';
 
 export {
   upsertRunFact,
@@ -30,8 +25,6 @@ export {
 } from './repositories/runStreamsRepo';
 export type { RunStreamRow, RunStreamWithPayload } from './repositories/runStreamsRepo';
 
-export { setFitArchivePath, getFitArchivePath } from './repositories/syncRepo';
-
 export {
   upsertRecoveryLog,
   listRecoveryLogs,
@@ -43,6 +36,20 @@ export type {
 } from './repositories/recoveryRepo';
 
 export {
+  getSyncSettings,
+  getSyncSettingsInternal,
+  updateSyncSettings,
+  setLastAutoSync,
+  setZeppSecrets,
+  getSyncSecretsFlags,
+  setDodofoToken,
+  getDodofoTokenEncrypted,
+  hasDodofoToken,
+  setFitArchivePath,
+  getFitArchivePath,
+  setIntervalsCredentials,
+  getIntervalsApiKeyEncrypted,
+  getIntervalsAthleteId,
   setZeppArchivePath,
   getZeppArchivePath,
 } from './repositories/syncRepo';
@@ -81,3 +88,11 @@ export {
   deleteExerciseProgress,
 } from './repositories/exerciseProgressRepo';
 export type { ExerciseProgress } from './repositories/exerciseProgressRepo';
+
+export {
+  listEquivalences,
+  listEquivalencesFor,
+  setEquivalence,
+  deleteEquivalence,
+} from './repositories/equivalencesRepo';
+export type { Equivalence, EquivalenceInput } from './repositories/equivalencesRepo';

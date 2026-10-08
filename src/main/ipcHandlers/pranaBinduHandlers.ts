@@ -55,10 +55,14 @@ import {
   listWorkoutSessions,
   listWorkoutSessionsForPlanEvent,
   deleteWorkoutSession,
-  getExerciseProgress,
-  listExerciseProgress,
-  setExerciseProgress,
+  listEquivalences,
+  listEquivalencesFor,
+  setEquivalence,
+  deleteEquivalence,
   setLastAutoSync,
+  listExerciseProgress,
+  getExerciseProgress,
+  setExerciseProgress,
 } from '../services/pranaBindu/melange';
 
 import { DodofoProvider } from '../services/pranaBindu/spice/providers/dodofoProvider';
@@ -74,6 +78,10 @@ import {
 } from '../services/pranaBindu/mentat/wadeProgramGenerator';
 import type { MovementState } from '../services/pranaBindu/mentat/wadeProgramGenerator';
 import { parseWorkoutText } from '../services/pranaBindu/mentat/workoutParser';
+import {
+  matchIcuWorkout,
+  matchIcuLine,
+} from '../services/pranaBindu/mentat/workoutMatcher';
 // ==================== Регистрация провайдеров ====================
 
 let providersRegistered = false;
@@ -2794,6 +2802,67 @@ export function registerPranaBinduHandlers(): void {
     }
   );
 
+  // -------- Эквивалентности между каталогами --------
+  ipcMain.handle('pb:equivalences-list', () => {
+    try {
+      const items = listEquivalences(getMelange());
+      return { success: true, items };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle(
+    'pb:equivalences-list-for',
+    (_event, source: string, sourceKey: string) => {
+      try {
+        if (!source || !sourceKey) {
+          return {
+            success: false,
+            error: 'source и sourceKey обязательны',
+          };
+        }
+        const items = listEquivalencesFor(getMelange(), source, sourceKey);
+        return { success: true, items };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+  ipcMain.handle('pb:equivalences-set', (_event, input: any) => {
+    try {
+      if (!input?.source || !input?.sourceKey) {
+        return {
+          success: false,
+          error: 'source и sourceKey обязательны',
+        };
+      }
+      if (!input?.target || !input?.targetKey) {
+        return {
+          success: false,
+          error: 'target и targetKey обязательны',
+        };
+      }
+      const res = setEquivalence(getMelange(), input);
+      return { success: true, ...res };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('pb:equivalences-delete', (_event, id: number) => {
+    try {
+      if (!Number.isFinite(id)) {
+        return { success: false, error: 'id обязателен' };
+      }
+      const ok = deleteEquivalence(getMelange(), id);
+      return { success: ok };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
   // -------- Прогресс по движению --------
   ipcMain.handle(
     'pb:get-exercise-progress',
@@ -3260,6 +3329,111 @@ export function registerPranaBinduHandlers(): void {
           total: files.length,
           importedIds,
           errors: errors.slice(0, 20),
+        };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+  // -------- Разведка: реверс-маппинг ICU-строк --------
+  ipcMain.handle('pb:debug-match-icu', (_event, text: string) => {
+    try {
+      if (!text || typeof text !== 'string') {
+        return { success: false, error: 'text обязателен (string)' };
+      }
+      const res = matchIcuWorkout(text);
+      return { success: true, data: res };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('pb:debug-match-icu-line', (_event, line: string) => {
+    try {
+      if (!line || typeof line !== 'string') {
+        return { success: false, error: 'line обязателен (string)' };
+      }
+      const res = matchIcuLine(line);
+      return { success: true, data: res };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  // -------- Разведка: реверс-маппинг всех plan_events в диапазоне --------
+  ipcMain.handle(
+    'pb:debug-match-plan-events',
+    (_event, from: string, to: string) => {
+      try {
+        if (!from || !to) {
+          return { success: false, error: 'from и to обязательны' };
+        }
+        const db = getMelange();
+        const rows = db
+          .prepare(
+            `SELECT id, date, name, description
+             FROM plan_events
+             WHERE date >= ? AND date <= ?
+             ORDER BY date ASC`
+          )
+          .all(from, to) as unknown as Array<{
+            id: number;
+            date: string;
+            name: string;
+            description: string | null;
+          }>;
+
+        let totalSteps = 0;
+        let full = 0;
+        let partial = 0;
+        let none = 0;
+        const unmatched = new Map<string, number>();
+        const partialMap = new Map<string, { count: number; note: string }>();
+
+        for (const row of rows) {
+          if (!row.description) continue;
+          const m = matchIcuWorkout(row.description);
+          totalSteps += m.summary.total;
+          full += m.summary.full;
+          partial += m.summary.partial;
+          none += m.summary.none;
+
+          for (const s of m.steps) {
+            const key = s.cleanLabel || s.raw;
+            if (s.confidence === 'none') {
+              unmatched.set(key, (unmatched.get(key) ?? 0) + 1);
+            } else if (s.confidence === 'partial') {
+              const prev = partialMap.get(key);
+              partialMap.set(key, {
+                count: (prev?.count ?? 0) + 1,
+                note: s.note ?? '',
+              });
+            }
+          }
+        }
+
+        const topUnmatched = [...unmatched.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 30)
+          .map(([label, count]) => ({ label, count }));
+
+        const topPartial = [...partialMap.entries()]
+          .sort((a, b) => b[1].count - a[1].count)
+          .slice(0, 30)
+          .map(([label, v]) => ({ label, count: v.count, note: v.note }));
+
+        return {
+          success: true,
+          data: {
+            events: rows.length,
+            totalSteps,
+            full,
+            partial,
+            none,
+            topUnmatched,
+            topPartial,
+          },
         };
       } catch (e) {
         return { success: false, error: (e as Error).message };

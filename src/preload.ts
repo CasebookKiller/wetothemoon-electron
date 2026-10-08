@@ -878,6 +878,28 @@ try {
       setExerciseProgress: (movementKey: string, level: number, rung: number) =>
         ipcRenderer.invoke('pb:set-exercise-progress', movementKey, level, rung),
 
+      dayLoadSummary: (from: string, to: string) =>
+        ipcRenderer.invoke('pb:day-load-summary', from, to),
+
+      autoSyncOnStart: () =>
+        ipcRenderer.invoke('pb:auto-sync-on-start'),
+
+      debugMatchIcu: (text: string) =>
+        ipcRenderer.invoke('pb:debug-match-icu', text),
+      debugMatchIcuLine: (line: string) =>
+        ipcRenderer.invoke('pb:debug-match-icu-line', line),
+      debugMatchPlanEvents: (from: string, to: string) =>
+        ipcRenderer.invoke('pb:debug-match-plan-events', from, to),
+
+      listEquivalences: () =>
+        ipcRenderer.invoke('pb:equivalences-list'),
+      listEquivalencesFor: (source: string, sourceKey: string) =>
+        ipcRenderer.invoke('pb:equivalences-list-for', source, sourceKey),
+      setEquivalence: (input: any) =>
+        ipcRenderer.invoke('pb:equivalences-set', input),
+      deleteEquivalence: (id: number) =>
+        ipcRenderer.invoke('pb:equivalences-delete', id),
+
     },
 
   });

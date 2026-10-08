@@ -69,7 +69,9 @@ export interface SyncSettingsRow {
   source: string | null;
   mode: string;
   auto_interval_min: number | null;
-  auto_on_start: 0 | 1;
+  auto_on_start: number;
+  last_sync_at: string | null;
+  last_sync_status: string | null;
   google_token_json: string | null;
   zeppbridge_path: string | null;
   zepp_provider: string | null;
@@ -81,8 +83,6 @@ export interface SyncSettingsRow {
   zepp_user_id: string | null;
   zepp_last_sync_at: string | null;
   zepp_last_sync_status: string | null;
-  last_sync_at: string | null;
-  last_sync_status: string | null;
   // dodofo
   dodofo_token: string | null;
   dodofo_user_id: string | null;
@@ -140,5 +140,19 @@ export interface ExerciseProgressRow {
   movement_key: string;
   current_level: number;
   current_rung: number;
+  updated_at: string;
+}
+
+export interface EquivalenceRow {
+  id: number;
+  source: string;
+  source_key: string;
+  source_level: string | null;
+  target: string;
+  target_key: string;
+  target_level: string | null;
+  confidence: string;
+  note: string | null;
+  created_at: string;
   updated_at: string;
 }

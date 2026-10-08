@@ -14,7 +14,7 @@ import {
   MIGRATION_V9_INTERVALS_ICU,
 } from './schema';
 
-export const SCHEMA_VERSION = 19;
+export const SCHEMA_VERSION = 21;
 
 interface Migration {
   version: number;
@@ -411,6 +411,59 @@ const migrations: readonly Migration[] = [
         );
       `);
       console.log('[Melange] v19: создана таблица exercise_progress');
+    },
+  },
+  {
+    version: 20,
+    apply: (db) => {
+      // Идемпотентная добавка колонок (как v7/v8/v9).
+      const addColumn = (table: string, column: string, type: string) => {
+        const cols = db
+          .prepare(`PRAGMA table_info(${table})`)
+          .all() as unknown as Array<{ name: string }>;
+        if (!cols.some((c) => c.name === column)) {
+          db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
+        }
+      };
+      // Список провайдеров, которые писали в этот день: ["intervals-icu","dodofo"]
+      addColumn('recovery_logs', 'sources_json', 'TEXT');
+      // Энергия за день (dodofo отдаёт — раньше теряли).
+      addColumn('recovery_logs', 'calories_active', 'INTEGER');
+      addColumn('recovery_logs', 'calories_total', 'INTEGER');
+      addColumn('recovery_logs', 'body_fat_pct', 'REAL');
+      console.log(
+        '[Melange] v20: recovery_logs + sources_json / calories_active / calories_total / body_fat_pct'
+      );
+    },
+  },
+  {
+    version: 21,
+    apply: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS equivalences (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          source TEXT NOT NULL,
+          source_key TEXT NOT NULL,
+          source_level TEXT,
+          target TEXT NOT NULL,
+          target_key TEXT NOT NULL,
+          target_level TEXT,
+          confidence TEXT NOT NULL DEFAULT 'manual',
+          note TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          UNIQUE (source, source_key, source_level, target, target_key, target_level)
+        );
+      `);
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_equivalences_source
+          ON equivalences(source, source_key);
+      `);
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_equivalences_target
+          ON equivalences(target, target_key);
+      `);
+      console.log('[Melange] v21: создана таблица equivalences');
     },
   },
 ];
