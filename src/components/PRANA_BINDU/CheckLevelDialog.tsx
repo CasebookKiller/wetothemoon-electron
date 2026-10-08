@@ -101,10 +101,6 @@ function detectRung(
   return { rung: bestRung, achievedTarget };
 }
 
-const LEVEL_OPTIONS = Array.from({ length: 10 }, (_, i) => ({
-  label: `W${i + 1}`,
-  value: i + 1,
-}));
 
 export const CheckLevelDialog: React.FC<Props> = ({
   visible,
@@ -170,6 +166,18 @@ export const CheckLevelDialog: React.FC<Props> = ({
   const entry = movementKey
     ? findProgressionsByKey(movementKey)
     : undefined;
+  // Wade → W<N>, все остальные категории (cali / runner / core /
+  // posture / weightloss) → L<N>. Совпадает с DayDrawer и
+  // wadeProgramGenerator.
+  const prefix = entry?.category === 'wade' ? 'W' : 'L';
+  const levelOptions = useMemo(
+    () =>
+      Array.from({ length: 10 }, (_, i) => ({
+        label: `${prefix}${i + 1}`,
+        value: i + 1,
+      })),
+    [prefix]
+  );
   const lvl = entry?.levels.find((l) => l.level === level);
   const rawLadder = lvl?.benchmarkLadder ?? [];
   const ladder: LadderPart[] = rawLadder
@@ -288,7 +296,7 @@ export const CheckLevelDialog: React.FC<Props> = ({
               <span className="pb-check-level-dialog__label">Уровень:</span>
               <Dropdown
                 value={level}
-                options={LEVEL_OPTIONS}
+                options={levelOptions}
                 onChange={(e) => {
                   setLevel(e.value);
                   setResult(null);
@@ -363,7 +371,7 @@ export const CheckLevelDialog: React.FC<Props> = ({
             {result.achievedTarget && (
               <div className="pb-check-level-dialog__result-line pb-check-level-dialog__result-line--success">
                 <i className="pi pi-star" /> Целевая ступень достигнута.
-                Уровень повышен до <b>W{level}</b>.
+                Уровень повышен до <b>{prefix}{level}</b>.
               </div>
             )}
             {!result.achievedTarget && result.detectedRung === 0 && (
