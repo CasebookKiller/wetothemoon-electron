@@ -19,8 +19,9 @@ export type TemplateCategory =
   | 'run-intervals'
   | 'run-fartlek'
   | 'run-drills'
-  | 'strength-big6'
+  | 'strength-big6'     // Wade Big-6 (по канону — пока без шаблонов)
   | 'strength-runner'
+  | 'circuit'           // Круговые сборные комплексы (калистеника)
   | 'warmup';
 
 export const CATEGORY_LABELS: Record<TemplateCategory, string> = {
@@ -32,6 +33,7 @@ export const CATEGORY_LABELS: Record<TemplateCategory, string> = {
   'run-drills': 'СБУ (беговые)',
   'strength-big6': 'Big-6 (Пол Уэйд)',
   'strength-runner': 'Силовая для бегунов',
+  'circuit': 'Круговые (калистеника)',
   'warmup': 'Разминка / заминка',
 };
 
@@ -267,12 +269,12 @@ Cue-текст (A-Skip, High Knees) — надпись на часах.`,
     verified: true,
   },
   {
-    id: 'drills-big6-run',
+    id: 'drills-full-complex',
     category: 'run-drills',
-    name: 'Drills Big-6 (running)',
-    description: '6 упражнений одним блоком, 4 повтора.',
+    name: 'Drills: Full Complex',
+    description: 'Полный комплекс СБУ: 6 упражнений, 4 повтора.',
     usage: `Классическая последовательность из 6 беговых упражнений по 50 метров. 4 повтора с возвратом трусцой.`,
-    text: `Drills Big-6
+    text: `Drills Full Complex
 Warmup
 - 2km Z2 Pace
 
@@ -290,17 +292,17 @@ Cooldown
     verified: true,
   },
 
-  // ============ Big-6 (Пол Уэйд) ============
+  // ================= Circuit ================
 
   {
-    id: 'big6-level1',
-    category: 'strength-big6',
-    name: 'Big-6 Level 1 (Basics)',
+    id: 'circuit-a',
+    category: 'circuit',
+    name: 'Circuit A (Basics)',
     description: 'Статика и малая амплитуда. Для начинающих.',
     usage: `Для силовых цели по пульсу не ставим — ICU их не поддерживает.
 Каждое упражнение — по времени. Название становится подсказкой на часах.
 Level 1 — облегчённые вариации (у стены, с опорой).`,
-    text: `Big-6 Level 1
+    text: `Circuit A
 - Wall Push-ups 30s Z2 Pace
 - Rest 20s Z1 Pace
 - Wall Sit 20s Z2 Pace
@@ -316,14 +318,14 @@ Level 1 — облегчённые вариации (у стены, с опор�
     verified: true,
   },
   {
-    id: 'big6-level2',
-    category: 'strength-big6',
-    name: 'Big-6 Level 2 (Classic)',
+    id: 'circuit-b',
+    category: 'circuit',
+    name: 'Circuit B (Classic)',
     description: 'Классика — базовые движения. 6 упражнений с отдыхом между ними.',
     usage: `Упражнения Z2 Pace (обычная работа), отдых Z1 Pace (легко) — на таймлайне чередование видно цветом.
 Каждое упражнение — максимум повторов за отведённое время.
 Между упражнениями отдых 30 секунд.`,
-    text: `Big-6 Level 2
+    text: `Circuit B
 3x
 - Push-ups 30s Z2 Pace
 - Rest 30s Z1 Pace
@@ -340,13 +342,13 @@ Level 1 — облегчённые вариации (у стены, с опор�
     verified: true,
   },
   {
-    id: 'big6-level3',
-    category: 'strength-big6',
-    name: 'Big-6 Level 3 (Advanced)',
+    id: 'circuit-c',
+    category: 'circuit',
+    name: 'Circuit C (Advanced)',
     description: 'Сложные вариации — пистолетики, алмазные, негативы.',
     usage: `Сложные упражнения — Z3 Pace (нагрузка выше), отдых — Z1 Pace.
 Full Bridge здесь обычное упражнение, поэтому Z2.`,
-    text: `Big-6 Level 3
+    text: `Circuit C
 3x
 - Diamond Push-ups 30s Z3 Pace
 - Rest 30s Z1 Pace
@@ -362,16 +364,16 @@ Full Bridge здесь обычное упражнение, поэтому Z2.`,
 - Rest 30s Z1 Pace`,
     verified:true,
   },
-    {
-    id: 'big6-circuit',
-    category: 'strength-big6',
-    name: 'Big-6 Circuit',
+  {
+    id: 'circuit-3x',
+    category: 'circuit',
+    name: 'Circuit 3x',
     description: 'Круговая для бегунов: 3 круга, короткий отдых между упражнениями и длинный — между кругами.',
     usage: `3x — 3 круга.
 Внутри круга: работа Z2, короткий отдых Z1 (20 сек).
 Между кругами — 60 сек Z1.
 На таймлайне видно 3 цветных цикла.`,
-    text: `Circuit Big-6
+    text: `Circuit 3x
 
 3x
 - Push-ups 30s Z2 Pace
@@ -389,13 +391,13 @@ Full Bridge здесь обычное упражнение, поэтому Z2.`,
     verified: true,
   },
   {
-    id: 'big6-technique',
-    category: 'strength-big6',
-    name: 'Big-6 Technique Focus',
+    id: 'circuit-technique',
+    category: 'circuit',
+    name: 'Circuit: Technique',
     description: 'Акцент на технику, медленное выполнение.',
     usage: `Не круговая, а последовательная работа над техникой. Каждое упражнение — медленно, подконтрольно.
 Без повторов — один проход по всем шести движениям.`,
-    text: `Technique Focus
+    text: `Circuit: Technique
 - Slow Push-ups 40s Z1 Pace
 - Rest 20s
 - Deep Squats 30s Z1 Pace
