@@ -20,6 +20,7 @@ import { parseWorkoutText } from '@/main/services/pranaBindu/mentat/workoutParse
 import { ExerciseCatalog } from './ExerciseCatalog';
 import { WadeProgramsPanel } from './WadeProgramsPanel';
 import { EquivalenceMapperPanel } from './EquivalenceMapperPanel';
+import { THENICS_CATALOG } from '@/main/services/pranaBindu/mentat/thenicsCatalog';
 
 interface Props {
   visible: boolean;
@@ -40,6 +41,32 @@ export const WorkoutTemplatesDialog: React.FC<Props> = ({
   const [mode, setMode] = useState<
     'templates' | 'catalog' | 'programs' | 'equivalences'
   >('templates');
+    // Счётчик разметки для вкладки «Соответствия».
+  const [mappedCount, setMappedCount] = useState<number | null>(null);
+  const totalCount = THENICS_CATALOG.length;
+
+  const loadMappedCount = async () => {
+    try {
+      const api = (window as any).electronAPI;
+      const res = await api?.pb?.listEquivalences?.();
+      if (res?.success) {
+        // Считаем уникальные source_key для source='thenics'.
+        const keys = new Set<string>();
+        for (const e of res.items ?? []) {
+          if (e.source === 'thenics') keys.add(e.sourceKey);
+        }
+        setMappedCount(keys.size);
+      }
+    } catch {
+      /* ignore */
+    }
+  };
+
+  useEffect(() => {
+    if (visible) void loadMappedCount();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+
   const [lastCopied, setLastCopied] = useState('');
 
   useEffect(() => {
@@ -160,6 +187,12 @@ export const WorkoutTemplatesDialog: React.FC<Props> = ({
             onClick={() => setMode('equivalences')}
           >
             Соответствия
+            {mappedCount != null && (
+              <span className="pb-templates__mode-count">
+                {' '}
+                {mappedCount}/{totalCount}
+              </span>
+            )}
           </button>
         </div>
 
@@ -318,7 +351,7 @@ export const WorkoutTemplatesDialog: React.FC<Props> = ({
 
       {mode === 'equivalences' && (
         <div className="pb-catalog__body">
-          <EquivalenceMapperPanel />
+          <EquivalenceMapperPanel onChanged={loadMappedCount} />
         </div>
       )}
 

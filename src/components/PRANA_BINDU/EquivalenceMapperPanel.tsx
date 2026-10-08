@@ -47,9 +47,14 @@ interface Equivalence {
 
 interface Props {
   className?: string;
+  /** Вызывается после успешного save/delete — чтобы родитель обновил счётчики. */
+  onChanged?: () => void;
 }
 
-export const EquivalenceMapperPanel: React.FC<Props> = ({ className }) => {
+export const EquivalenceMapperPanel: React.FC<Props> = ({
+  className,
+  onChanged,
+}) => {
   const api = (window as any).electronAPI;
 
   const [items, setItems] = useState<Equivalence[]>([]);
@@ -159,6 +164,7 @@ export const EquivalenceMapperPanel: React.FC<Props> = ({ className }) => {
       if (res?.success) {
         setInfo(res.inserted ? 'Связь добавлена' : 'Связь обновлена');
         await load();
+        onChanged?.();
       } else {
         setError(res?.error ?? 'Не удалось сохранить');
       }
@@ -189,6 +195,7 @@ export const EquivalenceMapperPanel: React.FC<Props> = ({ className }) => {
         setTargetLevel(null);
         setNote('');
         await load();
+        onChanged?.();
       }
     } catch (e) {
       setError((e as Error).message);
