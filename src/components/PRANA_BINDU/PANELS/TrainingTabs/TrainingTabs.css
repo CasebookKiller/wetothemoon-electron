@@ -1,0 +1,47 @@
+/* src/components/PRANA_BINDU/PANELS/TrainingTabs/TrainingTabs.css */
+
+.pb-training-tabs__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.pb-training-tabs__title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--pb-accent);
+  white-space: nowrap;
+}
+
+/* Переопределяем внешние отступы mode-switch внутри заголовка */
+.pb-training-tabs__header .pb-templates__mode-switch {
+  height: 2.25rem;
+  margin-bottom: 0;
+}
+
+.pb-training-tabs__header .pb-templates__mode-switch button {
+  font-size: 0.8rem;
+  padding: 0 0.75rem;
+}
+
+.pb-training-tabs__body {
+  min-height: 0;
+}
+
+.pb-training-tabs__tab-content {
+  min-height: 0;
+}
+
+/* Перебиваем дефолтный padding PrimeReact-хедера для этой Panel */
+.pb-training-tabs-panel .p-panel-header {
+  padding: 0.6rem 1rem !important;
+}
+
+/* На всякий случай — для внутренней обёртки */
+.pb-training-tabs-panel .p-panel-header .p-panel-title {
+  padding: 0;
+  width: 100%;
+}
