@@ -9,7 +9,6 @@ import { Button } from 'primereact/button';
 import { Column } from 'primereact/column';
 import { DataTable } from 'primereact/datatable';
 import { Message } from 'primereact/message';
-import { Panel } from 'primereact/panel';
 
 export interface PlanEventLite {
   id: number;
@@ -93,10 +92,7 @@ export const PlanEventsPanel: React.FC<Props> = ({
   onOpenTemplates,
 }) => {
   return (
-    <Panel
-      header={`План (${events.length})`}
-      className="shadow-5 mb-3 pb-panel"
-    >
+    <div className="pb-plan-panel">
       <div className="pb-plan__toolbar">
         <Button
           label={syncing ? 'Обновление…' : 'Обновить из ICU'}
@@ -217,6 +213,6 @@ export const PlanEventsPanel: React.FC<Props> = ({
           }
         />
       </DataTable>
-    </Panel>
+    </div>
   );
 };

@@ -5,7 +5,7 @@
 // Здесь только UI и переключатель вида.
 
 import React, { useState } from 'react';
-import { Panel } from 'primereact/panel';
+
 import { Message } from 'primereact/message';
 import { RunFiltersPanel } from './RunFiltersPanel';
 import { RunsTableFlat } from './RunsTableFlat';
@@ -37,9 +37,9 @@ export const RunsPanel: React.FC<RunsPanelProps> = ({
   items,
   loading,
   error,
-  filteredCount,
-  totalCount,
-  rawCount,
+  //filteredCount,
+  //totalCount,
+  //rawCount,
   filters,
   onFiltersChange,
   onResetFilters,
@@ -53,15 +53,15 @@ export const RunsPanel: React.FC<RunsPanelProps> = ({
     saveViewMode(m);
   };
 
-  const headerText =
+  /*const headerText =
     activeFilterCount > 0
       ? `Пробежки (${filteredCount} из ${totalCount})`
       : `Пробежки (${totalCount}${
           totalCount !== rawCount ? ` · ${rawCount} записей` : ''
-        })`;
+        })`;*/
 
   return (
-    <Panel header={headerText} className="shadow-5 mb-3 pb-panel">
+    <div className="pb-runs-panel">
       <div className="pb-runs-panel__toolbar">
         <RunFiltersPanel
           filters={filters}
@@ -110,6 +110,6 @@ export const RunsPanel: React.FC<RunsPanelProps> = ({
           onOpenFact={onOpenFact}
         />
       )}
-    </Panel>
+    </div>
   );
 };

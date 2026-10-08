@@ -73,6 +73,11 @@ import { Checkbox } from 'primereact/checkbox';
 
 import { ImportPanel } from '@/components/PRANA_BINDU/PANELS/ImportPanel/ImportPanel';
 
+import {
+  TrainingTabs,
+  type TrainingTab,
+} from '@/components/PRANA_BINDU/PANELS/TrainingTabs/TrainingTabs';
+
 interface ProviderOption {
   label: string;
   value: string;
@@ -1679,42 +1684,70 @@ export const PranaBinduPage: React.FC = () => {
         {/* ==================== WELLNESS (таблица) ==================== */}
         <WellnessPanel ref={wellnessPanelRef} from={syncFrom} to={syncTo} />
 
-        <Panel header="Календарь" className="shadow-5 mb-3 pb-panel">
-          <CalendarPanel
-            loadRange={handleLoadCalendarRange}
-            onDayClick={(d) => setDayDrawerDate(d)}
-          />
-        </Panel>
-
-        <PlanEventsPanel
-          events={planEvents}
-          loading={planLoading}
-          syncing={planSyncing}
-          clearing={planClearing}
-          error={planError}
-          syncResult={planSyncResult}
-          onSync={handleSyncPlan}
-          onClear={handleClearPlan}
-          onMassDelete={() => setMassDeleteVisible(true)}
-          onOpenEvent={handleOpenPlanEvent}
-          onOpenTemplates={() => setTemplatesVisible(true)}
-        />
-
-        <RunsPanel
-          items={filteredFacts}
-          loading={factsLoading}
-          error={factsError}
-          filteredCount={filteredFacts.length}
-          totalCount={groupedFacts.length}
-          rawCount={runFacts.length}
-          filters={filters}
-          onFiltersChange={setFilters}
-          onResetFilters={handleResetFilters}
-          activeFilterCount={activeFilterCount}
-          onOpenFact={(fact) => {
-            setSelectedFact(fact);
-            setDrawerVisible(true);
-          }}
+        <TrainingTabs
+          tabs={[
+            {
+              key: 'calendar',
+              label: 'Календарь',
+              title: 'Календарь',
+              node: (
+                <CalendarPanel
+                  loadRange={handleLoadCalendarRange}
+                  onDayClick={(d) => setDayDrawerDate(d)}
+                />
+              ),
+            },
+            {
+              key: 'plan',
+              label: 'План',
+              title:
+                planEvents.length > 0
+                  ? `План · ${planEvents.length}`
+                  : 'План',
+              node: (
+                <PlanEventsPanel
+                  events={planEvents}
+                  loading={planLoading}
+                  syncing={planSyncing}
+                  clearing={planClearing}
+                  error={planError}
+                  syncResult={planSyncResult}
+                  onSync={handleSyncPlan}
+                  onClear={handleClearPlan}
+                  onMassDelete={() => setMassDeleteVisible(true)}
+                  onOpenEvent={handleOpenPlanEvent}
+                  onOpenTemplates={() => setTemplatesVisible(true)}
+                />
+              ),
+            },
+            {
+              key: 'runs',
+              label: 'Пробежки',
+              title:
+                activeFilterCount > 0
+                  ? `Пробежки · ${filteredFacts.length} из ${groupedFacts.length}`
+                  : `Пробежки · ${groupedFacts.length}${
+                      groupedFacts.length !== runFacts.length
+                        ? ` (${runFacts.length} записей)`
+                        : ''
+                    }`,
+              node: (
+                <RunsPanel
+                  items={filteredFacts}
+                  loading={factsLoading}
+                  error={factsError}
+                  filters={filters}
+                  onFiltersChange={setFilters}
+                  onResetFilters={handleResetFilters}
+                  activeFilterCount={activeFilterCount}
+                  onOpenFact={(fact) => {
+                    setSelectedFact(fact);
+                    setDrawerVisible(true);
+                  }}
+                />
+              ),
+            },
+          ]}
         />
 
         <DodofoDebugDialog

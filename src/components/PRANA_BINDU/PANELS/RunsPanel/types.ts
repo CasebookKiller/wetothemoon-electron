@@ -11,11 +11,11 @@ export interface RunsPanelProps {
   loading: boolean;
   error: string;
   /** Сколько групп после фильтров (для заголовка). */
-  filteredCount: number;
+  //filteredCount: number;
   /** Сколько групп всего (до фильтров). */
-  totalCount: number;
+  //totalCount: number;
   /** Сколько run_facts до группировки. Для приписки «N записей». */
-  rawCount: number;
+  //rawCount: number;
   // Фильтры — state живёт в родителе, сюда передаётся как пропсы.
   filters: RunFilters;
   onFiltersChange: (f: RunFilters) => void;
