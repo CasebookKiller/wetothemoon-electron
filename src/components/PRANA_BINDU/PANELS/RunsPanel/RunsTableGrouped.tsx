@@ -9,8 +9,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Column } from 'primereact/column';
 import { DataTable } from 'primereact/datatable';
 import { Button } from 'primereact/button';
-import type { RunFactLite } from '../RunStreamsDrawer';
-import type { GroupedRunFact } from '../UTILS/groupRunFacts';
+import type { RunFactLite } from '../../RunStreamsDrawer';
+import type { GroupedRunFact } from '../../UTILS/groupRunFacts';
 import type { RunsTableProps } from './types';
 import {
   countByDate,

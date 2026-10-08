@@ -1,8 +1,8 @@
 // src/components/PRANA_BINDU/RunsPanel/types.ts
 
-import type { RunFactLite } from '../RunStreamsDrawer';
+import type { RunFactLite } from '../../RunStreamsDrawer';
 import type { RunFilters } from './RunFiltersPanel';
-import type { GroupedRunFact } from '../UTILS/groupRunFacts';
+import type { GroupedRunFact } from '../../UTILS/groupRunFacts';
 
 export type RunsViewMode = 'flat' | 'grouped';
 

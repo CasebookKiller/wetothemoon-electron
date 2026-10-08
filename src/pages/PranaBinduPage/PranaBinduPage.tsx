@@ -14,9 +14,9 @@ import {
 import {
   type RunFilters,
   EMPTY_FILTERS,
-} from '@/components/PRANA_BINDU/RunsPanel/RunFiltersPanel';
-import { RunsPanel } from '@/components/PRANA_BINDU/RunsPanel/RunsPanel';
-import { fmtKm, fmtDuration } from '@/components/PRANA_BINDU/RunsPanel/utils';
+} from '@/components/PRANA_BINDU/PANELS/RunsPanel/RunFiltersPanel';
+import { RunsPanel } from '@/components/PRANA_BINDU/PANELS/RunsPanel/RunsPanel';
+import { fmtKm, fmtDuration } from '@/components/PRANA_BINDU/PANELS/RunsPanel/utils';
 import { DodofoDebugDialog } from '@/components/PRANA_BINDU/DodofoDebugDialog';
 
 import './PranaBinduPage.css';
@@ -53,6 +53,11 @@ import {
 } from '@/components/PRANA_BINDU/MirrorDeleteDialog';
 
 import { FullWeek } from '@/components/PRANA_BINDU/FullWeek';
+
+import {
+  ProfilePanel,
+  type ProfilePanelHandle,
+} from '@/components/PRANA_BINDU/PANELS/ProfilePanel/ProfilePanel';
 
 import { DeleteGeneratedDialog } from '@/components/PRANA_BINDU/DeleteGeneratedDialog';
 
@@ -316,16 +321,6 @@ const SOURCE_PRIORITY: Record<string, number> = {
     });
 }*/
 
-function labelForSource(src: string): string {
-  switch (src) {
-    case 'icu': return 'intervals.icu';
-    case 'dodofo': return 'dodofo';
-    case 'manual': return 'ручной ввод';
-    case 'computed': return 'расчёт';
-    default: return src;
-  }
-}
-
 const REMINDER_HIDDEN_KEY = 'pb.checkReminder.hidden';
 const REMINDER_LAST_SHOWN_KEY = 'pb.checkReminder.lastShown';
 const REMINDER_CATEGORIES_KEY = 'pb.checkReminder.categories';
@@ -507,18 +502,7 @@ export const PranaBinduPage: React.FC = () => {
     }
   };
 
-  // ========================== Профиль =============================
-  const [profile, setProfile] = useState<{
-    maxHr: number | null;
-    lthr: number | null;
-    restingHr: number | null;
-    lthrSource?: string | null;
-    maxHrSource?: string | null;
-    restingHrSource?: string | null;
-  }>({ maxHr: null, lthr: null, restingHr: null });
-  const [profileSaving, setProfileSaving] = useState(false);
-  const [profileError, setProfileError] = useState('');
-  const [profileSaved, setProfileSaved] = useState(false);
+  const profilePanelRef = React.useRef<ProfilePanelHandle>(null);
 
   const [syncingWellness, setSyncingWellness] = useState(false);
   const [wellnessResult, setWellnessResult] = useState<string>('');
@@ -698,26 +682,6 @@ export const PranaBinduPage: React.FC = () => {
     }
   };
 
-  const loadProfile = async () => {
-    if (!api?.pb?.getProfile) return;
-    try {
-      const res = await api.pb.getProfile();
-      if (res?.success) {
-        const d = res.data ?? {};
-        setProfile({
-          maxHr: d.maxHr ?? null,
-          lthr: d.lactateThresholdHr ?? d.lthr ?? null,
-          restingHr: d.restingHr ?? null,
-          lthrSource: d.lthrSource ?? null,
-          maxHrSource: d.maxHrSource ?? null,
-          restingHrSource: d.restingHrSource ?? null,
-        });
-      }
-    } catch {
-      // ignore
-    }
-  };
-
   useEffect(() => {
     (async () => {
       try {
@@ -850,7 +814,7 @@ export const PranaBinduPage: React.FC = () => {
       } catch { /* ignore */ }
     })();
     //loadRunFacts();
-    loadProfile();
+    
     loadRecoveryLogs();
     loadSyncSettings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1028,7 +992,7 @@ export const PranaBinduPage: React.FC = () => {
       const res = await api.pb.syncThresholds(provider);
       if (res.success) {
         setThresholdsResult((res.applied ?? []).join(' · ') || 'обновлено');
-        await loadProfile();          // ← добавить
+        await profilePanelRef.current?.reload();
       } else {
         setThresholdsError(res.error ?? 'Ошибка');
       }
@@ -1054,7 +1018,7 @@ export const PranaBinduPage: React.FC = () => {
         setZonesResult(
           Array.isArray(res.zones) ? res.zones.join(' · ') : 'обновлено'
         );
-        await loadProfile();
+        await profilePanelRef.current?.reload();
       } else {
         setZonesError(res.error ?? 'Ошибка');
       }
@@ -1160,35 +1124,6 @@ export const PranaBinduPage: React.FC = () => {
         Используй dodofo или intervals-icu.
       </small>
     );
-  };
-
-  // ==================== Сохранение Профиля ===============
-
-  const handleSaveProfile = async () => {
-    if (!api?.pb?.updateProfile) {
-      setProfileError('electronAPI.pb.updateProfile недоступен');
-      return;
-    }
-    setProfileSaving(true);
-    setProfileError('');
-    setProfileSaved(false);
-    try {
-      const res = await api.pb.updateProfile({
-        maxHr: profile.maxHr,
-        lactateThresholdHr: profile.lthr,
-        restingHr: profile.restingHr,
-      });
-      if (res?.success) {
-        setProfileSaved(true);
-        setTimeout(() => setProfileSaved(false), 2000);
-      } else {
-        setProfileError(res?.error ?? 'Не удалось сохранить');
-      }
-    } catch (e) {
-      setProfileError((e as Error).message);
-    } finally {
-      setProfileSaving(false);
-    }
   };
 
   const [fitArchivePath, setFitArchivePath] = useState<string>('');
@@ -1896,141 +1831,7 @@ export const PranaBinduPage: React.FC = () => {
         </div>
 
         {/* ==================== ПРОФИЛЬ ==================== */}
-        <Panel header="Профиль" className="shadow-5 mb-3 pb-panel">
-          <div className="pb-profile__grid">
-            <div className="pb-profile__field">
-              <label className="pb-label" htmlFor="pb-profile-hrmax">
-                HRmax
-                {!profile.maxHr && <span className="pb-profile__missing">не задан</span>}
-              </label>
-              <InputNumber
-                inputId="pb-profile-hrmax"
-                value={profile.maxHr}
-                onValueChange={(e) =>
-                  setProfile((p) => ({ ...p, maxHr: e.value ?? null }))
-                }
-                placeholder="напр. 178"
-                min={100}
-                max={230}
-                showButtons
-                buttonLayout="horizontal"
-                incrementButtonIcon="pi pi-plus"
-                decrementButtonIcon="pi pi-minus"
-                className="pb-debug__input"
-              />
-              <small className="pb-hint">
-                Максимальный пульс.
-                {profile.maxHrSource && (
-                  <>
-                    {' '}
-                    <span className="pb-profile__src">
-                      источник: {labelForSource(profile.maxHrSource)}
-                    </span>
-                  </>
-                )}
-              </small>
-            </div>
-
-            <div className="pb-profile__field">
-              <label className="pb-label" htmlFor="pb-profile-lthr">
-                LTHR
-                {!profile.lthr && <span className="pb-profile__missing">не задан</span>}
-              </label>
-              <InputNumber
-                inputId="pb-profile-lthr"
-                value={profile.lthr}
-                onValueChange={(e) =>
-                  setProfile((p) => ({ ...p, lthr: e.value ?? null }))
-                }
-                placeholder="напр. 165"
-                min={80}
-                max={220}
-                showButtons
-                buttonLayout="horizontal"
-                incrementButtonIcon="pi pi-plus"
-                decrementButtonIcon="pi pi-minus"
-                className="pb-debug__input"
-              />
-              <small className="pb-hint">
-                Лактатный порог. Ключевой параметр для зон.
-                {profile.lthrSource && (
-                  <>
-                    {' '}
-                    <span className="pb-profile__src">
-                      источник: {labelForSource(profile.lthrSource)}
-                    </span>
-                  </>
-                )}
-              </small>
-            </div>
-
-            <div className="pb-profile__field">
-              <label className="pb-label" htmlFor="pb-profile-resthr">
-                RestHR
-                {!profile.restingHr && <span className="pb-profile__missing">не задан</span>}
-              </label>
-              <InputNumber
-                inputId="pb-profile-resthr"
-                value={profile.restingHr}
-                onValueChange={(e) =>
-                  setProfile((p) => ({ ...p, restingHr: e.value ?? null }))
-                }
-                placeholder="напр. 48"
-                min={30}
-                max={120}
-                showButtons
-                buttonLayout="horizontal"
-                incrementButtonIcon="pi pi-plus"
-                decrementButtonIcon="pi pi-minus"
-                className="pb-debug__input"
-              />
-              <small className="pb-hint">
-                Пульс покоя.
-                {profile.restingHrSource && (
-                  <>
-                    {' '}
-                    <span className="pb-profile__src">
-                      источник: {labelForSource(profile.restingHrSource)}
-                    </span>
-                  </>
-                )}
-              </small>
-            </div>
-          </div>
-
-          <div className="pb-profile__actions">
-            <Button
-              label={
-                profileSaving
-                  ? 'Сохранение…'
-                  : profileSaved
-                  ? 'Сохранено'
-                  : 'Сохранить'
-              }
-              icon={
-                profileSaving
-                  ? 'pi pi-spin pi-spinner'
-                  : profileSaved
-                  ? 'pi pi-check'
-                  : 'pi pi-save'
-              }
-              className="pb p-button-sm"
-              onClick={handleSaveProfile}
-              disabled={profileSaving}
-            />
-            <Button
-              label="Перечитать"
-              icon="pi pi-refresh"
-              className="pb-soft p-button-sm"
-              onClick={loadProfile}
-              disabled={profileSaving}
-            />
-          </div>
-
-          {profileError && (
-            <Message severity="error" text={profileError} className="w-full mt-2" />
-          )}
-        </Panel>
+        <ProfilePanel ref={profilePanelRef} />
 
         {/* ==================== ПОДКЛЮЧЕНИЯ ==================== */}
         <Panel header="Подключения" className="shadow-5 mb-3 pb-panel">

@@ -1,4 +1,4 @@
-// src/components/PRANA_BINDU/RunsPanel/RunsPanel.tsx
+// src/components/PRANA_BINDU/PANELS/RunsPanel/RunsPanel.tsx
 //
 // Панель «Пробежки»: фильтры + таблица в двух видах (плоский / по дням).
 // Логика загрузки данных и state фильтров — в родителе (PranaBinduPage).
