@@ -71,6 +71,8 @@ import { ExerciseCategory } from '@/main/services/pranaBindu/mentat/types';
 import { PROGRESSIONS_CATALOG } from '@/main/services/pranaBindu/mentat/exerciseCatalog';
 import { Checkbox } from 'primereact/checkbox';
 
+import { ImportPanel } from '@/components/PRANA_BINDU/PANELS/ImportPanel/ImportPanel';
+
 interface ProviderOption {
   label: string;
   value: string;
@@ -90,16 +92,6 @@ const MODULES = [
   { name: 'Mentat', description: 'Календарь, периодизация, подводка к старту' },
   { name: 'Water Discipline', description: 'Сон, HRV, гидратация, восстановление' },
   { name: 'Spice', description: 'Аналитика, Google Fit, Zepp, dodofo' },
-];
-
-const IMPORT_ORIGIN_OPTIONS = [
-  { label: 'Zepp / Amazfit', value: 'zepp-app' },
-  { label: 'Strava-архив', value: 'strava-archive' },
-  { label: 'Garmin Connect', value: 'garmin-connect' },
-  { label: 'Coros', value: 'coros' },
-  { label: 'Polar', value: 'polar' },
-  { label: 'Suunto', value: 'suunto' },
-  { label: 'Ручной импорт', value: 'manual-import' },
 ];
 
 function toIsoDate(d: Date): string {
@@ -463,23 +455,6 @@ export const PranaBinduPage: React.FC = () => {
   // Debug
   const [debugVisible, setDebugVisible] = useState(false);
 
-  const [importProgress, setImportProgress] = useState<{
-    current: number;
-    total: number;
-    filename: string;
-    imported: number;
-    updated: number;
-    skipped: number;
-    failed: number;
-  } | null>(null);
-
-  const [zeppArchivePath, setZeppArchivePath] = useState<string>('');
-  const [zeppUpdating, setZeppUpdating] = useState(false);
-  const [zeppResult, setZeppResult] = useState<{
-    imported: number; skipped: number; failed: number; total: number;
-  } | null>(null);
-  const [zeppError, setZeppError] = useState('');
-
   const [massDeleteVisible, setMassDeleteVisible] = useState(false);
 
   // ==================== Загрузка потоков (map) ====================
@@ -602,17 +577,6 @@ export const PranaBinduPage: React.FC = () => {
   }, [groupedFacts, filters]);
 
   const handleResetFilters = () => setFilters(EMPTY_FILTERS);
-
-  const [dragActive, setDragActive] = useState(false);
-
-  const [importOrigin, setImportOrigin] = useState<string>('zepp-app');
-
-  //const [intervalsApiKey, setIntervalsApiKey] = useState('');
-  //const [intervalsAthleteId, setIntervalsAthleteId] = useState('');
-  //const [intervalsHasKey, setIntervalsHasKey] = useState(false);
-  //const [intervalsSaving, setIntervalsSaving] = useState(false);
-  //const [intervalsError, setIntervalsError] = useState('');
-  //const [intervalsInfo, setIntervalsInfo] = useState('');
 
   const [recoveryLogs, setRecoveryLogs] = useState<any[]>([]);
   const [selectedRecovery, setSelectedRecovery] = useState<RecoveryLogLite | null>(null);
@@ -788,15 +752,6 @@ export const PranaBinduPage: React.FC = () => {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [provider]);
-
-  useEffect(() => {
-    if (!api?.pb?.onImportProgress) return;
-    api.pb.onImportProgress((data: any) => setImportProgress(data));
-    return () => {
-      api.pb.removeImportProgressListener?.();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   useEffect(() => {
     if (!api?.pb?.onSyncProgress) return;
@@ -1079,172 +1034,6 @@ export const PranaBinduPage: React.FC = () => {
     );
   };
 
-  const [fitArchivePath, setFitArchivePath] = useState<string>('');
-  const [archiveUpdating, setArchiveUpdating] = useState(false);
-  const [archiveResult, setArchiveResult] = useState<{
-    imported: number;
-    updated: number;
-    skipped: number;
-    failed: number;
-    total: number;
-  } | null>(null);
-  const [archiveError, setArchiveError] = useState('');
-
-  const handlePickArchiveFolder = async (): Promise<string | null> => {
-    if (!api?.pb?.pickDirectory) return null;
-    const res = await api.pb.pickDirectory({
-      title: 'Выберите папку с FIT-файлами Strava',
-      defaultPath: fitArchivePath || undefined,
-    });
-    if (!res?.success || !res.path) return null;
-    return res.path;
-  };
-
-  const handleUpdateFitArchive = async () => {
-    if (!api?.pb?.importFitDir) {
-      setArchiveError('electronAPI.pb.importFitDir недоступен');
-      return;
-    }
-    setArchiveUpdating(true);
-    setArchiveError('');
-    setArchiveResult(null);
-
-    try {
-      let targetPath = fitArchivePath;
-      if (!targetPath) {
-        const picked = await handlePickArchiveFolder();
-        if (!picked) {
-          setArchiveUpdating(false);
-          return; // отмена пользователя
-        }
-        targetPath = picked;
-      }
-
-      const res = await api.pb.importFitDir(targetPath, {
-        origin: 'strava-archive',
-        skipImported: false, // обновляем
-        savePath: true,
-      });
-
-      if (res.success) {
-        setFitArchivePath(targetPath);
-        setArchiveResult({
-          imported: res.imported ?? 0,
-          updated: res.updated ?? 0,
-          skipped: res.skipped ?? 0,
-          failed: res.failed ?? 0,
-          total: res.total ?? 0,
-        });
-        await loadRunFacts();
-      } else {
-        setArchiveError(res.error ?? 'Ошибка импорта');
-      }
-    } catch (e) {
-      setArchiveError((e as Error).message);
-    } finally {
-      setArchiveUpdating(false);
-      setImportProgress(null);
-    }
-  };
-
-  const handleChangeArchiveFolder = async () => {
-    const picked = await handlePickArchiveFolder();
-    if (!picked) return;
-    setFitArchivePath(picked);
-    // Сохраним путь сразу, без импорта
-    try {
-      await api.pb.importFitDir(picked, {
-        skipImported: true,
-        savePath: true,
-      });
-    } catch {
-      // ignore
-    }
-  };
-
-  const handleCancelImport = async () => {
-    try {
-      await api.pb.importCancel?.();
-    } catch {
-      // ignore
-    }
-  };
-
-  const runImportPaths = async (
-    paths: string[],
-    opts?: { origin?: string; skipImported?: boolean }
-  ) => {
-    if (!api?.pb?.importFiles) {
-      setArchiveError('electronAPI.pb.importFiles недоступен');
-      return;
-    }
-    if (paths.length === 0) return;
-
-    setArchiveUpdating(true);
-    setArchiveError('');
-    setArchiveResult(null);
-    try {
-      const res = await api.pb.importFiles(paths, {
-        origin: opts?.origin ?? 'manual-import',
-        skipImported: opts?.skipImported === true,
-      });
-      if (res.success) {
-        setArchiveResult({
-          imported: res.imported ?? 0,
-          updated: res.updated ?? 0,
-          skipped: res.skipped ?? 0,
-          failed: res.failed ?? 0,
-          total: res.total ?? 0,
-        });
-        await loadRunFacts();
-      } else {
-        setArchiveError(res.error ?? 'Ошибка импорта');
-      }
-    } catch (e) {
-      setArchiveError((e as Error).message);
-    } finally {
-      setArchiveUpdating(false);
-      setImportProgress(null);
-    }
-  };
-
-  const handlePickFiles = async () => {
-    if (!api?.pb?.pickFiles) return;
-    const res = await api.pb.pickFiles({ multiple: true });
-    if (!res?.success || !Array.isArray(res.paths)) return;
-    await runImportPaths(res.paths, { origin: importOrigin });
-  };
-
-  const handleDrop = async (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-
-    const files = Array.from(e.dataTransfer?.files ?? []);
-    const paths: string[] = [];
-    for (const f of files) {
-      try {
-        const p = api.getPathForFile?.(f);
-        if (p && typeof p === 'string') paths.push(p);
-      } catch {
-        // ignore
-      }
-    }
-    await runImportPaths(paths, { origin: importOrigin });
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!dragActive) setDragActive(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-  };
-
   const handleSyncWellness = async () => {
     if (!api?.pb?.syncWellness) {
       setWellnessError('electronAPI.pb.syncWellness недоступен');
@@ -1461,99 +1250,6 @@ export const PranaBinduPage: React.FC = () => {
   const handleOpenPlanEvent = (event: PlanEventLite) => {
     setSelectedPlanEvent(event);
     setPlanDrawerVisible(true);
-  };
-
-  const handleImportStravaCsv = async () => {
-    if (!api?.pb?.pickCsv || !api?.pb?.importStravaCsv) {
-      setArchiveError('electronAPI.pb.pickCsv / importStravaCsv недоступен');
-      return;
-    }
-    const picked = await api.pb.pickCsv();
-    if (!picked?.success || !picked.path) return;
-
-    setArchiveUpdating(true);
-    setArchiveError('');
-    setArchiveResult(null);
-    try {
-      const res = await api.pb.importStravaCsv(picked.path);
-      if (res.success) {
-        setArchiveResult({
-          imported: res.added ?? 0,
-          updated: res.updated ?? 0,
-          skipped: 0,
-          failed: res.failed ?? 0,
-          total: res.total ?? 0,
-        });
-        await loadRunFacts();
-      } else {
-        setArchiveError(res.error ?? 'Ошибка импорта');
-      }
-    } catch (e) {
-      setArchiveError((e as Error).message);
-    } finally {
-      setArchiveUpdating(false);
-    }
-  };
-
-  const handlePickZeppFolder = async (): Promise<string | null> => {
-    if (!api?.pb?.pickDirectory) return null;
-    const res = await api.pb.pickDirectory({
-      title: 'Выберите папку с FIT-файлами Zepp',
-      defaultPath: zeppArchivePath || undefined,
-    });
-    if (!res?.success || !res.path) return null;
-    return res.path;
-  };
-
-  const handleChangeZeppFolder = async () => {
-    const picked = await handlePickZeppFolder();
-    if (!picked) return;
-    setZeppArchivePath(picked);
-    try {
-      await api.pb.zeppArchivePathSet?.(picked);
-    } catch { /* ignore */ }
-  };
-
-  const handleUpdateZepp = async () => {
-    if (!api?.pb?.importZeppDir) {
-      setZeppError('electronAPI.pb.importZeppDir недоступен');
-      return;
-    }
-    setZeppUpdating(true);
-    setZeppError('');
-    setZeppResult(null);
-
-    try {
-      let target = zeppArchivePath;
-      if (!target) {
-        const picked = await handlePickZeppFolder();
-        if (!picked) { setZeppUpdating(false); return; }
-        target = picked;
-      }
-
-      const res = await api.pb.importZeppDir(target, {
-        skipIfFileExists: true,
-        savePath: true,
-      });
-
-      if (res.success) {
-        setZeppArchivePath(target);
-        setZeppResult({
-          imported: res.imported ?? 0,
-          skipped: res.skipped ?? 0,
-          failed: res.failed ?? 0,
-          total: res.total ?? 0,
-        });
-        await loadRunFacts();
-      } else {
-        setZeppError(res.error ?? 'Ошибка импорта');
-      }
-    } catch (e) {
-      setZeppError((e as Error).message);
-    } finally {
-      setZeppUpdating(false);
-      setImportProgress(null);
-    }
   };
 
   const handleLoadCalendarRange = React.useCallback(
@@ -1989,217 +1685,7 @@ export const PranaBinduPage: React.FC = () => {
         </Panel>
 
         {/* ==================== ИМПОРТ ФАЙЛОВ ==================== */}
-        <div
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          className={`pb-archive-dropzone ${dragActive ? 'pb-archive-dropzone--active' : ''}`}
-        >
-          <Panel header="Импорт файлов" className="shadow-5 mb-3 pb-panel">
-            <div className="flex flex-column gap-2">
-              <div className="pb-archive-origin">
-                <label className="pb-label">Откуда файлы</label>
-                <Dropdown
-                  value={importOrigin}
-                  options={IMPORT_ORIGIN_OPTIONS}
-                  onChange={(e) => setImportOrigin(e.value)}
-                  className="pb-archive-origin__dropdown"
-                  panelClassName="pb-dropdown-panel"
-                />
-                <small className="pb-hint">
-                  Метка источника сохраняется при первом импорте и не меняется
-                  при повторных загрузках того же файла.
-                </small>
-              </div>
-            </div>
-            <div className="flex flex-column gap-2">
-              <label className="pb-label">Путь к папке с FIT/TCX-файлами</label>
-              <div className="flex gap-2 flex-wrap align-items-center">
-                <span className="pb-archive-path" title={fitArchivePath || undefined}>
-                  {fitArchivePath || <i>папка не выбрана</i>}
-                </span>
-                <Button
-                  label={fitArchivePath ? 'Сменить папку' : 'Выбрать папку'}
-                  icon="pi pi-folder-open"
-                  className="pb-soft p-button-sm"
-                  onClick={handleChangeArchiveFolder}
-                  disabled={archiveUpdating}
-                />
-                <Button
-                  label={archiveUpdating ? 'Обновление…' : 'Обновить архив'}
-                  icon={archiveUpdating ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'}
-                  className="pb p-button-sm"
-                  onClick={handleUpdateFitArchive}
-                  disabled={archiveUpdating}
-                />
-                <Button
-                  label="Импортировать файлы"
-                  icon="pi pi-upload"
-                  className="pb-soft p-button-sm"
-                  onClick={handlePickFiles}
-                  disabled={archiveUpdating}
-                  tooltip="Выбрать отдельные FIT/TCX файлы для импорта"
-                />
-                <Button
-                  label="Импорт Strava CSV"
-                  icon="pi pi-file-import"
-                  className="pb-soft p-button-sm"
-                  onClick={handleImportStravaCsv}
-                  disabled={archiveUpdating}
-                  tooltip="Импортировать activities.csv из архива Strava"
-                />
-              </div>
-              <small className="pb-hint">
-                Перетащите FIT/TCX файлы в эту панель, чтобы импортировать их
-                без выбора папки.
-              </small>
-            </div>
-
-            {archiveUpdating && importProgress && (
-              <div className="pb-import-progress">
-                <div className="pb-import-progress__header">
-                  <span>
-                    {importProgress.current} / {importProgress.total}
-                    {' · '}
-                    <code>{importProgress.filename}</code>
-                  </span>
-                  <Button
-                    label="Отмена"
-                    icon="pi pi-times"
-                    className="pb-soft p-button-sm"
-                    onClick={handleCancelImport}
-                  />
-                </div>
-                <ProgressBar
-                  value={Math.round(
-                    (importProgress.current / importProgress.total) * 100
-                  )}
-                  showValue={false}
-                  style={{ height: '6px' }}
-                />
-                <div className="pb-import-progress__stats">
-                  <span>+{importProgress.imported}</span>
-                  <span>~{importProgress.updated}</span>
-                  <span>·{importProgress.skipped}</span>
-                  {importProgress.failed > 0 && (
-                    <span className="pb-import-progress__fail">
-                      ✗{importProgress.failed}
-                    </span>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {archiveError && (
-              <Message severity="error" text={archiveError} className="w-full mt-2" />
-            )}
-
-            {archiveResult && (
-              <Message
-                severity={archiveResult.failed > 0 ? 'warn' : 'success'}
-                className="w-full mt-2"
-                content={
-                  <span>
-                    Добавлено <b>{archiveResult.imported}</b>
-                    {' · '}обновлено <b>{archiveResult.updated}</b>
-                    {archiveResult.skipped > 0 && (
-                      <> · пропущено <b>{archiveResult.skipped}</b></>
-                    )}
-                    {archiveResult.failed > 0 && (
-                      <> · ошибок <b>{archiveResult.failed}</b></>
-                    )}
-                    {' · '}всего файлов <b>{archiveResult.total}</b>
-                  </span>
-                }
-              />
-            )}
-            <hr className="pb-sep" />
-
-            <div className="flex flex-column gap-2">
-              <label className="pb-label">Папка с FIT-файлами Zepp (Yandex.Disk)</label>
-              <div className="flex gap-2 flex-wrap align-items-center">
-                <span className="pb-archive-path" title={zeppArchivePath || undefined}>
-                  {zeppArchivePath || <i>папка не выбрана</i>}
-                </span>
-                <Button
-                  label={zeppArchivePath ? 'Сменить папку' : 'Выбрать папку'}
-                  icon="pi pi-folder-open"
-                  className="pb-soft p-button-sm"
-                  onClick={handleChangeZeppFolder}
-                  disabled={zeppUpdating}
-                />
-                <Button
-                  label={zeppUpdating ? 'Обновление…' : 'Обновить Zepp'}
-                  icon={zeppUpdating ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'}
-                  className="pb p-button-sm"
-                  onClick={handleUpdateZepp}
-                  disabled={zeppUpdating}
-                  tooltip="Импортировать только те тренировки, которых ещё нет"
-                />
-              </div>
-              <small className="pb-hint">
-                Тренировки, уже загруженные через Strava-архив (± 2 мин
-                по времени старта), будут пропущены.
-              </small>
-            </div>
-
-            {zeppUpdating && importProgress && (
-              <div className="pb-import-progress">
-                <div className="pb-import-progress__header">
-                  <span>
-                    {importProgress.current} / {importProgress.total}
-                    {' · '}
-                    <code>{importProgress.filename}</code>
-                  </span>
-                  <Button
-                    label="Отмена"
-                    icon="pi pi-times"
-                    className="pb-soft p-button-sm"
-                    onClick={handleCancelImport}
-                  />
-                </div>
-                <ProgressBar
-                  value={Math.round(
-                    (importProgress.current / importProgress.total) * 100
-                  )}
-                  showValue={false}
-                  style={{ height: '6px' }}
-                />
-                <div className="pb-import-progress__stats">
-                  <span>+{importProgress.imported}</span>
-                  <span>~{importProgress.updated}</span>
-                  <span>·{importProgress.skipped}</span>
-                  {importProgress.failed > 0 && (
-                    <span className="pb-import-progress__fail">
-                      ✗{importProgress.failed}
-                    </span>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {zeppError && (
-              <Message severity="error" text={zeppError} className="w-full mt-2" />
-            )}
-
-            {zeppResult && (
-              <Message
-                severity={zeppResult.failed > 0 ? 'warn' : 'success'}
-                className="w-full mt-2"
-                content={
-                  <span>
-                    Zepp: добавлено <b>{zeppResult.imported}</b>
-                    {' · '}пропущено <b>{zeppResult.skipped}</b>
-                    {zeppResult.failed > 0 && (
-                      <> · ошибок <b>{zeppResult.failed}</b></>
-                    )}
-                    {' · '}всего <b>{zeppResult.total}</b>
-                  </span>
-                }
-              />
-            )}
-          </Panel>
-        </div>
+        <ImportPanel onAfterImport={loadRunFacts} />
 
         {/* ==================== WELLNESS (таблица) ==================== */}
         <Panel header="Здоровье" className="shadow-5 mb-3 pb-panel">
