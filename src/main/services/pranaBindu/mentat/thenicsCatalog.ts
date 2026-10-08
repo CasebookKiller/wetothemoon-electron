@@ -259,8 +259,6 @@ export const THENICS_CATALOG: ThenicsEntry[] = [
     muscles: ['Legs'], equipment: ['No'] },
 
   // ============ Leg Raise / Core (расширено) ============
-  { id: 17, key: 'leg-raise', name: 'Leg Raise', nameRu: 'Подъём ног', level: 'Beginner',
-    muscles: ['Abs'], equipment: ['No'] },
   { id: 65, key: 'straddle-leg-raise-hold', name: 'Straddle Leg Raise Hold', level: 'Beginner',
     muscles: ['Abs'], equipment: ['No'] },
   { id: 67, key: 'straddle-leg-raises', name: 'Straddle Leg Raises', level: 'Beginner',
@@ -270,8 +268,6 @@ export const THENICS_CATALOG: ThenicsEntry[] = [
   { id: 69, key: 'leg-raise-hold', name: 'Leg Raise Hold', level: 'Beginner',
     muscles: ['Abs'], equipment: ['No'] },
   { id: 73, key: 'advanced-leg-raises', name: 'Advanced Leg Raises', level: 'Beginner',
-    muscles: ['Abs'], equipment: ['No'] },
-  { id: 115, key: 'plank', name: 'Plank', level: 'Beginner',
     muscles: ['Abs'], equipment: ['No'] },
   { id: 118, key: 'one-arm-plank', name: 'One Arm Plank', level: 'Beginner',
     muscles: ['Abs'], equipment: ['No'] },
@@ -288,8 +284,6 @@ export const THENICS_CATALOG: ThenicsEntry[] = [
   { id: 247, key: 'climber', name: 'Climber', level: 'Beginner',
     muscles: ['Arms', 'Chest', 'Abs'], equipment: ['No'] },
   { id: 253, key: 'cross-climber', name: 'Cross Climber', level: 'Beginner',
-    muscles: ['Abs'], equipment: ['No'] },
-  { id: 127, key: 'hollow-body-hold', name: 'Hollow Body Hold', level: 'Beginner',
     muscles: ['Abs'], equipment: ['No'] },
   { id: 128, key: 'hollow-arch-roll', name: 'Hollow Arch Roll', level: 'Beginner',
     muscles: ['Abs'], equipment: ['No'] },
@@ -323,8 +317,6 @@ export const THENICS_CATALOG: ThenicsEntry[] = [
     muscles: ['Abs'], equipment: ['Bench or Pillar'] },
   { id: 261, key: 'negative-dragon-flag', name: 'Negative Dragon Flag', level: 'Advanced',
     muscles: ['Abs'], equipment: ['Bench or Pillar'] },
-  { id: 34, key: 'dragon-flag', name: 'Dragon Flag', level: 'Advanced',
-    muscles: ['Abs'], equipment: ['Bench, Pillar or Very low bar'] },
 
   // ============ Leg Raise / Core ============
   { id: 17, key: 'leg-raise', name: 'Leg Raise', nameRu: 'Подъём ног', level: 'Beginner',
