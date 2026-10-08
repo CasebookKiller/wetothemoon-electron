@@ -204,11 +204,19 @@ export const CheckLevelDialog: React.FC<Props> = ({
     setError('');
     setResult(null);
     try {
+      // Сначала считаем достигнутый rung — нужен и для сессии
+      // (снимок «что показал тест»), и для прогресса.
+      const { rung: detected, achievedTarget } = detectRung(ladder, actual);
+
       const exercises: SessionExercise[] = [
         {
           movementKey,
           level,
-          rung,
+          // В сессию пишем достигнутый rung, а не текущий из
+          // exercise_progress. Иначе в DayDrawer виден «rung до
+          // теста», а не «rung после». 0 → 1, чтобы UI не показывал
+          // пустой тег (тест мог не дотянуть до первого rung).
+          rung: detected > 0 ? detected : 1,
           target: ladder[ladder.length - 1].raw,
           actualSets: actual,
           isTimeBased: isTimeBased,
@@ -232,7 +240,6 @@ export const CheckLevelDialog: React.FC<Props> = ({
         return;
       }
 
-      const { rung: detected, achievedTarget } = detectRung(ladder, actual);
       const newRung = Math.max(rung, Math.min(detected, ladder.length));
       const newLevel = achievedTarget ? Math.min(level + 1, 10) : level;
       const finalRung = achievedTarget ? 1 : newRung;

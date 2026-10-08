@@ -3240,9 +3240,22 @@ export function registerPranaBinduHandlers(): void {
 
             // 1. Сначала — дедуп по (source, external_id): файл уже импортировался.
             const byExt = db
-              .prepare(`SELECT id FROM run_facts WHERE source = ? AND external_id = ? LIMIT 1`)
-              .get(source, externalId) as { id: number } | undefined;
+              .prepare(
+                `SELECT id, origin FROM run_facts
+                 WHERE source = ? AND external_id = ? LIMIT 1`
+              )
+              .get(source, externalId) as
+              | { id: number; origin: string | null }
+              | undefined;
             if (byExt && skipIfFileExists) {
+              // Импорт из Zepp-папки всегда помечает origin='zepp-app'.
+              // Если файл раньше был отнесён к другому origin
+              // (strava-archive, manual-import) — обновляем:
+              // zepp-папка приоритетнее по достоверности источника.
+              if (byExt.origin !== 'zepp-app') {
+                db.prepare(`UPDATE run_facts SET origin = ? WHERE id = ?`)
+                  .run('zepp-app', byExt.id);
+              }
               skipped++;
               sendProgress({
                 current: i + 1, total: files.length, filename,
