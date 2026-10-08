@@ -78,6 +78,11 @@ interface ProviderOption {
   value: string;
 }
 
+import {
+  WellnessPanel,
+  type WellnessPanelHandle,
+} from '@/components/PRANA_BINDU/PANELS/WellnessPanel/WellnessPanel';
+
 const PROVIDER_OPTIONS: ProviderOption[] = [
   { label: 'dodofo (активности)', value: 'dodofo' },
   { label: 'intervals.icu (активности + события)', value: 'intervals-icu' },
@@ -483,6 +488,7 @@ export const PranaBinduPage: React.FC = () => {
   };
 
   const profilePanelRef = React.useRef<ProfilePanelHandle>(null);
+  const wellnessPanelRef = React.useRef<WellnessPanelHandle>(null);
 
   const [syncingWellness, setSyncingWellness] = useState(false);
   const [wellnessResult, setWellnessResult] = useState<string>('');
@@ -577,10 +583,6 @@ export const PranaBinduPage: React.FC = () => {
   }, [groupedFacts, filters]);
 
   const handleResetFilters = () => setFilters(EMPTY_FILTERS);
-
-  const [recoveryLogs, setRecoveryLogs] = useState<any[]>([]);
-  const [selectedRecovery, setSelectedRecovery] = useState<RecoveryLogLite | null>(null);
-  const [wellnessDrawerVisible, setWellnessDrawerVisible] = useState(false);
 
   const [planEvents, setPlanEvents] = useState<PlanEventLite[]>([]);
   const [templatesVisible, setTemplatesVisible] = useState(false);
@@ -769,7 +771,7 @@ export const PranaBinduPage: React.FC = () => {
     if (syncFrom && syncTo) saveStoredRange(syncFrom, syncTo);
     const t = setTimeout(() => {
       loadRunFacts();
-      loadRecoveryLogs();
+      wellnessPanelRef.current?.reload();
       loadPlanEvents();     // ← добавить
     }, 400);
     return () => clearTimeout(t);
@@ -1056,7 +1058,7 @@ export const PranaBinduPage: React.FC = () => {
         setWellnessResult(
           `Добавлено ${res.added} · обновлено ${res.updated} · всего ${res.total}`
         );
-        await loadRecoveryLogs();
+        await wellnessPanelRef.current?.reload();
       } else {
         setWellnessError(res.error ?? 'Ошибка');
       }
@@ -1148,24 +1150,11 @@ export const PranaBinduPage: React.FC = () => {
         setWellnessResult(summary);
       }
 
-      await loadRecoveryLogs();
+      await wellnessPanelRef.current?.reload();
     } catch (e) {
       setWellnessError((e as Error).message);
     } finally {
       setSyncingWellness(false);
-    }
-  };
-
-  const loadRecoveryLogs = async () => {
-    if (!api?.pb?.listRecoveryLogs) return;
-    try {
-      const res = await api.pb.listRecoveryLogs(
-        toIsoDate(syncFrom),
-        toIsoDate(syncTo)
-      );
-      if (res?.success) setRecoveryLogs(res.items ?? []);
-    } catch {
-      // ignore
     }
   };
 
@@ -1678,7 +1667,7 @@ export const PranaBinduPage: React.FC = () => {
             <AutoSyncPanel
               onAfterSync={async () => {
                 await loadRunFacts();
-                await loadRecoveryLogs();
+                await wellnessPanelRef.current?.reload();
               }}
             />
           </div>
@@ -1688,78 +1677,7 @@ export const PranaBinduPage: React.FC = () => {
         <ImportPanel onAfterImport={loadRunFacts} />
 
         {/* ==================== WELLNESS (таблица) ==================== */}
-        <Panel header="Здоровье" className="shadow-5 mb-3 pb-panel">
-          {recoveryLogs.length === 0 ? (
-            <small className="pb-hint">
-              Нет данных за выбранный диапазон. Нажмите «Подтянуть Здоровье»
-              в панели «Синхронизация (API)».
-            </small>
-          ) : (
-            <div className="pb-wellness-table pb-wellness-table--scrollable">
-              <div className="pb-wellness-table__header">
-                <span>Дата</span>
-                <span title="Пульс покоя">RHR</span>
-                <span title="Сон, часов">Сон</span>
-                <span title="Sleep score">Score</span>
-                <span title="Шаги">Шаги</span>
-                <span title="Chronic Training Load">CTL</span>
-                <span title="Acute Training Load">ATL</span>
-              </div>
-              <div className="pb-wellness-table__body">
-                {recoveryLogs.map((r) => {
-                  const avgRhr =
-                    recoveryLogs.filter((x) => x.resting_hr != null).reduce(
-                      (a, x) => a + x.resting_hr,
-                      0
-                    ) /
-                    (recoveryLogs.filter((x) => x.resting_hr != null).length || 1);
-                  const rhrCls =
-                    r.resting_hr == null
-                      ? ''
-                      : r.resting_hr <= avgRhr - 2
-                      ? 'pb-wellness-table__val--good'
-                      : r.resting_hr >= avgRhr + 3
-                      ? 'pb-wellness-table__val--warn'
-                      : '';
-
-                  return (
-                    <div
-                      key={r.date}
-                      className="pb-wellness-table__row pb-wellness-table__row--clickable"
-                      onClick={() => {
-                        setSelectedRecovery(r as RecoveryLogLite);
-                        setWellnessDrawerVisible(true);
-                      }}
-                      title="Открыть полную карточку дня"
-                    >
-                      <span className="pb-wellness-table__date">
-                        {r.date}
-                      </span>
-                      <span className={`pb-wellness-table__val ${rhrCls}`}>
-                        {r.resting_hr ?? '—'}
-                      </span>
-                      <span className="pb-wellness-table__val">
-                        {r.sleep_hours != null ? r.sleep_hours.toFixed(1) : '—'}
-                      </span>
-                      <span className="pb-wellness-table__val">
-                        {r.sleep_score ?? '—'}
-                      </span>
-                      <span className="pb-wellness-table__val">
-                        {r.steps != null ? r.steps.toLocaleString('ru-RU') : '—'}
-                      </span>
-                      <span className="pb-wellness-table__val pb-wellness-table__val--dim">
-                        {r.ctl != null ? r.ctl.toFixed(1) : '—'}
-                      </span>
-                      <span className="pb-wellness-table__val pb-wellness-table__val--dim">
-                        {r.atl != null ? r.atl.toFixed(1) : '—'}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </Panel>
+        <WellnessPanel ref={wellnessPanelRef} from={syncFrom} to={syncTo} />
 
         <Panel header="Календарь" className="shadow-5 mb-3 pb-panel">
           <CalendarPanel
@@ -1876,11 +1794,6 @@ export const PranaBinduPage: React.FC = () => {
           }}
         />
 
-        <WellnessDrawer
-          visible={wellnessDrawerVisible}
-          log={selectedRecovery}
-          onHide={() => setWellnessDrawerVisible(false)}
-        />
       </div>
 
       <CheckReminderDialog
