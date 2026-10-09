@@ -4,11 +4,12 @@
 // Глупый компонент: получает events + callbacks, ничего не знает
 // про IPC.
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from 'primereact/button';
 import { Column } from 'primereact/column';
 import { DataTable } from 'primereact/datatable';
 import { Message } from 'primereact/message';
+import { THENICS_CATALOG } from '@/main/services/pranaBindu/mentat/thenicsCatalog';
 
 export interface PlanEventLite {
   id: number;
@@ -38,6 +39,7 @@ interface Props {
   onClear: () => void;
   onOpenEvent: (event: PlanEventLite) => void;
   onOpenTemplates: () => void;
+  onOpenEquivalences: () => void;
   onMassDelete: () => void;
 }
 
@@ -90,7 +92,68 @@ export const PlanEventsPanel: React.FC<Props> = ({
   onMassDelete,
   onOpenEvent,
   onOpenTemplates,
+  onOpenEquivalences,
 }) => {
+    const api = (window as any).electronAPI;
+
+  // Счётчик разметки Thenics для баннера.
+  const [mappedCount, setMappedCount] = useState<number | null>(null);
+  const [bannerHidden, setBannerHidden] = useState(false);
+
+  const totalCount = THENICS_CATALOG.length;
+
+  const BANNER_HIDE_KEY = 'pb.equivBanner.hiddenUntil';
+
+  useEffect(() => {
+    // Скрыт до даты?
+    try {
+      const raw = localStorage.getItem(BANNER_HIDE_KEY);
+      if (raw) {
+        const until = Number(raw);
+        if (Number.isFinite(until) && Date.now() < until) {
+          setBannerHidden(true);
+        } else {
+          localStorage.removeItem(BANNER_HIDE_KEY);
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+
+    (async () => {
+      try {
+        const res = await api?.pb?.listEquivalences?.();
+        if (res?.success) {
+          const keys = new Set<string>();
+          for (const e of res.items ?? []) {
+            if (e.source === 'thenics') keys.add(e.sourceKey);
+          }
+          setMappedCount(keys.size);
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const hideBannerForToday = () => {
+    try {
+      // Скрыть до конца текущего дня.
+      const tomorrow = new Date();
+      tomorrow.setHours(24, 0, 0, 0);
+      localStorage.setItem(BANNER_HIDE_KEY, String(tomorrow.getTime()));
+    } catch {
+      /* ignore */
+    }
+    setBannerHidden(true);
+  };
+
+  const showBanner =
+    !bannerHidden &&
+    mappedCount != null &&
+    mappedCount < totalCount;
+
   return (
     <div className="pb-plan-panel">
       <div className="pb-plan__toolbar">
@@ -126,6 +189,36 @@ export const PlanEventsPanel: React.FC<Props> = ({
           tooltip="Готовые шаблоны тренировок для конструктора ICU"
         />
       </div>
+
+            {showBanner && (
+        <div className="pb-equiv-banner">
+          <i className="pi pi-info-circle pb-equiv-banner__icon" />
+          <div className="pb-equiv-banner__body">
+            <span className="pb-equiv-banner__title">
+              Упражнения Thenics не размечены
+            </span>
+            <span className="pb-equiv-banner__hint">
+              {mappedCount} из {totalCount} сопоставлено с нашими
+              упражнениями. Чем больше разметки — тем точнее подсказки
+              «≈ Thenics X» в карточках тренировок.
+            </span>
+          </div>
+          <Button
+            label="Разметить"
+            icon="pi pi-arrow-right"
+            className="pb-soft p-button-sm pb-equiv-banner__action"
+            onClick={onOpenEquivalences}
+          />
+          <Button
+            icon="pi pi-times"
+            text
+            className="pb-equiv-banner__close"
+            onClick={hideBannerForToday}
+            tooltip="Скрыть до завтра"
+            tooltipOptions={{ position: 'bottom' }}
+          />
+        </div>
+      )}
 
       {error && (
         <Message severity="error" text={error} className="w-full mt-2 mb-2" />

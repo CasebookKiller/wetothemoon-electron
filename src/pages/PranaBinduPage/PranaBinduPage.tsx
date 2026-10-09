@@ -384,7 +384,7 @@ export const PranaBinduPage: React.FC = () => {
   );
   const [reminderDue, setReminderDue] = useState<string[]>([]);
   const [templatesInitialMode, setTemplatesInitialMode] = useState<
-    'templates' | 'catalog' | 'programs' | undefined
+    'templates' | 'catalog' | 'programs' | 'equivalences' | undefined
   >(undefined);
 
   // ==================== Загрузка списка пробежек ====================
@@ -812,6 +812,10 @@ export const PranaBinduPage: React.FC = () => {
                   onMassDelete={() => setMassDeleteVisible(true)}
                   onOpenEvent={handleOpenPlanEvent}
                   onOpenTemplates={() => setTemplatesVisible(true)}
+                  onOpenEquivalences={() => {
+                    setTemplatesInitialMode('equivalences');
+                    setTemplatesVisible(true);
+                  }}
                 />
               ),
             },
