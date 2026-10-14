@@ -2,6 +2,10 @@
    DatabasePage.css
    ============================================================ */
 
+body[data-module='sietch'] {
+  --close-icon-color: var(--sietch-accent, #6ab2f2);
+}
+
 /* ---------- Пагинация в акцентном цвете ---------- */
 .p-paginator .p-paginator-page,
 .p-paginator .p-paginator-next,

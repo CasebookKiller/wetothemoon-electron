@@ -2980,3 +2980,46 @@ ul#ullist.p-datascroller-list {
 .gateway-top-zone:hover .gateway-top-panel {
   pointer-events: auto; /* при наведении активируем панель */
 }
+
+/* ============================================================
+   Универсальная кнопка закрытия PrimeReact-диалогов.
+   Цвет — из --close-icon-color (задаётся модулем).
+   Работает для любого body[data-module].
+   ============================================================ */
+
+body[data-module] .p-dialog .p-dialog-header-close,
+body[data-module] .p-dialog-header-close {
+  --_ci-accent: var(--close-icon-color, currentColor);
+
+  color: var(--_ci-accent) !important;
+  background: transparent !important;
+  border: none !important;
+  width: 2rem !important;
+  height: 2rem !important;
+  min-width: 2rem !important;
+  padding: 0 !important;
+  border-radius: 6px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: background-color 0.15s ease !important;
+  box-shadow: none !important;
+  outline: none !important;
+  opacity: 1 !important;
+}
+
+body[data-module] .p-dialog .p-dialog-header-close:hover,
+body[data-module] .p-dialog-header-close:hover {
+  background: color-mix(in srgb, var(--_ci-accent) 16%, transparent) !important;
+  color: var(--_ci-accent) !important;
+}
+
+body[data-module] .p-dialog .p-dialog-header-close svg,
+body[data-module] .p-dialog .p-dialog-header-close svg path,
+body[data-module] .p-dialog-header-close svg,
+body[data-module] .p-dialog-header-close svg path {
+  fill: currentColor !important;
+  color: currentColor !important;
+  width: 14px !important;
+  height: 14px !important;
+}

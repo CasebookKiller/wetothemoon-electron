@@ -1,3 +1,5 @@
+// src/components/Root.tsx
+
 import { type FC } from 'react';
 
 import { App } from '@/components/App.tsx';

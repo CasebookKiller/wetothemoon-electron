@@ -1,3 +1,9 @@
+body[data-module='osint'] {
+  --osint-accent: #6ab2f2;
+  --close-icon-color: var(--osint-accent);
+    --app-dialog-accent: var(--osint-accent, #6ab2f2);
+}
+
 .osint-page .p-panel {
   margin-bottom: 0;
 }

@@ -197,6 +197,11 @@ export const OSINTPage: React.FC = () => {
   const api = (window as any).electronAPI;
 
   useEffect(() => {
+    document.body.setAttribute('data-module', 'osint');
+    return () => document.body.removeAttribute('data-module');
+  }, []);
+
+  useEffect(() => {
     if (inn.trim()) {
       checkDump(inn);
     }
