@@ -86,7 +86,7 @@ import {
 import { buildExerciseGraph, auditGraph } from '../services/pranaBindu/mentat/graph/graphBuilder';
 import { DifficultyBand, ProgramProps } from '../services/pranaBindu/mentat/graph/ontology';
 
-import { WADE_SEED } from '../services/pranaBindu/mentat/graph/data';
+import { WADE_SEED, ENABLED_SEEDS } from '../services/pranaBindu/mentat/graph/data';
 import type { EdgeJson, GraphJson, NodeJson } from '../services/pranaBindu/mentat/graph/schema';
 import { buildPalette } from '../services/pranaBindu/mentat/graph/sources';
 import { findThenicsMatches } from '../services/pranaBindu/mentat/graph/equivalencesIndex';
@@ -121,6 +121,20 @@ function loadWadeGraph(): GraphJson {
     }
   }
   return WADE_SEED;
+}
+
+/**
+ * Загружает все enabled-графы из манифеста.
+ * Wade подменяется на user.json (если есть).
+ * Остальные (smithrun и будущие) читаются как seed из бандла.
+ *
+ * РЕЖИМ A: только чтение. Write-IPC по-прежнему пишут в wade.graph.user.json.
+ * В режиме B (после миграции) — этот блок станет точкой записи smithrun.
+ */
+function loadEnabledGraphs(): GraphJson[] {
+  return ENABLED_SEEDS.map((seed) =>
+    seed.id === 'wade' ? loadWadeGraph() : seed,
+  );
 }
 
 /**
@@ -4040,7 +4054,8 @@ export function registerPranaBinduHandlers(): void {
   ipcMain.handle('pb:debug-graph-query', async () => {
     const { buildExerciseGraph } = await import('../services/pranaBindu/mentat/graph/graphBuilder');
     const { indexGraph, getPatternSubtree, getExercisePath, summarizeGraph } = await import('../services/pranaBindu/mentat/graph/graphQueries');
-    const graph = buildExerciseGraph([loadWadeGraph()]);
+    const graphs = loadEnabledGraphs();
+    const graph = buildExerciseGraph(graphs);
     const idx = indexGraph(graph);
 
     const pushup = getPatternSubtree(graph, idx, 'push');
@@ -4067,9 +4082,13 @@ export function registerPranaBinduHandlers(): void {
 
   ipcMain.handle('pb:get-exercise-graph', async () => {
     try {
-      const g = loadWadeGraph();
-      const graph = buildExerciseGraph([g]);
-      return { ok: true, graph, source: fs.existsSync(userGraphPath()) ? 'user' : 'seed' };
+      const graphs = loadEnabledGraphs();
+      const graph = buildExerciseGraph(graphs);
+      return {
+        ok: true,
+        graph,
+        source: fs.existsSync(userGraphPath()) ? 'user' : 'seed',
+      };
     } catch (e) {
       return { ok: false, error: (e as Error).message };
     }
@@ -4436,8 +4455,8 @@ export function registerPranaBinduHandlers(): void {
 
   ipcMain.handle('pb:debug-graph-audit', async () => {
     try {
-      const g = loadWadeGraph();
-      const graph = buildExerciseGraph([g]);
+      const graphs = loadEnabledGraphs();
+      const graph = buildExerciseGraph(graphs);
       return { ok: true, audit: auditGraph(graph) };
     } catch (e) {
       return { ok: false, error: (e as Error).message };

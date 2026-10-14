@@ -4,7 +4,7 @@
   "labelRu": "Кузница Бега",
   "patterns": [],
   "catalogs": [
-    { "id": "smithrun", "label": "Smithrun", "labelRu": "Кузница Бега" }
+    { "id": "smithrun", "label": "Smithrun", "labelRu": "Кузница Бега", "pos": { "x": 500, "y": 1200 } }
   ],
   "canonicals": [],
   "nodes": [],
