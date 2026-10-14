@@ -4,6 +4,7 @@
 // Используется в шапке DayDrawer и в будущей ячейке FullWeek.
 
 import React from 'react';
+import AppIcon from '../COMMON/AppIcon/AppIcon';
 
 export interface RecoveryLogLite {
   date: string;
@@ -54,7 +55,7 @@ export const DaySummary: React.FC<Props> = ({ log, className }) => {
   return (
     <div className={`pb-day-summary ${className ?? ''}`}>
       <span className="pb-day-summary__item">
-        <i className="pi pi-moon" /> {fmtH(log.sleep_hours)}
+        <AppIcon name="moon" size="sm" color="accent" /> {fmtH(log.sleep_hours)}
       </span>
       {log.sleep_score != null && (
         <span className="pb-day-summary__item pb-day-summary__item--dim">
@@ -62,7 +63,7 @@ export const DaySummary: React.FC<Props> = ({ log, className }) => {
         </span>
       )}
       <span className="pb-day-summary__item">
-        <i className="pi pi-heart" /> {fmtInt(log.resting_hr)}
+        <AppIcon name="heart" size="sm" color="accent" /> {fmtInt(log.resting_hr)}
       </span>
       {log.hrv != null && (
         <span className="pb-day-summary__item pb-day-summary__item--dim">

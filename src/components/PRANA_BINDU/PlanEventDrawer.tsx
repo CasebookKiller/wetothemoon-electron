@@ -14,6 +14,7 @@ import {
   type DeleteScope,
 } from './DeletePlanEventDialog';
 import { LogWorkoutSessionDialog } from './LogWorkoutSessionDialog';
+import AppIcon from '../COMMON/AppIcon/AppIcon';
 
 interface Props {
   visible: boolean;
@@ -323,7 +324,7 @@ export const PlanEventDrawer: React.FC<Props> = ({
       {/* Header */}
       <div className="pb-drawer__header">
         <div className="pb-drawer__title">
-          <i className="pi pi-calendar pb-drawer__icon" />
+          <AppIcon name="calendar" size="md" color="accent" className="pb-drawer__icon" />
           {event.date}
           {timeOnly && timeOnly !== '00:00' && (
             <span className="pb-drawer__count"> {timeOnly}</span>

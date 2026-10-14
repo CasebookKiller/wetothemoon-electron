@@ -13,6 +13,7 @@ import React from 'react';
 import { Button } from 'primereact/button';
 import { Dialog } from 'primereact/dialog';
 import type { ExerciseCategory } from '@/main/services/pranaBindu/mentat/types';
+import AppIcon from '../COMMON/AppIcon/AppIcon';
 
 interface Props {
   visible: boolean;
@@ -117,7 +118,7 @@ export const CheckReminderDialog: React.FC<Props> = ({
             <div className="pb-check-reminder-dialog__list">
               {dueMovements.map((name, i) => (
                 <div key={i} className="pb-check-reminder-dialog__item">
-                  <i className="pi pi-circle-fill" />
+                  <AppIcon name="circle-fill" size="xs" color="accent" />
                   <span>{name}</span>
                 </div>
               ))}

@@ -5,6 +5,49 @@ body[data-module='prana-bindu'] .p-dropdown-panel .p-dropdown-item.p-highlight {
   color: #d4a373 !important;
 }
 
+body[data-module='prana-bindu'] {
+  --close-icon-color: var(--pb-accent, #d4a373);
+  --app-dialog-accent: var(--pb-accent, #d4a574);
+}
+
+/* ============================================================
+   Prana-Bindu: кнопка закрытия в диалогах PrimeReact
+   приводится к стилю .app-close-icon (плоская, песочная).
+   ============================================================ */
+
+body[data-module='prana-bindu'] .p-dialog .p-dialog-header-close {
+  --_accent: var(--close-icon-color, var(--pb-accent, #d4a373));
+
+  color: var(--_accent) !important;
+  background: transparent !important;
+  border: none !important;
+  width: 2rem !important;
+  height: 2rem !important;
+  min-width: 2rem !important;
+  padding: 0 !important;
+  border-radius: 6px !important;
+  opacity: 1 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+body[data-module='prana-bindu'] .p-dialog .p-dialog-header-close:hover {
+  background: color-mix(in srgb, var(--_accent) 16%, transparent) !important;
+  color: var(--_accent) !important;
+}
+
+body[data-module='prana-bindu'] .p-dialog .p-dialog-header-close svg,
+body[data-module='prana-bindu'] .p-dialog .p-dialog-header-close svg path {
+  fill: currentColor !important;
+  color: currentColor !important;
+  width: 14px !important;
+  height: 14px !important;
+}
+
 /* ============================================================
    Контейнер страницы
    ============================================================ */
@@ -5740,3 +5783,52 @@ body[data-module='prana-bindu'] .pb-debug-dialog .p-dialog-header-close svg path
   flex: 0 0 auto;
 }
 
+
+.pb-full-week__actions {
+  margin-left: auto;        /* прижимает весь блок вправо */
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-wrap: nowrap;
+}
+
+.pb-full-week__actions .p-button.pb-soft.p-button-sm {
+  min-width: 2.25rem !important;
+  width: 2.25rem !important;
+  height: 2.25rem !important;
+  padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.pb-full-week__actions .p-button .p-button-icon {
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.pb-catalog-picker__list {
+  max-height: 400px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 0.35rem;
+  margin-top: 0.5rem;
+}
+
+.pb-catalog-picker__row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.82rem;
+}
+
+.pb-catalog-picker__row:hover {
+  background: color-mix(in srgb, var(--pb-accent) 8%, transparent);
+}

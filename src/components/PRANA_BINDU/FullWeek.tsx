@@ -33,6 +33,9 @@ interface Props {
   onDayClick?: (date: string) => void;
   onOpenPlanEvent?: (eventId: number) => void;
   onOpenRunFact?: (factId: number) => void;
+  onOpenSettings?: () => void;       // ⭐ новое
+  onOpenExercises?: () => void;      // ⭐ новое
+  onOpenGraph?: () => void;          // ⭐ новое
   className?: string;
 }
 
@@ -112,6 +115,9 @@ export const FullWeek: React.FC<Props> = ({
   onDayClick,
   onOpenPlanEvent,
   onOpenRunFact,
+  onOpenSettings,
+  onOpenExercises,
+  onOpenGraph,
   className,
 }) => {
   const api = (window as any).electronAPI;
@@ -355,7 +361,7 @@ export const FullWeek: React.FC<Props> = ({
       onWheel={handleWheel}
     >
       {/* Toolbar */}
-            <div className="pb-full-week__toolbar">
+      <div className="pb-full-week__toolbar">
         <div className="pb-full-week__pin-slot" ref={pinSlotRef}>
           <Button
             icon={pinned ? 'pi pi-lock' : 'pi pi-lock-open'}
@@ -413,10 +419,31 @@ export const FullWeek: React.FC<Props> = ({
           <i className="pi pi-spin pi-spinner pb-full-week__spin" />
         )}
 
-        <div className="pb-full-week__legend pb-hint">
-          <span className="pb-full-week__dot pb-full-week__dot--plan" /> план
-          <span className="pb-full-week__sep">·</span>
-          <span className="pb-full-week__dot pb-full-week__dot--fact" /> факт
+        <div className="pb-full-week__actions">
+          <Button
+            icon="pi pi-cog"
+            className="pb-soft p-button-sm"
+            onClick={onOpenSettings}
+            disabled={!onOpenSettings}
+            tooltip="Настройки"
+            tooltipOptions={{ position: 'bottom' }}
+          />
+          <Button
+            icon="pi pi-book"
+            className="pb-soft p-button-sm"
+            onClick={onOpenExercises}
+            disabled={!onOpenExercises}
+            tooltip="Упражнения"
+            tooltipOptions={{ position: 'bottom' }}
+          />
+          <Button
+            icon="pi pi-share-alt"
+            className="pb-soft p-button-sm"
+            onClick={onOpenGraph}
+            disabled={!onOpenGraph}
+            tooltip="Граф упражнений"
+            tooltipOptions={{ position: 'bottom' }}
+          />
         </div>
       </div>
 

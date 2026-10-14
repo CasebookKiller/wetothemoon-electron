@@ -20,9 +20,11 @@ import { parseWorkoutText } from '@/main/services/pranaBindu/mentat/workoutParse
 import {
   findLevelByName,
   findNamedByName,
+  findProgressionByIcuName,   // ← новое
 } from '@/main/services/pranaBindu/mentat/exerciseCatalog';
 import type { PlanEventLite } from './PlanEventsPanel';
 import type { SessionExercise } from '@/main/services/pranaBindu/core/types';
+import { CatalogPickerDialog, type PickedExercise } from './CatalogPickerDialog';
 
 interface Props {
   visible: boolean;
@@ -101,12 +103,22 @@ function buildRows(text: string, initialActual: boolean): Row[] {
         level = found.level;
       }
     }
+    // NEW: если по уровню не нашли — ищем по icuName каталога
+    if (!movementKey) {
+      const canon = findProgressionByIcuName(stripped);
+      if (canon) {
+        movementKey = canon.key;
+        if (step.prefixLevel != null) {
+          // Ограничиваем уровнем каталога (защита от W99)
+          level = Math.min(step.prefixLevel, canon.levels.length);
+        }
+      }
+    }
     if (!movementKey) {
       const named = findNamedByName(stripped);
       if (named) movementKey = named.key;
     }
     if (!movementKey) movementKey = 'unknown';
-
     const isTimeBased =
       step.sets == null &&
       (step.durationSec ?? 0) > 0 &&
@@ -141,6 +153,8 @@ export const LogWorkoutSessionDialog: React.FC<Props> = ({
   const [freeOverrides, setFreeOverrides] = useState<Record<number, string>>(
     {}
   );
+  const [freeCatalogRows, setFreeCatalogRows] = useState<Row[]>([]);
+  const [catalogPickerOpen, setCatalogPickerOpen] = useState(false);
   const [rpe, setRpe] = useState<number | null>(7);
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
@@ -159,6 +173,8 @@ export const LogWorkoutSessionDialog: React.FC<Props> = ({
       setFreeText('');
     }
     setFreeOverrides({});
+    setFreeCatalogRows([]);
+    setCatalogPickerOpen(false);
     setRpe(7);
     setNotes('');
     setError('');
@@ -169,12 +185,12 @@ export const LogWorkoutSessionDialog: React.FC<Props> = ({
   // Активные строки: из плана или из свободного ввода
   const activeRows: Row[] = useMemo(() => {
     if (planEvent) return planRows;
-    const base = buildRows(freeText, true);
-    return base.map((r, idx) => ({
+    const textRows = buildRows(freeText, true).map((r, idx) => ({
       ...r,
       actualText: freeOverrides[idx] ?? r.actualText,
     }));
-  }, [planEvent, planRows, freeText, freeOverrides]);
+    return [...freeCatalogRows, ...textRows];
+  }, [planEvent, planRows, freeText, freeOverrides, freeCatalogRows]);
 
   const filledCount = useMemo(
     () => activeRows.filter((r) => r.actualText.trim().length > 0).length,
@@ -186,8 +202,22 @@ export const LogWorkoutSessionDialog: React.FC<Props> = ({
       setPlanRows((prev) =>
         prev.map((r, i) => (i === idx ? { ...r, ...patch } : r))
       );
-    } else if (patch.actualText !== undefined) {
-      setFreeOverrides((prev) => ({ ...prev, [idx]: patch.actualText! }));
+      return;
+    }
+    // Свободный режим: первые freeCatalogRows.length строк — каталоговые,
+    // остальные — текстовые (индексы сдвинуты).
+    const catalogCount = freeCatalogRows.length;
+    if (idx < catalogCount) {
+      if (patch.actualText !== undefined) {
+        setFreeCatalogRows((prev) =>
+          prev.map((r, i) => (i === idx ? { ...r, actualText: patch.actualText! } : r))
+        );
+      }
+      return;
+    }
+    const textIdx = idx - catalogCount;
+    if (patch.actualText !== undefined) {
+      setFreeOverrides((prev) => ({ ...prev, [textIdx]: patch.actualText! }));
     }
   };
 
@@ -249,6 +279,19 @@ export const LogWorkoutSessionDialog: React.FC<Props> = ({
     }
   };
 
+  const handleCatalogPick = (items: PickedExercise[]) => {
+    setFreeCatalogRows((prev) => [
+      ...prev,
+      ...items.map<Row>((it) => ({
+        movementKey: it.movementKey,
+        level: it.level,
+        label: it.label,
+        actualText: '',
+        isTimeBased: it.isTimeBased,
+      })),
+    ]);
+  };
+
   return (
     <Dialog
       visible={visible}
@@ -263,6 +306,21 @@ export const LogWorkoutSessionDialog: React.FC<Props> = ({
       className="pb-debug-dialog pb-log-workout-dialog"
     >
       <div className="pb-debug__body">
+        {/* Режим выбора из каталог */}
+        {!planEvent && (
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <Button
+              label="Из каталога"
+              icon="pi pi-book"
+              className="pb-soft p-button-sm"
+              onClick={() => setCatalogPickerOpen(true)}
+              disabled={saving}
+            />
+            <span className="pb-hint">
+              Добавить упражнение выбором из каталога (без парсера)
+            </span>
+          </div>
+        )}
         {/* Режим свободного ввода: textarea сверху */}
         {!planEvent && (
           <>
@@ -380,6 +438,11 @@ export const LogWorkoutSessionDialog: React.FC<Props> = ({
           />
         </div>
       </div>
+      <CatalogPickerDialog
+        visible={catalogPickerOpen}
+        onHide={() => setCatalogPickerOpen(false)}
+        onPick={handleCatalogPick}
+      />
     </Dialog>
   );
 };

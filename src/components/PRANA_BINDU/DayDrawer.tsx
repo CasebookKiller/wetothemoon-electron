@@ -21,6 +21,7 @@ import type { WorkoutSession, SessionExercise } from '@/main/services/pranaBindu
 import { CATEGORY_LABELS } from '@/main/services/pranaBindu/mentat/programs';
 import { findProgressionsByKey } from '@/main/services/pranaBindu/mentat/exerciseCatalog';
 import { useEquivalencesMap } from './HOOKS/useEquivalencesMap';
+import AppIcon from '../COMMON/AppIcon/AppIcon';
 
 
 interface Props {
@@ -174,7 +175,7 @@ export const DayDrawer: React.FC<Props> = ({
     >
       <div className="pb-drawer__header">
         <div className="pb-drawer__title">
-          <i className="pi pi-calendar pb-drawer__icon" />
+          <AppIcon name="calendar" size="md" color="accent" className="pb-drawer__icon" />
           {date ?? ''}
         </div>
       </div>

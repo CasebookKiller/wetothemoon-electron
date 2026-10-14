@@ -21,6 +21,7 @@ import { ExerciseCatalog } from './ExerciseCatalog';
 import { WadeProgramsPanel } from './WadeProgramsPanel';
 import { EquivalenceMapperPanel } from './EquivalenceMapperPanel';
 import { THENICS_CATALOG } from '@/main/services/pranaBindu/mentat/thenicsCatalog';
+import AppIcon from '../COMMON/AppIcon/AppIcon';
 
 interface Props {
   visible: boolean;
@@ -272,7 +273,7 @@ export const WorkoutTemplatesDialog: React.FC<Props> = ({
                           className="pb-templates__verified"
                           title="Шаблон проверен в конструкторе ICU"
                         >
-                          <i className="pi pi-check" /> проверено
+                          <AppIcon name="check" size="sm" color="success" /> проверено
                         </span>
                       )}
                     </div>
@@ -337,7 +338,7 @@ export const WorkoutTemplatesDialog: React.FC<Props> = ({
           <ExerciseCatalog onCopy={handleCatalogCopy} />
           {lastCopied && (
             <div className="pb-catalog__copied">
-              <i className="pi pi-check" /> Скопировано: <code>{lastCopied}</code>
+              <AppIcon name="check" size="sm" color="success" /> Скопировано: <code>{lastCopied}</code>
             </div>
           )}
         </div>

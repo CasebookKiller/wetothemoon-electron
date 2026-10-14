@@ -16,6 +16,7 @@ import { InputText } from 'primereact/inputtext';
 import { Message } from 'primereact/message';
 import { findProgressionsByKey } from '@/main/services/pranaBindu/mentat/exerciseCatalog';
 import type { SessionExercise } from '@/main/services/pranaBindu/core/types';
+import AppIcon from '../COMMON/AppIcon/AppIcon';
 
 interface Props {
   visible: boolean;
@@ -371,13 +372,13 @@ export const CheckLevelDialog: React.FC<Props> = ({
         {result && (
           <div className="pb-check-level-dialog__result">
             <div className="pb-check-level-dialog__result-line">
-              <i className="pi pi-check" /> Сохранено.
+              <AppIcon name="check" size="sm" color="success" /> Сохранено.
               {' '}Определён rung{' '}
               <b>{result.detectedRung}</b> из {ladder.length}.
             </div>
             {result.achievedTarget && (
               <div className="pb-check-level-dialog__result-line pb-check-level-dialog__result-line--success">
-                <i className="pi pi-star" /> Целевая ступень достигнута.
+                <AppIcon name="star" size="sm" color="accent" /> Целевая ступень достигнута.
                 Уровень повышен до <b>{prefix}{level}</b>.
               </div>
             )}

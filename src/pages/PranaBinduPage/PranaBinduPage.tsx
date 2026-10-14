@@ -65,6 +65,9 @@ import {
   type WellnessPanelHandle,
 } from '@/components/PRANA_BINDU/PANELS/WellnessPanel/WellnessPanel';
 
+import { Toast } from 'primereact/toast';
+import { ExerciseGraphDialog } from '@/components/PRANA_BINDU/ExerciseGraph/ExerciseGraphDialog';
+
 const MODULES = [
   { name: 'Stillsuit', description: 'Марафон: пульс, темп, экономичность' },
   { name: 'Crysknife', description: 'Big-6: сила, контроль, сухожилия' },
@@ -386,6 +389,9 @@ export const PranaBinduPage: React.FC = () => {
   const [templatesInitialMode, setTemplatesInitialMode] = useState<
     'templates' | 'catalog' | 'programs' | 'equivalences' | undefined
   >(undefined);
+
+  const toastRef = React.useRef<Toast>(null);
+  const [graphVisible, setGraphVisible] = useState(false);
 
   // ==================== Загрузка списка пробежек ====================
 
@@ -721,6 +727,19 @@ export const PranaBinduPage: React.FC = () => {
             setDrawerVisible(true);
           }
         }}
+        onOpenSettings={() =>
+          toastRef.current?.show({
+            severity: 'info',
+            summary: 'Скоро',
+            detail: 'Настройки в разработке',
+            life: 2500,
+          })
+        }
+        onOpenExercises={() => {
+          setTemplatesInitialMode('catalog');
+          setTemplatesVisible(true);
+        }}
+        onOpenGraph={() => setGraphVisible(true)}
       />
 
       <div className="pb-page p-4">
@@ -938,6 +957,13 @@ export const PranaBinduPage: React.FC = () => {
         onLater={handleReminderLater}
         onNever={handleReminderNever}
       />
+
+      <ExerciseGraphDialog
+        visible={graphVisible}
+        onHide={() => setGraphVisible(false)}
+      />
+
+      <Toast ref={toastRef} position="top-right" />
 
     </div>
   );

@@ -10,6 +10,7 @@ import { Checkbox } from 'primereact/checkbox';
 import { InputText } from 'primereact/inputtext';
 import { InputNumber } from 'primereact/inputnumber';
 import { RadioButton } from 'primereact/radiobutton';
+import AppIcon from '@/components/COMMON/AppIcon/AppIcon';
 
 export interface RunFilters {
   /** Строка поиска по названию (displayName + name в выбранных источниках). */
@@ -160,7 +161,7 @@ export const RunFiltersPanel: React.FC<Props> = ({
                     >
                       {b.label}
                     </span>
-                    {on && <i className="pi pi-check" />}
+                    {on && <AppIcon name="check" size="sm" color="success" />}
                   </button>
                 );
               })}
