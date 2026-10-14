@@ -172,8 +172,9 @@ export function loadGraph(json: GraphJson): LoadedGraph {
     }
     if (ref.startsWith('@concrete:')) {
       // @concrete:<catalog>:<graphKey>:<level>
-      const rest = ref.slice(10); // "wade:pushup:5"
-      const m = rest.match(/^([^:]+):([^:]+):(\d+)$/);
+      // level — целое или дробное (7, 7.1, 7.2).
+      const rest = ref.slice(10); // "<catalog>:<graphKey>:<level>"
+      const m = rest.match(/^([^:]+):([^:]+):(\d+(?:\.\d+)?)$/);
       if (!m) return null;
       const [, catalog, graphKey, levelStr] = m;
       return concreteExerciseId(catalog, graphKey, Number(levelStr));

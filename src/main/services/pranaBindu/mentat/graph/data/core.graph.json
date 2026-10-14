@@ -3,7 +3,9 @@
   "label": "Core",
   "labelRu": "Кор",
   "patterns": [],
-  "catalogs": [{ "id": "core", "label": "Core", "labelRu": "Кор" }],
+  "catalogs": [
+    { "id": "core", "label": "Core", "labelRu": "Кор" }
+  ],
   "canonicals": [],
   "nodes": [],
   "edges": [],

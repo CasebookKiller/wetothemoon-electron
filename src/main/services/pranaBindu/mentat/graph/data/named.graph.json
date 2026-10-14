@@ -3,7 +3,9 @@
   "label": "Named",
   "labelRu": "Именованные",
   "patterns": [],
-  "catalogs": [{ "id": "named", "label": "Named", "labelRu": "Именованные" }],
+  "catalogs": [
+    { "id": "named", "label": "Named", "labelRu": "Именованные" }
+  ],
   "canonicals": [],
   "nodes": [],
   "edges": [],

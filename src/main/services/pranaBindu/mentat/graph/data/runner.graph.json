@@ -1,9 +1,11 @@
 {
   "id": "runner",
   "label": "Runner",
-  "labelRu": "СБУ",
+  "labelRu": "Беговые",
   "patterns": [],
-  "catalogs": [{ "id": "runner", "label": "Runner", "labelRu": "СБУ" }],
+  "catalogs": [
+    { "id": "runner", "label": "Runner", "labelRu": "Беговые" }
+  ],
   "canonicals": [],
   "nodes": [],
   "edges": [],

@@ -1,9 +1,11 @@
 {
   "id": "weightloss",
-  "label": "Weightloss",
-  "labelRu": "Weightloss",
+  "label": "Weight-loss",
+  "labelRu": "Похудение",
   "patterns": [],
-  "catalogs": [{ "id": "weightloss", "label": "Weightloss", "labelRu": "Weightloss" }],
+  "catalogs": [
+    { "id": "weightloss", "label": "Weight-loss", "labelRu": "Похудение" }
+  ],
   "canonicals": [],
   "nodes": [],
   "edges": [],

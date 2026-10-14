@@ -2,8 +2,8 @@
   "version": 1,
   "catalogs": [
     { "id": "wade",       "file": "wade.graph.json",       "enabled": true,  "label": "Wade",        "labelRu": "Пол Уэйд" },
-    { "id": "smithrun",   "file": "smithrun.graph.json",   "enabled": true,  "label": "Smithrun",    "labelRu": "Смитри" },
-    { "id": "cali",       "file": "cali.graph.json",       "enabled": false, "label": "Cali",        "labelRu": "Cali Move" },
+    { "id": "smithrun",   "file": "smithrun.graph.json",   "enabled": true,  "label": "Smithrun",    "labelRu": "Кузница Бега" },
+    { "id": "cali",       "file": "cali.graph.json",       "enabled": false, "label": "Cali",        "labelRu": "Кали" },
     { "id": "runner",     "file": "runner.graph.json",     "enabled": false, "label": "Runner",      "labelRu": "Бегун" },
     { "id": "core",       "file": "core.graph.json",       "enabled": false, "label": "Core",        "labelRu": "Кор" },
     { "id": "posture",    "file": "posture.graph.json",    "enabled": false, "label": "Posture",     "labelRu": "Осанка" },

@@ -1,4 +1,8 @@
 // src/main/services/pranaBindu/mentat/graph/data/index.ts
+//
+// Реестр графов. Читает manifest.json — какие каталоги подключены
+// и какие из них enabled. Backward-compat: WADE_SEED и ALL_GRAPHS
+// сохранены для существующего кода.
 
 import wade from './wade.graph.json';
 import smithrun from './smithrun.graph.json';

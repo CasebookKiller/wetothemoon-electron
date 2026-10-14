@@ -1,9 +1,11 @@
 {
   "id": "posture",
   "label": "Posture",
-  "labelRu": "Posture",
+  "labelRu": "Осанка",
   "patterns": [],
-  "catalogs": [{ "id": "posture", "label": "Posture", "labelRu": "Posture" }],
+  "catalogs": [
+    { "id": "posture", "label": "Posture", "labelRu": "Осанка" }
+  ],
   "canonicals": [],
   "nodes": [],
   "edges": [],

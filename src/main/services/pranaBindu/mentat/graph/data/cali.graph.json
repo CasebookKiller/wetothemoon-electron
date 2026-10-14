@@ -3,7 +3,9 @@
   "label": "Cali",
   "labelRu": "Кали",
   "patterns": [],
-  "catalogs": [{ "id": "cali", "label": "Cali", "labelRu": "Кали" }],
+  "catalogs": [
+    { "id": "cali", "label": "Cali", "labelRu": "Кали" }
+  ],
   "canonicals": [],
   "nodes": [],
   "edges": [],
