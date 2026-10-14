@@ -18,26 +18,6 @@ export type WadeProgram = ProgramSpec;
 /** @deprecated use ProgramDaySpec */
 export type WadeProgramDay = ProgramDaySpec;
 
-//export interface WadeProgramDay {
-//  label: string;
-//  movementKeys: string[];
-//}
-
-//export interface WadeProgram {
-//  key: string;
-//  name: string;
-  /** Русское название для UI. */
-//  nameRu: string;
-//  description: string;
-//  usage?: string;
-  /** 7 слотов Пн..Вс: индекс дня в `days` или null (отдых). */
-//  weeklySchedule?: (number | null)[];
-  /** Цикл для программ без привязки к неделе. */
-//  cyclePattern?: (number | null)[];
-  /** Различные дни программы (A, B, C, …). */
-//  days: WadeProgramDay[];
-//}
-
 /** 6 движений Big-6 — базовый набор Уэйда. */
 const ALL_SIX = [
   'pushup',

@@ -169,13 +169,13 @@ export const WADE_HANDSTAND: CatalogEntry = {
   levels: [
     { level: 1, name: 'Wall Headstands', nameRu: 'Стойка на голове у стены',
       benchmarkLadder: ['30s', '60s', '120s'], source: 'wade' },
-    { level: 2, name: 'Wall Handstands', nameRu: 'Стойка на руках у стены',
+    { level: 2, name: 'Crow Stand', nameRu: 'Стойка Ворон',
       benchmarkLadder: ['10s', '30s', '60s'], source: 'wade' },
-    { level: 3, name: 'Half Handstand Push-ups', nameRu: 'Неполные отжимания в стойке у стены',
+    { level: 3, name: 'Wall Handstands', nameRu: 'Стойка на руках у стены',
       benchmarkLadder: ['30s', '60s', '120s'], source: 'wade' },
-    { level: 4, name: 'Wall Handstand Push-ups', nameRu: 'Отжимания в стойке на руках у стены',
+    { level: 4, name: 'Half Handstand Push-ups', nameRu: 'Неполные отжимания в стойке у стены',
       benchmarkLadder: ['1x5', '2x10', '2x20'], source: 'wade' },
-    { level: 5, name: 'Full Handstand Push-ups', nameRu: 'Отжимания в стойке на руках',
+    { level: 5, name: 'Wall Handstand Push-ups', nameRu: 'Отжимания в стойке на руках у стены',
       benchmarkLadder: ['1x5', '2x10', '2x15'], source: 'wade' },
     { level: 6, name: 'Close Handstand Push-ups', nameRu: 'Узкие отжимания в стойке',
       benchmarkLadder: ['1x5', '2x9', '2x12'], source: 'wade' },
@@ -342,7 +342,7 @@ export const CALI_FRONTLEVER: CatalogEntry = {
 
 export const RUNNER_SQUAT: CatalogEntry = {
   key: 'runnersquat',
-  label: 'Одноножные приседания',
+  label: 'Приседания на одной ноге',
   icuName: 'Single-Leg Squats',
   category: 'runner',
   levels: [
@@ -1000,4 +1000,19 @@ export function findAnythingByName(name: string): {
     return { kind: 'named', entry: named };
   }
   return undefined;
+}
+
+
+/**
+ * Поиск прогрессии по её icuName («Pull-ups» → pullup, «Squats» → squat).
+ * Используется в парсере, когда пользователь пишет общее имя каталога
+ * без точного названия уровня.
+ */
+export function findProgressionByIcuName(
+  name: string
+): CatalogEntry | undefined {
+  const norm = name.trim().toLowerCase();
+  return PROGRESSIONS_CATALOG.find(
+    (e) => e.icuName.toLowerCase() === norm,
+  );
 }
