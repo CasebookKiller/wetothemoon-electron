@@ -1,0 +1,82 @@
+/* ============================================================
+   Универсальный диалог.
+   Цвет header-а берётся из --app-dialog-accent (задаётся модулем),
+   fallback — --pb-accent → песочный.
+   ============================================================ */
+
+.app-dialog {
+  /* Переменная для акцента */
+  --_ad-accent: var(
+    --app-dialog-accent,
+    var(--pb-accent, #d4a373)
+  );
+}
+
+.app-dialog .p-dialog-header {
+  background: var(--tg-theme-section-bg-color, #1e2a38) !important;
+  color: var(--_ad-accent) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  padding: 0.75rem 1rem !important;
+}
+
+.app-dialog .p-dialog-header .p-dialog-title {
+  color: var(--_ad-accent) !important;
+  font-weight: 600 !important;
+  font-size: 1rem !important;
+  padding: 0 !important;
+}
+
+.app-dialog__header-inner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.app-dialog__title-icon {
+  color: var(--_ad-accent);
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.app-dialog__title-text {
+  color: var(--_ad-accent);
+  font-weight: 600;
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+.app-dialog .p-dialog-content {
+  background: var(--tg-theme-bg-color, #17212b) !important;
+  color: var(--tg-theme-text-color, #f5f5f5) !important;
+  padding: 1rem 1.25rem !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0.75rem !important;
+}
+
+/* Футер */
+
+.app-dialog__footer {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.25rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.app-dialog__footer--right {
+  justify-content: flex-end;
+}
+
+.app-dialog__footer--space-between {
+  justify-content: space-between;
+}
+
+/* На случай, если пользователь использует .app-dialog__body-content
+   для обёртки контента */
+.app-dialog__body-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}

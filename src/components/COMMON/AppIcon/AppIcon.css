@@ -1,0 +1,48 @@
+/* src/components/COMMON/AppIcon/AppIcon.css */
+
+/* ============================================================
+   Универсальная иконка.
+   Цвет:
+     1. --app-icon-color (если задан у родителя);
+     2. семантический класс (--accent / --muted / --success / ...);
+     3. иначе — наследует (currentColor).
+   ============================================================ */
+
+.app-icon {
+  color: var(--app-icon-color, currentColor);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+/* Размеры */
+.app-icon--xs { font-size: 0.65rem; }
+.app-icon--sm { font-size: 0.8rem; }
+.app-icon--md { font-size: 1rem; }
+.app-icon--lg { font-size: 1.25rem; }
+.app-icon--xl { font-size: 1.5rem; }
+
+/* Семантические цвета. Работают через модульные переменные,
+   если они заданы; иначе — разумные fallback. */
+.app-icon--accent {
+  color: var(--app-icon-accent, var(--pb-accent, #d4a574));
+}
+
+.app-icon--muted {
+  color: var(--tg-theme-hint-color, #708499);
+  opacity: 0.85;
+}
+
+.app-icon--success {
+  color: var(--app-icon-success, #6fbf73);
+}
+
+.app-icon--warning {
+  color: var(--app-icon-warning, #e8a838);
+}
+
+.app-icon--danger {
+  color: var(--app-icon-danger, #ec3942);
+}

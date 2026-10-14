@@ -1,0 +1,51 @@
+/* src/components/COMMON/CloseIcon/CloseIcon.css */
+
+/* ============================================================
+   Универсальная кнопка «×».
+   Цвет:
+     1. --close-icon-color, если задана родителем;
+     2. иначе — currentColor (наследует цвет текста).
+   Модуль задаёт --close-icon-color у себя — компонент нейтрален.
+   ============================================================ */
+
+.app-close-icon {
+  color: var(--close-icon-color, currentColor);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  outline: none;
+}
+
+/* Размеры */
+.app-close-icon--sm { width: 1.5rem; height: 1.5rem; font-size: 0.7rem; }
+.app-close-icon--md { width: 2rem;   height: 2rem;   font-size: 0.85rem; }
+.app-close-icon--lg { width: 2.5rem; height: 2.5rem; font-size: 1rem; }
+
+.app-close-icon .pi {
+  color: inherit;
+  line-height: 1;
+}
+
+/* Hover — мягкая заливка текущим цветом */
+.app-close-icon:hover:not(:disabled) {
+  background: color-mix(in srgb, currentColor 16%, transparent);
+}
+
+/* Focus */
+.app-close-icon:focus-visible {
+  box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 30%, transparent);
+}
+
+/* Disabled */
+.app-close-icon:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
