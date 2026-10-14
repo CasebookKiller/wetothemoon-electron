@@ -1,0 +1,41 @@
+{
+  "id": "leg-raise",
+  "label": "Leg Raise",
+  "labelRu": "Подъёмы ног",
+  "hintPattern": "core-flexion",
+  "canonicals": [
+    {
+      "id": "leg-raise",
+      "graphKey": "legraise",
+      "label": "Leg Raises",
+      "labelRu": "Подъёмы ног",
+      "catalog": "wade",
+      "pattern": "core-flexion",
+      "icuName": "Leg Raises",
+      "replacesEntryKeys": ["legraise"]
+    }
+  ],
+  "nodes": [
+    { "id": "l1",  "canonical": "leg-raise", "level": 1,  "label": "Knee Tucks",                "labelRu": "Подтягивание коленей к груди",              "benchmark": ["1x10", "2x20", "3x40"] },
+    { "id": "l2",  "canonical": "leg-raise", "level": 2,  "label": "Flat Bent Leg Raises",      "labelRu": "Подъёмы коленей из положения лёжа",         "benchmark": ["1x10", "2x20", "3x35"] },
+    { "id": "l3",  "canonical": "leg-raise", "level": 3,  "label": "Flat Frog Raises",          "labelRu": "Подъёмы согнутых ног лёжа",                 "benchmark": ["1x10", "2x15", "3x30"] },
+    { "id": "l4",  "canonical": "leg-raise", "level": 4,  "label": "Flat Straight Leg Raises",  "labelRu": "Подъёмы прямых ног из положения лёжа",      "benchmark": ["1x8",  "2x15", "3x25"] },
+    { "id": "l5",  "canonical": "leg-raise", "level": 5,  "label": "Hanging Knee Raises",       "labelRu": "Подтягивание коленей в висе",               "benchmark": ["1x5",  "2x10", "2x20"] },
+    { "id": "l6",  "canonical": "leg-raise", "level": 6,  "label": "Hanging Bent Raises",       "labelRu": "Подъёмы согнутых ног в висе",               "benchmark": ["1x5",  "2x10", "2x15"] },
+    { "id": "l7",  "canonical": "leg-raise", "level": 7,  "label": "Hanging Frog Raises",       "labelRu": "Подъёмы ног в висе «лягушка»",              "benchmark": ["1x5",  "2x10", "2x15"] },
+    { "id": "l8",  "canonical": "leg-raise", "level": 8,  "label": "Partial Straight Raises",   "labelRu": "Неполные подъёмы прямых ног в висе",        "benchmark": ["1x5",  "2x10", "2x15"] },
+    { "id": "l9",  "canonical": "leg-raise", "level": 9,  "label": "Hanging Straight Raises",   "labelRu": "Подъёмы прямых ног в висе",                 "benchmark": ["1x5",  "2x10", "2x15"] },
+    { "id": "l10", "canonical": "leg-raise", "level": 10, "label": "Windshield Wipers",         "labelRu": "«Дворники»",                                "benchmark": ["1x5",  "2x10", "2x30"] }
+  ],
+  "edges": [
+    { "from": "l1",  "to": "l2"  },
+    { "from": "l2",  "to": "l3"  },
+    { "from": "l3",  "to": "l4"  },
+    { "from": "l4",  "to": "l5"  },
+    { "from": "l5",  "to": "l6"  },
+    { "from": "l6",  "to": "l7"  },
+    { "from": "l7",  "to": "l8"  },
+    { "from": "l8",  "to": "l9"  },
+    { "from": "l9",  "to": "l10" }
+  ]
+}

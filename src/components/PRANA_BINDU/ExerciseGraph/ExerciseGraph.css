@@ -1,0 +1,1597 @@
+/* src/components/PRANA_BINDU/ExerciseGraph/ExerciseGraph.css */
+
+.pb-graph-dialog {
+  --pb-accent: var(--pb-accent-color, #d4a373);
+  --pb-icu-red: 224, 90, 90;
+}
+
+.pb-graph-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ---------- Тулбар ---------- */
+
+.pb-graph-view__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  flex: 0 0 auto;
+}
+
+.pb-graph-view__filter-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--tg-theme-hint-color, #708499);
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.pb-graph-view__filter-toggle:has(.p-inputswitch-checked) {
+  color: var(--pb-accent);
+}
+
+.pb-graph-view__count {
+  margin-left: auto;
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  font-size: 0.72rem;
+  color: var(--pb-accent);
+}
+
+/* ---------- Канвас ---------- */
+
+.pb-graph-view__canvas {
+  position: relative;
+  flex: 1 1 auto;
+  display: flex;
+  min-height: 0;
+  border: 1px solid var(--surface-border, rgba(255, 255, 255, 0.08));
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--tg-theme-bg-color, #17212b);
+}
+
+.pb-graph-view__canvas > .react-flow {
+  flex: 1 1 auto;
+  min-width: 0;
+  --xy-background-color: var(--tg-theme-bg-color, #17212b);
+  --xy-background-pattern-dots-color: color-mix(in srgb, var(--pb-accent) 22%, transparent);
+  --xy-edge-stroke: color-mix(in srgb, var(--pb-accent) 45%, #708499);
+  --xy-edge-stroke-selected: var(--pb-accent);
+  --xy-connectionline-stroke: var(--pb-accent);
+  --xy-minimap-background-color: var(--tg-theme-secondary-bg-color, #1c2733);
+}
+
+/* ---------- Узлы по глубине ---------- */
+
+.pb-graph-view .react-flow__node.pb-node {
+  border-radius: 6px;
+  font-size: 0.78rem;
+  padding: 0.4rem 0.65rem;
+  box-shadow: none;
+  transition: filter 0.15s, border-color 0.15s, transform 0.1s;
+  color: #f5f5f5;
+  font-weight: 500;
+}
+
+/* ============================================================
+   Раскраска узлов через CSS-переменные.
+   Значения приходят из viewModel.ts: --node-fill, --node-stroke,
+   --node-text, --node-badge-bg, --node-border-width.
+   ============================================================ */
+
+.pb-graph-view .react-flow__node.pb-node {
+  background: var(--node-fill, #d4a373);
+  border: var(--node-border-width, 1.5px) solid var(--node-stroke, #f1c9a5);
+  color: var(--node-text, #1a1a1a);
+  border-radius: 6px;
+  font-size: 0.78rem;
+  padding: 0;
+  box-shadow: none;
+  transition: filter 0.15s, border-color 0.15s;
+}
+
+.pb-graph-view .react-flow__node.pb-node:hover {
+  filter: brightness(1.1);
+}
+
+.pb-graph-view .react-flow__node.pb-node.selected,
+.pb-graph-view .react-flow__node.pb-node:focus {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--pb-accent, #d4a373) 55%, transparent),
+              0 0 12px rgba(212, 163, 115, 0.6);
+  outline: none;
+  z-index: 10;
+}
+
+/* Бейдж — фон из переменной */
+.pb-node-inner__badge {
+  background: var(--node-badge-bg, rgba(0, 0, 0, 0.25));
+  color: inherit;
+}
+
+/* ============================================================
+   Concrete-узлы Thenics-канона — тоже фиолетовый оттенок.
+   Идут по уровню, если level есть, иначе — depth-2.
+   ============================================================ */
+
+.pb-graph-view .react-flow__node.pb-node.pb-node--catalog-thenics.pb-node--depth-2 {
+  background: rgba(107, 91, 138, 0.35) !important;
+  border: 1px solid rgba(138, 122, 168, 0.55) !important;
+  color: #d8d0e8 !important;
+}
+
+/* Hover / selection */
+.pb-graph-view .react-flow__node.pb-node:hover {
+  filter: brightness(1.1);
+}
+
+.pb-graph-view .react-flow__node.pb-node.selected,
+.pb-graph-view .react-flow__node.pb-node:focus {
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--pb-accent) 55%, transparent),
+    0 0 12px rgba(212, 163, 115, 0.6) !important;
+  outline: none !important;
+  z-index: 10;
+}
+
+/* ---------- React Flow Controls (зум / fit / lock) ---------- */
+
+.pb-graph-view .react-flow__controls {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  border: 1px solid color-mix(in srgb, var(--pb-accent) 30%, transparent);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--tg-theme-secondary-bg-color, #17212b);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.pb-graph-view .react-flow__controls-button,
+.pb-graph-view .react-flow__controls-button.react-flow__controls-zoomin,
+.pb-graph-view .react-flow__controls-button.react-flow__controls-zoomout,
+.pb-graph-view .react-flow__controls-button.react-flow__controls-fitview,
+.pb-graph-view .react-flow__controls-button.react-flow__controls-interactive {
+  width: 30px !important;
+  height: 30px !important;
+  min-width: 30px !important;
+  min-height: 30px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 1px solid color-mix(in srgb, var(--pb-accent) 12%, transparent) !important;
+  border-radius: 0 !important;
+  color: var(--pb-accent) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: background 0.15s, color 0.15s;
+}
+
+.pb-graph-view .react-flow__controls-button:last-child {
+  border-bottom: none !important;
+}
+
+.pb-graph-view .react-flow__controls-button:hover {
+  background: color-mix(in srgb, var(--pb-accent) 15%, transparent) !important;
+  color: var(--pb-accent) !important;
+}
+
+.pb-graph-view .react-flow__controls-button:focus {
+  outline: none !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pb-accent) 30%, transparent) inset !important;
+}
+
+.pb-graph-view .react-flow__controls-button svg,
+.pb-graph-view .react-flow__controls-button svg path {
+  width: 14px !important;
+  height: 14px !important;
+  fill: currentColor !important;
+  color: currentColor !important;
+}
+
+/* ---------- MiniMap ---------- */
+
+.pb-graph-view .react-flow__minimap {
+  border: 1px solid color-mix(in srgb, var(--pb-accent) 25%, transparent);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--tg-theme-secondary-bg-color, #1c2733) !important;
+}
+
+.pb-graph-view .react-flow__minimap-mask {
+  fill: color-mix(in srgb, var(--pb-accent) 14%, transparent);
+}
+
+.pb-graph-view .react-flow__minimap-node {
+  fill: color-mix(in srgb, var(--pb-accent) 40%, transparent) !important;
+  stroke: none !important;
+}
+
+/* ---------- Правая панель «просмотр» ---------- */
+
+.pb-graph-view__detail {
+  width: 340px;
+  flex: 0 0 340px;
+  overflow-y: auto;
+  padding: 0.75rem 1rem;
+  border-left: 1px solid var(--surface-border, rgba(255, 255, 255, 0.08));
+  background: color-mix(in srgb, var(--pb-accent) 3%, transparent);
+  font-size: 0.82rem;
+  color: var(--tg-theme-text-color, #f5f5f5);
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--pb-accent) 45%, transparent) transparent;
+}
+
+.pb-graph-view__detail::-webkit-scrollbar { width: 8px; }
+.pb-graph-view__detail::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--pb-accent) 50%, transparent);
+  border-radius: 4px;
+}
+
+.pb-graph-view__detail-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding-bottom: 0.6rem;
+  margin-bottom: 0.75rem;
+  border-bottom: 1px solid var(--surface-border, rgba(255, 255, 255, 0.08));
+}
+
+.pb-graph-view__detail-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.pb-graph-view__detail-sub {
+  font-size: 0.72rem;
+  color: var(--tg-theme-hint-color, #708499);
+  margin-top: 0.15rem;
+}
+
+.pb-graph-view__detail-id {
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  font-size: 0.68rem;
+  color: var(--tg-theme-hint-color, #708499);
+  margin-top: 0.2rem;
+  word-break: break-all;
+}
+
+.pb-graph-view__detail-section { margin-bottom: 0.85rem; }
+
+.pb-graph-view__detail-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--pb-accent);
+  margin-bottom: 0.3rem;
+  opacity: 0.85;
+}
+
+.pb-graph-view__detail-section ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.pb-graph-view__detail-section li {
+  padding: 0.15rem 0;
+  border-bottom: 1px dashed color-mix(in srgb, var(--pb-accent) 10%, transparent);
+}
+
+.pb-graph-view__edge-kind {
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  font-size: 0.68rem;
+  color: var(--pb-accent);
+  background: color-mix(in srgb, var(--pb-accent) 12%, transparent);
+  padding: 0 0.3rem;
+  border-radius: 3px;
+}
+
+.pb-graph-view__detail .pb-soft.p-button {
+  min-width: auto !important;
+  width: 1.75rem !important;
+  height: 1.75rem !important;
+  padding: 0 !important;
+}
+
+/* ---------- Спиннер / ошибка ---------- */
+
+.pb-graph-view__center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 2rem;
+}
+
+.pb-graph-view__error {
+  color: #ec3942;
+  font-size: 0.9rem;
+}
+
+/* ============================================================
+   InputSwitch.
+   OFF: тёмный фон, песочная рамка, песочная ручка слева.
+   ON:  песочный фон, тёмная ручка справа.
+   Активное состояние — класс .p-highlight (+ backup data-p-highlight).
+   ============================================================ */
+
+/* --- Контейнер --- */
+.pb-graph-toggle.p-inputswitch,
+.pb-templates-dialog .p-inputswitch,
+.pb-graph-dialog .p-inputswitch {
+  width: 2.2rem !important;
+  height: 1.2rem !important;
+  display: inline-block !important;
+  position: relative !important;
+}
+
+/* --- Слайдер-обёртка (трек) --- */
+.pb-graph-toggle.p-inputswitch .p-inputswitch-slider,
+.pb-templates-dialog .p-inputswitch .p-inputswitch-slider,
+.pb-graph-dialog .p-inputswitch .p-inputswitch-slider {
+  position: absolute !important;
+  inset: 0 !important;
+  background: transparent !important;
+  border: 1px solid #d4a373 !important;
+  border-radius: 999px !important;
+  box-sizing: border-box !important;
+  transition: background 0.15s, border-color 0.15s !important;
+}
+
+.pb-graph-toggle.p-inputswitch:not(.p-disabled):hover .p-inputswitch-slider,
+.pb-templates-dialog .p-inputswitch:not(.p-disabled):hover .p-inputswitch-slider,
+.pb-graph-dialog .p-inputswitch:not(.p-disabled):hover .p-inputswitch-slider {
+  background: rgba(212, 163, 115, 0.12) !important;
+  border-color: #d4a373 !important;
+}
+
+/* --- Ручка. Общая геометрия для OFF и ON --- */
+.pb-graph-toggle.p-inputswitch .p-inputswitch-slider::before,
+.pb-templates-dialog .p-inputswitch .p-inputswitch-slider::before,
+.pb-graph-dialog .p-inputswitch .p-inputswitch-slider::before {
+  content: '' !important;
+  position: absolute !important;
+  top: 50% !important;
+  left: 0.12rem !important;
+  width: 0.85rem !important;
+  height: 0.85rem !important;
+  margin: 0 !important;
+  transform: translateY(-50%) !important; /* ← держит вертикальное центрирование */
+  background: #d4a373 !important;
+  border-radius: 50% !important;
+  box-shadow: 0 0 4px rgba(212, 163, 115, 0.5) !important;
+  transition: left 0.15s ease, background 0.15s, box-shadow 0.15s !important;
+}
+
+/* --- ON: трек заливается, ручка уходит вправо --- */
+.pb-graph-toggle.p-inputswitch.p-highlight .p-inputswitch-slider,
+.pb-graph-toggle.p-inputswitch.p-inputswitch-checked .p-inputswitch-slider,
+.pb-graph-toggle.p-inputswitch[data-p-highlight='true'] .p-inputswitch-slider,
+.pb-templates-dialog .p-inputswitch.p-highlight .p-inputswitch-slider,
+.pb-templates-dialog .p-inputswitch.p-inputswitch-checked .p-inputswitch-slider,
+.pb-templates-dialog .p-inputswitch[data-p-highlight='true'] .p-inputswitch-slider,
+.pb-graph-dialog .p-inputswitch.p-highlight .p-inputswitch-slider,
+.pb-graph-dialog .p-inputswitch.p-inputswitch-checked .p-inputswitch-slider,
+.pb-graph-dialog .p-inputswitch[data-p-highlight='true'] .p-inputswitch-slider {
+  background: #d4a373 !important;
+  border-color: #d4a373 !important;
+}
+
+.pb-graph-toggle.p-inputswitch.p-highlight:not(.p-disabled):hover .p-inputswitch-slider,
+.pb-graph-toggle.p-inputswitch.p-inputswitch-checked:not(.p-disabled):hover .p-inputswitch-slider,
+.pb-templates-dialog .p-inputswitch.p-highlight:not(.p-disabled):hover .p-inputswitch-slider,
+.pb-templates-dialog .p-inputswitch.p-inputswitch-checked:not(.p-disabled):hover .p-inputswitch-slider,
+.pb-graph-dialog .p-inputswitch.p-highlight:not(.p-disabled):hover .p-inputswitch-slider,
+.pb-graph-dialog .p-inputswitch.p-inputswitch-checked:not(.p-disabled):hover .p-inputswitch-slider {
+  background: #e0b287 !important;
+  border-color: #e0b287 !important;
+}
+
+.pb-graph-toggle.p-inputswitch.p-highlight .p-inputswitch-slider::before,
+.pb-graph-toggle.p-inputswitch.p-inputswitch-checked .p-inputswitch-slider::before,
+.pb-graph-toggle.p-inputswitch[data-p-highlight='true'] .p-inputswitch-slider::before,
+.pb-templates-dialog .p-inputswitch.p-highlight .p-inputswitch-slider::before,
+.pb-templates-dialog .p-inputswitch.p-inputswitch-checked .p-inputswitch-slider::before,
+.pb-templates-dialog .p-inputswitch[data-p-highlight='true'] .p-inputswitch-slider::before,
+.pb-graph-dialog .p-inputswitch.p-highlight .p-inputswitch-slider::before,
+.pb-graph-dialog .p-inputswitch.p-inputswitch-checked .p-inputswitch-slider::before,
+.pb-graph-dialog .p-inputswitch[data-p-highlight='true'] .p-inputswitch-slider::before {
+  left: calc(100% - 0.85rem - 0.12rem) !important;
+  right: auto !important;
+  transform: translateY(-50%) !important;
+  background: #1a1a1a !important;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.6) !important;
+}
+
+/* --- Focus --- */
+.pb-graph-toggle.p-inputswitch.p-focus .p-inputswitch-slider,
+.pb-templates-dialog .p-inputswitch.p-focus .p-inputswitch-slider,
+.pb-graph-dialog .p-inputswitch.p-focus .p-inputswitch-slider {
+  box-shadow: 0 0 0 2px rgba(212, 163, 115, 0.35) !important;
+}
+
+/* --- Подпись рядом --- */
+.pb-graph-view__filter-toggle:has(.p-inputswitch.p-highlight),
+.pb-graph-view__filter-toggle:has(.p-inputswitch.p-inputswitch-checked),
+.pb-graph-view__filter-toggle:has(.p-inputswitch[data-p-highlight='true']) {
+  color: var(--pb-accent);
+}
+
+/* --- Свитчер «Слои / Круг» --- */
+.pb-graph-view__toolbar .pb-runs-view-switch {
+  height: 2rem;
+  border: 1px solid rgba(212, 163, 115, 0.35);
+}
+
+.pb-graph-view__toolbar .pb-runs-view-switch button {
+  font-size: 0.78rem;
+  padding: 0 0.7rem;
+}
+
+/* ---------- Индикатор отложенного пересчёта ---------- */
+
+.pb-graph-view__stale {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--tg-theme-secondary-bg-color, #17212b) 85%, transparent);
+  border: 1px solid color-mix(in srgb, var(--pb-accent) 35%, transparent);
+  color: var(--pb-accent);
+  pointer-events: none;
+  animation: pb-graph-stale-in 0.15s ease-out;
+}
+
+.pb-graph-view__stale .pi {
+  font-size: 0.9rem;
+}
+
+@keyframes pb-graph-stale-in {
+  from { opacity: 0; transform: scale(0.9); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* ---------- Легенда рёбер ---------- */
+
+.pb-graph-view__legend {
+  position: absolute;
+  left: 0.75rem;      /* было bottom: 0.75rem */
+  top: 0.75rem;       /* ← вместо bottom */
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.5rem 0.75rem;
+  background: color-mix(in srgb, var(--tg-theme-secondary-bg-color, #17212b) 88%, transparent);
+  border: 1px solid color-mix(in srgb, var(--pb-accent) 25%, transparent);
+  border-radius: 6px;
+  font-size: 0.7rem;
+  color: var(--tg-theme-hint-color, #708499);
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+  user-select: none;
+}
+
+.pb-graph-view__legend-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  line-height: 1.4;
+}
+
+.pb-graph-view__legend-row svg {
+  flex: 0 0 24px;
+}
+
+/* ---------- Обёртка фильтров ---------- */
+
+.pb-graph-view__filters {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+}
+
+/* Строка 1 (тулбар) — уже есть. Добавим нижний отступ побольше. */
+.pb-graph-view__filters .pb-graph-view__toolbar {
+  margin-bottom: 0.4rem;
+}
+
+/* ---------- Строка 2: чипы паттернов ---------- */
+
+.pb-graph-view__pattern-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  padding-bottom: 0.55rem;
+  margin-bottom: 0.6rem;
+  border-bottom: 1px solid var(--surface-border, rgba(255, 255, 255, 0.08));
+}
+
+.pb-graph-chip {
+  background: transparent;
+  border: 1px solid rgba(212, 163, 115, 0.35);
+  border-radius: 4px;
+  color: var(--tg-theme-hint-color, #708499);
+  padding: 0.15rem 0.55rem;
+  font: inherit;
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.pb-graph-chip:hover {
+  color: #d4a373;
+  border-color: #d4a373;
+  background: rgba(212, 163, 115, 0.08);
+}
+
+.pb-graph-chip.is-on {
+  background: rgba(212, 163, 115, 0.18);
+  color: #d4a373;
+  border-color: #d4a373;
+  font-weight: 600;
+}
+
+
+
+/* ---------- Дочерние чипы паттернов ---------- */
+
+.pb-graph-chip--child {
+  padding-left: 0.4rem;
+}
+
+.pb-graph-chip__parent {
+  margin-left: 0.4rem;
+  font-size: 0.62rem;
+  opacity: 0.65;
+  font-style: italic;
+  color: inherit;
+  text-transform: lowercase;
+}
+
+.pb-graph-chip.is-on .pb-graph-chip__parent {
+  opacity: 0.85;
+  font-style: normal;
+}
+
+/* Fallback: подсветить каноны даже если depth не тот */
+.pb-graph-view .react-flow__node[data-id^="ex:canonical:"] {
+  background: #e8a838 !important;
+  border: 1.5px solid #ffcb6b !important;
+  color: #1a1a1a !important;
+  font-weight: 600 !important;
+}
+
+/* Fallback: подсветить каноны даже если depth не тот */
+.pb-graph-view .react-flow__node[data-id^="ex:canonical:"] {
+  background: #e8a838 !important;
+  border: 1.5px solid #ffcb6b !important;
+  color: #1a1a1a !important;
+  font-weight: 600 !important;
+}
+
+/* Fallback: паттерны — песочные */
+.pb-graph-view .react-flow__node[data-id^="pat:"] {
+  background: #d4a373 !important;
+  border: 2px solid #f1c9a5 !important;
+  color: #1a1a1a !important;
+  font-weight: 800 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.55rem 0.9rem !important;
+}
+
+/* ---------- Обёртка правой панели ---------- */
+
+.pb-graph-view__side {
+  display: flex;
+  flex-direction: column;
+  width: 340px;
+  flex: 0 0 340px;
+  border-left: 1px solid var(--surface-border, rgba(255, 255, 255, 0.08));
+  background: color-mix(in srgb, var(--pb-accent) 3%, transparent);
+}
+
+.pb-graph-view__side-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--surface-border, rgba(255, 255, 255, 0.08));
+}
+
+.pb-graph-view__side-tabs button {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--tg-theme-hint-color, #708499);
+  padding: 0.6rem 0.75rem;
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.pb-graph-view__side-tabs button:hover {
+  color: var(--pb-accent);
+}
+
+.pb-graph-view__side-tabs button.is-active {
+  color: var(--pb-accent);
+  border-bottom-color: var(--pb-accent);
+  font-weight: 600;
+}
+
+/* ---------- Палитра ---------- */
+
+.pb-palette {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  border-left: none;  /* убрать дубль из .pb-graph-view__detail */
+  background: transparent;
+}
+
+.pb-palette__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--surface-border, rgba(255, 255, 255, 0.08));
+}
+
+.pb-palette__tabs button {
+  background: transparent;
+  border: 1px solid rgba(212, 163, 115, 0.35);
+  border-radius: 4px;
+  color: var(--tg-theme-hint-color, #708499);
+  padding: 0.15rem 0.55rem;
+  font: inherit;
+  font-size: 0.72rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.pb-palette__tabs button:hover {
+  color: #d4a373;
+  border-color: #d4a373;
+}
+
+.pb-palette__tabs button.is-active {
+  background: rgba(212, 163, 115, 0.18);
+  color: #d4a373;
+  border-color: #d4a373;
+  font-weight: 600;
+}
+
+.pb-palette__count {
+  font-size: 0.65rem;
+  opacity: 0.7;
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+}
+
+.pb-palette__search {
+  width: 100%;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--pb-accent) 30%, transparent);
+  color: var(--tg-theme-text-color, #f5f5f5);
+  padding: 0.35rem 0.55rem;
+  font: inherit;
+  font-size: 0.78rem;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+.pb-palette__search:focus {
+  outline: none;
+  border-color: var(--pb-accent);
+}
+
+.pb-palette__list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--pb-accent) 45%, transparent) transparent;
+}
+
+.pb-palette__list::-webkit-scrollbar { width: 6px; }
+.pb-palette__list::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--pb-accent) 50%, transparent);
+  border-radius: 3px;
+}
+
+.pb-palette__item {
+  padding: 0.35rem 0.5rem;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s;
+}
+
+.pb-palette__item:hover {
+  background: color-mix(in srgb, var(--pb-accent) 6%, transparent);
+  border-color: color-mix(in srgb, var(--pb-accent) 25%, transparent);
+}
+
+.pb-palette__item-name {
+  font-size: 0.82rem;
+  color: var(--tg-theme-text-color, #f5f5f5);
+}
+
+.pb-palette__item-label {
+  font-size: 0.7rem;
+  color: var(--tg-theme-hint-color, #708499);
+}
+
+.pb-palette__item-meta {
+  font-size: 0.68rem;
+  color: var(--pb-accent);
+  opacity: 0.75;
+  margin-top: 0.1rem;
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+}
+
+.pb-palette__item.is-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: auto;   /* чтобы title показывался */
+}
+
+.pb-palette__item.is-disabled:hover {
+  background: transparent;
+  border-color: transparent;
+}
+
+.pb-palette__check {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.7rem;
+  color: #6fbf73;
+}
+
+.pb-palette__item {
+  position: relative;   /* чтобы чек-иконка позиционировалась */
+  padding-right: 1.6rem;
+}
+
+.pb-palette__badge {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.62rem;
+  color: #d4a373;
+  background: rgba(212, 163, 115, 0.14);
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+}
+
+.pb-palette__item {
+  position: relative;
+  padding-right: 5rem;
+}
+
+.pb-palette__item.is-linked {
+  opacity: 0.5;
+  cursor: pointer;
+}
+
+.pb-palette__item.is-candidate {
+  cursor: pointer;
+  border: 1px solid rgba(232, 168, 56, 0.35);
+  background: rgba(232, 168, 56, 0.06);
+}
+
+.pb-palette__item.is-candidate:hover {
+  background: rgba(232, 168, 56, 0.14);
+}
+
+.pb-palette__badge {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.62rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+}
+
+.pb-palette__badge--linked {
+  color: #6fbf73;
+  background: rgba(111, 191, 115, 0.14);
+}
+
+.pb-palette__badge--candidate {
+  color: #e8a838;
+  background: rgba(232, 168, 56, 0.16);
+}
+
+.pb-palette__check {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.7rem;
+  color: #6fbf73;
+}
+
+/* ============================================================
+   ConfirmDialog в стиле Prana-Bindu.
+   Портал PrimeReact — вне .pb-graph-dialog, поэтому пишем явно.
+   ============================================================ */
+
+.pb-confirm-dialog.p-dialog {
+  --pb-accent: var(--pb-accent-color, #d4a373);
+  background: var(--tg-theme-bg-color, #17212b) !important;
+  border: 1px solid var(--surface-border, rgba(255, 255, 255, 0.08)) !important;
+  border-radius: 8px !important;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5) !important;
+}
+
+.pb-confirm-dialog .p-dialog-header {
+  background: var(--tg-theme-section-bg-color, #1e2a38) !important;
+  color: var(--pb-accent) !important;
+  border-bottom: 1px solid var(--surface-border, rgba(255, 255, 255, 0.08)) !important;
+  padding: 0.75rem 1rem !important;
+}
+
+.pb-confirm-dialog .p-dialog-header .p-dialog-title {
+  color: var(--pb-accent) !important;
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.pb-confirm-dialog .p-dialog-header .p-dialog-header-close,
+.pb-confirm-dialog .p-dialog-header .p-dialog-header-icon {
+  color: var(--pb-accent) !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  width: 2rem !important;
+  height: 2rem !important;
+}
+
+.pb-confirm-dialog .p-dialog-header .p-dialog-header-close:hover {
+  background: color-mix(in srgb, var(--pb-accent) 14%, transparent) !important;
+}
+
+.pb-confirm-dialog .p-dialog-header .p-dialog-header-close svg,
+.pb-confirm-dialog .p-dialog-header .p-dialog-header-close svg path {
+  fill: var(--pb-accent) !important;
+  color: var(--pb-accent) !important;
+}
+
+.pb-confirm-dialog .p-dialog-content {
+  background: var(--tg-theme-bg-color, #17212b) !important;
+  color: var(--tg-theme-text-color, #f5f5f5) !important;
+  padding: 1rem !important;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.pb-confirm-dialog .p-confirm-dialog-icon {
+  color: var(--pb-accent) !important;
+  font-size: 1.6rem;
+}
+
+.pb-confirm-dialog .p-confirm-dialog-message {
+  color: var(--tg-theme-text-color, #f5f5f5);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.pb-confirm-dialog .p-dialog-footer {
+  background: var(--tg-theme-bg-color, #17212b) !important;
+  border-top: 1px solid var(--surface-border, rgba(255, 255, 255, 0.08)) !important;
+  padding: 0.75rem 1rem !important;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+/* Кнопки — как .pb и .pb-soft */
+
+.pb-confirm-dialog .p-confirm-dialog-accept.p-button {
+  background: transparent !important;
+  border: 1px solid var(--pb-accent) !important;
+  color: var(--pb-accent) !important;
+  border-radius: 6px !important;
+  font-size: 0.8rem !important;
+  padding: 0.5rem 1rem !important;
+  transition: background 0.15s, color 0.15s;
+}
+
+.pb-confirm-dialog .p-confirm-dialog-accept.p-button:hover {
+  background: var(--pb-accent) !important;
+  color: var(--tg-theme-bg-color, #17212b) !important;
+}
+
+.pb-confirm-dialog .p-confirm-dialog-accept.p-button:focus {
+  outline: none !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pb-accent) 30%, transparent) !important;
+}
+
+.pb-confirm-dialog .p-confirm-dialog-reject.p-button {
+  background: transparent !important;
+  border: 1px solid color-mix(in srgb, var(--pb-accent) 50%, transparent) !important;
+  color: var(--pb-accent) !important;
+  border-radius: 6px !important;
+  font-size: 0.8rem !important;
+  padding: 0.5rem 1rem !important;
+  transition: background 0.15s;
+}
+
+.pb-confirm-dialog .p-confirm-dialog-reject.p-button:hover {
+  background: color-mix(in srgb, var(--pb-accent) 12%, transparent) !important;
+}
+
+.pb-confirm-dialog .p-confirm-dialog-reject.p-button:focus {
+  outline: none !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pb-accent) 25%, transparent) !important;
+}
+
+.pb-node-detail__per-side {
+  font-size: 0.7rem;
+  color: var(--pb-accent, #d4a373);
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  opacity: 0.85;
+  letter-spacing: 0.03em;
+}
+
+/* ---------- Ladder-чипы в DetailPanel ---------- */
+
+.pb-graph-view__detail .pb-node-detail__per-side {
+  font-size: 0.72rem !important;
+  color: var(--pb-accent, #d4a373) !important;
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace !important;
+  opacity: 0.9;
+  letter-spacing: 0.03em;
+  margin-left: 0.15rem;
+}
+
+.pb-graph-view__detail .pb-bench-chips {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0.35rem !important;
+  margin-top: 0.4rem !important;
+}
+
+.pb-graph-view__detail .pb-bench-chip {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 0.75rem !important;
+  padding: 0.3rem 0.6rem !important;
+  border: 1px solid color-mix(in srgb, var(--pb-accent) 25%, transparent) !important;
+  border-radius: 4px !important;
+  background: color-mix(in srgb, var(--pb-accent) 5%, transparent) !important;
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace !important;
+  font-size: 0.78rem !important;
+  line-height: 1.2 !important;
+}
+
+.pb-graph-view__detail .pb-bench-chip__rung {
+  color: var(--tg-theme-hint-color, #708499) !important;
+  font-size: 0.7rem !important;
+  min-width: 3.6rem !important;
+  flex: 0 0 auto !important;
+  white-space: nowrap !important;
+}
+
+.pb-graph-view__detail .pb-bench-chip__val {
+  color: var(--pb-accent, #d4a373) !important;
+  font-weight: 600 !important;
+  flex: 0 0 auto !important;
+  white-space: nowrap !important;
+}
+
+/* ---------- Диалог создания связи ---------- */
+
+.pb-edge-dialog__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.pb-edge-dialog__row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.pb-edge-dialog__label {
+  font-size: 0.7rem;
+  color: var(--pb-accent, #d4a373);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.pb-edge-dialog__value {
+  font-size: 0.85rem;
+  color: var(--tg-theme-text-color, #f5f5f5);
+  padding: 0.3rem 0;
+}
+
+.pb-edge-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Кнопка «Поменять» в диалоге создания связи */
+.pb-edge-dialog__swap {
+  align-self: flex-start;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--pb-accent) 35%, transparent);
+  border-radius: 4px;
+  color: var(--pb-accent);
+  padding: 0.15rem 0.5rem;
+  font: inherit;
+  font-size: 0.7rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.pb-edge-dialog__swap:hover {
+  background: color-mix(in srgb, var(--pb-accent) 12%, transparent);
+  border-color: var(--pb-accent);
+}
+
+.pb-edge-dialog__swap .pi {
+  font-size: 0.75rem;
+}
+
+.pb-edge-form__select {
+  background: var(--tg-theme-bg-color, #17212b);
+  border: 1px solid rgba(212, 163, 115, 0.35);
+  color: var(--tg-theme-text-color, #f5f5f5);
+  border-radius: 4px;
+  padding: 0.35rem 0.5rem;
+  font: inherit;
+  font-size: 0.8rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.pb-edge-form__select:focus {
+  outline: none;
+  border-color: var(--pb-accent, #d4a373);
+}
+
+.pb-graph-view .react-flow__handle {
+  background: var(--pb-accent, #d4a373);
+  width: 8px;
+  height: 8px;
+  border: 2px solid var(--tg-theme-bg-color, #17212b);
+}
+
+.pb-graph-view .react-flow__handle:hover {
+  background: #fff;
+}
+
+.pb-edge-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.pb-edge-del {
+  background: transparent;
+  border: none;
+  color: rgba(212, 163, 115, 0.5);
+  cursor: pointer;
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+  transition: color 0.15s, background 0.15s;
+  flex: 0 0 auto;
+}
+
+.pb-edge-del:hover {
+  color: #ec3942;
+  background: rgba(236, 57, 66, 0.12);
+}
+
+.pb-edge-row__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.pb-edge-row__label:hover {
+  color: var(--pb-accent, #d4a373);
+  text-decoration: underline;
+}
+
+/* ---------- Создание узлов: диалоги ---------- */
+
+.pb-create-dialog .p-dialog-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.pb-create-error {
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  border: 1px solid rgba(236, 57, 66, 0.5);
+  background: rgba(236, 57, 66, 0.12);
+  color: #ec3942;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.pb-create-dialog .pb-hint code {
+  background: rgba(255, 255, 255, 0.06);
+  padding: 0.05rem 0.3rem;
+  border-radius: 3px;
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  font-size: 0.72rem;
+  color: var(--pb-accent, #d4a373);
+}
+
+/* ---------- Radio и checkbox в PB-диалогах ---------- */
+
+.pb-create-dialog input[type='radio'],
+.pb-create-dialog input[type='checkbox'] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 1rem;
+  height: 1rem;
+  border: 1px solid color-mix(in srgb, var(--pb-accent, #d4a373) 45%, transparent);
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  margin: 0;
+  flex: 0 0 auto;
+  box-sizing: border-box;
+}
+
+.pb-create-dialog input[type='radio'] {
+  border-radius: 50%;
+}
+
+.pb-create-dialog input[type='checkbox'] {
+  border-radius: 2px;
+}
+
+.pb-create-dialog input[type='radio']:hover,
+.pb-create-dialog input[type='checkbox']:hover {
+  border-color: var(--pb-accent, #d4a373);
+}
+
+.pb-create-dialog input[type='radio']:checked,
+.pb-create-dialog input[type='checkbox']:checked {
+  border-color: var(--pb-accent, #d4a373);
+}
+
+/* Точка для radio */
+.pb-create-dialog input[type='radio']:checked::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--pb-accent, #d4a373);
+}
+
+/* Галочка для checkbox */
+.pb-create-dialog input[type='checkbox']:checked::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(45deg);
+  width: 0.25rem;
+  height: 0.5rem;
+  border: solid var(--pb-accent, #d4a373);
+  border-width: 0 2px 2px 0;
+}
+
+.pb-create-dialog input[type='radio']:focus-visible,
+.pb-create-dialog input[type='checkbox']:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pb-accent, #d4a373) 30%, transparent);
+}
+
+.pb-create-dialog .pb-hint label,
+.pb-create-dialog label.pb-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.pb-graph-view__detail-head-actions {
+  display: flex;
+  gap: 0.25rem;
+  align-items: flex-start;
+}
+
+.pb-detail-action-btn {
+  background: transparent;
+  border: none;
+  color: var(--pb-accent, #d4a373);
+  cursor: pointer;
+  padding: 0;
+  width: 2rem;
+  height: 2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  opacity: 0.75;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+  flex: 0 0 auto;
+}
+
+.pb-detail-action-btn:hover {
+  opacity: 1;
+  background: color-mix(in srgb, var(--pb-accent) 16%, transparent);
+}
+
+.pb-detail-action-btn--danger {
+  color: #ec3942;
+}
+
+.pb-detail-action-btn--danger:hover {
+  background: rgba(236, 57, 66, 0.14);
+}
+
+.pb-detail-action-btn .pi {
+  font-size: 0.85rem;
+}
+
+/* ============================================================
+   Кастомные узлы: header / body / footer
+   ============================================================ */
+
+.pb-node-inner {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  border-radius: inherit;
+  min-width: 0;   /* ← новое */  
+}
+
+/* Header */
+
+.pb-node-inner__header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.55rem 0.6rem 0.55rem;   /* ← было 0.4rem по вертикали */
+  min-height: 1.6rem;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.pb-node-inner__header--pattern {
+  justify-content: center;
+}
+
+.pb-node-inner__header--program {
+  justify-content: center;
+}
+
+.pb-node-inner__label {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: 600;
+  font-size: 0.8rem;
+  line-height: 1.2;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: break-word;
+}
+
+.pb-node-inner__label--pattern {
+  font-weight: 800;
+  font-size: 0.86rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+
+.pb-node-inner__label--program {
+  font-weight: 700;
+  font-size: 0.82rem;
+}
+
+/* Badge (уровень) */
+
+.pb-node-inner__badge {
+  flex: 0 0 auto;
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--tg-theme-text-color, #f5f5f5);
+  letter-spacing: 0.02em;
+}
+
+/* Body */
+
+.pb-node-inner__body {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* Footer */
+
+.pb-node-inner__footer {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.5rem 0.25rem 0.5rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.18);
+  min-height: 1.1rem;
+  box-sizing: border-box;
+  background: var(--node-band-fill, rgba(0, 0, 0, 0.08));
+  margin-top: auto;   /* ← прижимает футер к низу узла */
+}
+
+.pb-node-inner__footer--pattern {
+  justify-content: center;
+}
+
+.pb-node-inner__footer--program {
+  justify-content: center;
+}
+
+/* Иконка-метка (буквы) */
+
+.pb-node-inner__icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.35rem;
+  height: 1.1rem;
+  padding: 0 0.25rem;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.3);
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: inherit;
+  opacity: 0.9;
+}
+
+.pb-node-inner__footer-text {
+  font-size: 0.66rem;
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  color: inherit;
+  opacity: 0.75;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Скрыть дефолтный label-враппер React Flow */
+.pb-graph-view .react-flow__node-default > .react-flow__node-default__inner,
+.pb-graph-view .react-flow__node .react-flow__node-default__inner {
+  display: none;
+}
+
+/* На всякий случай — убрать у встроенного default-узла отступы */
+.pb-graph-view .react-flow__node-default {
+  padding: 0 !important;
+}
+
+.pb-node-inner__header--catalog {
+  justify-content: center;
+}
+
+.pb-node-inner__label--catalog {
+  font-weight: 700;
+  font-size: 0.82rem;
+  text-align: center;
+}
+
+.pb-node-inner__footer--catalog {
+  justify-content: center;
+}
+
+.pb-node-inner__footer-icons {
+  display: inline-flex;
+  gap: 0.15rem;
+  flex-wrap: wrap;
+}
+
+.pb-node-inner__footer-icons .pb-node-inner__icon {
+  min-width: 1.15rem;
+  height: 0.95rem;
+  font-size: 0.55rem;
+  padding: 0 0.2rem;
+}
+
+.pb-node-inner__footer--catalog {
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+/* ============================================================
+   Вход / выход узла: две подсказки.
+   1) Полоска-индикатор у края — видна всегда (B).
+   2) Кружок-хэндл на полоске — появляется при hover (A).
+   Полоска рисуется через ::before / ::after у самого узла —
+   это чисто визуальный слой, не участвует в drag&drop.
+   Кружок — это React Flow handle, за него тянем связь.
+   ============================================================ */
+
+/* --- Полоски по краям узла (B) --- */
+
+.pb-graph-view .react-flow__node.pb-node::before,
+.pb-graph-view .react-flow__node.pb-node::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 40%;
+  border-radius: 2px;
+  pointer-events: none;
+  transition: height 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  z-index: 1;
+}
+
+/* Вход — target — слева, песочный */
+.pb-graph-view .react-flow__node.pb-node::before {
+  left: -6px;
+  background: color-mix(in srgb, var(--pb-accent, #d4a373) 50%, transparent);
+}
+
+/* Выход — source — справа, циан */
+.pb-graph-view .react-flow__node.pb-node::after {
+  right: -6px;
+  background: rgba(74, 168, 255, 0.55);
+}
+
+/* При hover на узел полоски растут и подсвечиваются */
+.pb-graph-view .react-flow__node:hover.pb-node::before {
+  height: 65%;
+  background: var(--pb-accent, #d4a373);
+  box-shadow: 0 0 6px var(--pb-accent, #d4a373);
+}
+
+.pb-graph-view .react-flow__node:hover.pb-node::after {
+  height: 65%;
+  background: #4aa8ff;
+  box-shadow: 0 0 6px #4aa8ff;
+}
+
+/* --- Кружки-хэндлы (A) ---
+   Стиль «кольцо» — как у кнопок .pb в приложении: прозрачный фон,
+   цветная рамка, заливка при hover. */
+
+.pb-graph-view .react-flow__handle {
+  width: 14px !important;
+  height: 14px !important;
+  min-width: 14px !important;
+  min-height: 14px !important;
+  background: var(--tg-theme-bg-color, #17212b) !important;
+  border: 2px solid transparent !important;
+  border-radius: 50% !important;
+  opacity: 0 !important;
+  transition: opacity 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+  z-index: 2;
+}
+
+/* Сдвигаем чуть наружу, чтобы совпадали с полосками */
+.pb-graph-view .react-flow__handle.react-flow__handle-left {
+  left: -7px !important;
+}
+
+.pb-graph-view .react-flow__handle.react-flow__handle-right {
+  right: -7px !important;
+}
+
+/* --- Hover на узел: показываем кружки --- */
+
+/* Вход (target): кольцо песочное */
+.pb-graph-view .react-flow__node:hover .react-flow__handle.react-flow__handle-left {
+  opacity: 1 !important;
+  border-color: var(--pb-accent, #d4a373) !important;
+}
+
+/* Выход (source): кольцо циан */
+.pb-graph-view .react-flow__node:hover .react-flow__handle.react-flow__handle-right {
+  opacity: 1 !important;
+  border-color: #4aa8ff !important;
+}
+
+/* --- Hover прямо на кружок: заливка цветом рамки --- */
+
+.pb-graph-view .react-flow__handle.react-flow__handle-left:hover {
+  background: var(--pb-accent, #d4a373) !important;
+}
+
+.pb-graph-view .react-flow__handle.react-flow__handle-right:hover {
+  background: #4aa8ff !important;
+}
+
+/* --- Tooltip на hover --- */
+
+.pb-graph-view .react-flow__handle::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  background: var(--tg-theme-secondary-bg-color, #232e3c);
+  color: var(--pb-accent, #d4a373);
+  font-size: 0.65rem;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  z-index: 10;
+}
+
+.pb-graph-view .react-flow__handle:hover::after {
+  opacity: 1;
+}

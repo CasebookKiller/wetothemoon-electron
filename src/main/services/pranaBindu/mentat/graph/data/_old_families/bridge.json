@@ -1,0 +1,41 @@
+{
+  "id": "bridge",
+  "label": "Bridge",
+  "labelRu": "Мостик",
+  "hintPattern": "core-extension",
+  "canonicals": [
+    {
+      "id": "bridge",
+      "graphKey": "bridge",
+      "label": "Bridges",
+      "labelRu": "Мостики",
+      "catalog": "wade",
+      "pattern": "core-extension",
+      "icuName": "Bridges",
+      "replacesEntryKeys": ["bridge"]
+    }
+  ],
+  "nodes": [
+    { "id": "b1",  "canonical": "bridge", "level": 1,  "label": "Short Bridges",       "labelRu": "Мостик от плеч",                    "benchmark": ["1x10", "2x25", "3x50"] },
+    { "id": "b2",  "canonical": "bridge", "level": 2,  "label": "Straight Bridges",    "labelRu": "Прямой мостик",                     "benchmark": ["1x10", "2x20", "3x40"] },
+    { "id": "b3",  "canonical": "bridge", "level": 3,  "label": "Angled Bridges",      "labelRu": "Мостик из обратного наклона",       "benchmark": ["1x8",  "2x15", "3x30"] },
+    { "id": "b4",  "canonical": "bridge", "level": 4,  "label": "Head Bridges",        "labelRu": "Мостик из упора на голову",         "benchmark": ["1x8",  "2x15", "2x25"] },
+    { "id": "b5",  "canonical": "bridge", "level": 5,  "label": "Half Bridges",        "labelRu": "Полумостик",                        "benchmark": ["1x8",  "2x15", "2x20"] },
+    { "id": "b6",  "canonical": "bridge", "level": 6,  "label": "Full Bridges",        "labelRu": "Полный мостик",                     "benchmark": ["1x6",  "2x10", "2x15"] },
+    { "id": "b7",  "canonical": "bridge", "level": 7,  "label": "Stand-to-Stand Bridges", "labelRu": "Мостик по стенке вниз",          "benchmark": ["1x3",  "2x6",  "2x10"] },
+    { "id": "b8",  "canonical": "bridge", "level": 8,  "label": "Walking Bridges",     "labelRu": "Мостик по стенке вверх",            "benchmark": ["1x2",  "2x4",  "2x8"] },
+    { "id": "b9",  "canonical": "bridge", "level": 9,  "label": "Stand-to-Stand (advanced)", "labelRu": "Неполный мостик из положения стоя", "benchmark": ["1x1", "2x3", "2x6"] },
+    { "id": "b10", "canonical": "bridge", "level": 10, "label": "One-Arm Bridges",     "labelRu": "Полный мостик из положения стоя",    "benchmark": ["1x1",  "2x3",  "2x10-30s"] }
+  ],
+  "edges": [
+    { "from": "b1", "to": "b2"  },
+    { "from": "b2", "to": "b3"  },
+    { "from": "b3", "to": "b4"  },
+    { "from": "b4", "to": "b5"  },
+    { "from": "b5", "to": "b6"  },
+    { "from": "b6", "to": "b7"  },
+    { "from": "b7", "to": "b8"  },
+    { "from": "b8", "to": "b9"  },
+    { "from": "b9", "to": "b10" }
+  ]
+}

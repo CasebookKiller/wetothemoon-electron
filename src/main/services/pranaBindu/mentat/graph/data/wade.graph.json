@@ -1,0 +1,235 @@
+{
+  "id": "wade",
+  "label": "Wade",
+  "labelRu": "Пол Уэйд",
+  "patterns": [
+    { "id": "push",           "label": "Push",           "labelRu": "Жим" },
+    { "id": "pull",           "label": "Pull",           "labelRu": "Тяга" },
+    { "id": "squat",          "label": "Squat",          "labelRu": "Присед" },
+    { "id": "core-flexion",   "label": "Core Flexion",   "labelRu": "Сгибание кора" },
+    { "id": "core-extension", "label": "Core Extension", "labelRu": "Разгибание кора" }
+  ],
+
+  "catalogs": [
+    { "id": "wade", "label": "Wade", "labelRu": "Пол Уэйд" }
+  ],
+
+  "canonicals": [
+    {
+      "id": "push-up",
+      "graphKey": "pushup",
+      "label": "Push-ups",
+      "labelRu": "Отжимания",
+      "pattern": "push",
+      "catalog": "wade",
+      "icuName": "Push-ups"
+    },
+    {
+      "id": "hspu",
+      "graphKey": "handstand",
+      "label": "Handstand Push-ups",
+      "labelRu": "Стойка и отжимания в стойке",
+      "pattern": "push",
+      "catalog": "wade",
+      "icuName": "Handstand Push-ups",
+      "iconKey": "HS"
+    },
+    {
+      "id": "pull-up",
+      "graphKey": "pullup",
+      "label": "Pull-ups",
+      "labelRu": "Подтягивания",
+      "pattern": "pull",
+      "catalog": "wade",
+      "icuName": "Pull-ups"
+    },
+    {
+      "id": "squat",
+      "graphKey": "squat",
+      "label": "Squats",
+      "labelRu": "Приседания",
+      "pattern": "squat",
+      "catalog": "wade",
+      "icuName": "Squats"
+    },
+    {
+      "id": "leg-raise",
+      "graphKey": "legraise",
+      "label": "Leg Raises",
+      "labelRu": "Подъёмы ног",
+      "pattern": "core-flexion",
+      "catalog": "wade",
+      "icuName": "Leg Raises"
+    },
+    {
+      "id": "bridge",
+      "graphKey": "bridge",
+      "label": "Bridges",
+      "labelRu": "Мостики",
+      "pattern": "core-extension",
+      "catalog": "wade",
+      "icuName": "Bridges"
+    }
+  ],
+
+  "nodes": [
+    { "id": "pu1",  "canonical": "push-up", "level": 1,  "label": "Wall Push-ups",           "labelRu": "Отжимания от стены",                      "benchmark": ["1x10", "2x25", "3x50"] },
+    { "id": "pu2",  "canonical": "push-up", "level": 2,  "label": "Incline Push-ups",        "labelRu": "Отжимания в наклоне",                     "benchmark": ["1x10", "2x20", "3x40"] },
+    { "id": "pu3",  "canonical": "push-up", "level": 3,  "label": "Kneeling Push-ups",       "labelRu": "Отжимания на коленях",                    "benchmark": ["1x10", "2x15", "3x30"] },
+    { "id": "pu4",  "canonical": "push-up", "level": 4,  "label": "Half Push-ups",           "labelRu": "Неполные отжимания",                      "benchmark": ["1x8",  "2x35", "3x50"] },
+    { "id": "pu5",  "canonical": "push-up", "level": 5,  "label": "Full Push-ups",           "labelRu": "Полные отжимания",                        "benchmark": ["1x5",  "2x10", "2x30"] },
+    { "id": "pu6",  "canonical": "push-up", "level": 6,  "label": "Close Push-ups",          "labelRu": "Узкие отжимания",          "tags": ["close"], "benchmark": ["1x5", "2x10", "2x20"] },
+    { "id": "pu7",  "canonical": "push-up", "level": 7,  "label": "Uneven Push-ups",         "labelRu": "Разновысокие отжимания",                  "benchmark": ["1x5",  "2x10", "2x20"], "perSide": true },
+    { "id": "pu8",  "canonical": "push-up", "level": 8,  "label": "1/2 One-Arm Push-ups",    "labelRu": "Неполные отжимания на одной руке",        "benchmark": ["1x5",  "2x10", "2x20"], "perSide": true },
+    { "id": "pu9",  "canonical": "push-up", "level": 9,  "label": "Lever Push-ups",          "labelRu": "Отжимания на одной руке с поддержкой",    "benchmark": ["1x5",  "2x10", "2x20"], "perSide": true },
+    { "id": "pu10", "canonical": "push-up", "level": 10, "label": "One-Arm Push-ups",        "labelRu": "Отжимания на одной руке",                 "benchmark": ["1x5",  "2x10", "2x50"], "perSide": true },
+
+    { "id": "h1",  "canonical": "hspu", "level": 1,  "label": "Wall Headstands",         "labelRu": "Стойка на голове у стены",                    "benchmark": ["30s", "60s", "120s"] },
+    { "id": "h2",  "canonical": "hspu", "level": 2,  "label": "Crow Stand",              "labelRu": "Стойка Ворон",                                "benchmark": ["10s", "30s", "60s"] },
+    { "id": "h3",  "canonical": "hspu", "level": 3,  "label": "Wall Handstands",         "labelRu": "Стойка на руках у стены",                     "benchmark": ["30s", "60s", "120s"] },
+    { "id": "h4",  "canonical": "hspu", "level": 4,  "label": "Half Handstand Push-ups", "labelRu": "Неполные отжимания в стойке у стены",         "benchmark": ["1x5", "2x10", "2x20"] },
+    { "id": "h5",  "canonical": "hspu", "level": 5,  "label": "Wall Handstand Push-ups", "labelRu": "Отжимания в стойке на руках у стены",         "benchmark": ["1x5", "2x10", "2x15"] },
+    { "id": "h6",  "canonical": "hspu", "level": 6,  "label": "Close Handstand Push-ups","labelRu": "Узкие отжимания в стойке",        "tags": ["close"], "benchmark": ["1x5", "2x9", "2x12"] },
+    { "id": "h7",  "canonical": "hspu", "level": 7,  "label": "Uneven Handstand Push-ups","labelRu": "Разновысокие отжимания в стойке",           "benchmark": ["1x5", "2x8", "2x10"], "perSide": true },
+    { "id": "h8",  "canonical": "hspu", "level": 8,  "label": "1/2 One-Arm HSPU",        "labelRu": "Неполные отжимания в стойке на одной руке",   "benchmark": ["1x4", "2x6", "2x8"],  "perSide": true },
+    { "id": "h9",  "canonical": "hspu", "level": 9,  "label": "Lever HSPU",              "labelRu": "Отжимания в стойке на одной руке с поддержкой","benchmark": ["1x3", "2x4", "2x6"],  "perSide": true },
+    { "id": "h10", "canonical": "hspu", "level": 10, "label": "One-Arm HSPU",            "labelRu": "Отжимания в стойке на одной руке",            "benchmark": ["1x1", "2x2", "2x5"],  "perSide": true },
+
+    { "id": "pl1",  "canonical": "pull-up", "level": 1,  "label": "Vertical Pulls",       "labelRu": "Вертикальные подтягивания",              "benchmark": ["1x10", "2x25", "3x40"] },
+    { "id": "pl2",  "canonical": "pull-up", "level": 2,  "label": "Horizontal Pulls",     "labelRu": "Горизонтальные подтягивания", "tags": ["row"], "benchmark": ["1x10", "2x20", "3x30"] },
+    { "id": "pl3",  "canonical": "pull-up", "level": 3,  "label": "Jackknife Pull-ups",   "labelRu": "Подтягивания складной нож",              "benchmark": ["1x10", "2x15", "3x20"] },
+    { "id": "pl4",  "canonical": "pull-up", "level": 4,  "label": "Half Pull-ups",        "labelRu": "Неполные подтягивания",                  "benchmark": ["1x8",  "2x11", "3x15"] },
+    { "id": "pl5",  "canonical": "pull-up", "level": 5,  "label": "Full Pull-ups",        "labelRu": "Полные подтягивания",                    "benchmark": ["1x5",  "2x8",  "2x10"] },
+    { "id": "pl6",  "canonical": "pull-up", "level": 6,  "label": "Close Pull-ups",       "labelRu": "Узкие подтягивания", "tags": ["close"], "benchmark": ["1x5", "2x8", "2x10"] },
+    { "id": "pl7",  "canonical": "pull-up", "level": 7,  "label": "Uneven Pull-ups",      "labelRu": "Разновысокие подтягивания",              "benchmark": ["1x5",  "2x7",  "2x9"], "perSide": true },
+    { "id": "pl8",  "canonical": "pull-up", "level": 8,  "label": "1/2 One-Arm Pull-ups", "labelRu": "Неполные подтягивания на одной руке",    "benchmark": ["1x4",  "2x6",  "2x8"], "perSide": true },
+    { "id": "pl9",  "canonical": "pull-up", "level": 9,  "label": "Lever Pull-ups",       "labelRu": "Подтягивания на одной руке с поддержкой","benchmark": ["1x3",  "2x5",  "2x7"], "perSide": true },
+    { "id": "pl10", "canonical": "pull-up", "level": 10, "label": "One-Arm Pull-ups",     "labelRu": "Подтягивания на одной руке",             "benchmark": ["1x2",  "2x3",  "2x6"], "perSide": true },
+
+    { "id": "sq1",  "canonical": "squat", "level": 1,  "label": "Shoulder Stand Squats",   "labelRu": "Приседания в стойке на плечах",     "benchmark": ["1x10", "2x20", "3x40"] },
+    { "id": "sq2",  "canonical": "squat", "level": 2,  "label": "Jackknife Squats",        "labelRu": "Приседания складной нож",           "benchmark": ["1x10", "2x20", "3x30"] },
+    { "id": "sq3",  "canonical": "squat", "level": 3,  "label": "Assisted Squats",         "labelRu": "Приседания с поддержкой",           "benchmark": ["1x10", "2x15", "3x20"] },
+    { "id": "sq4",  "canonical": "squat", "level": 4,  "label": "Half Squats",             "labelRu": "Неполные приседания",               "benchmark": ["1x8",  "2x11", "2x15"] },
+    { "id": "sq5",  "canonical": "squat", "level": 5,  "label": "Full Squats",             "labelRu": "Полные приседания",                 "benchmark": ["1x5",  "2x8",  "2x10"] },
+    { "id": "sq6",  "canonical": "squat", "level": 6,  "label": "Close Squats",            "labelRu": "Узкие приседания", "tags": ["close"], "benchmark": ["1x5", "2x8", "2x10"] },
+    { "id": "sq7",  "canonical": "squat", "level": 7,  "label": "Uneven Squats",           "labelRu": "Разновысокие приседания",           "benchmark": ["1x5",  "2x7",  "2x9"], "perSide": true },
+    { "id": "sq8",  "canonical": "squat", "level": 8,  "label": "1/2 One-Leg Squats",      "labelRu": "Неполные приседания на одной ноге", "benchmark": ["1x4",  "2x6",  "2x8"], "perSide": true },
+    { "id": "sq9",  "canonical": "squat", "level": 9,  "label": "Assisted One-Leg Squats", "labelRu": "Одноногий присед с опорой",         "benchmark": ["1x3",  "2x5",  "2x7"], "perSide": true },
+    { "id": "sq10", "canonical": "squat", "level": 10, "label": "One-Leg Squats",          "labelRu": "Приседания на одной ноге",          "benchmark": ["1x1",  "2x3",  "2x6"], "perSide": true },
+
+    { "id": "lr1",  "canonical": "leg-raise", "level": 1,  "label": "Knee Tucks",                  "labelRu": "Подтягивание коленей к груди",              "benchmark": ["1x10", "2x20", "3x40"] },
+    { "id": "lr2",  "canonical": "leg-raise", "level": 2,  "label": "Flat Bent Leg Raises",        "labelRu": "Подъёмы коленей из положения лёжа",         "benchmark": ["1x10", "2x20", "3x35"] },
+    { "id": "lr3",  "canonical": "leg-raise", "level": 3,  "label": "Flat Frog Raises",            "labelRu": "Подъёмы согнутых ног лёжа",                 "benchmark": ["1x10", "2x15", "3x30"] },
+    { "id": "lr4",  "canonical": "leg-raise", "level": 4,  "label": "Frog Leg Raises",             "labelRu": "Подъёмы ног «лягушка»",                     "benchmark": ["1x8",  "2x15", "3x25"] },
+    { "id": "lr5",  "canonical": "leg-raise", "level": 5,  "label": "Flat Straight Leg Raises",    "labelRu": "Подъёмы прямых ног из положения лёжа",      "benchmark": ["1x5",  "2x10", "2x20"] },
+    { "id": "lr6",  "canonical": "leg-raise", "level": 6,  "label": "Hanging Knee Raises",         "labelRu": "Подтягивание коленей в висе",               "benchmark": ["1x5",  "2x10", "2x15"] },
+    { "id": "lr7",  "canonical": "leg-raise", "level": 7,  "label": "Hanging Bent Raises",         "labelRu": "Подъёмы согнутых ног в висе",               "benchmark": ["1x5",  "2x10", "2x15"] },
+    { "id": "lr8",  "canonical": "leg-raise", "level": 8,  "label": "Hanging Frog Raises",         "labelRu": "Подъёмы ног в висе «лягушка»",              "benchmark": ["1x5",  "2x10", "2x15"] },
+    { "id": "lr9",  "canonical": "leg-raise", "level": 9,  "label": "Partial Straight Raises",     "labelRu": "Неполные подъёмы прямых ног в висе",        "benchmark": ["1x5",  "2x10", "2x15"] },
+    { "id": "lr10", "canonical": "leg-raise", "level": 10, "label": "Hanging Straight Raises",     "labelRu": "Подъёмы прямых ног в висе",                 "benchmark": ["1x5",  "2x10", "2x30"] },
+
+    { "id": "br1",  "canonical": "bridge", "level": 1,  "label": "Short Bridges",            "labelRu": "Мостик от плеч",                    "benchmark": ["1x10", "2x25", "3x50"] },
+    { "id": "br2",  "canonical": "bridge", "level": 2,  "label": "Straight Bridges",         "labelRu": "Прямой мостик",                     "benchmark": ["1x10", "2x20", "3x40"] },
+    { "id": "br3",  "canonical": "bridge", "level": 3,  "label": "Angled Bridges",           "labelRu": "Мостик из обратного наклона",       "benchmark": ["1x8",  "2x15", "3x30"] },
+    { "id": "br4",  "canonical": "bridge", "level": 4,  "label": "Head Bridges",             "labelRu": "Мостик из упора на голову",         "benchmark": ["1x8",  "2x15", "2x25"] },
+    { "id": "br5",  "canonical": "bridge", "level": 5,  "label": "Half Bridges",             "labelRu": "Полумостик",                        "benchmark": ["1x8",  "2x15", "2x20"] },
+    { "id": "br6",  "canonical": "bridge", "level": 6,  "label": "Full Bridges",             "labelRu": "Полный мостик",                     "benchmark": ["1x6",  "2x10", "2x15"] },
+    { "id": "br7",  "canonical": "bridge", "level": 7,  "label": "Stand-to-Stand Bridges",   "labelRu": "Мостик по стенке вниз",             "benchmark": ["1x3",  "2x6",  "2x10"] },
+    { "id": "br8",  "canonical": "bridge", "level": 8,  "label": "Walking Bridges",          "labelRu": "Мостик по стенке вверх",            "benchmark": ["1x2",  "2x4",  "2x8"] },
+    { "id": "br9",  "canonical": "bridge", "level": 9,  "label": "Stand-to-Stand (advanced)","labelRu": "Неполный мостик из положения стоя", "benchmark": ["1x1",  "2x3",  "2x6"] },
+    { "id": "br10", "canonical": "bridge", "level": 10, "label": "One-Arm Bridges",          "labelRu": "Полный мостик из положения стоя",   "benchmark": ["1x1",  "2x3",  "2x10-30s"] }
+  ],
+
+  "edges": [
+    { "from": "pu1",  "to": "pu2"  },
+    { "from": "pu2",  "to": "pu3"  },
+    { "from": "pu3",  "to": "pu4"  },
+    { "from": "pu4",  "to": "pu5"  },
+    { "from": "pu5",  "to": "pu6"  },
+    { "from": "pu6",  "to": "pu7"  },
+    { "from": "pu7",  "to": "pu8"  },
+    { "from": "pu8",  "to": "pu9"  },
+    { "from": "pu9",  "to": "pu10" },
+
+    { "from": "h1",  "to": "h2"  },
+    { "from": "h2",  "to": "h3"  },
+    { "from": "h3",  "to": "h4"  },
+    { "from": "h4",  "to": "h5"  },
+    { "from": "h5",  "to": "h6"  },
+    { "from": "h6",  "to": "h7"  },
+    { "from": "h7",  "to": "h8"  },
+    { "from": "h8",  "to": "h9"  },
+    { "from": "h9",  "to": "h10" },
+
+    { "from": "pl1",  "to": "pl2"  },
+    { "from": "pl2",  "to": "pl3"  },
+    { "from": "pl3",  "to": "pl4"  },
+    { "from": "pl4",  "to": "pl5"  },
+    { "from": "pl5",  "to": "pl6"  },
+    { "from": "pl6",  "to": "pl7"  },
+    { "from": "pl7",  "to": "pl8"  },
+    { "from": "pl8",  "to": "pl9"  },
+    { "from": "pl9",  "to": "pl10" },
+
+    { "from": "sq1",  "to": "sq2"  },
+    { "from": "sq2",  "to": "sq3"  },
+    { "from": "sq3",  "to": "sq4"  },
+    { "from": "sq4",  "to": "sq5"  },
+    { "from": "sq5",  "to": "sq6"  },
+    { "from": "sq6",  "to": "sq7"  },
+    { "from": "sq7",  "to": "sq8"  },
+    { "from": "sq8",  "to": "sq9"  },
+    { "from": "sq9",  "to": "sq10" },
+
+    { "from": "lr1",  "to": "lr2"  },
+    { "from": "lr2",  "to": "lr3"  },
+    { "from": "lr3",  "to": "lr4"  },
+    { "from": "lr4",  "to": "lr5"  },
+    { "from": "lr5",  "to": "lr6"  },
+    { "from": "lr6",  "to": "lr7"  },
+    { "from": "lr7",  "to": "lr8"  },
+    { "from": "lr8",  "to": "lr9"  },
+    { "from": "lr9",  "to": "lr10" },
+
+    { "from": "br1",  "to": "br2"  },
+    { "from": "br2",  "to": "br3"  },
+    { "from": "br3",  "to": "br4"  },
+    { "from": "br4",  "to": "br5"  },
+    { "from": "br5",  "to": "br6"  },
+    { "from": "br6",  "to": "br7"  },
+    { "from": "br7",  "to": "br8"  },
+    { "from": "br8",  "to": "br9"  },
+    { "from": "br9",  "to": "br10" }
+  ],
+
+  "programs": [
+    {
+      "id": "new-blood",
+      "label": "New Blood",
+      "labelRu": "Новая кровь",
+      "category": "wade",
+      "canonicals": ["push-up", "pull-up", "squat", "leg-raise", "bridge", "hspu"]
+    },
+    {
+      "id": "good-behavior",
+      "label": "Good Behavior",
+      "labelRu": "Хорошее поведение",
+      "category": "wade",
+      "canonicals": ["push-up", "pull-up", "squat", "leg-raise", "bridge", "hspu"]
+    },
+    {
+      "id": "veterano",
+      "label": "Veterano",
+      "labelRu": "Ветеран",
+      "category": "wade",
+      "canonicals": ["push-up", "pull-up", "squat", "leg-raise", "bridge", "hspu"]
+    },
+    {
+      "id": "revolving-door",
+      "label": "Revolving Door",
+      "labelRu": "Вращающаяся дверь",
+      "category": "wade",
+      "canonicals": ["push-up", "pull-up", "squat", "leg-raise", "bridge", "hspu"]
+    }
+  ]
+}

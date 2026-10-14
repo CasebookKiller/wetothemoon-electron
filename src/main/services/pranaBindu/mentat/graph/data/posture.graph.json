@@ -1,0 +1,11 @@
+{
+  "id": "posture",
+  "label": "Posture",
+  "labelRu": "Posture",
+  "patterns": [],
+  "catalogs": [{ "id": "posture", "label": "Posture", "labelRu": "Posture" }],
+  "canonicals": [],
+  "nodes": [],
+  "edges": [],
+  "programs": []
+}

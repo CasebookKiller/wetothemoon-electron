@@ -1,0 +1,41 @@
+{
+  "id": "squat",
+  "label": "Squat",
+  "labelRu": "Присед",
+  "hintPattern": "squat",
+  "canonicals": [
+    {
+      "id": "squat",
+      "graphKey": "squat",
+      "label": "Squats",
+      "labelRu": "Приседания",
+      "catalog": "wade",
+      "pattern": "squat",
+      "icuName": "Squats",
+      "replacesEntryKeys": ["squat"]
+    }
+  ],
+  "nodes": [
+    { "id": "s1",  "canonical": "squat", "level": 1,  "label": "Shoulder Stand Squats", "labelRu": "Приседания в стойке на плечах", "benchmark": ["1x10", "2x20", "3x40"] },
+    { "id": "s2",  "canonical": "squat", "level": 2,  "label": "Jackknife Squats",      "labelRu": "Приседания складной нож",        "benchmark": ["1x10", "2x20", "3x30"] },
+    { "id": "s3",  "canonical": "squat", "level": 3,  "label": "Assisted Squats",       "labelRu": "Приседания с поддержкой",        "benchmark": ["1x10", "2x15", "3x20"] },
+    { "id": "s4",  "canonical": "squat", "level": 4,  "label": "Half Squats",           "labelRu": "Неполные приседания",            "benchmark": ["1x8",  "2x11", "2x15"] },
+    { "id": "s5",  "canonical": "squat", "level": 5,  "label": "Full Squats",           "labelRu": "Полные приседания",              "benchmark": ["1x5",  "2x8",  "2x10"] },
+    { "id": "s6",  "canonical": "squat", "level": 6,  "label": "Close Squats",          "labelRu": "Узкие приседания",     "tags": ["close"], "benchmark": ["1x5", "2x8", "2x10"] },
+    { "id": "s7",  "canonical": "squat", "level": 7,  "label": "Uneven Squats",         "labelRu": "Разновысокие приседания",        "benchmark": ["1x5",  "2x7",  "2x9"] },
+    { "id": "s8",  "canonical": "squat", "level": 8,  "label": "1/2 One-Leg Squats",    "labelRu": "Неполные приседания на одной ноге", "benchmark": ["1x4", "2x6", "2x8"] },
+    { "id": "s9",  "canonical": "squat", "level": 9,  "label": "Pistol Squats",         "labelRu": "Пистолетик",                     "benchmark": ["1x3",  "2x5",  "2x7"] },
+    { "id": "s10", "canonical": "squat", "level": 10, "label": "One-Leg Squats",        "labelRu": "Приседания на одной ноге",       "benchmark": ["1x1",  "2x3",  "2x6"] }
+  ],
+  "edges": [
+    { "from": "s1", "to": "s2"  },
+    { "from": "s2", "to": "s3"  },
+    { "from": "s3", "to": "s4"  },
+    { "from": "s4", "to": "s5"  },
+    { "from": "s5", "to": "s6"  },
+    { "from": "s6", "to": "s7"  },
+    { "from": "s7", "to": "s8"  },
+    { "from": "s8", "to": "s9"  },
+    { "from": "s9", "to": "s10" }
+  ]
+}

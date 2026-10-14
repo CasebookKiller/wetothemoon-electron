@@ -1,0 +1,74 @@
+{
+  "id": "pull",
+  "label": "Pull",
+  "labelRu": "Тяга",
+  "hintPattern": "pull",
+  "canonicals": [
+    {
+      "id": "pull-up",
+      "graphKey": "pullup",
+      "label": "Pull-ups",
+      "labelRu": "Подтягивания",
+      "catalog": "wade",
+      "pattern": "pull",
+      "icuName": "Pull-ups",
+      "replacesEntryKeys": ["pullup"]
+    },
+    {
+      "id": "front-lever",
+      "graphKey": "frontlever",
+      "label": "Front Lever",
+      "labelRu": "Передний вис",
+      "catalog": "cali",
+      "pattern": "straight-arm",
+      "secondaryPattern": "pull",
+      "isStatic": true,
+      "icuName": "Front Lever",
+      "replacesEntryKeys": ["frontlever"]
+    }
+  ],
+  "nodes": [
+    { "id": "pu1",  "canonical": "pull-up", "level": 1,  "label": "Vertical Pulls",       "labelRu": "Вертикальные подтягивания",               "benchmark": ["1x10", "2x25", "3x40"] },
+    { "id": "pu2",  "canonical": "pull-up", "level": 2,  "label": "Horizontal Pulls",     "labelRu": "Горизонтальные подтягивания",  "tags": ["row"], "benchmark": ["1x10", "2x20", "3x30"] },
+    { "id": "pu3",  "canonical": "pull-up", "level": 3,  "label": "Jackknife Pull-ups",   "labelRu": "Подтягивания складной нож",               "benchmark": ["1x10", "2x15", "3x20"] },
+    { "id": "pu4",  "canonical": "pull-up", "level": 4,  "label": "Half Pull-ups",        "labelRu": "Неполные подтягивания",                   "benchmark": ["1x8",  "2x11", "3x15"] },
+    { "id": "pu5",  "canonical": "pull-up", "level": 5,  "label": "Full Pull-ups",        "labelRu": "Полные подтягивания",                     "benchmark": ["1x5",  "2x8",  "2x10"] },
+    { "id": "pu6",  "canonical": "pull-up", "level": 6,  "label": "Close Pull-ups",       "labelRu": "Узкие подтягивания",           "tags": ["close"], "benchmark": ["1x5", "2x8", "2x10"] },
+    { "id": "pu7",  "canonical": "pull-up", "level": 7,  "label": "Uneven Pull-ups",      "labelRu": "Разновысокие подтягивания",               "benchmark": ["1x5",  "2x7",  "2x9"] },
+    { "id": "pu8",  "canonical": "pull-up", "level": 8,  "label": "1/2 One-Arm Pull-ups", "labelRu": "Неполные подтягивания на одной руке",     "benchmark": ["1x4",  "2x6",  "2x8"] },
+    { "id": "pu9",  "canonical": "pull-up", "level": 9,  "label": "Lever Pull-ups",       "labelRu": "Подтягивания на одной руке с поддержкой", "benchmark": ["1x3",  "2x5",  "2x7"] },
+    { "id": "pu10", "canonical": "pull-up", "level": 10, "label": "One-Arm Pull-ups",     "labelRu": "Подтягивания на одной руке",              "benchmark": ["1x2",  "2x3",  "2x6"] },
+
+    { "id": "fl1",  "canonical": "front-lever", "level": 1,  "label": "Tuck Front Lever",          "labelRu": "Передний вис в группировке",              "benchmark": ["10s", "20s", "30s"] },
+    { "id": "fl2",  "canonical": "front-lever", "level": 2,  "label": "Advanced Tuck FL",          "labelRu": "Продвинутая группировка",                 "benchmark": ["10s", "15s", "20s"] },
+    { "id": "fl3",  "canonical": "front-lever", "level": 3,  "label": "One-Leg FL",                "labelRu": "Одна нога выпрямлена",                    "benchmark": ["10s", "15s", "20s"] },
+    { "id": "fl4",  "canonical": "front-lever", "level": 4,  "label": "Straddle FL",               "labelRu": "Передний вис ноги врозь",                 "benchmark": ["5s",  "10s", "15s"] },
+    { "id": "fl5",  "canonical": "front-lever", "level": 5,  "label": "Full Front Lever",          "labelRu": "Полный передний вис",                     "benchmark": ["5s",  "10s", "15s"] },
+    { "id": "fl6",  "canonical": "front-lever", "level": 6,  "label": "FL Raises",                 "labelRu": "Подъёмы в передний вис",                  "benchmark": ["1x3", "2x5", "3x8"] },
+    { "id": "fl7",  "canonical": "front-lever", "level": 7,  "label": "FL Rows",                   "labelRu": "Тяги в переднем висе",                    "benchmark": ["1x3", "2x5", "3x8"] },
+    { "id": "fl8",  "canonical": "front-lever", "level": 8,  "label": "Touch-and-Go FL",           "labelRu": "Касания в переднем висе",                 "benchmark": ["1x1", "2x3", "3x5"] },
+    { "id": "fl9",  "canonical": "front-lever", "level": 9,  "label": "One-Arm FL (tuck)",         "labelRu": "Передний вис на одной руке (группировка)", "benchmark": ["3s",  "5s",  "10s"] },
+    { "id": "fl10", "canonical": "front-lever", "level": 10, "label": "One-Arm Front Lever",       "labelRu": "Передний вис на одной руке",              "benchmark": ["2s",  "3s",  "5s"] }
+  ],
+  "edges": [
+    { "from": "pu1",  "to": "pu2"  },
+    { "from": "pu2",  "to": "pu3"  },
+    { "from": "pu3",  "to": "pu4"  },
+    { "from": "pu4",  "to": "pu5"  },
+    { "from": "pu5",  "to": "pu6"  },
+    { "from": "pu6",  "to": "pu7"  },
+    { "from": "pu7",  "to": "pu8"  },
+    { "from": "pu8",  "to": "pu9"  },
+    { "from": "pu9",  "to": "pu10" },
+
+    { "from": "fl1",  "to": "fl2"  },
+    { "from": "fl2",  "to": "fl3"  },
+    { "from": "fl3",  "to": "fl4"  },
+    { "from": "fl4",  "to": "fl5"  },
+    { "from": "fl5",  "to": "fl6"  },
+    { "from": "fl6",  "to": "fl7"  },
+    { "from": "fl7",  "to": "fl8"  },
+    { "from": "fl8",  "to": "fl9"  },
+    { "from": "fl9",  "to": "fl10" }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "id": "smithrun",
+  "label": "Smithrun",
+  "labelRu": "Кузница Бега",
+  "patterns": [],
+  "catalogs": [
+    { "id": "smithrun", "label": "Smithrun", "labelRu": "Кузница Бега" }
+  ],
+  "canonicals": [],
+  "nodes": [],
+  "edges": [],
+  "programs": []
+}

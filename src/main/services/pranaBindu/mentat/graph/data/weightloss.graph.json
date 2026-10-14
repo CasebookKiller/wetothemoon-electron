@@ -1,0 +1,11 @@
+{
+  "id": "weightloss",
+  "label": "Weightloss",
+  "labelRu": "Weightloss",
+  "patterns": [],
+  "catalogs": [{ "id": "weightloss", "label": "Weightloss", "labelRu": "Weightloss" }],
+  "canonicals": [],
+  "nodes": [],
+  "edges": [],
+  "programs": []
+}

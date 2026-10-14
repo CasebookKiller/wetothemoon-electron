@@ -911,6 +911,48 @@ try {
       deleteEquivalence: (id: number) =>
         ipcRenderer.invoke('pb:equivalences-delete', id),
 
+      debugGraphAudit: () => ipcRenderer.invoke('pb:debug-graph-audit'),
+      debugGraphQuery: () => ipcRenderer.invoke('pb:debug-graph-query'),
+
+      getExerciseGraph: () => ipcRenderer.invoke('pb:get-exercise-graph'),
+      graphGetJson: () => ipcRenderer.invoke('pb:graph-get-json'),
+      graphPalette: () => ipcRenderer.invoke('pb:graph-palette'),
+      graphAddCanonical: (payload: any) =>
+        ipcRenderer.invoke('pb:graph-add-canonical', payload),
+
+      graphSave: (graphJson: any) => ipcRenderer.invoke('pb:graph-save', graphJson),
+      graphReset: () => ipcRenderer.invoke('pb:graph-reset'),
+      graphPath: () => ipcRenderer.invoke('pb:graph-path'),
+
+      graphAddEdge: (payload: any) =>
+        ipcRenderer.invoke('pb:graph-add-edge', payload),
+      graphDeleteEdge: (payload: any) =>
+        ipcRenderer.invoke('pb:graph-delete-edge', payload),
+      graphUpdateEdge: (payload: any) =>
+        ipcRenderer.invoke('pb:graph-update-edge', payload),
+
+      graphDeleteCanonical: (id: string) =>
+        ipcRenderer.invoke('pb:graph-delete-canonical', id),
+      graphUpdateCanonical: (payload: any) =>
+        ipcRenderer.invoke('pb:graph-update-canonical', payload),
+      graphAddPattern: (payload: any) =>
+        ipcRenderer.invoke('pb:graph-add-pattern', payload),
+      graphAddCanonicalCustom: (payload: any) =>
+        ipcRenderer.invoke('pb:graph-add-canonical-custom', payload),
+      graphAddExercise: (payload: any) =>
+        ipcRenderer.invoke('pb:graph-add-exercise', payload),
+      graphDeleteExercise: (id: string) =>
+        ipcRenderer.invoke('pb:graph-delete-exercise', id),
+      graphDeletePattern: (id: string) =>
+        ipcRenderer.invoke('pb:graph-delete-pattern', id),
+      graphUpdateExercise: (payload: any) =>
+        ipcRenderer.invoke('pb:graph-update-exercise', payload),
+      graphUpdatePattern: (payload: any) =>
+        ipcRenderer.invoke('pb:graph-update-pattern', payload),
+
+      graphSaveNodePos: (payload: { id: string; x: number; y: number }) =>
+        ipcRenderer.invoke('pb:graph-save-node-pos', payload),
+
     },
 
   });

@@ -83,6 +83,136 @@ import {
   matchIcuWorkout,
   matchIcuLine,
 } from '../services/pranaBindu/mentat/workoutMatcher';
+import { buildExerciseGraph, auditGraph } from '../services/pranaBindu/mentat/graph/graphBuilder';
+import { DifficultyBand, ProgramProps } from '../services/pranaBindu/mentat/graph/ontology';
+
+import { WADE_SEED } from '../services/pranaBindu/mentat/graph/data';
+import type { EdgeJson, GraphJson, NodeJson } from '../services/pranaBindu/mentat/graph/schema';
+import { buildPalette } from '../services/pranaBindu/mentat/graph/sources';
+import { findThenicsMatches } from '../services/pranaBindu/mentat/graph/equivalencesIndex';
+
+import {
+  seedToPairs,
+  dbToPairs,
+  findThenicsStatus,
+  buildKeyIndex,
+  pairToGraphId,
+} from '../services/pranaBindu/mentat/graph/equivalencesMerge';
+
+// Пути
+function graphDir(): string {
+  const dir = path.join(app.getPath('userData'), 'prana_bindu', 'graph');
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+function userGraphPath(): string {
+  return path.join(graphDir(), 'wade.graph.user.json');
+}
+
+// Загрузка активного графа Wade: user, если есть, иначе seed
+function loadWadeGraph(): GraphJson {
+  const p = userGraphPath();
+  if (fs.existsSync(p)) {
+    try {
+      const raw = fs.readFileSync(p, 'utf8');
+      return JSON.parse(raw) as GraphJson;
+    } catch (e) {
+      console.warn('[graph] user.json повреждён, fallback на seed:', (e as Error).message);
+    }
+  }
+  return WADE_SEED;
+}
+
+/**
+ * Graph-id → JSON-ref для edges[].
+ *   pat:push                    → @pattern:push
+ *   cat:wade                    → @catalog:wade
+ *   ex:canonical:push-up        → @canonical:push-up
+ *   ex:wade:pushup:5            → pu5  (если 4-я часть — число)
+ *   ex:named:custom-calves:c1   → c1   (если 4-я часть — не число)
+ */
+function graphIdToJsonRef(graphId: string, graph: GraphJson): string | null {
+  if (graphId.startsWith('pat:')) return `@pattern:${graphId.slice(4)}`;
+  if (graphId.startsWith('cat:')) return `@catalog:${graphId.slice(4)}`;
+  if (graphId.startsWith('ex:canonical:')) {
+    return `@canonical:${graphId.slice(13)}`;
+  }
+
+  const parts = graphId.split(':');
+  if (parts.length < 4) return null;
+
+  const [, catalog, canonKey, tail] = parts;
+
+  // tail — число (целое или с дробью 7.1, 7.2, …)?
+  // Ищем по (catalog, canonKey, level)
+  if (/^\d+(\.\d+)?$/.test(tail)) {
+    const level = Number(tail);
+    const node = graph.nodes.find((n) => {
+      const canon = graph.canonicals.find((c) => c.id === n.canonical);
+      if (!canon) return false;
+      const key = canon.graphKey ?? canon.id;
+      return canon.catalog === catalog && key === canonKey && n.level === level;
+    });
+    return node?.id ?? null;
+  }
+
+  // tail — не число? Ищем по (catalog, canonKey, node.id)
+  const node = graph.nodes.find((n) => {
+    if (n.id !== tail) return false;
+    const canon = graph.canonicals.find((c) => c.id === n.canonical);
+    if (!canon) return false;
+    return canon.catalog === catalog;
+  });
+  return node?.id ?? null;
+}
+
+type NodeCollection = 'patterns' | 'catalogs' | 'canonicals' | 'nodes' | 'programs';
+
+function resolveNodePath(
+  graphId: string,
+  graph: GraphJson,
+): { collection: NodeCollection; index: number } | null {
+  if (graphId.startsWith('pat:')) {
+    const key = graphId.slice(4);
+    const idx = graph.patterns.findIndex((p) => p.id === key);
+    return idx >= 0 ? { collection: 'patterns', index: idx } : null;
+  }
+  if (graphId.startsWith('cat:')) {
+    const id = graphId.slice(4);
+    const idx = graph.catalogs.findIndex((c) => c.id === id);
+    return idx >= 0 ? { collection: 'catalogs', index: idx } : null;
+  }
+  if (graphId.startsWith('prg:')) {
+    const key = graphId.slice(4);
+    const idx = graph.programs.findIndex((p) => p.id === key);
+    return idx >= 0 ? { collection: 'programs', index: idx } : null;
+  }
+  if (graphId.startsWith('ex:canonical:')) {
+    const key = graphId.slice(13);
+    const idx = graph.canonicals.findIndex((c) => c.id === key);
+    return idx >= 0 ? { collection: 'canonicals', index: idx } : null;
+  }
+
+  // concrete: ex:<catalog>:<key>[:<level|nodeId>]
+  const parts = graphId.split(':');
+  if (parts.length < 4) return null;
+  const [, catalog, canonKey, tail] = parts;
+
+  if (/^\d+(\.\d+)?$/.test(tail)) {
+    const level = Number(tail);
+    const idx = graph.nodes.findIndex((n) => {
+      const canon = graph.canonicals.find((c) => c.id === n.canonical);
+      if (!canon) return false;
+      const gk = canon.graphKey ?? canon.id;
+      return canon.catalog === catalog && gk === canonKey && n.level === level;
+    });
+    return idx >= 0 ? { collection: 'nodes', index: idx } : null;
+  }
+
+  const idx = graph.nodes.findIndex((n) => n.id === tail);
+  return idx >= 0 ? { collection: 'nodes', index: idx } : null;
+}
+
 // ==================== Регистрация провайдеров ====================
 
 let providersRegistered = false;
@@ -3907,6 +4037,704 @@ export function registerPranaBinduHandlers(): void {
     }
   );
 
+  ipcMain.handle('pb:debug-graph-query', async () => {
+    const { buildExerciseGraph } = await import('../services/pranaBindu/mentat/graph/graphBuilder');
+    const { indexGraph, getPatternSubtree, getExercisePath, summarizeGraph } = await import('../services/pranaBindu/mentat/graph/graphQueries');
+    const graph = buildExerciseGraph([loadWadeGraph()]);
+    const idx = indexGraph(graph);
+
+    const pushup = getPatternSubtree(graph, idx, 'push');
+    const firstConcrete = pushup?.canonicals[0]?.concretes[0];
+    const path = firstConcrete ? getExercisePath(idx, firstConcrete.id) : null;
+
+    return {
+      ok: true,
+      summary: summarizeGraph(graph, idx),
+      pushSubtree: {
+        canonicals: pushup?.canonicals.length,
+        totalConcretes: pushup?.canonicals.reduce((s, c) => s + c.concretes.length, 0),
+        canonicalsDetail: pushup?.canonicals.map((c) => ({
+          canonical: c.canonical.id,
+          concretes: c.concretes.length,
+          programs: c.programs.map((p) => (p.props as ProgramProps).key),
+        })),
+      },
+      samplePath: path,
+    };
+  });
+
+  // ==================== GRAPH ====================
+
+  ipcMain.handle('pb:get-exercise-graph', async () => {
+    try {
+      const g = loadWadeGraph();
+      const graph = buildExerciseGraph([g]);
+      return { ok: true, graph, source: fs.existsSync(userGraphPath()) ? 'user' : 'seed' };
+    } catch (e) {
+      return { ok: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('pb:graph-get-json', async () => {
+    try {
+      const g = loadWadeGraph();
+      return { ok: true, graph: g, source: fs.existsSync(userGraphPath()) ? 'user' : 'seed' };
+    } catch (e) {
+      return { ok: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('pb:graph-save', async (_e, graphJson: GraphJson) => {
+    try {
+      const p = userGraphPath();
+      fs.writeFileSync(p, JSON.stringify(graphJson, null, 2), 'utf8');
+      return { ok: true, path: p };
+    } catch (e) {
+      return { ok: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('pb:graph-add-canonical', async (_e, payload: {
+    id: string;
+    label: string;
+    labelRu?: string;
+    catalog: string;
+    pattern?: string | null;
+    secondaryPattern?: string | null;
+    isStatic?: boolean;
+    icuName?: string;
+  }) => {
+    try {
+      // Валидация id
+      if (!payload.id || !/^[a-z0-9-]+$/i.test(payload.id)) {
+        return { ok: false, error: 'id: только латиница, цифры и дефис' };
+      }
+      if (!payload.label) {
+        return { ok: false, error: 'label обязателен' };
+      }
+
+      const current = loadWadeGraph();
+
+      if (current.canonicals.some((c) => c.id === payload.id)) {
+        return { ok: false, error: `canonical '${payload.id}' уже существует` };
+      }
+
+      const newCanon: any = {
+        id: payload.id,
+        label: payload.label,
+        labelRu: payload.labelRu,
+        catalog: payload.catalog,
+        pattern: payload.pattern ?? null,
+        icuName: payload.icuName,
+      };
+      // Расширяем схему опциональными полями — они уже есть в schema,
+      // но если нет — TS не помешает, JSON их сохранит.
+      if (payload.secondaryPattern) newCanon.secondaryPattern = payload.secondaryPattern;
+      if (payload.isStatic) newCanon.isStatic = true;
+
+      const next: GraphJson = {
+        ...current,
+        canonicals: [...current.canonicals, newCanon],
+      };
+
+      const p = userGraphPath();
+      fs.writeFileSync(p, JSON.stringify(next, null, 2), 'utf8');
+
+      return { ok: true, graph: next };
+    } catch (e) {
+      return { ok: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('pb:graph-add-edge', async (_e, payload: {
+    fromGraphId: string;
+    toGraphId: string;
+    kind: string;
+    note?: string;
+  }) => {
+    try {
+      if (!payload?.fromGraphId || !payload?.toGraphId || !payload?.kind) {
+        return { ok: false, error: 'fromGraphId, toGraphId, kind обязательны' };
+      }
+      if (payload.fromGraphId === payload.toGraphId) {
+        return {
+          ok: false,
+          error: 'fromGraphId и toGraphId совпадают — это баг UI',
+        };
+      }
+      if (payload.fromGraphId === payload.toGraphId) {
+        return { ok: false, error: 'Нельзя связать узел с самим собой' };
+      }
+
+      const current = loadWadeGraph();
+      const fromRef = graphIdToJsonRef(payload.fromGraphId, current);
+      const toRef = graphIdToJsonRef(payload.toGraphId, current);
+      if (!fromRef) return { ok: false, error: `Не разрезолвился источник: ${payload.fromGraphId}` };
+      if (!toRef)   return { ok: false, error: `Не разрезолвилась цель: ${payload.toGraphId}` };
+      if (fromRef === toRef) {
+        return {
+          ok: false,
+          error: 'Оба узла указывают на один и тот же JSON-узел. Проверьте: возможно, у двух упражнений в группе совпадают graph-id.',
+        };
+      }
+      const kind = payload.kind;
+      const dup = current.edges.find(
+        (e) =>
+          e.from === fromRef &&
+          e.to === toRef &&
+          (e.kind ?? 'progresses-to') === kind,
+      );
+      if (dup) {
+        return { ok: false, error: 'Такая связь уже существует' };
+      }
+
+      const newEdge = {
+        from: fromRef,
+        to: toRef,
+        kind,
+        ...(payload.note ? { note: payload.note } : {}),
+      };
+
+      const next: GraphJson = {
+        ...current,
+        edges: [...current.edges, newEdge],
+      };
+
+      fs.writeFileSync(userGraphPath(), JSON.stringify(next, null, 2), 'utf8');
+      return { ok: true, graph: next };
+    } catch (e) {
+      return { ok: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('pb:graph-save-node-pos', async (_e, payload: {
+    id: string;
+    x: number;
+    y: number;
+  }) => {
+    try {
+      if (!payload?.id) return { ok: false, error: 'id обязателен' };
+      if (!Number.isFinite(payload.x) || !Number.isFinite(payload.y)) {
+        return { ok: false, error: 'x, y должны быть числами' };
+      }
+
+      const current = loadWadeGraph();
+      const path = resolveNodePath(payload.id, current);
+      if (!path) return { ok: false, error: `Узел '${payload.id}' не найден` };
+
+      const collection = current[path.collection] as Array<{ pos?: { x: number; y: number } }>;
+      collection[path.index].pos = { x: payload.x, y: payload.y };
+
+      fs.writeFileSync(userGraphPath(), JSON.stringify(current, null, 2), 'utf8');
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('pb:graph-delete-edge', async (_e, payload: {
+    fromGraphId: string;
+    toGraphId: string;
+    kind: string;
+  }) => {
+    try {
+      if (!payload?.fromGraphId || !payload?.toGraphId || !payload?.kind) {
+        return { ok: false, error: 'fromGraphId, toGraphId, kind обязательны' };
+      }
+      const current = loadWadeGraph();
+      const fromRef = graphIdToJsonRef(payload.fromGraphId, current);
+      const toRef = graphIdToJsonRef(payload.toGraphId, current);
+      if (!fromRef || !toRef) {
+        return { ok: false, error: 'Не разрезолвились узлы' };
+      }
+      const before = current.edges.length;
+      const nextEdges = current.edges.filter(
+        (e) =>
+          !(
+            e.from === fromRef &&
+            e.to === toRef &&
+            (e.kind ?? 'progresses-to') === payload.kind
+          ),
+      );
+      if (nextEdges.length === before) {
+        return {
+          ok: false,
+          error: 'Связь не найдена в user.json (возможно, она из seed)',
+        };
+      }
+      const next: GraphJson = { ...current, edges: nextEdges };
+      fs.writeFileSync(userGraphPath(), JSON.stringify(next, null, 2), 'utf8');
+      return { ok: true, graph: next };
+    } catch (e) {
+      return { ok: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('pb:graph-update-edge', async (_e, payload: {
+    fromGraphId: string;
+    toGraphId: string;
+    oldKind: string;
+    newKind: string;
+    note?: string;
+  }) => {
+    try {
+      if (!payload?.fromGraphId || !payload?.toGraphId ||
+          !payload?.oldKind || !payload?.newKind) {
+        return { ok: false, error: 'fromGraphId, toGraphId, oldKind, newKind обязательны' };
+      }
+
+      const current = loadWadeGraph();
+      const fromRef = graphIdToJsonRef(payload.fromGraphId, current);
+      const toRef = graphIdToJsonRef(payload.toGraphId, current);
+      if (!fromRef || !toRef) {
+        return { ok: false, error: 'Не разрезолвились узлы' };
+      }
+
+      const idx = current.edges.findIndex(
+        (e) =>
+          e.from === fromRef &&
+          e.to === toRef &&
+          (e.kind ?? 'progresses-to') === payload.oldKind,
+      );
+      if (idx < 0) {
+        return { ok: false, error: 'Связь не найдена в user.json (возможно, она из seed)' };
+      }
+
+      // Проверка на дубль после переименования
+      if (payload.newKind !== payload.oldKind) {
+        const dup = current.edges.find(
+          (e, i) =>
+            i !== idx &&
+            e.from === fromRef &&
+            e.to === toRef &&
+            (e.kind ?? 'progresses-to') === payload.newKind,
+        );
+        if (dup) {
+          return { ok: false, error: `Связь с типом '${payload.newKind}' уже существует` };
+        }
+      }
+
+      const newEdge: EdgeJson = {
+        from: fromRef,
+        to: toRef,
+        kind: payload.newKind,
+        ...(payload.note ? { note: payload.note } : {}),
+      };
+
+      const nextEdges = [...current.edges];
+      nextEdges[idx] = newEdge;
+
+      const next: GraphJson = { ...current, edges: nextEdges };
+      fs.writeFileSync(userGraphPath(), JSON.stringify(next, null, 2), 'utf8');
+      return { ok: true, graph: next };
+    } catch (e) {
+      return { ok: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('pb:graph-reset', async () => {
+    try {
+      const p = userGraphPath();
+      if (fs.existsSync(p)) fs.unlinkSync(p);
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('pb:graph-path', async () => {
+    return { ok: true, path: userGraphPath() };
+  });
+
+  ipcMain.handle('pb:graph-palette', async () => {
+    try {
+      const g = loadWadeGraph();
+      const groups = buildPalette(g);
+
+      const exerciseGraph = buildExerciseGraph([g]);
+      const existing = new Set(exerciseGraph.nodes.map((n) => n.id));
+
+      const db = getMelange();
+      const seedPairs = seedToPairs();
+      const dbItems = listEquivalences(db);
+      const dbPairs = dbToPairs(dbItems);
+      const keyIndex = buildKeyIndex(g);
+
+      for (const grp of groups) {
+        for (const item of grp.items) {
+          if (!item.graphId) continue;
+
+          // 1. Сам узел в графе (Wade-каноны и Wade-уровни)
+          if (existing.has(item.graphId)) {
+            item.inGraph = true;
+            if (!item.state) item.state = 'linked';
+            continue;
+          }
+
+          // 2. Thenics — через merge seed+DB
+          if (item.source === 'thenics') {
+            const payload = item.payload as { key: string; level?: string };
+            const localId = `thenics-${payload.key}`;
+
+            // 1. Прямое совпадение id — canonical уже добавлен (как группа)
+            if (item.graphId && existing.has(item.graphId)) {
+              item.inGraph = true;
+              item.state = 'linked';
+              continue;
+            }
+
+            // 2. Узел с этим local id уже есть в графе (создан через палитру в группе)
+            const refNode = exerciseGraph.nodes.find(
+              (n) =>
+                n.kind === 'exercise' &&
+                (n.props as any).isCanonical === false &&
+                (n.props as any).key === localId,
+            );
+            if (refNode) {
+              item.inGraph = true;
+              item.state = 'linked';
+              item.existingGraphId = refNode.id;
+              const p = refNode.props as any;
+              item.existingShort = p.labelRu ?? p.label ?? refNode.id;
+              continue;
+            }
+
+            // 3. EQUIVALENCES / DB — как раньше
+            const status = findThenicsStatus(
+              payload.key, payload.level, dbPairs, seedPairs, existing, keyIndex,
+            );
+            if (status.linked.length > 0) {
+              const pr = status.linked[0];
+              item.state = 'linked';
+              item.existingGraphId = pairToGraphId(pr);
+              item.existingShort = pr.targetLevel
+                ? `${pr.target.toUpperCase()}-L${pr.targetLevel}`
+                : pr.target.toUpperCase();
+              continue;
+            }
+            if (status.candidates.length > 0) {
+              const pr = status.candidates[0];
+              item.state = 'candidate';
+              item.existingGraphId = pairToGraphId(pr);
+              item.existingShort = pr.targetLevel
+                ? `${pr.target.toUpperCase()}-L${pr.targetLevel}`
+                : pr.target.toUpperCase();
+              item.candidate = { ...pr };
+              continue;
+            }
+
+            item.state = 'active';
+          }
+        }
+      }
+
+      return { ok: true, groups };
+    } catch (e) {
+      return { ok: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('pb:debug-graph-audit', async () => {
+    try {
+      const g = loadWadeGraph();
+      const graph = buildExerciseGraph([g]);
+      return { ok: true, audit: auditGraph(graph) };
+    } catch (e) {
+      return { ok: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('pb:graph-delete-canonical', async (_e, id: string) => {
+    try {
+      if (!id) return { ok: false, error: 'id обязателен' };
+      const current = loadWadeGraph();
+      if (!current.canonicals.some((c) => c.id === id)) {
+        return { ok: false, error: `canonical '${id}' не найден` };
+      }
+      const hasConcrete = current.nodes.some((n) => n.canonical === id);
+      if (hasConcrete) {
+        return { ok: false, error: 'У canonical есть concrete-узлы. Сначала удалите их.' };
+      }
+      const ref = `@canonical:${id}`;
+      const nextEdges = current.edges.filter(
+        (e) => e.from !== ref && e.to !== ref,
+      );
+      const removedEdges = current.edges.length - nextEdges.length;
+      const next: GraphJson = {
+        ...current,
+        canonicals: current.canonicals.filter((c) => c.id !== id),
+        edges: nextEdges,
+      };
+      fs.writeFileSync(userGraphPath(), JSON.stringify(next, null, 2), 'utf8');
+      return { ok: true, graph: next, removedEdges };
+    } catch (e) {
+      return { ok: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('pb:graph-update-canonical', async (_e, payload: {
+    id: string;
+    patch: {
+      label?: string;
+      labelRu?: string;
+      pattern?: string | null;
+      secondaryPattern?: string | null;
+      isStatic?: boolean;
+      icuName?: string;
+    };
+  }) => {
+    try {
+      if (!payload?.id) return { ok: false, error: 'id обязателен' };
+      const current = loadWadeGraph();
+      const idx = current.canonicals.findIndex((c) => c.id === payload.id);
+      if (idx < 0) return { ok: false, error: `canonical '${payload.id}' не найден` };
+
+      const updated = { ...current.canonicals[idx], ...payload.patch };
+      const next: GraphJson = {
+        ...current,
+        canonicals: [
+          ...current.canonicals.slice(0, idx),
+          updated,
+          ...current.canonicals.slice(idx + 1),
+        ],
+      };
+      fs.writeFileSync(userGraphPath(), JSON.stringify(next, null, 2), 'utf8');
+      return { ok: true, graph: next };
+    } catch (e) {
+      return { ok: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('pb:graph-add-pattern', async (_e, payload: {
+    id: string; label: string; labelRu?: string;
+  }) => {
+    try {
+      if (!payload?.id || !/^[a-z0-9-]+$/i.test(payload.id))
+        return { ok: false, error: 'id: латиница, цифры, дефис' };
+      if (!payload?.label) return { ok: false, error: 'label обязателен' };
+
+      const current = loadWadeGraph();
+      const id = `custom-${payload.id}`;
+      if (current.patterns.some((p) => p.id === id)) {
+        return { ok: false, error: `Паттерн '${id}' уже существует` };
+      }
+      const next: GraphJson = {
+        ...current,
+        patterns: [...current.patterns, { id, label: payload.label, labelRu: payload.labelRu }],
+      };
+      fs.writeFileSync(userGraphPath(), JSON.stringify(next, null, 2), 'utf8');
+      return { ok: true, graph: next, id };
+    } catch (e) {
+      return { ok: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('pb:graph-add-canonical-custom', async (_e, payload: {
+    id: string; label: string; labelRu?: string;
+    catalog?: string; pattern?: string | null;
+    secondaryPattern?: string | null; isStatic?: boolean;
+  }) => {
+    try {
+      if (!payload?.id || !/^[a-z0-9-]+$/i.test(payload.id))
+        return { ok: false, error: 'id: латиница, цифры, дефис' };
+      if (!payload?.label) return { ok: false, error: 'label обязателен' };
+
+      const current = loadWadeGraph();
+      const id = `custom-${payload.id}`;
+      if (current.canonicals.some((c) => c.id === id)) {
+        return { ok: false, error: `Canonical '${id}' уже существует` };
+      }
+      const newCanon: any = {
+        id,
+        label: payload.label,
+        labelRu: payload.labelRu,
+        catalog: payload.catalog ?? 'named',
+        pattern: payload.pattern ?? null,
+        isStatic: payload.isStatic ?? false,
+      };
+      if (payload.secondaryPattern) newCanon.secondaryPattern = payload.secondaryPattern;
+
+      const next: GraphJson = {
+        ...current,
+        canonicals: [...current.canonicals, newCanon],
+      };
+      fs.writeFileSync(userGraphPath(), JSON.stringify(next, null, 2), 'utf8');
+      return { ok: true, graph: next, id };
+    } catch (e) {
+      return { ok: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('pb:graph-add-exercise', async (_e, payload: {
+    id: string; canonical: string; label: string;
+    labelRu?: string; level?: number | null;
+    benchmark?: string[]; perSide?: boolean; tags?: string[];
+    band?: DifficultyBand;
+  }) => {
+    try {
+      if (!payload?.id || !/^[a-z0-9-]+$/i.test(payload.id))
+        return { ok: false, error: 'id: латиница, цифры, дефис' };
+      if (!payload?.canonical) return { ok: false, error: 'canonical обязателен' };
+      if (!payload?.label) return { ok: false, error: 'label обязателен' };
+
+      const current = loadWadeGraph();
+      if (!current.canonicals.some((c) => c.id === payload.canonical)) {
+        return { ok: false, error: `Canonical '${payload.canonical}' не найден` };
+      }
+      if (current.nodes.some((n) => n.id === payload.id)) {
+        return { ok: false, error: `Узел '${payload.id}' уже существует` };
+      }
+      const newNode: any = {
+        id: payload.id,
+        canonical: payload.canonical,
+        label: payload.label,
+        labelRu: payload.labelRu,
+      };
+      if (payload.level !== undefined && payload.level !== null) newNode.level = payload.level;
+      if (payload.benchmark?.length) newNode.benchmark = payload.benchmark;
+      if (payload.perSide) newNode.perSide = true;
+      if (payload.tags?.length) newNode.tags = payload.tags;
+      if (payload.band) newNode.band = payload.band;
+
+      const next: GraphJson = { ...current, nodes: [...current.nodes, newNode] };
+      fs.writeFileSync(userGraphPath(), JSON.stringify(next, null, 2), 'utf8');
+      return { ok: true, graph: next, id: payload.id };
+    } catch (e) {
+      return { ok: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('pb:graph-delete-exercise', async (_e, id: string) => {
+    try {
+      if (!id) return { ok: false, error: 'id обязателен' };
+      const current = loadWadeGraph();
+      const node = current.nodes.find((n) => n.id === id);
+      if (!node) return { ok: false, error: `Узел '${id}' не найден` };
+
+      // Каскад: удаляем все рёбра, ссылающиеся на этот node.id
+      const nextEdges = current.edges.filter(
+        (e) => e.from !== id && e.to !== id,
+      );
+      const removedEdges = current.edges.length - nextEdges.length;
+
+      const next: GraphJson = {
+        ...current,
+        nodes: current.nodes.filter((n) => n.id !== id),
+        edges: nextEdges,
+      };
+      fs.writeFileSync(userGraphPath(), JSON.stringify(next, null, 2), 'utf8');
+      return { ok: true, graph: next, removedEdges };
+    } catch (e) {
+      return { ok: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('pb:graph-delete-pattern', async (_e, id: string) => {
+    try {
+      if (!id) return { ok: false, error: 'id обязателен' };
+      const current = loadWadeGraph();
+      if (!current.patterns.some((p) => p.id === id)) {
+        return { ok: false, error: `Паттерн '${id}' не найден` };
+      }
+      // Запрет, если на него ссылаются canonical
+      const used = current.canonicals.some((c) => c.pattern === id);
+      if (used) {
+        return { ok: false, error: 'На паттерн ссылаются каноны. Удалите их сначала.' };
+      }
+      const ref = `@pattern:${id}`;
+      const nextEdges = current.edges.filter(
+        (e) => e.from !== ref && e.to !== ref,
+      );
+      const next: GraphJson = {
+        ...current,
+        patterns: current.patterns.filter((p) => p.id !== id),
+        edges: nextEdges,
+      };
+      fs.writeFileSync(userGraphPath(), JSON.stringify(next, null, 2), 'utf8');
+      return { ok: true, graph: next };
+    } catch (e) {
+      return { ok: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('pb:graph-update-exercise', async (_e, payload: {
+    id: string;
+    patch: {
+      label?: string;
+      labelRu?: string;
+      level?: number | null;
+      benchmark?: string[];
+      perSide?: boolean;
+      canonical?: string;
+      tags?: string[];
+    };
+  }) => {
+    try {
+      if (!payload?.id) return { ok: false, error: 'id обязателен' };
+      const current = loadWadeGraph();
+      const idx = current.nodes.findIndex((n) => n.id === payload.id);
+      if (idx < 0) return { ok: false, error: `Узел '${payload.id}' не найден` };
+
+      const old = current.nodes[idx];
+      const p = payload.patch;
+
+      // Нормализация: level === null → удаляем поле
+      const nextNode: NodeJson = { ...old };
+
+      if (p.label !== undefined) nextNode.label = p.label;
+      if (p.labelRu !== undefined) nextNode.labelRu = p.labelRu;
+      if (p.canonical !== undefined) nextNode.canonical = p.canonical;
+      if (p.benchmark !== undefined) nextNode.benchmark = p.benchmark;
+      if (p.perSide !== undefined) nextNode.perSide = p.perSide;
+      if (p.tags !== undefined) nextNode.tags = p.tags;
+
+      if (p.level !== undefined) {
+        if (p.level === null) {
+          delete nextNode.level;
+        } else {
+          nextNode.level = p.level;
+        }
+      }
+
+      const next: GraphJson = {
+        ...current,
+        nodes: [
+          ...current.nodes.slice(0, idx),
+          nextNode,
+          ...current.nodes.slice(idx + 1),
+        ],
+      };
+      fs.writeFileSync(userGraphPath(), JSON.stringify(next, null, 2), 'utf8');
+      return { ok: true, graph: next };
+    } catch (e) {
+      return { ok: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('pb:graph-update-pattern', async (_e, payload: {
+    id: string;
+    patch: { label?: string; labelRu?: string };
+  }) => {
+    try {
+      if (!payload?.id) return { ok: false, error: 'id обязателен' };
+      const current = loadWadeGraph();
+      const idx = current.patterns.findIndex((p) => p.id === payload.id);
+      if (idx < 0) return { ok: false, error: `Паттерн '${payload.id}' не найден` };
+      const updated = { ...current.patterns[idx], ...payload.patch };
+      const next: GraphJson = {
+        ...current,
+        patterns: [
+          ...current.patterns.slice(0, idx),
+          updated,
+          ...current.patterns.slice(idx + 1),
+        ],
+      };
+      fs.writeFileSync(userGraphPath(), JSON.stringify(next, null, 2), 'utf8');
+      return { ok: true, graph: next };
+    } catch (e) {
+      return { ok: false, error: (e as Error).message };
+    }
+  });
+
   console.log('[Prana-Bindu] IPC-хендлеры зарегистрированы (pb:*)');
 }
-

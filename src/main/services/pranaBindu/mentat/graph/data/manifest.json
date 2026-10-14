@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "catalogs": [
+    { "id": "wade",       "file": "wade.graph.json",       "enabled": true,  "label": "Wade",        "labelRu": "Пол Уэйд" },
+    { "id": "smithrun",   "file": "smithrun.graph.json",   "enabled": true,  "label": "Smithrun",    "labelRu": "Смитри" },
+    { "id": "cali",       "file": "cali.graph.json",       "enabled": false, "label": "Cali",        "labelRu": "Cali Move" },
+    { "id": "runner",     "file": "runner.graph.json",     "enabled": false, "label": "Runner",      "labelRu": "Бегун" },
+    { "id": "core",       "file": "core.graph.json",       "enabled": false, "label": "Core",        "labelRu": "Кор" },
+    { "id": "posture",    "file": "posture.graph.json",    "enabled": false, "label": "Posture",     "labelRu": "Осанка" },
+    { "id": "weightloss", "file": "weightloss.graph.json", "enabled": false, "label": "Weight-loss", "labelRu": "Похудение" },
+    { "id": "named",      "file": "named.graph.json",      "enabled": false, "label": "Named",       "labelRu": "Именованные" },
+    { "id": "thenics",    "file": "thenics.graph.json",    "enabled": false, "label": "Thenics",     "labelRu": "Thenics" }
+  ]
+}

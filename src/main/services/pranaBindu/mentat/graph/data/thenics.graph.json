@@ -1,0 +1,11 @@
+{
+  "id": "thenics",
+  "label": "Thenics",
+  "labelRu": "Thenics",
+  "patterns": [],
+  "catalogs": [{ "id": "thenics", "label": "Thenics", "labelRu": "Thenics" }],
+  "canonicals": [],
+  "nodes": [],
+  "edges": [],
+  "programs": []
+}
