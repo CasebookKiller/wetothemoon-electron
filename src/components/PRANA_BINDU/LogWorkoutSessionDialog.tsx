@@ -1,13 +1,20 @@
 // src/components/PRANA_BINDU/LogWorkoutSessionDialog.tsx
 //
 // Форма ввода факта выполнения тренировки.
-// Два режима:
+//
+// Два режима работы:
 //   1) planEvent != null — план из plan_events: парсим description,
-//      показываем упражнения с полем «факт».
-//   2) planEvent == null — свободный ввод: пользователь набирает
-//      строки в ICU-формате, каждая становится упражнением,
-//      actualText по умолчанию = target.
+//      показываем упражнения с полем «Факт», каждое можно пропустить.
+//   2) planEvent == null — свободный ввод:
+//      • таб «Из каталога» — выбор через CatalogPickerDialog;
+//      • таб «Вручную» — textarea + кнопка «Добавить N строк».
+//      Строки из обоих источников попадают в общий список ниже.
+//
 // Пишет в workout_sessions (Melange v18).
+//
+// UUID-и строк (crypto.randomUUID) живут только в React-state.
+// В БД уходят распарсенные поля SessionExercise + rawText для
+// текстовых строк (см. core/types.ts).
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { Button } from 'primereact/button';
@@ -20,33 +27,36 @@ import { parseWorkoutText } from '@/main/services/pranaBindu/mentat/workoutParse
 import {
   findLevelByName,
   findNamedByName,
-  findProgressionByIcuName,   // ← новое
+  findProgressionByIcuName,
 } from '@/main/services/pranaBindu/mentat/exerciseCatalog';
 import type { PlanEventLite } from './PlanEventsPanel';
 import type { SessionExercise } from '@/main/services/pranaBindu/core/types';
-import { CatalogPickerDialog, type PickedExercise } from './CatalogPickerDialog';
+import {
+  CatalogPickerDialog,
+  type PickedExercise,
+} from './CatalogPickerDialog';
 
-interface Props {
-  visible: boolean;
-  planEvent: PlanEventLite | null;
-  /** Используется только в режиме free (без плана). */
-  freeDate?: string | null;
-  onHide: () => void;
-  onSaved: () => void;
-}
+// ==================== Типы ====================
+
+type RowSource = 'plan' | 'catalog' | 'text';
 
 interface Row {
+  id: string;
+  source: RowSource;
   movementKey: string;
   level?: number;
-  target?: string;
   label: string;
+  target?: string;
   actualText: string;
   isTimeBased: boolean;
+  skipped: boolean;
+  /** Оригинальная строка пользователя (только для source='text'). */
+  rawText?: string;
 }
 
 // ==================== Вспомогательные ====================
 
-/** Разбор строки `<sets>x<reps>` или `[r1,r2,…]`. */
+/** Разбор строки `<sets>x<reps>` или `[r1,r2,…]` или `r1 r2 r3`. */
 function parseActualSets(text: string): number[] | undefined {
   const t = text.trim();
   if (!t) return undefined;
@@ -65,19 +75,22 @@ function parseActualSets(text: string): number[] | undefined {
 }
 
 /**
- * Общая логика: превратить ParsedWorkout → Row[].
- * Используется и для режима плана, и для свободного ввода.
- * initialActual — если true, заполняем actualText = target
- * (для свободного режима: пользователь подтверждает «как план»).
+ * Превратить текст тренировки в массив Row.
+ * source: 'plan' → actualText пустой (пользователь вводит);
+ *         'text' → actualText = target (пользователь подтверждает).
+ * rawText заполняется для source='text' (для аудита).
  */
-function buildRows(text: string, initialActual: boolean): Row[] {
+function buildRows(
+  text: string,
+  source: RowSource,
+  fillActual: boolean
+): Row[] {
   const parsed = parseWorkoutText(text ?? '');
   const rows: Row[] = [];
 
   for (const step of parsed.flatSteps) {
     if (!step.label) continue;
 
-    // Целевая метрика
     let target: string | undefined;
     if (step.sets != null && step.reps != null) {
       if (Array.isArray(step.reps)) {
@@ -91,7 +104,6 @@ function buildRows(text: string, initialActual: boolean): Row[] {
       target = `${step.distanceM}mtr`;
     }
 
-    // Определяем movementKey
     let movementKey: string | undefined;
     let level: number | undefined;
     const stripped = step.label.replace(/\s+[WL]\d+\s*$/, '').trim();
@@ -103,13 +115,11 @@ function buildRows(text: string, initialActual: boolean): Row[] {
         level = found.level;
       }
     }
-    // NEW: если по уровню не нашли — ищем по icuName каталога
     if (!movementKey) {
       const canon = findProgressionByIcuName(stripped);
       if (canon) {
         movementKey = canon.key;
         if (step.prefixLevel != null) {
-          // Ограничиваем уровнем каталога (защита от W99)
           level = Math.min(step.prefixLevel, canon.levels.length);
         }
       }
@@ -119,18 +129,23 @@ function buildRows(text: string, initialActual: boolean): Row[] {
       if (named) movementKey = named.key;
     }
     if (!movementKey) movementKey = 'unknown';
+
     const isTimeBased =
       step.sets == null &&
       (step.durationSec ?? 0) > 0 &&
       step.distanceM == null;
 
     rows.push({
+      id: crypto.randomUUID(),
+      source,
       movementKey,
       level,
-      target,
       label: step.label,
-      actualText: initialActual ? (target ?? '') : '',
+      target,
+      actualText: fillActual ? (target ?? '') : '',
       isTimeBased,
+      skipped: false,
+      rawText: source === 'text' ? step.raw : undefined,
     });
   }
 
@@ -138,6 +153,15 @@ function buildRows(text: string, initialActual: boolean): Row[] {
 }
 
 // ==================== Компонент ====================
+
+interface Props {
+  visible: boolean;
+  planEvent: PlanEventLite | null;
+  /** Используется только в режиме free (без плана). */
+  freeDate?: string | null;
+  onHide: () => void;
+  onSaved: () => void;
+}
 
 export const LogWorkoutSessionDialog: React.FC<Props> = ({
   visible,
@@ -148,81 +172,102 @@ export const LogWorkoutSessionDialog: React.FC<Props> = ({
 }) => {
   const api = (window as any).electronAPI;
 
-  const [planRows, setPlanRows] = useState<Row[]>([]);
+  // Единый список строк — plan + catalog + text.
+  const [rows, setRows] = useState<Row[]>([]);
+
+  // Свободный режим:
+  const [freeMode, setFreeMode] = useState<'catalog' | 'manual'>('manual');
   const [freeText, setFreeText] = useState('');
-  const [freeOverrides, setFreeOverrides] = useState<Record<number, string>>(
-    {}
-  );
-  const [freeCatalogRows, setFreeCatalogRows] = useState<Row[]>([]);
-  const [catalogPickerOpen, setCatalogPickerOpen] = useState(false);
+
+  // Общие поля:
   const [rpe, setRpe] = useState<number | null>(7);
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
+  const [catalogPickerOpen, setCatalogPickerOpen] = useState(false);
 
   // Сброс при открытии
   useEffect(() => {
     if (!visible) return;
     if (planEvent) {
       const description = (planEvent as any).description ?? '';
-      setPlanRows(buildRows(description, false));
-      setFreeText('');
+      setRows(buildRows(description, 'plan', false));
     } else {
-      setPlanRows([]);
-      setFreeText('');
+      setRows([]);
     }
-    setFreeOverrides({});
-    setFreeCatalogRows([]);
-    setCatalogPickerOpen(false);
+    setFreeMode('manual');
+    setFreeText('');
     setRpe(7);
     setNotes('');
     setError('');
     setInfo('');
+    setCatalogPickerOpen(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, planEvent?.id, freeDate]);
 
-  // Активные строки: из плана или из свободного ввода
-  const activeRows: Row[] = useMemo(() => {
-    if (planEvent) return planRows;
-    const textRows = buildRows(freeText, true).map((r, idx) => ({
-      ...r,
-      actualText: freeOverrides[idx] ?? r.actualText,
-    }));
-    return [...freeCatalogRows, ...textRows];
-  }, [planEvent, planRows, freeText, freeOverrides, freeCatalogRows]);
+  const isFreeMode = !planEvent;
 
+  // Счётчики
   const filledCount = useMemo(
-    () => activeRows.filter((r) => r.actualText.trim().length > 0).length,
-    [activeRows]
+    () => rows.filter((r) => r.actualText.trim().length > 0 && !r.skipped).length,
+    [rows]
+  );
+  const unknownCount = useMemo(
+    () => rows.filter((r) => r.movementKey === 'unknown').length,
+    [rows]
   );
 
-  const updateRow = (idx: number, patch: Partial<Row>) => {
-    if (planEvent) {
-      setPlanRows((prev) =>
-        prev.map((r, i) => (i === idx ? { ...r, ...patch } : r))
-      );
-      return;
-    }
-    // Свободный режим: первые freeCatalogRows.length строк — каталоговые,
-    // остальные — текстовые (индексы сдвинуты).
-    const catalogCount = freeCatalogRows.length;
-    if (idx < catalogCount) {
-      if (patch.actualText !== undefined) {
-        setFreeCatalogRows((prev) =>
-          prev.map((r, i) => (i === idx ? { ...r, actualText: patch.actualText! } : r))
-        );
-      }
-      return;
-    }
-    const textIdx = idx - catalogCount;
-    if (patch.actualText !== undefined) {
-      setFreeOverrides((prev) => ({ ...prev, [textIdx]: patch.actualText! }));
-    }
+  // Превью того, что даст textarea (для кнопки «Добавить N строк»).
+  const pendingTextRows = useMemo(() => {
+    if (!isFreeMode || !freeText.trim()) return [];
+    return buildRows(freeText, 'text', true);
+  }, [freeText, isFreeMode]);
+
+  // --------- Действия со строками ---------
+
+  const updateRow = (id: string, patch: Partial<Row>) => {
+    setRows((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, ...patch } : r))
+    );
   };
 
+  const deleteRow = (id: string) => {
+    setRows((prev) => prev.filter((r) => r.id !== id));
+  };
+
+  const toggleSkip = (id: string) => {
+    setRows((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, skipped: !r.skipped } : r))
+    );
+  };
+
+  const handleCatalogPick = (items: PickedExercise[]) => {
+    setRows((prev) => [
+      ...prev,
+      ...items.map<Row>((it) => ({
+        id: crypto.randomUUID(),
+        source: 'catalog',
+        movementKey: it.movementKey,
+        level: it.level,
+        label: it.label,
+        actualText: '',
+        isTimeBased: it.isTimeBased,
+        skipped: false,
+      })),
+    ]);
+  };
+
+  const handleAddFromText = () => {
+    if (pendingTextRows.length === 0) return;
+    setRows((prev) => [...prev, ...pendingTextRows]);
+    setFreeText('');
+  };
+
+  // --------- Сохранение ---------
+
   const handleSave = async () => {
-    if (activeRows.length === 0) {
+    if (rows.length === 0) {
       setError('Нет упражнений для сохранения');
       return;
     }
@@ -236,7 +281,7 @@ export const LogWorkoutSessionDialog: React.FC<Props> = ({
     setError('');
     setInfo('');
     try {
-      const exercises: SessionExercise[] = activeRows.map((r) => {
+      const exercises: SessionExercise[] = rows.map((r) => {
         const sets = parseActualSets(r.actualText);
         return {
           movementKey: r.movementKey,
@@ -244,7 +289,8 @@ export const LogWorkoutSessionDialog: React.FC<Props> = ({
           target: r.target,
           actualSets: sets,
           isTimeBased: r.isTimeBased,
-          skipped: sets == null,
+          skipped: r.skipped || sets == null,
+          rawText: r.rawText,
         };
       });
 
@@ -279,81 +325,138 @@ export const LogWorkoutSessionDialog: React.FC<Props> = ({
     }
   };
 
-  const handleCatalogPick = (items: PickedExercise[]) => {
-    setFreeCatalogRows((prev) => [
-      ...prev,
-      ...items.map<Row>((it) => ({
-        movementKey: it.movementKey,
-        level: it.level,
-        label: it.label,
-        actualText: '',
-        isTimeBased: it.isTimeBased,
-      })),
-    ]);
-  };
+  // --------- Рендер ---------
+
+  const title = planEvent
+    ? `Записать факт · ${planEvent.name}`
+    : `Записать факт · ${freeDate ?? ''}`;
 
   return (
     <Dialog
       visible={visible}
       onHide={saving ? () => {} : onHide}
-      header={
-        planEvent
-          ? `Записать факт · ${planEvent.name}`
-          : `Записать факт · ${freeDate ?? ''}`
-      }
-      style={{ width: '680px' }}
+      header={title}
+      style={{ width: '720px', maxWidth: '96vw' }}
       modal
       className="pb-debug-dialog pb-log-workout-dialog"
     >
       <div className="pb-debug__body">
-        {/* Режим выбора из каталог */}
-        {!planEvent && (
+        {/* Табы: только в free-режиме */}
+        {isFreeMode && (
+          <div className="pb-templates__mode-switch">
+            <button
+              type="button"
+              className={freeMode === 'catalog' ? 'is-active' : ''}
+              onClick={() => setFreeMode('catalog')}
+            >
+              Из каталога
+            </button>
+            <button
+              type="button"
+              className={freeMode === 'manual' ? 'is-active' : ''}
+              onClick={() => setFreeMode('manual')}
+            >
+              Вручную
+            </button>
+          </div>
+        )}
+
+        {/* Источник строк — каталог */}
+        {isFreeMode && freeMode === 'catalog' && (
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             <Button
-              label="Из каталога"
+              label="Выбрать из каталога"
               icon="pi pi-book"
               className="pb-soft p-button-sm"
               onClick={() => setCatalogPickerOpen(true)}
               disabled={saving}
             />
             <span className="pb-hint">
-              Добавить упражнение выбором из каталога (без парсера)
+              Добавить упражнение выбором из каталога
             </span>
           </div>
         )}
-        {/* Режим свободного ввода: textarea сверху */}
-        {!planEvent && (
+
+        {/* Источник строк — textarea */}
+        {isFreeMode && freeMode === 'manual' && (
           <>
             <div className="pb-log-workout-dialog__hint pb-hint">
-              Введите упражнения, каждое с новой строки. Формат —
-              как в ICU:
+              Введите упражнения, каждое с новой строки. Формат — как в ICU:
               <br />
-              <code>Push-ups W3 3x10</code> · <code>Squats W2 3x15</code> ·{' '}
-              <code>Plank 30s</code>
+              <code>Push-ups W3 3x10</code> ·{' '}
+              <code>Squats W2 3x15</code> · <code>Plank 30s</code>
             </div>
             <InputTextarea
               value={freeText}
-              onChange={(e) => {
-                setFreeText(e.target.value);
-                // При изменении textarea — сбрасываем overrides,
-                // иначе индексы разъедутся.
-                setFreeOverrides({});
-              }}
+              onChange={(e) => setFreeText(e.target.value)}
               rows={5}
               className="pb-log-workout-dialog__free-input"
               placeholder={'Push-ups W3 3x10\nSquats W2 3x15\nPlank 30s'}
               disabled={saving}
             />
+            <div
+              style={{
+                display: 'flex',
+                gap: '0.5rem',
+                alignItems: 'center',
+                marginTop: '-0.4rem',
+              }}
+            >
+              <Button
+                label={
+                  pendingTextRows.length > 0
+                    ? `Добавить ${pendingTextRows.length} ${
+                        pendingTextRows.length === 1 ? 'строку' : 'строк'
+                      }`
+                    : 'Добавить в список'
+                }
+                icon="pi pi-plus"
+                className="pb-soft p-button-sm"
+                onClick={handleAddFromText}
+                disabled={saving || pendingTextRows.length === 0}
+              />
+              {pendingTextRows.length > 0 && (
+                <span className="pb-hint">
+                  Будет распознано: {pendingTextRows.length}
+                </span>
+              )}
+            </div>
           </>
         )}
 
-        {/* Список упражнений */}
-        {activeRows.length > 0 && (
+        {/* Общий список строк */}
+        {rows.length > 0 ? (
           <div className="pb-log-workout-dialog__list">
-            {activeRows.map((r, idx) => (
-              <div key={idx} className="pb-log-workout-dialog__row">
+            {rows.map((r) => (
+              <div
+                key={r.id}
+                className={`pb-log-workout-dialog__row ${
+                  r.skipped ? 'is-skipped' : ''
+                }`}
+              >
                 <div className="pb-log-workout-dialog__row-main">
                   <div className="pb-log-workout-dialog__row-name">
+                    {r.source === 'plan' && (
+                      <i
+                        className="pi pi-list"
+                        title="Из плана"
+                        style={{ marginRight: '0.35rem', opacity: 0.6 }}
+                      />
+                    )}
+                    {r.source === 'catalog' && (
+                      <i
+                        className="pi pi-book"
+                        title="Из каталога"
+                        style={{ marginRight: '0.35rem', opacity: 0.6 }}
+                      />
+                    )}
+                    {r.source === 'text' && (
+                      <i
+                        className="pi pi-pencil"
+                        title="Введено вручную"
+                        style={{ marginRight: '0.35rem', opacity: 0.6 }}
+                      />
+                    )}
                     {r.label}
                   </div>
                   {r.target && (
@@ -362,24 +465,62 @@ export const LogWorkoutSessionDialog: React.FC<Props> = ({
                     </div>
                   )}
                 </div>
+
                 <InputText
                   value={r.actualText}
                   onChange={(e) =>
-                    updateRow(idx, { actualText: e.target.value })
+                    updateRow(r.id, { actualText: e.target.value })
                   }
                   placeholder={r.isTimeBased ? '30 25 20' : '3x10 или 12 10 8'}
                   className="pb-log-workout-dialog__row-input"
-                  disabled={saving}
+                  disabled={saving || r.skipped}
                 />
+
+                {r.source === 'plan' ? (
+                  <Button
+                    icon={r.skipped ? 'pi pi-replay' : 'pi pi-ban'}
+                    text
+                    className="pb-drawer__name-edit"
+                    onClick={() => toggleSkip(r.id)}
+                    disabled={saving}
+                    tooltip={r.skipped ? 'Вернуть' : 'Пропустить'}
+                    tooltipOptions={{ position: 'left' }}
+                  />
+                ) : (
+                  <Button
+                    icon="pi pi-trash"
+                    text
+                    className="pb-drawer__name-edit"
+                    onClick={() => deleteRow(r.id)}
+                    disabled={saving}
+                    tooltip="Удалить"
+                    tooltipOptions={{ position: 'left' }}
+                  />
+                )}
               </div>
             ))}
           </div>
+        ) : (
+          <div className="pb-drawer__empty">
+            {planEvent
+              ? 'В плане не найдено упражнений'
+              : 'Список пуст. Добавьте упражнения из каталога или вручную.'}
+          </div>
         )}
 
-        {activeRows.length === 0 && planEvent && (
-          <div className="pb-drawer__empty">
-            В плане не найдено упражнений
-          </div>
+        {/* Баннер unknown — не блокирует сохранение */}
+        {unknownCount > 0 && (
+          <Message
+            severity="warn"
+            className="w-full"
+            content={
+              <span>
+                {unknownCount}{' '}
+                {unknownCount === 1 ? 'строка не распознана' : 'строк не распознано'}{' '}
+                — сохранятся без привязки к каталогу.
+              </span>
+            }
+          />
         )}
 
         {/* RPE */}
@@ -410,12 +551,8 @@ export const LogWorkoutSessionDialog: React.FC<Props> = ({
           disabled={saving}
         />
 
-        {error && (
-          <Message severity="error" text={error} className="w-full" />
-        )}
-        {info && (
-          <Message severity="success" text={info} className="w-full" />
-        )}
+        {error && <Message severity="error" text={error} className="w-full" />}
+        {info && <Message severity="success" text={info} className="w-full" />}
 
         <div className="flex gap-2 justify-content-end mt-3">
           <Button
@@ -429,15 +566,16 @@ export const LogWorkoutSessionDialog: React.FC<Props> = ({
             label={
               saving
                 ? 'Сохранение…'
-                : `Сохранить (${filledCount} из ${activeRows.length})`
+                : `Сохранить (${filledCount} из ${rows.length})`
             }
             icon={saving ? 'pi pi-spin pi-spinner' : 'pi pi-check'}
             className="pb p-button-sm"
             onClick={handleSave}
-            disabled={saving || activeRows.length === 0}
+            disabled={saving || rows.length === 0}
           />
         </div>
       </div>
+
       <CatalogPickerDialog
         visible={catalogPickerOpen}
         onHide={() => setCatalogPickerOpen(false)}

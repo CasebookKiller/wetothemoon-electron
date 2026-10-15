@@ -126,6 +126,8 @@ export interface SessionExercise {
   skipped?: boolean;
   /** Дополнительная заметка по конкретному упражнению. */
   note?: string;
+  /** Исходная строка, как ввёл пользователь (для режима «вручную»). */
+  rawText?: string;
 }
 
 /**

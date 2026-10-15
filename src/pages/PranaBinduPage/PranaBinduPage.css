@@ -4949,6 +4949,14 @@ body[data-module='prana-bindu'] .pb-debug-dialog .p-dialog-header-close svg path
   box-sizing: border-box;
 }
 
+.pb-log-workout-dialog__row.is-skipped {
+  opacity: 0.55;
+}
+
+.pb-log-workout-dialog__row.is-skipped .pb-log-workout-dialog__row-name {
+  text-decoration: line-through;
+}
+
 .pb-log-workout-dialog__footer-row {
   display: flex;
   align-items: center;
