@@ -1918,21 +1918,19 @@ body[data-module='prana-bindu'] .p-tooltip.p-tooltip-bottom .p-tooltip-arrow {
   color: #26c6da;
 }
 
-/* Бейдж «пропущено» — нейтральный, не сигналит об ошибке. */
+/* Бейдж «пропущено» — warning, чтобы не сливался с приглушённым
+   контентом. Это сигнал «не сделано», он должен быть виден. */
 .pb-source-badge--skipped {
-  background: rgba(112, 132, 153, 0.18);
-  color: var(--tg-theme-hint-color, #708499);
+  background: rgba(232, 168, 56, 0.18);
+  color: #e8a838;
 }
 
-/* Сессия, где все упражнения пропущены: контент приглушён,
-   заголовок с бейджем «пропущено» остаётся чётким. */
+/* Сессия, где все упражнения пропущены: приглушается только
+   содержимое (упражнения + мета). Заголовок остаётся чётким —
+   чтобы карточку было видно в списке. */
 .pb-day-list__item--session.is-all-skipped .pb-day-fact__session-list,
 .pb-day-list__item--session.is-all-skipped .pb-day-list__item-meta {
   opacity: 0.45;
-}
-
-.pb-day-list__item--session.is-all-skipped .pb-day-list__item-title {
-  color: var(--tg-theme-hint-color, #708499);
 }
 
 /* ============================================================
