@@ -1918,6 +1918,23 @@ body[data-module='prana-bindu'] .p-tooltip.p-tooltip-bottom .p-tooltip-arrow {
   color: #26c6da;
 }
 
+/* Бейдж «пропущено» — нейтральный, не сигналит об ошибке. */
+.pb-source-badge--skipped {
+  background: rgba(112, 132, 153, 0.18);
+  color: var(--tg-theme-hint-color, #708499);
+}
+
+/* Сессия, где все упражнения пропущены: контент приглушён,
+   заголовок с бейджем «пропущено» остаётся чётким. */
+.pb-day-list__item--session.is-all-skipped .pb-day-fact__session-list,
+.pb-day-list__item--session.is-all-skipped .pb-day-list__item-meta {
+  opacity: 0.45;
+}
+
+.pb-day-list__item--session.is-all-skipped .pb-day-list__item-title {
+  color: var(--tg-theme-hint-color, #708499);
+}
+
 /* ============================================================
    Drawer: единое название тренировки над вкладками
    ============================================================ */

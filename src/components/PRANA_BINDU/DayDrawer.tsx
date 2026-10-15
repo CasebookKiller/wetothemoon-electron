@@ -65,6 +65,11 @@ function exerciseSummary(ex: SessionExercise): string {
   return ex.actualSets.join(' / ');
 }
 
+/** Упражнение считается пропущенным, если skipped=true или нет actualSets. */
+function isExerciseSkipped(ex: SessionExercise): boolean {
+  return ex.skipped === true || !ex.actualSets || ex.actualSets.length === 0;
+}
+
 export const DayDrawer: React.FC<Props> = ({
   visible,
   date,
@@ -164,6 +169,27 @@ export const DayDrawer: React.FC<Props> = ({
     [freeSessions]
   );
   const { lookupByTarget } = useEquivalencesMap();
+
+  // Для карточек сессий: все ли упражнения пропущены (для бейджа
+  // и приглушения).
+  const programSessionStatus = React.useMemo(() => {
+    const m = new Map<number, boolean>();
+    for (const s of programSessions) {
+      m.set(
+        s.id,
+        s.exercises.length > 0 &&
+          s.exercises.every((ex) => isExerciseSkipped(ex)),
+      );
+    }
+    return m;
+  }, [programSessions]);
+
+  const freeAllSkipped = React.useMemo(
+    () =>
+      freeExercises.length > 0 &&
+      freeExercises.every(({ ex }) => isExerciseSkipped(ex)),
+    [freeExercises],
+  );
 
   return (
     <Sidebar
@@ -294,13 +320,23 @@ export const DayDrawer: React.FC<Props> = ({
                     </div>
                     <div className="pb-day-list">
                       {/* 1. Программные сессии — каждая отдельно */}
-                      {programSessions.map((s) => (
+                      {programSessions.map((s) => {
+                        const isAllSkipped =
+                          programSessionStatus.get(s.id) === true;
+                        return (
                         <div
                           key={s.id}
-                          className="pb-day-list__item pb-day-list__item--session"
+                          className={`pb-day-list__item pb-day-list__item--session${
+                            isAllSkipped ? ' is-all-skipped' : ''
+                          }`}
                         >
                           <div className="pb-day-list__item-title">
                             {`Программа: ${s.programKey}`}
+                            {isAllSkipped && (
+                              <span className="pb-source-badge pb-source-badge--skipped">
+                                пропущено
+                              </span>
+                            )}
                             {s.isTest && (
                               <span className="pb-source-badge pb-source-badge--dodofo">
                                 тест
@@ -388,17 +424,27 @@ export const DayDrawer: React.FC<Props> = ({
                             )}
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
 
                       {/* 2. Свободные сессии — одна карточка на день */}
                       {freeExercises.length > 0 && (
-                        <div className="pb-day-list__item pb-day-list__item--session">
+                        <div
+                          className={`pb-day-list__item pb-day-list__item--session${
+                            freeAllSkipped ? ' is-all-skipped' : ''
+                          }`}
+                        >
                           <div className="pb-day-list__item-title">
                             {`Свободная сессия${
                               freeExercises.length > 1
                                 ? ` · ${freeExercises.length} упражнения`
                                 : ''
                             }`}
+                            {freeAllSkipped && (
+                              <span className="pb-source-badge pb-source-badge--skipped">
+                                пропущено
+                              </span>
+                            )}
                           </div>
                           <div className="pb-day-fact__session-list">
                             {freeExercises.map(({ ex, session }, i) => {
