@@ -881,8 +881,8 @@ try {
       dayLoadSummary: (from: string, to: string) =>
         ipcRenderer.invoke('pb:day-load-summary', from, to),
 
-      autoSyncOnStart: () =>
-        ipcRenderer.invoke('pb:auto-sync-on-start'),
+      autoSyncOnStart: (opts?: { force?: boolean }) =>
+        ipcRenderer.invoke('pb:auto-sync-on-start', opts),
 
       debugMatchIcu: (text: string) =>
         ipcRenderer.invoke('pb:debug-match-icu', text),

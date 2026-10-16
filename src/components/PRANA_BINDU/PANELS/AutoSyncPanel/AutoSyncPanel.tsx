@@ -124,7 +124,9 @@ export const AutoSyncPanel: React.FC<Props> = ({ onAfterSync }) => {
     setAutoSyncError('');
     setAutoSyncResult('');
     try {
-      const res = await api.pb.autoSyncOnStart();
+      // force=true → игнорируем cooldown и чекбокс autoOnStart.
+      // Кнопка ручного запуска должна работать всегда.
+      const res = await api.pb.autoSyncOnStart({ force: true });
       if (res?.success) {
         if (res.skipped === 'disabled') {
           setAutoSyncResult('Автосинхронизация выключена — пропущено.');

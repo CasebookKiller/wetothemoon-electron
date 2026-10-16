@@ -3634,14 +3634,19 @@ export function registerPranaBinduHandlers(): void {
   // Синкает workouts за 7 дней по всем провайдерам с capabilities.workouts,
   // и wellness за те же 7 дней в мультипровайдерном режиме.
   // Async: не блокирует UI, всё в фоне.
-  ipcMain.handle('pb:auto-sync-on-start', async () => {
+  ipcMain.handle(
+    'pb:auto-sync-on-start',
+    async (_event, opts?: { force?: boolean }) => {
     try {
       const db = getMelange();
       const settings = getSyncSettings(db);
+      const force = opts?.force === true;
 
       // Единственный флаг — autoOnStart. Поле mode оставлено
       // для совместимости с v5-схемой, но UI рулит чекбоксом.
-      if (!settings.autoOnStart) {
+      // force=true (кнопка «Синхронизировать сейчас») игнорирует
+      // и чекбокс, и кулдаун — чтобы можно было запустить вручную.
+      if (!settings.autoOnStart && !force) {
         return { success: true, skipped: 'disabled' };
       }
 
@@ -3652,7 +3657,7 @@ export function registerPranaBinduHandlers(): void {
       const now = Date.now();
       const elapsedMin = last > 0 ? Math.floor((now - last) / 60000) : null;
 
-      if (last > 0 && now - last < intervalMin * 60_000) {
+      if (!force && last > 0 && now - last < intervalMin * 60_000) {
         return {
           success: true,
           skipped: 'cooldown',
@@ -4000,7 +4005,8 @@ export function registerPranaBinduHandlers(): void {
     } catch (e) {
       return { success: false, error: (e as Error).message };
     }
-  });
+    },
+  );
 
 
   // -------- Синхронизация плана из intervals.icu --------
