@@ -224,7 +224,7 @@ export const AutoSyncPanel: React.FC<Props> = ({ onAfterSync }) => {
             return (
               <label
                 key={p}
-                className={`pb-auto-providers__row ${
+                className={`pb-auto-providers__row pb-check-row pb-checkbox-dark ${
                   notYetImplemented ? 'is-pending' : ''
                 }`}
                 title={
