@@ -108,13 +108,19 @@ function buildRows(
     let level: number | undefined;
     const stripped = step.label.replace(/\s+[WL]\d+\s*$/, '').trim();
 
-    if (step.prefixKind && step.prefixLevel != null) {
+    // 1. Прогрессия по точному имени уровня (с учётом aliases).
+    //    Вызывается всегда — префикс W/L не обязателен.
+    //    Пример: 'Bench Dip' → dips, level=1.
+    {
       const found = findLevelByName(stripped);
       if (found) {
         movementKey = found.entry.key;
         level = found.level;
       }
     }
+
+    // 2. Прогрессия по icuName (с учётом aliases прогрессии).
+    //    Уровень берём из префикса, если он был.
     if (!movementKey) {
       const canon = findProgressionByIcuName(stripped);
       if (canon) {
@@ -124,6 +130,8 @@ function buildRows(
         }
       }
     }
+
+    // 3. Named (с учётом aliases).
     if (!movementKey) {
       const named = findNamedByName(stripped);
       if (named) movementKey = named.key;

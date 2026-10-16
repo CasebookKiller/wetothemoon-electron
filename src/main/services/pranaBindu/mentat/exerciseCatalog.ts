@@ -955,6 +955,39 @@ export const NAMED_EXERCISES: NamedExercise[] = [
 
 // ==================== Утилиты поиска ====================
 
+// ==================== Нормализация имён ====================
+
+/**
+ * Нормализация имени для сравнения: нижний регистр, дефисы → пробелы,
+ * схлопывание пробелов. Позволяет сравнивать 'Single-Leg RDL' и
+ * 'Single Leg RDL', 'Bench Dip' и 'bench dip'.
+ */
+function normalizeName(label: string): string {
+  return label
+    .trim()
+    .toLowerCase()
+    .replace(/-/g, ' ')
+    .replace(/\s+/g, ' ');
+}
+
+/** Совпадает ли label с name или одним из aliases (после нормализации). */
+function nameMatches(
+  label: string,
+  name: string,
+  aliases?: string[]
+): boolean {
+  const target = normalizeName(label);
+  if (normalizeName(name) === target) return true;
+  if (aliases) {
+    for (const a of aliases) {
+      if (normalizeName(a) === target) return true;
+    }
+  }
+  return false;
+}
+
+// ==================== Поиск ====================
+
 /** Поиск прогрессии по ключу (pushup, squat, dips, …). */
 export function findProgressionsByKey(key: string): CatalogEntry | undefined {
   return PROGRESSIONS_CATALOG.find((e) => e.key === key);
@@ -965,23 +998,23 @@ export function findNamedByKey(key: string): NamedExercise | undefined {
   return NAMED_EXERCISES.find((e) => e.key === key);
 }
 
-/** Поиск NamedExercise по ICU-имени (регистронезависимо). */
+/** Поиск NamedExercise по ICU-имени (с учётом aliases). */
 export function findNamedByName(name: string): NamedExercise | undefined {
-  const norm = name.trim().toLowerCase();
-  return NAMED_EXERCISES.find((e) => e.icuName.toLowerCase() === norm);
+  return NAMED_EXERCISES.find((e) =>
+    nameMatches(name, e.icuName, e.aliases),
+  );
 }
 
 /**
- * Поиск варианта прогрессии по имени: 'Diamond Push-ups' → pushup, level=6.
- * Возвращает { entry, level } или undefined.
+ * Поиск варианта прогрессии по имени: 'Bench Dip' → dips, level=1.
+ * Сравнивает и name уровня, и его aliases.
  */
 export function findLevelByName(
   variantName: string
 ): { entry: CatalogEntry; level: number } | undefined {
-  const norm = variantName.trim().toLowerCase();
   for (const entry of PROGRESSIONS_CATALOG) {
     for (const lvl of entry.levels) {
-      if (lvl.name.toLowerCase() === norm) {
+      if (nameMatches(variantName, lvl.name, lvl.aliases)) {
         return { entry, level: lvl.level };
       }
     }
@@ -1017,15 +1050,14 @@ export function findAnythingByName(name: string): {
 
 
 /**
- * Поиск прогрессии по её icuName («Pull-ups» → pullup, «Squats» → squat).
+ * Поиск прогрессии по её icuName (с учётом aliases прогрессии).
  * Используется в парсере, когда пользователь пишет общее имя каталога
  * без точного названия уровня.
  */
 export function findProgressionByIcuName(
   name: string
 ): CatalogEntry | undefined {
-  const norm = name.trim().toLowerCase();
-  return PROGRESSIONS_CATALOG.find(
-    (e) => e.icuName.toLowerCase() === norm,
+  return PROGRESSIONS_CATALOG.find((e) =>
+    nameMatches(name, e.icuName, e.aliases),
   );
 }
