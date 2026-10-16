@@ -131,10 +131,11 @@ export const CatalogPickerDialog: React.FC<Props> = ({
     const out: Array<{
       key: string;
       label: string;
+      hint: string | undefined;
       badge: string;
     }> = [];
 
-    for (const p of PROGRESSIONS_CATALOG) {
+        for (const p of PROGRESSIONS_CATALOG) {
       for (const lvl of p.levels) {
         const matches =
           normalize(p.label).includes(q) ||
@@ -146,7 +147,10 @@ export const CatalogPickerDialog: React.FC<Props> = ({
         const prefix = p.category === 'wade' ? 'W' : 'L';
         out.push({
           key: levelKey(p.key, lvl.level),
-          label: `${p.label} · ${lvl.nameRu ?? lvl.name}`,
+          // label = чистое имя уровня; родительская прогрессия
+          // видна через code (W1) — так же, как в Wade-табе.
+          label: lvl.name,
+          hint: lvl.nameRu,
           badge: `${prefix}${lvl.level}`,
         });
       }
@@ -161,7 +165,23 @@ export const CatalogPickerDialog: React.FC<Props> = ({
       if (!matches) continue;
       out.push({
         key: namedKey(n.key),
-        label: `${n.label}${n.nameRu ? ` · ${n.nameRu}` : ''}`,
+        label: n.label,
+        hint: n.nameRu,
+        badge: n.category,
+      });
+    }
+
+    for (const n of NAMED_EXERCISES) {
+      const matches =
+        normalize(n.label).includes(q) ||
+        normalize(n.icuName).includes(q) ||
+        (n.nameRu ? normalize(n.nameRu).includes(q) : false) ||
+        n.key.includes(q);
+      if (!matches) continue;
+      out.push({
+        key: namedKey(n.key),
+        label: n.label,
+        hint: n.nameRu,
         badge: n.category,
       });
     }
@@ -220,21 +240,34 @@ export const CatalogPickerDialog: React.FC<Props> = ({
     onHide();
   };
 
-  // Рендер одной плоской строки
-  const renderRow = (key: string, label: string, badge: string) => {
+  /**
+   * Рендер строки каталога в стиле Wade-уровней:
+   *   [☐] [code] [name] [hint(справа)]
+   * code — W1..W10 для уровней, 'drill'/'plyo'/... для named.
+   * hint — русский перевод (lvl.nameRu или n.nameRu).
+   */
+  const renderRow = (
+    key: string,
+    label: string,
+    hint: string | undefined,
+    code: string,
+  ) => {
     const isSelected = selected.has(key);
     return (
       <label
         key={key}
-        className={`pb-catalog-picker__row ${isSelected ? 'is-selected' : ''}`}
+        className={`pb-catalog-picker__level ${isSelected ? 'is-selected' : ''}`}
       >
         <input
           type="checkbox"
           checked={isSelected}
           onChange={() => toggleSelected(key)}
         />
-        <span className="pb-catalog-picker__row-name">{label}</span>
-        <span className="pb-catalog-picker__row-badge">{badge}</span>
+        <span className="pb-catalog__level-code">{code}</span>
+        <span className="pb-catalog__level-name">{label}</span>
+        {hint && (
+          <span className="pb-catalog__level-hint">{hint}</span>
+        )}
       </label>
     );
   };
@@ -305,7 +338,9 @@ export const CatalogPickerDialog: React.FC<Props> = ({
         <>
           <div className="pb-hint">Найдено: {searchResults.length}</div>
           <div className="pb-catalog-picker__list">
-            {searchResults.map((r) => renderRow(r.key, r.label, r.badge))}
+            {searchResults.map((r) =>
+              renderRow(r.key, r.label, r.hint, r.badge),
+            )}
           </div>
         </>
       );
@@ -335,7 +370,12 @@ export const CatalogPickerDialog: React.FC<Props> = ({
               <div className="pb-hint">Нет элементов</div>
             ) : (
               items.map((n) =>
-                renderRow(namedKey(n.key), n.label, n.category),
+                renderRow(
+                  namedKey(n.key),
+                  n.label,
+                  n.nameRu,
+                  n.category,
+                ),
               )
             )}
           </div>
@@ -357,7 +397,12 @@ export const CatalogPickerDialog: React.FC<Props> = ({
           </div>
           <div className="pb-catalog-picker__list">
             {NAMED_EXERCISES.map((n) =>
-              renderRow(namedKey(n.key), n.label, n.category),
+              renderRow(
+                namedKey(n.key),
+                n.label,
+                n.nameRu,
+                n.category,
+              ),
             )}
           </div>
         </>

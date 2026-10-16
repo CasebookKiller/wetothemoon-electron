@@ -5953,6 +5953,24 @@ body[data-module='prana-bindu'] .pb-debug-dialog .p-dialog-header-close svg path
   background: color-mix(in srgb, var(--pb-accent) 10%, transparent);
 }
 
+/* В picker-строке code может быть длиннее, чем W1-W10:
+   'drill', 'prehab', 'run-basic' — до 9 символов.
+   Расширяем столбец, но оставляем минимальную ширину,
+   чтобы W1..W10 и drill визуально стояли в одной колонке. */
+.pb-catalog-picker__level .pb-catalog__level-code {
+  flex: 0 0 auto;
+  min-width: 2.4rem;
+  text-align: center;
+}
+
+/* В named-строках нет длинной ladder-подсказки, поэтому
+   столбец hint может быть чуть шире. */
+.pb-catalog-picker__level .pb-catalog__level-hint {
+  flex: 0 1 auto;
+  max-width: 45%;
+  text-align: right;
+}
+
 .pb-catalog-picker__row input[type='checkbox'],
 .pb-catalog-picker__level input[type='checkbox'] {
   flex: 0 0 auto;
