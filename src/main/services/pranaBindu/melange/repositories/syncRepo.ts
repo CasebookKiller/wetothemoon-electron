@@ -4,8 +4,32 @@
 // Репозиторий принимает уже зашифрованные строки как есть.
 
 import type { DatabaseSync } from 'node:sqlite';
-import type { SyncSettings } from '../../spice/types';
+import type {
+  SyncSettings,
+  AutoSyncProvider,
+} from '../../spice/types';
+import {
+  ALL_AUTO_SYNC_PROVIDERS,
+  DEFAULT_AUTO_SYNC_PROVIDERS,
+} from '../../spice/types';
 import type { SyncSettingsRow } from '../types';
+
+/** Парсит auto_providers_json. NULL/пусто → DEFAULT_AUTO_SYNC_PROVIDERS. */
+function parseAutoProviders(raw: string | null): AutoSyncProvider[] {
+  if (!raw) return [...DEFAULT_AUTO_SYNC_PROVIDERS];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [...DEFAULT_AUTO_SYNC_PROVIDERS];
+    const valid = parsed.filter((x): x is AutoSyncProvider =>
+      typeof x === 'string' &&
+      (ALL_AUTO_SYNC_PROVIDERS as readonly string[]).includes(x),
+    );
+    // Если всё отфильтровалось — значит формат битый, даём дефолт.
+    return valid.length > 0 ? valid : [...DEFAULT_AUTO_SYNC_PROVIDERS];
+  } catch {
+    return [...DEFAULT_AUTO_SYNC_PROVIDERS];
+  }
+}
 
 function rowToDomain(row: SyncSettingsRow): SyncSettings {
   return {
@@ -13,6 +37,7 @@ function rowToDomain(row: SyncSettingsRow): SyncSettings {
     mode: (row.mode as SyncSettings['mode']) ?? 'manual',
     autoOnStart: row.auto_on_start === 1,
     autoIntervalMin: row.auto_interval_min ?? null,
+    autoProviders: parseAutoProviders(row.auto_providers_json),
     lastSyncAt: row.last_sync_at ?? undefined,
     lastSyncStatus: row.last_sync_status ?? undefined,
     zeppProvider: row.zepp_provider ?? undefined,
@@ -53,6 +78,16 @@ export function updateSyncSettings(
   const current = getSyncSettingsInternal(db);
   if (!current) throw new Error('sync_settings не инициализирован (seed не выполнен)');
 
+  // auto_providers_json — сериализуем массив, если он явно передан.
+  let autoProvidersJson = current.auto_providers_json ?? null;
+  if (patch.autoProviders !== undefined) {
+    if (patch.autoProviders.length === 0) {
+      autoProvidersJson = null;
+    } else {
+      autoProvidersJson = JSON.stringify(patch.autoProviders);
+    }
+  }
+
   const merged = {
     source: patch.source ?? current.source,
     mode: patch.mode ?? current.mode,
@@ -66,6 +101,7 @@ export function updateSyncSettings(
       patch.autoIntervalMin !== undefined
         ? patch.autoIntervalMin
         : current.auto_interval_min,
+    auto_providers_json: autoProvidersJson,
     zepp_provider: patch.zeppProvider ?? current.zepp_provider,
     zepp_fallback_provider:
       patch.zeppFallbackProvider ?? current.zepp_fallback_provider,
@@ -87,6 +123,7 @@ export function updateSyncSettings(
     `UPDATE sync_settings SET
       source = ?, mode = ?,
       auto_on_start = ?, auto_interval_min = ?,
+      auto_providers_json = ?,
       zepp_provider = ?, zepp_fallback_provider = ?,
       zepp_auth_host = ?, zepp_data_host = ?,
       zepp_user_id = ?,
@@ -99,6 +136,7 @@ export function updateSyncSettings(
     merged.mode,
     merged.auto_on_start,
     merged.auto_interval_min,
+    merged.auto_providers_json,
     merged.zepp_provider,
     merged.zepp_fallback_provider,
     merged.zepp_auth_host,
@@ -244,4 +282,23 @@ export function setLastAutoSync(
        last_sync_status = ?
      WHERE id = 1`
   ).run(at, status);
+}
+
+/**
+ * Получить список активных провайдеров автосинка.
+ * Используется handler'ом pb:auto-sync-on-start.
+ */
+export function getAutoProviders(db: DatabaseSync): AutoSyncProvider[] {
+  const settings = getSyncSettings(db);
+  return settings.autoProviders ?? [...DEFAULT_AUTO_SYNC_PROVIDERS];
+}
+
+/**
+ * Установить список активных провайдеров автосинка.
+ */
+export function setAutoProviders(
+  db: DatabaseSync,
+  providers: AutoSyncProvider[],
+): void {
+  updateSyncSettings(db, { autoProviders: providers });
 }

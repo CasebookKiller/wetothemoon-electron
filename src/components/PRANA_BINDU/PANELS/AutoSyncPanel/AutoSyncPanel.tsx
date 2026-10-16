@@ -12,6 +12,12 @@ import React, { useEffect, useState } from 'react';
 import { Button } from 'primereact/button';
 import { Checkbox } from 'primereact/checkbox';
 import { Message } from 'primereact/message';
+import {
+  ALL_AUTO_SYNC_PROVIDERS,
+  AUTO_SYNC_PROVIDER_LABELS,
+  DEFAULT_AUTO_SYNC_PROVIDERS,
+  type AutoSyncProvider,
+} from '@/main/services/pranaBindu/spice/types';
 
 interface Props {
   /** Вызывается после успешного прогона автосинка. */
@@ -30,6 +36,9 @@ export const AutoSyncPanel: React.FC<Props> = ({ onAfterSync }) => {
   const [autoSyncRunning, setAutoSyncRunning] = useState(false);
   const [autoSyncResult, setAutoSyncResult] = useState('');
   const [autoSyncError, setAutoSyncError] = useState('');
+  const [autoProviders, setAutoProviders] = useState<Set<AutoSyncProvider>>(
+    () => new Set(DEFAULT_AUTO_SYNC_PROVIDERS),
+  );
 
   const loadSyncSettings = async () => {
     if (!api?.pb?.syncSettingsGet) return;
@@ -43,6 +52,10 @@ export const AutoSyncPanel: React.FC<Props> = ({ onAfterSync }) => {
         );
         setAutoSyncLastAt(d.lastSyncAt ?? null);
         setAutoSyncLastStatus(d.lastSyncStatus ?? null);
+        const provs: AutoSyncProvider[] = Array.isArray(d.autoProviders)
+          ? d.autoProviders
+          : [...DEFAULT_AUTO_SYNC_PROVIDERS];
+        setAutoProviders(new Set(provs));
       }
     } catch {
       /* ignore */
@@ -74,6 +87,7 @@ export const AutoSyncPanel: React.FC<Props> = ({ onAfterSync }) => {
   const persistAutoSync = async (patch: {
     autoOnStart?: boolean;
     autoIntervalMin?: number | null;
+    autoProviders?: AutoSyncProvider[];
   }) => {
     if (!api?.pb?.syncSettingsUpdate) return;
     try {
@@ -92,6 +106,16 @@ export const AutoSyncPanel: React.FC<Props> = ({ onAfterSync }) => {
       setAutoSyncError((e as Error).message);
       setTimeout(() => setAutoSyncError(''), 3000);
     }
+  };
+
+  const toggleProvider = (p: AutoSyncProvider) => {
+    setAutoProviders((prev) => {
+      const next = new Set(prev);
+      if (next.has(p)) next.delete(p);
+      else next.add(p);
+      void persistAutoSync({ autoProviders: Array.from(next) });
+      return next;
+    });
   };
 
   const handleRunAutoSyncNow = async () => {
@@ -185,6 +209,44 @@ export const AutoSyncPanel: React.FC<Props> = ({ onAfterSync }) => {
             className="w-full"
           />
         )}
+
+        {/* Список провайдеров — какие участвуют в автосинке */}
+        <div className="pb-auto-providers">
+          <div className="pb-auto-providers__title">Источники в автосинке</div>
+          {ALL_AUTO_SYNC_PROVIDERS.map((p) => {
+            const isOn = autoProviders.has(p);
+            // A.3–A.5: обработка этих провайдеров ещё не реализована.
+            // Флажки работают (сохраняются в БД), но handler пока
+            // их игнорирует. После A.3–A.5 они начнут действовать.
+            const notYetImplemented = (
+              ['zepp-fit', 'strava-fit', 'icu-plan', 'streams', 'thresholds'] as AutoSyncProvider[]
+            ).includes(p);
+            return (
+              <label
+                key={p}
+                className={`pb-auto-providers__row ${
+                  notYetImplemented ? 'is-pending' : ''
+                }`}
+                title={
+                  notYetImplemented
+                    ? 'Сохраняется в настройках, но пока не активно в автосинке (в разработке, шаги A.3–A.5)'
+                    : undefined
+                }
+              >
+                <Checkbox
+                  inputId={`pb-auto-provider-${p}`}
+                  checked={isOn}
+                  onChange={() => toggleProvider(p)}
+                  disabled={autoSyncRunning}
+                />
+                <span>{AUTO_SYNC_PROVIDER_LABELS[p]}</span>
+                {notYetImplemented && (
+                  <span className="pb-auto-providers__pending-tag">скоро</span>
+                )}
+              </label>
+            );
+          })}
+        </div>
 
         <div className="flex gap-2 flex-wrap">
           <Button

@@ -12,9 +12,10 @@ import {
   MIGRATION_V7_RUN_FACTS_GPS,
   MIGRATION_V8_RECOVERY_FIELDS,
   MIGRATION_V9_INTERVALS_ICU,
+  MIGRATION_V22_AUTO_PROVIDERS,
 } from './schema';
 
-export const SCHEMA_VERSION = 21;
+export const SCHEMA_VERSION = 22;
 
 interface Migration {
   version: number;
@@ -466,7 +467,31 @@ const migrations: readonly Migration[] = [
       console.log('[Melange] v21: создана таблица equivalences');
     },
   },
+  {
+    version: 22,
+    apply: (db) => {
+      // Не используем PRAGMA table_info: в node:sqlite на первом
+      // прогоне он может вернуть пустой список (известное поведение).
+      // Вместо этого — пробуем ALTER TABLE и ловим 'duplicate column name'.
+      try {
+        for (const sql of MIGRATION_V22_AUTO_PROVIDERS) db.exec(sql);
+        console.log(
+          '[Melange] v22: добавлена sync_settings.auto_providers_json',
+        );
+      } catch (e) {
+        const msg = String(e);
+        if (msg.includes('duplicate column name')) {
+          console.log(
+            '[Melange] v22: колонка auto_providers_json уже есть, пропускаем',
+          );
+        } else {
+          throw e;
+        }
+      }
+    },
+  },
 ];
+
 
 function getCurrentVersion(db: DatabaseSync): number {
   const row = db

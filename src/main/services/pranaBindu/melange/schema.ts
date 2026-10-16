@@ -348,3 +348,14 @@ export const MIGRATION_V9_INTERVALS_ICU: readonly string[] = [
   `ALTER TABLE sync_settings ADD COLUMN intervals_last_sync_at TEXT;`,
   `ALTER TABLE sync_settings ADD COLUMN intervals_last_sync_status TEXT;`,
 ];
+
+// ==================== Миграция v22: авто-провайдеры ====================
+
+/**
+ * auto_providers_json — JSON-массив AutoSyncProvider[].
+ * Каждый провайдер включается/выключается в AutoSyncPanel.
+ * NULL или пустая строка → берём DEFAULT_AUTO_SYNC_PROVIDERS.
+ */
+export const MIGRATION_V22_AUTO_PROVIDERS: readonly string[] = [
+  `ALTER TABLE sync_settings ADD COLUMN auto_providers_json TEXT;`,
+];

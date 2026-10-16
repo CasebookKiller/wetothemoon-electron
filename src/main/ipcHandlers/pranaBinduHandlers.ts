@@ -64,6 +64,7 @@ import {
   listExerciseProgress,
   getExerciseProgress,
   setExerciseProgress,
+  getAutoProviders,
 } from '../services/pranaBindu/melange';
 
 import { DodofoProvider } from '../services/pranaBindu/spice/providers/dodofoProvider';
@@ -3661,6 +3662,11 @@ export function registerPranaBinduHandlers(): void {
         };
       }
 
+      // --- Список активных провайдеров ---
+      // v22: пользователь сам выбирает, что тянется при старте.
+      // См. AutoSyncPanel. Фильтрация применяется ниже.
+      const enabledProviders = new Set(getAutoProviders(db));
+
       // --- 1. Workouts за 7 дней ---
       const to = new Date();
       const from = new Date();
@@ -3672,7 +3678,10 @@ export function registerPranaBinduHandlers(): void {
       const toIso = iso(to);
 
       const workoutProviders = listProviders().filter(
-        (p) => p.capabilities?.workouts && typeof p.fetchWorkouts === 'function'
+        (p) =>
+          p.capabilities?.workouts &&
+          typeof p.fetchWorkouts === 'function' &&
+          enabledProviders.has(p.name as any),
       );
 
       const workoutsSummary: Array<{
@@ -3715,9 +3724,13 @@ export function registerPranaBinduHandlers(): void {
         }
       }
 
-      // --- 2. Wellness за 7 дней (все провайдеры с capabilities.wellness) ---
+      // --- 2. Wellness за 7 дней (только включённые провайдеры) ---
       const wellnessProviders = listProviders()
-        .filter((p) => p.capabilities?.wellness)
+        .filter(
+          (p) =>
+            p.capabilities?.wellness &&
+            enabledProviders.has(p.name as any),
+        )
         .map((p) => p.name)
         .sort((a, b) => {
           if (a === 'intervals-icu') return -1;
@@ -3834,11 +3847,28 @@ export function registerPranaBinduHandlers(): void {
           : 'partial';
       setLastAutoSync(db, status);
 
+      // --- 4. Заглушки для будущих провайдеров (A.3-A.5) ---
+      // zepp-fit, strava-fit, icu-plan, streams, thresholds — флаги уже
+      // есть в UI, обработка появится отдельными шагами. Пока
+      // логируем, чтобы было видно в консоли, какие провайдеры
+      // пользователь включил, но они ещё не в автосинке.
+      const pendingProviders: string[] = [];
+      for (const p of ['zepp-fit', 'strava-fit', 'icu-plan', 'streams', 'thresholds']) {
+        if (enabledProviders.has(p as any)) pendingProviders.push(p);
+      }
+      if (pendingProviders.length > 0) {
+        console.log(
+          `[Prana-Bindu] auto-sync: включены, но пока не в автосинке: ${pendingProviders.join(', ')} (A.3–A.5)`,
+        );
+      }
+
       return {
         success: true,
         ran: true,
         from: fromIso,
         to: toIso,
+        enabledProviders: Array.from(enabledProviders),
+        pendingProviders,
         workouts: workoutsSummary,
         wellness: {
           added: wellnessAdded,
