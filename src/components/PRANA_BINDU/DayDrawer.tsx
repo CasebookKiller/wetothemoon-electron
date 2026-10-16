@@ -19,7 +19,10 @@ import type { RunFactLite } from './RunStreamsDrawer';
 import { groupRunFacts, type GroupedRunFact } from './UTILS/groupRunFacts';
 import type { WorkoutSession, SessionExercise } from '@/main/services/pranaBindu/core/types';
 import { CATEGORY_LABELS } from '@/main/services/pranaBindu/mentat/programs';
-import { findProgressionsByKey } from '@/main/services/pranaBindu/mentat/exerciseCatalog';
+import {
+  findProgressionsByKey,
+  findNamedByKey,
+} from '@/main/services/pranaBindu/mentat/exerciseCatalog';
 import { useEquivalencesMap } from './HOOKS/useEquivalencesMap';
 import AppIcon from '../COMMON/AppIcon/AppIcon';
 
@@ -68,6 +71,57 @@ function exerciseSummary(ex: SessionExercise): string {
 /** Упражнение считается пропущенным, если skipped=true или нет actualSets. */
 function isExerciseSkipped(ex: SessionExercise): boolean {
   return ex.skipped === true || !ex.actualSets || ex.actualSets.length === 0;
+}
+
+/**
+ * Раскрыть упражнение в UI: название, уровень, русский перевод, эквиваленты.
+ * Работает и для прогрессий (progression / W-L префикс), и для named.
+ */
+function describeExercise(
+  ex: SessionExercise,
+  lookupByTarget: (
+    catalog: string,
+    key: string,
+    level: number | undefined,
+  ) => Array<{ label: string; fullLabel: string }>,
+): {
+  label: string;
+  lvlTag: string | null;
+  lvlRu: string | null;
+  eqHints: Array<{ label: string; fullLabel: string }>;
+} {
+  const prog = findProgressionsByKey(ex.movementKey);
+
+  // 1. Прогрессия
+  if (prog) {
+    const lvl = prog.levels.find((l) => l.level === ex.level);
+    const prefix = prog.category === 'wade' ? 'W' : 'L';
+    return {
+      label: lvl?.name ?? prog.label ?? ex.movementKey,
+      lvlTag: ex.level != null ? `${prefix}${ex.level}` : null,
+      lvlRu: lvl?.nameRu ?? null,
+      eqHints: lookupByTarget(prog.category, ex.movementKey, ex.level),
+    };
+  }
+
+  // 2. Named-упражнение (drill / plyo / warmup / run-basic / prehab)
+  const named = findNamedByKey(ex.movementKey);
+  if (named) {
+    return {
+      label: named.label,
+      lvlTag: null,
+      lvlRu: named.nameRu ?? null,
+      eqHints: [],
+    };
+  }
+
+  // 3. Ничего не нашли — как есть
+  return {
+    label: ex.movementKey,
+    lvlTag: null,
+    lvlRu: null,
+    eqHints: [],
+  };
 }
 
 export const DayDrawer: React.FC<Props> = ({
@@ -158,17 +212,85 @@ export const DayDrawer: React.FC<Props> = ({
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
     [sessions]
   );
-  const freeExercises = React.useMemo(
-    () =>
-      freeSessions.flatMap((s) =>
-        s.exercises.map((ex) => ({
-          ex,
-          session: s,
-        }))
+
+  /**
+   * Группы свободных сессий по времени (±30 мин).
+   * Сессии, сохранённые подряд, попадают в одну карточку.
+   * Между группами — отдельные карточки.
+   */
+  interface FreeGroup {
+    ids: number[];
+    createdAt: string;
+    exercises: Array<{ ex: SessionExercise; session: WorkoutSession }>;
+    isAllSkipped: boolean;
+  }
+
+  const freeGroups = React.useMemo<FreeGroup[]>(() => {
+    if (freeSessions.length === 0) return [];
+    const WINDOW_MS = 30 * 60 * 1000;
+    const out: WorkoutSession[][] = [];
+    let current: WorkoutSession[] = [];
+
+    for (const s of freeSessions) {
+      if (current.length === 0) {
+        current.push(s);
+        continue;
+      }
+      const last = current[current.length - 1];
+      const dt =
+        new Date(s.createdAt).getTime() -
+        new Date(last.createdAt).getTime();
+      if (dt <= WINDOW_MS) {
+        current.push(s);
+      } else {
+        out.push(current);
+        current = [s];
+      }
+    }
+    if (current.length > 0) out.push(current);
+
+    return out.map((g) => ({
+      ids: g.map((s) => s.id),
+      createdAt: g[0].createdAt,
+      exercises: g.flatMap((s) =>
+        s.exercises.map((ex) => ({ ex, session: s }))
       ),
-    [freeSessions]
-  );
+      isAllSkipped:
+        g.length > 0 &&
+        g.every((s) =>
+          s.exercises.length > 0 &&
+          s.exercises.every((ex) => isExerciseSkipped(ex)),
+        ),
+    }));
+  }, [freeSessions]);
+
   const { lookupByTarget } = useEquivalencesMap();
+
+  /**
+   * Удалить сессии по id. Множественное удаление — все id
+   * удаляются циклом, потом reload.
+   */
+  const handleDeleteSessions = React.useCallback(
+    async (ids: number[]) => {
+      if (ids.length === 0) return;
+      const msg =
+        ids.length === 1
+          ? 'Удалить эту запись?'
+          : `Удалить ${ids.length} записи?`;
+      if (!window.confirm(`${msg}\nЭто действие нельзя отменить.`)) return;
+      try {
+        for (const id of ids) {
+          await api.pb.deleteWorkoutSession(id);
+        }
+        await reload();
+        onAfterChange();
+      } catch (e) {
+        setError((e as Error).message);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [api, onAfterChange],
+  );
 
   // Для карточек сессий: все ли упражнения пропущены (для бейджа
   // и приглушения).
@@ -183,13 +305,6 @@ export const DayDrawer: React.FC<Props> = ({
     }
     return m;
   }, [programSessions]);
-
-  const freeAllSkipped = React.useMemo(
-    () =>
-      freeExercises.length > 0 &&
-      freeExercises.every(({ ex }) => isExerciseSkipped(ex)),
-    [freeExercises],
-  );
 
   return (
     <Sidebar
@@ -331,50 +446,43 @@ export const DayDrawer: React.FC<Props> = ({
                           }`}
                         >
                           <div className="pb-day-list__item-title">
-                            {`Программа: ${s.programKey}`}
-                            {isAllSkipped && (
-                              <span className="pb-source-badge pb-source-badge--skipped">
-                                пропущено
-                              </span>
-                            )}
-                            {s.isTest && (
-                              <span className="pb-source-badge pb-source-badge--dodofo">
-                                тест
-                              </span>
-                            )}
-                            {s.generatorCategory &&
-                              CATEGORY_LABELS[
-                                s.generatorCategory as keyof typeof CATEGORY_LABELS
-                              ] && (
-                                <span className="pb-source-badge pb-source-badge--manual">
-                                  {
-                                    CATEGORY_LABELS[
-                                      s.generatorCategory as keyof typeof CATEGORY_LABELS
-                                    ]
-                                  }
+                            <span className="pb-day-list__item-title-text">
+                              {`Программа: ${s.programKey}`}
+                              {isAllSkipped && (
+                                <span className="pb-source-badge pb-source-badge--skipped">
+                                  пропущено
                                 </span>
                               )}
+                              {s.isTest && (
+                                <span className="pb-source-badge pb-source-badge--dodofo">
+                                  тест
+                                </span>
+                              )}
+                              {s.generatorCategory &&
+                                CATEGORY_LABELS[
+                                  s.generatorCategory as keyof typeof CATEGORY_LABELS
+                                ] && (
+                                  <span className="pb-source-badge pb-source-badge--manual">
+                                    {
+                                      CATEGORY_LABELS[
+                                        s.generatorCategory as keyof typeof CATEGORY_LABELS
+                                      ]
+                                    }
+                                  </span>
+                                )}
+                            </span>
+                            <Button
+                              icon="pi pi-trash"
+                              text
+                              className="pb-day-list__delete-btn"
+                              onClick={() => handleDeleteSessions([s.id])}
+                              tooltip="Удалить запись"
+                              tooltipOptions={{ position: 'left' }}
+                            />
                           </div>
                           <div className="pb-day-fact__session-list">
                             {s.exercises.map((ex, i) => {
-                              const prog = findProgressionsByKey(ex.movementKey);
-                              const lvl = prog?.levels.find(
-                                (l) => l.level === ex.level
-                              );
-                              const prefix =
-                                prog?.category === 'wade' ? 'W' : 'L';
-                              const label =
-                                lvl?.name ?? prog?.label ?? ex.movementKey;
-                              const lvlTag =
-                                ex.level != null ? `${prefix}${ex.level}` : null;
-                              const lvlRu = lvl?.nameRu ?? null;
-                              const eqHints = prog
-                                ? lookupByTarget(
-                                    prog.category,
-                                    ex.movementKey,
-                                    ex.level
-                                  )
-                                : [];
+                              const d = describeExercise(ex, lookupByTarget);
 
                               return (
                                 <div
@@ -382,30 +490,30 @@ export const DayDrawer: React.FC<Props> = ({
                                   className="pb-day-fact__ex-row"
                                 >
                                   <span className="pb-day-fact__ex-key">
-                                    {label}
-                                    {lvlTag && (
+                                    {d.label}
+                                    {d.lvlTag && (
                                       <>
                                         {' '}
                                         <span className="pb-day-fact__ex-lvl">
-                                          {lvlTag}
+                                          {d.lvlTag}
                                         </span>
                                       </>
                                     )}
                                   </span>
-                                  {lvlRu && (
+                                  {d.lvlRu && (
                                     <span className="pb-day-fact__ex-lvl-ru">
-                                      {lvlRu}
+                                      {d.lvlRu}
                                     </span>
                                   )}
-                                  {eqHints.length > 0 && (
+                                  {d.eqHints.length > 0 && (
                                     <span
                                       className="pb-exercise-equiv"
-                                      title={`≈ ${eqHints
+                                      title={`≈ ${d.eqHints
                                         .map((h) => h.fullLabel)
                                         .join('\n≈ ')}`}
                                     >
                                       ≈{' '}
-                                      {eqHints
+                                      {d.eqHints
                                         .map((h) => h.label)
                                         .join(', ')}
                                     </span>
@@ -427,55 +535,52 @@ export const DayDrawer: React.FC<Props> = ({
                         );
                       })}
 
-                      {/* 2. Свободные сессии — одна карточка на день */}
-                      {freeExercises.length > 0 && (
+                      {/* 2. Свободные сессии — группы по ±30 мин */}
+                      {freeGroups.map((g, gi) => (
                         <div
+                          key={`${g.createdAt}-${gi}`}
                           className={`pb-day-list__item pb-day-list__item--session${
-                            freeAllSkipped ? ' is-all-skipped' : ''
+                            g.isAllSkipped ? ' is-all-skipped' : ''
                           }`}
                         >
                           <div className="pb-day-list__item-title">
-                            {`Свободная сессия${
-                              freeExercises.length > 1
-                                ? ` · ${freeExercises.length} упражнения`
-                                : ''
-                            }`}
-                            {freeAllSkipped && (
-                              <span className="pb-source-badge pb-source-badge--skipped">
-                                пропущено
-                              </span>
-                            )}
+                            <span className="pb-day-list__item-title-text">
+                              {`Свободная сессия${
+                                g.exercises.length > 1
+                                  ? ` · ${g.exercises.length} упражнения`
+                                  : ''
+                              }`}
+                              {g.isAllSkipped && (
+                                <span className="pb-source-badge pb-source-badge--skipped">
+                                  пропущено
+                                </span>
+                              )}
+                            </span>
+                            <Button
+                              icon="pi pi-trash"
+                              text
+                              className="pb-day-list__delete-btn"
+                              onClick={() => handleDeleteSessions(g.ids)}
+                              tooltip={
+                                g.ids.length === 1
+                                  ? 'Удалить запись'
+                                  : `Удалить группу (${g.ids.length})`
+                              }
+                              tooltipOptions={{ position: 'left' }}
+                            />
                           </div>
                           <div className="pb-day-fact__session-list">
-                            {freeExercises.map(({ ex, session }, i) => {
-                              const prog = findProgressionsByKey(ex.movementKey);
-                              const lvl = prog?.levels.find(
-                                (l) => l.level === ex.level
-                              );
-                              const prefix =
-                                prog?.category === 'wade' ? 'W' : 'L';
-                              const label =
-                                lvl?.name ?? prog?.label ?? ex.movementKey;
-                              const lvlTag =
-                                ex.level != null ? `${prefix}${ex.level}` : null;
-                              const lvlRu = lvl?.nameRu ?? null;
-                              const eqHints = prog
-                                ? lookupByTarget(
-                                    prog.category,
-                                    ex.movementKey,
-                                    ex.level
-                                  )
-                                : [];
+                            {g.exercises.map(({ ex, session }, i) => {
+                              const d = describeExercise(ex, lookupByTarget);
 
-                              // HH:MM из createdAt сессии.
                               let timeStr = '';
                               try {
-                                const d = new Date(session.createdAt);
-                                if (!Number.isNaN(d.getTime())) {
-                                  timeStr = `${String(d.getHours()).padStart(
+                                const dt = new Date(session.createdAt);
+                                if (!Number.isNaN(dt.getTime())) {
+                                  timeStr = `${String(dt.getHours()).padStart(
                                     2,
                                     '0'
-                                  )}:${String(d.getMinutes()).padStart(2, '0')}`;
+                                  )}:${String(dt.getMinutes()).padStart(2, '0')}`;
                                 }
                               } catch {
                                 /* ignore */
@@ -492,30 +597,30 @@ export const DayDrawer: React.FC<Props> = ({
                                     </span>
                                   )}
                                   <span className="pb-day-fact__ex-key">
-                                    {label}
-                                    {lvlTag && (
+                                    {d.label}
+                                    {d.lvlTag && (
                                       <>
                                         {' '}
                                         <span className="pb-day-fact__ex-lvl">
-                                          {lvlTag}
+                                          {d.lvlTag}
                                         </span>
                                       </>
                                     )}
                                   </span>
-                                  {lvlRu && (
+                                  {d.lvlRu && (
                                     <span className="pb-day-fact__ex-lvl-ru">
-                                      {lvlRu}
+                                      {d.lvlRu}
                                     </span>
                                   )}
-                                  {eqHints.length > 0 && (
+                                  {d.eqHints.length > 0 && (
                                     <span
                                       className="pb-exercise-equiv"
-                                      title={`≈ ${eqHints
+                                      title={`≈ ${d.eqHints
                                         .map((h) => h.fullLabel)
                                         .join('\n≈ ')}`}
                                     >
                                       ≈{' '}
-                                      {eqHints
+                                      {d.eqHints
                                         .map((h) => h.label)
                                         .join(', ')}
                                     </span>
@@ -532,12 +637,12 @@ export const DayDrawer: React.FC<Props> = ({
                               );
                             })}
                           </div>
-                          {/* Общий notes, если у всех одинаковые (например, «Проверка уровня») */}
+                          {/* Общий notes */}
                           {(() => {
                             const notes = Array.from(
                               new Set(
-                                freeSessions
-                                  .map((s) => s.notes)
+                                g.exercises
+                                  .map(({ session }) => session.notes)
                                   .filter((n): n is string => !!n)
                               )
                             );
@@ -551,7 +656,7 @@ export const DayDrawer: React.FC<Props> = ({
                             );
                           })()}
                         </div>
-                      )}
+                      ))}
                     </div>
                   </div>
                 )}
