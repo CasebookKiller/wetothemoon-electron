@@ -3878,18 +3878,105 @@ export function registerPranaBinduHandlers(): void {
           : 'partial';
       setLastAutoSync(db, status);
 
-      // --- 4. Заглушки для будущих провайдеров (A.3-A.5) ---
-      // zepp-fit, strava-fit, icu-plan, streams, thresholds — флаги уже
-      // есть в UI, обработка появится отдельными шагами. Пока
-      // логируем, чтобы было видно в консоли, какие провайдеры
-      // пользователь включил, но они ещё не в автосинке.
+      // --- 4. Zepp FIT folder ---
+      // Тянем из сохранённой папки. skipIfFileExists=true —
+      // уже импортированные файлы пропускаем (проверка по
+      // source+external_id, быстрая по индексу).
+      // savePath=false — не трогаем настройку, она уже там.
+      let zeppFitResult: {
+        imported: number;
+        skipped: number;
+        failed: number;
+        error?: string;
+      } | null = null;
+
+      if (enabledProviders.has('zepp-fit')) {
+        try {
+          const zeppPath = getZeppArchivePath(db);
+          if (!zeppPath) {
+            zeppFitResult = {
+              imported: 0,
+              skipped: 0,
+              failed: 0,
+              error: 'zepp_archive_path не задан',
+            };
+            console.log(
+              '[Prana-Bindu] auto-sync: zepp-fit пропущен (путь не задан)',
+            );
+          } else if (!fs.existsSync(zeppPath)) {
+            zeppFitResult = {
+              imported: 0,
+              skipped: 0,
+              failed: 0,
+              error: 'папка недоступна',
+            };
+            console.log(
+              `[Prana-Bindu] auto-sync: zepp-fit пропущен (папка недоступна: ${zeppPath})`,
+            );
+          } else {
+            // Импорт — можно было бы вызвать через ipcMain.handle,
+            // но здесь мы в main-процессе, вызываем логику напрямую.
+            // Используем существующий performImportFiles + обёртку.
+            // НО: performImportFiles посылает прогресс в sender — его тут нет.
+            // Поэтому вызываем внутренний импорт без прогресса.
+            // Простое решение: список файлов + performImportFiles с no-op sender.
+            const noopSender = () => { /* no-op */ };
+
+            const files: string[] = [];
+            const entries = fs.readdirSync(zeppPath, { withFileTypes: true });
+            for (const e of entries) {
+              if (e.isFile() && /\.(fit|tcx)(\.gz)?$/i.test(e.name)) {
+                files.push(path.join(zeppPath, e.name));
+              }
+            }
+
+            if (files.length === 0) {
+              zeppFitResult = { imported: 0, skipped: 0, failed: 0 };
+              console.log(
+                `[Prana-Bindu] auto-sync: zepp-fit — файлов в папке нет`,
+              );
+            } else {
+              // skipIfFileExists=true реализуется через
+              // skipImported=true в performImportFiles.
+              const r = await performImportFiles(
+                files,
+                db,
+                noopSender,
+                'zepp-app',
+                true,
+              );
+              zeppFitResult = {
+                imported: r.imported,
+                skipped: r.skipped,
+                failed: r.failed,
+              };
+              console.log(
+                `[Prana-Bindu] auto-sync: zepp-fit +${r.imported} ·${r.skipped} ✗${r.failed} (всего ${files.length})`,
+              );
+            }
+          }
+        } catch (e) {
+          zeppFitResult = {
+            imported: 0,
+            skipped: 0,
+            failed: 0,
+            error: (e as Error).message,
+          };
+          console.warn(
+            '[Prana-Bindu] auto-sync: zepp-fit error:',
+            (e as Error).message,
+          );
+        }
+      }
+
+      // --- 5. Заглушки для остальных провайдеров (A.4-A.5) ---
       const pendingProviders: string[] = [];
-      for (const p of ['zepp-fit', 'strava-fit', 'icu-plan', 'streams', 'thresholds']) {
+      for (const p of ['strava-fit', 'icu-plan', 'streams', 'thresholds']) {
         if (enabledProviders.has(p as any)) pendingProviders.push(p);
       }
       if (pendingProviders.length > 0) {
         console.log(
-          `[Prana-Bindu] auto-sync: включены, но пока не в автосинке: ${pendingProviders.join(', ')} (A.3–A.5)`,
+          `[Prana-Bindu] auto-sync: включены, но пока не в автосинке: ${pendingProviders.join(', ')} (A.4–A.5)`,
         );
       }
 
@@ -3902,6 +3989,7 @@ export function registerPranaBinduHandlers(): void {
         gapReason,
         enabledProviders: Array.from(enabledProviders),
         pendingProviders,
+        zeppFit: zeppFitResult,
         workouts: workoutsSummary,
         wellness: {
           added: wellnessAdded,

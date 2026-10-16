@@ -148,9 +148,21 @@ export const AutoSyncPanel: React.FC<Props> = ({ onAfterSync }) => {
                 ? `${windowDays} дн. (макс.)`
                 : `${windowDays} дн. (от последнего синка)`
             : '';
+          const zepp = res.zeppFit;
+          let zeppLabel = '';
+          if (zepp) {
+            if (zepp.error) {
+              zeppLabel = ` Zepp: ${zepp.error}.`;
+            } else if (zepp.imported > 0 || zepp.failed > 0) {
+              zeppLabel = ` Zepp: +${zepp.imported}${
+                zepp.failed > 0 ? ` ✗${zepp.failed}` : ''
+              }.`;
+            }
+          }
           setAutoSyncResult(
             `Готово: workouts ${wTotal}, wellness +${well}.` +
-              (windowLabel ? ` Окно: ${windowLabel}.` : ''),
+              (windowLabel ? ` Окно: ${windowLabel}.` : '') +
+              zeppLabel,
           );
         }
         if (onAfterSync) await onAfterSync();
