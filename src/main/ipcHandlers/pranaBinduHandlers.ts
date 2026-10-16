@@ -3667,15 +3667,46 @@ export function registerPranaBinduHandlers(): void {
       // См. AutoSyncPanel. Фильтрация применяется ниже.
       const enabledProviders = new Set(getAutoProviders(db));
 
-      // --- 1. Workouts за 7 дней ---
+      // --- Окно синхронизации: gap detection ---
+      // По умолчанию 7 дней, но если приложение не открывалось
+      // дольше — тянем с последнего sync. Cap — 90 дней, чтобы
+      // случайный старый lastSyncAt не выкачал полгода.
+      const DEFAULT_WINDOW_DAYS = 7;
+      const MAX_WINDOW_DAYS = 90;
+
+      const lastSyncAt = settings.lastSyncAt;
+      let windowDays = DEFAULT_WINDOW_DAYS;
+      let gapReason = 'default';
+
+      if (lastSyncAt) {
+        const lastMs = new Date(lastSyncAt).getTime();
+        if (Number.isFinite(lastMs)) {
+          const elapsedDays = Math.floor(
+            (Date.now() - lastMs) / 86_400_000,
+          );
+          if (elapsedDays > DEFAULT_WINDOW_DAYS) {
+            // +1 день — чтобы покрыть день последнего успешного синка.
+            windowDays = Math.min(elapsedDays + 1, MAX_WINDOW_DAYS);
+            gapReason = 'gap';
+            if (elapsedDays >= MAX_WINDOW_DAYS) {
+              gapReason = 'gap-capped';
+            }
+          }
+        }
+      }
+
       const to = new Date();
       const from = new Date();
-      from.setDate(from.getDate() - 7);
+      from.setDate(from.getDate() - windowDays);
       const pad = (n: number) => String(n).padStart(2, '0');
       const iso = (d: Date) =>
         `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
       const fromIso = iso(from);
       const toIso = iso(to);
+
+      console.log(
+        `[Prana-Bindu] auto-sync: окно ${windowDays} дн. (${gapReason}), ${fromIso}..${toIso}`,
+      );
 
       const workoutProviders = listProviders().filter(
         (p) =>
@@ -3867,6 +3898,8 @@ export function registerPranaBinduHandlers(): void {
         ran: true,
         from: fromIso,
         to: toIso,
+        windowDays,
+        gapReason,
         enabledProviders: Array.from(enabledProviders),
         pendingProviders,
         workouts: workoutsSummary,

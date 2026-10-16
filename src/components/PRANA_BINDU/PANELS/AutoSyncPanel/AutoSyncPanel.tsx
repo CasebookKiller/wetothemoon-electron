@@ -138,8 +138,19 @@ export const AutoSyncPanel: React.FC<Props> = ({ onAfterSync }) => {
             0
           );
           const well = res.wellness?.added ?? 0;
+          const windowDays =
+            typeof res.windowDays === 'number' ? res.windowDays : null;
+          const gapReason = res.gapReason ?? 'default';
+          const windowLabel = windowDays
+            ? gapReason === 'default'
+              ? `${windowDays} дн.`
+              : gapReason === 'gap-capped'
+                ? `${windowDays} дн. (макс.)`
+                : `${windowDays} дн. (от последнего синка)`
+            : '';
           setAutoSyncResult(
-            `Готово: workouts ${wTotal}, wellness +${well}.`
+            `Готово: workouts ${wTotal}, wellness +${well}.` +
+              (windowLabel ? ` Окно: ${windowLabel}.` : ''),
           );
         }
         if (onAfterSync) await onAfterSync();
