@@ -13,9 +13,10 @@ import {
   MIGRATION_V8_RECOVERY_FIELDS,
   MIGRATION_V9_INTERVALS_ICU,
   MIGRATION_V22_AUTO_PROVIDERS,
+  MIGRATION_V23_STREAMS_LOADED,
 } from './schema';
 
-export const SCHEMA_VERSION = 22;
+export const SCHEMA_VERSION = 23;
 
 interface Migration {
   version: number;
@@ -470,9 +471,6 @@ const migrations: readonly Migration[] = [
   {
     version: 22,
     apply: (db) => {
-      // Не используем PRAGMA table_info: в node:sqlite на первом
-      // прогоне он может вернуть пустой список (известное поведение).
-      // Вместо этого — пробуем ALTER TABLE и ловим 'duplicate column name'.
       try {
         for (const sql of MIGRATION_V22_AUTO_PROVIDERS) db.exec(sql);
         console.log(
@@ -488,6 +486,52 @@ const migrations: readonly Migration[] = [
           throw e;
         }
       }
+    },
+  },
+  {
+    version: 23,
+    apply: (db) => {
+      const tryAddColumn = (sql: string): boolean => {
+        try {
+          db.exec(sql);
+          return true;
+        } catch (e) {
+          if (String(e).includes('duplicate column name')) return false;
+          throw e;
+        }
+      };
+
+      const added1 = tryAddColumn(
+        `ALTER TABLE run_facts ADD COLUMN streams_loaded INTEGER NOT NULL DEFAULT 0;`,
+      );
+      const added2 = tryAddColumn(
+        `ALTER TABLE run_facts ADD COLUMN streams_failed_at TEXT;`,
+      );
+
+      db.exec(
+        `CREATE INDEX IF NOT EXISTS idx_run_facts_streams_loaded
+           ON run_facts(streams_loaded);`,
+      );
+
+      // Backfill: все факты, у которых есть записи в run_streams,
+      // помечаем как loaded. Идемпотентно.
+      const before = db
+        .prepare(
+          `SELECT COUNT(*) AS n FROM run_facts WHERE streams_loaded = 0
+             AND id IN (SELECT DISTINCT run_fact_id FROM run_streams)`,
+        )
+        .get() as { n: number };
+
+      db.exec(
+        `UPDATE run_facts SET streams_loaded = 1
+           WHERE id IN (SELECT DISTINCT run_fact_id FROM run_streams);`,
+      );
+
+      console.log(
+        `[Melange] v23: streams_loaded / streams_failed_at` +
+          ` (added: ${[added1, added2].filter(Boolean).length}/2,` +
+          ` backfill: ${before.n})`,
+      );
     },
   },
 ];

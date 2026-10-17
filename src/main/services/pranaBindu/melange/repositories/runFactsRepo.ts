@@ -10,7 +10,7 @@ import type { RawWorkout } from '../../spice/providers/types';
 export interface RunFactRow {
   id: number;
   date: string;
-  start_time: string | null;   // ← новое
+  start_time: string | null;
   plan_id: number | null;
   actual_km: number | null;
   actual_pace: string | null;
@@ -26,8 +26,11 @@ export interface RunFactRow {
   gps_quality: string | null;
   distance_source: string | null;
   gps_coverage_pct: number | null;
-  name: string | null;        // ← новое
-  user_name: string | null;   // ← новое
+  name: string | null;
+  user_name: string | null;
+  // v23
+  streams_loaded: number;         // 0 | 1
+  streams_failed_at: string | null;
 }
 
 export interface UpsertResult {
@@ -219,4 +222,81 @@ export function countRunFacts(
     )
     .get(from, to) as unknown as { n: number } | undefined;
   return row?.n ?? 0;
+}
+
+// ==================== v23: флаг загрузки стримов ====================
+
+/**
+ * Пометить факт: стрим успешно загружен.
+ * Вызывается неявно из upsertRunStreams (runStreamsRepo).
+ * Экспорт — для случаев, когда нужен явный вызов.
+ */
+export function markStreamsLoaded(
+  db: DatabaseSync,
+  runFactId: number,
+): void {
+  db.prepare(
+    `UPDATE run_facts
+       SET streams_loaded = 1, streams_failed_at = NULL
+     WHERE id = ?`,
+  ).run(runFactId);
+}
+
+/**
+ * Пометить факт: попытка загрузки стрима провалилась.
+ * streams_failed_at — cooldown-маркер. Auto-sync не будет
+ * пытаться снова, пока не пройдёт retryAfterHours.
+ */
+export function markStreamsFailed(
+  db: DatabaseSync,
+  runFactId: number,
+): void {
+  db.prepare(
+    `UPDATE run_facts
+       SET streams_loaded = 0, streams_failed_at = ?
+     WHERE id = ?`,
+  ).run(new Date().toISOString(), runFactId);
+}
+
+/**
+ * Список фактов в окне, у которых streams_loaded = 0
+ * (или была неудачная попытка > retryAfterHours назад).
+ *
+ * Используется в auto-sync для догона streams при первом
+ * включении чекбокса «streams» или после долгого перерыва.
+ */
+export function listFactsWithoutStreams(
+  db: DatabaseSync,
+  from: string,
+  to: string,
+  opts?: {
+    source?: string;
+    retryAfterHours?: number;
+  },
+): RunFactRow[] {
+  const retryAfterHours = opts?.retryAfterHours ?? 24;
+  const cutoff = new Date(
+    Date.now() - retryAfterHours * 3600_000,
+  ).toISOString();
+
+  const conds: string[] = [
+    `date >= ?`,
+    `date <= ?`,
+    `streams_loaded = 0`,
+    `(streams_failed_at IS NULL OR streams_failed_at < ?)`,
+  ];
+  const params: unknown[] = [from, to, cutoff];
+
+  if (opts?.source) {
+    conds.push(`source = ?`);
+    params.push(opts.source);
+  }
+
+  return db
+    .prepare(
+      `SELECT * FROM run_facts
+       WHERE ${conds.join(' AND ')}
+       ORDER BY date DESC`,
+    )
+    .all(...(params as any[])) as unknown as RunFactRow[];
 }

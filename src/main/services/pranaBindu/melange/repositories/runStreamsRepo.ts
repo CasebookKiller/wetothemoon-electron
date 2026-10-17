@@ -64,6 +64,13 @@ export function upsertRunStreams(
     fetchedAt
   );
 
+  // v23: помечаем факт — стрим загружен. Быстрый путь для auto-sync.
+  db.prepare(
+    `UPDATE run_facts
+       SET streams_loaded = 1, streams_failed_at = NULL
+     WHERE id = ?`,
+  ).run(runFactId);
+
   return getRunStreamMeta(db, runFactId, source)!;
 }
 
@@ -128,4 +135,18 @@ export function deleteRunStreams(
   db.prepare(
     `DELETE FROM run_streams WHERE run_fact_id = ? AND source = ?`
   ).run(runFactId, source);
+
+  // v23: если у факта не осталось ни одного стрима — сбрасываем флаг.
+  const remaining = db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM run_streams WHERE run_fact_id = ?`,
+    )
+    .get(runFactId) as { n: number };
+  if (remaining.n === 0) {
+    db.prepare(
+      `UPDATE run_facts
+         SET streams_loaded = 0, streams_failed_at = NULL
+       WHERE id = ?`,
+    ).run(runFactId);
+  }
 }

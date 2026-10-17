@@ -359,3 +359,22 @@ export const MIGRATION_V9_INTERVALS_ICU: readonly string[] = [
 export const MIGRATION_V22_AUTO_PROVIDERS: readonly string[] = [
   `ALTER TABLE sync_settings ADD COLUMN auto_providers_json TEXT;`,
 ];
+
+// ==================== Миграция v23: флаг загрузки стримов ====================
+
+/**
+ * streams_loaded — быстрый флаг «стрим загружен», чтобы не делать
+ * LEFT JOIN run_streams при batch-проверке в автосинке.
+ * streams_failed_at — маркер неудачной попытки (cooldown перед retry).
+ *
+ * Backfill: у всех фактов, у которых уже есть записи в run_streams,
+ * флаг выставляется в 1. Выполняется один раз при миграции.
+ */
+export const MIGRATION_V23_STREAMS_LOADED: readonly string[] = [
+  `ALTER TABLE run_facts ADD COLUMN streams_loaded INTEGER NOT NULL DEFAULT 0;`,
+  `ALTER TABLE run_facts ADD COLUMN streams_failed_at TEXT;`,
+  `CREATE INDEX IF NOT EXISTS idx_run_facts_streams_loaded
+     ON run_facts(streams_loaded);`,
+  `UPDATE run_facts SET streams_loaded = 1
+     WHERE id IN (SELECT DISTINCT run_fact_id FROM run_streams);`,
+];
