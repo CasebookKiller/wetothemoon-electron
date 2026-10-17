@@ -67,6 +67,12 @@ import {
   getAutoProviders,
 } from '../services/pranaBindu/melange';
 
+import {
+  markStreamsFailed,
+  listFactsWithoutStreams,
+  toDateOnly,
+} from '../services/pranaBindu/melange/repositories/runFactsRepo';
+
 import { DodofoProvider } from '../services/pranaBindu/spice/providers/dodofoProvider';
 import { IntervalsIcuProvider } from '../services/pranaBindu/spice/providers/intervalsIcuProvider';
 import { parseFit } from '../services/pranaBindu/spice/parsers/fitParser';
@@ -515,15 +521,20 @@ async function syncStreamsForFact(
   }
 
   const extId = fact.external_id;
-  if (!extId) return { status: 'failed', error: 'external_id пуст' };
+  if (!extId) {
+    markStreamsFailed(db, fact.id);
+    return { status: 'failed', error: 'external_id пуст' };
+  }
 
   // === intervals.icu ===
   if (providerName === 'intervals-icu') {
     if (typeof provider.fetchUnifiedWorkout !== 'function') {
+      markStreamsFailed(db, fact.id);
       return { status: 'failed', error: 'fetchUnifiedWorkout не реализован' };
     }
     const m = extId.match(/^intervals-icu:(.+)$/);
     if (!m) {
+      markStreamsFailed(db, fact.id);
       return { status: 'failed', error: `external_id '${extId}' не в формате intervals-icu:<id>` };
     }
     const activityId = m[1];
@@ -571,16 +582,19 @@ async function syncStreamsForFact(
   // === dodofo ===
   if (providerName === 'dodofo') {
     if (typeof provider.fetchStreams !== 'function') {
+      markStreamsFailed(db, fact.id);
       return { status: 'failed', error: 'fetchStreams не реализован' };
     }
     const m = extId.match(/^dodofo:(\d+)$/);
     if (!m) {
+      markStreamsFailed(db, fact.id);
       return { status: 'failed', error: `external_id '${extId}' не в формате dodofo:<id>` };
     }
     const activityId = Number(m[1]);
 
     const raw = await provider.fetchStreams(activityId);
     if (raw == null || typeof raw !== 'object') {
+      markStreamsFailed(db, fact.id);
       return { status: 'failed', error: 'Пустой ответ fetchStreams' };
     }
 
@@ -596,6 +610,7 @@ async function syncStreamsForFact(
     return { status: 'fetched' };
   }
 
+  markStreamsFailed(db, fact.id);
   return { status: 'failed', error: `Провайдер «${providerName}» пока не поддержан для потоков` };
 }
 
@@ -1548,6 +1563,107 @@ export function registerPranaBinduHandlers(): void {
         return { success: false, error: (e as Error).message };
       }
     }
+  );
+
+  // -------- Догон отсутствующих потоков (A.5b) --------
+  // Разовая операция: проходит по run_facts с streams_loaded=0
+  // в окне, для каждого факта с известным провайдером пытается
+  // загрузить stream. Используется кнопкой «Догнать потоки» в SyncPanel.
+  ipcMain.handle(
+    'pb:streams-catch-up',
+    async (_event, from: string, to: string) => {
+      if (!from || !to) {
+        return { success: false, error: 'from и to обязательны' };
+      }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+        return { success: false, error: 'Формат даты: YYYY-MM-DD' };
+      }
+      if (from > to) {
+        return { success: false, error: 'from больше to' };
+      }
+
+      try {
+        const db = getMelange();
+        // retryAfterHours=0 — ручная операция, игнорируем cooldown.
+        const all = listFactsWithoutStreams(db, from, to, {
+          retryAfterHours: 0,
+        });
+
+        // Только факты с известным провайдером (dodofo / intervals-icu).
+        const fetchable = all.filter(
+          (f) => f.source === 'dodofo' || f.source === 'intervals-icu',
+        );
+
+        const sender = _event.sender;
+        let current = 0;
+        let fetched = 0;
+        let failed = 0;
+        const errors: Array<{ id: number; error: string }> = [];
+
+        for (const fact of fetchable) {
+          current++;
+          const providerName = fact.source as string;
+          const provider = getProvider(providerName) as any;
+          if (!provider) {
+            failed++;
+            errors.push({ id: fact.id, error: 'провайдер не найден' });
+            continue;
+          }
+          try {
+            const r = await syncStreamsForFact(
+              db,
+              provider,
+              providerName,
+              {
+                id: fact.id,
+                source: fact.source ?? '',
+                external_id: fact.external_id,
+                date: fact.date,
+              },
+              false,
+            );
+            if (r.status === 'fetched') fetched++;
+            else if (r.status === 'failed') {
+              failed++;
+              if (r.error) errors.push({ id: fact.id, error: r.error });
+            }
+          } catch (e) {
+            failed++;
+            errors.push({ id: fact.id, error: (e as Error).message });
+          }
+
+          if (!sender.isDestroyed()) {
+            sender.send('pb:sync-progress', {
+              current,
+              total: fetchable.length,
+              runFactId: fact.id,
+              externalId: fact.external_id,
+              fetched,
+              skipped: 0,
+              failed,
+            });
+          }
+          await new Promise((r) => setImmediate(r));
+        }
+
+        console.log(
+          `[Prana-Bindu] streams-catch-up ${from}..${to}: ` +
+            `fetched=${fetched}, failed=${failed}, ` +
+            `total_no_streams=${all.length}, fetchable=${fetchable.length}`,
+        );
+
+        return {
+          success: true,
+          total: fetchable.length,
+          fetched,
+          failed,
+          skipped: all.length - fetchable.length,
+          errors: errors.slice(0, 20),
+        };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    },
   );
 
   // -------- Метаданные потоков по runFactId --------
@@ -3724,6 +3840,8 @@ export function registerPranaBinduHandlers(): void {
         provider: string;
         added: number;
         updated: number;
+        streamsFetched?: number;
+        streamsFailed?: number;
         error?: string;
       }> = [];
 
@@ -3732,18 +3850,52 @@ export function registerPranaBinduHandlers(): void {
           const items = await (provider as any).fetchWorkouts(fromIso, toIso);
           let added = 0;
           let updated = 0;
+          let streamsFetched = 0;
+          let streamsFailed = 0;
           for (const w of items) {
             const res = upsertRunFact(db, w);
-            if (res.inserted) added++;
-            else updated++;
+            if (res.inserted) {
+              added++;
+              // A.5b: новый факт → сразу stream.
+              if (
+                provider.capabilities?.streams &&
+                typeof (provider as any).fetchStreams === 'function'
+              ) {
+                try {
+                  const r = await syncStreamsForFact(
+                    db,
+                    provider as any,
+                    provider.name,
+                    {
+                      id: res.id,
+                      source: w.source,
+                      external_id: w.externalId,
+                      date: toDateOnly(w.startTime),
+                    },
+                    false,
+                  );
+                  if (r.status === 'fetched') streamsFetched++;
+                  else if (r.status === 'failed') streamsFailed++;
+                } catch {
+                  streamsFailed++;
+                }
+              }
+            } else {
+              updated++;
+            }
           }
           workoutsSummary.push({
             provider: provider.name,
             added,
             updated,
+            streamsFetched,
+            streamsFailed,
           });
           console.log(
-            `[Prana-Bindu] auto-sync workouts (${provider.name}) ${fromIso}..${toIso}: +${added} ~${updated}`
+            `[Prana-Bindu] auto-sync workouts (${provider.name}) ${fromIso}..${toIso}: +${added} ~${updated}` +
+              (streamsFetched > 0 || streamsFailed > 0
+                ? ` streams: ${streamsFetched} ok / ${streamsFailed} err`
+                : ''),
           );
         } catch (e) {
           const msg = (e as Error).message;
@@ -3985,7 +4137,7 @@ export function registerPranaBinduHandlers(): void {
         error?: string;
       } | null = null;
 
-      if (enabledProviders.has('icu-plan')) {
+      if (enabledProviders.has('intervals-icu')) {
         try {
           const provider = getProvider('intervals-icu') as any;
           if (!provider || typeof provider.fetchPlanEvents !== 'function') {
@@ -4028,14 +4180,14 @@ export function registerPranaBinduHandlers(): void {
         }
       }
 
-      // --- 6. Заглушки для остальных провайдеров (A.5) ---
+      // --- 6. Заглушки для остальных провайдеров ---
       const pendingProviders: string[] = [];
-      for (const p of ['strava-fit', 'streams', 'thresholds']) {
+      for (const p of ['strava-fit', 'thresholds']) {
         if (enabledProviders.has(p as any)) pendingProviders.push(p);
       }
       if (pendingProviders.length > 0) {
         console.log(
-          `[Prana-Bindu] auto-sync: включены, но пока не в автосинке: ${pendingProviders.join(', ')} (A.5)`,
+          `[Prana-Bindu] auto-sync: включены, но пока не в автосинке: ${pendingProviders.join(', ')}`,
         );
       }
 

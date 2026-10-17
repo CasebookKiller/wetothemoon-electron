@@ -257,18 +257,20 @@ export const AutoSyncPanel: React.FC<Props> = ({ onAfterSync }) => {
             // A.3–A.5: обработка этих провайдеров ещё не реализована.
             // Флажки работают (сохраняются в БД), но handler пока
             // их игнорирует. После A.3–A.5 они начнут действовать.
-            const notYetImplemented = (
-              ['zepp-fit', 'strava-fit', 'icu-plan', 'streams', 'thresholds'] as AutoSyncProvider[]
-            ).includes(p);
+            const notYetImplemented: AutoSyncProvider[] = [
+              'strava-fit',
+              'thresholds',
+            ];
+            const isPending = notYetImplemented.includes(p);
             return (
               <label
                 key={p}
                 className={`pb-auto-providers__row pb-check-row pb-checkbox-dark ${
-                  notYetImplemented ? 'is-pending' : ''
+                  isPending ? 'is-pending' : ''
                 }`}
                 title={
-                  notYetImplemented
-                    ? 'Сохраняется в настройках, но пока не активно в автосинке (в разработке, шаги A.3–A.5)'
+                  isPending
+                    ? 'Сохраняется в настройках, но пока не активно в автосинке (в разработке)'
                     : undefined
                 }
               >
@@ -279,7 +281,7 @@ export const AutoSyncPanel: React.FC<Props> = ({ onAfterSync }) => {
                   disabled={autoSyncRunning}
                 />
                 <span>{AUTO_SYNC_PROVIDER_LABELS[p]}</span>
-                {notYetImplemented && (
+                {isPending && (
                   <span className="pb-auto-providers__pending-tag">скоро</span>
                 )}
               </label>

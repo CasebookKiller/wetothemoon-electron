@@ -44,7 +44,7 @@ export interface UpsertResult {
  * Локальная дата (YYYY-MM-DD) из ISO-строки.
  * Локальная зона атлета — тренировка в 23:30 должна попасть в свой день.
  */
-function toDateOnly(iso: string): string {
+export function toDateOnly(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
   const y = d.getFullYear();

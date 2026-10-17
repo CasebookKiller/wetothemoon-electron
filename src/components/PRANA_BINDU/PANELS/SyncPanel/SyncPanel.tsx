@@ -107,6 +107,14 @@ export const SyncPanel: React.FC<Props> = ({
   const [syncError, setSyncError] = useState('');
 
   const [syncingStreams, setSyncingStreams] = useState(false);
+  const [catchingUpStreams, setCatchingUpStreams] = useState(false);
+  const [catchUpResult, setCatchUpResult] = useState<{
+    fetched: number;
+    failed: number;
+    skipped: number;
+    total: number;
+  } | null>(null);
+  const [catchUpError, setCatchUpError] = useState('');
   const [overwriteStreams, setOverwriteStreams] = useState<boolean>(() => {
     try {
       return localStorage.getItem('pb.syncOverwriteStreams') === '1';
@@ -230,6 +238,39 @@ export const SyncPanel: React.FC<Props> = ({
       setStreamsAllError((e as Error).message);
     } finally {
       setSyncingStreams(false);
+      setSyncStreamsProgress(null);
+    }
+  };
+
+  const handleCatchUpStreams = async () => {
+    if (!api?.pb?.streamsCatchUp) {
+      setCatchUpError('electronAPI.pb.streamsCatchUp недоступен');
+      return;
+    }
+    setCatchingUpStreams(true);
+    setCatchUpError('');
+    setCatchUpResult(null);
+    setSyncStreamsProgress(null);
+    try {
+      const res = await api.pb.streamsCatchUp(
+        toIsoDate(from),
+        toIsoDate(to),
+      );
+      if (res.success) {
+        setCatchUpResult({
+          fetched: res.fetched ?? 0,
+          failed: res.failed ?? 0,
+          skipped: res.skipped ?? 0,
+          total: res.total ?? 0,
+        });
+        if (onAfterSync) await onAfterSync();
+      } else {
+        setCatchUpError(res.error ?? 'Ошибка');
+      }
+    } catch (e) {
+      setCatchUpError((e as Error).message);
+    } finally {
+      setCatchingUpStreams(false);
       setSyncStreamsProgress(null);
     }
   };
@@ -521,6 +562,20 @@ export const SyncPanel: React.FC<Props> = ({
             </label>
             <Button
               label={
+                catchingUpStreams ? 'Догон…' : 'Догнать потоки'
+              }
+              icon={
+                catchingUpStreams
+                  ? 'pi pi-spin pi-spinner'
+                  : 'pi pi-cloud-upload'
+              }
+              className="pb-soft p-button-sm"
+              onClick={handleCatchUpStreams}
+              disabled={catchingUpStreams || syncingStreams}
+              tooltip="Загрузить стримы для фактов, у которых их нет (без учёта cooldown)"
+            />
+            <Button
+              label={
                 syncingThresholds ? 'Пороги…' : 'Подтянуть пороги'
               }
               icon={
@@ -629,6 +684,9 @@ export const SyncPanel: React.FC<Props> = ({
             }
           />
         )}
+        {catchUpError && (
+          <Message severity="error" text={catchUpError} className="w-full" />
+        )}
         {streamsAllError && (
           <Message severity="error" text={streamsAllError} className="w-full" />
         )}
@@ -655,6 +713,24 @@ export const SyncPanel: React.FC<Props> = ({
                   </div>
                 )}
               </div>
+            }
+          />
+        )}
+        {catchUpResult && (
+          <Message
+            severity={catchUpResult.failed > 0 ? 'warn' : 'success'}
+            className="w-full"
+            content={
+              <span>
+                Догон: загружено <b>{catchUpResult.fetched}</b>
+                {catchUpResult.failed > 0 && (
+                  <> · ошибок <b>{catchUpResult.failed}</b></>
+                )}
+                {catchUpResult.skipped > 0 && (
+                  <> · пропущено (нет провайдера) <b>{catchUpResult.skipped}</b></>
+                )}
+                {' · '}всего фактов без стримов <b>{catchUpResult.total}</b>
+              </span>
             }
           />
         )}

@@ -683,6 +683,9 @@ try {
         opts?: { onlyMissing?: boolean; provider?: string }
       ) => ipcRenderer.invoke('pb:sync-run-streams-all', from, to, opts),
 
+      streamsCatchUp: (from: string, to: string) =>
+        ipcRenderer.invoke('pb:streams-catch-up', from, to),
+
       syncCancel: () => ipcRenderer.invoke('pb:sync-cancel'),
 
       onSyncProgress: (

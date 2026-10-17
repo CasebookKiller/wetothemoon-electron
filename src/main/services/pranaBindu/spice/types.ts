@@ -13,24 +13,21 @@ export type SyncSource =
 export type SyncMode = 'manual' | 'auto';
 
 /**
- * Идентификаторы операций автосинхронизации. Каждая может быть
- * независимо включена/выключена пользователем.
+ * Провайдеры автосинхронизации. Каждый — самостоятельный источник.
  *
- *   dodofo         — fetchWorkouts + fetchWellness через dodofo
- *   intervals-icu  — fetchWorkouts + fetchWellness через ICU
- *   zepp-fit       — importZeppDir из zepp_archive_path
- *   strava-fit     — importFitDir из fit_archive_path (skipImported)
- *   icu-plan       — syncPlan за окно (тихо, без MirrorDelete)
- *   streams        — syncRunStreamsAll onlyMissing для новых фактов
- *   thresholds     — syncThresholds + syncZones (раз в сутки)
+ *   dodofo         — workouts + wellness + streams (для новых фактов)
+ *   intervals-icu  — workouts + wellness + streams + plan ICU
+ *   zepp-fit       — импорт FIT из локальной папки (zepp_archive_path)
+ *   strava-fit     — импорт FIT/TCX из локальной папки (fit_archive_path)
+ *   thresholds     — пороги и зоны (A.10, пока не реализовано)
+ *
+ * `streams` и `icu-plan` убраны: стримы идут с фактом, план — с ICU.
  */
 export type AutoSyncProvider =
   | 'dodofo'
   | 'intervals-icu'
   | 'zepp-fit'
   | 'strava-fit'
-  | 'icu-plan'
-  | 'streams'
   | 'thresholds';
 
 export const ALL_AUTO_SYNC_PROVIDERS: readonly AutoSyncProvider[] = [
@@ -38,30 +35,20 @@ export const ALL_AUTO_SYNC_PROVIDERS: readonly AutoSyncProvider[] = [
   'intervals-icu',
   'zepp-fit',
   'strava-fit',
-  'icu-plan',
-  'streams',
   'thresholds',
 ] as const;
 
-/** Дефолт при первом запуске или если колонка пуста. */
 export const DEFAULT_AUTO_SYNC_PROVIDERS: readonly AutoSyncProvider[] = [
   'dodofo',
   'intervals-icu',
   'zepp-fit',
-  'icu-plan',
-  'streams',
-  // strava-fit и thresholds — по умолчанию выключены,
-  // чтобы не нагружать старт приложения.
 ] as const;
 
-/** Русские подписи для UI. */
 export const AUTO_SYNC_PROVIDER_LABELS: Record<AutoSyncProvider, string> = {
-  'dodofo': 'dodofo (workouts + wellness)',
-  'intervals-icu': 'intervals.icu (workouts + wellness)',
+  'dodofo': 'dodofo (workouts + wellness + streams)',
+  'intervals-icu': 'intervals.icu (workouts + wellness + streams + план)',
   'zepp-fit': 'Zepp FIT (локальная папка)',
   'strava-fit': 'Strava FIT/TCX (локальная папка)',
-  'icu-plan': 'План ICU',
-  'streams': 'Потоки (новые факты)',
   'thresholds': 'Пороги и зоны',
 };
 
