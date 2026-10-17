@@ -161,10 +161,24 @@ export const AutoSyncPanel: React.FC<Props> = ({ onAfterSync }) => {
               }.`;
             }
           }
+          const icuPlan = res.icuPlan;
+          let planLabel = '';
+          if (icuPlan) {
+            if (icuPlan.error) {
+              planLabel = ` План: ${icuPlan.error}.`;
+            } else if (icuPlan.added > 0 || icuPlan.updated > 0 || icuPlan.failed > 0) {
+              const parts: string[] = [];
+              if (icuPlan.added > 0) parts.push(`+${icuPlan.added}`);
+              if (icuPlan.updated > 0) parts.push(`~${icuPlan.updated}`);
+              if (icuPlan.failed > 0) parts.push(`✗${icuPlan.failed}`);
+              planLabel = ` План: ${parts.join(' ')}.`;
+            }
+          }
           setAutoSyncResult(
             `Готово: workouts ${wTotal}, wellness +${well}.` +
               (windowLabel ? ` Окно: ${windowLabel}.` : '') +
-              zeppLabel,
+              zeppLabel +
+              planLabel,
           );
         }
         if (onAfterSync) await onAfterSync();

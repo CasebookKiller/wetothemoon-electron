@@ -3974,14 +3974,68 @@ export function registerPranaBinduHandlers(): void {
         }
       }
 
-      // --- 5. Заглушки для остальных провайдеров (A.4-A.5) ---
+      // --- 5. ICU план за окно ---
+      // Тихо: без MirrorDelete (это ручное действие из SyncPanel).
+      // Тянем только события из ICU; stale-события не удаляем,
+      // их пользователь разберёт руками через MirrorDeleteDialog.
+      let icuPlanResult: {
+        added: number;
+        updated: number;
+        failed: number;
+        error?: string;
+      } | null = null;
+
+      if (enabledProviders.has('icu-plan')) {
+        try {
+          const provider = getProvider('intervals-icu') as any;
+          if (!provider || typeof provider.fetchPlanEvents !== 'function') {
+            icuPlanResult = {
+              added: 0,
+              updated: 0,
+              failed: 0,
+              error: 'провайдер ICU не поддерживает план',
+            };
+          } else {
+            const events = await provider.fetchPlanEvents(fromIso, toIso);
+            let added = 0;
+            let updated = 0;
+            let failed = 0;
+            for (const ev of events) {
+              try {
+                const r = upsertPlanEvent(db, ev);
+                if (r.inserted) added++;
+                else updated++;
+              } catch {
+                failed++;
+              }
+            }
+            icuPlanResult = { added, updated, failed };
+            console.log(
+              `[Prana-Bindu] auto-sync: icu-plan +${added} ~${updated} ✗${failed} (всего ${events.length})`,
+            );
+          }
+        } catch (e) {
+          icuPlanResult = {
+            added: 0,
+            updated: 0,
+            failed: 0,
+            error: (e as Error).message,
+          };
+          console.warn(
+            '[Prana-Bindu] auto-sync: icu-plan error:',
+            (e as Error).message,
+          );
+        }
+      }
+
+      // --- 6. Заглушки для остальных провайдеров (A.5) ---
       const pendingProviders: string[] = [];
-      for (const p of ['strava-fit', 'icu-plan', 'streams', 'thresholds']) {
+      for (const p of ['strava-fit', 'streams', 'thresholds']) {
         if (enabledProviders.has(p as any)) pendingProviders.push(p);
       }
       if (pendingProviders.length > 0) {
         console.log(
-          `[Prana-Bindu] auto-sync: включены, но пока не в автосинке: ${pendingProviders.join(', ')} (A.4–A.5)`,
+          `[Prana-Bindu] auto-sync: включены, но пока не в автосинке: ${pendingProviders.join(', ')} (A.5)`,
         );
       }
 
@@ -3995,6 +4049,7 @@ export function registerPranaBinduHandlers(): void {
         enabledProviders: Array.from(enabledProviders),
         pendingProviders,
         zeppFit: zeppFitResult,
+        icuPlan: icuPlanResult,
         workouts: workoutsSummary,
         wellness: {
           added: wellnessAdded,
