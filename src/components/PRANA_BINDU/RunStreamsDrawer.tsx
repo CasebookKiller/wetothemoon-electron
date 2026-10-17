@@ -166,7 +166,14 @@ const SourcePanel: React.FC<{
           );
         }
         const reload = await api.pb.getRunStreamsMeta(fact.id);
-        if (reload?.success) setMetas(reload.items ?? []);
+        const newMetas = reload?.success ? reload.items ?? [] : [];
+        setMetas(newMetas);
+        // Перечитываем payload — иначе карта и график не появятся
+        // без ручного переключения табов.
+        if (newMetas.length > 0) {
+          const p = await api.pb.getRunStreams(fact.id, newMetas[0].source);
+          if (p?.success) setStreamsPayload(p.payload);
+        }
         onAfterSync();
       } else {
         setError(res?.error ?? 'Не удалось загрузить потоки');
@@ -240,10 +247,11 @@ const SourcePanel: React.FC<{
         </div>
       </div>
 
-      {streamsPayload?.latlng && (
+      {streamsPayload?.latlng && streamsPayload.latlng.length > 1 && (
         <>
           <div className="pb-drawer__section-title">Карта</div>
           <GpsMapView
+            key={`map-${fact.id}-${metas[0]?.fetched_at ?? 'init'}`}
             latlng={streamsPayload.latlng}
             hr={streamsPayload.hr}
             elevation={streamsPayload.elevationM}
