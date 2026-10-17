@@ -10,7 +10,7 @@ import type {
   ProgramProps,
   PatternProps,
 } from '@/main/services/pranaBindu/mentat/graph/ontology';
-import CloseIcon from '@/components/COMMON/CloseIсon/CloseIcon';
+import CloseIcon from '@/components/COMMON/CloseIcon/CloseIcon';
 
 interface Props {
   graph: ExerciseGraph;
