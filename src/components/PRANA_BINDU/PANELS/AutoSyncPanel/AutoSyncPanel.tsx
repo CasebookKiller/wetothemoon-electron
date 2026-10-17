@@ -257,11 +257,9 @@ export const AutoSyncPanel: React.FC<Props> = ({ onAfterSync }) => {
             // A.3–A.5: обработка этих провайдеров ещё не реализована.
             // Флажки работают (сохраняются в БД), но handler пока
             // их игнорирует. После A.3–A.5 они начнут действовать.
-            const notYetImplemented: AutoSyncProvider[] = [
-              'strava-fit',
-              'thresholds',
-            ];
-            const isPending = notYetImplemented.includes(p);
+            const isPending: boolean = (
+              ['strava-fit', 'thresholds'] as AutoSyncProvider[]
+            ).includes(p);
             return (
               <label
                 key={p}
