@@ -27,6 +27,7 @@ const IMPORT_ORIGIN_OPTIONS = [
 interface Props {
   className?: string;
   onAfterImport?: () => void | Promise<void>;
+  embedded?: boolean;
 }
 
 interface ImportProgress {
@@ -50,6 +51,7 @@ interface ImportResult {
 export const ImportPanel: React.FC<Props> = ({
   className,
   onAfterImport,
+  embedded,
 }) => {
   const api = (window as any).electronAPI;
 
@@ -368,8 +370,8 @@ export const ImportPanel: React.FC<Props> = ({
       } ${className ?? ''}`}
     >
       <Panel
-        header="Импорт файлов"
-        className="shadow-5 mb-3 pb-panel"
+        header={embedded ? undefined : "Импорт файлов"}
+        className={embedded ? '' : "shadow-5 mb-3 pb-panel"}
       >
         <div className="flex flex-column gap-2">
           <div className="pb-archive-origin">

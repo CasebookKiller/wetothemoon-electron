@@ -12,9 +12,10 @@ import { Panel } from 'primereact/panel';
 
 interface Props {
   className?: string;
+  embedded?: boolean;
 }
 
-export const ConnectionsPanel: React.FC<Props> = ({ className }) => {
+export const ConnectionsPanel: React.FC<Props> = ({ className, embedded }) => {
   const api = (window as any).electronAPI;
 
   // dodofo
@@ -172,8 +173,12 @@ export const ConnectionsPanel: React.FC<Props> = ({ className }) => {
 
   return (
     <Panel
-      header="Подключения"
-      className={`shadow-5 mb-3 pb-panel ${className ?? ''}`}
+      header={embedded ? undefined : "Подключения"}
+      className={
+        embedded
+          ? className ?? ''
+          : `shadow-5 mb-3 pb-panel ${className ?? ''}`
+      }
     >
       <div className="pb-connections">
         {/* --- dodofo --- */}

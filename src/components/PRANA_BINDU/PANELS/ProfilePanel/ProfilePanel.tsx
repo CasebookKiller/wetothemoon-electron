@@ -37,10 +37,16 @@ function labelForSource(src: string): string {
 
 interface Props {
   className?: string;
+  /**
+   * Если true — панель рендерится без Panel-обёртки (без заголовка
+   * и тени). Используется внутри SettingsDialog, где обёрткой
+   * служит TabPanel.
+   */
+  embedded?: boolean;
 }
 
 export const ProfilePanel = forwardRef<ProfilePanelHandle, Props>(
-  ({ className }, ref) => {
+  ({ className, embedded }, ref) => {
     const api = (window as any).electronAPI;
 
     const [profile, setProfile] = useState<ProfileState>({
@@ -108,8 +114,12 @@ export const ProfilePanel = forwardRef<ProfilePanelHandle, Props>(
 
     return (
       <Panel
-        header="Профиль"
-        className={`shadow-5 mb-3 pb-panel ${className ?? ''}`}
+        header={embedded ? undefined : "Профиль"}
+        className={
+          embedded
+            ? className ?? ''
+            : `shadow-5 mb-3 pb-panel ${className ?? ''}`
+        }
       >
         <div className="pb-profile__grid">
           <div className="pb-profile__field">

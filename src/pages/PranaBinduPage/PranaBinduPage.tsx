@@ -37,28 +37,15 @@ import {
 
 import { FullWeek } from '@/components/PRANA_BINDU/FullWeek';
 
-import {
-  ProfilePanel,
-  type ProfilePanelHandle,
-} from '@/components/PRANA_BINDU/PANELS/ProfilePanel/ProfilePanel';
-
-import {
-  ConnectionsPanel,
-} from '@/components/PRANA_BINDU/PANELS/ConnectionsPanel/ConnectionsPanel';
-
 import { DeleteGeneratedDialog } from '@/components/PRANA_BINDU/DeleteGeneratedDialog';
 
 import { CheckReminderDialog } from '@/components/PRANA_BINDU/CheckReminderDialog';
 import { ExerciseCategory } from '@/main/services/pranaBindu/mentat/types';
 import { PROGRESSIONS_CATALOG } from '@/main/services/pranaBindu/mentat/exerciseCatalog';
 
-import { ImportPanel } from '@/components/PRANA_BINDU/PANELS/ImportPanel/ImportPanel';
-
 import {
   TrainingTabs,
 } from '@/components/PRANA_BINDU/PANELS/TrainingTabs/TrainingTabs';
-
-import { SyncPanel } from '@/components/PRANA_BINDU/PANELS/SyncPanel/SyncPanel';
 
 import {
   WellnessPanel,
@@ -67,6 +54,7 @@ import {
 
 import { Toast } from 'primereact/toast';
 import { ExerciseGraphDialog } from '@/components/PRANA_BINDU/ExerciseGraph/ExerciseGraphDialog';
+import { SettingsDialog } from '@/components/PRANA_BINDU/SettingsDialog/SettingsDialog';
 
 const MODULES = [
   { name: 'Stillsuit', description: 'Марафон: пульс, темп, экономичность' },
@@ -273,7 +261,6 @@ export const PranaBinduPage: React.FC = () => {
     }
   };
 
-  const profilePanelRef = React.useRef<ProfilePanelHandle>(null);
   const wellnessPanelRef = React.useRef<WellnessPanelHandle>(null);
 
   const groupedFacts = React.useMemo(
@@ -392,6 +379,7 @@ export const PranaBinduPage: React.FC = () => {
 
   const toastRef = React.useRef<Toast>(null);
   const [graphVisible, setGraphVisible] = useState(false);
+  const [settingsVisible, setSettingsVisible] = useState(false);
 
   // ==================== Загрузка списка пробежек ====================
 
@@ -727,14 +715,7 @@ export const PranaBinduPage: React.FC = () => {
             setDrawerVisible(true);
           }
         }}
-        onOpenSettings={() =>
-          toastRef.current?.show({
-            severity: 'info',
-            summary: 'Скоро',
-            detail: 'Настройки в разработке',
-            life: 2500,
-          })
-        }
+        onOpenSettings={() => setSettingsVisible(true)}
         onOpenExercises={() => {
           setTemplatesInitialMode('catalog');
           setTemplatesVisible(true);
@@ -765,35 +746,8 @@ export const PranaBinduPage: React.FC = () => {
           
         </div>
 
-        {/* ==================== ПРОФИЛЬ ==================== */}
-        <ProfilePanel ref={profilePanelRef} />
-
-        {/* ==================== ПОДКЛЮЧЕНИЯ ==================== */}
-        <ConnectionsPanel />
-
-        {/* ==================== СИНХРОНИЗАЦИЯ (API) ==================== */}
-        <SyncPanel
-          from={syncFrom}
-          to={syncTo}
-          onFromChange={setSyncFrom}
-          onToChange={setSyncTo}
-          onOpenDebug={() => setDebugVisible(true)}
-          onAfterSync={async () => {
-            await loadRunFacts();
-          }}
-          onAfterThresholds={async () => {
-            await profilePanelRef.current?.reload();
-          }}
-          onAfterZones={async () => {
-            await profilePanelRef.current?.reload();
-          }}
-          onAfterWellness={async () => {
-            await wellnessPanelRef.current?.reload();
-          }}
-        />
-
-        {/* ==================== ИМПОРТ ФАЙЛОВ ==================== */}
-        <ImportPanel onAfterImport={loadRunFacts} />
+        {/* Настройки (профиль / подключения / синхронизация / импорт)
+            вынесены в модалку — открывается кнопкой в FullWeek. */}
 
         {/* ==================== WELLNESS (таблица) ==================== */}
         <WellnessPanel ref={wellnessPanelRef} from={syncFrom} to={syncTo} />
@@ -961,6 +915,23 @@ export const PranaBinduPage: React.FC = () => {
       <ExerciseGraphDialog
         visible={graphVisible}
         onHide={() => setGraphVisible(false)}
+      />
+
+      <SettingsDialog
+        visible={settingsVisible}
+        onHide={() => setSettingsVisible(false)}
+        onAfterSync={loadRunFacts}
+        onAfterWellness={async () => {
+          await wellnessPanelRef.current?.reload();
+        }}
+        onOpenDebug={() => {
+          setSettingsVisible(false);
+          setDebugVisible(true);
+        }}
+        syncFrom={syncFrom}
+        syncTo={syncTo}
+        onSyncFromChange={setSyncFrom}
+        onSyncToChange={setSyncTo}
       />
 
       <Toast ref={toastRef} position="top-right" />

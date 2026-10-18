@@ -63,22 +63,17 @@ function defaultSyncRange(): { from: Date; to: Date } {
 // ==================== Props ====================
 
 interface Props {
-  // Диапазон — controlled, живёт в родителе.
   from: Date;
   to: Date;
   onFromChange: (d: Date) => void;
   onToChange: (d: Date) => void;
-
-  // Открыть диалог отладки (DodofoDebugDialog рендерится в родителе).
   onOpenDebug: () => void;
-
-  // Коллбэки после успешных операций.
   onAfterSync?: () => void | Promise<void>;
   onAfterThresholds?: () => void | Promise<void>;
   onAfterZones?: () => void | Promise<void>;
   onAfterWellness?: () => void | Promise<void>;
-
   className?: string;
+  embedded?: boolean;
 }
 
 export const SyncPanel: React.FC<Props> = ({
@@ -92,6 +87,7 @@ export const SyncPanel: React.FC<Props> = ({
   onAfterZones,
   onAfterWellness,
   className,
+  embedded,
 }) => {
   const api = (window as any).electronAPI;
 
@@ -414,8 +410,12 @@ export const SyncPanel: React.FC<Props> = ({
 
   return (
     <Panel
-      header="Синхронизация (API)"
-      className={`shadow-5 mb-3 pb-panel ${className ?? ''}`}
+      header={embedded ? undefined : "Синхронизация (API)"}
+      className={
+        embedded
+          ? className ?? ''
+          : `shadow-5 mb-3 pb-panel ${className ?? ''}`
+      }
     >
       <div className="flex flex-column gap-3">
         {/* Диапазон */}
