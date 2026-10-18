@@ -887,6 +887,19 @@ try {
       autoSyncOnStart: (opts?: { force?: boolean }) =>
         ipcRenderer.invoke('pb:auto-sync-on-start', opts),
 
+      onAutoSyncStart: (cb: (data: any) => void) => {
+        ipcRenderer.removeAllListeners('pb:auto-sync-start');
+        ipcRenderer.on('pb:auto-sync-start', (_e, data) => cb(data));
+      },
+      onAutoSyncComplete: (cb: (data: any) => void) => {
+        ipcRenderer.removeAllListeners('pb:auto-sync-complete');
+        ipcRenderer.on('pb:auto-sync-complete', (_e, data) => cb(data));
+      },
+      removeAutoSyncListeners: () => {
+        ipcRenderer.removeAllListeners('pb:auto-sync-start');
+        ipcRenderer.removeAllListeners('pb:auto-sync-complete');
+      },
+
       debugMatchIcu: (text: string) =>
         ipcRenderer.invoke('pb:debug-match-icu', text),
       debugMatchIcuLine: (line: string) =>

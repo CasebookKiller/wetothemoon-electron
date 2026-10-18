@@ -521,6 +521,24 @@ export const PranaBinduPage: React.FC = () => {
     return () => document.body.removeAttribute('data-module');
   }, []);
 
+  // Автосинхронизация в фоне: после завершения — перечитываем
+  // данные для всех панелей (RunsPanel, PlanEventsPanel, WellnessPanel).
+  useEffect(() => {
+    const api = (window as any).electronAPI;
+    if (!api?.pb?.onAutoSyncComplete) return;
+
+    api.pb.onAutoSyncComplete((data: any) => {
+      console.log('[Prana-Bindu] auto-sync завершён, обновляю панели:', data);
+      void loadRunFacts();
+      void loadPlanEvents();
+      void wellnessPanelRef.current?.reload();
+    });
+
+    return () => {
+      api.pb.removeAutoSyncListeners?.();
+    };
+  }, []);
+
   useEffect(() => {
     saveStoredFilters(filters);
   }, [filters]);

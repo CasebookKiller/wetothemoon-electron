@@ -38,6 +38,7 @@ export const AutoSyncPanel: React.FC<Props> = ({ onAfterSync }) => {
   const [autoSyncRunning, setAutoSyncRunning] = useState(false);
   const [autoSyncResult, setAutoSyncResult] = useState('');
   const [autoSyncError, setAutoSyncError] = useState('');
+  const [autoSyncPending, setAutoSyncPending] = useState(false);
   const [autoProviders, setAutoProviders] = useState<Set<AutoSyncProvider>>(
     () => new Set(DEFAULT_AUTO_SYNC_PROVIDERS),
   );
@@ -71,24 +72,101 @@ export const AutoSyncPanel: React.FC<Props> = ({ onAfterSync }) => {
 
   useEffect(() => {
     void loadSyncSettings();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Подписка на события фонового синка от main-процесса.
+  useEffect(() => {
+    if (!api?.pb) return;
+
+    api.pb.onAutoSyncStart?.((data: any) => {
+      setAutoSyncPending(true);
+      setAutoSyncRunning(true);
+      setAutoSyncError('');
+      setAutoSyncResult(
+        `Синхронизация в фоне… (окно ${data?.windowDays ?? '?'} дн.)`,
+      );
+    });
+
+    api.pb.onAutoSyncComplete?.((data: any) => {
+      setAutoSyncPending(false);
+      setAutoSyncRunning(false);
+      
+      if (data?.success === false) {
+        setAutoSyncError(data?.error ?? 'Синхронизация упала');
+        return;
+      }
+
+      const wTotal = (data.workouts ?? []).reduce(
+        (s: number, w: any) => s + (w.added ?? 0) + (w.updated ?? 0),
+        0
+      );
+      const well = data.wellness?.added ?? 0;
+      const windowDays =
+        typeof data.windowDays === 'number' ? data.windowDays : null;
+      const gapReason = data.gapReason ?? 'default';
+      const windowLabel = windowDays
+        ? gapReason === 'default'
+          ? `${windowDays} дн.`
+          : gapReason === 'gap-capped'
+            ? `${windowDays} дн. (макс.)`
+            : `${windowDays} дн. (от последнего синка)`
+        : '';
+        
+      const zepp = data.zeppFit;
+      let zeppLabel = '';
+      if (zepp) {
+        if (zepp.error) {
+          zeppLabel = ` Zepp: ${zepp.error}.`;
+        } else if (zepp.imported > 0 || zepp.failed > 0) {
+          zeppLabel = ` Zepp: +${zepp.imported}${
+            zepp.failed > 0 ? ` ✗${zepp.failed}` : ''
+          }.`;
+        }
+      }
+      
+      const icuPlan = data.icuPlan;
+      let planLabel = '';
+      if (icuPlan) {
+        if (icuPlan.error) {
+          planLabel = ` План: ${icuPlan.error}.`;
+        } else if (
+          icuPlan.added > 0 ||
+          icuPlan.updated > 0 ||
+          icuPlan.failed > 0
+        ) {
+          const parts: string[] = [];
+          if (icuPlan.added > 0) parts.push(`+${icuPlan.added}`);
+          if (icuPlan.updated > 0) parts.push(`~${icuPlan.updated}`);
+          if (icuPlan.failed > 0) parts.push(`✗${icuPlan.failed}`);
+          planLabel = ` План: ${parts.join(' ')}.`;
+        }
+      }
+      
+      setAutoSyncResult(
+        `Готово: workouts ${wTotal}, wellness +${well}.` +
+          (windowLabel ? ` Окно: ${windowLabel}.` : '') +
+          zeppLabel +
+          planLabel,
+      );
+      
+      void loadSyncSettings();
+      if (onAfterSync) void onAfterSync();
+    });
+
+    return () => {
+      api.pb.removeAutoSyncListeners?.();
+    };
   }, []);
 
   // Автосинк при старте окна — один раз за монтирование.
   useEffect(() => {
     (async () => {
       try {
-        const res = await api.pb.autoSyncOnStart?.();
-        if (res?.success && res.ran) {
-          console.log('[Prana-Bindu] auto-sync при старте:', res);
-          if (onAfterSync) await onAfterSync();
-          await loadSyncSettings();
-        }
+        await api.pb.autoSyncOnStart?.();
       } catch {
         /* ignore */
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const persistAutoSync = async (patch: {
@@ -131,73 +209,36 @@ export const AutoSyncPanel: React.FC<Props> = ({ onAfterSync }) => {
     setAutoSyncRunning(true);
     setAutoSyncError('');
     setAutoSyncResult('');
+    setAutoSyncPending(true);
     try {
-      // force=true → игнорируем cooldown и чекбокс autoOnStart.
-      // Кнопка ручного запуска должна работать всегда.
       const res = await api.pb.autoSyncOnStart({ force: true });
-      if (res?.success) {
-        if (res.skipped === 'disabled') {
-          setAutoSyncResult('Автосинхронизация выключена — пропущено.');
-        } else if (res.skipped === 'cooldown') {
-          setAutoSyncResult(
-            `Пропущено (прошло ${res.elapsedMin} мин из ${res.intervalMin}).`
-          );
-        } else if (res.ran) {
-          const wTotal = (res.workouts ?? []).reduce(
-            (s: number, w: any) => s + (w.added ?? 0) + (w.updated ?? 0),
-            0
-          );
-          const well = res.wellness?.added ?? 0;
-          const windowDays =
-            typeof res.windowDays === 'number' ? res.windowDays : null;
-          const gapReason = res.gapReason ?? 'default';
-          const windowLabel = windowDays
-            ? gapReason === 'default'
-              ? `${windowDays} дн.`
-              : gapReason === 'gap-capped'
-                ? `${windowDays} дн. (макс.)`
-                : `${windowDays} дн. (от последнего синка)`
-            : '';
-          const zepp = res.zeppFit;
-          let zeppLabel = '';
-          if (zepp) {
-            if (zepp.error) {
-              zeppLabel = ` Zepp: ${zepp.error}.`;
-            } else if (zepp.imported > 0 || zepp.failed > 0) {
-              zeppLabel = ` Zepp: +${zepp.imported}${
-                zepp.failed > 0 ? ` ✗${zepp.failed}` : ''
-              }.`;
-            }
-          }
-          const icuPlan = res.icuPlan;
-          let planLabel = '';
-          if (icuPlan) {
-            if (icuPlan.error) {
-              planLabel = ` План: ${icuPlan.error}.`;
-            } else if (icuPlan.added > 0 || icuPlan.updated > 0 || icuPlan.failed > 0) {
-              const parts: string[] = [];
-              if (icuPlan.added > 0) parts.push(`+${icuPlan.added}`);
-              if (icuPlan.updated > 0) parts.push(`~${icuPlan.updated}`);
-              if (icuPlan.failed > 0) parts.push(`✗${icuPlan.failed}`);
-              planLabel = ` План: ${parts.join(' ')}.`;
-            }
-          }
-          setAutoSyncResult(
-            `Готово: workouts ${wTotal}, wellness +${well}.` +
-              (windowLabel ? ` Окно: ${windowLabel}.` : '') +
-              zeppLabel +
-              planLabel,
-          );
-        }
-        if (onAfterSync) await onAfterSync();
-        await loadSyncSettings();
-      } else {
-        setAutoSyncError(res?.error ?? 'Ошибка');
+      if (!res?.success) {
+        setAutoSyncError(res?.error ?? 'Ошибка запуска');
+        setAutoSyncRunning(false);
+        setAutoSyncPending(false);
+        return;
+      }
+      if (res.skipped === 'disabled') {
+        setAutoSyncResult('Автосинхронизация выключена — пропущено.');
+        setAutoSyncRunning(false);
+        setAutoSyncPending(false);
+      } else if (res.skipped === 'cooldown') {
+        setAutoSyncResult(
+          `Пропущено (прошло ${res.elapsedMin} мин из ${res.intervalMin}).`
+        );
+        setAutoSyncRunning(false);
+        setAutoSyncPending(false);
+      } else if (res.skipped === 'already_running') {
+        setAutoSyncResult('Синхронизация уже идёт в фоне.');
+        setAutoSyncRunning(false);
+        setAutoSyncPending(false);
+      } else if (res.started) {
+        setAutoSyncResult('Синхронизация идёт в фоне…');
       }
     } catch (e) {
       setAutoSyncError((e as Error).message);
-    } finally {
       setAutoSyncRunning(false);
+      setAutoSyncPending(false);
     }
   };
 

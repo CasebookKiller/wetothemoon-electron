@@ -3750,9 +3750,16 @@ export function registerPranaBinduHandlers(): void {
   // Синкает workouts за 7 дней по всем провайдерам с capabilities.workouts,
   // и wellness за те же 7 дней в мультипровайдерном режиме.
   // Async: не блокирует UI, всё в фоне.
+  let isAutoSyncRunning = false;
+
   ipcMain.handle(
     'pb:auto-sync-on-start',
-    async (_event, opts?: { force?: boolean }) => {
+    async (event, opts?: { force?: boolean }) => {
+    if (isAutoSyncRunning) {
+      return { success: true, skipped: 'already_running' };
+    }
+    const sender = event.sender;
+
     try {
       const db = getMelange();
       const settings = getSyncSettings(db);
@@ -3829,7 +3836,21 @@ export function registerPranaBinduHandlers(): void {
         `[Prana-Bindu] auto-sync: окно ${windowDays} дн. (${gapReason}), ${fromIso}..${toIso}`,
       );
 
-      const workoutProviders = listProviders().filter(
+      isAutoSyncRunning = true;
+
+      // Уведомляем UI о старте
+      if (!sender.isDestroyed()) {
+        sender.send('pb:auto-sync-start', {
+          from: fromIso,
+          to: toIso,
+          windowDays,
+        });
+      }
+
+      // --- Фоновая задача ---
+      (async () => {
+        try {
+          const workoutProviders = listProviders().filter(
         (p) =>
           p.capabilities?.workouts &&
           typeof p.fetchWorkouts === 'function' &&
@@ -4071,6 +4092,8 @@ export function registerPranaBinduHandlers(): void {
               `[Prana-Bindu] auto-sync: zepp-fit пропущен (папка недоступна: ${zeppPath})`,
             );
           } else {
+            // Сбрасываем флаг, чтобы не унаследовать отмену из ручного импорта
+            importFitCancelRequested = false;
             // Импорт — можно было бы вызвать через ipcMain.handle,
             // но здесь мы в main-процессе, вызываем логику напрямую.
             // Используем существующий performImportFiles + обёртку.
@@ -4180,41 +4203,63 @@ export function registerPranaBinduHandlers(): void {
         }
       }
 
-      // --- 6. Заглушки для остальных провайдеров ---
-      const pendingProviders: string[] = [];
-      for (const p of ['strava-fit', 'thresholds']) {
-        if (enabledProviders.has(p as any)) pendingProviders.push(p);
-      }
-      if (pendingProviders.length > 0) {
-        console.log(
-          `[Prana-Bindu] auto-sync: включены, но пока не в автосинке: ${pendingProviders.join(', ')}`,
-        );
-      }
+          // --- 6. Заглушки для остальных провайдеров ---
+          const pendingProviders: string[] = [];
+          for (const p of ['strava-fit', 'thresholds']) {
+            if (enabledProviders.has(p as any)) pendingProviders.push(p);
+          }
+          if (pendingProviders.length > 0) {
+            console.log(
+              `[Prana-Bindu] auto-sync: включены, но пока не в автосинке: ${pendingProviders.join(', ')}`,
+            );
+          }
 
-      return {
-        success: true,
-        ran: true,
-        from: fromIso,
-        to: toIso,
-        windowDays,
-        gapReason,
-        enabledProviders: Array.from(enabledProviders),
-        pendingProviders,
-        zeppFit: zeppFitResult,
-        icuPlan: icuPlanResult,
-        workouts: workoutsSummary,
-        wellness: {
-          added: wellnessAdded,
-          updated: wellnessUpdated,
-          perProvider: wellnessSummary,
-        },
-      };
+          // Собираем итоговый результат фоновой задачи
+          const finalResult = {
+            success: true,
+            ran: true,
+            from: fromIso,
+            to: toIso,
+            windowDays,
+            gapReason,
+            enabledProviders: Array.from(enabledProviders),
+            pendingProviders,
+            zeppFit: zeppFitResult,
+            icuPlan: icuPlanResult,
+            workouts: workoutsSummary,
+            wellness: {
+              added: wellnessAdded,
+              updated: wellnessUpdated,
+              perProvider: wellnessSummary,
+            },
+          };
+
+          // Отправляем событие в UI
+          if (!sender.isDestroyed()) {
+            sender.send('pb:auto-sync-complete', finalResult);
+          }
+        } catch (e) {
+          if (!sender.isDestroyed()) {
+            sender.send('pb:auto-sync-complete', {
+              success: false,
+              error: (e as Error).message,
+            });
+          }
+        } finally {
+          // Обязательно снимаем блокировку
+          isAutoSyncRunning = false;
+        }
+      })(); // <-- Закрываем IIFE
+
+      // Мгновенно возвращаем ответ в UI, чтобы кнопка "отвисла"
+      return { success: true, started: true, from: fromIso, to: toIso };
+
     } catch (e) {
+      isAutoSyncRunning = false;
       return { success: false, error: (e as Error).message };
     }
     },
   );
-
 
   // -------- Синхронизация плана из intervals.icu --------
   ipcMain.handle(

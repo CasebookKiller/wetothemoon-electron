@@ -6213,3 +6213,25 @@ body[data-module='prana-bindu'] .pb-debug-dialog .p-dialog-header-close svg path
 .pb-settings-tab-content .pb-connections__block {
   border: 1px solid var(--surface-border, rgba(255, 255, 255, 0.08)) !important;
 }
+
+/* ============================================================
+   Фикс размера Message внутри модалки настроек
+   (портал рендерится вне .pb-page, поэтому наследует
+   огромные дефолтные размеры PrimeReact)
+   ============================================================ */
+
+.pb-settings-dialog .p-inline-message {
+  font-size: 0.85rem !important;
+  padding: 0.5rem 0.75rem !important;
+}
+
+.pb-settings-dialog .p-inline-message .p-inline-message-text {
+  font-size: 0.85rem !important;
+  font-weight: inherit !important;
+  line-height: 1.4 !important;
+}
+
+/* Уменьшаем иконку внутри Message */
+.pb-settings-dialog .p-inline-message .p-inline-message-icon {
+  font-size: 1rem !important;
+}
