@@ -1141,35 +1141,24 @@ export function registerPranaBinduHandlers(): void {
   });
 
   // -------- Синхронизация порогов --------
-  // -------- Подтянуть пороги из активного провайдера --------
-  ipcMain.handle('pb:sync-thresholds', async (_event, providerName?: string) => {
+  async function doSyncThresholds(
+    db: ReturnType<typeof getMelange>,
+    name: string
+  ): Promise<{ success: boolean; provider: string; applied?: string[]; error?: string }> {
     try {
-      const name =
-        providerName ??
-        getSyncSettings(getMelange()).source ??
-        'dodofo';
-
       const provider = getProvider(name) as any;
       if (!provider) {
-        return { success: false, error: `Провайдер «${name}» не зарегистрирован` };
+        return { success: false, provider: name, error: `Провайдер «${name}» не зарегистрирован` };
       }
       if (!provider.capabilities?.thresholds) {
-        return {
-          success: false,
-          error: `Провайдер «${name}» не поддерживает пороги`,
-        };
+        return { success: false, provider: name, error: `Провайдер «${name}» не поддерживает пороги` };
       }
       if (typeof provider.fetchThresholds !== 'function') {
-        return {
-          success: false,
-          error: `Провайдер «${name}» не реализует fetchThresholds`,
-        };
+        return { success: false, provider: name, error: `Провайдер «${name}» не реализует fetchThresholds` };
       }
 
       const raw = await provider.fetchThresholds();
-      const db = getMelange();
-
-            const patch: Record<string, number | string> = {};
+      const patch: Record<string, number | string> = {};
       const applied: string[] = [];
 
       if (raw?.resthr?.value != null) {
@@ -1189,35 +1178,40 @@ export function registerPranaBinduHandlers(): void {
       }
 
       if (Object.keys(patch).length === 0) {
-        return {
-          success: false,
-          error: `Провайдер «${name}» не отдал ни одного порога`,
-        };
+        return { success: false, provider: name, error: `Провайдер «${name}» не отдал ни одного порога` };
       }
 
-      const updated = updateProfile(db, patch);
+      updateProfile(db, patch);
       console.log(`[Prana-Bindu] sync-thresholds (${name}): ${applied.join(', ')}`);
 
-      return { success: true, provider: name, applied, data: updated };
+      return { success: true, provider: name, applied };
     } catch (e) {
-      return { success: false, error: (e as Error).message };
+      return { success: false, provider: name, error: (e as Error).message };
     }
+  }
+
+  ipcMain.handle('pb:sync-thresholds', async (_event, providerName?: string) => {
+    const name = providerName ?? getSyncSettings(getMelange()).source ?? 'dodofo';
+    const res = await doSyncThresholds(getMelange(), name);
+    if (!res.success) return res;
+    return { ...res, data: getProfile(getMelange()) };
   });
 
   // -------- Подтянуть HR-зоны --------
-  ipcMain.handle('pb:sync-zones', async (_event, providerName?: string) => {
-    const name =
-      providerName ??
-      getSyncSettings(getMelange()).source ??
-      'intervals-icu';
-
+  async function doSyncZones(
+    db: ReturnType<typeof getMelange>,
+    name: string
+  ): Promise<{ success: boolean; provider: string; hr_zones?: number[] | null; pace_zones_kmh?: number[] | null; error?: string }> {
     try {
       const provider = getProvider(name) as any;
       if (!provider) {
-        return { success: false, error: `Провайдер «${name}» не зарегистрирован` };
+        return { success: false, provider: name, error: `Провайдер «${name}» не зарегистрирован` };
+      }
+      if (!provider.capabilities?.zones) {
+        return { success: false, provider: name, error: `Провайдер «${name}» не поддерживает зоны` };
       }
       if (typeof provider.fetchZones !== 'function') {
-        return { success: false, error: `Провайдер «${name}» не реализует fetchZones` };
+        return { success: false, provider: name, error: `Провайдер «${name}» не реализует fetchZones` };
       }
 
       const raw = await provider.fetchZones();
@@ -1231,10 +1225,9 @@ export function registerPranaBinduHandlers(): void {
           : undefined;
 
       if (!hrZones && !paceZonesKmh) {
-        return { success: false, error: `Провайдер «${name}» не отдал зоны` };
+        return { success: false, provider: name, error: `Провайдер «${name}» не отдал зоны` };
       }
 
-      const db = getMelange();
       const patch: Record<string, unknown> = {};
       if (hrZones) {
         patch.hrZones = hrZones;
@@ -1246,23 +1239,24 @@ export function registerPranaBinduHandlers(): void {
         patch.thresholdPaceMs = thresholdPaceMs;
       }
 
-      const updated = updateProfile(db, patch as any);
+      updateProfile(db, patch as any);
 
       console.log(
         `[Prana-Bindu] sync-zones (${name}): hr=[${hrZones?.join(', ') ?? '—'}], ` +
         `pace=[${paceZonesKmh?.join(', ') ?? '—'}] км/ч`
       );
 
-      return {
-        success: true,
-        provider: name,
-        hr_zones: hrZones,
-        pace_zones_kmh: paceZonesKmh,
-        data: updated,
-      };
+      return { success: true, provider: name, hr_zones: hrZones, pace_zones_kmh: paceZonesKmh };
     } catch (e) {
-      return { success: false, error: (e as Error).message };
+      return { success: false, provider: name, error: (e as Error).message };
     }
+  }
+
+  ipcMain.handle('pb:sync-zones', async (_event, providerName?: string) => {
+    const name = providerName ?? getSyncSettings(getMelange()).source ?? 'intervals-icu';
+    const res = await doSyncZones(getMelange(), name);
+    if (!res.success) return res;
+    return { ...res, data: getProfile(getMelange()) };
   });
 
   // -------- Разведка: сырой ответ fetchZones --------
@@ -3851,367 +3845,436 @@ export function registerPranaBinduHandlers(): void {
       (async () => {
         try {
           const workoutProviders = listProviders().filter(
-        (p) =>
-          p.capabilities?.workouts &&
-          typeof p.fetchWorkouts === 'function' &&
-          enabledProviders.has(p.name as any),
-      );
+          (p) =>
+            p.capabilities?.workouts &&
+            typeof p.fetchWorkouts === 'function' &&
+            enabledProviders.has(p.name as any),
+          );
 
-      const workoutsSummary: Array<{
-        provider: string;
-        added: number;
-        updated: number;
-        streamsFetched?: number;
-        streamsFailed?: number;
-        error?: string;
-      }> = [];
+          const workoutsSummary: Array<{
+            provider: string;
+            added: number;
+            updated: number;
+            streamsFetched?: number;
+            streamsFailed?: number;
+            error?: string;
+          }> = [];
 
-      for (const provider of workoutProviders) {
-        try {
-          const items = await (provider as any).fetchWorkouts(fromIso, toIso);
-          let added = 0;
-          let updated = 0;
-          let streamsFetched = 0;
-          let streamsFailed = 0;
-          for (const w of items) {
-            const res = upsertRunFact(db, w);
-            if (res.inserted) {
-              added++;
-              // A.5b: новый факт → сразу stream.
-              if (
-                provider.capabilities?.streams &&
-                typeof (provider as any).fetchStreams === 'function'
-              ) {
-                try {
-                  const r = await syncStreamsForFact(
-                    db,
-                    provider as any,
-                    provider.name,
-                    {
-                      id: res.id,
-                      source: w.source,
-                      external_id: w.externalId,
-                      date: toDateOnly(w.startTime),
-                    },
-                    false,
-                  );
-                  if (r.status === 'fetched') streamsFetched++;
-                  else if (r.status === 'failed') streamsFailed++;
-                } catch {
-                  streamsFailed++;
+          for (const provider of workoutProviders) {
+            try {
+              const items = await (provider as any).fetchWorkouts(fromIso, toIso);
+              let added = 0;
+              let updated = 0;
+              let streamsFetched = 0;
+              let streamsFailed = 0;
+              for (const w of items) {
+                const res = upsertRunFact(db, w);
+                if (res.inserted) {
+                  added++;
+                  // A.5b: новый факт → сразу stream.
+                  if (
+                    provider.capabilities?.streams &&
+                    typeof (provider as any).fetchStreams === 'function'
+                  ) {
+                    try {
+                      const r = await syncStreamsForFact(
+                        db,
+                        provider as any,
+                        provider.name,
+                        {
+                          id: res.id,
+                          source: w.source,
+                          external_id: w.externalId,
+                          date: toDateOnly(w.startTime),
+                        },
+                        false,
+                      );
+                      if (r.status === 'fetched') streamsFetched++;
+                      else if (r.status === 'failed') streamsFailed++;
+                    } catch {
+                      streamsFailed++;
+                    }
+                  }
+                } else {
+                  updated++;
                 }
               }
-            } else {
-              updated++;
+              workoutsSummary.push({
+                provider: provider.name,
+                added,
+                updated,
+                streamsFetched,
+                streamsFailed,
+              });
+              console.log(
+                `[Prana-Bindu] auto-sync workouts (${provider.name}) ${fromIso}..${toIso}: +${added} ~${updated}` +
+                  (streamsFetched > 0 || streamsFailed > 0
+                    ? ` streams: ${streamsFetched} ok / ${streamsFailed} err`
+                    : ''),
+              );
+            } catch (e) {
+              const msg = (e as Error).message;
+              workoutsSummary.push({
+                provider: provider.name,
+                added: 0,
+                updated: 0,
+                error: msg,
+              });
+              console.warn(
+                `[Prana-Bindu] auto-sync workouts (${provider.name}) error:`,
+                msg
+              );
             }
           }
-          workoutsSummary.push({
-            provider: provider.name,
-            added,
-            updated,
-            streamsFetched,
-            streamsFailed,
-          });
-          console.log(
-            `[Prana-Bindu] auto-sync workouts (${provider.name}) ${fromIso}..${toIso}: +${added} ~${updated}` +
-              (streamsFetched > 0 || streamsFailed > 0
-                ? ` streams: ${streamsFetched} ok / ${streamsFailed} err`
-                : ''),
-          );
-        } catch (e) {
-          const msg = (e as Error).message;
-          workoutsSummary.push({
-            provider: provider.name,
-            added: 0,
-            updated: 0,
-            error: msg,
-          });
-          console.warn(
-            `[Prana-Bindu] auto-sync workouts (${provider.name}) error:`,
-            msg
-          );
-        }
-      }
 
-      // --- 2. Wellness за 7 дней (только включённые провайдеры) ---
-      const wellnessProviders = listProviders()
-        .filter(
-          (p) =>
-            p.capabilities?.wellness &&
-            enabledProviders.has(p.name as any),
-        )
-        .map((p) => p.name)
-        .sort((a, b) => {
-          if (a === 'intervals-icu') return -1;
-          if (b === 'intervals-icu') return 1;
-          if (a === 'dodofo') return -1;
-          if (b === 'dodofo') return 1;
-          return 0;
-        });
-
-      let wellnessAdded = 0;
-      let wellnessUpdated = 0;
-      const wellnessSummary: Array<{
-        provider: string;
-        added: number;
-        updated: number;
-        error?: string;
-      }> = [];
-
-      for (const name of wellnessProviders) {
-        try {
-          const provider = getProvider(name) as any;
-          if (!provider || typeof provider.fetchWellness !== 'function') {
-            continue;
-          }
-          const raw = await provider.fetchWellness(fromIso, toIso);
-          const days: any[] = Array.isArray(raw) ? raw : raw?.days ?? [];
-          let added = 0;
-          let updated = 0;
-          for (const day of days) {
-            if (!day?.id && !day?.date) continue;
-            const date = day.id ?? day.date;
-            const res = upsertRecoveryLog(db, {
-              date,
-              resting_hr: day.restingHR ?? day.resting_hr,
-              hrv: day.hrv ?? day.hrv_ms,
-              hrv_sdnn: day.hrvSDNN ?? day.hrv_sdnn,
-              sleep_hours:
-                day.sleepSecs != null
-                  ? Math.round((day.sleepSecs / 3600) * 100) / 100
-                  : day.sleep_hours ?? day.sleepHours,
-              sleep_score: day.sleepScore ?? day.sleep_score,
-              sleep_quality: day.sleepQuality ?? day.sleep_quality,
-              sleep_total_min: day.sleep_total_min ?? day.sleepTotalMin,
-              deep_min: day.deep_min ?? day.deepMin,
-              rem_min: day.rem_min ?? day.remMin,
-              light_min: day.light_min ?? day.lightMin,
-              awake_min: day.awake_min ?? day.awakeMin,
-              steps: day.steps,
-              weight_kg: day.weight ?? day.weight_kg,
-              vo2max: day.vo2max,
-              body_battery_charged:
-                day.body_battery_charged ?? day.bodyBatteryCharged,
-              body_battery_drained:
-                day.body_battery_drained ?? day.bodyBatteryDrained,
-              stress_avg: day.stress_avg ?? day.stressAvg,
-              sp_o2: day.spo2_avg_pct ?? day.spO2,
-              ctl: day.ctl,
-              atl: day.atl,
-              ramp_rate: day.rampRate ?? day.ramp_rate,
-              readiness: day.readiness,
-              soreness: day.soreness,
-              fatigue: day.fatigue,
-              stress: day.stress,
-              mood: day.mood,
-              motivation: day.motivation,
-              injury: day.injury,
-              avg_sleeping_hr:
-                day.avgSleepingHR ?? day.avg_sleeping_hr,
-              baevsky_si: day.baevskySI ?? day.baevsky_si,
-              systolic: day.systolic,
-              diastolic: day.diastolic,
-              calories_active:
-                day.calories_active ?? day.caloriesActive ?? null,
-              calories_total:
-                day.calories_total ?? day.caloriesTotal ?? null,
-              body_fat_pct: day.body_fat_pct ?? day.bodyFatPct ?? null,
-              auto_source: name,
-              raw_json: JSON.stringify(day),
+          // --- 2. Wellness за 7 дней (только включённые провайдеры) ---
+          const wellnessProviders = listProviders()
+            .filter(
+              (p) =>
+                p.capabilities?.wellness &&
+                enabledProviders.has(p.name as any),
+            )
+            .map((p) => p.name)
+            .sort((a, b) => {
+              if (a === 'intervals-icu') return -1;
+              if (b === 'intervals-icu') return 1;
+              if (a === 'dodofo') return -1;
+              if (b === 'dodofo') return 1;
+              return 0;
             });
-            if (res.inserted) added++;
-            else updated++;
-          }
-          wellnessAdded += added;
-          wellnessUpdated += updated;
-          wellnessSummary.push({ provider: name, added, updated });
-          console.log(
-            `[Prana-Bindu] auto-sync wellness (${name}) ${fromIso}..${toIso}: +${added} ~${updated}`
-          );
-        } catch (e) {
-          const msg = (e as Error).message;
-          wellnessSummary.push({
-            provider: name,
-            added: 0,
-            updated: 0,
-            error: msg,
-          });
-          console.warn(
-            `[Prana-Bindu] auto-sync wellness (${name}) error:`,
-            msg
-          );
-        }
-      }
 
-      // --- 3. Обновляем last_sync_at / last_sync_status ---
-      const totalErrors =
-        workoutsSummary.filter((w) => w.error).length +
-        wellnessSummary.filter((w) => w.error).length;
-      const status =
-        totalErrors === 0
-          ? 'ok'
-          : totalErrors ===
-            workoutsSummary.length + wellnessSummary.length
-          ? 'error'
-          : 'partial';
-      setLastAutoSync(db, status);
+          let wellnessAdded = 0;
+          let wellnessUpdated = 0;
+          const wellnessSummary: Array<{
+            provider: string;
+            added: number;
+            updated: number;
+            error?: string;
+          }> = [];
 
-      // --- 4. Zepp FIT folder ---
-      // Тянем из сохранённой папки. skipIfFileExists=true —
-      // уже импортированные файлы пропускаем (проверка по
-      // source+external_id, быстрая по индексу).
-      // savePath=false — не трогаем настройку, она уже там.
-      let zeppFitResult: {
-        imported: number;
-        skipped: number;
-        failed: number;
-        error?: string;
-      } | null = null;
-
-      if (enabledProviders.has('zepp-fit')) {
-        try {
-          const zeppPath = getZeppArchivePath(db);
-          if (!zeppPath) {
-            zeppFitResult = {
-              imported: 0,
-              skipped: 0,
-              failed: 0,
-              error: 'zepp_archive_path не задан',
-            };
-            console.log(
-              '[Prana-Bindu] auto-sync: zepp-fit пропущен (путь не задан)',
-            );
-          } else if (!fs.existsSync(zeppPath)) {
-            zeppFitResult = {
-              imported: 0,
-              skipped: 0,
-              failed: 0,
-              error: 'папка недоступна',
-            };
-            console.log(
-              `[Prana-Bindu] auto-sync: zepp-fit пропущен (папка недоступна: ${zeppPath})`,
-            );
-          } else {
-            // Сбрасываем флаг, чтобы не унаследовать отмену из ручного импорта
-            importFitCancelRequested = false;
-            // Импорт — можно было бы вызвать через ipcMain.handle,
-            // но здесь мы в main-процессе, вызываем логику напрямую.
-            // Используем существующий performImportFiles + обёртку.
-            // НО: performImportFiles посылает прогресс в sender — его тут нет.
-            // Поэтому вызываем внутренний импорт без прогресса.
-            // Простое решение: список файлов + performImportFiles с no-op sender.
-            const noopSender = () => { /* no-op */ };
-
-            const files: string[] = [];
-            const entries = fs.readdirSync(zeppPath, { withFileTypes: true });
-            for (const e of entries) {
-              if (e.isFile() && /\.(fit|tcx)(\.gz)?$/i.test(e.name)) {
-                files.push(path.join(zeppPath, e.name));
+          for (const name of wellnessProviders) {
+            try {
+              const provider = getProvider(name) as any;
+              if (!provider || typeof provider.fetchWellness !== 'function') {
+                continue;
               }
-            }
-
-            if (files.length === 0) {
-              zeppFitResult = { imported: 0, skipped: 0, failed: 0 };
-              console.log(
-                `[Prana-Bindu] auto-sync: zepp-fit — файлов в папке нет`,
-              );
-            } else {
-              // skipIfFileExists=true реализуется через
-              // skipImported=true в performImportFiles.
-              const r = await performImportFiles(
-                files,
-                db,
-                noopSender,
-                'zepp-app',
-                true,
-              );
-              zeppFitResult = {
-                imported: r.imported,
-                skipped: r.skipped,
-                failed: r.failed,
-              };
-              console.log(
-                `[Prana-Bindu] auto-sync: zepp-fit +${r.imported} ·${r.skipped} ✗${r.failed} (всего ${files.length})`,
-              );
-            }
-          }
-        } catch (e) {
-          zeppFitResult = {
-            imported: 0,
-            skipped: 0,
-            failed: 0,
-            error: (e as Error).message,
-          };
-          console.warn(
-            '[Prana-Bindu] auto-sync: zepp-fit error:',
-            (e as Error).message,
-          );
-        }
-      }
-
-      // --- 5. ICU план за окно ---
-      // Тихо: без MirrorDelete (это ручное действие из SyncPanel).
-      // Тянем только события из ICU; stale-события не удаляем,
-      // их пользователь разберёт руками через MirrorDeleteDialog.
-      let icuPlanResult: {
-        added: number;
-        updated: number;
-        failed: number;
-        error?: string;
-      } | null = null;
-
-      if (enabledProviders.has('intervals-icu')) {
-        try {
-          const provider = getProvider('intervals-icu') as any;
-          if (!provider || typeof provider.fetchPlanEvents !== 'function') {
-            icuPlanResult = {
-              added: 0,
-              updated: 0,
-              failed: 0,
-              error: 'провайдер ICU не поддерживает план',
-            };
-          } else {
-            const events = await provider.fetchPlanEvents(fromIso, toIso);
-            let added = 0;
-            let updated = 0;
-            let failed = 0;
-            for (const ev of events) {
-              try {
-                const r = upsertPlanEvent(db, ev);
-                if (r.inserted) added++;
+              const raw = await provider.fetchWellness(fromIso, toIso);
+              const days: any[] = Array.isArray(raw) ? raw : raw?.days ?? [];
+              let added = 0;
+              let updated = 0;
+              for (const day of days) {
+                if (!day?.id && !day?.date) continue;
+                const date = day.id ?? day.date;
+                const res = upsertRecoveryLog(db, {
+                  date,
+                  resting_hr: day.restingHR ?? day.resting_hr,
+                  hrv: day.hrv ?? day.hrv_ms,
+                  hrv_sdnn: day.hrvSDNN ?? day.hrv_sdnn,
+                  sleep_hours:
+                    day.sleepSecs != null
+                      ? Math.round((day.sleepSecs / 3600) * 100) / 100
+                      : day.sleep_hours ?? day.sleepHours,
+                  sleep_score: day.sleepScore ?? day.sleep_score,
+                  sleep_quality: day.sleepQuality ?? day.sleep_quality,
+                  sleep_total_min: day.sleep_total_min ?? day.sleepTotalMin,
+                  deep_min: day.deep_min ?? day.deepMin,
+                  rem_min: day.rem_min ?? day.remMin,
+                  light_min: day.light_min ?? day.lightMin,
+                  awake_min: day.awake_min ?? day.awakeMin,
+                  steps: day.steps,
+                  weight_kg: day.weight ?? day.weight_kg,
+                  vo2max: day.vo2max,
+                  body_battery_charged:
+                    day.body_battery_charged ?? day.bodyBatteryCharged,
+                  body_battery_drained:
+                    day.body_battery_drained ?? day.bodyBatteryDrained,
+                  stress_avg: day.stress_avg ?? day.stressAvg,
+                  sp_o2: day.spo2_avg_pct ?? day.spO2,
+                  ctl: day.ctl,
+                  atl: day.atl,
+                  ramp_rate: day.rampRate ?? day.ramp_rate,
+                  readiness: day.readiness,
+                  soreness: day.soreness,
+                  fatigue: day.fatigue,
+                  stress: day.stress,
+                  mood: day.mood,
+                  motivation: day.motivation,
+                  injury: day.injury,
+                  avg_sleeping_hr:
+                    day.avgSleepingHR ?? day.avg_sleeping_hr,
+                  baevsky_si: day.baevskySI ?? day.baevsky_si,
+                  systolic: day.systolic,
+                  diastolic: day.diastolic,
+                  calories_active:
+                    day.calories_active ?? day.caloriesActive ?? null,
+                  calories_total:
+                    day.calories_total ?? day.caloriesTotal ?? null,
+                  body_fat_pct: day.body_fat_pct ?? day.bodyFatPct ?? null,
+                  auto_source: name,
+                  raw_json: JSON.stringify(day),
+                });
+                if (res.inserted) added++;
                 else updated++;
-              } catch {
-                failed++;
               }
+              wellnessAdded += added;
+              wellnessUpdated += updated;
+              wellnessSummary.push({ provider: name, added, updated });
+              console.log(
+                `[Prana-Bindu] auto-sync wellness (${name}) ${fromIso}..${toIso}: +${added} ~${updated}`
+              );
+            } catch (e) {
+              const msg = (e as Error).message;
+              wellnessSummary.push({
+                provider: name,
+                added: 0,
+                updated: 0,
+                error: msg,
+              });
+              console.warn(
+                `[Prana-Bindu] auto-sync wellness (${name}) error:`,
+                msg
+              );
             }
-            icuPlanResult = { added, updated, failed };
-            console.log(
-              `[Prana-Bindu] auto-sync: icu-plan +${added} ~${updated} ✗${failed} (всего ${events.length})`,
-            );
           }
-        } catch (e) {
-          icuPlanResult = {
-            added: 0,
-            updated: 0,
-            failed: 0,
-            error: (e as Error).message,
-          };
-          console.warn(
-            '[Prana-Bindu] auto-sync: icu-plan error:',
-            (e as Error).message,
-          );
-        }
-      }
 
-          // --- 6. Заглушки для остальных провайдеров ---
-          const pendingProviders: string[] = [];
-          for (const p of ['strava-fit', 'thresholds']) {
-            if (enabledProviders.has(p as any)) pendingProviders.push(p);
+          // --- 3. Обновляем last_sync_at / last_sync_status ---
+          const totalErrors =
+            workoutsSummary.filter((w) => w.error).length +
+            wellnessSummary.filter((w) => w.error).length;
+          const status =
+            totalErrors === 0
+              ? 'ok'
+              : totalErrors ===
+                workoutsSummary.length + wellnessSummary.length
+              ? 'error'
+              : 'partial';
+          setLastAutoSync(db, status);
+
+          // --- 4. Zepp FIT folder ---
+          // Тянем из сохранённой папки. skipIfFileExists=true —
+          // уже импортированные файлы пропускаем (проверка по
+          // source+external_id, быстрая по индексу).
+          // savePath=false — не трогаем настройку, она уже там.
+          let zeppFitResult: {
+            imported: number;
+            skipped: number;
+            failed: number;
+            error?: string;
+          } | null = null;
+
+          if (enabledProviders.has('zepp-fit')) {
+            try {
+              const zeppPath = getZeppArchivePath(db);
+              if (!zeppPath) {
+                zeppFitResult = {
+                  imported: 0,
+                  skipped: 0,
+                  failed: 0,
+                  error: 'zepp_archive_path не задан',
+                };
+                console.log(
+                  '[Prana-Bindu] auto-sync: zepp-fit пропущен (путь не задан)',
+                );
+              } else if (!fs.existsSync(zeppPath)) {
+                zeppFitResult = {
+                  imported: 0,
+                  skipped: 0,
+                  failed: 0,
+                  error: 'папка недоступна',
+                };
+                console.log(
+                  `[Prana-Bindu] auto-sync: zepp-fit пропущен (папка недоступна: ${zeppPath})`,
+                );
+              } else {
+                // Сбрасываем флаг, чтобы не унаследовать отмену из ручного импорта
+                importFitCancelRequested = false;
+                // Импорт — можно было бы вызвать через ipcMain.handle,
+                // но здесь мы в main-процессе, вызываем логику напрямую.
+                // Используем существующий performImportFiles + обёртку.
+                // НО: performImportFiles посылает прогресс в sender — его тут нет.
+                // Поэтому вызываем внутренний импорт без прогресса.
+                // Простое решение: список файлов + performImportFiles с no-op sender.
+                const noopSender = () => { /* no-op */ };
+
+                const files: string[] = [];
+                const entries = fs.readdirSync(zeppPath, { withFileTypes: true });
+                for (const e of entries) {
+                  if (e.isFile() && /\.(fit|tcx)(\.gz)?$/i.test(e.name)) {
+                    files.push(path.join(zeppPath, e.name));
+                  }
+                }
+
+                if (files.length === 0) {
+                  zeppFitResult = { imported: 0, skipped: 0, failed: 0 };
+                  console.log(
+                    `[Prana-Bindu] auto-sync: zepp-fit — файлов в папке нет`,
+                  );
+                } else {
+                  // skipIfFileExists=true реализуется через
+                  // skipImported=true в performImportFiles.
+                  const r = await performImportFiles(
+                    files,
+                    db,
+                    noopSender,
+                    'zepp-app',
+                    true,
+                  );
+                  zeppFitResult = {
+                    imported: r.imported,
+                    skipped: r.skipped,
+                    failed: r.failed,
+                  };
+                  console.log(
+                    `[Prana-Bindu] auto-sync: zepp-fit +${r.imported} ·${r.skipped} ✗${r.failed} (всего ${files.length})`,
+                  );
+                }
+              }
+            } catch (e) {
+              zeppFitResult = {
+                imported: 0,
+                skipped: 0,
+                failed: 0,
+                error: (e as Error).message,
+              };
+              console.warn(
+                '[Prana-Bindu] auto-sync: zepp-fit error:',
+                (e as Error).message,
+              );
+            }
           }
-          if (pendingProviders.length > 0) {
-            console.log(
-              `[Prana-Bindu] auto-sync: включены, но пока не в автосинке: ${pendingProviders.join(', ')}`,
-            );
+
+          // --- 4b. Strava FIT/TCX (локальная папка) ---
+          let stravaFitResult: {
+            imported: number;
+            skipped: number;
+            failed: number;
+            error?: string;
+          } | null = null;
+
+          if (enabledProviders.has('strava-fit')) {
+            try {
+              const fitPath = getFitArchivePath(db);
+              if (!fitPath) {
+                stravaFitResult = { imported: 0, skipped: 0, failed: 0, error: 'fit_archive_path не задан' };
+                console.log('[Prana-Bindu] auto-sync: strava-fit пропущен (путь не задан)');
+              } else if (!fs.existsSync(fitPath)) {
+                stravaFitResult = { imported: 0, skipped: 0, failed: 0, error: 'папка недоступна' };
+                console.log(`[Prana-Bindu] auto-sync: strava-fit пропущен (папка недоступна: ${fitPath})`);
+              } else {
+                importFitCancelRequested = false;
+                const noopSender = () => { /* no-op */ };
+
+                const files: string[] = [];
+                const walk = (dir: string) => {
+                  const entries = fs.readdirSync(dir, { withFileTypes: true });
+                  for (const e of entries) {
+                    const full = path.join(dir, e.name);
+                    if (e.isDirectory()) walk(full);
+                    else if (e.isFile() && /\.(fit|tcx)(\.gz)?$/i.test(e.name)) files.push(full);
+                  }
+                };
+                walk(fitPath);
+
+                if (files.length === 0) {
+                  stravaFitResult = { imported: 0, skipped: 0, failed: 0 };
+                  console.log(`[Prana-Bindu] auto-sync: strava-fit — файлов в папке нет`);
+                } else {
+                  const r = await performImportFiles(files, db, noopSender, 'strava-archive', true);
+                  stravaFitResult = { imported: r.imported, skipped: r.skipped, failed: r.failed };
+                  console.log(`[Prana-Bindu] auto-sync: strava-fit +${r.imported} ·${r.skipped} ✗${r.failed} (всего ${files.length})`);
+                }
+              }
+            } catch (e) {
+              stravaFitResult = { imported: 0, skipped: 0, failed: 0, error: (e as Error).message };
+              console.warn('[Prana-Bindu] auto-sync: strava-fit error:', (e as Error).message);
+            }
+          }
+
+          // --- 5. ICU план за окно ---
+          // Тихо: без MirrorDelete (это ручное действие из SyncPanel).
+          // Тянем только события из ICU; stale-события не удаляем,
+          // их пользователь разберёт руками через MirrorDeleteDialog.
+          let icuPlanResult: {
+            added: number;
+            updated: number;
+            failed: number;
+            error?: string;
+          } | null = null;
+
+          if (enabledProviders.has('intervals-icu')) {
+            try {
+              const provider = getProvider('intervals-icu') as any;
+              if (!provider || typeof provider.fetchPlanEvents !== 'function') {
+                icuPlanResult = {
+                  added: 0,
+                  updated: 0,
+                  failed: 0,
+                  error: 'провайдер ICU не поддерживает план',
+                };
+              } else {
+                const events = await provider.fetchPlanEvents(fromIso, toIso);
+                let added = 0;
+                let updated = 0;
+                let failed = 0;
+                for (const ev of events) {
+                  try {
+                    const r = upsertPlanEvent(db, ev);
+                    if (r.inserted) added++;
+                    else updated++;
+                  } catch {
+                    failed++;
+                  }
+                }
+                icuPlanResult = { added, updated, failed };
+                console.log(
+                  `[Prana-Bindu] auto-sync: icu-plan +${added} ~${updated} ✗${failed} (всего ${events.length})`,
+                );
+              }
+            } catch (e) {
+              icuPlanResult = {
+                added: 0,
+                updated: 0,
+                failed: 0,
+                error: (e as Error).message,
+              };
+              console.warn(
+                '[Prana-Bindu] auto-sync: icu-plan error:',
+                (e as Error).message,
+              );
+            }
+          }
+
+          // --- 6. Пороги и зоны ---
+          const thresholdsSummary: Array<{ name: string; applied?: string[]; error?: string }> = [];
+          const zonesSummary: Array<{ name: string; hr_zones?: number[] | null; pace_zones_kmh?: number[] | null; error?: string }> = [];
+
+          if (enabledProviders.has('thresholds')) {
+            const thresholdProviders = listProviders()
+              .filter((p) => p.capabilities?.thresholds && typeof p.fetchThresholds === 'function' && enabledProviders.has(p.name as any))
+              .map((p) => p.name)
+              .sort((a, b) => {
+                if (a === 'intervals-icu') return -1;
+                if (b === 'intervals-icu') return 1;
+                if (a === 'dodofo') return -1;
+                if (b === 'dodofo') return 1;
+                return 0;
+              });
+
+            for (const name of thresholdProviders) {
+              const res = await doSyncThresholds(db, name);
+              if (res.success) thresholdsSummary.push({ name, applied: res.applied });
+              else thresholdsSummary.push({ name, error: res.error });
+            }
+
+            const zoneProviders = listProviders()
+              .filter((p) => p.capabilities?.zones && typeof p.fetchZones === 'function' && enabledProviders.has(p.name as any))
+              .map((p) => p.name);
+
+            for (const name of zoneProviders) {
+              const res = await doSyncZones(db, name);
+              if (res.success) zonesSummary.push({ name, hr_zones: res.hr_zones, pace_zones_kmh: res.pace_zones_kmh });
+              else zonesSummary.push({ name, error: res.error });
+            }
           }
 
           // Собираем итоговый результат фоновой задачи
@@ -4223,9 +4286,10 @@ export function registerPranaBinduHandlers(): void {
             windowDays,
             gapReason,
             enabledProviders: Array.from(enabledProviders),
-            pendingProviders,
             zeppFit: zeppFitResult,
+            stravaFit: stravaFitResult,
             icuPlan: icuPlanResult,
+            thresholds: { providers: thresholdsSummary, zones: zonesSummary },
             workouts: workoutsSummary,
             wellness: {
               added: wellnessAdded,

@@ -141,12 +141,43 @@ export const AutoSyncPanel: React.FC<Props> = ({ onAfterSync }) => {
           planLabel = ` План: ${parts.join(' ')}.`;
         }
       }
+
+      const strava = data.stravaFit;
+      let stravaLabel = '';
+      if (strava) {
+        if (strava.error) {
+          stravaLabel = ` Strava: ${strava.error}.`;
+        } else if (strava.imported > 0 || strava.failed > 0) {
+          stravaLabel = ` Strava: +${strava.imported}${
+            strava.failed > 0 ? ` ✗${strava.failed}` : ''
+          }.`;
+        }
+      }
+
+      let threshLabel = '';
+      const thresh = data.thresholds;
+      if (thresh) {
+        const applied = thresh.providers
+          ?.filter((p: any) => p.applied?.length > 0)
+          .map((p: any) => p.name)
+          .join(', ');
+        const zones = thresh.zones?.map((z: any) => z.name).join(', ');
+        
+        const parts: string[] = [];
+        if (applied) parts.push(`Пороги: ${applied}`);
+        if (zones) parts.push(`Зоны: ${zones}`);
+        if (parts.length > 0) {
+          threshLabel = ` ${parts.join(' · ')}.`;
+        }
+      }
       
       setAutoSyncResult(
         `Готово: workouts ${wTotal}, wellness +${well}.` +
           (windowLabel ? ` Окно: ${windowLabel}.` : '') +
           zeppLabel +
-          planLabel,
+          stravaLabel +
+          planLabel +
+          threshLabel,
       );
       
       void loadSyncSettings();
@@ -305,12 +336,8 @@ export const AutoSyncPanel: React.FC<Props> = ({ onAfterSync }) => {
           <div className="pb-auto-providers__title">Источники в автосинке</div>
           {ALL_AUTO_SYNC_PROVIDERS.map((p) => {
             const isOn = autoProviders.has(p);
-            // A.3–A.5: обработка этих провайдеров ещё не реализована.
-            // Флажки работают (сохраняются в БД), но handler пока
-            // их игнорирует. После A.3–A.5 они начнут действовать.
-            const isPending: boolean = (
-              ['strava-fit', 'thresholds'] as AutoSyncProvider[]
-            ).includes(p);
+            // Все провайдеры теперь реализованы в автосинке.
+            const isPending = false;
             return (
               <label
                 key={p}

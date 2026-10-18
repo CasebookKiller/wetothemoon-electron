@@ -149,7 +149,7 @@ export class IntervalsIcuProvider implements ZeppDataProvider {
     workouts: true,
     streams: true,       // включим в шаге 2
     thresholds: true,
-    zones: false,
+    zones: true,
     wellness: true,
   };
 
