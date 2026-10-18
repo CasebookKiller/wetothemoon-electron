@@ -14,9 +14,10 @@ import {
   MIGRATION_V9_INTERVALS_ICU,
   MIGRATION_V22_AUTO_PROVIDERS,
   MIGRATION_V23_STREAMS_LOADED,
+  MIGRATION_V24_AUTO_RANGE_DAYS,
 } from './schema';
 
-export const SCHEMA_VERSION = 23;
+export const SCHEMA_VERSION = 24;
 
 interface Migration {
   version: number;
@@ -531,6 +532,29 @@ const migrations: readonly Migration[] = [
         `[Melange] v23: streams_loaded / streams_failed_at` +
           ` (added: ${[added1, added2].filter(Boolean).length}/2,` +
           ` backfill: ${before.n})`,
+      );
+    },
+  },
+  {
+    version: 24,
+    apply: (db) => {
+      const tryAddColumn = (sql: string): boolean => {
+        try {
+          db.exec(sql);
+          return true;
+        } catch (e) {
+          if (String(e).includes('duplicate column name')) return false;
+          throw e;
+        }
+      };
+
+      const added = tryAddColumn(
+        `ALTER TABLE sync_settings ADD COLUMN auto_range_days INTEGER;`,
+      );
+
+      console.log(
+        `[Melange] v24: auto_range_days` +
+          ` (${added ? 'добавлена' : 'уже есть'})`,
       );
     },
   },

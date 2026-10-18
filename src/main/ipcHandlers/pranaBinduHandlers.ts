@@ -3789,14 +3789,14 @@ export function registerPranaBinduHandlers(): void {
       const enabledProviders = new Set(getAutoProviders(db));
 
       // --- Окно синхронизации: gap detection ---
-      // По умолчанию 7 дней, но если приложение не открывалось
-      // дольше — тянем с последнего sync. Cap — 90 дней, чтобы
-      // случайный старый lastSyncAt не выкачал полгода.
-      const DEFAULT_WINDOW_DAYS = 7;
+      // База = autoRangeDays из настроек (дефолт 7). Gap detection
+      // может расширить окно, если приложение не открывалось дольше.
+      // Cap — 90 дней.
       const MAX_WINDOW_DAYS = 90;
+      const userRangeDays = settings.autoRangeDays ?? 7;
 
       const lastSyncAt = settings.lastSyncAt;
-      let windowDays = DEFAULT_WINDOW_DAYS;
+      let windowDays = userRangeDays;
       let gapReason = 'default';
 
       if (lastSyncAt) {
@@ -3805,7 +3805,7 @@ export function registerPranaBinduHandlers(): void {
           const elapsedDays = Math.floor(
             (Date.now() - lastMs) / 86_400_000,
           );
-          if (elapsedDays > DEFAULT_WINDOW_DAYS) {
+          if (elapsedDays >= userRangeDays) {
             // +1 день — чтобы покрыть день последнего успешного синка.
             windowDays = Math.min(elapsedDays + 1, MAX_WINDOW_DAYS);
             gapReason = 'gap';

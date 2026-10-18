@@ -72,6 +72,7 @@ export interface SyncSettingsRow {
   auto_on_start: number;
   /** v22: JSON-массив AutoSyncProvider[]. */
   auto_providers_json: string | null;
+  auto_range_days: number | null;
   last_sync_at: string | null;
   last_sync_status: string | null;
   google_token_json: string | null;

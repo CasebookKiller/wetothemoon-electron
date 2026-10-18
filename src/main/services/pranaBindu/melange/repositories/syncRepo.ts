@@ -37,6 +37,7 @@ function rowToDomain(row: SyncSettingsRow): SyncSettings {
     mode: (row.mode as SyncSettings['mode']) ?? 'manual',
     autoOnStart: row.auto_on_start === 1,
     autoIntervalMin: row.auto_interval_min ?? null,
+    autoRangeDays: row.auto_range_days ?? null,
     autoProviders: parseAutoProviders(row.auto_providers_json),
     lastSyncAt: row.last_sync_at ?? undefined,
     lastSyncStatus: row.last_sync_status ?? undefined,
@@ -101,6 +102,10 @@ export function updateSyncSettings(
       patch.autoIntervalMin !== undefined
         ? patch.autoIntervalMin
         : current.auto_interval_min,
+    auto_range_days:
+      patch.autoRangeDays !== undefined
+        ? patch.autoRangeDays
+        : current.auto_range_days,
     auto_providers_json: autoProvidersJson,
     zepp_provider: patch.zeppProvider ?? current.zepp_provider,
     zepp_fallback_provider:
@@ -123,6 +128,7 @@ export function updateSyncSettings(
     `UPDATE sync_settings SET
       source = ?, mode = ?,
       auto_on_start = ?, auto_interval_min = ?,
+      auto_range_days = ?,
       auto_providers_json = ?,
       zepp_provider = ?, zepp_fallback_provider = ?,
       zepp_auth_host = ?, zepp_data_host = ?,
@@ -136,6 +142,7 @@ export function updateSyncSettings(
     merged.mode,
     merged.auto_on_start,
     merged.auto_interval_min,
+    merged.auto_range_days,
     merged.auto_providers_json,
     merged.zepp_provider,
     merged.zepp_fallback_provider,

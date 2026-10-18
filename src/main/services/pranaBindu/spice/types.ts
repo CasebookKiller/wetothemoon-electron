@@ -59,6 +59,12 @@ export interface SyncSettings {
   autoOnStart?: boolean;
   /** Антидребезг: не чаще раза в N минут. null/undefined → 360 (6ч). */
   autoIntervalMin?: number | null;
+  /**
+   * База диапазона автосинка в днях.
+   * Gap detection может расширить её (если пропущен синк), но не сузить.
+   * Cap — 90 дней. Дефолт — 7.
+   */
+  autoRangeDays?: number | null;
   lastSyncAt?: string;
   lastSyncStatus?: string;
   /**

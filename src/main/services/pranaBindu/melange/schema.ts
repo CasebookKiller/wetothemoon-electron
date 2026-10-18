@@ -378,3 +378,14 @@ export const MIGRATION_V23_STREAMS_LOADED: readonly string[] = [
   `UPDATE run_facts SET streams_loaded = 1
      WHERE id IN (SELECT DISTINCT run_fact_id FROM run_streams);`,
 ];
+
+// ==================== Миграция v24: диапазон автосинка ====================
+
+/**
+ * auto_range_days — пользовательский диапазон синхронизации в днях.
+ * Используется в auto-sync как база: gap detection может его расширить,
+ * но не сузить. Cap — 90 дней.
+ */
+export const MIGRATION_V24_AUTO_RANGE_DAYS: readonly string[] = [
+  `ALTER TABLE sync_settings ADD COLUMN auto_range_days INTEGER;`,
+];

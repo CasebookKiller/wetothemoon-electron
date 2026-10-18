@@ -18,6 +18,7 @@ import {
   DEFAULT_AUTO_SYNC_PROVIDERS,
   type AutoSyncProvider,
 } from '@/main/services/pranaBindu/spice/types';
+import { Dropdown } from 'primereact/dropdown';
 
 interface Props {
   /** Вызывается после успешного прогона автосинка. */
@@ -29,6 +30,7 @@ export const AutoSyncPanel: React.FC<Props> = ({ onAfterSync }) => {
 
   const [autoSyncOnStart, setAutoSyncOnStart] = useState(false);
   const [autoSyncIntervalMin, setAutoSyncIntervalMin] = useState(360);
+  const [autoRangeDays, setAutoRangeDays] = useState<number>(7);
   const [autoSyncLastAt, setAutoSyncLastAt] = useState<string | null>(null);
   const [autoSyncLastStatus, setAutoSyncLastStatus] = useState<string | null>(
     null
@@ -49,6 +51,11 @@ export const AutoSyncPanel: React.FC<Props> = ({ onAfterSync }) => {
         setAutoSyncOnStart(!!d.autoOnStart);
         setAutoSyncIntervalMin(
           typeof d.autoIntervalMin === 'number' ? d.autoIntervalMin : 360
+        );
+        setAutoRangeDays(
+          typeof d.autoRangeDays === 'number' && d.autoRangeDays > 0
+            ? d.autoRangeDays
+            : 7
         );
         setAutoSyncLastAt(d.lastSyncAt ?? null);
         setAutoSyncLastStatus(d.lastSyncStatus ?? null);
@@ -87,6 +94,7 @@ export const AutoSyncPanel: React.FC<Props> = ({ onAfterSync }) => {
   const persistAutoSync = async (patch: {
     autoOnStart?: boolean;
     autoIntervalMin?: number | null;
+    autoRangeDays?: number | null;
     autoProviders?: AutoSyncProvider[];
   }) => {
     if (!api?.pb?.syncSettingsUpdate) return;
@@ -223,9 +231,11 @@ export const AutoSyncPanel: React.FC<Props> = ({ onAfterSync }) => {
           </span>
         </label>
         <small className="pb-hint">
-          Забирает workouts и wellness за последние 7 дней. Антидребезг —
-          не чаще раза в {Math.round(autoSyncIntervalMin / 60)} ч.
-          Стримы и план не трогает (это ручные операции).
+          Забирает workouts и wellness за последние{' '}
+          {autoRangeDays} {autoRangeDays === 1 ? 'день' : autoRangeDays < 5 ? 'дня' : 'дней'}.
+          Антидребезг — не чаще раза в {Math.round(autoSyncIntervalMin / 60)} ч.
+          Если приложение не открывалось дольше — окно расширяется до
+          момента последнего синка (cap 90 дней).
         </small>
 
         {autoSyncLastAt && (
@@ -285,6 +295,43 @@ export const AutoSyncPanel: React.FC<Props> = ({ onAfterSync }) => {
               </label>
             );
           })}
+        </div>
+
+        {/* Диапазон синхронизации */}
+        <div className="pb-auto-providers" style={{ marginTop: '0.5rem' }}>
+          <div className="pb-auto-providers__title">
+            Диапазон синхронизации
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Dropdown
+              value={autoRangeDays}
+              options={[
+                { label: '7 дней', value: 7 },
+                { label: '30 дней', value: 30 },
+                { label: '90 дней', value: 90 },
+                { label: '180 дней', value: 180 },
+                { label: '365 дней', value: 365 },
+              ]}
+              onChange={(e) => {
+                const v = Number(e.value);
+                if (Number.isFinite(v) && v > 0) {
+                  setAutoRangeDays(v);
+                  void persistAutoSync({ autoRangeDays: v });
+                }
+              }}
+              editable
+              placeholder="Выбрать или ввести"
+              className="pb-wade-programs__dd pb-wade-programs__dd--weeks"
+              panelClassName="pb-dropdown-panel"
+              disabled={autoSyncRunning}
+              style={{ minWidth: '11rem' }}
+            />
+            <span className="pb-hint">дней</span>
+          </div>
+          <small className="pb-hint">
+            База для диапазона. Gap detection может расширить окно
+            (если приложение не открывалось дольше), cap — 90 дней.
+          </small>
         </div>
 
         <div className="flex gap-2 flex-wrap">
