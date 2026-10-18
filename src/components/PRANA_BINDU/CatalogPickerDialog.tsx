@@ -7,7 +7,7 @@
 //
 // Избранное и «уже добавлено» — итерация 2.
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Button } from 'primereact/button';
 import { AppDialog } from '@/components/COMMON/AppDialog/AppDialog';
 import { AppDialogFooter } from '@/components/COMMON/AppDialog/AppDialogFooter';
@@ -31,11 +31,14 @@ interface Props {
   visible: boolean;
   onHide: () => void;
   onPick: (items: PickedExercise[]) => void;
+  /** Ключи уже добавленных в сессию упражнений. */
+  alreadyPickedIds?: Set<string>;
 }
 
 // ==================== Табы ====================
 
 type TabId =
+  | 'favorites'
   | 'wade'
   | 'cali'
   | 'runner'
@@ -46,6 +49,7 @@ type TabId =
   | 'all';
 
 const TABS: { id: TabId; label: string }[] = [
+  { id: 'favorites', label: 'Избранное' },
   { id: 'wade', label: 'Wade' },
   { id: 'cali', label: 'Cali' },
   { id: 'runner', label: 'Runner' },
@@ -80,18 +84,54 @@ function namedKey(key: string): string {
   return `named:${key}`;
 }
 
+// ==================== Избранное (localStorage) ====================
+
+interface StatItem {
+  count: number;
+  lastUsedAt: number;
+}
+
+type StatsMap = Record<string, StatItem>;
+
+const STATS_KEY = 'pb.catalogPicker.stats';
+
+function loadStats(): StatsMap {
+  try {
+    const raw = localStorage.getItem(STATS_KEY);
+    if (!raw) return {};
+    return JSON.parse(raw) as StatsMap;
+  } catch {
+    return {};
+  }
+}
+
+function saveStats(stats: StatsMap): void {
+  try {
+    localStorage.setItem(STATS_KEY, JSON.stringify(stats));
+  } catch {
+    /* ignore */
+  }
+}
+
 // ==================== Компонент ====================
 
 export const CatalogPickerDialog: React.FC<Props> = ({
   visible,
   onHide,
   onPick,
+  alreadyPickedIds,
 }) => {
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [tab, setTab] = useState<TabId>('wade');
+  const [tab, setTab] = useState<TabId>('favorites'); // Дефолт — Избранное
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [namedSubTab, setNamedSubTab] = useState<NamedCategory>('drill');
+  const [stats, setStats] = useState<StatsMap>(() => loadStats());
+
+  // Перечитываем статистику при открытии диалога.
+  useEffect(() => {
+    if (visible) setStats(loadStats());
+  }, [visible]);
 
   const resetState = () => {
     setSearch('');
@@ -190,6 +230,7 @@ export const CatalogPickerDialog: React.FC<Props> = ({
   }, [search]);
 
   const toggleSelected = (key: string) => {
+    if (alreadyPickedIds?.has(key)) return; // уже в сессии — игнор
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
@@ -235,6 +276,16 @@ export const CatalogPickerDialog: React.FC<Props> = ({
       });
     }
 
+    // Обновляем статистику (count++, lastUsedAt = now)
+    const nextStats = { ...stats };
+    const now = Date.now();
+    for (const key of selected) {
+      const cur = nextStats[key] ?? { count: 0, lastUsedAt: 0 };
+      nextStats[key] = { count: cur.count + 1, lastUsedAt: now };
+    }
+    saveStats(nextStats);
+    setStats(nextStats);
+
     onPick(picked);
     resetState();
     onHide();
@@ -253,20 +304,29 @@ export const CatalogPickerDialog: React.FC<Props> = ({
     code: string,
   ) => {
     const isSelected = selected.has(key);
+    const isPicked = alreadyPickedIds?.has(key) ?? false;
+
     return (
       <label
         key={key}
-        className={`pb-catalog-picker__level ${isSelected ? 'is-selected' : ''}`}
+        className={`pb-catalog-picker__level ${
+          isSelected ? 'is-selected' : ''
+        } ${isPicked ? 'is-picked' : ''}`}
+        title={isPicked ? 'Уже добавлено в эту сессию' : undefined}
       >
         <input
           type="checkbox"
-          checked={isSelected}
+          checked={isSelected || isPicked}
+          disabled={isPicked}
           onChange={() => toggleSelected(key)}
         />
         <span className="pb-catalog__level-code">{code}</span>
         <span className="pb-catalog__level-name">{label}</span>
         {hint && (
           <span className="pb-catalog__level-hint">{hint}</span>
+        )}
+        {isPicked && (
+          <i className="pi pi-check" style={{ color: 'var(--pb-accent)', fontSize: '0.85rem', marginLeft: '0.5rem' }} />
         )}
       </label>
     );
@@ -331,6 +391,7 @@ export const CatalogPickerDialog: React.FC<Props> = ({
   const renderTabContent = () => {
     // Поиск
     if (searchResults !== null) {
+      // ... существующий блок поиска (без изменений)
       if (searchResults.length === 0) {
         return <div className="pb-hint">Ничего не найдено</div>;
       }
@@ -342,6 +403,78 @@ export const CatalogPickerDialog: React.FC<Props> = ({
               renderRow(r.key, r.label, r.hint, r.badge),
             )}
           </div>
+        </>
+      );
+    }
+
+    // Избранное
+    if (tab === 'favorites') {
+      const itemsWithData = Object.entries(stats)
+        .map(([key, data]) => {
+          // Ищем label для ключа
+          let label = key;
+          let hint: string | undefined;
+          let code = '';
+
+          if (key.startsWith('progression:')) {
+            const [, progKey, lvlStr] = key.split(':');
+            const lvl = Number(lvlStr);
+            const p = PROGRESSIONS_CATALOG.find((x) => x.key === progKey);
+            if (p) {
+              const levelObj = p.levels.find((l) => l.level === lvl);
+              if (levelObj) {
+                label = levelObj.name;
+                hint = levelObj.nameRu;
+                code = (p.category === 'wade' ? 'W' : 'L') + lvl;
+              }
+            }
+          } else if (key.startsWith('named:')) {
+            const nKey = key.slice(6);
+            const n = NAMED_EXERCISES.find((x) => x.key === nKey);
+            if (n) {
+              label = n.label;
+              hint = n.nameRu;
+              code = n.category;
+            }
+          }
+
+          return { key, data, label, hint, code };
+        })
+        .filter((x) => x.code !== ''); // отсекаем битые ключи
+
+      const topFreq = [...itemsWithData]
+        .sort((a, b) => b.data.count - a.data.count)
+        .slice(0, 5);
+      const topRecent = [...itemsWithData]
+        .sort((a, b) => b.data.lastUsedAt - a.data.lastUsedAt)
+        .slice(0, 5);
+
+      if (topFreq.length === 0 && topRecent.length === 0) {
+        return <div className="pb-hint">Пока ничего не выбирали.</div>;
+      }
+
+      return (
+        <>
+          {topFreq.length > 0 && (
+            <>
+              <div className="pb-catalog__section-title">Часто выбираете</div>
+              <div className="pb-catalog-picker__list">
+                {topFreq.map((r) =>
+                  renderRow(r.key, r.label, r.hint, r.code),
+                )}
+              </div>
+            </>
+          )}
+          {topRecent.length > 0 && (
+            <>
+              <div className="pb-catalog__section-title" style={{ marginTop: '0.75rem' }}>Недавние</div>
+              <div className="pb-catalog-picker__list">
+                {topRecent.map((r) =>
+                  renderRow(r.key, r.label, r.hint, r.code),
+                )}
+              </div>
+            </>
+          )}
         </>
       );
     }

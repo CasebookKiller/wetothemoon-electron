@@ -380,6 +380,8 @@ export const PranaBinduPage: React.FC = () => {
   const toastRef = React.useRef<Toast>(null);
   const [graphVisible, setGraphVisible] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
+  // Счётчик для принудительного обновления FullWeek при изменении фактов
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // ==================== Загрузка списка пробежек ====================
 
@@ -715,6 +717,7 @@ export const PranaBinduPage: React.FC = () => {
   return (
     <div className="pb-page-root">
       <FullWeek
+        key={`fw-refresh-${refreshKey}`}
         onDayClick={(d) => setDayDrawerDate(d)}
         onOpenPlanEvent={(id) => {
           const ev = planEvents.find((p) => p.id === id) ?? null;
@@ -914,6 +917,7 @@ export const PranaBinduPage: React.FC = () => {
           onAfterChange={() => {
             void loadPlanEvents();
             void loadRunFacts();
+            setRefreshKey((k) => k + 1);
           }}
         />
 

@@ -5953,6 +5953,15 @@ body[data-module='prana-bindu'] .pb-debug-dialog .p-dialog-header-close svg path
   background: color-mix(in srgb, var(--pb-accent) 10%, transparent);
 }
 
+.pb-catalog-picker__level.is-picked {
+  opacity: 0.55;
+  background: color-mix(in srgb, #6fbf73 8%, transparent);
+  cursor: not-allowed;
+}
+.pb-catalog-picker__level.is-picked input[type='checkbox'] {
+  cursor: not-allowed;
+}
+
 /* В picker-строке code может быть длиннее, чем W1-W10:
    'drill', 'prehab', 'run-basic' — до 9 символов.
    Расширяем столбец, но оставляем минимальную ширину,
