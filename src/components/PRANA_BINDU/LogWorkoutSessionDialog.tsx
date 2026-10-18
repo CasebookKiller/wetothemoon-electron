@@ -184,7 +184,6 @@ export const LogWorkoutSessionDialog: React.FC<Props> = ({
   const [rows, setRows] = useState<Row[]>([]);
 
   // Свободный режим:
-  const [freeMode, setFreeMode] = useState<'catalog' | 'manual'>('manual');
   const [freeText, setFreeText] = useState('');
 
   // Общие поля:
@@ -204,7 +203,6 @@ export const LogWorkoutSessionDialog: React.FC<Props> = ({
     } else {
       setRows([]);
     }
-    setFreeMode('manual');
     setFreeText('');
     setRpe(7);
     setNotes('');
@@ -265,6 +263,22 @@ export const LogWorkoutSessionDialog: React.FC<Props> = ({
       })),
     ]);
   };
+
+  // Список ключей уже добавленных в сессию упражнений (только catalog).
+  // Формат совпадает с тем, что использует CatalogPickerDialog:
+  //   progression:<key>:<level>  или  named:<key>
+  const alreadyPickedIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const r of rows) {
+      if (r.source !== 'catalog') continue;
+      if (r.level !== undefined) {
+        set.add(`progression:${r.movementKey}:${r.level}`);
+      } else {
+        set.add(`named:${r.movementKey}`);
+      }
+    }
+    return set;
+  }, [rows]);
 
   const handleAddFromText = () => {
     if (pendingTextRows.length === 0) return;
@@ -349,47 +363,31 @@ export const LogWorkoutSessionDialog: React.FC<Props> = ({
       className="pb-debug-dialog pb-log-workout-dialog"
     >
       <div className="pb-debug__body">
-        {/* Табы: только в free-режиме */}
+        {/* Свободный режим: две опции одновременно */}
         {isFreeMode && (
-          <div className="pb-templates__mode-switch">
-            <button
-              type="button"
-              className={freeMode === 'catalog' ? 'is-active' : ''}
-              onClick={() => setFreeMode('catalog')}
-            >
-              Из каталога
-            </button>
-            <button
-              type="button"
-              className={freeMode === 'manual' ? 'is-active' : ''}
-              onClick={() => setFreeMode('manual')}
-            >
-              Вручную
-            </button>
-          </div>
-        )}
-
-        {/* Источник строк — каталог */}
-        {isFreeMode && freeMode === 'catalog' && (
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <Button
-              label="Выбрать из каталога"
-              icon="pi pi-book"
-              className="pb-soft p-button-sm"
-              onClick={() => setCatalogPickerOpen(true)}
-              disabled={saving}
-            />
-            <span className="pb-hint">
-              Добавить упражнение выбором из каталога
-            </span>
-          </div>
-        )}
-
-        {/* Источник строк — textarea */}
-        {isFreeMode && freeMode === 'manual' && (
           <>
+            <div
+              style={{
+                display: 'flex',
+                gap: '0.5rem',
+                alignItems: 'center',
+              }}
+            >
+              <Button
+                label="Выбрать из каталога"
+                icon="pi pi-book"
+                className="pb-soft p-button-sm"
+                onClick={() => setCatalogPickerOpen(true)}
+                disabled={saving}
+              />
+              <span className="pb-hint">
+                Добавить упражнение выбором из каталога
+              </span>
+            </div>
+
             <div className="pb-log-workout-dialog__hint pb-hint">
-              Введите упражнения, каждое с новой строки. Формат — как в ICU:
+              …или введите упражнения вручную, каждое с новой строки
+              (формат — как в ICU):
               <br />
               <code>Push-ups W3 3x10</code> ·{' '}
               <code>Squats W2 3x15</code> · <code>Plank 30s</code>
@@ -397,7 +395,7 @@ export const LogWorkoutSessionDialog: React.FC<Props> = ({
             <InputTextarea
               value={freeText}
               onChange={(e) => setFreeText(e.target.value)}
-              rows={5}
+              rows={3}
               className="pb-log-workout-dialog__free-input"
               placeholder={'Push-ups W3 3x10\nSquats W2 3x15\nPlank 30s'}
               disabled={saving}
@@ -588,6 +586,7 @@ export const LogWorkoutSessionDialog: React.FC<Props> = ({
         visible={catalogPickerOpen}
         onHide={() => setCatalogPickerOpen(false)}
         onPick={handleCatalogPick}
+        alreadyPickedIds={alreadyPickedIds}
       />
     </Dialog>
   );
