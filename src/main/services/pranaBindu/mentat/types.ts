@@ -72,6 +72,7 @@ export interface ParsedWorkout {
 }
 
 export type ExerciseCategory =
+  | 'smithrun'
   | 'wade'
   | 'cali'
   | 'runner'

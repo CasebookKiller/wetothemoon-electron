@@ -35,6 +35,7 @@ import {
   CatalogPickerDialog,
   type PickedExercise,
 } from './CatalogPickerDialog';
+import { AddUnknownExerciseDialog } from './AddUnknownExerciseDialog';
 
 // ==================== Типы ====================
 
@@ -193,6 +194,7 @@ export const LogWorkoutSessionDialog: React.FC<Props> = ({
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
   const [catalogPickerOpen, setCatalogPickerOpen] = useState(false);
+  const [addUnknownRowId, setAddUnknownRowId] = useState<string | null>(null);
 
   // Сброс при открытии
   useEffect(() => {
@@ -380,6 +382,13 @@ export const LogWorkoutSessionDialog: React.FC<Props> = ({
                 onClick={() => setCatalogPickerOpen(true)}
                 disabled={saving}
               />
+              <Button
+                label="Создать новое"
+                icon="pi pi-plus-circle"
+                className="pb-soft p-button-sm"
+                onClick={() => setAddUnknownRowId('new')}
+                disabled={saving}
+              />
               <span className="pb-hint">
                 Добавить упражнение выбором из каталога
               </span>
@@ -481,6 +490,19 @@ export const LogWorkoutSessionDialog: React.FC<Props> = ({
                   className="pb-log-workout-dialog__row-input"
                   disabled={saving || r.skipped}
                 />
+
+                {r.movementKey === 'unknown' && (
+                  <Button
+                    icon="pi pi-plus-circle"
+                    text
+                    className="pb-drawer__name-edit"
+                    onClick={() => setAddUnknownRowId(r.id)}
+                    disabled={saving}
+                    tooltip="Добавить в каталог"
+                    tooltipOptions={{ position: 'left' }}
+                    style={{ color: '#e8a838' }}
+                  />
+                )}
 
                 {r.source === 'plan' ? (
                   <Button
@@ -587,6 +609,22 @@ export const LogWorkoutSessionDialog: React.FC<Props> = ({
         onHide={() => setCatalogPickerOpen(false)}
         onPick={handleCatalogPick}
         alreadyPickedIds={alreadyPickedIds}
+      />
+
+      <AddUnknownExerciseDialog
+        visible={!!addUnknownRowId}
+        initialName={
+          addUnknownRowId === 'new'
+            ? ''
+            : rows.find((x) => x.id === addUnknownRowId)?.label.replace(/\s+[WL]\d+\s*$/, '').trim() || ''
+        }
+        onHide={() => setAddUnknownRowId(null)}
+        onSaved={(movementKey, level) => {
+          if (addUnknownRowId && addUnknownRowId !== 'new') {
+            updateRow(addUnknownRowId, { movementKey, level });
+          }
+          setAddUnknownRowId(null);
+        }}
       />
     </Dialog>
   );

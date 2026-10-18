@@ -91,6 +91,7 @@ import {
   matchIcuLine,
 } from '../services/pranaBindu/mentat/workoutMatcher';
 import { buildExerciseGraph, auditGraph } from '../services/pranaBindu/mentat/graph/graphBuilder';
+import { registerCustomExercise } from '../services/pranaBindu/mentat/exerciseCatalog';
 import { DifficultyBand, ProgramProps } from '../services/pranaBindu/mentat/graph/ontology';
 
 import { WADE_SEED, ENABLED_SEEDS } from '../services/pranaBindu/mentat/graph/data';
@@ -5225,6 +5226,80 @@ export function registerPranaBinduHandlers(): void {
       return { ok: true, graph: next };
     } catch (e) {
       return { ok: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('pb:graph-add-custom-exercise', async (_e, payload: {
+    name: string;
+    catalog: string;
+    type: 'named' | 'progression';
+    groupName: string;
+    level?: number;
+  }) => {
+    try {
+      const key = payload.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      const groupKey = payload.groupName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      const level = payload.level || 1;
+      
+      let current = loadWadeGraph();
+      const canonicalId = `custom-${groupKey}-group`;
+      const nodeId = `custom-${groupKey}-l${level}`;
+
+      if (payload.type === 'progression') {
+        // Ищем, есть ли уже группа с таким названием (по label или id)
+        let existingGroup = current.canonicals.find(
+          c => c.label.toLowerCase() === payload.groupName.toLowerCase() || c.id === canonicalId
+        );
+
+        if (!existingGroup) {
+          existingGroup = {
+            id: canonicalId,
+            label: payload.groupName,
+            catalog: payload.catalog,
+            pattern: 'custom',
+          };
+          current.canonicals.push(existingGroup);
+        }
+
+        // Добавляем узел в эту группу на указанный уровень
+        if (!current.nodes.some(n => n.id === nodeId)) {
+          current.nodes.push({
+            id: nodeId,
+            canonical: existingGroup.id,
+            label: payload.name,
+            level: level,
+          });
+        }
+      } else {
+        // Named упражнение (без уровней)
+        if (!current.nodes.some(n => n.id === `custom-${key}`)) {
+          current.nodes.push({
+            id: `custom-${key}`,
+            canonical: '',
+            label: payload.name,
+          });
+        }
+      }
+
+      const p = userGraphPath();
+      fs.writeFileSync(p, JSON.stringify(current, null, 2), 'utf8');
+
+      // Регистрируем в парсере (runtime)
+      registerCustomExercise({
+        key: groupKey,
+        label: payload.name,
+        isProgression: payload.type === 'progression',
+        groupLabel: payload.groupName,
+        level: level,
+      });
+
+      return { 
+        success: true, 
+        movementKey: payload.type === 'progression' ? groupKey : key,
+        level: payload.type === 'progression' ? level : undefined
+      };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
     }
   });
 

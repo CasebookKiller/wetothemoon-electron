@@ -2,12 +2,44 @@
   "id": "smithrun",
   "label": "Smithrun",
   "labelRu": "Кузница Бега",
-  "patterns": [],
+  "patterns": [
+    { "id": "squat", "label": "Squat", "labelRu": "Приседания" }
+  ],
   "catalogs": [
     { "id": "smithrun", "label": "Smithrun", "labelRu": "Кузница Бега", "pos": { "x": 500, "y": 1200 } }
   ],
-  "canonicals": [],
-  "nodes": [],
-  "edges": [],
+  "canonicals": [
+    {
+      "id": "pistol-plyo-progression",
+      "label": "Single-Leg & Pistol Progression",
+      "labelRu": "Пистолет и одноногие прыжки",
+      "catalog": "smithrun",
+      "pattern": "squat",
+      "icuName": "Pistol & Plyo"
+    }
+  ],
+  "nodes": [
+    { "id": "pistol-plyo-1", "canonical": "pistol-plyo-progression", "level": 1, "label": "Controlled step-up", "labelRu": "Контролируемый шаг на возвышение" },
+    { "id": "pistol-plyo-2", "canonical": "pistol-plyo-progression", "level": 2, "label": "Paused step-up", "labelRu": "Шаг на возвышение с паузой" },
+    { "id": "pistol-plyo-3", "canonical": "pistol-plyo-progression", "level": 3, "label": "Explosive step-up", "labelRu": "Взрывной шаг на возвышение" },
+    { "id": "pistol-plyo-4", "canonical": "pistol-plyo-progression", "level": 4, "label": "Assisted pistol", "labelRu": "Пистолет с опорой" },
+    { "id": "pistol-plyo-5", "canonical": "pistol-plyo-progression", "level": 5, "label": "Low box pistol", "labelRu": "Пистолет на низкой коробке" },
+    { "id": "pistol-plyo-6", "canonical": "pistol-plyo-progression", "level": 6, "label": "Controlled step-down", "labelRu": "Контролируемый спуск с возвышения" },
+    { "id": "pistol-plyo-7", "canonical": "pistol-plyo-progression", "level": 7, "label": "Deficit pistol", "labelRu": "Пистолет с дефицитом амплитуды" },
+    { "id": "pistol-plyo-8", "canonical": "pistol-plyo-progression", "level": 8, "label": "Single-leg box hop", "labelRu": "Прыжок на коробку на одной ноге" },
+    { "id": "pistol-plyo-9", "canonical": "pistol-plyo-progression", "level": 9, "label": "Single-leg bounds", "labelRu": "Одноногие прыжки-выпады" },
+    { "id": "pistol-plyo-10", "canonical": "pistol-plyo-progression", "level": 10, "label": "Pistol + jump combo", "labelRu": "Комбо: пистолет + прыжок" }
+  ],
+  "edges": [
+    { "from": "pistol-plyo-1", "to": "pistol-plyo-2", "kind": "progresses-to" },
+    { "from": "pistol-plyo-2", "to": "pistol-plyo-3", "kind": "progresses-to" },
+    { "from": "pistol-plyo-3", "to": "pistol-plyo-4", "kind": "progresses-to" },
+    { "from": "pistol-plyo-4", "to": "pistol-plyo-5", "kind": "progresses-to" },
+    { "from": "pistol-plyo-5", "to": "pistol-plyo-6", "kind": "progresses-to" },
+    { "from": "pistol-plyo-6", "to": "pistol-plyo-7", "kind": "progresses-to" },
+    { "from": "pistol-plyo-7", "to": "pistol-plyo-8", "kind": "progresses-to" },
+    { "from": "pistol-plyo-8", "to": "pistol-plyo-9", "kind": "progresses-to" },
+    { "from": "pistol-plyo-9", "to": "pistol-plyo-10", "kind": "progresses-to" }
+  ],
   "programs": []
 }

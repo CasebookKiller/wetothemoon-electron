@@ -969,6 +969,8 @@ try {
       graphSaveNodePos: (payload: { id: string; x: number; y: number }) =>
         ipcRenderer.invoke('pb:graph-save-node-pos', payload),
 
+      addCustomExercise: (payload: any) => ipcRenderer.invoke('pb:graph-add-custom-exercise', payload),
+
     },
 
   });

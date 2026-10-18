@@ -26,6 +26,7 @@ type FilterKey = 'all' | ExerciseCategory | NamedExerciseCategory;
 
 const FILTERS: Array<{ key: FilterKey; label: string }> = [
   { key: 'all', label: 'Все' },
+  { key: 'smithrun', label: 'Smithrun' },
   { key: 'wade', label: 'Wade' },
   { key: 'cali', label: 'Cali' },
   { key: 'runner', label: 'Runner' },
@@ -75,7 +76,7 @@ export const ExerciseCatalog: React.FC<Props> = ({ onCopy, className }) => {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const PROGRESSION_CATEGORIES = new Set([
-    'wade', 'cali', 'runner', 'core', 'posture', 'weightloss',
+    'smithrun', 'wade', 'cali', 'runner', 'core', 'posture', 'weightloss',
   ]);
 
   const filteredProgressions = useMemo(() => {

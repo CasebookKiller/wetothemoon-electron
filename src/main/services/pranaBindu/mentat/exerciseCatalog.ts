@@ -11,6 +11,27 @@
 
 import type { CatalogEntry, NamedExercise } from './types';
 
+// ==================== Smithrun (Кастомные) ====================
+
+export const SMITHRUN_PISTOL_PLYO: CatalogEntry = {
+  key: 'pistol-plyo-progression',
+  label: 'Пистолет и одноногие прыжки',
+  icuName: 'Pistol & Plyo',
+  category: 'smithrun',
+  levels: [
+    { level: 1, name: 'Controlled step-up', nameRu: 'Контролируемый шаг на возвышение', source: 'custom' },
+    { level: 2, name: 'Paused step-up', nameRu: 'Шаг на возвышение с паузой', source: 'custom' },
+    { level: 3, name: 'Explosive step-up', nameRu: 'Взрывной шаг на возвышение', source: 'custom' },
+    { level: 4, name: 'Assisted pistol', nameRu: 'Пистолет с опорой', source: 'custom' },
+    { level: 5, name: 'Low box pistol', nameRu: 'Пистолет на низкой коробке', source: 'custom' },
+    { level: 6, name: 'Controlled step-down', nameRu: 'Контролируемый спуск с возвышения', source: 'custom' },
+    { level: 7, name: 'Deficit pistol', nameRu: 'Пистолет с дефицитом амплитуды', source: 'custom' },
+    { level: 8, name: 'Single-leg box hop', nameRu: 'Прыжок на коробку на одной ноге', source: 'custom' },
+    { level: 9, name: 'Single-leg bounds', nameRu: 'Одноногие прыжки-выпады', source: 'custom' },
+    { level: 10, name: 'Pistol + jump combo', nameRu: 'Комбо: пистолет + прыжок', source: 'custom' },
+  ],
+};
+
 // ==================== Big-6 Пола Уэйда (W1..W10) ====================
 
 export const WADE_PUSHUP: CatalogEntry = {
@@ -681,6 +702,8 @@ export const WEIGHTLOSS_BODYWEIGHT: CatalogEntry = {
 // ==================== Сводный каталог прогрессий ====================
 
 export const PROGRESSIONS_CATALOG: CatalogEntry[] = [
+  // Smithrun
+  SMITHRUN_PISTOL_PLYO,
   // Wade
   WADE_PUSHUP,
   WADE_SQUAT,
@@ -1054,10 +1077,74 @@ export function findAnythingByName(name: string): {
  * Используется в парсере, когда пользователь пишет общее имя каталога
  * без точного названия уровня.
  */
+// ==================== Динамические (кастомные) упражнения ====================
+
+/**
+ * Поиск прогрессии по её icuName (с учётом aliases прогрессии).
+ * Используется в парсере, когда пользователь пишет общее имя каталога
+ * без точного названия уровня.
+ */
 export function findProgressionByIcuName(
   name: string
 ): CatalogEntry | undefined {
   return PROGRESSIONS_CATALOG.find((e) =>
     nameMatches(name, e.icuName, e.aliases),
   );
+}
+
+// ==================== Динамические (кастомные) упражнения ====================
+
+/** Добавляет новое упражнение в runtime-каталог. */
+export function registerCustomExercise(
+  payload: {
+    key: string;
+    label: string;
+    isProgression: boolean;
+    groupLabel?: string;
+    level?: number;
+  }
+): void {
+  if (payload.isProgression) {
+    // Ищем по label или по key
+    let group = PROGRESSIONS_CATALOG.find(
+      (p) => p.label.toLowerCase() === payload.groupLabel?.toLowerCase() || p.key === payload.key
+    );
+    
+    if (!group) {
+      group = {
+        key: payload.key,
+        label: payload.groupLabel || payload.label,
+        icuName: payload.groupLabel || payload.label,
+        category: 'wade',
+        levels: [],
+      };
+      PROGRESSIONS_CATALOG.push(group);
+    }
+
+    const lvlNum = payload.level || (group.levels.length + 1);
+    
+    // Проверяем, нет ли уже такого уровня
+    const existingLvl = group.levels.find(l => l.level === lvlNum);
+    if (!existingLvl) {
+      group.levels.push({
+        level: lvlNum,
+        name: payload.label,
+        source: 'custom',
+      });
+      // Сортируем уровни по порядку
+      group.levels.sort((a, b) => a.level - b.level);
+    } else {
+      // Если уровень уже есть, просто обновляем название
+      existingLvl.name = payload.label;
+    }
+  } else {
+    if (!NAMED_EXERCISES.some(n => n.key === payload.key)) {
+      NAMED_EXERCISES.push({
+        key: payload.key,
+        category: 'prehab',
+        label: payload.label,
+        icuName: payload.label,
+      });
+    }
+  }
 }

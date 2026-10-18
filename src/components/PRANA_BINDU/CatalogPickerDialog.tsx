@@ -39,6 +39,7 @@ interface Props {
 
 type TabId =
   | 'favorites'
+  | 'smithrun'
   | 'wade'
   | 'cali'
   | 'runner'
@@ -50,6 +51,7 @@ type TabId =
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'favorites', label: 'Избранное' },
+  { id: 'smithrun', label: 'Smithrun' },
   { id: 'wade', label: 'Wade' },
   { id: 'cali', label: 'Cali' },
   { id: 'runner', label: 'Runner' },
