@@ -1,0 +1,104 @@
+/* ============================================================
+   COMMON Dialogs (PrimeReact overrides)
+   Работает через body[data-module] и --module-accent.
+   ============================================================ */
+
+/* Шапка диалога (используем селектор по data-module, так как портал) */
+body[data-module] .p-dialog .p-dialog-header {
+  background: var(--tg-theme-section-bg-color, #1e2a38) !important;
+  color: var(--module-accent) !important;
+  border: none !important;
+  border-bottom: 1px solid var(--surface-border, rgba(255, 255, 255, 0.08)) !important;
+  padding: 0.75rem 1rem;
+}
+
+body[data-module] .p-dialog .p-dialog-title {
+  color: var(--module-accent) !important;
+  font-weight: 600;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* Контент диалога */
+body[data-module] .p-dialog .p-dialog-content {
+  padding: 0.75rem 1rem !important;
+  background: var(--tg-theme-bg-color, #17212b) !important;
+  color: var(--tg-theme-text-color, #f5f5f5) !important;
+}
+
+/* Кнопки закрытия и развертывания */
+body[data-module] .p-dialog .p-dialog-header-close,
+body[data-module] .p-dialog .p-dialog-header-maximize {
+  color: var(--module-accent) !important;
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  width: 2rem !important;
+  height: 2rem !important;
+  min-width: 2rem !important;
+  padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 6px !important;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+body[data-module] .p-dialog .p-dialog-header-close:hover,
+body[data-module] .p-dialog .p-dialog-header-maximize:hover {
+  background: rgba(var(--module-accent-rgb), 0.16) !important;
+  color: var(--module-accent) !important;
+}
+
+body[data-module] .p-dialog .p-dialog-header-close:focus,
+body[data-module] .p-dialog .p-dialog-header-maximize:focus {
+  box-shadow: 0 0 0 2px rgba(var(--module-accent-rgb), 0.30) !important;
+}
+
+/* Иконки внутри кнопок */
+body[data-module] .p-dialog .p-dialog-header-close svg,
+body[data-module] .p-dialog .p-dialog-header-close svg path,
+body[data-module] .p-dialog .p-dialog-header-maximize svg,
+body[data-module] .p-dialog .p-dialog-header-maximize svg path {
+  fill: currentColor !important;
+  color: currentColor !important;
+  width: 14px !important;
+  height: 14px !important;
+}
+
+/* --- InputText / Dropdown / InputTextarea внутри диалогов --- */
+/* Портал рендерится вне .pb-page, поэтому используем body[data-module] */
+body[data-module] .p-dialog .p-inputtext:enabled:focus,
+body[data-module] .p-dialog .p-inputtextarea:enabled:focus,
+body[data-module] .p-dialog .p-inputnumber-input:enabled:focus {
+  border-color: var(--module-accent) !important;
+  box-shadow: 0 0 0 1px var(--module-accent) !important;
+  outline: none !important;
+}
+
+body[data-module] .p-dialog .p-inputtext:enabled:hover,
+body[data-module] .p-dialog .p-inputtextarea:enabled:hover,
+body[data-module] .p-dialog .p-inputnumber-input:enabled:hover {
+  border-color: var(--module-accent) !important;
+}
+
+body[data-module] .p-dialog .p-dropdown:not(.p-disabled):hover {
+  border-color: var(--module-accent) !important;
+}
+
+body[data-module] .p-dialog .p-dropdown:not(.p-disabled).p-focus {
+  border-color: var(--module-accent) !important;
+  box-shadow: 0 0 0 1px var(--module-accent) !important;
+  outline: none !important;
+}
+
+body[data-module] .p-dialog .p-dropdown .p-dropdown-trigger {
+  color: var(--module-accent) !important;
+}
+
+body[data-module] .p-dialog .p-dropdown .p-dropdown-trigger svg {
+  fill: var(--module-accent) !important;
+}
