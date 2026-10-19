@@ -1,5 +1,11 @@
 /* src/pages/PranaBinduPage/PranaBinduPage.css */
 
+@import '@/styles/common/theme.css';
+@import '@/styles/common/buttons.css';
+@import '@/styles/common/inputs.css';
+@import './styles/pb-layout.css';
+@import './styles/pb-components.css';
+
 body[data-module='prana-bindu'] .p-dropdown-panel .p-dropdown-item.p-highlight {
   background: rgba(212, 163, 115, 0.18) !important;
   color: #d4a373 !important;
@@ -123,137 +129,6 @@ body[data-module='prana-bindu'] .p-dialog .p-dialog-header-close svg path {
   border-radius: 4px;
   display: inline-block;
   color: var(--tg-theme-text-color, #f5f5f5);
-}
-
-/* ============================================================
-   Кнопки .pb / .pb-soft / .pb-destructive / .pb-destructive-soft
-   Структура 1-в-1 как у .osint-*, но с песочным акцентом.
-   ============================================================ */
-
-/* --- базовый .pb --- */
-.pb.p-button {
-  color: var(--pb-accent);
-  background: var(--tg-theme-bg-color, #17212b);
-  border: 1px solid var(--pb-accent);
-  padding: 0.75rem 1.25rem;
-  font-size: 0.75rem;
-  transition: background-color 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s;
-  border-radius: 6px;
-}
-
-.pb.p-button:hover {
-  background: var(--pb-accent);
-  color: var(--tg-theme-bg-color, #17212b);
-  border-color: var(--pb-accent);
-}
-
-.pb.p-button:focus {
-  outline: none;
-  box-shadow: 0 0 0 2px rgba(var(--pb-accent-rgb), 0.25);
-}
-
-.pb.p-inputtext:enabled:focus {
-  outline: 0 none;
-  outline-offset: 0;
-  box-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
-  border-color: var(--pb-accent);
-}
-
-.pb.p-inputtext:enabled:hover {
-  border-color: var(--pb-accent);
-}
-
-span.pb {
-  color: var(--pb-accent);
-}
-
-/* --- мягкий вариант .pb-soft --- */
-.pb-soft.p-button {
-  color: var(--pb-accent);
-  background: var(--tg-theme-bg-color, #17212b);
-  border: 1px solid var(--pb-accent);
-  padding: 0.75rem 1.25rem;
-  font-size: 0.75rem;
-  transition: background-color 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s;
-  border-radius: 6px;
-}
-
-.pb-soft.p-button:hover {
-  background: rgba(var(--pb-accent-rgb), 0.12);
-  color: var(--pb-accent);
-  border-color: var(--pb-accent);
-}
-
-.pb-soft.p-button:focus {
-  outline: none;
-  box-shadow: 0 0 0 2px rgba(var(--pb-accent-rgb), 0.25);
-}
-
-/* --- destructive .pb-destructive --- */
-.pb-destructive.p-button {
-  color: var(--tg-theme-destructive-text-color, #ec3942);
-  background: var(--tg-theme-bg-color, #17212b);
-  border: 1px solid var(--tg-theme-destructive-text-color, #ec3942);
-  padding: 0.75rem 1.25rem;
-  font-size: 0.75rem;
-  transition: background-color 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s;
-  border-radius: 6px;
-}
-
-.pb-destructive.p-button:hover {
-  background: var(--tg-theme-destructive-text-color, #ec3942);
-  color: var(--tg-theme-bg-color, #17212b);
-  border-color: var(--tg-theme-destructive-text-color, #ec3942);
-}
-
-.pb-destructive.p-button:focus {
-  outline: none;
-  box-shadow: 0 0 0 2px rgba(236, 57, 66, 0.25);
-}
-
-span.pb-destructive {
-  color: var(--tg-theme-destructive-text-color, #ec3942);
-}
-
-/* --- destructive soft .pb-destructive-soft --- */
-.pb-destructive-soft.p-button {
-  color: var(--tg-theme-destructive-text-color, #ec3942);
-  background: var(--tg-theme-bg-color, #17212b);
-  border: 1px solid var(--tg-theme-destructive-text-color, #ec3942);
-  padding: 0.75rem 1.25rem;
-  font-size: 0.75rem;
-  transition: background-color 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s;
-  border-radius: 6px;
-}
-
-.pb-destructive-soft.p-button:hover {
-  background: rgba(236, 57, 66, 0.12);
-  color: var(--tg-theme-destructive-text-color, #ec3942);
-  border-color: var(--tg-theme-destructive-text-color, #ec3942);
-}
-
-/* --- disabled для destructive --- */
-.pb-destructive.p-button:disabled,
-.pb-destructive.p-button.p-disabled {
-  color: var(--tg-theme-destructive-text-color, #ec3942) !important;
-  background: var(--tg-theme-bg-color, #17212b) !important;
-  border: 1px solid var(--tg-theme-destructive-text-color, #ec3942) !important;
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.pb-destructive.p-button:disabled .p-button-icon,
-.pb-destructive.p-button:disabled .p-button-label,
-.pb-destructive.p-button.p-disabled .p-button-icon,
-.pb-destructive.p-button.p-disabled .p-button-label {
-  color: var(--tg-theme-destructive-text-color, #ec3942) !important;
-}
-
-.pb-destructive.p-button:disabled:hover,
-.pb-destructive.p-button.p-disabled:hover {
-  background: var(--tg-theme-bg-color, #17212b) !important;
-  color: var(--tg-theme-destructive-text-color, #ec3942) !important;
-  border-color: var(--tg-theme-destructive-text-color, #ec3942) !important;
 }
 
 /* ============================================================
@@ -3899,7 +3774,14 @@ body[data-module='prana-bindu'] .p-tooltip.p-tooltip-bottom .p-tooltip-arrow {
   align-items: center;
   gap: 0.5rem;
   margin-bottom: 0.6rem;
-  flex-wrap: wrap;
+  flex-wrap: nowrap; /* Запрещаем перенос на новую строку */
+}
+
+.pb-full-week__toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
 }
 
 .pb-full-week__range {
@@ -5846,11 +5728,11 @@ body[data-module='prana-bindu'] .pb-debug-dialog .p-dialog-header-close svg path
 
 
 .pb-full-week__actions {
-  margin-left: auto;        /* прижимает весь блок вправо */
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
   flex-wrap: nowrap;
+  flex-shrink: 0;
 }
 
 .pb-full-week__actions .p-button.pb-soft.p-button-sm {
@@ -6243,4 +6125,131 @@ body[data-module='prana-bindu'] .pb-debug-dialog .p-dialog-header-close svg path
 /* Уменьшаем иконку внутри Message */
 .pb-settings-dialog .p-inline-message .p-inline-message-icon {
   font-size: 1rem !important;
+}
+
+/* ============================================================
+   Бренд-заголовок в FullWeek
+   ============================================================ */
+
+.pb-full-week__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--pb-accent);
+  font-weight: 700;
+  font-size: 1.1rem;
+  white-space: nowrap;
+  margin-left: auto; /* Прижимает бренд вправо */
+  margin-right: 0.5rem;
+}
+
+.pb-full-week__brand .pi {
+  font-size: 1.25rem;
+}
+
+/* ============================================================
+   Центрирование контента страницы и сетка Wellness + Tabs
+   ============================================================ */
+
+.pb-page__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center; /* Жестко центрируем все дочерние блоки */
+  gap: 1.25rem;
+  width: 100%;
+}
+
+/* Блок карточек модулей (Stillsuit, Crysknife...) растягиваем на всю ширину */
+.pb-page__content > .grid {
+  align-self: stretch; 
+  width: 100%;
+}
+
+/* Сетка панелей */
+.pb-main-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  align-items: start;
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto; /* Центрируем сетку */
+}
+
+.pb-main-grid__col {
+  min-width: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center; /* Центрируем всё содержимое колонки по горизонтали */
+}
+
+/* Убеждаемся, что панели занимают всю ширину колонки и центрируются */
+.pb-main-grid__col > .p-panel,
+.pb-main-grid__col > .pb-panel,
+.pb-main-grid__col > div {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* На широких экранах — две РАВНЫЕ колонки */
+@media (min-width: 1200px) {
+  .pb-main-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-width: 1400px;
+  }
+}
+
+/* ============================================================
+   Таблица истории порогов (Threshold History)
+   ============================================================ */
+
+.pb-threshold-table {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.8rem;
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  margin-top: 0.5rem;
+}
+
+.pb-threshold-table__header,
+.pb-threshold-table__row {
+  display: grid;
+  grid-template-columns: 1fr 80px 80px 80px 80px;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.25rem 0;
+}
+
+.pb-threshold-table__header {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--tg-theme-hint-color, #708499);
+  border-bottom: 1px solid var(--surface-border, rgba(255,255,255,0.08));
+  padding-bottom: 0.35rem;
+  margin-bottom: 0.25rem;
+}
+
+.pb-threshold-table__row {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  color: var(--tg-theme-text-color, #f5f5f5);
+}
+
+.pb-threshold-table__row:last-child {
+  border-bottom: none;
+}
+
+.pb-threshold-table__date {
+  color: var(--tg-theme-hint-color, #708499);
+}
+
+.pb-threshold-table__val {
+  text-align: right;
+}
+
+.pb-threshold-table__header span:not(:first-child) {
+  text-align: right;
 }

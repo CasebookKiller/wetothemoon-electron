@@ -1,0 +1,97 @@
+/* ============================================================
+   COMMON buttons
+   Используют --module-accent / --module-accent-rgb.
+   Работают в любом модуле (PB, OSINT, Gateway...).
+   ============================================================ */
+
+/* --- базовый .pb --- */
+.pb.p-button {
+  color: var(--module-accent);
+  background: var(--tg-theme-bg-color, #17212b);
+  border: 1px solid var(--module-accent);
+  padding: 0.75rem 1.25rem;
+  font-size: 0.75rem;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s;
+  border-radius: 6px;
+}
+.pb.p-button:hover {
+  background: var(--module-accent);
+  color: var(--tg-theme-bg-color, #17212b);
+  border-color: var(--module-accent);
+}
+.pb.p-button:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(var(--module-accent-rgb), 0.25);
+}
+span.pb {
+  color: var(--module-accent);
+}
+
+/* --- мягкий .pb-soft --- */
+.pb-soft.p-button {
+  color: var(--module-accent);
+  background: var(--tg-theme-bg-color, #17212b);
+  border: 1px solid var(--module-accent);
+  padding: 0.75rem 1.25rem;
+  font-size: 0.75rem;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s;
+  border-radius: 6px;
+}
+.pb-soft.p-button:hover {
+  background: rgba(var(--module-accent-rgb), 0.12);
+  color: var(--module-accent);
+  border-color: var(--module-accent);
+}
+.pb-soft.p-button:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(var(--module-accent-rgb), 0.25);
+}
+
+/* --- destructive .pb-destructive --- */
+.pb-destructive.p-button {
+  color: var(--tg-theme-destructive-text-color, #ec3942);
+  background: var(--tg-theme-bg-color, #17212b);
+  border: 1px solid var(--tg-theme-destructive-text-color, #ec3942);
+  padding: 0.75rem 1.25rem;
+  font-size: 0.75rem;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s;
+  border-radius: 6px;
+}
+.pb-destructive.p-button:hover {
+  background: var(--tg-theme-destructive-text-color, #ec3942);
+  color: var(--tg-theme-bg-color, #17212b);
+  border-color: var(--tg-theme-destructive-text-color, #ec3942);
+}
+.pb-destructive.p-button:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(236, 57, 66, 0.25);
+}
+span.pb-destructive {
+  color: var(--tg-theme-destructive-text-color, #ec3942);
+}
+
+/* --- destructive soft .pb-destructive-soft --- */
+.pb-destructive-soft.p-button {
+  color: var(--tg-theme-destructive-text-color, #ec3942);
+  background: var(--tg-theme-bg-color, #17212b);
+  border: 1px solid var(--tg-theme-destructive-text-color, #ec3942);
+  padding: 0.75rem 1.25rem;
+  font-size: 0.75rem;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s;
+  border-radius: 6px;
+}
+.pb-destructive-soft.p-button:hover {
+  background: rgba(236, 57, 66, 0.12);
+  color: var(--tg-theme-destructive-text-color, #ec3942);
+  border-color: var(--tg-theme-destructive-text-color, #ec3942);
+}
+
+/* --- disabled для destructive --- */
+.pb-destructive.p-button:disabled,
+.pb-destructive.p-button.p-disabled {
+  color: var(--tg-theme-destructive-text-color, #ec3942) !important;
+  background: var(--tg-theme-bg-color, #17212b) !important;
+  border: 1px solid var(--tg-theme-destructive-text-color, #ec3942) !important;
+  opacity: 0.5;
+  cursor: not-allowed;
+}

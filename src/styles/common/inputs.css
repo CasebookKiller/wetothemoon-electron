@@ -1,0 +1,7 @@
+/* ============================================================
+   COMMON inputs
+   TODO: extract base InputText / Dropdown / Checkbox / Radio /
+         InputNumber / Calendar / MultiSelect styles here
+         (заменить var(--pb-accent) → var(--module-accent)).
+   Пока все стили инпутов остаются в PranaBinduPage.css.
+   ============================================================ */

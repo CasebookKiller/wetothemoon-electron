@@ -1,0 +1,27 @@
+/* src/styles/common/theme.css */
+:root {
+  /* Базовые цвета (из Telegram-темы) */
+  --tg-bg: #17212b;
+  --tg-surface: #232e3c;
+  --tg-text: #f5f5f5;
+  --tg-hint: #708499;
+  --tg-destructive: #ec3942;
+  --tg-success: #6fbf73;
+  --tg-border: rgba(255, 255, 255, 0.08);
+
+  /* Цвета по умолчанию (для COMMON-компонентов) */
+  --module-accent: #6ab2f2; /* Синий, как в OSINT */
+  --module-accent-rgb: 106, 178, 242;
+}
+
+/* Тема для конкретного модуля (Prana-Bindu) */
+[data-module="prana-bindu"], .pb-page-root {
+  --module-accent: #d4a373;
+  --module-accent-rgb: 212, 163, 115;
+}
+
+/* Тема для OSINT */
+[data-module="osint"] {
+  --module-accent: #6ab2f2;
+  --module-accent-rgb: 106, 178, 242;
+}
