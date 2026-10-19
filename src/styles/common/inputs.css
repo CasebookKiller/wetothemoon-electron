@@ -5,3 +5,93 @@
          (заменить var(--pb-accent) → var(--module-accent)).
    Пока все стили инпутов остаются в PranaBinduPage.css.
    ============================================================ */
+
+   /* ============================================================
+   COMMON Inputs (PrimeReact overrides)
+   Используют --module-accent / --module-accent-rgb.
+   ============================================================ */
+
+/* --- Text Inputs --- */
+input.p-inputtext:enabled:focus,
+textarea.p-inputtextarea:enabled:focus {
+  outline: 0 none;
+  outline-offset: 0;
+  box-shadow: 0 0 0 1px var(--module-accent);
+  border-color: var(--module-accent);
+}
+
+input.p-inputtext:enabled:hover,
+textarea.p-inputtextarea:enabled:hover {
+  border-color: var(--module-accent);
+}
+
+/* --- Dropdown --- */
+.p-dropdown:not(.p-disabled).p-focus {
+  outline: 0 none !important;
+  outline-offset: 0 !important;
+  box-shadow: 0 0 0 0.2rem rgba(var(--module-accent-rgb), 0.2) !important;
+  border-color: var(--module-accent) !important;
+}
+
+.p-dropdown:not(.p-disabled):hover {
+  border-color: var(--module-accent);
+}
+
+/* Выбранный элемент в выпадающем списке */
+.p-dropdown-panel .p-dropdown-items .p-dropdown-item.p-highlight {
+  background: rgba(var(--module-accent-rgb), 0.18) !important;
+  color: var(--module-accent) !important;
+}
+
+.p-dropdown-panel .p-dropdown-items .p-dropdown-item.p-highlight.p-focus {
+  background: rgba(var(--module-accent-rgb), 0.28) !important;
+  color: var(--module-accent) !important;
+}
+
+/* Hover на невыбранном элементе */
+.p-dropdown-panel .p-dropdown-items .p-dropdown-item:not(.p-highlight):hover {
+  background: rgba(var(--module-accent-rgb), 0.08) !important;
+  color: var(--module-accent) !important;
+}
+
+/* --- Checkbox / RadioButton --- */
+.p-checkbox.p-highlight .p-checkbox-box,
+.p-radiobutton.p-highlight .p-radiobutton-box {
+  border-color: var(--module-accent);
+  background: var(--module-accent);
+}
+
+/* Компактные темные чекбоксы (используются в фильтрах) */
+.pb-checkbox-dark .p-checkbox .p-checkbox-box {
+  border-color: rgba(var(--module-accent-rgb), 0.45) !important;
+}
+.pb-checkbox-dark .p-checkbox.p-highlight .p-checkbox-box {
+  background: transparent !important;
+  border-color: var(--module-accent) !important;
+  color: var(--module-accent) !important;
+}
+.pb-checkbox-dark .p-checkbox.p-highlight .p-checkbox-icon {
+  color: var(--module-accent) !important;
+}
+
+/* --- InputSwitch --- */
+.p-inputswitch.p-inputswitch-checked .p-inputswitch-slider {
+  background: var(--module-accent);
+}
+
+/* --- Calendar (только базовые цвета) --- */
+.p-calendar:not(.p-disabled).p-focus > .p-inputtext {
+  box-shadow: 0 0 0 0.2rem rgba(var(--module-accent-rgb), 0.2);
+  border-color: var(--module-accent);
+}
+
+.p-datepicker .p-datepicker-header button,
+.p-datepicker .p-datepicker-buttonbar button {
+  color: var(--module-accent) !important;
+}
+
+.p-datepicker .p-datepicker-calendar .p-highlight {
+  background: var(--module-accent) !important;
+  color: #1a1a1a !important;
+  border-color: var(--module-accent) !important;
+}

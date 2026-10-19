@@ -143,32 +143,6 @@ body[data-module='prana-bindu'] .p-dialog .p-dialog-header-close svg path {
   min-width: 120px;
 }
 
-/* Чекбоксы и радиокнопки — песочный акцент */
-.pb-page .p-checkbox.p-highlight .p-checkbox-box,
-.pb-page .p-radiobutton.p-highlight .p-radiobutton-box {
-  border-color: var(--pb-accent);
-  background: var(--pb-accent);
-}
-
-/* Toggle кнопка тоже — на всякий случай */
-.pb-page .p-inputswitch.p-inputswitch-checked .p-inputswitch-slider {
-  background: var(--pb-accent);
-}
-
-/* Dropdown — border-color при focus */
-.pb-page .p-dropdown:not(.p-disabled).p-focus {
-  box-shadow: 0 0 0 1px var(--pb-accent);
-  border-color: var(--pb-accent);
-}
-
-/* InputText — focus-цвет */
-.pb-page .p-inputtext:enabled:focus {
-  outline: 0 none;
-  outline-offset: 0;
-  box-shadow: 0 0 0 1px var(--pb-accent);
-  border-color: var(--pb-accent);
-}
-
 /* ============================================================
    Переопределение глобального стиля панели внутри .pb-page
    Затрагивает только панели Prana-Bindu, не трогает OSINT.
@@ -199,19 +173,6 @@ body[data-module='prana-bindu'] .p-dialog .p-dialog-header-close svg path {
 
 /* InputText — hover-цвет рамки, песочный */
 .pb-page .p-inputtext:enabled:hover {
-  border-color: var(--pb-accent);
-}
-
-/* Dropdown — focus-цвет рамки и тени, песочный */
-.pb-page .p-dropdown:not(.p-disabled).p-focus {
-  outline: 0 none;
-  outline-offset: 0;
-  box-shadow: 0 0 0 0.2rem rgba(var(--pb-accent-rgb), 0.2);
-  border-color: var(--pb-accent);
-}
-
-/* Dropdown — hover-цвет рамки, песочный */
-.pb-page .p-dropdown:not(.p-disabled):hover {
   border-color: var(--pb-accent);
 }
 
