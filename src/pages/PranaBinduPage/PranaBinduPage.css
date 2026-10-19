@@ -4,6 +4,7 @@
 @import '@/styles/common/buttons.css';
 @import '@/styles/common/inputs.css';
 @import '@/styles/common/dialogs.css';
+@import '@/styles/common/tables.css';
 @import './styles/pb-layout.css';
 @import './styles/pb-components.css';
 
@@ -132,39 +133,6 @@ body[data-module='prana-bindu'] {
 .pb-page .p-panel .p-panel-header-icon.p-panel-toggler:focus {
   color: var(--pb-accent) !important;
   background-color: rgba(var(--pb-accent-rgb), 0.12) !important;
-}
-
-/* InputText — hover-цвет рамки, песочный */
-.pb-page .p-inputtext:enabled:hover {
-  border-color: var(--pb-accent);
-}
-
-/* Calendar (если появится) */
-.pb-page .p-calendar:not(.p-disabled).p-focus > .p-inputtext {
-  box-shadow: 0 0 0 0.2rem rgba(var(--pb-accent-rgb), 0.2);
-  border-color: var(--pb-accent);
-}
-
-/* MultiSelect (если появится) */
-.pb-page .p-multiselect:not(.p-disabled).p-focus {
-  box-shadow: 0 0 0 0.2rem rgba(var(--pb-accent-rgb), 0.2);
-  border-color: var(--pb-accent);
-}
-
-.pb-page .p-multiselect:not(.p-disabled):hover {
-  border-color: var(--pb-accent);
-}
-
-/* InputSwitch — checked (уже был в файле, оставим) */
-.pb-page .p-inputswitch.p-inputswitch-checked .p-inputswitch-slider {
-  background: var(--pb-accent);
-}
-
-.pb-page .p-dropdown:not(.p-disabled).p-focus {
-  outline: 0 none !important;
-  outline-offset: 0 !important;
-  box-shadow: 0 0 0 0.2rem rgba(var(--pb-accent-rgb), 0.2) !important;
-  border-color: var(--pb-accent) !important;
 }
 
 .pb-label-ok {
@@ -1381,79 +1349,6 @@ body[data-module='prana-bindu'],
   line-height: inherit;
 }
 
-/* ============================================================
-   Wellness: мини-таблица последних 14 дней
-   ============================================================ */
-
-.pb-wellness-table {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  font-size: 0.8rem;
-  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
-  margin-top: 0.5rem;
-}
-
-.pb-wellness-table__header,
-.pb-wellness-table__row {
-  display: grid;
-  grid-template-columns: 3.5rem 3rem 3rem 3rem 5rem 3.5rem 3.5rem;
-  gap: 0.5rem;
-  align-items: center;
-}
-
-.pb-wellness-table__header {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--tg-theme-hint-color, #708499);
-  padding-bottom: 0.3rem;
-  border-bottom: 1px solid var(--surface-border, rgba(255,255,255,0.08));
-  font-family: inherit;
-}
-
-.pb-wellness-table__row {
-  padding: 0.15rem 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-}
-
-.pb-wellness-table__row:last-child {
-  border-bottom: none;
-}
-
-.pb-wellness-table__date {
-  color: var(--tg-theme-hint-color, #708499);
-}
-
-.pb-wellness-table__val {
-  color: var(--tg-theme-text-color, #f5f5f5);
-  text-align: right;
-}
-
-.pb-wellness-table__header span {
-  text-align: right;
-}
-
-.pb-wellness-table__header span:first-child,
-.pb-wellness-table__date {
-  text-align: left;
-}
-
-.pb-wellness-table__val--dim {
-  color: var(--tg-theme-hint-color, #708499);
-  font-size: 0.75rem;
-}
-
-.pb-wellness-table__val--good {
-  color: #6fbf73;
-  font-weight: 600;
-}
-
-.pb-wellness-table__val--warn {
-  color: #e8a838;
-  font-weight: 600;
-}
-
 .pb-source-badge--manual {
   background: rgba(111, 191, 115, 0.18);
   color: #6fbf73;
@@ -1506,27 +1401,6 @@ body[data-module='prana-bindu'],
 
 .pb-connections__title .pi {
   font-size: 0.9rem;
-}
-
-/* ============================================================
-   Wellness-таблица: скролл
-   ============================================================ */
-
-.pb-wellness-table--scrollable .pb-wellness-table__body {
-  max-height: 360px;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--pb-accent) transparent;
-  padding-right: 0.25rem;
-}
-
-.pb-wellness-table--scrollable .pb-wellness-table__body::-webkit-scrollbar {
-  width: 8px;
-}
-
-.pb-wellness-table--scrollable .pb-wellness-table__body::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--pb-accent) 45%, transparent);
-  border-radius: 4px;
 }
 
 .pb-profile__src {
@@ -2199,14 +2073,6 @@ body[data-module='prana-bindu'] .p-tooltip.p-tooltip-bottom .p-tooltip-arrow {
    Библиотека шаблонов: диалог в стиле Prana-Bindu
    ============================================================ */
 
-.pb-templates-dialog .p-dialog-header {
-  background: var(--tg-theme-section-bg-color, #1e2a38);
-  color: var(--pb-accent);
-  border: none !important;
-  border-bottom: 1px solid var(--surface-border, rgba(255, 255, 255, 0.08)) !important;
-  padding: 0.75rem 1rem;
-}
-
 .pb-templates-dialog .p-dialog-header .p-dialog-title {
   color: var(--pb-accent) !important;
   font-weight: 600;
@@ -2278,9 +2144,7 @@ body[data-module='prana-bindu'] .p-tooltip.p-tooltip-bottom .p-tooltip-arrow {
 }
 
 .pb-templates-dialog .p-dialog-content {
-  padding: 0.75rem 1rem 1rem 1rem !important;
-  background: var(--tg-theme-bg-color, #17212b);
-  color: var(--tg-theme-text-color, #f5f5f5);
+  padding: 0.75rem 1rem 0.5rem 1rem !important;
 }
 
 /* Диалог: ограничение по высоте + flex-раскладка внутри */
@@ -2651,17 +2515,6 @@ body[data-module='prana-bindu'] .p-tooltip.p-tooltip-bottom .p-tooltip-arrow {
 
 .pb-templates-dialog.p-dialog-maximized .p-dialog-content {
   width: 100%;
-}
-
-/* Строки wellness-таблицы — кликабельные */
-.pb-wellness-table__row--clickable {
-  cursor: pointer;
-  transition: background-color 0.15s ease;
-  border-radius: 3px;
-}
-
-.pb-wellness-table__row--clickable:hover {
-  background: color-mix(in srgb, var(--pb-accent) 8%, transparent);
 }
 
 /* Бейдж источника в шапке wellness-drawer */
@@ -3600,161 +3453,6 @@ body[data-module='prana-bindu'] .p-tooltip.p-tooltip-bottom .p-tooltip-arrow {
 /* Focus ring */
 .pb-mirror-delete-dialog .p-checkbox.p-focus .p-checkbox-box {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--pb-accent) 25%, transparent) !important;
-}
-
-/* ============================================================
-   FullWeek — sticky-полоса недели на всю ширину
-   ============================================================ */
-
-/* Обёртка страницы Prana-Bindu: FullWeek сверху, контент ниже */
-.pb-page-root {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background: var(--tg-theme-bg-color, #17212b);
-}
-
-/* Корневой контейнер FullWeek */
-.pb-full-week {
-  position: relative;
-  z-index: 40;
-  background: var(--tg-theme-bg-color, #17212b);
-  border-bottom: 1px solid var(--surface-border, rgba(255, 255, 255, 0.08));
-  padding: 0.6rem 1rem 0.75rem 1rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
-}
-
-/* Прикреплено: вся панель фиксируется к верху окна */
-.pb-full-week.is-pinned {
-  position: sticky;
-  top: 0;
-}
-
-/* Откреплено: панель скроллится как обычный блок.
-   Никаких изменений padding / shadow — чтобы не было сдвига. */
-.pb-full-week.is-unpinned {
-  position: static;
-}
-
-/* Свёрнуто */
-.pb-full-week.is-collapsed {
-  padding-bottom: 0.6rem;
-}
-
-/* Toolbar */
-.pb-full-week__toolbar {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.6rem;
-  flex-wrap: nowrap; /* Запрещаем перенос на новую строку */
-}
-
-.pb-full-week__toolbar-left {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-shrink: 0;
-}
-
-.pb-full-week__range {
-  margin-left: 0.5rem;
-}
-
-.pb-full-week__spin {
-  color: var(--pb-accent);
-}
-
-.pb-full-week__legend {
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-}
-
-.pb-full-week__dot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-}
-
-.pb-full-week__dot--plan {
-  background: #009e80;
-}
-
-.pb-full-week__dot--fact {
-  background: var(--pb-accent);
-}
-
-.pb-full-week__sep {
-  margin: 0 0.2rem;
-  opacity: 0.5;
-}
-
-/* Слот держит место в тулбаре, пока кнопка «улётела»
-   в fixed-угол. Размеры слота и кнопки совпадают,
-   чтобы при переключении не было сдвига ни на пиксель. */
-.pb-full-week__pin-slot {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 2.51rem;
-  width: 2.51rem;
-  height: 2.51rem;
-}
-
-.pb-full-week__pin-btn.p-button {
-  min-width: 2.51rem !important;
-  width: 2.51rem !important;
-  height: 2.51rem !important;
-  padding: 0 !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-}
-
-/* Откреплено: та же кнопка выходит из потока.
-   top / left намеренно НЕ задаём — браузер возьмёт
-   «static position» (место кнопки в слоте тулбара)
-   и зафиксирует его относительно viewport. */
-.pb-full-week__pin-btn.is-floating.p-button {
-  position: fixed;
-  z-index: 100;
-  background: var(--tg-theme-bg-color, #17212b) !important;
-  border: 1px solid var(--pb-accent) !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-}
-
-.pb-full-week__pin-btn.is-floating.p-button:hover {
-  background: var(--pb-accent) !important;
-  color: var(--tg-theme-bg-color, #17212b) !important;
-}
-
-/* 7 ячеек */
-.pb-full-week__grid {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 0.5rem;
-  overflow-x: auto;
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--pb-accent) 45%, transparent) transparent;
-  padding-bottom: 0.25rem;
-}
-
-.pb-full-week__grid::-webkit-scrollbar {
-  height: 6px;
-}
-
-.pb-full-week__grid::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--pb-accent) 45%, transparent);
-  border-radius: 3px;
-}
-
-@media (max-width: 1200px) {
-  .pb-full-week__grid {
-    grid-template-columns: repeat(7, minmax(180px, 1fr));
-  }
 }
 
 .pb-full-week__day {
@@ -5424,30 +5122,6 @@ body[data-module='prana-bindu'] .p-tooltip.p-tooltip-bottom .p-tooltip-arrow {
   flex: 0 0 auto;
 }
 
-
-.pb-full-week__actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  flex-wrap: nowrap;
-  flex-shrink: 0;
-}
-
-.pb-full-week__actions .p-button.pb-soft.p-button-sm {
-  min-width: 2.25rem !important;
-  width: 2.25rem !important;
-  height: 2.25rem !important;
-  padding: 0 !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-}
-
-.pb-full-week__actions .p-button .p-button-icon {
-  font-size: 0.9rem;
-  margin: 0;
-}
-
 /* ============================================================
    CatalogPickerDialog — табы, collapse, поиск, выбор
    ============================================================ */
@@ -5823,131 +5497,4 @@ body[data-module='prana-bindu'] .p-tooltip.p-tooltip-bottom .p-tooltip-arrow {
 /* Уменьшаем иконку внутри Message */
 .pb-settings-dialog .p-inline-message .p-inline-message-icon {
   font-size: 1rem !important;
-}
-
-/* ============================================================
-   Бренд-заголовок в FullWeek
-   ============================================================ */
-
-.pb-full-week__brand {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  color: var(--pb-accent);
-  font-weight: 700;
-  font-size: 1.1rem;
-  white-space: nowrap;
-  margin-left: auto; /* Прижимает бренд вправо */
-  margin-right: 0.5rem;
-}
-
-.pb-full-week__brand .pi {
-  font-size: 1.25rem;
-}
-
-/* ============================================================
-   Центрирование контента страницы и сетка Wellness + Tabs
-   ============================================================ */
-
-.pb-page__content {
-  display: flex;
-  flex-direction: column;
-  align-items: center; /* Жестко центрируем все дочерние блоки */
-  gap: 1.25rem;
-  width: 100%;
-}
-
-/* Блок карточек модулей (Stillsuit, Crysknife...) растягиваем на всю ширину */
-.pb-page__content > .grid {
-  align-self: stretch; 
-  width: 100%;
-}
-
-/* Сетка панелей */
-.pb-main-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 1.5rem;
-  align-items: start;
-  width: 100%;
-  max-width: 800px;
-  margin: 0 auto; /* Центрируем сетку */
-}
-
-.pb-main-grid__col {
-  min-width: 0;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center; /* Центрируем всё содержимое колонки по горизонтали */
-}
-
-/* Убеждаемся, что панели занимают всю ширину колонки и центрируются */
-.pb-main-grid__col > .p-panel,
-.pb-main-grid__col > .pb-panel,
-.pb-main-grid__col > div {
-  width: 100%;
-  margin-left: auto;
-  margin-right: auto;
-}
-
-/* На широких экранах — две РАВНЫЕ колонки */
-@media (min-width: 1200px) {
-  .pb-main-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    max-width: 1400px;
-  }
-}
-
-/* ============================================================
-   Таблица истории порогов (Threshold History)
-   ============================================================ */
-
-.pb-threshold-table {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  font-size: 0.8rem;
-  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
-  margin-top: 0.5rem;
-}
-
-.pb-threshold-table__header,
-.pb-threshold-table__row {
-  display: grid;
-  grid-template-columns: 1fr 80px 80px 80px 80px;
-  gap: 0.5rem;
-  align-items: center;
-  padding: 0.25rem 0;
-}
-
-.pb-threshold-table__header {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--tg-theme-hint-color, #708499);
-  border-bottom: 1px solid var(--surface-border, rgba(255,255,255,0.08));
-  padding-bottom: 0.35rem;
-  margin-bottom: 0.25rem;
-}
-
-.pb-threshold-table__row {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-  color: var(--tg-theme-text-color, #f5f5f5);
-}
-
-.pb-threshold-table__row:last-child {
-  border-bottom: none;
-}
-
-.pb-threshold-table__date {
-  color: var(--tg-theme-hint-color, #708499);
-}
-
-.pb-threshold-table__val {
-  text-align: right;
-}
-
-.pb-threshold-table__header span:not(:first-child) {
-  text-align: right;
 }
