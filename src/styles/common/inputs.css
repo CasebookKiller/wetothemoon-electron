@@ -95,3 +95,52 @@ textarea.p-inputtextarea:enabled:hover {
   color: #1a1a1a !important;
   border-color: var(--module-accent) !important;
 }
+
+/* ============================================================
+   COMMON Slider (PrimeReact overrides)
+   ============================================================ */
+.p-slider {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-radius: 4px !important;
+}
+
+.p-slider .p-slider-range {
+  background: var(--module-accent) !important;
+}
+
+.p-slider .p-slider-handle {
+  background: var(--module-accent) !important;
+  border: 2px solid var(--tg-theme-bg-color, #17212b) !important;
+  width: 1.2rem !important;
+  height: 1.2rem !important;
+  margin-top: -0.6rem !important;
+  transition: box-shadow 0.2s ease !important;
+}
+
+.p-slider .p-slider-handle:focus {
+  box-shadow: 0 0 0 3px rgba(var(--module-accent-rgb), 0.3) !important;
+  outline: none !important;
+}
+
+.p-slider-horizontal {
+  height: 6px !important;
+}
+
+/* Компактные чекбоксы в стиле Prana-Bindu (как в фильтрах) */
+.pb-checkbox-dark .p-checkbox .p-checkbox-box {
+  width: 1rem !important;
+  height: 1rem !important;
+  border-radius: 2px !important;
+  border: 1px solid rgba(var(--module-accent-rgb), 0.45) !important;
+  background: transparent !important;
+}
+.pb-checkbox-dark .p-checkbox.p-highlight .p-checkbox-box {
+  background: transparent !important;
+  border-color: var(--module-accent) !important;
+  color: var(--module-accent) !important;
+}
+.pb-checkbox-dark .p-checkbox.p-highlight .p-checkbox-icon {
+  color: var(--module-accent) !important;
+  width: 0.65rem !important;
+  height: 0.65rem !important;
+}

@@ -55,6 +55,7 @@ import {
 import { Toast } from 'primereact/toast';
 import { ExerciseGraphDialog } from '@/components/PRANA_BINDU/ExerciseGraph/ExerciseGraphDialog';
 import { SettingsDialog } from '@/components/PRANA_BINDU/SettingsDialog/SettingsDialog';
+import { RouteMapEditor } from '@/components/PRANA_BINDU/RouteMapEditor';
 
 const MODULES = [
   { name: 'Stillsuit', description: 'Марафон: пульс, темп, экономичность' },
@@ -380,6 +381,8 @@ export const PranaBinduPage: React.FC = () => {
   const toastRef = React.useRef<Toast>(null);
   const [graphVisible, setGraphVisible] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
+  const [mapVisible, setMapVisible] = useState(false);
+  const [standaloneRunId, setStandaloneRunId] = useState<number | null>(null);
   // Счётчик для принудительного обновления FullWeek при изменении фактов
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -742,106 +745,109 @@ export const PranaBinduPage: React.FC = () => {
           setTemplatesVisible(true);
         }}
         onOpenGraph={() => setGraphVisible(true)}
+        onOpenMap={() => {
+          setStandaloneRunId(null);
+          setMapVisible(true);
+        }}
       />
 
       <div className="pb-page p-4">
-        <div className="mb-4">
-          <h1 className="pb-title">
-            <i className="pi pi-wave-pulse pb-title-icon" />
-            Prana-Bindu
-          </h1>
-          <p className="pb-subtitle">Тренировки тела: бег и сила</p>
-        </div>
-
-        <div className="grid mb-3">
-          {MODULES.map((m) => (
-            <div key={m.name} className="col-12 md:col-6 lg:col-4 p-2">
-              <div className="surface-card p-3 shadow-2 border-round h-full">
-                <div className="pb-module-name">{m.name}</div>
-                <div className="pb-module-desc">{m.description}</div>
+        <div className="pb-page__content">
+          <div className="grid">
+            {MODULES.map((m) => (
+              <div key={m.name} className="col-12 md:col-6 lg:col-4 p-2">
+                <div className="surface-card p-3 shadow-2 border-round h-full">
+                  <div className="pb-module-name">{m.name}</div>
+                  <div className="pb-module-desc">{m.description}</div>
+                </div>
               </div>
+            ))}
+
+            {/* Сюда надо перенести панели, но здесь надо поработать над стилями, шириной и стилями панелей при расзмещении в решетке */}
+            
+          </div>
+
+          {/* Настройки (профиль / подключения / синхронизация / импорт)
+              вынесены в модалку — открывается кнопкой в FullWeek. */}
+
+          {/* ==================== WELLNESS + TABS ==================== */}
+          <div className="pb-main-grid">
+            <div className="pb-main-grid__col">
+              <WellnessPanel ref={wellnessPanelRef} from={syncFrom} to={syncTo} />
             </div>
-          ))}
-
-          {/* Сюда надо перенести панели, но здесь надо поработать над стилями, шириной и стилями панелей при расзмещении в решетке */}
-          
-        </div>
-
-        {/* Настройки (профиль / подключения / синхронизация / импорт)
-            вынесены в модалку — открывается кнопкой в FullWeek. */}
-
-        {/* ==================== WELLNESS (таблица) ==================== */}
-        <WellnessPanel ref={wellnessPanelRef} from={syncFrom} to={syncTo} />
-
-        <TrainingTabs
-          tabs={[
-            {
-              key: 'calendar',
-              label: 'Календарь',
-              title: 'Календарь',
-              node: (
-                <CalendarPanel
-                  loadRange={handleLoadCalendarRange}
-                  onDayClick={(d) => setDayDrawerDate(d)}
-                />
-              ),
-            },
-            {
-              key: 'plan',
-              label: 'План',
-              title:
-                planEvents.length > 0
-                  ? `План · ${planEvents.length}`
-                  : 'План',
-              node: (
-                <PlanEventsPanel
-                  events={planEvents}
-                  loading={planLoading}
-                  syncing={planSyncing}
-                  clearing={planClearing}
-                  error={planError}
-                  syncResult={planSyncResult}
-                  onSync={handleSyncPlan}
-                  onClear={handleClearPlan}
-                  onMassDelete={() => setMassDeleteVisible(true)}
-                  onOpenEvent={handleOpenPlanEvent}
-                  onOpenTemplates={() => setTemplatesVisible(true)}
-                  onOpenEquivalences={() => {
-                    setTemplatesInitialMode('equivalences');
-                    setTemplatesVisible(true);
-                  }}
-                />
-              ),
-            },
-            {
-              key: 'runs',
-              label: 'Пробежки',
-              title:
-                activeFilterCount > 0
-                  ? `Пробежки · ${filteredFacts.length} из ${groupedFacts.length}`
-                  : `Пробежки · ${groupedFacts.length}${
-                      groupedFacts.length !== runFacts.length
-                        ? ` (${runFacts.length} записей)`
-                        : ''
-                    }`,
-              node: (
-                <RunsPanel
-                  items={filteredFacts}
-                  loading={factsLoading}
-                  error={factsError}
-                  filters={filters}
-                  onFiltersChange={setFilters}
-                  onResetFilters={handleResetFilters}
-                  activeFilterCount={activeFilterCount}
-                  onOpenFact={(fact) => {
-                    setSelectedFact(fact);
-                    setDrawerVisible(true);
-                  }}
-                />
-              ),
-            },
-          ]}
-        />
+            <div className="pb-main-grid__col">
+              <TrainingTabs
+            tabs={[
+              {
+                key: 'calendar',
+                label: 'Календарь',
+                title: 'Календарь',
+                node: (
+                  <CalendarPanel
+                    loadRange={handleLoadCalendarRange}
+                    onDayClick={(d) => setDayDrawerDate(d)}
+                  />
+                ),
+              },
+              {
+                key: 'plan',
+                label: 'План',
+                title:
+                  planEvents.length > 0
+                    ? `План · ${planEvents.length}`
+                    : 'План',
+                node: (
+                  <PlanEventsPanel
+                    events={planEvents}
+                    loading={planLoading}
+                    syncing={planSyncing}
+                    clearing={planClearing}
+                    error={planError}
+                    syncResult={planSyncResult}
+                    onSync={handleSyncPlan}
+                    onClear={handleClearPlan}
+                    onMassDelete={() => setMassDeleteVisible(true)}
+                    onOpenEvent={handleOpenPlanEvent}
+                    onOpenTemplates={() => setTemplatesVisible(true)}
+                    onOpenEquivalences={() => {
+                      setTemplatesInitialMode('equivalences');
+                      setTemplatesVisible(true);
+                    }}
+                  />
+                ),
+              },
+              {
+                key: 'runs',
+                label: 'Пробежки',
+                title:
+                  activeFilterCount > 0
+                    ? `Пробежки · ${filteredFacts.length} из ${groupedFacts.length}`
+                    : `Пробежки · ${groupedFacts.length}${
+                        groupedFacts.length !== runFacts.length
+                          ? ` (${runFacts.length} записей)`
+                          : ''
+                      }`,
+                node: (
+                  <RunsPanel
+                    items={filteredFacts}
+                    loading={factsLoading}
+                    error={factsError}
+                    filters={filters}
+                    onFiltersChange={setFilters}
+                    onResetFilters={handleResetFilters}
+                    activeFilterCount={activeFilterCount}
+                    onOpenFact={(fact) => {
+                      setSelectedFact(fact);
+                      setDrawerVisible(true);
+                    }}
+                  />
+                ),
+              },
+            ]}
+              />
+            </div>
+          </div>
+        </div> {/* .pb-page__content */}
 
         <DodofoDebugDialog
           visible={debugVisible}
@@ -854,6 +860,11 @@ export const PranaBinduPage: React.FC = () => {
           runFact={selectedFact}
           onHide={() => setDrawerVisible(false)}
           onAfterSync={() => loadRunFacts()}
+          onOpenFullMap={(id) => {
+            setDrawerVisible(false);
+            setStandaloneRunId(id);
+            setMapVisible(true);
+          }}
         />
 
         <PlanEventDrawer
@@ -937,6 +948,15 @@ export const PranaBinduPage: React.FC = () => {
       <ExerciseGraphDialog
         visible={graphVisible}
         onHide={() => setGraphVisible(false)}
+      />
+
+      <RouteMapEditor
+        visible={mapVisible}
+        initialRunId={standaloneRunId ?? undefined}
+        onHide={() => {
+          setMapVisible(false);
+          setStandaloneRunId(null);
+        }}
       />
 
       <SettingsDialog

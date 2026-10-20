@@ -92,6 +92,7 @@ import {
 } from '../services/pranaBindu/mentat/workoutMatcher';
 import { buildExerciseGraph, auditGraph } from '../services/pranaBindu/mentat/graph/graphBuilder';
 import { registerCustomExercise } from '../services/pranaBindu/mentat/exerciseCatalog';
+import { computeThresholds } from '../services/pranaBindu/core/thresholds';
 import { DifficultyBand, ProgramProps } from '../services/pranaBindu/mentat/graph/ontology';
 
 import { WADE_SEED, ENABLED_SEEDS } from '../services/pranaBindu/mentat/graph/data';
@@ -5298,6 +5299,55 @@ export function registerPranaBinduHandlers(): void {
         movementKey: payload.type === 'progression' ? groupKey : key,
         level: payload.type === 'progression' ? level : undefined
       };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+    ipcMain.handle('pb:compute-thresholds', async (_event, windowDays: number = 365) => {
+    try {
+      const db = getMelange();
+      const result = computeThresholds(db, windowDays);
+
+      // Записываем в историю
+      db.prepare(`
+        INSERT INTO threshold_history 
+        (computed_at, window_days, lthr, hrmax, resthr, source, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        new Date().toISOString(),
+        windowDays,
+        result.lthr,
+        result.hrmax,
+        result.resthr,
+        result.source,
+        result.notes
+      );
+
+      // НЕ обновляем profile здесь, чтобы не затереть данные провайдеров.
+      // Обновление профиля будет отдельной кнопкой "Применить".
+
+      return { success: true, data: result };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('pb:get-threshold-history', async () => {
+    try {
+      const rows = getMelange()
+        .prepare(`
+          SELECT * FROM threshold_history
+          WHERE id IN (
+            SELECT MAX(id) 
+            FROM threshold_history 
+            GROUP BY substr(computed_at, 1, 10)
+          )
+          ORDER BY computed_at DESC
+          LIMIT 30
+        `)
+        .all();
+      return { success: true, items: rows };
     } catch (e) {
       return { success: false, error: (e as Error).message };
     }

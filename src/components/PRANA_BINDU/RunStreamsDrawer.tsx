@@ -50,6 +50,7 @@ interface Props {
   runFact: RunFactLite | null;
   onHide: () => void;
   onAfterSync: () => void;
+  onOpenFullMap?: (runFactId: number) => void;
 }
 
 // ==================== Форматтеры ====================
@@ -340,6 +341,7 @@ export const RunStreamsDrawer: React.FC<Props> = ({
   runFact,
   onHide,
   onAfterSync,
+  onOpenFullMap,
 }) => {
   const api = (window as any).electronAPI;
 
@@ -461,6 +463,16 @@ export const RunStreamsDrawer: React.FC<Props> = ({
             </span>
           )}
         </div>
+        {runFact && onOpenFullMap && (
+          <Button
+            icon="pi pi-map"
+            text
+            className="pb-drawer__name-edit"
+            onClick={() => onOpenFullMap(runFact.id)}
+            tooltip="Открыть на большой карте"
+            tooltipOptions={{ position: 'bottom' }}
+          />
+        )}
       </div>
 
       {!loadingFacts && facts.length > 0 && (() => {

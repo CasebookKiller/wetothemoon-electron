@@ -107,8 +107,8 @@ export function groupRunFacts(
         if (pa !== pb) return pa - pb;
         return (a.id ?? 0) - (b.id ?? 0);
       });
-      const sources = sortedGroup.map((s) =>
-        sourceBadge(s.source, s.origin)
+      const sources = Array.from(
+        new Set(sortedGroup.map((s) => sourceBadge(s.source, s.origin)))
       );
       const hasStreams = sortedGroup.some((s) => streamsMap[s.id]?.length);
 
