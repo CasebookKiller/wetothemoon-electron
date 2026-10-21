@@ -303,15 +303,33 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
 
   const elevationGain = useMemo(() => {
     if (!streams?.elevationM) return 0;
+    const raw = streams.elevationM;
+    
+    // 1. Сглаживание (скользящее среднее по 5 точкам)
+    const windowSize = 5;
+    const smooth: (number | null)[] = [];
+    for (let i = 0; i < raw.length; i++) {
+      let sum = 0;
+      let count = 0;
+      for (let j = Math.max(0, i - windowSize); j <= Math.min(raw.length - 1, i + windowSize); j++) {
+        if (raw[j] != null) {
+          sum += raw[j]!;
+          count++;
+        }
+      }
+      smooth.push(count > 0 ? sum / count : null);
+    }
+
+    // 2. Подсчёт с порогом 3 метра (отсекает GPS-шум)
     let gain = 0;
-    // Порог 1.5 метра отсекает шум высотомера (GPS-дрожание),
-    // иначе на 5 км набегает несколько тысяч метров набора.
-    const threshold = 1.5;
-    let last = streams.elevationM[0] ?? 0;
-    for (let i = 1; i < streams.elevationM.length; i++) {
-      const curr = streams.elevationM[i];
+    const threshold = 3.0;
+    let last = smooth[0] ?? 0;
+    
+    for (let i = 1; i < smooth.length; i++) {
+      const curr = smooth[i];
       if (curr == null) continue;
       const diff = curr - last;
+      
       if (diff > threshold) {
         gain += diff;
         last = curr;

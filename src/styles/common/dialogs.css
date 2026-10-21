@@ -143,3 +143,29 @@ body[data-module] .p-dialog .p-dialog-content {
   padding-bottom: 16px;
   box-sizing: border-box;
 }
+
+/* ==================== Фикс синего фокуса Dropdown в Prana-Bindu ==================== */
+
+/* Переопределяем внутренние переменные PrimeReact v10 */
+body[data-module] .p-dialog {
+  --p-dropdown-focus-ring-color: var(--module-accent) !important;
+  --p-dropdown-focus-ring-shadow: 0 0 0 2px var(--module-accent) !important;
+  --p-inputtext-focus-ring-color: var(--module-accent) !important;
+  --p-inputtext-focus-ring-shadow: 0 0 0 2px var(--module-accent) !important;
+}
+
+/* Убираем синюю рамку при фокусе, нажатии и наведении */
+body[data-module] .p-dialog .p-dropdown:not(.p-disabled):hover,
+body[data-module] .p-dialog .p-dropdown:not(.p-disabled).p-focus,
+body[data-module] .p-dialog .p-dropdown:not(.p-disabled):focus,
+body[data-module] .p-dialog .p-dropdown:not(.p-disabled):active,
+body[data-module] .p-dialog .p-dropdown:not(.p-disabled).p-inputwrapper-focus {
+  border-color: var(--module-accent) !important;
+  box-shadow: 0 0 0 2px var(--module-accent) !important;
+  outline: none !important;
+}
+
+/* Убираем синюю рамку у самой панели (списка) */
+body[data-module] .p-dialog .p-dropdown-panel {
+  border-color: var(--surface-border) !important;
+}
