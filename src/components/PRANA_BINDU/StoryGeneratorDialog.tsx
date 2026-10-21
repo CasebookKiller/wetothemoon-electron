@@ -5,11 +5,9 @@ import { Button } from 'primereact/button';
 import { Dropdown } from 'primereact/dropdown';
 import { Slider } from 'primereact/slider';
 import { LngLatBounds, Map as MapLibreMap } from 'maplibre-gl';
-import { getOsmStyleObject, getSavedLayers, PALETTES } from './mapStyles';
+import { getOsmStyleObject, getSavedLayers, PALETTES, GradientChannel } from './mapStyles';
 
 // ==================== Типы ====================
-
-type GradientChannel = 'none' | 'hr' | 'speedKmh' | 'elevationM';
 
 interface Props {
   visible: boolean;
@@ -302,25 +300,48 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
   // ==================== Вычисляемые ====================
 
   const elevationGain = useMemo(() => {
+    // 1. Пытаемся взять готовое значение из метаданных тренировки (самый точный путь)
+    if (fact?.raw_json) {
+      try {
+        const raw = typeof fact.raw_json === 'string' 
+          ? JSON.parse(fact.raw_json) 
+          : fact.raw_json;
+
+        // Zepp/FIT хранит в summary.elevationGain
+        // intervals.icu хранит в total_elevation_gain или raw.total_elevation_gain
+        const gain = 
+          raw?.summary?.elevationGain ??
+          raw?.total_elevation_gain ??
+          raw?.raw?.total_elevation_gain;
+
+        if (typeof gain === 'number' && gain > 0) {
+          return Math.round(gain);
+        }
+      } catch (e) {
+        console.warn('[Story] Не удалось распарсить raw_json для высоты', e);
+      }
+    }
+
+    // 2. Fallback: если метаданных нет, считаем сами из потоков
     if (!streams?.elevationM) return 0;
-    const raw = streams.elevationM;
+    const rawElev = streams.elevationM;
     
-    // 1. Сглаживание (скользящее среднее по 5 точкам)
+    // Сглаживание (скользящее среднее по 5 точкам)
     const windowSize = 5;
     const smooth: (number | null)[] = [];
-    for (let i = 0; i < raw.length; i++) {
+    for (let i = 0; i < rawElev.length; i++) {
       let sum = 0;
       let count = 0;
-      for (let j = Math.max(0, i - windowSize); j <= Math.min(raw.length - 1, i + windowSize); j++) {
-        if (raw[j] != null) {
-          sum += raw[j]!;
+      for (let j = Math.max(0, i - windowSize); j <= Math.min(rawElev.length - 1, i + windowSize); j++) {
+        if (rawElev[j] != null) {
+          sum += rawElev[j]!;
           count++;
         }
       }
       smooth.push(count > 0 ? sum / count : null);
     }
 
-    // 2. Подсчёт с порогом 3 метра (отсекает GPS-шум)
+    // Порог 3 метра
     let gain = 0;
     const threshold = 3.0;
     let last = smooth[0] ?? 0;
@@ -338,9 +359,11 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
       }
     }
     return Math.round(gain);
-  }, [streams]);
+  }, [streams, fact]);
 
   const splits = useMemo(() => {
+    console.log('[Story] fact raw:', fact);
+    console.log('[Story] streams channels:', Object.keys(streams || {}));
     if (!streams?.distM || !streams?.secT) return [];
     const result: { km: number; paceSec: number }[] = [];
     let lastDist = 0;
@@ -613,7 +636,7 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
     const maxHr = fact.max_hr ?? '—';
 
     const noBgLayout =
-      layout === 'splits' || layout === 'receipt' || layout === 'minimal';
+      layout === 'receipt' || layout === 'minimal';
 
     if (noBgLayout) {
       ctx.fillStyle = '#111111';
@@ -634,6 +657,12 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
       gradientFade.addColorStop(1, 'rgba(0,0,0,0.85)');
       ctx.fillStyle = gradientFade;
       ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+      // Для сплитов добавляем легкое затемнение, чтобы карта/фото были видны
+      if (layout === 'splits') {
+        ctx.fillStyle = 'rgba(17, 17, 17, 0.45)';
+        ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      }
     }
 
     ctx.fillStyle = '#ffffff';
@@ -681,27 +710,54 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
       drawPill(`СР. ПУЛЬС ${hr} УД / МИН`, 80, 880);
       drawPill(`НАБОР ${elevationGain} М`, 80, 980);
     } else if (layout === 'splits') {
-      ctx.font = 'bold 70px Inter, sans-serif';
-      ctx.fillText('Промежуточное время по км', 80, 300);
+      // Добавим подложку под заголовок для читаемости на любом фоне
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+      ctx.beginPath();
+      ctx.roundRect(60, 170, 960, 100, 20);
+      ctx.fill();
+
+      ctx.font = 'bold 55px Inter, sans-serif';
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.fillText('Промежуточное время по км', CANVAS_WIDTH / 2, 235);
+      
       ctx.font = 'bold 50px Inter, sans-serif';
-      let y = 500;
-      const maxBarWidth = 500;
+      let y = 400;
+      const maxBarWidth = 350; 
       const maxPace = Math.max(...splits.map((s) => s.paceSec));
       const minPace = Math.min(...splits.map((s) => s.paceSec));
+      
       splits.forEach((s) => {
+        // Подложка под каждую строку (чтобы текст не сливался с картой)
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.beginPath();
+        ctx.roundRect(60, y - 10, 960, 80, 40);
+        ctx.fill();
+
+        // Номер километра
+        ctx.textAlign = 'left';
         ctx.fillStyle = '#ffffff';
-        ctx.fillText(String(s.km), 80, y + 40);
+        ctx.fillText(String(s.km), 100, y + 45);
+        
+        // Полоска (акцентный цвет Prana-Bindu)
         const ratio =
           maxPace === minPace ? 1 : (maxPace - s.paceSec) / (maxPace - minPace);
-        const barWidth = 150 + ratio * maxBarWidth;
-        ctx.fillStyle = '#ff5a00';
+        const barWidth = 100 + ratio * maxBarWidth;
+        ctx.fillStyle = '#d4a373';
         ctx.beginPath();
-        ctx.roundRect(160, y, barWidth, 60, 30);
+        ctx.roundRect(160, y + 5, barWidth, 50, 25);
         ctx.fill();
+        
+        // Время темпа
         ctx.fillStyle = '#ffffff';
-        ctx.fillText(secToPaceStr(s.paceSec), 160 + maxBarWidth + 50, y + 40);
-        y += 100;
+        ctx.textAlign = 'right';
+        ctx.fillText(secToPaceStr(s.paceSec), CANVAS_WIDTH - 100, y + 45);
+        
+        y += 95;
       });
+      
+      // Возвращаем выравнивание для подписи
+      ctx.textAlign = 'left';
       ctx.font = 'bold 60px Inter, sans-serif';
       ctx.fillText('smth.run', 80, 1750);
     } else if (layout === 'dotted') {
@@ -798,7 +854,8 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
     const map = mapRef.current;
     if (!map) return;
 
-    const noBgLayout = layout === 'splits' || layout === 'receipt' || layout === 'minimal';
+    // Убрали 'splits' из списка макетов без фона
+    const noBgLayout = layout === 'receipt' || layout === 'minimal';
 
     const outCanvas = document.createElement('canvas');
     outCanvas.width = CANVAS_WIDTH;
