@@ -5,6 +5,7 @@ import { Button } from 'primereact/button';
 import { Dropdown } from 'primereact/dropdown';
 import { Slider } from 'primereact/slider';
 import { Checkbox } from 'primereact/checkbox';
+import { InputText } from 'primereact/inputtext';
 import {
   Map as MapLibreMap,
   Marker,
@@ -98,6 +99,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
 
   const [activeTab, setActiveTab] = useState<TabType>('runs');
   const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Слои карты
   const [layers, setLayers] = useState<RasterLayer[]>(() => getSavedLayers());
@@ -160,11 +162,28 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     }
   }, [visible, initialRunId, groupedRuns]);
 
-  useEffect(() => { setVisibleCount(CHUNK_SIZE); }, [rawFacts]);
+  useEffect(() => { setVisibleCount(CHUNK_SIZE); }, [rawFacts, searchQuery]);
+
+  // Автовыбор последней пробежки при открытии редактора
+  useEffect(() => {
+    if (visible && !initialRunId && groupedRuns.length > 0 && !selectedGroup) {
+      setSelectedGroup(groupedRuns[0]);
+      setSelectedSource(groupedRuns[0].primary.source);
+    }
+  }, [visible, initialRunId, groupedRuns, selectedGroup]);
+
+  // Фильтрация по поисковому запросу
+  const filteredGroups = useMemo(() => {
+    if (!searchQuery.trim()) return groupedRuns;
+    const lower = searchQuery.toLowerCase();
+    return groupedRuns.filter((g) =>
+      g.displayName.toLowerCase().includes(lower)
+    );
+  }, [groupedRuns, searchQuery]);
 
   const visibleGroups = useMemo(
-    () => groupedRuns.slice(0, visibleCount),
-    [groupedRuns, visibleCount]
+    () => filteredGroups.slice(0, visibleCount),
+    [filteredGroups, visibleCount]
   );
 
   // Подгрузка по скроллу
@@ -178,7 +197,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     };
     list.addEventListener('scroll', onScroll, { passive: true });
     return () => list.removeEventListener('scroll', onScroll);
-  }, [groupedRuns.length]);
+  }, [filteredGroups.length]);
 
   // ==================== Инициализация карты ====================
   useEffect(() => {
@@ -200,7 +219,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
           center: [37.618423, 55.751244],
           zoom: 12,
           attributionControl: { compact: true },
-          // В новых версиях MapLibre настройки WebGL-контекста передаются сюда
           canvasContextAttributes: {
             preserveDrawingBuffer: true, 
           },
@@ -532,9 +550,9 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
 
   const handlePrevTrack = () => {
     if (!selectedGroup) return;
-    const currentIndex = groupedRuns.findIndex(g => g.startTime === selectedGroup.startTime && g.primary.id === selectedGroup.primary.id);
+    const currentIndex = filteredGroups.findIndex(g => g.startTime === selectedGroup.startTime && g.primary.id === selectedGroup.primary.id);
     if (currentIndex > 0) {
-      const nextGroup = groupedRuns[currentIndex - 1];
+      const nextGroup = filteredGroups[currentIndex - 1];
       setSelectedGroup(nextGroup);
       setSelectedSource(nextGroup.primary.source);
     }
@@ -542,9 +560,9 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
 
   const handleNextTrack = () => {
     if (!selectedGroup) return;
-    const currentIndex = groupedRuns.findIndex(g => g.startTime === selectedGroup.startTime && g.primary.id === selectedGroup.primary.id);
-    if (currentIndex < groupedRuns.length - 1) {
-      const nextGroup = groupedRuns[currentIndex + 1];
+    const currentIndex = filteredGroups.findIndex(g => g.startTime === selectedGroup.startTime && g.primary.id === selectedGroup.primary.id);
+    if (currentIndex < filteredGroups.length - 1) {
+      const nextGroup = filteredGroups[currentIndex + 1];
       setSelectedGroup(nextGroup);
       setSelectedSource(nextGroup.primary.source);
     }
@@ -596,8 +614,23 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
             </div>
 
             {activeTab === 'runs' && (
-              <div ref={listRef} style={{ flex: 1, overflowY: 'auto', padding: '0.5rem' }}>
-                {loadingFacts && <div className="pb-hint" style={{ textAlign: 'center', padding: '1rem' }}>Загрузка...</div>}
+              <>
+                <div style={{ padding: '0.75rem', borderBottom: '1px solid var(--surface-border)' }}>
+                  <div className="pb-run-filters__row">
+                    <label className="pb-label">Поиск по названию</label>
+                    <span className="pb-run-filters__search-wrap">
+                      <i className="pi pi-search" />
+                      <InputText
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Утренний, длинная, 1047…"
+                        className="pb-run-filters__search"
+                      />
+                    </span>
+                  </div>
+                </div>
+                <div ref={listRef} style={{ flex: 1, overflowY: 'auto', padding: '0.5rem' }}>
+                  {loadingFacts && <div className="pb-hint" style={{ textAlign: 'center', padding: '1rem' }}>Загрузка...</div>}
                 {!loadingFacts && visibleGroups.map((g, idx) => {
                   const isSelected = selectedGroup?.primary.id === g.primary.id && selectedGroup?.startTime === g.startTime;
                   return (
@@ -628,7 +661,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                     </div>
                   );
                 })}
-                {visibleCount < groupedRuns.length && (
+                {visibleCount < filteredGroups.length && (
                   <div style={{ textAlign: 'center', padding: '0.5rem' }}>
                     <Button
                       label="Показать ещё"
@@ -637,7 +670,8 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                     />
                   </div>
                 )}
-              </div>
+                </div>
+              </>
             )}
 
             {activeTab === 'filters' && (
@@ -789,6 +823,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                         { label: 'Пульс', value: 'hr' },
                         { label: 'Скорость', value: 'speedKmh' },
                         { label: 'Высота', value: 'elevationM' },
+                        { label: 'Каденс', value: 'cadence' },
                       ]}
                       onChange={(e) => updateGradient({ channel: e.value })}
                       className="pb-wade-programs__dd w-full"
@@ -890,7 +925,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                   pointerEvents: 'auto', width: 'fit-content', height: '2.5rem', boxSizing: 'border-box'
                 }}>
                   <Button icon="pi pi-chevron-left" text className="pb-drawer__name-edit" 
-                    onClick={handlePrevTrack} disabled={groupedRuns[0]?.primary.id === selectedGroup.primary.id}
+                    onClick={handlePrevTrack} disabled={filteredGroups[0]?.primary.id === selectedGroup.primary.id}
                     tooltip="Предыдущий трек" tooltipOptions={{ position: 'bottom' }}
                   />
                   <div style={{ fontSize: '0.75rem', color: 'var(--pb-accent)', minWidth: '7rem', textAlign: 'center', lineHeight: 1.2 }}>
@@ -898,7 +933,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                     <span style={{ color: 'var(--tg-hint)', fontSize: '0.65rem' }}>{selectedGroup.date}</span>
                   </div>
                   <Button icon="pi pi-chevron-right" text className="pb-drawer__name-edit"
-                    onClick={handleNextTrack} disabled={groupedRuns[groupedRuns.length - 1]?.primary.id === selectedGroup.primary.id}
+                    onClick={handleNextTrack} disabled={filteredGroups[filteredGroups.length - 1]?.primary.id === selectedGroup.primary.id}
                     tooltip="Следующий трек" tooltipOptions={{ position: 'bottom' }}
                   />
                 </div>
