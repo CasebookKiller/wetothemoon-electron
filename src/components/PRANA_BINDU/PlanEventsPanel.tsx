@@ -10,6 +10,7 @@ import { Column } from 'primereact/column';
 import { DataTable } from 'primereact/datatable';
 import { Message } from 'primereact/message';
 import { THENICS_CATALOG } from '@/main/services/pranaBindu/mentat/thenicsCatalog';
+import { AddPlanEventDialog } from './AddPlanEventDialog';
 
 export interface PlanEventLite {
   id: number;
@@ -94,7 +95,9 @@ export const PlanEventsPanel: React.FC<Props> = ({
   onOpenTemplates,
   onOpenEquivalences,
 }) => {
-    const api = (window as any).electronAPI;
+  const api = (window as any).electronAPI;
+
+  const [addVisible, setAddVisible] = useState(false);
 
   // Счётчик разметки Thenics для баннера.
   const [mappedCount, setMappedCount] = useState<number | null>(null);
@@ -187,6 +190,15 @@ export const PlanEventsPanel: React.FC<Props> = ({
           onClick={onOpenTemplates}
           disabled={syncing || clearing}
           tooltip="Готовые шаблоны тренировок для конструктора ICU"
+        />
+        <Button
+          label="Добавить"
+          icon="pi pi-plus"
+          className="pb p-button-sm"
+          onClick={() => setAddVisible(true)}
+          disabled={syncing || clearing}
+          tooltip="Добавить тренировку в план вручную"
+          tooltipOptions={{ position: 'bottom' }}
         />
       </div>
 
@@ -306,6 +318,15 @@ export const PlanEventsPanel: React.FC<Props> = ({
           }
         />
       </DataTable>
+
+      <AddPlanEventDialog
+        visible={addVisible}
+        onHide={() => setAddVisible(false)}
+        onCreated={() => {
+          setAddVisible(false);
+          onSync(); // перезагрузить список
+        }}
+      />
     </div>
   );
 };

@@ -140,9 +140,10 @@ function saveStoredRange(from: Date, to: Date): void {
 }
 
 function defaultSyncRange(): { from: Date; to: Date } {
-  const to = new Date();
   const from = new Date();
-  from.setDate(from.getDate() - 30);
+  from.setDate(from.getDate() - 30);   // 30 дней назад
+  const to = new Date();
+  to.setDate(to.getDate() + 30);       // 30 дней вперёд (план)
   return { from, to };
 }
 
@@ -583,6 +584,7 @@ export const PranaBinduPage: React.FC = () => {
           `+${res.added} · ~${res.updated} · связанных: ${res.linked ?? 0}`
         );
         await loadPlanEvents();
+        setRefreshKey((k) => k + 1);   // ← заставит FullWeek перемонтироваться
 
         const stale: StaleCandidate[] = res.staleCandidates ?? [];
         if (stale.length > 0) {
