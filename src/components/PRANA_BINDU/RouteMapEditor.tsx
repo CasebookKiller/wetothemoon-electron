@@ -22,8 +22,14 @@ import {
   TrackSettings,
   getSavedTrackSettings,
   saveTrackSettings,
-  DEFAULT_TRACK_SETTINGS, // <-- добавили
+  DEFAULT_TRACK_SETTINGS,
+  GradientChannel,
+  GradientSettings,
+  getSavedGradient,
+  saveGradient,
+  PALETTES,
 } from './mapStyles';
+import { StoryGeneratorDialog } from './StoryGeneratorDialog';
 
 interface Props {
   visible: boolean;
@@ -36,6 +42,49 @@ type TabType = 'runs' | 'filters';
 const HEADER_HEIGHT = 56;
 const CHUNK_SIZE = 25;
 
+// ==================== Утилиты для градиента ====================
+
+function computeStats(values: (number | null)[] | undefined): { min: number; max: number } | null {
+  if (!values || values.length === 0) return null;
+  let min = Infinity;
+  let max = -Infinity;
+  let count = 0;
+  for (const v of values) {
+    if (v != null && Number.isFinite(v)) {
+      if (v < min) min = v;
+      if (v > max) max = v;
+      count++;
+    }
+  }
+  return count > 0 ? { min, max } : null;
+}
+
+function buildColorExpression(
+  channel: GradientChannel,
+  paletteKey: string,
+  dataStats: { min: number; max: number } | null,
+  fallbackColor: string
+): any {
+  if (channel === 'none' || !dataStats) return fallbackColor;
+  const palette = PALETTES[paletteKey];
+  if (!palette) return fallbackColor;
+
+  const stops = palette.stops.map((s) => {
+    const actualV = palette.absolute
+      ? s.v
+      : dataStats.min + (dataStats.max - dataStats.min) * s.v;
+    return [actualV, s.c];
+  });
+
+  return [
+    'coalesce',
+    ['interpolate', ['linear'], ['get', channel], ...stops.flat()],
+    fallbackColor,
+  ];
+}
+
+// ==================== Компонент ====================
+
 export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId }) => {
   const api = (window as any).electronAPI;
 
@@ -45,14 +94,21 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
 
   const [selectedGroup, setSelectedGroup] = useState<GroupedRunFact | null>(null);
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
+  const [streamsPayload, setStreamsPayload] = useState<any>(null);
 
   const [activeTab, setActiveTab] = useState<TabType>('runs');
-  
-  // Состояния слоёв и трека
+  const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(true);
+
+  // Слои карты
   const [layers, setLayers] = useState<RasterLayer[]>(() => getSavedLayers());
   const [activeLayerId, setActiveLayerId] = useState<string>(layers[0]?.id || '');
+
+  // Настройки трека
   const [trackSettings, setTrackSettings] = useState<TrackSettings>(() => getSavedTrackSettings());
-  
+
+  // Настройки градиента
+  const [gradient, setGradient] = useState<GradientSettings>(() => getSavedGradient());
+
   const [loadingStreams, setLoadingStreams] = useState(false);
 
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -63,10 +119,18 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
   const saveTimeoutRef = useRef<number | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
 
+  const [storyVisible, setStoryVisible] = useState(false);
+  const [mapSnapshot, setMapSnapshot] = useState<string | null>(null);
+
+  // Ref для trackSettings — чтобы draw-эффект видел актуальное значение,
+  // но не перерисовывался при каждом изменении width/opacity.
+  const trackSettingsRef = useRef(trackSettings);
+  useEffect(() => { trackSettingsRef.current = trackSettings; }, [trackSettings]);
+
   const activeLayer = layers.find(l => l.id === activeLayerId) || layers[0];
   const groupedRuns = useMemo(() => groupRunFacts(rawFacts, {}), [rawFacts]);
 
-  // Загрузка данных
+  // ==================== Загрузка списка треков ====================
   useEffect(() => {
     if (!visible) return;
     setLoadingFacts(true);
@@ -116,7 +180,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     return () => list.removeEventListener('scroll', onScroll);
   }, [groupedRuns.length]);
 
-  // Инициализация карты
+  // ==================== Инициализация карты ====================
   useEffect(() => {
     if (!visible) return;
     let attempts = 0;
@@ -136,7 +200,11 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
           center: [37.618423, 55.751244],
           zoom: 12,
           attributionControl: { compact: true },
-        });
+          // В новых версиях MapLibre настройки WebGL-контекста передаются сюда
+          canvasContextAttributes: {
+            preserveDrawingBuffer: true, 
+          },
+        } as any);
         map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
         map.on('style.load', () => setMapLoaded(true));
         mapRef.current = map;
@@ -147,6 +215,17 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     retryTimerRef.current = window.setTimeout(tryInit, 100);
     return () => { if (retryTimerRef.current) clearTimeout(retryTimerRef.current); };
   }, [visible]);
+
+  // Ресайз карты при сворачивании/разворачивании левой панели
+  useEffect(() => {
+    if (mapRef.current) {
+      // Небольшая задержка, чтобы CSS успел применить изменения ширины
+      const t = setTimeout(() => {
+        mapRef.current?.resize();
+      }, 100);
+      return () => clearTimeout(t);
+    }
+  }, [isLeftPanelOpen]);
 
   // Очистка
   useEffect(() => {
@@ -176,89 +255,174 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     saveLayers(layers);
   }, [layers, mapLoaded]);
 
-  // Отрисовка трека с учётом trackSettings
+  // ==================== Загрузка streams при выборе тренировки ====================
   useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !mapLoaded || !selectedGroup || !selectedSource) return;
+    if (!selectedGroup || !selectedSource) {
+      setStreamsPayload(null);
+      return;
+    }
     const fact = selectedGroup.items.find((it: any) => it.source === selectedSource) || selectedGroup.primary;
 
-    markersRef.current.forEach(m => m.remove());
-    markersRef.current = [];
-    
-    // Удаляем старые слои трека
-    if (map.getLayer('active-track-glow')) map.removeLayer('active-track-glow');
-    if (map.getLayer('active-track')) map.removeLayer('active-track');
-    if (map.getSource('active-track')) map.removeSource('active-track');
-
     setLoadingStreams(true);
-    // Сначала узнаем, под каким source сохранены потоки для этого факта.
-    // Для ICU они сохраняются как 'fit'.
     api.pb.getRunStreamsMeta(fact.id)
       .then((metaRes: any) => {
         let actualSource = fact.source;
-        if (metaRes?.success && metaRes.items && metaRes.items.length > 0) {
-          // Приоритет: если есть 'fit' — берем его, иначе первый доступный
+        if (metaRes?.success && metaRes.items?.length > 0) {
           const fitStream = metaRes.items.find((s: any) => s.source === 'fit');
           actualSource = fitStream ? 'fit' : metaRes.items[0].source;
         }
         return api.pb.getRunStreams(fact.id, actualSource);
       })
       .then((res: any) => {
-        if (!res?.success || !res.payload?.latlng) return;
-        const coords = res.payload.latlng
-          .filter((p: any) => p != null)
-          .map((p: [number, number]) => [p[1], p[0]]);
-        if (coords.length < 2) return;
+        if (res?.success && res.payload) {
+          setStreamsPayload(res.payload);
+        } else {
+          setStreamsPayload(null);
+        }
+      })
+      .catch((err: any) => {
+        console.error('[RouteMapEditor] stream error:', err);
+        setStreamsPayload(null);
+      })
+      .finally(() => setLoadingStreams(false));
+  }, [selectedGroup, selectedSource, api]);
 
-        map.addSource('active-track', {
-          type: 'geojson',
-          data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coords } },
-        });
+  // ==================== Отрисовка трека (с градиентом) ====================
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
 
-        // Слой свечения (подложка), если включен
-        if (trackSettings.glow) {
-          map.addLayer({
-            id: 'active-track-glow',
-            type: 'line',
-            source: 'active-track',
-            layout: { 'line-join': 'round', 'line-cap': 'round' },
-            paint: {
-              'line-color': trackSettings.color,
-              'line-width': trackSettings.width * 3,
-              'line-opacity': trackSettings.opacity * 0.3,
-              'line-blur': 10,
-            },
-          });
+    // Очищаем старые слои и маркеры
+    markersRef.current.forEach(m => m.remove());
+    markersRef.current = [];
+    if (map.getLayer('active-track-glow')) map.removeLayer('active-track-glow');
+    if (map.getLayer('active-track')) map.removeLayer('active-track');
+    if (map.getSource('active-track')) map.removeSource('active-track');
+
+    if (!streamsPayload?.latlng || streamsPayload.latlng.length < 2) return;
+
+    const coords: [number, number][] = streamsPayload.latlng
+      .filter((p: any) => p != null)
+      .map((p: [number, number]) => [p[1], p[0]]);
+
+    if (coords.length < 2) return;
+
+    const ts = trackSettingsRef.current;
+    let sourceData: any;
+    let colorExpr: any = ts.color;
+
+    if (gradient.channel === 'none') {
+      // Одна линия (простой случай)
+      sourceData = {
+        type: 'Feature',
+        properties: {},
+        geometry: { type: 'LineString', coordinates: coords },
+      };
+    } else {
+      // Сегменты с градиентом
+      const channelValues = streamsPayload[gradient.channel] as (number | null)[] | undefined;
+      const stats = computeStats(channelValues);
+      if (stats) {
+        colorExpr = buildColorExpression(gradient.channel, gradient.palette, stats, ts.color);
+      }
+
+      const step = Math.max(5, Math.floor(coords.length / 1000));
+      const features: any[] = [];
+
+      for (let i = 0; i < coords.length - 1; i += step) {
+        const endIdx = Math.min(i + step, coords.length - 1);
+        const slice = coords.slice(i, endIdx + 1);
+        if (slice.length < 2) continue;
+
+        let avg: number | null = null;
+        if (channelValues) {
+          const segVals = channelValues.slice(i, endIdx + 1);
+          const valid = segVals.filter((v): v is number => v != null && Number.isFinite(v));
+          if (valid.length > 0) {
+            avg = valid.reduce((a, b) => a + b, 0) / valid.length;
+          }
         }
 
-        // Основной слой трека
-        map.addLayer({
-          id: 'active-track',
-          type: 'line',
-          source: 'active-track',
-          layout: { 'line-join': 'round', 'line-cap': 'round' },
-          paint: { 
-            'line-color': trackSettings.color, 
-            'line-width': trackSettings.width,
-            'line-opacity': trackSettings.opacity,
-          },
+        features.push({
+          type: 'Feature',
+          properties: avg != null ? { [gradient.channel]: avg } : {},
+          geometry: { type: 'LineString', coordinates: slice },
         });
+      }
 
-        const bounds = coords.reduce((b: any, c: any) => b.extend(c), new LngLatBounds(coords[0], coords[0]));
-        map.fitBounds(bounds, { padding: 50, duration: 800 });
-        markersRef.current.push(new Marker({ color: '#6fbf73' }).setLngLat(coords[0]).addTo(map));
-      })
-      .catch((err: any) => console.error('[RouteMapEditor] stream error:', err))
-      .finally(() => setLoadingStreams(false));
-  }, [selectedGroup, selectedSource, mapLoaded, api, trackSettings]);
+      sourceData = { type: 'FeatureCollection', features };
+    }
+
+    map.addSource('active-track', {
+      type: 'geojson',
+      data: sourceData,
+    });
+    
+    // Если трек скрыт, не рисуем его
+    if (!ts.visible) {
+       return; // или просто не добавляем слои
+    }
+
+    // Glow (опционально)
+    if (ts.glow) {
+      map.addLayer({
+        id: 'active-track-glow',
+        type: 'line',
+        source: 'active-track',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: {
+          'line-color': ts.color,
+          'line-width': ts.width * 3,
+          'line-opacity': ts.opacity * 0.3,
+          'line-blur': 10,
+        },
+      });
+    }
+
+    // Основной трек
+    map.addLayer({
+      id: 'active-track',
+      type: 'line',
+      source: 'active-track',
+      layout: { 
+        'line-join': 'round', 
+        'line-cap': 'round',
+        'visibility': ts.visible ? 'visible' : 'none'
+      },
+      paint: {
+        'line-color': colorExpr,
+        'line-width': ts.width,
+        'line-opacity': ts.opacity,
+      },
+    });
+
+    const bounds = coords.reduce(
+      (b: any, c: any) => b.extend(c),
+      new LngLatBounds(coords[0], coords[0])
+    );
+    map.fitBounds(bounds, { padding: 50, duration: 800 });
+
+    markersRef.current.push(
+      new Marker({ color: '#6fbf73' }).setLngLat(coords[0]).addTo(map)
+    );
+  }, [
+    streamsPayload,
+    mapLoaded,
+    gradient.channel,
+    gradient.palette,
+    trackSettings.glow,
+    trackSettings.color,
+  ]);
+
+  // ==================== Хендлеры ====================
 
   const handleClose = () => {
     setSelectedGroup(null);
     setSelectedSource(null);
+    setStreamsPayload(null);
     onHide();
   };
 
-  // --- Быстрое обновление карты без ререндера React ---
   const handleSliderChange = (layerId: string, key: keyof RasterLayer, val: number) => {
     if (mapRef.current && mapRef.current.getLayer(layerId)) {
       const paintKey = {
@@ -269,7 +433,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
         contrast: 'raster-contrast',
         hueRotate: 'raster-hue-rotate',
       }[key as string];
-      
       if (paintKey) {
         mapRef.current.setPaintProperty(layerId, paintKey as any, val);
       }
@@ -290,25 +453,38 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     setTrackSettings(next);
     saveTrackSettings(next);
 
-    // Мгновенно обновляем на карте
     const map = mapRef.current;
-    if (map) {
-      if (key === 'color') {
-        if (map.getLayer('active-track')) map.setPaintProperty('active-track', 'line-color', val);
-        if (map.getLayer('active-track-glow')) map.setPaintProperty('active-track-glow', 'line-color', val);
-      } else if (key === 'width') {
-        if (map.getLayer('active-track')) map.setPaintProperty('active-track', 'line-width', val);
-        if (map.getLayer('active-track-glow')) map.setPaintProperty('active-track-glow', 'line-width', val * 3);
-      } else if (key === 'opacity') {
-        if (map.getLayer('active-track')) map.setPaintProperty('active-track', 'line-opacity', val);
-        if (map.getLayer('active-track-glow')) map.setPaintProperty('active-track-glow', 'line-opacity', val * 0.3);
-      } else if (key === 'glow') {
-        // Если включили/выключили свечение, нужно перерисовать трек.
-        // Вызываем перерисовку через изменение стейта (React useEffect сработает заново).
-        setTrackSettings({ ...next });
+    if (!map) return;
+    if (key === 'width') {
+      if (map.getLayer('active-track')) map.setPaintProperty('active-track', 'line-width', val);
+      if (map.getLayer('active-track-glow')) map.setPaintProperty('active-track-glow', 'line-width', val * 3);
+    } else if (key === 'opacity') {
+      if (map.getLayer('active-track')) map.setPaintProperty('active-track', 'line-opacity', val);
+      if (map.getLayer('active-track-glow')) map.setPaintProperty('active-track-glow', 'line-opacity', val * 0.3);
+    } else if (key === 'visible') {
+      // Мгновенно скрываем/показываем слои трека
+      if (map.getLayer('active-track')) {
+        map.setLayoutProperty('active-track', 'visibility', val ? 'visible' : 'none');
+      }
+      if (map.getLayer('active-track-glow')) {
+        map.setLayoutProperty('active-track-glow', 'visibility', val ? 'visible' : 'none');
       }
     }
+    // color и glow обрабатываются через перерисовку (в deps draw-эффекта)
   };
+
+  const updateGradient = (patch: Partial<GradientSettings>) => {
+    const next = { ...gradient, ...patch };
+    setGradient(next);
+    saveGradient(next);
+  };
+
+  // Показываем min/max выбранного канала
+  const gradientStats = useMemo(() => {
+    if (gradient.channel === 'none' || !streamsPayload) return null;
+    const values = streamsPayload[gradient.channel] as (number | null)[] | undefined;
+    return computeStats(values);
+  }, [gradient.channel, streamsPayload]);
 
   const addLayer = () => {
     const newId = `layer-${Date.now()}`;
@@ -348,27 +524,58 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     }));
   }, [selectedGroup]);
 
+  const paletteOptions = useMemo(() => {
+    return Object.entries(PALETTES)
+      .filter(([, p]) => !p.channels || p.channels.includes(gradient.channel))
+      .map(([key, p]) => ({ label: p.label, value: key }));
+  }, [gradient.channel]);
+
+  const handlePrevTrack = () => {
+    if (!selectedGroup) return;
+    const currentIndex = groupedRuns.findIndex(g => g.startTime === selectedGroup.startTime && g.primary.id === selectedGroup.primary.id);
+    if (currentIndex > 0) {
+      const nextGroup = groupedRuns[currentIndex - 1];
+      setSelectedGroup(nextGroup);
+      setSelectedSource(nextGroup.primary.source);
+    }
+  };
+
+  const handleNextTrack = () => {
+    if (!selectedGroup) return;
+    const currentIndex = groupedRuns.findIndex(g => g.startTime === selectedGroup.startTime && g.primary.id === selectedGroup.primary.id);
+    if (currentIndex < groupedRuns.length - 1) {
+      const nextGroup = groupedRuns[currentIndex + 1];
+      setSelectedGroup(nextGroup);
+      setSelectedSource(nextGroup.primary.source);
+    }
+  };
+
+  const toggleLayerVisibility = (layerId: string) => {
+    const next = layers.map(l => l.id === layerId ? { ...l, visible: !l.visible } : l);
+    setLayers(next);
+    saveLayers(next);
+    if (mapRef.current && mapRef.current.getLayer(layerId)) {
+      const targetLayer = next.find(l => l.id === layerId);
+      mapRef.current.setLayoutProperty(layerId, 'visibility', targetLayer?.visible ? 'visible' : 'none');
+    }
+  };
+
+  // ==================== Рендер ====================
+
   return (
     <Dialog
       visible={visible}
       onHide={handleClose}
       header="Картографический редактор"
       maximizable
-      style={{ width: '95vw', height: '90vh' }}
       modal
-      className="pb-debug-dialog"
-      contentStyle={{
-        padding: 0, display: 'flex', overflow: 'hidden',
-        height: `calc(90vh - ${HEADER_HEIGHT}px)`,
-      }}
+      className="pb-debug-dialog pb-map-editor-dialog"
+      contentStyle={{ padding: 0, display: 'flex', overflow: 'hidden' }}
     >
       <div style={{ display: 'flex', width: '100%', height: '100%' }}>
-        
-        {/* Левая панель */}
-        {!initialRunId && (
+        {!initialRunId && isLeftPanelOpen && (
           <div style={{ width: '340px', borderRight: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', height: '100%' }}>
-            
-            {/* Табы в стиле чипсов */}
+
             <div style={{ padding: '0.75rem', borderBottom: '1px solid var(--surface-border)' }}>
               <div className="pb-catalog__chips" style={{ marginBottom: 0 }}>
                 <button
@@ -388,7 +595,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
               </div>
             </div>
 
-            {/* Вкладка ТРЕКИ */}
             {activeTab === 'runs' && (
               <div ref={listRef} style={{ flex: 1, overflowY: 'auto', padding: '0.5rem' }}>
                 {loadingFacts && <div className="pb-hint" style={{ textAlign: 'center', padding: '1rem' }}>Загрузка...</div>}
@@ -434,19 +640,19 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
               </div>
             )}
 
-            {/* Вкладка СТИЛЬ (Слои) */}
             {activeTab === 'filters' && (
               <div style={{ flex: 1, overflowY: 'auto', padding: '0.5rem' }}>
-                {/* 1. Слои карты */}
+
+                {/* Слои */}
                 <div className="pb-connections__block">
                   <div className="pb-connections__title">
                     <i className="pi pi-clone" /> Слои карты
-                    <Button 
-                      icon="pi pi-plus" 
-                      text 
-                      className="pb-soft p-button-sm" 
-                      style={{ marginLeft: 'auto', padding: '0.1rem', width: '1.8rem', height: '1.8rem' }} 
-                      onClick={addLayer} 
+                    <Button
+                      icon="pi pi-plus"
+                      text
+                      className="pb-soft p-button-sm"
+                      style={{ marginLeft: 'auto', padding: '0.1rem', width: '1.8rem', height: '1.8rem' }}
+                      onClick={addLayer}
                       tooltip="Добавить слой"
                       tooltipOptions={{ position: 'bottom' }}
                     />
@@ -462,23 +668,23 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                       }}
                     >
                       <label className="pb-check-row pb-checkbox-dark" onClick={(e) => e.stopPropagation()}>
-                        <Checkbox 
-                          checked={l.visible} 
+                        <Checkbox
+                          checked={l.visible}
                           onChange={(e) => {
                             const next = layers.map(x => x.id === l.id ? { ...x, visible: !!e.checked } : x);
                             setLayers(next);
                             if (mapRef.current && mapRef.current.getLayer(l.id)) {
                               mapRef.current.setLayoutProperty(l.id, 'visibility', (e.checked ? 'visible' : 'none') as any);
                             }
-                          }} 
+                          }}
                         />
                       </label>
                       <span style={{ marginLeft: '0.5rem', flex: 1, fontSize: '0.8rem' }}>{l.name}</span>
-                      <Button 
-                        icon="pi pi-trash" 
-                        text 
-                        className="pb-drawer__name-edit" 
-                        onClick={(e) => { e.stopPropagation(); removeLayer(l.id); }} 
+                      <Button
+                        icon="pi pi-trash"
+                        text
+                        className="pb-drawer__name-edit"
+                        onClick={(e) => { e.stopPropagation(); removeLayer(l.id); }}
                         tooltip="Удалить слой"
                         tooltipOptions={{ position: 'left' }}
                       />
@@ -486,12 +692,10 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                   ))}
                 </div>
 
-                {/* 2. Настройки активного слоя */}
+                {/* Настройки активного слоя */}
                 {activeLayer && (
-                  <div className="pb-connections__block mb-2">
-                    <div className="pb-connections__title">
-                      Свойства: {activeLayer.name}
-                    </div>
+                  <div className="pb-connections__block">
+                    <div className="pb-connections__title">Свойства: {activeLayer.name}</div>
                     {(['opacity','brightnessMin','brightnessMax','saturation','contrast','hueRotate'] as (keyof RasterLayer)[]).map(k => (
                       <div key={k} style={{ marginTop: '0.75rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--tg-hint)' }}>
@@ -515,15 +719,15 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                   </div>
                 )}
 
-                {/* 3. Настройки трека (перенесены сюда) */}
+                {/* Настройки трека */}
                 <div className="pb-connections__block">
                   <div className="pb-connections__title">Настройки трека</div>
-                  
+
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.75rem' }}>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--tg-hint)' }}>Цвет</span>
-                    <input 
-                      type="color" 
-                      value={trackSettings.color} 
+                    <span style={{ fontSize: '0.75rem', color: 'var(--tg-hint)' }}>Цвет (базовый)</span>
+                    <input
+                      type="color"
+                      value={trackSettings.color}
                       onChange={(e) => updateTrackSetting('color', e.target.value)}
                       style={{ width: '2.5rem', height: '1.5rem', border: 'none', background: 'transparent', cursor: 'pointer' }}
                     />
@@ -552,60 +756,219 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                       onChange={(e) => updateTrackSetting('opacity', e.value as number)}
                     />
                   </div>
-                  
+
                   <div className="flex align-items-center mt-3 pb-check-row pb-checkbox-dark" style={{ cursor: 'pointer' }}>
-                     <Checkbox 
-                       checked={trackSettings.glow} 
-                       onChange={(e) => updateTrackSetting('glow', !!e.checked)} 
-                     />
-                     <span style={{ marginLeft: '0.5rem', fontSize: '0.8rem' }}>Свечение под треком</span>
+                    <Checkbox
+                      checked={trackSettings.glow}
+                      onChange={(e) => updateTrackSetting('glow', !!e.checked)}
+                    />
+                    <span style={{ marginLeft: '0.5rem', fontSize: '0.8rem' }}>Свечение под треком</span>
                   </div>
 
-                  <Button 
-                    label="Сбросить настройки трека" 
-                    icon="pi pi-refresh" 
+                  <Button
+                    label="Сбросить настройки трека"
+                    icon="pi pi-refresh"
                     className="pb-soft p-button-sm w-full mt-3"
                     onClick={() => {
                       setTrackSettings(DEFAULT_TRACK_SETTINGS);
                       saveTrackSettings(DEFAULT_TRACK_SETTINGS);
-                    }} 
+                    }}
                   />
+                </div>
+
+                {/* Градиент по данным */}
+                <div className="pb-connections__block">
+                  <div className="pb-connections__title">Градиент по данным</div>
+
+                  <div style={{ marginTop: '0.75rem' }}>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--tg-hint)', marginBottom: '0.35rem' }}>Канал</div>
+                    <Dropdown
+                      value={gradient.channel}
+                      options={[
+                        { label: 'Нет (сплошной)', value: 'none' },
+                        { label: 'Пульс', value: 'hr' },
+                        { label: 'Скорость', value: 'speedKmh' },
+                        { label: 'Высота', value: 'elevationM' },
+                      ]}
+                      onChange={(e) => updateGradient({ channel: e.value })}
+                      className="pb-wade-programs__dd w-full"
+                      panelClassName="pb-dropdown-panel"
+                    />
+                  </div>
+
+                  {gradient.channel !== 'none' && (
+                    <>
+                      <div style={{ marginTop: '0.75rem' }}>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--tg-hint)', marginBottom: '0.35rem' }}>Палитра</div>
+                        <Dropdown
+                          value={gradient.palette}
+                          options={paletteOptions}
+                          onChange={(e) => updateGradient({ palette: e.value })}
+                          className="pb-wade-programs__dd w-full"
+                          panelClassName="pb-dropdown-panel"
+                        />
+                      </div>
+
+                      {gradientStats && (
+                        <div className="pb-hint" style={{ fontSize: '0.7rem', marginTop: '0.5rem' }}>
+                          Диапазон: {gradientStats.min.toFixed(1)} – {gradientStats.max.toFixed(1)}
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
 
               </div>
             )}
-
           </div>
         )}
 
-        {/* Правая панель — Карта */}
+        {/* Карта */}
         <div style={{ flex: 1, position: 'relative', height: '100%' }}>
-          {selectedGroup && sourceOptions.length > 1 && (
-            <div style={{
-              position: 'absolute', top: 10, left: 10, zIndex: 5,
-              background: 'rgba(23, 33, 43, 0.85)', padding: '0.5rem', borderRadius: '6px',
-              border: '1px solid var(--surface-border)',
-              display: 'flex', alignItems: 'center', gap: '0.5rem',
-            }}>
-              <span style={{ fontSize: '0.75rem', color: 'var(--pb-accent)' }}>Источник:</span>
-              <Dropdown
-                value={selectedSource}
-                options={sourceOptions}
-                onChange={(e) => setSelectedSource(e.value)}
-                className="pb-wade-programs__dd"
-                style={{ minWidth: '10rem', height: '2rem', fontSize: '0.8rem' }}
-                panelClassName="pb-dropdown-panel"
-              />
-            </div>
-          )}
+
           {loadingStreams && (
             <div style={{ position: 'absolute', top: 10, right: 10, zIndex: 5, background: 'rgba(0,0,0,0.5)', padding: '5px 10px', borderRadius: '4px' }}>
               <i className="pi pi-spin pi-spinner" />
             </div>
           )}
+
+          {/* Плавающий HUD на карте (Навигация + Источник + Слои) */}
+          {selectedGroup && (
+            <div style={{
+              position: 'absolute', top: 10, left: 10, zIndex: 5,
+              display: 'flex', flexDirection: 'column', gap: '0.5rem', 
+              pointerEvents: 'none' // Контейнер не перехватывает клики
+            }}>
+              
+              {/* ВЕРХНЯЯ СТРОКА: Свернуть + Навигация + Источник */}
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                
+                {/* Кнопка сворачивания левой панели */}
+                {!initialRunId && (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: 'rgba(23, 33, 43, 0.85)', borderRadius: '6px', border: '1px solid var(--surface-border)',
+                    backdropFilter: 'blur(4px)', pointerEvents: 'auto', height: '2.5rem', boxSizing: 'border-box'
+                  }}>
+                    <Button
+                      icon={isLeftPanelOpen ? 'pi pi-angle-double-left' : 'pi pi-angle-double-right'}
+                      text
+                      className="pb-drawer__name-edit"
+                      onClick={() => setIsLeftPanelOpen(!isLeftPanelOpen)}
+                      tooltip={isLeftPanelOpen ? 'Свернуть панель' : 'Развернуть панель'}
+                      tooltipOptions={{ position: 'bottom' }}
+                    />
+                  </div>
+                )}
+
+                {/* Кнопка Сторис */}
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'rgba(23, 33, 43, 0.85)', borderRadius: '6px', border: '1px solid var(--surface-border)',
+                  backdropFilter: 'blur(4px)', pointerEvents: 'auto', height: '2.5rem', width: '2.5rem', boxSizing: 'border-box'
+                }}>
+                  <Button
+                    icon="pi pi-camera"
+                    text
+                    className="pb-drawer__name-edit"
+                    onClick={() => {
+                      // Всю работу по снимку теперь делает сам StoryGeneratorDialog
+                      setMapSnapshot(null);
+                      setStoryVisible(true);
+                    }}
+                    tooltip="Сделать сторис"
+                    tooltipOptions={{ position: 'bottom' }}
+                  />
+                </div>
+
+                {/* Панель навигации по трекам */}
+                <div style={{ 
+                  display: 'flex', alignItems: 'center', gap: '0.25rem', 
+                  background: 'rgba(23, 33, 43, 0.85)', padding: '0.25rem', 
+                  borderRadius: '6px', border: '1px solid var(--surface-border)',
+                  backdropFilter: 'blur(4px)',
+                  pointerEvents: 'auto', width: 'fit-content', height: '2.5rem', boxSizing: 'border-box'
+                }}>
+                  <Button icon="pi pi-chevron-left" text className="pb-drawer__name-edit" 
+                    onClick={handlePrevTrack} disabled={groupedRuns[0]?.primary.id === selectedGroup.primary.id}
+                    tooltip="Предыдущий трек" tooltipOptions={{ position: 'bottom' }}
+                  />
+                  <div style={{ fontSize: '0.75rem', color: 'var(--pb-accent)', minWidth: '7rem', textAlign: 'center', lineHeight: 1.2 }}>
+                    {selectedGroup.displayName} <br/> 
+                    <span style={{ color: 'var(--tg-hint)', fontSize: '0.65rem' }}>{selectedGroup.date}</span>
+                  </div>
+                  <Button icon="pi pi-chevron-right" text className="pb-drawer__name-edit"
+                    onClick={handleNextTrack} disabled={groupedRuns[groupedRuns.length - 1]?.primary.id === selectedGroup.primary.id}
+                    tooltip="Следующий трек" tooltipOptions={{ position: 'bottom' }}
+                  />
+                </div>
+
+                {/* Панель выбора источника (если их >1) */}
+                {sourceOptions.length > 1 && (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: '0.5rem',
+                    background: 'rgba(23, 33, 43, 0.85)', padding: '0.4rem 0.5rem',
+                    borderRadius: '6px', border: '1px solid var(--surface-border)',
+                    backdropFilter: 'blur(4px)',
+                    pointerEvents: 'auto', width: 'fit-content', height: '2.5rem', boxSizing: 'border-box'
+                  }}>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--pb-accent)', whiteSpace: 'nowrap' }}>Источник:</span>
+                    <Dropdown
+                      value={selectedSource}
+                      options={sourceOptions}
+                      onChange={(e) => setSelectedSource(e.value)}
+                      className="pb-wade-programs__dd"
+                      style={{ minWidth: '10rem', height: '2rem', fontSize: '0.8rem' }}
+                      panelClassName="pb-dropdown-panel"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* НИЖНЯЯ ПАНЕЛЬ: Слои и Трек (в строку) */}
+              <div style={{
+                display: 'flex', flexDirection: 'row', gap: '0.75rem', alignItems: 'center',
+                background: 'rgba(23, 33, 43, 0.85)', padding: '0.4rem 0.75rem',
+                borderRadius: '6px', border: '1px solid var(--surface-border)',
+                backdropFilter: 'blur(4px)',
+                pointerEvents: 'auto', width: 'fit-content'
+              }}>
+                <label className="pb-check-row pb-checkbox-dark" style={{ fontSize: '0.75rem', cursor: 'pointer' }}>
+                  <Checkbox 
+                    checked={trackSettings.visible} 
+                    onChange={(e) => updateTrackSetting('visible', !!e.checked)} 
+                  />
+                  <span>Трек</span>
+                </label>
+                {layers.map(l => (
+                  <label key={l.id} className="pb-check-row pb-checkbox-dark" style={{ fontSize: '0.75rem', cursor: 'pointer' }}>
+                    <Checkbox 
+                      checked={l.visible} 
+                      onChange={() => toggleLayerVisibility(l.id)} 
+                    />
+                    <span>{l.name}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div ref={mapContainerRef} style={{ position: 'absolute', inset: 0 }} />
         </div>
       </div>
+
+      {selectedGroup && (
+        <StoryGeneratorDialog
+          visible={storyVisible}
+          onHide={() => setStoryVisible(false)}
+          mapRef={mapRef}
+          initialSnapshot={mapSnapshot}
+          fact={selectedGroup.primary}
+          streams={streamsPayload}
+          initialTrackSettings={trackSettings}
+          gradient={gradient}
+        />
+      )}
     </Dialog>
   );
 };

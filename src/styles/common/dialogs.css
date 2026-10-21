@@ -102,3 +102,42 @@ body[data-module] .p-dialog .p-dropdown .p-dropdown-trigger {
 body[data-module] .p-dialog .p-dropdown .p-dropdown-trigger svg {
   fill: var(--module-accent) !important;
 }
+
+/* Скроллбар во всех диалогах модуля — уже и с отступом */
+body[data-module] .p-dialog ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+body[data-module] .p-dialog ::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 3px;
+}
+body[data-module] .p-dialog ::-webkit-scrollbar-thumb {
+  background: var(--module-accent, #d4a373);
+  border-radius: 3px;
+}
+body[data-module] .p-dialog ::-webkit-scrollbar-thumb:hover {
+  background: var(--module-accent, #d4a373);
+  filter: brightness(1.15);
+}
+body[data-module] .p-dialog ::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Слайдеры: отступ справа под ручку (translateX(-50%)) и от скроллбара */
+body[data-module] .p-dialog .p-slider {
+  margin-left: 10px;
+  margin-right: 10px;
+}
+
+/* Контейнер со скроллом — резервируем место под скроллбар */
+body[data-module] .p-dialog .p-dialog-content {
+  scrollbar-gutter: stable;
+}
+
+/* Левая панель сторис: отступ от скроллбара, чтобы кнопки не сливались */
+.pb-story-sidebar {
+  padding-right: 12px;
+  padding-bottom: 16px;
+  box-sizing: border-box;
+}
