@@ -229,8 +229,9 @@ function fmtDuration(sec: number | null): string {
   const h = Math.floor(sec / 3600);
   const m = Math.floor((sec % 3600) / 60);
   const s = sec % 60;
-  return h > 0 ? `${h}ч ${m}м` : `${m}мин. ${String(s).padStart(2, '0')}с.`;
+  return h > 0 ? `${h} ч ${m} м` : `${m} мин. ${String(s).padStart(2, '0')} с.`;
 }
+
 function fmtPace(pace: string | null): string {
   return pace ? `${pace}` : '—';
 }
@@ -303,9 +304,20 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
   const elevationGain = useMemo(() => {
     if (!streams?.elevationM) return 0;
     let gain = 0;
+    // Порог 1.5 метра отсекает шум высотомера (GPS-дрожание),
+    // иначе на 5 км набегает несколько тысяч метров набора.
+    const threshold = 1.5;
+    let last = streams.elevationM[0] ?? 0;
     for (let i = 1; i < streams.elevationM.length; i++) {
-      const diff = (streams.elevationM[i] ?? 0) - (streams.elevationM[i - 1] ?? 0);
-      if (diff > 0) gain += diff;
+      const curr = streams.elevationM[i];
+      if (curr == null) continue;
+      const diff = curr - last;
+      if (diff > threshold) {
+        gain += diff;
+        last = curr;
+      } else if (diff < -threshold) {
+        last = curr;
+      }
     }
     return Math.round(gain);
   }, [streams]);
@@ -618,10 +630,10 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
       ctx.fillText('км', 80 + kmWidth + 15, 1550);
       ctx.font = 'bold 60px Inter, sans-serif';
       ctx.fillText(`${time}`, 80, 1650);
-      ctx.fillText(`${pace} /км`, 80, 1730);
+      ctx.fillText(`${pace} / км`, 80, 1730);
       ctx.font = '40px Inter, sans-serif';
       ctx.fillStyle = '#d4a373';
-      ctx.fillText(`Ср. пульс: ${hr} уд/мин`, 80, 1810);
+      ctx.fillText(`Ср. пульс: ${hr} уд / мин`, 80, 1810);
       ctx.font = 'bold 50px Inter, sans-serif';
       ctx.fillStyle = '#ffffff';
       ctx.textAlign = 'right';
@@ -634,20 +646,22 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
       ctx.fillText(fact.date, 80, 480);
       ctx.fillStyle = '#ffffff';
       const drawPill = (text: string, x: number, y: number) => {
-        ctx.font = 'bold 55px Inter, sans-serif';
+        // Уменьшили шрифт (45px) и высоту плашки (80px), 
+        // чтобы тексты гарантированно помещались и не наезжали.
+        ctx.font = 'bold 45px Inter, sans-serif';
         const w = ctx.measureText(text).width + 80;
         ctx.beginPath();
-        ctx.roundRect(x, y, w, 100, 50);
+        ctx.roundRect(x, y, w, 80, 40);
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 4;
         ctx.stroke();
-        ctx.fillText(text, x + 40, y + 65);
+        ctx.fillText(text, x + 40, y + 55);
       };
-      drawPill(`РАССТОЯНИЕ ${km} КМ`, 80, 600);
-      drawPill(`ВРЕМЯ ${time}`, 80, 730);
-      drawPill(`ТЕМП ${pace}`, 80, 860);
-      drawPill(`СР. ПУЛЬС ${hr} УД/МИН`, 80, 990);
-      drawPill(`НАБОР ${elevationGain} М`, 80, 1120);
+      drawPill(`РАССТОЯНИЕ ${km} КМ`, 80, 580);
+      drawPill(`ВРЕМЯ ${time}`, 80, 680);
+      drawPill(`ТЕМП ${pace} / КМ`, 80, 780);
+      drawPill(`СР. ПУЛЬС ${hr} УД / МИН`, 80, 880);
+      drawPill(`НАБОР ${elevationGain} М`, 80, 980);
     } else if (layout === 'splits') {
       ctx.font = 'bold 70px Inter, sans-serif';
       ctx.fillText('Промежуточное время по км', 80, 300);
@@ -693,11 +707,11 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
         ctx.setLineDash([]);
       };
       drawDotted('Расстояние', `${km} км`, 700);
-      drawDotted('Темп', `${pace} /км`, 800);
+      drawDotted('Темп', `${pace} / км`, 800);
       drawDotted('Время', `${time}`, 900);
       drawDotted('Набор высоты', `${elevationGain} м`, 1000);
-      drawDotted('Ср. пульс', `${hr} уд/мин`, 1100);
-      drawDotted('Макс. пульс', `${maxHr} уд/мин`, 1200);
+      drawDotted('Ср. пульс', `${hr} уд / мин`, 1100);
+      drawDotted('Макс. пульс', `${maxHr} уд / мин`, 1200);
     } else if (layout === 'receipt') {
       const w = 800;
       const h = 1200;
@@ -987,7 +1001,7 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
                 { label: 'Минимализм', value: 'minimal' },
               ]}
               onChange={(e) => setLayout(e.value)}
-              className="w-full mt-2"
+              panelClassName="pb-dropdown-panel"
             />
           </div>
 

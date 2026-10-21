@@ -89,9 +89,11 @@ body[data-module] .p-dialog .p-dropdown:not(.p-disabled):hover {
   border-color: var(--module-accent) !important;
 }
 
-body[data-module] .p-dialog .p-dropdown:not(.p-disabled).p-focus {
+body[data-module] .p-dialog .p-dropdown:not(.p-disabled).p-focus,
+body[data-module] .p-dialog .p-dropdown:focus,
+body[data-module] .p-dialog .p-dropdown.p-focus {
   border-color: var(--module-accent) !important;
-  box-shadow: 0 0 0 1px var(--module-accent) !important;
+  box-shadow: 0 0 0 2px var(--module-accent) !important;
   outline: none !important;
 }
 
