@@ -5307,10 +5307,10 @@ export function registerPranaBinduHandlers(): void {
     }
   });
 
-    ipcMain.handle('pb:compute-thresholds', async (_event, windowDays: number = 365) => {
+  ipcMain.handle('pb:compute-thresholds', async (_event, optsOrDays: any = 365) => {
     try {
       const db = getMelange();
-      const result = computeThresholds(db, windowDays);
+      const result = computeThresholds(db, optsOrDays);
 
       // Записываем в историю
       db.prepare(`
@@ -5319,16 +5319,13 @@ export function registerPranaBinduHandlers(): void {
         VALUES (?, ?, ?, ?, ?, ?, ?)
       `).run(
         new Date().toISOString(),
-        windowDays,
+        result.windowDays,
         result.lthr,
         result.hrmax,
         result.resthr,
         result.source,
         result.notes
       );
-
-      // НЕ обновляем profile здесь, чтобы не затереть данные провайдеров.
-      // Обновление профиля будет отдельной кнопкой "Применить".
 
       return { success: true, data: result };
     } catch (e) {
