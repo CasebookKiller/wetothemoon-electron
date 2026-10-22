@@ -11,6 +11,10 @@ export interface ComputeThresholdsOptions {
   lthrTestDuration?: number;
   /** Учитывать только «чистые» тесты — |дрейф HR| < 5%. */
   onlyClean?: boolean;
+  /** Учитывать только интенсивные — hr_avg ≥ 0.80 × HRmax. */
+  onlyIntense?: boolean;
+  /** Метод агрегации: 0 = медиана всех, N > 0 = среднее топ-N. */
+  topN?: number;
 }
 
 export interface ComputedThresholds {
@@ -21,6 +25,11 @@ export interface ComputedThresholds {
   windowDays: number;
   notes: string;
   testsUsed: number;
+  /** Диагностика: сколько всего / отфильтровано. */
+  testsTotal: number;
+  skippedClean: number;
+  skippedIntense: number;
+  method: 'median' | 'topN' | null;
 }
 
 // ==================== Коэффициенты LTHR ====================
@@ -53,6 +62,104 @@ function getLthrFactor(durationSec: number): number {
   if (durationSec <= 900) return 0.93;
   if (durationSec <= 1200) return 0.95;
   return 1.0;
+}
+
+// ==================== Хелпер: расчёт LTHR из набора тестов ====================
+
+interface TestRow {
+  hr_avg: number | null;
+  hr_max: number | null;
+  hr_drift_pct: number | null;
+}
+
+interface LthrFromTestsOpts {
+  onlyClean: boolean;
+  onlyIntense: boolean;
+  topN: number;
+}
+
+interface LthrFromTestsResult {
+  lthr: number | null;
+  used: number;
+  total: number;
+  skippedClean: number;
+  skippedIntense: number;
+  method: 'median' | 'topN' | null;
+  hrMaxGlobal: number;
+}
+
+function computeLthrFromTests(
+  tests: TestRow[],
+  factor: number,
+  opts: LthrFromTestsOpts,
+): LthrFromTestsResult {
+  const total = tests.length;
+
+  // 1. Пик HR — по всем тестам (не по отфильтрованным)
+  const hrMaxGlobal = tests.reduce(
+    (m, t) => (t.hr_max != null && t.hr_max > m ? t.hr_max : m),
+    0,
+  );
+
+  // 2. Фильтр чистоты
+  let filtered = tests;
+  let skippedClean = 0;
+  if (opts.onlyClean) {
+    const before = filtered.length;
+    filtered = filtered.filter(
+      (t) => t.hr_drift_pct == null || Math.abs(t.hr_drift_pct) < 5,
+    );
+    skippedClean = before - filtered.length;
+  }
+
+  // 3. Фильтр интенсивности (hr_avg >= 0.80 × hrMaxGlobal)
+  let skippedIntense = 0;
+  if (opts.onlyIntense && hrMaxGlobal > 0) {
+    const threshold = 0.8 * hrMaxGlobal;
+    const before = filtered.length;
+    filtered = filtered.filter(
+      (t) => t.hr_avg != null && t.hr_avg >= threshold,
+    );
+    skippedIntense = before - filtered.length;
+  }
+
+  const hrs = filtered
+    .map((t) => t.hr_avg)
+    .filter((v): v is number => v != null && v > 0);
+
+  if (hrs.length < 3) {
+    return {
+      lthr: null,
+      used: hrs.length,
+      total,
+      skippedClean,
+      skippedIntense,
+      method: null,
+      hrMaxGlobal,
+    };
+  }
+
+  // 4. Агрегация: topN-среднее или медиана
+  let agg: number;
+  let method: 'median' | 'topN';
+  if (opts.topN > 0 && opts.topN < hrs.length) {
+    const sorted = [...hrs].sort((a, b) => b - a).slice(0, opts.topN);
+    agg = sorted.reduce((a, b) => a + b, 0) / sorted.length;
+    method = 'topN';
+  } else {
+    agg = median(hrs)!;
+    method = 'median';
+  }
+
+  return {
+    lthr: Math.round(agg * factor),
+    used: hrs.length,
+    total,
+    skippedClean,
+    skippedIntense,
+    method,
+    hrMaxGlobal,
+  };
 }
 
 function durationLabel(sec: number): string {
@@ -114,6 +221,8 @@ export function computeThresholds(
   const windowDays = opts.windowDays ?? 365;
   const lthrTestDuration = opts.lthrTestDuration ?? 1200;
   const onlyClean = opts.onlyClean ?? false;
+  const onlyIntense = opts.onlyIntense ?? true;  // по умолчанию включено
+  const topN = opts.topN ?? 0;                    // 0 = медиана
 
   const now = new Date();
   const from = new Date();
@@ -136,36 +245,21 @@ export function computeThresholds(
           AND ts.duration_value = ?
           AND rf.date >= ? AND rf.date <= ?`,
     )
-    .all(lthrTestDuration, fromIso, toIso) as Array<{
-    hr_avg: number | null;
-    hr_max: number | null;
-    hr_drift_pct: number | null;
-  }>;
-
-  const cleanTests = onlyClean
-    ? testRows.filter(
-        (t) => t.hr_drift_pct == null || Math.abs(t.hr_drift_pct) < 5,
-      )
-    : testRows;
-
-  const testHrs = cleanTests
-    .map((t) => t.hr_avg)
-    .filter((v): v is number => v != null && v > 0);
+    .all(lthrTestDuration, fromIso, toIso) as unknown as TestRow[];
 
   const factor = getLthrFactor(lthrTestDuration);
   const durationLabelStr = durationLabel(lthrTestDuration);
 
-  let lthr: number | null = null;
-  let source: 'test_segments' | 'autoscan' = 'autoscan';
-  const testsUsed = testHrs.length;
+  const lthrResult = computeLthrFromTests(testRows, factor, {
+    onlyClean,
+    onlyIntense,
+    topN,
+  });
 
-  if (testHrs.length >= 3) {
-    const medHr = median(testHrs);
-    if (medHr != null) {
-      lthr = Math.round(medHr * factor);
-      source = 'test_segments';
-    }
-  }
+  let lthr: number | null = lthrResult.lthr;
+  let source: 'test_segments' | 'autoscan' =
+    lthrResult.lthr != null ? 'test_segments' : 'autoscan';
+  const testsUsed = lthrResult.used;
 
   // ==================== 2. HRmax (пик по всем тестам и streams) ====================
 
@@ -224,12 +318,26 @@ export function computeThresholds(
   // ==================== 5. Notes ====================
 
   let notes: string;
+  const filters: string[] = [];
+  if (onlyClean) filters.push(`чистота (${lthrResult.skippedClean} отсеяно)`);
+  if (onlyIntense)
+    filters.push(
+      `интенсивность ≥80% HRmax (${lthrResult.skippedIntense} отсеяно)`,
+    );
+  const filterStr = filters.length > 0 ? ` Фильтры: ${filters.join(', ')}.` : '';
+  const methodStr =
+    lthrResult.method === 'topN'
+      ? `среднее топ-${Math.min(topN, lthrResult.used)}`
+      : 'медиана';
+
+  const autoscanSuffix = autoscanUsed
+    ? ' Использован автопоиск (20-мин отрезок × 0.95).'
+    : ' Автопоиск тоже не дал результата.';
+
   if (source === 'test_segments') {
-    notes = `По ${testsUsed} тестам ${durationLabelStr} (ср. HR × ${factor}).`;
-  } else if (testsUsed > 0 && testsUsed < 3) {
-    notes = `Найдено ${testsUsed} теста(ов) ${durationLabelStr} — нужно ≥3. Использован автопоиск.${
-      onlyClean ? ' Фильтр чистоты применён к тестам.' : ''
-    }`;
+    notes = `По ${testsUsed} тестам ${durationLabelStr} (${methodStr} × ${factor}). Всего: ${lthrResult.total}.${filterStr}`;
+  } else if (lthrResult.total > 0) {
+    notes = `Тестов ${durationLabelStr}: ${lthrResult.total}, из них после фильтров — ${testsUsed}, нужно ≥3.${filterStr}${autoscanSuffix}`;
   } else if (autoscanUsed) {
     notes = `Тестов ${durationLabelStr} нет. Автопоиск: 95% от лучшего 20-мин отрезка по потокам.`;
   } else {
@@ -244,6 +352,10 @@ export function computeThresholds(
     windowDays,
     notes,
     testsUsed,
+    testsTotal: lthrResult.total,
+    skippedClean: lthrResult.skippedClean,
+    skippedIntense: lthrResult.skippedIntense,
+    method: lthrResult.method,
   };
 }
 
@@ -259,12 +371,14 @@ export interface TimelinePoint {
 }
 
 export interface ComputeTimelineOptions {
-  from: string;            // YYYY-MM-DD
-  to: string;              // YYYY-MM-DD
-  windowDays: number;      // размер скользящего окна (30/60/90)
-  stepDays?: number;       // шаг по времени (по умолчанию 14)
-  lthrTestDuration?: number; // 300/600/900/1200/1800 (по умолчанию 1200)
+  from: string;
+  to: string;
+  windowDays: number;
+  stepDays?: number;
+  lthrTestDuration?: number;
   onlyClean?: boolean;
+  onlyIntense?: boolean;
+  topN?: number;
 }
 
 /**
@@ -282,6 +396,8 @@ export function computeThresholdsTimeline(
   const stepDays = opts.stepDays ?? 14;
   const lthrTestDuration = opts.lthrTestDuration ?? 1200;
   const onlyClean = opts.onlyClean ?? false;
+  const onlyIntense = opts.onlyIntense ?? true;
+  const topN = opts.topN ?? 0;
   const factor = getLthrFactor(lthrTestDuration);
 
   const toDate = new Date(opts.to + 'T00:00:00');
@@ -311,36 +427,19 @@ export function computeThresholdsTimeline(
             AND ts.duration_value = ?
             AND rf.date >= ? AND rf.date <= ?`,
       )
-      .all(lthrTestDuration, winFromIso, winToIso) as Array<{
-      hr_avg: number | null;
-      hr_max: number | null;
-      hr_drift_pct: number | null;
-    }>;
+      .all(lthrTestDuration, winFromIso, winToIso) as unknown as TestRow[];
 
-    const cleanTests = onlyClean
-      ? testRows.filter(
-          (t) => t.hr_drift_pct == null || Math.abs(t.hr_drift_pct) < 5,
-        )
-      : testRows;
+        const lthrResult = computeLthrFromTests(testRows, factor, {
+      onlyClean,
+      onlyIntense,
+      topN,
+    });
 
-    const hrs = cleanTests
-      .map((t) => t.hr_avg)
-      .filter((v): v is number => v != null && v > 0);
-
-    let lthr: number | null = null;
+    let lthr: number | null = lthrResult.lthr;
     let source: TimelinePoint['source'] = 'insufficient';
-    if (hrs.length >= 3) {
-      const med = median(hrs);
-      if (med != null) {
-        lthr = Math.round(med * factor);
-        source = 'test_segments';
-      }
-    }
+    if (lthr != null) source = 'test_segments';
 
-    const maxHrs = testRows
-      .map((t) => t.hr_max)
-      .filter((v): v is number => v != null && v > 0);
-    const hrmax = maxHrs.length > 0 ? Math.max(...maxHrs) : null;
+    const hrmax = lthrResult.hrMaxGlobal > 0 ? lthrResult.hrMaxGlobal : null;
 
     // RestHR — медиана из recovery_logs в окне
     const logs = listRecoveryLogs(db, winFromIso, winToIso);
@@ -355,7 +454,7 @@ export function computeThresholdsTimeline(
       lthr,
       hrmax,
       resthr,
-      testsUsed: hrs.length,
+      testsUsed: lthrResult.used,
       source,
     });
 
