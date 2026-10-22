@@ -38,7 +38,7 @@ interface Props {
   initialRunId?: number;
 }
 
-type TabType = 'runs' | 'filters';
+type TabType = 'runs' | 'filters' | 'thresholds';
 
 const HEADER_HEIGHT = 56;
 const CHUNK_SIZE = 25;
@@ -348,6 +348,30 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
   const [saveStatus, setSaveStatus] = useState<
     'idle' | 'saving' | 'saved' | 'error'
   >('idle');
+
+    // Тестовые отрезки (C.2)
+  const [segments, setSegments] = useState<
+    Array<{
+      id: number;
+      runFactId: number;
+      durationType: 'time' | 'distance';
+      durationValue: number;
+      distanceM: number;
+      durationSec: number;
+      paceSecPerKm: number | null;
+      hrAvg: number | null;
+      hrMax: number | null;
+      hrDriftPct: number | null;
+      cadenceAvg: number | null;
+      note: string | null;
+      createdAt: string;
+    }>
+  >([]);
+  const [segmentsLoading, setSegmentsLoading] = useState(false);
+  const [segmentFilter, setSegmentFilter] = useState<
+    'all' | 'time-60' | 'time-300' | 'time-600' | 'time-1200' | 'time-1800' | 'distance'
+  >('all');
+
   const testMarkerRef = useRef<Marker | null>(null);
   const testFinishMarkerRef = useRef<Marker | null>(null);
   const markupClickHandlerRef = useRef<((e: any) => void) | null>(null);
@@ -524,6 +548,30 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
       localStorage.setItem('pb.testVisible', testVisible ? '1' : '0');
     } catch { /* ignore */ }
   }, [testVisible]);
+
+  // ==================== Загрузка сохранённых тестовых отрезков ====================
+
+  const loadSegments = async () => {
+    if (!api?.pb?.testSegmentList) return;
+    setSegmentsLoading(true);
+    try {
+      const res = await api.pb.testSegmentList();
+      if (res?.success) {
+        setSegments(res.items ?? []);
+      }
+    } catch (e) {
+      console.error('[pb-map] test-segment list error:', e);
+    } finally {
+      setSegmentsLoading(false);
+    }
+  };
+
+  // Загружаем при переключении на вкладку «Пороги» или при открытии
+  useEffect(() => {
+    if (visible && activeTab === 'thresholds') {
+      void loadSegments();
+    }
+  }, [visible, activeTab]);
 
   // Очистка
   useEffect(() => {
@@ -1036,6 +1084,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
       if (res?.success) {
         setSaveStatus('saved');
         setTimeout(() => setSaveStatus('idle'), 3000);
+        void loadSegments(); // обновим список
       } else {
         console.error('[pb-map] test-segment save error:', res?.error);
         setSaveStatus('error');
@@ -1047,6 +1096,112 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
       setTimeout(() => setSaveStatus('idle'), 3000);
     }
   };
+
+  // ==================== Обработчики для вкладки «Пороги» ====================
+
+  const handleDeleteSegment = async (id: number) => {
+    if (!window.confirm('Удалить этот тестовый отрезок?')) return;
+    try {
+      const res = await api.pb.testSegmentDelete(id);
+      if (res?.success) {
+        setSegments((prev) => prev.filter((s) => s.id !== id));
+      } else {
+        console.error('[pb-map] test-segment delete error:', res?.error);
+      }
+    } catch (e) {
+      console.error('[pb-map] test-segment delete:', e);
+    }
+  };
+
+  const fmtSegDuration = (s: {
+    durationType: 'time' | 'distance';
+    durationValue: number;
+  }): string => {
+    if (s.durationType === 'time') {
+      const v = s.durationValue;
+      if (v < 60) return `${v}с`;
+      if (v < 3600) return `${Math.round(v / 60)}м`;
+      return `${Math.round(v / 3600)}ч`;
+    }
+    const v = s.durationValue;
+    if (v < 1000) return `${v}м`;
+    return `${(v / 1000).toFixed(1)}км`;
+  };
+
+  const fmtSegDate = (iso: string): string => {
+    try {
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return iso;
+      const pad = (n: number) => String(n).padStart(2, '0');
+      return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    } catch {
+      return iso;
+    }
+  };
+
+  const fmtSegPace = (sec: number | null): string => {
+    if (sec == null || !Number.isFinite(sec) || sec <= 0) return '—';
+    const m = Math.floor(sec / 60);
+    const s = Math.round(sec % 60);
+    return `${m}:${String(s).padStart(2, '0')}`;
+  };
+
+  const median = (arr: number[]): number | null => {
+    if (arr.length === 0) return null;
+    const sorted = [...arr].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 === 0
+      ? (sorted[mid - 1] + sorted[mid]) / 2
+      : sorted[mid];
+  };
+
+  // Название трека по runFactId (fallback — #id)
+  const getFactInfo = (runFactId: number): { date: string; name: string } => {
+    const fact = rawFacts.find((f) => f.id === runFactId);
+    if (!fact) return { date: '—', name: `#${runFactId}` };
+    const name = fact.user_name || fact.name || fact.date || `#${runFactId}`;
+    return { date: fact.date || '—', name };
+  };
+
+  // Фильтрация
+  const filteredSegments = useMemo(() => {
+    if (segmentFilter === 'all') return segments;
+    if (segmentFilter === 'distance') {
+      return segments.filter((s) => s.durationType === 'distance');
+    }
+    const map: Record<string, number> = {
+      'time-60': 60,
+      'time-300': 300,
+      'time-600': 600,
+      'time-1200': 1200,
+      'time-1800': 1800,
+    };
+    const target = map[segmentFilter];
+    if (target == null) return segments;
+    return segments.filter(
+      (s) => s.durationType === 'time' && s.durationValue === target
+    );
+  }, [segments, segmentFilter]);
+
+  // Медианы по отфильтрованным
+  const segmentMedians = useMemo(() => {
+    if (filteredSegments.length === 0) return null;
+    const hrs = filteredSegments
+      .map((s) => s.hrAvg)
+      .filter((v): v is number => v != null);
+    const paces = filteredSegments
+      .map((s) => s.paceSecPerKm)
+      .filter((v): v is number => v != null);
+    const drifts = filteredSegments
+      .map((s) => s.hrDriftPct)
+      .filter((v): v is number => v != null);
+    return {
+      hrMedian: median(hrs),
+      paceMedian: median(paces),
+      driftMedian: median(drifts),
+      count: filteredSegments.length,
+    };
+  }, [filteredSegments]);
 
   // ==================== Рендер ====================
 
@@ -1079,6 +1234,13 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                   onClick={() => setActiveTab('filters')}
                 >
                   <i className="pi pi-sliders-h" style={{ marginRight: '0.35rem' }} /> Стиль
+                </button>
+                <button
+                  type="button"
+                  className={`pb-catalog__chip ${activeTab === 'thresholds' ? 'is-on' : ''}`}
+                  onClick={() => setActiveTab('thresholds')}
+                >
+                  <i className="pi pi-chart-line" style={{ marginRight: '0.35rem' }} /> Пороги
                 </button>
               </div>
             </div>
@@ -1323,6 +1485,314 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                   )}
                 </div>
 
+              </div>
+            )}
+
+            {activeTab === 'thresholds' && (
+              <div style={{ flex: 1, overflowY: 'auto', padding: '0.5rem' }}>
+                {/* Заголовок + обновить */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    marginBottom: '0.75rem',
+                  }}
+                >
+                  <span
+                    className="pb-hint"
+                    style={{ fontSize: '0.75rem', flex: 1 }}
+                  >
+                    {segments.length === 0
+                      ? 'Пока нет сохранённых отрезков'
+                      : `Всего: ${segments.length}`}
+                  </span>
+                  <Button
+                    icon="pi pi-refresh"
+                    text
+                    className="pb-soft p-button-sm"
+                    style={{
+                      padding: '0.1rem',
+                      width: '1.8rem',
+                      height: '1.8rem',
+                    }}
+                    onClick={() => void loadSegments()}
+                    disabled={segmentsLoading}
+                    tooltip="Обновить"
+                    tooltipOptions={{ position: 'bottom' }}
+                  />
+                </div>
+
+                {/* Фильтр по длительности */}
+                <div
+                  className="pb-catalog__chips"
+                  style={{ marginBottom: '0.75rem', flexWrap: 'wrap' }}
+                >
+                  {[
+                    { id: 'all', label: 'Все' },
+                    { id: 'time-60', label: '1м' },
+                    { id: 'time-300', label: '5м' },
+                    { id: 'time-600', label: '10м' },
+                    { id: 'time-1200', label: '20м' },
+                    { id: 'time-1800', label: '30м' },
+                    { id: 'distance', label: 'Дист.' },
+                  ].map((f) => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      className={`pb-catalog__chip ${
+                        segmentFilter === f.id ? 'is-on' : ''
+                      }`}
+                      onClick={() =>
+                        setSegmentFilter(f.id as typeof segmentFilter)
+                      }
+                      style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem' }}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+
+                {segmentsLoading && (
+                  <div
+                    className="pb-hint"
+                    style={{ textAlign: 'center', padding: '0.5rem' }}
+                  >
+                    <i className="pi pi-spin pi-spinner" /> Загрузка…
+                  </div>
+                )}
+
+                {/* Медианы */}
+                {segmentMedians && segmentMedians.count > 0 && (
+                  <div
+                    style={{
+                      background: 'rgba(212, 163, 115, 0.08)',
+                      border: '1px solid rgba(212, 163, 115, 0.3)',
+                      borderRadius: 6,
+                      padding: '0.5rem 0.6rem',
+                      marginBottom: '0.75rem',
+                      fontSize: '0.75rem',
+                    }}
+                  >
+                    <div
+                      style={{
+                        color: 'var(--pb-accent)',
+                        fontWeight: 600,
+                        marginBottom: '0.3rem',
+                      }}
+                    >
+                      Медиана {segmentFilter === 'all' ? 'всех' : 'по фильтру'} (
+                      {segmentMedians.count}{' '}
+                      {segmentMedians.count === 1 ? 'тест' : 'тестов'})
+                    </div>
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'auto 1fr',
+                        gap: '0.15rem 0.5rem',
+                      }}
+                    >
+                      <span style={{ color: 'var(--tg-hint)' }}>HR:</span>
+                      <span style={{ fontFamily: 'monospace' }}>
+                        {segmentMedians.hrMedian != null
+                          ? Math.round(segmentMedians.hrMedian)
+                          : '—'}{' '}
+                        уд/мин
+                      </span>
+                      <span style={{ color: 'var(--tg-hint)' }}>Темп:</span>
+                      <span style={{ fontFamily: 'monospace' }}>
+                        {fmtSegPace(segmentMedians.paceMedian)} /км
+                      </span>
+                      <span style={{ color: 'var(--tg-hint)' }}>Дрейф:</span>
+                      <span style={{ fontFamily: 'monospace' }}>
+                        {segmentMedians.driftMedian != null
+                          ? `${
+                              segmentMedians.driftMedian >= 0 ? '+' : ''
+                            }${segmentMedians.driftMedian.toFixed(1)}%`
+                          : '—'}
+                      </span>
+                    </div>
+                    {segmentMedians.count < 3 && (
+                      <div
+                        style={{
+                          fontSize: '0.7rem',
+                          color: 'var(--tg-hint)',
+                          marginTop: '0.3rem',
+                        }}
+                      >
+                        Для статистики нужно ≥3 теста
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Таблица */}
+                {filteredSegments.length > 0 && (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table
+                      style={{
+                        width: '100%',
+                        borderCollapse: 'collapse',
+                        fontSize: '0.72rem',
+                      }}
+                    >
+                      <thead>
+                        <tr
+                          style={{
+                            borderBottom: '1px solid var(--surface-border)',
+                            color: 'var(--tg-hint)',
+                            textAlign: 'left',
+                          }}
+                        >
+                          <th style={{ padding: '0.4rem 0.3rem' }}>Дата</th>
+                          <th style={{ padding: '0.4rem 0.3rem' }}>Трек</th>
+                          <th style={{ padding: '0.4rem 0.3rem' }}>Длит.</th>
+                          <th style={{ padding: '0.4rem 0.3rem' }}>Темп</th>
+                          <th style={{ padding: '0.4rem 0.3rem' }}>HR</th>
+                          <th style={{ padding: '0.4rem 0.3rem' }}>Макс</th>
+                          <th style={{ padding: '0.4rem 0.3rem' }}>Дрейф</th>
+                          <th style={{ padding: '0.4rem 0.3rem' }}></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredSegments.map((s) => {
+                          const info = getFactInfo(s.runFactId);
+                          return (
+                            <tr
+                              key={s.id}
+                              style={{
+                                borderBottom:
+                                  '1px solid rgba(255,255,255,0.04)',
+                              }}
+                            >
+                              <td
+                                style={{
+                                  padding: '0.35rem 0.3rem',
+                                  color: 'var(--tg-hint)',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {fmtSegDate(s.createdAt)}
+                              </td>
+                              <td
+                                style={{
+                                  padding: '0.35rem 0.3rem',
+                                  maxWidth: '100px',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                }}
+                                title={info.name}
+                              >
+                                {info.name}
+                              </td>
+                              <td
+                                style={{
+                                  padding: '0.35rem 0.3rem',
+                                  fontFamily: 'monospace',
+                                }}
+                              >
+                                {fmtSegDuration(s)}
+                              </td>
+                              <td
+                                style={{
+                                  padding: '0.35rem 0.3rem',
+                                  fontFamily: 'monospace',
+                                }}
+                              >
+                                {fmtSegPace(s.paceSecPerKm)}
+                              </td>
+                              <td
+                                style={{
+                                  padding: '0.35rem 0.3rem',
+                                  fontFamily: 'monospace',
+                                }}
+                              >
+                                {s.hrAvg != null ? Math.round(s.hrAvg) : '—'}
+                              </td>
+                              <td
+                                style={{
+                                  padding: '0.35rem 0.3rem',
+                                  fontFamily: 'monospace',
+                                }}
+                              >
+                                {s.hrMax ?? '—'}
+                              </td>
+                              <td
+                                style={{
+                                  padding: '0.35rem 0.3rem',
+                                  fontFamily: 'monospace',
+                                  color:
+                                    s.hrDriftPct != null &&
+                                    Math.abs(s.hrDriftPct) > 5
+                                      ? 'var(--tg-destructive)'
+                                      : undefined,
+                                }}
+                              >
+                                {s.hrDriftPct != null
+                                  ? `${
+                                      s.hrDriftPct >= 0 ? '+' : ''
+                                    }${s.hrDriftPct.toFixed(1)}%`
+                                  : '—'}
+                              </td>
+                              <td
+                                style={{
+                                  padding: '0.35rem 0.3rem',
+                                  width: '30px',
+                                }}
+                              >
+                                <Button
+                                  icon="pi pi-trash"
+                                  text
+                                  className="pb-drawer__name-edit"
+                                  style={{
+                                    width: '1.7rem',
+                                    height: '1.7rem',
+                                    padding: 0,
+                                  }}
+                                  onClick={() => void handleDeleteSegment(s.id)}
+                                  tooltip="Удалить"
+                                  tooltipOptions={{ position: 'left' }}
+                                />
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {!segmentsLoading &&
+                  filteredSegments.length === 0 &&
+                  segments.length > 0 && (
+                    <div
+                      className="pb-hint"
+                      style={{
+                        textAlign: 'center',
+                        padding: '0.75rem',
+                        fontSize: '0.75rem',
+                      }}
+                    >
+                      Нет отрезков под этот фильтр
+                    </div>
+                  )}
+
+                {!segmentsLoading && segments.length === 0 && (
+                  <div
+                    className="pb-hint"
+                    style={{
+                      padding: '0.75rem',
+                      fontSize: '0.75rem',
+                      textAlign: 'center',
+                      border: '1px dashed var(--surface-border)',
+                      borderRadius: 6,
+                    }}
+                  >
+                    Поставьте точку старта на карте (🎯), выберите длительность
+                    и сохраните тест.
+                  </div>
+                )}
               </div>
             )}
           </div>
