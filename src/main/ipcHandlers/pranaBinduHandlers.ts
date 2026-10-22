@@ -5383,6 +5383,25 @@ export function registerPranaBinduHandlers(): void {
 
   // ==================== Test Segments ====================
 
+  ipcMain.handle(
+    'pb:test-segment-candidates',
+    (_event, opts: any) => {
+      try {
+        if (!opts?.testPoint?.lat || !opts?.testPoint?.lng) {
+          return { success: false, error: 'testPoint обязателен' };
+        }
+        if (opts.durationType !== 'time' && opts.durationType !== 'distance') {
+          return { success: false, error: 'durationType: time | distance' };
+        }
+        const { findTestSegmentCandidates } = require('../services/pranaBindu/core/testSegmentCandidates');
+        const items = findTestSegmentCandidates(getMelange(), opts);
+        return { success: true, items };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
   ipcMain.handle('pb:test-segment-create', (_event, payload: any) => {
     try {
       if (!payload?.runFactId) {

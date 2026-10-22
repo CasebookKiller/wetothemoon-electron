@@ -975,6 +975,9 @@ try {
 
       addCustomExercise: (payload: any) => ipcRenderer.invoke('pb:graph-add-custom-exercise', payload),
 
+      testSegmentCandidates: (opts: any) =>
+        ipcRenderer.invoke('pb:test-segment-candidates', opts),
+
       testSegmentCreate: (payload: any) =>
         ipcRenderer.invoke('pb:test-segment-create', payload),
       testSegmentList: (opts?: any) =>

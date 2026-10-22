@@ -31,6 +31,7 @@ import {
   PALETTES,
 } from './mapStyles';
 import { StoryGeneratorDialog } from './StoryGeneratorDialog';
+import { TestCandidatesDialog } from './TestCandidatesDialog';
 
 interface Props {
   visible: boolean;
@@ -368,6 +369,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     }>
   >([]);
   const [segmentsLoading, setSegmentsLoading] = useState(false);
+  const [candidatesVisible, setCandidatesVisible] = useState(false);
   const [segmentFilter, setSegmentFilter] = useState<
     'all' | 'time-60' | 'time-300' | 'time-600' | 'time-1200' | 'time-1800' | 'distance'
   >('all');
@@ -1508,6 +1510,15 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                       : `Всего: ${segments.length}`}
                   </span>
                   <Button
+                    label="Найти кандидатов"
+                    icon="pi pi-search"
+                    className="pb-soft p-button-sm"
+                    onClick={() => setCandidatesVisible(true)}
+                    disabled={!testPoint || !selectedGroup}
+                    tooltip={!testPoint ? 'Сначала поставьте точку старта (🎯)' : 'Сканировать тренировки и найти подходящие отрезки'}
+                    tooltipOptions={{ position: 'bottom' }}
+                  />
+                  <Button
                     icon="pi pi-refresh"
                     text
                     className="pb-soft p-button-sm"
@@ -2161,6 +2172,19 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
           <div ref={mapContainerRef} style={{ position: 'absolute', inset: 0 }} />
         </div>
       </div>
+
+            {testPoint && (
+        <TestCandidatesDialog
+          visible={candidatesVisible}
+          onHide={() => setCandidatesVisible(false)}
+          testPoint={testPoint}
+          durationType={testDuration.type}
+          durationValue={testDuration.value}
+          onSaved={() => {
+            void loadSegments();
+          }}
+        />
+      )}
 
       {selectedGroup && (
         <StoryGeneratorDialog
