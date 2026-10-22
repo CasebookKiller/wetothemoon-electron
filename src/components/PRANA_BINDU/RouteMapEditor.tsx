@@ -738,6 +738,9 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
       testFinishMarkerRef.current = null;
     }
 
+    // Полностью скрыто чекбоксом «Тест» — не отрисовываем ничего
+    if (!testVisible) return;
+
     if (!testPoint) return;
 
     // Маркер старта (перетаскиваемый)
@@ -795,12 +798,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
         geometry: { type: 'LineString', coordinates: segCoords },
       },
     });
-
-    if (!testVisible) {
-      // Источник добавили (чтобы не пересоздавать при переключении видимости),
-      // но слои и маркер финиша не показываем.
-      return;
-    }
 
     // Тёмная подложка под отрезком (чтобы читался на любом цвете трека)
     map.addLayer({
@@ -1422,7 +1419,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
           )}
 
           {/* Панель метрик теста */}
-          {testPoint && streamsPayload?.latlng && (() => {
+          {testVisible && testPoint && streamsPayload?.latlng && (() => {
             const latlng = streamsPayload.latlng as (number | null)[][];
             const startIdx = findNearestIdx(latlng, testPoint);
             if (startIdx < 0) return null;
@@ -1484,7 +1481,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
           })()}
 
           {/* Панель выбора длительности */}
-          {testPoint && streamsPayload?.latlng && (
+          {testVisible && testPoint && streamsPayload?.latlng && (
             <div
               style={{
                 position: 'absolute',
