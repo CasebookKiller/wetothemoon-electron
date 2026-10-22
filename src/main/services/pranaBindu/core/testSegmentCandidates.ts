@@ -156,7 +156,7 @@ function computeStats(
   hrDriftPct: number | null;
   cadenceAvg: number | null;
 } {
-  const secT = streams?.secT as number[] | undefined;
+  const secT = (streams?.secT ?? streams?.sec_t) as number[] | undefined;
   const distM = streams?.distM as number[] | undefined;
   const hr = streams?.hr as (number | null)[] | undefined;
   const cadence = streams?.cadence as (number | null)[] | undefined;
@@ -226,8 +226,9 @@ export function findTestSegmentCandidates(
   const facts = db
     .prepare(
       `SELECT id, date, start_time, source, name, user_name
-         FROM run_facts
-        WHERE date >= ? AND date <= ? AND streams_loaded = 1
+         FROM run_facts rf
+        WHERE date >= ? AND date <= ?
+          AND EXISTS (SELECT 1 FROM run_streams WHERE run_fact_id = rf.id)
         ORDER BY date DESC`,
     )
     .all(opts.from, opts.to) as Array<{
@@ -279,13 +280,20 @@ export function findTestSegmentCandidates(
     const latlng = stream.payload.latlng as (number | null)[][] | undefined;
     if (!latlng || latlng.length < 2) continue;
 
+    // UnifiedStreams использует secT/distM, но dodofo-файлы могут
+    // содержать sec_t (старый формат). Поддерживаем оба.
+    const secT = (stream.payload.secT ?? stream.payload.sec_t) as
+      | number[]
+      | undefined;
+    const distM = stream.payload.distM as number[] | undefined;
+
     const startIdx = findNearestIdx(latlng, opts.testPoint);
     if (startIdx < 0) continue;
 
     const endIdx =
       opts.durationType === 'time'
-        ? findEndIdxByTime(stream.payload.secT, startIdx, opts.durationValue)
-        : findEndIdxByDist(stream.payload.distM, latlng, startIdx, opts.durationValue);
+        ? findEndIdxByTime(secT, startIdx, opts.durationValue)
+        : findEndIdxByDist(distM, latlng, startIdx, opts.durationValue);
     if (endIdx <= startIdx) continue;
 
     const stats = computeStats(stream.payload, startIdx, endIdx);
@@ -347,4 +355,58 @@ export function findTestSegmentCandidates(
   });
 
   return candidates;
+}
+
+/**
+ * Диагностика — что видит SQL и сколько отсекается на каждом шаге.
+ * Используется в UI, чтобы понимать, почему кандидатов мало.
+ */
+export function diagnoseCandidates(
+  db: DatabaseSync,
+  opts: FindCandidatesOptions,
+): {
+  factsInWindow: number;
+  factsWithStreams: number;
+  factsWithLatlng: number;
+  candidatesAfterCompute: number;
+} {
+  const factsInWindow = (
+    db
+      .prepare(
+        `SELECT COUNT(*) as n FROM run_facts WHERE date >= ? AND date <= ?`,
+      )
+      .get(opts.from, opts.to) as { n: number }
+  ).n;
+
+  const factsWithStreams = (
+    db
+      .prepare(
+        `SELECT COUNT(*) as n FROM run_facts rf
+          WHERE rf.date >= ? AND rf.date <= ?
+            AND EXISTS (SELECT 1 FROM run_streams WHERE run_fact_id = rf.id)`,
+      )
+      .get(opts.from, opts.to) as { n: number }
+  ).n;
+
+  const factsWithLatlng = (
+    db
+      .prepare(
+        `SELECT COUNT(*) as n FROM run_facts rf
+          WHERE rf.date >= ? AND rf.date <= ?
+            AND EXISTS (
+              SELECT 1 FROM run_streams
+               WHERE run_fact_id = rf.id AND channels LIKE '%latlng%'
+            )`,
+      )
+      .get(opts.from, opts.to) as { n: number }
+  ).n;
+
+  const candidates = findTestSegmentCandidates(db, opts);
+
+  return {
+    factsInWindow,
+    factsWithStreams,
+    factsWithLatlng,
+    candidatesAfterCompute: candidates.length,
+  };
 }
