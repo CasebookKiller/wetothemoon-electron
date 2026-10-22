@@ -768,6 +768,8 @@ try {
 
       pickFiles: (opts?: { multiple?: boolean }) =>
         ipcRenderer.invoke('pb:pick-files', opts),
+      pickImage: (defaultPath?: string) => ipcRenderer.invoke('pb:pick-image', defaultPath),
+      readFileBase64: (path: string) => ipcRenderer.invoke('pb:read-file-base64', path),
       importFiles: (
         paths: string[],
         opts?: { origin?: string; skipImported?: boolean }
@@ -966,10 +968,19 @@ try {
       graphUpdatePattern: (payload: any) =>
         ipcRenderer.invoke('pb:graph-update-pattern', payload),
 
-      graphSaveNodePos: (payload: { id: string; x: number; y: number }) =>
-        ipcRenderer.invoke('pb:graph-save-node-pos', payload),
+      computeThresholds: (windowDays?: number) =>
+        ipcRenderer.invoke('pb:compute-thresholds', windowDays),
+      getThresholdHistory: () =>
+        ipcRenderer.invoke('pb:get-threshold-history'),
 
       addCustomExercise: (payload: any) => ipcRenderer.invoke('pb:graph-add-custom-exercise', payload),
+
+      testSegmentCreate: (payload: any) =>
+        ipcRenderer.invoke('pb:test-segment-create', payload),
+      testSegmentList: (opts?: any) =>
+        ipcRenderer.invoke('pb:test-segment-list', opts),
+      testSegmentDelete: (id: number) =>
+        ipcRenderer.invoke('pb:test-segment-delete', id),
 
     },
 

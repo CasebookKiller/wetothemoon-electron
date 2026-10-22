@@ -65,6 +65,9 @@ import {
   getExerciseProgress,
   setExerciseProgress,
   getAutoProviders,
+  createTestSegment,
+  listTestSegments,
+  deleteTestSegment,
 } from '../services/pranaBindu/melange';
 
 import {
@@ -5348,6 +5351,84 @@ export function registerPranaBinduHandlers(): void {
         `)
         .all();
       return { success: true, items: rows };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  // -------- Выбор картинки для сторис --------
+  ipcMain.handle('pb:pick-image', async (_event, defaultPath?: string) => {
+    try {
+      const res = await dialog.showOpenDialog({
+        properties: ['openFile'],
+        title: 'Выберите фото для фона',
+        defaultPath,
+        filters: [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'webp'] }],
+      });
+      if (res.canceled || res.filePaths.length === 0) return { success: false };
+      return { success: true, path: res.filePaths[0] };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  // -------- Чтение файла в base64 --------
+  ipcMain.handle('pb:read-file-base64', async (_event, filePath: string) => {
+    try {
+      const data = fs.readFileSync(filePath);
+      const ext = path.extname(filePath).toLowerCase();
+      const mime = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
+      return `data:${mime};base64,${data.toString('base64')}`;
+    } catch (e) {
+      throw e;
+    }
+  });
+
+  // ==================== Test Segments ====================
+
+  ipcMain.handle('pb:test-segment-create', (_event, payload: any) => {
+    try {
+      if (!payload?.runFactId) {
+        return { success: false, error: 'runFactId обязателен' };
+      }
+      if (
+        typeof payload.startLat !== 'number' ||
+        typeof payload.startLng !== 'number'
+      ) {
+        return { success: false, error: 'startLat/startLng обязательны' };
+      }
+      if (
+        payload.durationType !== 'time' &&
+        payload.durationType !== 'distance'
+      ) {
+        return { success: false, error: 'durationType: time | distance' };
+      }
+      const id = createTestSegment(getMelange(), payload);
+      return { success: true, id };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle(
+    'pb:test-segment-list',
+    (_event, opts?: { from?: string; to?: string; runFactId?: number }) => {
+      try {
+        const items = listTestSegments(getMelange(), opts);
+        return { success: true, items };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+  ipcMain.handle('pb:test-segment-delete', (_event, id: number) => {
+    try {
+      if (!Number.isFinite(id)) {
+        return { success: false, error: 'id обязателен' };
+      }
+      const ok = deleteTestSegment(getMelange(), id);
+      return { success: ok };
     } catch (e) {
       return { success: false, error: (e as Error).message };
     }

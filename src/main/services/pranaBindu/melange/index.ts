@@ -98,3 +98,14 @@ export {
 } from './repositories/equivalencesRepo';
 export type { Equivalence, EquivalenceInput } from './repositories/equivalencesRepo';
 
+export {
+  createTestSegment,
+  listTestSegments,
+  listTestSegmentsForRun,
+  deleteTestSegment,
+} from './repositories/testSegmentsRepo';
+export type {
+  TestSegment,
+  CreateTestSegmentInput,
+  TestSegmentDurationType,
+} from './repositories/testSegmentsRepo';

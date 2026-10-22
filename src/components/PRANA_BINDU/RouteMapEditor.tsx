@@ -345,6 +345,9 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
       return true;
     }
   });
+  const [saveStatus, setSaveStatus] = useState<
+    'idle' | 'saving' | 'saved' | 'error'
+  >('idle');
   const testMarkerRef = useRef<Marker | null>(null);
   const testFinishMarkerRef = useRef<Marker | null>(null);
   const markupClickHandlerRef = useRef<((e: any) => void) | null>(null);
@@ -980,6 +983,71 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     }
   };
 
+  // ==================== Расчёт тестового отрезка ====================
+
+  const segmentInfo = useMemo(() => {
+    if (!testPoint || !streamsPayload?.latlng) return null;
+    const latlng = streamsPayload.latlng as (number | null)[][];
+    const startIdx = findNearestIdx(latlng, testPoint);
+    if (startIdx < 0) return null;
+
+    const endIdx =
+      testDuration.type === 'time'
+        ? findEndIdxByTime(streamsPayload.secT, startIdx, testDuration.value)
+        : findEndIdxByDist(
+            streamsPayload.distM,
+            latlng,
+            startIdx,
+            testDuration.value
+          );
+    if (endIdx <= startIdx) return null;
+
+    const stats = computeSegmentStats(streamsPayload, startIdx, endIdx);
+    return { startIdx, endIdx, stats };
+  }, [testPoint, testDuration, streamsPayload]);
+
+  const handleSaveTest = async () => {
+    if (!segmentInfo || !selectedGroup || !testPoint) return;
+    const fact =
+      selectedGroup.items.find((it: any) => it.source === selectedSource) ||
+      selectedGroup.primary;
+    if (!fact?.id) return;
+
+    setSaveStatus('saving');
+    try {
+      const api = (window as any).electronAPI;
+      const res = await api.pb.testSegmentCreate({
+        runFactId: fact.id,
+        startLat: testPoint.lat,
+        startLng: testPoint.lng,
+        startIdx: segmentInfo.startIdx,
+        endIdx: segmentInfo.endIdx,
+        durationType: testDuration.type,
+        durationValue: testDuration.value,
+        distanceM: segmentInfo.stats.distanceM,
+        durationSec: segmentInfo.stats.durationSec,
+        paceSecPerKm: segmentInfo.stats.paceSecPerKm,
+        hrAvg: segmentInfo.stats.hrAvg,
+        hrMax: segmentInfo.stats.hrMax,
+        hrDriftPct: segmentInfo.stats.hrDriftPct,
+        cadenceAvg: segmentInfo.stats.cadenceAvg,
+        note: null,
+      });
+      if (res?.success) {
+        setSaveStatus('saved');
+        setTimeout(() => setSaveStatus('idle'), 3000);
+      } else {
+        console.error('[pb-map] test-segment save error:', res?.error);
+        setSaveStatus('error');
+        setTimeout(() => setSaveStatus('idle'), 3000);
+      }
+    } catch (e) {
+      console.error('[pb-map] test-segment save:', e);
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus('idle'), 3000);
+    }
+  };
+
   // ==================== Рендер ====================
 
   return (
@@ -1419,21 +1487,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
           )}
 
           {/* Панель метрик теста */}
-          {testVisible && testPoint && streamsPayload?.latlng && (() => {
-            const latlng = streamsPayload.latlng as (number | null)[][];
-            const startIdx = findNearestIdx(latlng, testPoint);
-            if (startIdx < 0) return null;
-
-            const endIdx =
-              testDuration.type === 'time'
-                ? findEndIdxByTime(streamsPayload.secT, startIdx, testDuration.value)
-                : findEndIdxByDist(streamsPayload.distM, latlng, startIdx, testDuration.value);
-
-            if (endIdx <= startIdx) return null;
-
-            const stats = computeSegmentStats(streamsPayload, startIdx, endIdx);
-
-            return (
+          {testVisible && segmentInfo && (
               <div
                 style={{
                   position: 'absolute',
@@ -1458,27 +1512,67 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '0.2rem 0.5rem' }}>
                   <span style={{ color: 'var(--tg-hint)' }}>Время:</span>
-                  <span style={{ fontFamily: 'monospace' }}>{fmtSecAsDuration(stats.durationSec)}</span>
+                  <span style={{ fontFamily: 'monospace' }}>{fmtSecAsDuration(segmentInfo.stats.durationSec)}</span>
                   <span style={{ color: 'var(--tg-hint)' }}>Дистанция:</span>
-                  <span style={{ fontFamily: 'monospace' }}>{(stats.distanceM / 1000).toFixed(2)} км</span>
+                  <span style={{ fontFamily: 'monospace' }}>{(segmentInfo.stats.distanceM / 1000).toFixed(2)} км</span>
                   <span style={{ color: 'var(--tg-hint)' }}>Темп:</span>
-                  <span style={{ fontFamily: 'monospace' }}>{fmtSecAsPace(stats.paceSecPerKm)} /км</span>
+                  <span style={{ fontFamily: 'monospace' }}>{fmtSecAsPace(segmentInfo.stats.paceSecPerKm)} /км</span>
                   <span style={{ color: 'var(--tg-hint)' }}>Ср. пульс:</span>
-                  <span style={{ fontFamily: 'monospace' }}>{stats.hrAvg != null ? Math.round(stats.hrAvg) : '—'} уд/мин</span>
+                  <span style={{ fontFamily: 'monospace' }}>{segmentInfo.stats.hrAvg != null ? Math.round(segmentInfo.stats.hrAvg) : '—'} уд/мин</span>
                   <span style={{ color: 'var(--tg-hint)' }}>Макс. пульс:</span>
-                  <span style={{ fontFamily: 'monospace' }}>{stats.hrMax ?? '—'} уд/мин</span>
+                  <span style={{ fontFamily: 'monospace' }}>{segmentInfo.stats.hrMax ?? '—'} уд/мин</span>
                   <span style={{ color: 'var(--tg-hint)' }}>Дрейф HR:</span>
                   <span style={{ fontFamily: 'monospace' }}>
-                    {stats.hrDriftPct != null
-                      ? `${stats.hrDriftPct >= 0 ? '+' : ''}${stats.hrDriftPct.toFixed(1)}%`
+                    {segmentInfo.stats.hrDriftPct != null
+                      ? `${segmentInfo.stats.hrDriftPct >= 0 ? '+' : ''}${segmentInfo.stats.hrDriftPct.toFixed(1)}%`
                       : '—'}
                   </span>
                   <span style={{ color: 'var(--tg-hint)' }}>Каденс:</span>
-                  <span style={{ fontFamily: 'monospace' }}>{stats.cadenceAvg != null ? Math.round(stats.cadenceAvg) : '—'}</span>
+                  <span style={{ fontFamily: 'monospace' }}>{segmentInfo.stats.cadenceAvg != null ? Math.round(segmentInfo.stats.cadenceAvg) : '—'}</span>
                 </div>
+                <button
+                  type="button"
+                  onClick={handleSaveTest}
+                  disabled={saveStatus === 'saving' || saveStatus === 'saved'}
+                  style={{
+                    marginTop: '0.6rem',
+                    width: '100%',
+                    padding: '0.35rem 0.5rem',
+                    fontSize: '0.75rem',
+                    border: `1px solid ${
+                      saveStatus === 'saved'
+                        ? 'var(--tg-success)'
+                        : saveStatus === 'error'
+                        ? 'var(--tg-destructive)'
+                        : 'var(--pb-accent)'
+                    }`,
+                    background:
+                      saveStatus === 'saved'
+                        ? 'rgba(111, 191, 115, 0.15)'
+                        : 'transparent',
+                    color:
+                      saveStatus === 'saved'
+                        ? 'var(--tg-success)'
+                        : saveStatus === 'error'
+                        ? 'var(--tg-destructive)'
+                        : 'var(--pb-accent)',
+                    borderRadius: 4,
+                    cursor:
+                      saveStatus === 'saving' || saveStatus === 'saved'
+                        ? 'default'
+                        : 'pointer',
+                  }}
+                >
+                  {saveStatus === 'saving'
+                    ? '⏳ Сохранение…'
+                    : saveStatus === 'saved'
+                    ? '✓ Сохранено'
+                    : saveStatus === 'error'
+                    ? '✗ Ошибка сохранения'
+                    : '💾 Сохранить как тест'}
+                </button>
               </div>
-            );
-          })()}
+          )}
 
           {/* Панель выбора длительности */}
           {testVisible && testPoint && streamsPayload?.latlng && (

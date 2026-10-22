@@ -17,7 +17,7 @@ import {
   MIGRATION_V24_AUTO_RANGE_DAYS,
 } from './schema';
 
-export const SCHEMA_VERSION = 24;
+export const SCHEMA_VERSION = 26;
 
 interface Migration {
   version: number;
@@ -558,8 +558,61 @@ const migrations: readonly Migration[] = [
       );
     },
   },
+  {
+    version: 25,
+    apply: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS threshold_history (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          computed_at TEXT NOT NULL,
+          window_days INTEGER NOT NULL,
+          lthr REAL,
+          hrmax REAL,
+          resthr REAL,
+          source TEXT NOT NULL,          -- 'computed_20min', 'computed_30min', 'computed_8020'
+          notes TEXT
+        );
+      `);
+      console.log('[Melange] v25: создана таблица threshold_history');
+    },
+  },
+  {
+    version: 26,
+    apply: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS test_segments (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          run_fact_id INTEGER NOT NULL,
+          start_lat REAL NOT NULL,
+          start_lng REAL NOT NULL,
+          start_idx INTEGER NOT NULL,
+          end_idx INTEGER NOT NULL,
+          duration_type TEXT NOT NULL CHECK (duration_type IN ('time', 'distance')),
+          duration_value INTEGER NOT NULL,
+          distance_m REAL NOT NULL,
+          duration_sec INTEGER NOT NULL,
+          pace_sec_per_km REAL,
+          hr_avg REAL,
+          hr_max INTEGER,
+          hr_drift_pct REAL,
+          cadence_avg REAL,
+          note TEXT,
+          created_at TEXT NOT NULL,
+          FOREIGN KEY (run_fact_id) REFERENCES run_facts(id) ON DELETE CASCADE
+        );
+      `);
+      db.exec(
+        `CREATE INDEX IF NOT EXISTS idx_test_segments_run_fact
+           ON test_segments(run_fact_id);`,
+      );
+      db.exec(
+        `CREATE INDEX IF NOT EXISTS idx_test_segments_created
+           ON test_segments(created_at);`,
+      );
+      console.log('[Melange] v26: создана таблица test_segments');
+    },
+  },
 ];
-
 
 function getCurrentVersion(db: DatabaseSync): number {
   const row = db
