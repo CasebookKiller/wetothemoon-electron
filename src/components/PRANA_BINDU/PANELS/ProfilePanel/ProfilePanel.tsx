@@ -11,6 +11,7 @@ import { InputNumber } from 'primereact/inputnumber';
 import { Dropdown } from 'primereact/dropdown';
 import { Message } from 'primereact/message';
 import { Panel } from 'primereact/panel';
+import { Checkbox } from 'primereact/checkbox';
 
 export interface ProfilePanelHandle {
   /** Перечитать профиль из БД. */
@@ -330,13 +331,13 @@ export const ProfilePanel = forwardRef<ProfilePanelHandle, Props>(
               className="pb-check-row pb-checkbox-dark"
               style={{ fontSize: '0.8rem', cursor: 'pointer' }}
             >
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={onlyClean}
-                onChange={(e) => setOnlyClean(e.target.checked)}
-                style={{ marginRight: '0.35rem' }}
+                onChange={(e) => setOnlyClean(!!e.checked)}
               />
-              <span>Только чистые (дрейф &lt; 5%)</span>
+              <span className="pb-hint" style={{ marginLeft: '0.4rem' }}>
+                Только чистые (дрейф &lt; 5%)
+              </span>
             </label>
             <Button
               label={computing ? 'Расчёт…' : 'Рассчитать из фактов'}
