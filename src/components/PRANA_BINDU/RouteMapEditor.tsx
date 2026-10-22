@@ -338,6 +338,13 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
   const [markupMode, setMarkupMode] = useState(false);
   const [testPoint, setTestPoint] = useState<TestPoint | null>(() => loadTestPoint());
   const [testDuration, setTestDuration] = useState<TestDuration>(() => loadTestDuration());
+  const [testVisible, setTestVisible] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('pb.testVisible') !== '0';
+    } catch {
+      return true;
+    }
+  });
   const testMarkerRef = useRef<Marker | null>(null);
   const testFinishMarkerRef = useRef<Marker | null>(null);
   const markupClickHandlerRef = useRef<((e: any) => void) | null>(null);
@@ -507,6 +514,13 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
       canvas.style.cursor = '';
     };
   }, [mapLoaded, markupMode]);
+
+  // Сохранение видимости тестового отрезка
+  useEffect(() => {
+    try {
+      localStorage.setItem('pb.testVisible', testVisible ? '1' : '0');
+    } catch { /* ignore */ }
+  }, [testVisible]);
 
   // Очистка
   useEffect(() => {
@@ -782,6 +796,12 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
       },
     });
 
+    if (!testVisible) {
+      // Источник добавили (чтобы не пересоздавать при переключении видимости),
+      // но слои и маркер финиша не показываем.
+      return;
+    }
+
     // Тёмная подложка под отрезком (чтобы читался на любом цвете трека)
     map.addLayer({
       id: 'test-segment-outline',
@@ -815,7 +835,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
         .addTo(map);
       testFinishMarkerRef.current = finishMarker;
     }
-  }, [streamsPayload, mapLoaded, testPoint, testDuration]);
+  }, [streamsPayload, mapLoaded, testPoint, testDuration, testVisible]);
 
   // ==================== Хендлеры ====================
 
@@ -1388,6 +1408,15 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                     <span>{l.name}</span>
                   </label>
                 ))}
+                {testPoint && (
+                  <label className="pb-check-row pb-checkbox-dark" style={{ fontSize: '0.75rem', cursor: 'pointer' }}>
+                    <Checkbox 
+                      checked={testVisible} 
+                      onChange={(e) => setTestVisible(!!e.checked)} 
+                    />
+                    <span>Тест</span>
+                  </label>
+                )}
               </div>
             </div>
           )}
