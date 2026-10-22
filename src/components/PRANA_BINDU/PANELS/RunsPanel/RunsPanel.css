@@ -162,24 +162,6 @@
   scrollbar-color: var(--pb-accent) transparent;
 }
 
-.pb-runs-table-wrap .p-datatable .p-datatable-wrapper::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-.pb-runs-table-wrap .p-datatable .p-datatable-wrapper::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--pb-accent) 50%, transparent);
-  border-radius: 4px;
-}
-
-.pb-runs-table-wrap .p-datatable .p-datatable-wrapper::-webkit-scrollbar-thumb:hover {
-  background: color-mix(in srgb, var(--pb-accent) 75%, transparent);
-}
-
-.pb-runs-table-wrap .p-datatable .p-datatable-wrapper::-webkit-scrollbar-track {
-  background: transparent;
-}
-
 /* ============================================================
    Пагинатор в стиле Prana-Bindu — компактный, accent-цвет
    ============================================================ */

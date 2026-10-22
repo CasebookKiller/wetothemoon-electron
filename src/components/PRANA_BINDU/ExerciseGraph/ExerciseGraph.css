@@ -230,12 +230,6 @@
   scrollbar-color: color-mix(in srgb, var(--pb-accent) 45%, transparent) transparent;
 }
 
-.pb-graph-view__detail::-webkit-scrollbar { width: 8px; }
-.pb-graph-view__detail::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--pb-accent) 50%, transparent);
-  border-radius: 4px;
-}
-
 .pb-graph-view__detail-head {
   display: flex;
   justify-content: space-between;
@@ -551,8 +545,6 @@
   font-weight: 600;
 }
 
-
-
 /* ---------- Дочерние чипы паттернов ---------- */
 
 .pb-graph-chip--child {
@@ -718,12 +710,6 @@
   gap: 0.15rem;
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--pb-accent) 45%, transparent) transparent;
-}
-
-.pb-palette__list::-webkit-scrollbar { width: 6px; }
-.pb-palette__list::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--pb-accent) 50%, transparent);
-  border-radius: 3px;
 }
 
 .pb-palette__item {
