@@ -238,30 +238,48 @@ export const AddPlanEventDialog: React.FC<Props> = ({
       className="pb-templates-dialog pb-settings-dialog"
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem', marginTop: '0.5rem' }}>
-        {/* Дата */}
-        <div>
-          <label className="pb-label" style={{ display: 'block', marginBottom: '0.35rem' }}>Дата</label>
-          <Calendar
-            value={date}
-            onChange={(e) => setDate(e.value as Date)}
-            dateFormat="dd.mm.yy"
-            showIcon
-            className="pb-cal pb-cal--full"
-            disabled={saving}
-          />
-        </div>
+        {/* Дата + Тип — в одну строку */}
+        <div
+          style={{
+            display: 'flex',
+            gap: '0.75rem',
+            alignItems: 'flex-end',
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ flex: '1 1 12rem', minWidth: '10rem' }}>
+            <label
+              className="pb-label"
+              style={{ display: 'block', marginBottom: '0.35rem' }}
+            >
+              Дата
+            </label>
+            <Calendar
+              value={date}
+              onChange={(e) => setDate(e.value as Date)}
+              dateFormat="dd.mm.yy"
+              showIcon
+              className="pb-cal pb-cal--full"
+              disabled={saving}
+            />
+          </div>
 
-        {/* Тип */}
-        <div>
-          <label className="pb-label" style={{ display: 'block', marginBottom: '0.35rem' }}>Тип</label>
-          <Dropdown
-            value={sport}
-            options={SPORT_OPTIONS}
-            onChange={(e) => setSport(e.value)}
-            className="w-full"
-            panelClassName="pb-dropdown-panel"
-            disabled={saving}
-          />
+          <div style={{ flex: '1 1 12rem', minWidth: '10rem' }}>
+            <label
+              className="pb-label"
+              style={{ display: 'block', marginBottom: '0.35rem' }}
+            >
+              Тип
+            </label>
+            <Dropdown
+              value={sport}
+              options={SPORT_OPTIONS}
+              onChange={(e) => setSport(e.value)}
+              className="w-full"
+              panelClassName="pb-dropdown-panel"
+              disabled={saving}
+            />
+          </div>
         </div>
 
         {/* Название */}
