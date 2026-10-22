@@ -68,9 +68,16 @@ export const ProfilePanel = forwardRef<ProfilePanelHandle, Props>(
       source: 'test_segments' | 'autoscan';
       notes: string;
       testsUsed: number;
+      testsTotal: number;
+      skippedClean: number;
+      skippedIntense: number;
+      method: 'median' | 'topN' | null;
+      hrRange: { min: number; max: number; median: number } | null;
     } | null>(null);
     const [lthrTestDuration, setLthrTestDuration] = useState<number>(1200);
     const [onlyClean, setOnlyClean] = useState<boolean>(false);
+    const [onlyIntensePct, setOnlyIntensePct] = useState<number>(80);
+    const [topN, setTopN] = useState<number>(3);
     const [error, setError] = useState('');
     const [saved, setSaved] = useState(false);
 
@@ -113,6 +120,10 @@ export const ProfilePanel = forwardRef<ProfilePanelHandle, Props>(
       if (savedDur) setLthrTestDuration(Number(savedDur));
       const savedClean = localStorage.getItem('pb.thresholds.onlyClean');
       if (savedClean === '1') setOnlyClean(true);
+      const savedIntensePct = localStorage.getItem('pb.thresholds.onlyIntensePct');
+      if (savedIntensePct != null) setOnlyIntensePct(Number(savedIntensePct) || 80);
+      const savedTopN = localStorage.getItem('pb.thresholds.topN');
+      if (savedTopN != null) setTopN(Number(savedTopN) || 0);
     }, []);
 
     useEffect(() => {
@@ -125,6 +136,14 @@ export const ProfilePanel = forwardRef<ProfilePanelHandle, Props>(
     useEffect(() => {
       localStorage.setItem('pb.thresholds.onlyClean', onlyClean ? '1' : '0');
     }, [onlyClean]);
+
+    useEffect(() => {
+      localStorage.setItem('pb.thresholds.onlyIntensePct', String(onlyIntensePct));
+    }, [onlyIntensePct]);
+
+    useEffect(() => {
+      localStorage.setItem('pb.thresholds.topN', String(topN));
+    }, [topN]);
 
     const loadHistory = async () => {
       try {
@@ -328,6 +347,20 @@ export const ProfilePanel = forwardRef<ProfilePanelHandle, Props>(
               tooltip="Длительность тестового отрезка, по которому считается LTHR"
               tooltipOptions={{ position: 'top' }}
             />
+            <Dropdown
+              value={topN}
+              options={[
+                { label: 'Медиана всех', value: 0 },
+                { label: 'Топ-3 среднее', value: 3 },
+                { label: 'Топ-5 среднее', value: 5 },
+              ]}
+              onChange={(e) => setTopN(e.value)}
+              className="pb-wade-programs__dd pb-wade-programs__dd--weeks"
+              panelClassName="pb-dropdown-panel"
+              style={{ minWidth: '9rem' }}
+              tooltip="Как агрегировать тесты: медиана всех или среднее топ-N (лучшие)"
+              tooltipOptions={{ position: 'top' }}
+            />
             <label
               className="pb-check-row pb-checkbox-dark"
               style={{ fontSize: '0.8rem', cursor: 'pointer' }}
@@ -337,9 +370,26 @@ export const ProfilePanel = forwardRef<ProfilePanelHandle, Props>(
                 onChange={(e) => setOnlyClean(!!e.checked)}
               />
               <span className="pb-hint" style={{ marginLeft: '0.4rem' }}>
-                Только чистые (дрейф &lt; 5%)
+                Чистые (дрейф &lt; 5%)
               </span>
             </label>
+            <Dropdown
+              value={onlyIntensePct}
+              options={[
+                { label: 'Все (без фильтра)', value: 0 },
+                { label: '≥75% HRmax', value: 75 },
+                { label: '≥80% HRmax', value: 80 },
+                { label: '≥85% HRmax', value: 85 },
+                { label: '≥88% HRmax', value: 88 },
+                { label: '≥90% HRmax', value: 90 },
+              ]}
+              onChange={(e) => setOnlyIntensePct(e.value)}
+              className="pb-wade-programs__dd pb-wade-programs__dd--weeks"
+              panelClassName="pb-dropdown-panel"
+              style={{ minWidth: '9rem' }}
+              tooltip="Отсеять тесты, где пульс слишком низкий для порога"
+              tooltipOptions={{ position: 'top' }}
+            />
             <Button
               label={computing ? 'Расчёт…' : 'Рассчитать из фактов'}
               icon={computing ? 'pi pi-spin pi-spinner' : 'pi pi-calculator'}
@@ -351,6 +401,8 @@ export const ProfilePanel = forwardRef<ProfilePanelHandle, Props>(
                     windowDays,
                     lthrTestDuration,
                     onlyClean,
+                    onlyIntensePct: onlyIntensePct / 100,
+                    topN,
                   });
                   if (res.success) {
                     setComputed(res.data);
@@ -411,9 +463,33 @@ export const ProfilePanel = forwardRef<ProfilePanelHandle, Props>(
               <div className="col-4">LTHR: <b>{computed.lthr ?? '—'}</b></div>
               <div className="col-4">RestHR: <b>{computed.resthr ?? '—'}</b></div>
             </div>
+            {computed.hrRange && (
+              <div
+                className="pb-hint"
+                style={{ fontSize: '0.72rem', marginTop: '0.3rem' }}
+              >
+                HR на отобранных тестах: {Math.round(computed.hrRange.min)}–{Math.round(computed.hrRange.max)}, медиана {Math.round(computed.hrRange.median)}
+              </div>
+            )}
             <div className="pb-hint" style={{ fontSize: '0.72rem', marginTop: '0.4rem' }}>
               {computed.notes}
             </div>
+            {(computed.skippedClean > 0 || computed.skippedIntense > 0) && (
+              <div
+                className="pb-hint"
+                style={{
+                  fontSize: '0.72rem',
+                  marginTop: '0.2rem',
+                  color: 'var(--tg-hint)',
+                }}
+              >
+                Отфильтровано:{' '}
+                {computed.skippedClean > 0 && `по чистоте ${computed.skippedClean}`}
+                {computed.skippedClean > 0 && computed.skippedIntense > 0 && ' · '}
+                {computed.skippedIntense > 0 && `по интенсивности ${computed.skippedIntense}`}
+                {' '}из {computed.testsTotal} тестов.
+              </div>
+            )}
             <Button
               label="Применить эти значения"
               icon="pi pi-check"
@@ -434,6 +510,8 @@ export const ProfilePanel = forwardRef<ProfilePanelHandle, Props>(
         <ThresholdsTimelineChart
           lthrTestDuration={lthrTestDuration}
           onlyClean={onlyClean}
+          onlyIntensePct={onlyIntensePct / 100}
+          topN={topN}
         />
 
         {/* Подсказка по методике расчёта */}

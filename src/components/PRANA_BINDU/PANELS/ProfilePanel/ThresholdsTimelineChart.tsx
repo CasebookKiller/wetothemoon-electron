@@ -20,6 +20,8 @@ interface TimelinePoint {
 interface Props {
   lthrTestDuration: number;
   onlyClean: boolean;
+  onlyIntensePct: number;
+  topN: number;
 }
 
 type PeriodMonths = 6 | 12 | 24;
@@ -28,6 +30,8 @@ type WindowDays = 30 | 60 | 90;
 export const ThresholdsTimelineChart: React.FC<Props> = ({
   lthrTestDuration,
   onlyClean,
+  onlyIntensePct,
+  topN,
 }) => {
   const api = (window as any).electronAPI;
 
@@ -41,6 +45,7 @@ export const ThresholdsTimelineChart: React.FC<Props> = ({
   const [points, setPoints] = useState<TimelinePoint[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [testCountByDuration, setTestCountByDuration] = useState<Record<number, number>>({});
 
   const load = async () => {
     setLoading(true);
@@ -60,12 +65,29 @@ export const ThresholdsTimelineChart: React.FC<Props> = ({
         stepDays: 14,
         lthrTestDuration,
         onlyClean,
+        onlyIntensePct,
+        topN,
       });
       if (!res?.success) {
         setError(res?.error ?? 'Ошибка загрузки');
         return;
       }
       setPoints(res.items ?? []);
+      // Диагностика: сколько тестов по каждой длительности в БД (всё время)
+      try {
+        const allMeta = await api.pb.testSegmentList({});
+        if (allMeta?.success && Array.isArray(allMeta.items)) {
+          const counts: Record<number, number> = {};
+          for (const t of allMeta.items) {
+            if (t.durationType === 'time') {
+              counts[t.durationValue] = (counts[t.durationValue] ?? 0) + 1;
+            }
+          }
+          setTestCountByDuration(counts);
+        }
+      } catch {
+        /* ignore */
+      }
     } finally {
       setLoading(false);
     }
@@ -74,7 +96,7 @@ export const ThresholdsTimelineChart: React.FC<Props> = ({
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [periodMonths, windowDays, lthrTestDuration, onlyClean]);
+  }, [periodMonths, windowDays, lthrTestDuration, onlyClean, onlyIntensePct, topN]);
 
   const chartData = useMemo(() => {
     const labels = points.map((p) => p.date);
@@ -88,11 +110,13 @@ export const ThresholdsTimelineChart: React.FC<Props> = ({
         backgroundColor: 'rgba(212, 163, 115, 0.15)',
         borderWidth: 2.5,
         tension: 0.3,
-        spanGaps: true,
+        spanGaps: false,
         pointRadius: 3,
         pointHoverRadius: 6,
         pointBackgroundColor: '#d4a373',
-      });
+        // Привязываем «N тестов» к точке для tooltip
+        testsUsed: points.map((p) => p.testsUsed),
+      } as any);
     }
     if (showHrmax) {
       datasets.push({
@@ -165,7 +189,10 @@ export const ThresholdsTimelineChart: React.FC<Props> = ({
               const idx = items[0].dataIndex;
               const p = points[idx];
               if (!p) return '';
-              return `Тестов: ${p.testsUsed} · ${p.source === 'test_segments' ? 'по тестам' : 'нет данных'}`;
+              if (p.source === 'test_segments') {
+                return `Тестов в окне: ${p.testsUsed}`;
+              }
+              return 'Нет 3+ тестов этой длительности в окне';
             },
           },
         },
@@ -185,6 +212,16 @@ export const ThresholdsTimelineChart: React.FC<Props> = ({
       },
     };
   }, [points]);
+
+  // Нет данных для порогов — если нет ни одной точки LTHR и HRmax.
+  // RestHR может быть (он из recovery_logs), но без порогов график бесполезен.
+  const hasThresholdData = points.some(
+    (p) => p.lthr != null || p.hrmax != null,
+  );
+  const noTestsWarning =
+    !loading &&
+    points.length > 0 &&
+    !hasThresholdData;
 
   const isEmpty = !loading && points.length > 0 && points.every((p) => p.lthr == null && p.hrmax == null && p.resthr == null);
 
@@ -234,11 +271,38 @@ export const ThresholdsTimelineChart: React.FC<Props> = ({
           <span style={{ marginLeft: '0.3rem' }}>RestHR</span>
         </label>
 
+        <span
+          className="pb-hint"
+          style={{
+            fontSize: '0.72rem',
+            marginLeft: 'auto',
+            color: 'var(--tg-hint)',
+          }}
+          title={`Тестов в БД: ${Object.entries(testCountByDuration).map(([k, v]) => `${Math.round(Number(k) / 60)}м=${v}`).join(' · ')}`}
+        >
+          Всего тестов{' '}
+          {lthrTestDuration < 60
+            ? `${lthrTestDuration}с`
+            : `${Math.round(lthrTestDuration / 60)}м`}
+          : <b style={{ color: 'var(--pb-accent)' }}>{testCountByDuration[lthrTestDuration] ?? 0}</b>
+          {Object.keys(testCountByDuration).length > 1 && (
+            <span style={{ opacity: 0.7 }}>
+              {' · '}
+              {Object.entries(testCountByDuration)
+                .filter(([k]) => Number(k) !== lthrTestDuration)
+                .sort(([a], [b]) => Number(b) - Number(a))
+                .slice(0, 3)
+                .map(([k, v]) => `${Math.round(Number(k) / 60)}м=${v}`)
+                .join(' · ')}
+            </span>
+          )}
+        </span>
+
         <Button
           icon="pi pi-refresh"
           text
           className="pb-soft p-button-sm"
-          style={{ marginLeft: 'auto', padding: '0.1rem', width: '1.8rem', height: '1.8rem' }}
+          style={{ padding: '0.1rem', width: '1.8rem', height: '1.8rem' }}
           onClick={() => void load()}
           disabled={loading}
           tooltip="Обновить"
@@ -275,6 +339,40 @@ export const ThresholdsTimelineChart: React.FC<Props> = ({
             ? `${lthrTestDuration}с`
             : `${Math.round(lthrTestDuration / 60)}м`}{' '}
           через редактор карт (🎯 → «💾 Сохранить как тест»).
+        </div>
+      )}
+
+      {!loading && noTestsWarning && (
+        <div
+          style={{
+            padding: '0.6rem 0.8rem',
+            marginBottom: '0.5rem',
+            background: 'rgba(232, 168, 56, 0.08)',
+            border: '1px solid rgba(232, 168, 56, 0.35)',
+            borderRadius: 6,
+            fontSize: '0.78rem',
+            color: 'var(--tg-hint)',
+          }}
+        >
+          <i className="pi pi-info-circle" style={{ color: '#e8a838', marginRight: '0.4rem' }} />
+          Нет тестов длительности{' '}
+          {lthrTestDuration < 60
+            ? `${lthrTestDuration}с`
+            : `${Math.round(lthrTestDuration / 60)}м`}{' '}
+          в окне. Показан только RestHR.
+          {lthrTestDuration !== 1200 && (
+            <>
+              {' '}
+              Сохрани тесты или переключи длительность на{' '}
+              <b>20 мин</b> в панели «Рассчитать из фактов».
+            </>
+          )}
+          {lthrTestDuration === 1200 && (
+            <>
+              {' '}
+              Сохрани хотя бы 3 теста через редактор карт (🎯 → 💾).
+            </>
+          )}
         </div>
       )}
 

@@ -11,8 +11,8 @@ export interface ComputeThresholdsOptions {
   lthrTestDuration?: number;
   /** Учитывать только «чистые» тесты — |дрейф HR| < 5%. */
   onlyClean?: boolean;
-  /** Учитывать только интенсивные — hr_avg ≥ 0.80 × HRmax. */
-  onlyIntense?: boolean;
+  /** Учитывать только интенсивные — hr_avg ≥ (pct × HRmax). */
+  onlyIntensePct?: number;   // 0 = не фильтровать, 0.80 / 0.85 / 0.88 / 0.90
   /** Метод агрегации: 0 = медиана всех, N > 0 = среднее топ-N. */
   topN?: number;
 }
@@ -30,6 +30,8 @@ export interface ComputedThresholds {
   skippedClean: number;
   skippedIntense: number;
   method: 'median' | 'topN' | null;
+  /** Разброс HR по отфильтрованным тестам. */
+  hrRange: { min: number; max: number; median: number } | null;
 }
 
 // ==================== Коэффициенты LTHR ====================
@@ -74,7 +76,7 @@ interface TestRow {
 
 interface LthrFromTestsOpts {
   onlyClean: boolean;
-  onlyIntense: boolean;
+  onlyIntensePct: number;  // 0 = не фильтровать
   topN: number;
 }
 
@@ -86,6 +88,7 @@ interface LthrFromTestsResult {
   skippedIntense: number;
   method: 'median' | 'topN' | null;
   hrMaxGlobal: number;
+  hrRange: { min: number; max: number; median: number } | null;
 }
 
 function computeLthrFromTests(
@@ -112,10 +115,10 @@ function computeLthrFromTests(
     skippedClean = before - filtered.length;
   }
 
-  // 3. Фильтр интенсивности (hr_avg >= 0.80 × hrMaxGlobal)
+  // 3. Фильтр интенсивности
   let skippedIntense = 0;
-  if (opts.onlyIntense && hrMaxGlobal > 0) {
-    const threshold = 0.8 * hrMaxGlobal;
+  if (opts.onlyIntensePct > 0 && hrMaxGlobal > 0) {
+    const threshold = opts.onlyIntensePct * hrMaxGlobal;
     const before = filtered.length;
     filtered = filtered.filter(
       (t) => t.hr_avg != null && t.hr_avg >= threshold,
@@ -128,6 +131,14 @@ function computeLthrFromTests(
     .filter((v): v is number => v != null && v > 0);
 
   if (hrs.length < 3) {
+    const hrRange =
+      hrs.length > 0
+        ? {
+            min: Math.min(...hrs),
+            max: Math.max(...hrs),
+            median: median(hrs) ?? 0,
+          }
+        : null;
     return {
       lthr: null,
       used: hrs.length,
@@ -136,6 +147,7 @@ function computeLthrFromTests(
       skippedIntense,
       method: null,
       hrMaxGlobal,
+      hrRange,
     };
   }
 
@@ -151,6 +163,12 @@ function computeLthrFromTests(
     method = 'median';
   }
 
+  const hrRange = {
+    min: Math.min(...hrs),
+    max: Math.max(...hrs),
+    median: median(hrs) ?? 0,
+  };
+
   return {
     lthr: Math.round(agg * factor),
     used: hrs.length,
@@ -159,6 +177,7 @@ function computeLthrFromTests(
     skippedIntense,
     method,
     hrMaxGlobal,
+    hrRange,
   };
 }
 
@@ -221,8 +240,8 @@ export function computeThresholds(
   const windowDays = opts.windowDays ?? 365;
   const lthrTestDuration = opts.lthrTestDuration ?? 1200;
   const onlyClean = opts.onlyClean ?? false;
-  const onlyIntense = opts.onlyIntense ?? true;  // по умолчанию включено
-  const topN = opts.topN ?? 0;                    // 0 = медиана
+  const onlyIntensePct = opts.onlyIntensePct ?? 0.80; // по умолчанию 80%
+  const topN = opts.topN ?? 0;                         // 0 = медиана
 
   const now = new Date();
   const from = new Date();
@@ -252,7 +271,7 @@ export function computeThresholds(
 
   const lthrResult = computeLthrFromTests(testRows, factor, {
     onlyClean,
-    onlyIntense,
+    onlyIntensePct,
     topN,
   });
 
@@ -320,9 +339,9 @@ export function computeThresholds(
   let notes: string;
   const filters: string[] = [];
   if (onlyClean) filters.push(`чистота (${lthrResult.skippedClean} отсеяно)`);
-  if (onlyIntense)
+  if (onlyIntensePct > 0)
     filters.push(
-      `интенсивность ≥80% HRmax (${lthrResult.skippedIntense} отсеяно)`,
+      `интенсивность ≥${Math.round(onlyIntensePct * 100)}% HRmax (${lthrResult.skippedIntense} отсеяно)`,
     );
   const filterStr = filters.length > 0 ? ` Фильтры: ${filters.join(', ')}.` : '';
   const methodStr =
@@ -356,6 +375,7 @@ export function computeThresholds(
     skippedClean: lthrResult.skippedClean,
     skippedIntense: lthrResult.skippedIntense,
     method: lthrResult.method,
+    hrRange: lthrResult.hrRange,
   };
 }
 
@@ -377,7 +397,7 @@ export interface ComputeTimelineOptions {
   stepDays?: number;
   lthrTestDuration?: number;
   onlyClean?: boolean;
-  onlyIntense?: boolean;
+  onlyIntensePct?: number;
   topN?: number;
 }
 
@@ -396,7 +416,7 @@ export function computeThresholdsTimeline(
   const stepDays = opts.stepDays ?? 14;
   const lthrTestDuration = opts.lthrTestDuration ?? 1200;
   const onlyClean = opts.onlyClean ?? false;
-  const onlyIntense = opts.onlyIntense ?? true;
+  const onlyIntensePct = opts.onlyIntensePct ?? 0.80;
   const topN = opts.topN ?? 0;
   const factor = getLthrFactor(lthrTestDuration);
 
@@ -429,9 +449,9 @@ export function computeThresholdsTimeline(
       )
       .all(lthrTestDuration, winFromIso, winToIso) as unknown as TestRow[];
 
-        const lthrResult = computeLthrFromTests(testRows, factor, {
+    const lthrResult = computeLthrFromTests(testRows, factor, {
       onlyClean,
-      onlyIntense,
+      onlyIntensePct,
       topN,
     });
 
