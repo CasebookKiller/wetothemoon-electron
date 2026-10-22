@@ -15,6 +15,8 @@ export interface ComputeThresholdsOptions {
   onlyIntensePct?: number;   // 0 = не фильтровать, 0.80 / 0.85 / 0.88 / 0.90
   /** Метод агрегации: 0 = медиана всех, N > 0 = среднее топ-N. */
   topN?: number;
+  /** Минимум тестов для расчёта (default 3). */
+  minTests?: number;
 }
 
 export interface ComputedThresholds {
@@ -78,6 +80,7 @@ interface LthrFromTestsOpts {
   onlyClean: boolean;
   onlyIntensePct: number;  // 0 = не фильтровать
   topN: number;
+  minTests: number;
 }
 
 interface LthrFromTestsResult {
@@ -130,7 +133,7 @@ function computeLthrFromTests(
     .map((t) => t.hr_avg)
     .filter((v): v is number => v != null && v > 0);
 
-  if (hrs.length < 3) {
+  if (hrs.length < opts.minTests) {
     const hrRange =
       hrs.length > 0
         ? {
@@ -242,6 +245,7 @@ export function computeThresholds(
   const onlyClean = opts.onlyClean ?? false;
   const onlyIntensePct = opts.onlyIntensePct ?? 0.80; // по умолчанию 80%
   const topN = opts.topN ?? 0;                         // 0 = медиана
+  const minTests = opts.minTests ?? 3;                 // по умолчанию 3
 
   const now = new Date();
   const from = new Date();
@@ -273,6 +277,7 @@ export function computeThresholds(
     onlyClean,
     onlyIntensePct,
     topN,
+    minTests,
   });
 
   let lthr: number | null = lthrResult.lthr;
@@ -399,6 +404,7 @@ export interface ComputeTimelineOptions {
   onlyClean?: boolean;
   onlyIntensePct?: number;
   topN?: number;
+  minTests?: number;
 }
 
 /**
@@ -418,6 +424,7 @@ export function computeThresholdsTimeline(
   const onlyClean = opts.onlyClean ?? false;
   const onlyIntensePct = opts.onlyIntensePct ?? 0.80;
   const topN = opts.topN ?? 0;
+  const minTests = opts.minTests ?? 3;
   const factor = getLthrFactor(lthrTestDuration);
 
   const toDate = new Date(opts.to + 'T00:00:00');
@@ -453,6 +460,7 @@ export function computeThresholdsTimeline(
       onlyClean,
       onlyIntensePct,
       topN,
+      minTests,
     });
 
     let lthr: number | null = lthrResult.lthr;

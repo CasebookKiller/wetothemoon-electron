@@ -22,6 +22,7 @@ interface Props {
   onlyClean: boolean;
   onlyIntensePct: number;
   topN: number;
+  minTests: number;
 }
 
 type PeriodMonths = 6 | 12 | 24;
@@ -32,6 +33,7 @@ export const ThresholdsTimelineChart: React.FC<Props> = ({
   onlyClean,
   onlyIntensePct,
   topN,
+  minTests,
 }) => {
   const api = (window as any).electronAPI;
 
@@ -67,6 +69,7 @@ export const ThresholdsTimelineChart: React.FC<Props> = ({
         onlyClean,
         onlyIntensePct,
         topN,
+        minTests,
       });
       if (!res?.success) {
         setError(res?.error ?? 'Ошибка загрузки');
@@ -96,7 +99,7 @@ export const ThresholdsTimelineChart: React.FC<Props> = ({
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [periodMonths, windowDays, lthrTestDuration, onlyClean, onlyIntensePct, topN]);
+  }, [periodMonths, windowDays, lthrTestDuration, onlyClean, onlyIntensePct, topN, minTests]);
 
   const chartData = useMemo(() => {
     const labels = points.map((p) => p.date);

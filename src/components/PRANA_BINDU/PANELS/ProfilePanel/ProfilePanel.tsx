@@ -78,6 +78,7 @@ export const ProfilePanel = forwardRef<ProfilePanelHandle, Props>(
     const [onlyClean, setOnlyClean] = useState<boolean>(false);
     const [onlyIntensePct, setOnlyIntensePct] = useState<number>(80);
     const [topN, setTopN] = useState<number>(3);
+    const [minTests, setMinTests] = useState<number>(3);
     const [error, setError] = useState('');
     const [saved, setSaved] = useState(false);
 
@@ -124,6 +125,8 @@ export const ProfilePanel = forwardRef<ProfilePanelHandle, Props>(
       if (savedIntensePct != null) setOnlyIntensePct(Number(savedIntensePct) || 80);
       const savedTopN = localStorage.getItem('pb.thresholds.topN');
       if (savedTopN != null) setTopN(Number(savedTopN) || 0);
+      const savedMinTests = localStorage.getItem('pb.thresholds.minTests');
+      if (savedMinTests != null) setMinTests(Number(savedMinTests) || 3);
     }, []);
 
     useEffect(() => {
@@ -144,6 +147,10 @@ export const ProfilePanel = forwardRef<ProfilePanelHandle, Props>(
     useEffect(() => {
       localStorage.setItem('pb.thresholds.topN', String(topN));
     }, [topN]);
+
+    useEffect(() => {
+      localStorage.setItem('pb.thresholds.minTests', String(minTests));
+    }, [minTests]);
 
     const loadHistory = async () => {
       try {
@@ -361,6 +368,23 @@ export const ProfilePanel = forwardRef<ProfilePanelHandle, Props>(
               tooltip="Как агрегировать тесты: медиана всех или среднее топ-N (лучшие)"
               tooltipOptions={{ position: 'top' }}
             />
+
+                        <Dropdown
+              value={minTests}
+              options={[
+                { label: 'Мин. 1 тест', value: 1 },
+                { label: 'Мин. 2 теста', value: 2 },
+                { label: 'Мин. 3 теста', value: 3 },
+                { label: 'Мин. 5 тестов', value: 5 },
+              ]}
+              onChange={(e) => setMinTests(e.value)}
+              className="pb-wade-programs__dd pb-wade-programs__dd--weeks"
+              panelClassName="pb-dropdown-panel"
+              style={{ minWidth: '10rem' }}
+              tooltip="Сколько минимум тестов нужно, чтобы считать LTHR по ним (иначе — автопоиск)"
+              tooltipOptions={{ position: 'top' }}
+            />
+
             <label
               className="pb-check-row pb-checkbox-dark"
               style={{ fontSize: '0.8rem', cursor: 'pointer' }}
@@ -403,6 +427,7 @@ export const ProfilePanel = forwardRef<ProfilePanelHandle, Props>(
                     onlyClean,
                     onlyIntensePct: onlyIntensePct / 100,
                     topN,
+                    minTests,
                   });
                   if (res.success) {
                     setComputed(res.data);
@@ -428,7 +453,7 @@ export const ProfilePanel = forwardRef<ProfilePanelHandle, Props>(
               <span style={{ fontWeight: 600, color: 'var(--pb-accent)' }}>
                 <i className="pi pi-calculator" /> Результат расчёта
               </span>
-              {computed.source === 'test_segments' ? (
+              {computed.source === 'test_segments' && computed.testsUsed >= 3 ? (
                 <span
                   className="pb-source-badge"
                   style={{
@@ -441,6 +466,20 @@ export const ProfilePanel = forwardRef<ProfilePanelHandle, Props>(
                   }}
                 >
                   ✓ по {computed.testsUsed} тестам
+                </span>
+              ) : computed.source === 'test_segments' ? (
+                <span
+                  className="pb-source-badge"
+                  style={{
+                    background: 'rgba(232, 168, 56, 0.15)',
+                    color: '#e8a838',
+                    border: '1px solid #e8a838',
+                    padding: '0.1rem 0.4rem',
+                    borderRadius: 4,
+                    fontSize: '0.7rem',
+                  }}
+                >
+                  ⚠ по {computed.testsUsed} {computed.testsUsed === 1 ? 'тесту' : 'тестам'} (мало)
                 </span>
               ) : (
                 <span
@@ -512,6 +551,7 @@ export const ProfilePanel = forwardRef<ProfilePanelHandle, Props>(
           onlyClean={onlyClean}
           onlyIntensePct={onlyIntensePct / 100}
           topN={topN}
+          minTests={minTests}
         />
 
         {/* Подсказка по методике расчёта */}
