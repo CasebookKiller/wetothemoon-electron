@@ -978,6 +978,9 @@ try {
       testSegmentCandidates: (opts: any) =>
         ipcRenderer.invoke('pb:test-segment-candidates', opts),
 
+      thresholdsTimeline: (opts: any) =>
+        ipcRenderer.invoke('pb:thresholds-timeline', opts),
+
       testSegmentCreate: (payload: any) =>
         ipcRenderer.invoke('pb:test-segment-create', payload),
       testSegmentList: (opts?: any) =>

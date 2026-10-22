@@ -246,3 +246,121 @@ export function computeThresholds(
     testsUsed,
   };
 }
+
+// ==================== Timeline (C.4) ====================
+
+export interface TimelinePoint {
+  date: string;            // YYYY-MM-DD (конец окна)
+  lthr: number | null;
+  hrmax: number | null;
+  resthr: number | null;
+  testsUsed: number;
+  source: 'test_segments' | 'autoscan' | 'insufficient';
+}
+
+export interface ComputeTimelineOptions {
+  from: string;            // YYYY-MM-DD
+  to: string;              // YYYY-MM-DD
+  windowDays: number;      // размер скользящего окна (30/60/90)
+  stepDays?: number;       // шаг по времени (по умолчанию 14)
+  lthrTestDuration?: number; // 300/600/900/1200/1800 (по умолчанию 1200)
+  onlyClean?: boolean;
+}
+
+/**
+ * Rolling timeline: для каждой даты считаем медиану LTHR по тестам
+ * в скользящем окне [date - windowDays, date].
+ *
+ * По умолчанию работает только по test_segments (быстро, ~10 SQL).
+ * Автопоиск по streams не используется — слишком медленно для N точек.
+ */
+export function computeThresholdsTimeline(
+  db: DatabaseSync,
+  opts: ComputeTimelineOptions,
+): TimelinePoint[] {
+  const windowDays = opts.windowDays;
+  const stepDays = opts.stepDays ?? 14;
+  const lthrTestDuration = opts.lthrTestDuration ?? 1200;
+  const onlyClean = opts.onlyClean ?? false;
+  const factor = getLthrFactor(lthrTestDuration);
+
+  const toDate = new Date(opts.to + 'T00:00:00');
+  const fromDate = new Date(opts.from + 'T00:00:00');
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const iso = (d: Date) =>
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+  const points: TimelinePoint[] = [];
+  const cursor = new Date(fromDate);
+  // Первая точка — когда окно полностью набрано
+  cursor.setDate(cursor.getDate() + windowDays);
+
+  while (cursor <= toDate) {
+    const winFrom = new Date(cursor);
+    winFrom.setDate(winFrom.getDate() - windowDays);
+    const winFromIso = iso(winFrom);
+    const winToIso = iso(cursor);
+
+    // Тесты в окне
+    const testRows = db
+      .prepare(
+        `SELECT ts.hr_avg, ts.hr_max, ts.hr_drift_pct
+           FROM test_segments ts
+           JOIN run_facts rf ON rf.id = ts.run_fact_id
+          WHERE ts.duration_type = 'time'
+            AND ts.duration_value = ?
+            AND rf.date >= ? AND rf.date <= ?`,
+      )
+      .all(lthrTestDuration, winFromIso, winToIso) as Array<{
+      hr_avg: number | null;
+      hr_max: number | null;
+      hr_drift_pct: number | null;
+    }>;
+
+    const cleanTests = onlyClean
+      ? testRows.filter(
+          (t) => t.hr_drift_pct == null || Math.abs(t.hr_drift_pct) < 5,
+        )
+      : testRows;
+
+    const hrs = cleanTests
+      .map((t) => t.hr_avg)
+      .filter((v): v is number => v != null && v > 0);
+
+    let lthr: number | null = null;
+    let source: TimelinePoint['source'] = 'insufficient';
+    if (hrs.length >= 3) {
+      const med = median(hrs);
+      if (med != null) {
+        lthr = Math.round(med * factor);
+        source = 'test_segments';
+      }
+    }
+
+    const maxHrs = testRows
+      .map((t) => t.hr_max)
+      .filter((v): v is number => v != null && v > 0);
+    const hrmax = maxHrs.length > 0 ? Math.max(...maxHrs) : null;
+
+    // RestHR — медиана из recovery_logs в окне
+    const logs = listRecoveryLogs(db, winFromIso, winToIso);
+    const restValues = logs
+      .map((l) => l.resting_hr)
+      .filter((v): v is number => v != null && v > 0);
+    const medRest = median(restValues);
+    const resthr = medRest != null ? Math.round(medRest) : null;
+
+    points.push({
+      date: winToIso,
+      lthr,
+      hrmax,
+      resthr,
+      testsUsed: hrs.length,
+      source,
+    });
+
+    cursor.setDate(cursor.getDate() + stepDays);
+  }
+
+  return points;
+}

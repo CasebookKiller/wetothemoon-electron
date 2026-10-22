@@ -11,6 +11,7 @@ import { InputNumber } from 'primereact/inputnumber';
 import { Dropdown } from 'primereact/dropdown';
 import { Message } from 'primereact/message';
 import { Panel } from 'primereact/panel';
+import { ThresholdsTimelineChart } from './ThresholdsTimelineChart';
 import { Checkbox } from 'primereact/checkbox';
 
 export interface ProfilePanelHandle {
@@ -428,6 +429,12 @@ export const ProfilePanel = forwardRef<ProfilePanelHandle, Props>(
             />
           </div>
         )}
+
+        {/* График динамики LTHR / HRmax / RestHR */}
+        <ThresholdsTimelineChart
+          lthrTestDuration={lthrTestDuration}
+          onlyClean={onlyClean}
+        />
 
         {/* Подсказка по методике расчёта */}
         <div className="mt-3">
