@@ -405,7 +405,7 @@ export const ProfilePanel = forwardRef<ProfilePanelHandle, Props>(
                 </span>
               )}
             </div>
-            <div className="grid">
+            <div className="grid" style={{ color: 'var(--tg-text, #f5f5f5)' }}>
               <div className="col-4">HRmax: <b>{computed.hrmax ?? '—'}</b></div>
               <div className="col-4">LTHR: <b>{computed.lthr ?? '—'}</b></div>
               <div className="col-4">RestHR: <b>{computed.resthr ?? '—'}</b></div>
@@ -449,7 +449,15 @@ export const ProfilePanel = forwardRef<ProfilePanelHandle, Props>(
         {history.length > 0 && (
           <div className="mt-4">
             <div className="pb-label mb-2" style={{ fontWeight: 600 }}>История расчётов (последний за день)</div>
-            <div className="pb-threshold-table">
+            <div
+              className="pb-threshold-table"
+              style={{
+                // Локально перебиваем глобальную синюю переменную PrimeReact/Telegram.
+                // Наследуется в .pb-threshold-table__row через var(--tg-theme-text-color).
+                ['--tg-theme-text-color' as any]: 'var(--tg-text, #f5f5f5)',
+                color: 'var(--tg-text, #f5f5f5)',
+              }}
+            >
               <div className="pb-threshold-table__header">
                 <span>Дата</span>
                 <span>Окно</span>
@@ -459,11 +467,36 @@ export const ProfilePanel = forwardRef<ProfilePanelHandle, Props>(
               </div>
               {history.map((h) => (
                 <div key={h.id} className="pb-threshold-table__row">
-                  <span className="pb-threshold-table__date">{new Date(h.computed_at).toLocaleDateString('ru-RU')}</span>
-                  <span className="pb-threshold-table__val">{h.window_days} дн.</span>
-                  <span className="pb-threshold-table__val">{h.hrmax ?? '—'}</span>
-                  <span className="pb-threshold-table__val">{h.lthr ?? '—'}</span>
-                  <span className="pb-threshold-table__val">{h.resthr ?? '—'}</span>
+                  <span
+                    className="pb-threshold-table__date"
+                    style={{ color: 'var(--tg-text, #f5f5f5)' }}
+                  >
+                    {new Date(h.computed_at).toLocaleDateString('ru-RU')}
+                  </span>
+                  <span
+                    className="pb-threshold-table__val"
+                    style={{ color: 'var(--tg-text, #f5f5f5)' }}
+                  >
+                    {h.window_days} дн.
+                  </span>
+                  <span
+                    className="pb-threshold-table__val"
+                    style={{ color: 'var(--tg-text, #f5f5f5)' }}
+                  >
+                    {h.hrmax ?? '—'}
+                  </span>
+                  <span
+                    className="pb-threshold-table__val"
+                    style={{ color: 'var(--tg-text, #f5f5f5)' }}
+                  >
+                    {h.lthr ?? '—'}
+                  </span>
+                  <span
+                    className="pb-threshold-table__val"
+                    style={{ color: 'var(--tg-text, #f5f5f5)' }}
+                  >
+                    {h.resthr ?? '—'}
+                  </span>
                 </div>
               ))}
             </div>
