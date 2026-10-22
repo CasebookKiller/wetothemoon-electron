@@ -84,6 +84,224 @@ function buildColorExpression(
   ];
 }
 
+// ==================== Утилиты для тестовых отрезков ====================
+
+interface TestPoint {
+  lat: number;
+  lng: number;
+}
+
+interface TestDuration {
+  type: 'time' | 'distance';
+  value: number; // секунды или метры
+}
+
+const TEST_POINT_KEY = 'pb.testPoint';
+const TEST_DURATION_KEY = 'pb.testDuration';
+
+function loadTestPoint(): TestPoint | null {
+  try {
+    const raw = localStorage.getItem(TEST_POINT_KEY);
+    if (!raw) return null;
+    const p = JSON.parse(raw);
+    if (typeof p?.lat === 'number' && typeof p?.lng === 'number') {
+      return { lat: p.lat, lng: p.lng };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function saveTestPoint(p: TestPoint | null): void {
+  try {
+    if (p) localStorage.setItem(TEST_POINT_KEY, JSON.stringify(p));
+    else localStorage.removeItem(TEST_POINT_KEY);
+  } catch { /* ignore */ }
+}
+
+function loadTestDuration(): TestDuration {
+  try {
+    const raw = localStorage.getItem(TEST_DURATION_KEY);
+    if (raw) {
+      const d = JSON.parse(raw);
+      if (d?.type === 'time' || d?.type === 'distance') {
+        return { type: d.type, value: Number(d.value) || 1200 };
+      }
+    }
+  } catch { /* ignore */ }
+  return { type: 'time', value: 1200 }; // 20 минут
+}
+
+function saveTestDuration(d: TestDuration): void {
+  try {
+    localStorage.setItem(TEST_DURATION_KEY, JSON.stringify(d));
+  } catch { /* ignore */ }
+}
+
+function haversineM(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number
+): number {
+  const R = 6371000;
+  const φ1 = (lat1 * Math.PI) / 180;
+  const φ2 = (lat2 * Math.PI) / 180;
+  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+  const Δλ = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(Δφ / 2) ** 2 +
+    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function findNearestIdx(
+  latlng: (number | null)[][] | undefined,
+  point: TestPoint
+): number {
+  if (!latlng || latlng.length === 0) return -1;
+  let best = 0;
+  let bestDist = Infinity;
+  for (let i = 0; i < latlng.length; i++) {
+    const p = latlng[i];
+    if (!p || p[0] == null || p[1] == null) continue;
+    const d = haversineM(p[0], p[1], point.lat, point.lng);
+    if (d < bestDist) {
+      bestDist = d;
+      best = i;
+    }
+  }
+  return best;
+}
+
+function findEndIdxByTime(
+  secT: number[] | undefined,
+  startIdx: number,
+  targetSec: number
+): number {
+  if (!secT || secT.length === 0) return startIdx;
+  const startSec = secT[startIdx];
+  for (let i = startIdx + 1; i < secT.length; i++) {
+    if (secT[i] - startSec >= targetSec) return i;
+  }
+  return secT.length - 1;
+}
+
+function findEndIdxByDist(
+  distM: number[] | undefined,
+  latlng: (number | null)[][] | undefined,
+  startIdx: number,
+  targetM: number
+): number {
+  if (distM && distM.length > 0) {
+    const startM = distM[startIdx];
+    for (let i = startIdx + 1; i < distM.length; i++) {
+      if (distM[i] - startM >= targetM) return i;
+    }
+    return distM.length - 1;
+  }
+  // fallback: считаем haversine накоплением
+  if (!latlng) return startIdx;
+  let cum = 0;
+  for (let i = startIdx + 1; i < latlng.length; i++) {
+    const a = latlng[i - 1];
+    const b = latlng[i];
+    if (!a || !b) continue;
+    const aLat = a[0];
+    const aLng = a[1];
+    const bLat = b[0];
+    const bLng = b[1];
+    if (aLat == null || aLng == null || bLat == null || bLng == null) continue;
+    cum += haversineM(aLat, aLng, bLat, bLng);
+    if (cum >= targetM) return i;
+  }
+  return latlng.length - 1;
+}
+
+interface SegmentStats {
+  durationSec: number;
+  distanceM: number;
+  paceSecPerKm: number | null;
+  hrAvg: number | null;
+  hrMax: number | null;
+  hrDriftPct: number | null;
+  cadenceAvg: number | null;
+}
+
+function computeSegmentStats(
+  streams: any,
+  startIdx: number,
+  endIdx: number
+): SegmentStats {
+  const secT = streams?.secT as number[] | undefined;
+  const distM = streams?.distM as number[] | undefined;
+  const hr = streams?.hr as (number | null)[] | undefined;
+  const cadence = streams?.cadence as (number | null)[] | undefined;
+
+  const durationSec =
+    secT && secT[endIdx] != null && secT[startIdx] != null
+      ? secT[endIdx] - secT[startIdx]
+      : 0;
+  const distanceM =
+    distM && distM[endIdx] != null && distM[startIdx] != null
+      ? distM[endIdx] - distM[startIdx]
+      : 0;
+  const paceSecPerKm =
+    distanceM > 0 && durationSec > 0
+      ? durationSec / (distanceM / 1000)
+      : null;
+
+  const hrs = (hr?.slice(startIdx, endIdx + 1) ?? []).filter(
+    (v): v is number => v != null && Number.isFinite(v)
+  );
+  const hrAvg =
+    hrs.length > 0 ? hrs.reduce((a, b) => a + b, 0) / hrs.length : null;
+  const hrMax = hrs.length > 0 ? Math.max(...hrs) : null;
+
+  let hrDriftPct: number | null = null;
+  if (hrs.length >= 4) {
+    const mid = Math.floor(hrs.length / 2);
+    const a1 = hrs.slice(0, mid);
+    const a2 = hrs.slice(mid);
+    const avg1 = a1.reduce((s, v) => s + v, 0) / a1.length;
+    const avg2 = a2.reduce((s, v) => s + v, 0) / a2.length;
+    if (avg1 > 0) hrDriftPct = ((avg2 - avg1) / avg1) * 100;
+  }
+
+  const cads = (cadence?.slice(startIdx, endIdx + 1) ?? []).filter(
+    (v): v is number => v != null && Number.isFinite(v)
+  );
+  const cadenceAvg =
+    cads.length > 0 ? cads.reduce((s, v) => s + v, 0) / cads.length : null;
+
+  return {
+    durationSec,
+    distanceM,
+    paceSecPerKm,
+    hrAvg,
+    hrMax,
+    hrDriftPct,
+    cadenceAvg,
+  };
+}
+
+function fmtSecAsPace(sec: number | null): string {
+  if (sec == null || !Number.isFinite(sec) || sec <= 0) return '—';
+  const m = Math.floor(sec / 60);
+  const s = Math.round(sec % 60);
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function fmtSecAsDuration(sec: number): string {
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = Math.round(sec % 60);
+  if (h > 0) return `${h}ч ${m}м ${s}с`;
+  if (m > 0) return `${m}м ${String(s).padStart(2, '0')}с`;
+  return `${s}с`;
+}
+
 // ==================== Компонент ====================
 
 export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId }) => {
@@ -115,6 +333,15 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
 
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
+
+  // Разметка / тестовая точка
+  const [markupMode, setMarkupMode] = useState(false);
+  const [testPoint, setTestPoint] = useState<TestPoint | null>(() => loadTestPoint());
+  const [testDuration, setTestDuration] = useState<TestDuration>(() => loadTestDuration());
+  const testMarkerRef = useRef<Marker | null>(null);
+  const testFinishMarkerRef = useRef<Marker | null>(null);
+  const markupClickHandlerRef = useRef<((e: any) => void) | null>(null);
+
   const markersRef = useRef<Marker[]>([]);
   const retryTimerRef = useRef<number | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -245,12 +472,58 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     }
   }, [isLeftPanelOpen]);
 
+    // ==================== Режим разметки: клик по карте ====================
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+
+    // Снимаем предыдущий обработчик
+    if (markupClickHandlerRef.current) {
+      map.off('click', markupClickHandlerRef.current);
+      markupClickHandlerRef.current = null;
+    }
+
+    // Меняем курсор
+    const canvas = map.getCanvas();
+    canvas.style.cursor = markupMode ? 'crosshair' : '';
+
+    if (!markupMode) return;
+
+    const handler = (e: any) => {
+      const { lat, lng } = e.lngLat;
+      const p: TestPoint = { lat, lng };
+      setTestPoint(p);
+      saveTestPoint(p);
+    };
+    map.on('click', handler);
+    markupClickHandlerRef.current = handler;
+
+    return () => {
+      if (markupClickHandlerRef.current) {
+        map.off('click', markupClickHandlerRef.current);
+        markupClickHandlerRef.current = null;
+      }
+      canvas.style.cursor = '';
+    };
+  }, [mapLoaded, markupMode]);
+
   // Очистка
   useEffect(() => {
     if (!visible && mapRef.current) {
       mapRef.current.remove();
       mapRef.current = null;
       markersRef.current = [];
+      if (testMarkerRef.current) {
+        testMarkerRef.current.remove();
+        testMarkerRef.current = null;
+      }
+      if (testFinishMarkerRef.current) {
+        testFinishMarkerRef.current.remove();
+        testFinishMarkerRef.current = null;
+      }
+      markupClickHandlerRef.current = null;
+      setMarkupMode(false);
       setMapLoaded(false);
     }
   }, [visible]);
@@ -431,6 +704,118 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     trackSettings.glow,
     trackSettings.color,
   ]);
+
+  // ==================== Отрисовка тестовой точки + отрезка ====================
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+
+    // Убираем старые слои/маркеры
+    if (map.getLayer('test-segment-outline')) map.removeLayer('test-segment-outline');
+    if (map.getLayer('test-segment')) map.removeLayer('test-segment');
+    if (map.getSource('test-segment')) map.removeSource('test-segment');
+    if (testMarkerRef.current) {
+      testMarkerRef.current.remove();
+      testMarkerRef.current = null;
+    }
+    if (testFinishMarkerRef.current) {
+      testFinishMarkerRef.current.remove();
+      testFinishMarkerRef.current = null;
+    }
+
+    if (!testPoint) return;
+
+    // Маркер старта (перетаскиваемый)
+    const startMarker = new Marker({
+      color: '#d4a373',
+      draggable: true,
+    })
+      .setLngLat([testPoint.lng, testPoint.lat])
+      .addTo(map);
+
+    startMarker.on('dragend', () => {
+      const lngLat = startMarker.getLngLat();
+      const p: TestPoint = { lat: lngLat.lat, lng: lngLat.lng };
+      setTestPoint(p);
+      saveTestPoint(p);
+    });
+
+    testMarkerRef.current = startMarker;
+
+    // Ищем отрезок на треке
+    const latlng = streamsPayload?.latlng as (number | null)[][] | undefined;
+    if (!latlng || latlng.length < 2) return;
+
+    const startIdx = findNearestIdx(latlng, testPoint);
+    if (startIdx < 0) return;
+
+    let endIdx: number;
+    if (testDuration.type === 'time') {
+      endIdx = findEndIdxByTime(streamsPayload.secT, startIdx, testDuration.value);
+    } else {
+      endIdx = findEndIdxByDist(
+        streamsPayload.distM,
+        latlng,
+        startIdx,
+        testDuration.value
+      );
+    }
+    if (endIdx <= startIdx) return;
+
+    // Геометрия отрезка (в формате MapLibre [lng, lat])
+    const segCoords: [number, number][] = [];
+    for (let i = startIdx; i <= endIdx; i++) {
+      const p = latlng[i];
+      if (p && p[0] != null && p[1] != null) {
+        segCoords.push([p[1], p[0]]);
+      }
+    }
+    if (segCoords.length < 2) return;
+
+    map.addSource('test-segment', {
+      type: 'geojson',
+      data: {
+        type: 'Feature',
+        properties: {},
+        geometry: { type: 'LineString', coordinates: segCoords },
+      },
+    });
+
+    // Тёмная подложка под отрезком (чтобы читался на любом цвете трека)
+    map.addLayer({
+      id: 'test-segment-outline',
+      type: 'line',
+      source: 'test-segment',
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: {
+        'line-color': '#000000',
+        'line-width': trackSettingsRef.current.width + 6,
+        'line-opacity': 0.4,
+      },
+    });
+
+    map.addLayer({
+      id: 'test-segment',
+      type: 'line',
+      source: 'test-segment',
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: {
+        'line-color': '#d4a373',
+        'line-width': trackSettingsRef.current.width + 2,
+        'line-opacity': 0.95,
+      },
+    });
+
+    // Маркер финиша
+    const last = latlng[endIdx];
+    if (last && last[0] != null && last[1] != null) {
+      const finishMarker = new Marker({ color: '#ff5a00' })
+        .setLngLat([last[1], last[0]])
+        .addTo(map);
+      testFinishMarkerRef.current = finishMarker;
+    }
+  }, [streamsPayload, mapLoaded, testPoint, testDuration]);
 
   // ==================== Хендлеры ====================
 
@@ -916,6 +1301,25 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                   />
                 </div>
 
+                                {/* Кнопка Разметка */}
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: markupMode ? 'rgba(212, 163, 115, 0.2)' : 'rgba(23, 33, 43, 0.85)',
+                  borderRadius: '6px',
+                  border: `1px solid ${markupMode ? 'var(--pb-accent)' : 'var(--surface-border)'}`,
+                  backdropFilter: 'blur(4px)', pointerEvents: 'auto', height: '2.5rem', width: '2.5rem', boxSizing: 'border-box'
+                }}>
+                  <Button
+                    icon="pi pi-map-marker"
+                    text
+                    className="pb-drawer__name-edit"
+                    onClick={() => setMarkupMode((v) => !v)}
+                    tooltip={markupMode ? 'Выйти из разметки' : 'Разметка: клик по карте — поставить точку старта'}
+                    tooltipOptions={{ position: 'bottom' }}
+                    style={{ color: markupMode ? 'var(--pb-accent)' : undefined }}
+                  />
+                </div>
+
                 {/* Панель навигации по трекам */}
                 <div style={{ 
                   display: 'flex', alignItems: 'center', gap: '0.25rem', 
@@ -985,6 +1389,187 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                   </label>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Панель метрик теста */}
+          {testPoint && streamsPayload?.latlng && (() => {
+            const latlng = streamsPayload.latlng as (number | null)[][];
+            const startIdx = findNearestIdx(latlng, testPoint);
+            if (startIdx < 0) return null;
+
+            const endIdx =
+              testDuration.type === 'time'
+                ? findEndIdxByTime(streamsPayload.secT, startIdx, testDuration.value)
+                : findEndIdxByDist(streamsPayload.distM, latlng, startIdx, testDuration.value);
+
+            if (endIdx <= startIdx) return null;
+
+            const stats = computeSegmentStats(streamsPayload, startIdx, endIdx);
+
+            return (
+              <div
+                style={{
+                  position: 'absolute',
+                  bottom: 100,
+                  right: 10,
+                  zIndex: 5,
+                  background: 'rgba(23, 33, 43, 0.92)',
+                  border: '1px solid var(--surface-border)',
+                  borderRadius: 8,
+                  padding: '0.6rem 0.8rem',
+                  backdropFilter: 'blur(4px)',
+                  minWidth: '200px',
+                  fontSize: '0.8rem',
+                  pointerEvents: 'auto',
+                }}
+              >
+                <div style={{
+                  fontWeight: 600, color: 'var(--pb-accent)',
+                  marginBottom: '0.4rem', fontSize: '0.85rem'
+                }}>
+                  Тестовый отрезок
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '0.2rem 0.5rem' }}>
+                  <span style={{ color: 'var(--tg-hint)' }}>Время:</span>
+                  <span style={{ fontFamily: 'monospace' }}>{fmtSecAsDuration(stats.durationSec)}</span>
+                  <span style={{ color: 'var(--tg-hint)' }}>Дистанция:</span>
+                  <span style={{ fontFamily: 'monospace' }}>{(stats.distanceM / 1000).toFixed(2)} км</span>
+                  <span style={{ color: 'var(--tg-hint)' }}>Темп:</span>
+                  <span style={{ fontFamily: 'monospace' }}>{fmtSecAsPace(stats.paceSecPerKm)} /км</span>
+                  <span style={{ color: 'var(--tg-hint)' }}>Ср. пульс:</span>
+                  <span style={{ fontFamily: 'monospace' }}>{stats.hrAvg != null ? Math.round(stats.hrAvg) : '—'} уд/мин</span>
+                  <span style={{ color: 'var(--tg-hint)' }}>Макс. пульс:</span>
+                  <span style={{ fontFamily: 'monospace' }}>{stats.hrMax ?? '—'} уд/мин</span>
+                  <span style={{ color: 'var(--tg-hint)' }}>Дрейф HR:</span>
+                  <span style={{ fontFamily: 'monospace' }}>
+                    {stats.hrDriftPct != null
+                      ? `${stats.hrDriftPct >= 0 ? '+' : ''}${stats.hrDriftPct.toFixed(1)}%`
+                      : '—'}
+                  </span>
+                  <span style={{ color: 'var(--tg-hint)' }}>Каденс:</span>
+                  <span style={{ fontFamily: 'monospace' }}>{stats.cadenceAvg != null ? Math.round(stats.cadenceAvg) : '—'}</span>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Панель выбора длительности */}
+          {testPoint && streamsPayload?.latlng && (
+            <div
+              style={{
+                position: 'absolute',
+                bottom: 10,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                zIndex: 5,
+                background: 'rgba(23, 33, 43, 0.92)',
+                border: '1px solid var(--surface-border)',
+                borderRadius: 8,
+                padding: '0.4rem 0.6rem',
+                backdropFilter: 'blur(4px)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.4rem',
+                pointerEvents: 'auto',
+              }}
+            >
+              <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+                <span style={{ color: 'var(--tg-hint)', fontSize: '0.7rem', minWidth: '70px' }}>По времени:</span>
+                {[
+                  { label: '1м', value: 60 },
+                  { label: '5м', value: 300 },
+                  { label: '10м', value: 600 },
+                  { label: '15м', value: 900 },
+                  { label: '20м', value: 1200 },
+                  { label: '30м', value: 1800 },
+                ].map((o) => {
+                  const active = testDuration.type === 'time' && testDuration.value === o.value;
+                  return (
+                    <button
+                      key={`time-${o.value}`}
+                      type="button"
+                      onClick={() => {
+                        const d: TestDuration = { type: 'time', value: o.value };
+                        setTestDuration(d);
+                        saveTestDuration(d);
+                      }}
+                      style={{
+                        padding: '0.25rem 0.5rem',
+                        fontSize: '0.72rem',
+                        border: `1px solid ${active ? 'var(--pb-accent)' : 'var(--surface-border)'}`,
+                        background: active ? 'rgba(212, 163, 115, 0.15)' : 'transparent',
+                        color: active ? 'var(--pb-accent)' : 'var(--tg-text)',
+                        borderRadius: 4,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {o.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+                <span style={{ color: 'var(--tg-hint)', fontSize: '0.7rem', minWidth: '70px' }}>По дистанции:</span>
+                {[
+                  { label: '100м', value: 100 },
+                  { label: '200м', value: 200 },
+                  { label: '400м', value: 400 },
+                  { label: '500м', value: 500 },
+                  { label: '1км', value: 1000 },
+                  { label: '2км', value: 2000 },
+                  { label: '5км', value: 5000 },
+                ].map((o) => {
+                  const active = testDuration.type === 'distance' && testDuration.value === o.value;
+                  return (
+                    <button
+                      key={`dist-${o.value}`}
+                      type="button"
+                      onClick={() => {
+                        const d: TestDuration = { type: 'distance', value: o.value };
+                        setTestDuration(d);
+                        saveTestDuration(d);
+                      }}
+                      style={{
+                        padding: '0.25rem 0.5rem',
+                        fontSize: '0.72rem',
+                        border: `1px solid ${active ? 'var(--pb-accent)' : 'var(--surface-border)'}`,
+                        background: active ? 'rgba(212, 163, 115, 0.15)' : 'transparent',
+                        color: active ? 'var(--pb-accent)' : 'var(--tg-text)',
+                        borderRadius: 4,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {o.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{ fontSize: '0.65rem', color: 'var(--tg-hint)', textAlign: 'center' }}>
+                Маркер можно перетащить. Клик в режиме «Разметка» ставит новую точку.
+              </div>
+            </div>
+          )}
+
+          {/* Хинт: нет точки, но есть трек */}
+          {!testPoint && streamsPayload?.latlng && (
+            <div
+              style={{
+                position: 'absolute',
+                bottom: 10,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                zIndex: 5,
+                background: 'rgba(23, 33, 43, 0.85)',
+                border: '1px dashed var(--surface-border)',
+                borderRadius: 6,
+                padding: '0.4rem 0.75rem',
+                fontSize: '0.75rem',
+                color: 'var(--tg-hint)',
+                pointerEvents: 'none',
+              }}
+            >
+              🎯 Включите «Разметку» и кликните по карте — поставите точку старта
             </div>
           )}
 
