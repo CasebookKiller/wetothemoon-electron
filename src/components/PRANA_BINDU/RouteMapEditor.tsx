@@ -1530,47 +1530,42 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                   <span style={{ color: 'var(--tg-hint)' }}>Каденс:</span>
                   <span style={{ fontFamily: 'monospace' }}>{segmentInfo.stats.cadenceAvg != null ? Math.round(segmentInfo.stats.cadenceAvg) : '—'}</span>
                 </div>
-                <button
+                <Button
                   type="button"
                   onClick={handleSaveTest}
                   disabled={saveStatus === 'saving' || saveStatus === 'saved'}
+                  className="pb-soft p-button-sm"
                   style={{
-                    marginTop: '0.6rem',
                     width: '100%',
-                    padding: '0.35rem 0.5rem',
-                    fontSize: '0.75rem',
-                    border: `1px solid ${
-                      saveStatus === 'saved'
-                        ? 'var(--tg-success)'
-                        : saveStatus === 'error'
-                        ? 'var(--tg-destructive)'
-                        : 'var(--pb-accent)'
-                    }`,
-                    background:
-                      saveStatus === 'saved'
-                        ? 'rgba(111, 191, 115, 0.15)'
-                        : 'transparent',
-                    color:
-                      saveStatus === 'saved'
-                        ? 'var(--tg-success)'
-                        : saveStatus === 'error'
-                        ? 'var(--tg-destructive)'
-                        : 'var(--pb-accent)',
-                    borderRadius: 4,
-                    cursor:
-                      saveStatus === 'saving' || saveStatus === 'saved'
-                        ? 'default'
-                        : 'pointer',
+                    marginTop: '0.6rem',
+                    ...(saveStatus === 'saved' && {
+                      color: 'var(--tg-success)',
+                      borderColor: 'var(--tg-success)',
+                    }),
+                    ...(saveStatus === 'error' && {
+                      color: 'var(--tg-destructive)',
+                      borderColor: 'var(--tg-destructive)',
+                    }),
                   }}
-                >
-                  {saveStatus === 'saving'
-                    ? '⏳ Сохранение…'
-                    : saveStatus === 'saved'
-                    ? '✓ Сохранено'
-                    : saveStatus === 'error'
-                    ? '✗ Ошибка сохранения'
-                    : '💾 Сохранить как тест'}
-                </button>
+                  icon={
+                    saveStatus === 'saving'
+                      ? 'pi pi-spin pi-spinner'
+                      : saveStatus === 'saved'
+                      ? 'pi pi-check'
+                      : saveStatus === 'error'
+                      ? 'pi pi-times'
+                      : 'pi pi-save'
+                  }
+                  label={
+                    saveStatus === 'saving'
+                      ? 'Сохранение…'
+                      : saveStatus === 'saved'
+                      ? 'Сохранено'
+                      : saveStatus === 'error'
+                      ? 'Ошибка сохранения'
+                      : 'Сохранить как тест'
+                  }
+                />
               </div>
           )}
 
