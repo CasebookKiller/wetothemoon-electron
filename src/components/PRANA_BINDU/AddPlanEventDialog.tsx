@@ -43,15 +43,14 @@ interface PlanStep {
   id: string;
   movementKey: string;
   level?: number;
-  label: string;         // "Incline Push-ups W2" — уже с W/L-уровнем
+  label: string;
   isTimeBased: boolean;
   sets: number;
   reps: number;
   durationSec: number;
-  zone: number;          // 1-5
+  zone: number;
 }
 
-/** Собрать ICU-строку шага из структурных полей. */
 function formatStepLine(step: PlanStep): string {
   const parts: string[] = ['-', step.label];
   if (!step.isTimeBased && step.sets > 0 && step.reps > 0) {
@@ -79,16 +78,20 @@ export const AddPlanEventDialog: React.FC<Props> = ({
   onCreated,
   defaultDate,
 }) => {
+  // Состояние формы
   const [date, setDate] = useState<Date | null>(defaultDate ?? new Date());
   const [sport, setSport] = useState<string>('Workout');
   const [name, setName] = useState('');
 
-  // Два источника для description: структурированный (steps) и свободный текст.
+  // Workout: два источника description
   const [workoutMode, setWorkoutMode] = useState<'catalog' | 'text'>('catalog');
   const [steps, setSteps] = useState<PlanStep[]>([]);
   const [freeDescription, setFreeDescription] = useState('');
 
+  // Push to ICU
   const [pushToIcu, setPushToIcu] = useState<boolean>(true);
+
+  // UI
   const [catalogVisible, setCatalogVisible] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -116,14 +119,14 @@ export const AddPlanEventDialog: React.FC<Props> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
-  // Итоговое описание
+  // Итоговое ICU-описание
   const finalDescription = isWorkout
     ? workoutMode === 'catalog'
       ? stepsToDescription(steps)
       : freeDescription
     : freeDescription;
 
-  // alreadyPickedIds для каталога — чтобы не дублировать
+  // Уже выбранные упражнения (для дедупа в каталоге)
   const alreadyPickedIds = useMemo(() => {
     const set = new Set<string>();
     for (const s of steps) {
@@ -237,7 +240,14 @@ export const AddPlanEventDialog: React.FC<Props> = ({
       modal
       className="pb-templates-dialog pb-settings-dialog"
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem', marginTop: '0.5rem' }}>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.9rem',
+          marginTop: '0.5rem',
+        }}
+      >
         {/* Дата + Тип — в одну строку */}
         <div
           style={{
@@ -284,29 +294,42 @@ export const AddPlanEventDialog: React.FC<Props> = ({
 
         {/* Название */}
         <div>
-          <label className="pb-label" style={{ display: 'block', marginBottom: '0.35rem' }}>Название</label>
+          <label
+            className="pb-label"
+            style={{ display: 'block', marginBottom: '0.35rem' }}
+          >
+            Название
+          </label>
           <InputText
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder={
-              isWorkout ? 'Например: Силовая — верх тела' : 'Например: Recovery 45 мин'
+              isWorkout
+                ? 'Например: Силовая — верх тела'
+                : 'Например: Recovery 45 мин'
             }
             className="w-full"
             disabled={saving}
           />
         </div>
 
-        {/* Упражнения или свободный текст */}
+        {/* Упражнения / свободный текст */}
         {isWorkout ? (
           <>
-            <div className="pb-templates__mode-switch" style={{ marginBottom: 0 }}>
+            <div
+              className="pb-templates__mode-switch"
+              style={{ marginBottom: 0 }}
+            >
               <button
                 type="button"
                 className={workoutMode === 'catalog' ? 'is-active' : ''}
                 onClick={() => setWorkoutMode('catalog')}
                 disabled={saving}
               >
-                <i className="pi pi-book" style={{ marginRight: '0.35rem' }} />
+                <i
+                  className="pi pi-book"
+                  style={{ marginRight: '0.35rem' }}
+                />
                 Из каталога
               </button>
               <button
@@ -315,14 +338,23 @@ export const AddPlanEventDialog: React.FC<Props> = ({
                 onClick={() => setWorkoutMode('text')}
                 disabled={saving}
               >
-                <i className="pi pi-pencil" style={{ marginRight: '0.35rem' }} />
+                <i
+                  className="pi pi-pencil"
+                  style={{ marginRight: '0.35rem' }}
+                />
                 Свободный текст
               </button>
             </div>
 
             {workoutMode === 'catalog' ? (
               <div>
-                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: '0.5rem',
+                    marginBottom: '0.5rem',
+                  }}
+                >
                   <Button
                     label="+ Из каталога"
                     icon="pi pi-book"
@@ -351,10 +383,17 @@ export const AddPlanEventDialog: React.FC<Props> = ({
                       textAlign: 'center',
                     }}
                   >
-                    Пока пусто. Нажмите «+ Из каталога», чтобы добавить упражнения.
+                    Пока пусто. Нажмите «+ Из каталога», чтобы добавить
+                    упражнения.
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.4rem',
+                    }}
+                  >
                     {steps.map((s) => (
                       <PlanStepRow
                         key={s.id}
@@ -371,7 +410,10 @@ export const AddPlanEventDialog: React.FC<Props> = ({
                   <div style={{ marginTop: '0.5rem' }}>
                     <div
                       className="pb-label"
-                      style={{ fontSize: '0.75rem', marginBottom: '0.25rem' }}
+                      style={{
+                        fontSize: '0.75rem',
+                        marginBottom: '0.25rem',
+                      }}
                     >
                       Описание для ICU:
                     </div>
@@ -479,9 +521,13 @@ export const AddPlanEventDialog: React.FC<Props> = ({
         </div>
 
         {status && (
-          <div style={{ fontSize: '0.8rem', color: 'var(--tg-hint)' }}>{status}</div>
+          <div style={{ fontSize: '0.8rem', color: 'var(--tg-hint)' }}>
+            {status}
+          </div>
         )}
-        {error && <Message severity="error" text={error} className="w-full" />}
+        {error && (
+          <Message severity="error" text={error} className="w-full" />
+        )}
       </div>
 
       <div
@@ -508,7 +554,9 @@ export const AddPlanEventDialog: React.FC<Props> = ({
           icon={pushToIcu ? 'pi pi-cloud-upload' : 'pi pi-check'}
           className="pb p-button-sm"
           onClick={handleSave}
-          disabled={!name.trim() || !date || saving || !finalDescription.trim()}
+          disabled={
+            !name.trim() || !date || saving || !finalDescription.trim()
+          }
           loading={saving}
         />
       </div>
@@ -553,7 +601,11 @@ const PlanStepRow: React.FC<PlanStepRowProps> = ({
     >
       <i
         className="pi pi-book"
-        style={{ color: 'var(--pb-accent)', flexShrink: 0, fontSize: '0.85rem' }}
+        style={{
+          color: 'var(--pb-accent)',
+          flexShrink: 0,
+          fontSize: '0.85rem',
+        }}
       />
       <span
         style={{
@@ -580,13 +632,20 @@ const PlanStepRow: React.FC<PlanStepRowProps> = ({
             buttonLayout="horizontal"
             incrementButtonIcon="pi pi-plus"
             decrementButtonIcon="pi pi-minus"
-            inputStyle={{ width: '2.5rem', textAlign: 'center', padding: '0.2rem' }}
-            style={{ height: '2rem' }}
+            inputStyle={{
+              width: '2.5rem',
+              textAlign: 'center',
+              padding: '0.2rem',
+            }}
             disabled={disabled}
             tooltip="Подходы"
             tooltipOptions={{ position: 'top' }}
           />
-          <span style={{ fontSize: '0.8rem', color: 'var(--tg-hint)' }}>×</span>
+          <span
+            style={{ fontSize: '0.8rem', color: 'var(--tg-hint)' }}
+          >
+            ×
+          </span>
           <InputNumber
             value={step.reps}
             onValueChange={(e) => onChange({ reps: e.value ?? 1 })}
@@ -596,8 +655,11 @@ const PlanStepRow: React.FC<PlanStepRowProps> = ({
             buttonLayout="horizontal"
             incrementButtonIcon="pi pi-plus"
             decrementButtonIcon="pi pi-minus"
-            inputStyle={{ width: '3rem', textAlign: 'center', padding: '0.2rem' }}
-            style={{ height: '2rem' }}
+            inputStyle={{
+              width: '3rem',
+              textAlign: 'center',
+              padding: '0.2rem',
+            }}
             disabled={disabled}
             tooltip="Повторы"
             tooltipOptions={{ position: 'top' }}
@@ -611,8 +673,11 @@ const PlanStepRow: React.FC<PlanStepRowProps> = ({
         min={5}
         max={3600}
         suffix="с"
-        inputStyle={{ width: '4rem', textAlign: 'center', padding: '0.2rem' }}
-        style={{ height: '2rem' }}
+        inputStyle={{
+          width: '4rem',
+          textAlign: 'center',
+          padding: '0.2rem',
+        }}
         disabled={disabled}
         tooltip="Общая длительность шага (в секундах)"
         tooltipOptions={{ position: 'top' }}
@@ -620,9 +685,12 @@ const PlanStepRow: React.FC<PlanStepRowProps> = ({
 
       <Dropdown
         value={step.zone}
-        options={[1, 2, 3, 4, 5].map((z) => ({ label: `Z${z}`, value: z }))}
+        options={[1, 2, 3, 4, 5].map((z) => ({
+          label: `Z${z}`,
+          value: z,
+        }))}
         onChange={(e) => onChange({ zone: e.value })}
-        style={{ width: '5rem', height: '2rem' }}
+        style={{ width: '5rem' }}
         panelClassName="pb-dropdown-panel"
         disabled={disabled}
         tooltip="Зона"
