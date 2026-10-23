@@ -370,13 +370,25 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
   >([]);
   const [segmentsLoading, setSegmentsLoading] = useState(false);
   const [candidatesVisible, setCandidatesVisible] = useState(false);
+  // Рисование эталонного маршрута (C.5, фаза A2)
+  const [drawMode, setDrawMode] = useState(false);
+  const [draftPoints, setDraftPoints] = useState<[number, number][]>([]);
+  const [saveRefVisible, setSaveRefVisible] = useState(false);
+  const [saveRefName, setSaveRefName] = useState('');
+  const [saveRefStatus, setSaveRefStatus] = useState<
+    'idle' | 'saving' | 'saved' | 'error'
+  >('idle');
+  const [saveRefError, setSaveRefError] = useState('');
   const [segmentFilter, setSegmentFilter] = useState<
     'all' | 'time-60' | 'time-300' | 'time-600' | 'time-1200' | 'time-1800' | 'distance'
   >('all');
 
   const testMarkerRef = useRef<Marker | null>(null);
   const testFinishMarkerRef = useRef<Marker | null>(null);
+
   const markupClickHandlerRef = useRef<((e: any) => void) | null>(null);
+  const drawClickHandlerRef = useRef<((e: any) => void) | null>(null);
+  const draftMarkersRef = useRef<Marker[]>([]);
 
   const markersRef = useRef<Marker[]>([]);
   const retryTimerRef = useRef<number | null>(null);
@@ -550,6 +562,159 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
       localStorage.setItem('pb.testVisible', testVisible ? '1' : '0');
     } catch { /* ignore */ }
   }, [testVisible]);
+  
+    // ==================== Рисование эталона: клики ====================
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+
+    // Снимаем предыдущий обработчик
+    if (drawClickHandlerRef.current) {
+      map.off('click', drawClickHandlerRef.current);
+      drawClickHandlerRef.current = null;
+    }
+
+    const canvas = map.getCanvas();
+
+    if (!drawMode) {
+      canvas.style.cursor = markupMode ? 'crosshair' : '';
+      // Восстанавливаем видимость трека и тестового отрезка
+      if (map.getLayer('active-track')) {
+        map.setLayoutProperty(
+          'active-track',
+          'visibility',
+          trackSettingsRef.current.visible ? 'visible' : 'none',
+        );
+      }
+      if (map.getLayer('active-track-glow')) {
+        map.setLayoutProperty(
+          'active-track-glow',
+          'visibility',
+          trackSettingsRef.current.glow && trackSettingsRef.current.visible
+            ? 'visible'
+            : 'none',
+        );
+      }
+      if (map.getLayer('test-segment')) {
+        map.setLayoutProperty('test-segment', 'visibility', 'visible');
+      }
+      if (map.getLayer('test-segment-outline')) {
+        map.setLayoutProperty('test-segment-outline', 'visibility', 'visible');
+      }
+      return;
+    }
+
+    // Включаем режим рисования
+    canvas.style.cursor = 'crosshair';
+
+    // Скрываем трек и тестовый отрезок — чтобы не мешали
+    if (map.getLayer('active-track')) {
+      map.setLayoutProperty('active-track', 'visibility', 'none');
+    }
+    if (map.getLayer('active-track-glow')) {
+      map.setLayoutProperty('active-track-glow', 'visibility', 'none');
+    }
+    if (map.getLayer('test-segment')) {
+      map.setLayoutProperty('test-segment', 'visibility', 'none');
+    }
+    if (map.getLayer('test-segment-outline')) {
+      map.setLayoutProperty('test-segment-outline', 'visibility', 'none');
+    }
+
+    const handler = (e: any) => {
+      const { lat, lng } = e.lngLat;
+      setDraftPoints((prev) => {
+        // Пропускаем дубли (dblclick = 2 click + dblclick)
+        const last = prev[prev.length - 1];
+        if (last) {
+          const d = haversineM(last[0], last[1], lat, lng);
+          if (d < 1) return prev;
+        }
+        return [...prev, [lat, lng]];
+      });
+    };
+    map.on('click', handler);
+    drawClickHandlerRef.current = handler;
+
+    return () => {
+      if (drawClickHandlerRef.current) {
+        map.off('click', drawClickHandlerRef.current);
+        drawClickHandlerRef.current = null;
+      }
+    };
+  }, [drawMode, mapLoaded, markupMode]);
+
+  // ==================== Рисование эталона: линия и маркеры ====================
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+
+    // Очищаем старые маркеры и линию
+    draftMarkersRef.current.forEach((m) => m.remove());
+    draftMarkersRef.current = [];
+
+    if (map.getLayer('draft-line')) map.removeLayer('draft-line');
+    if (map.getSource('draft-line')) map.removeSource('draft-line');
+
+    if (!drawMode) return;
+    if (draftPoints.length === 0) return;
+
+    // Маркеры вершин
+    draftPoints.forEach((p, i) => {
+      const isFirst = i === 0;
+      const isLast = i === draftPoints.length - 1 && draftPoints.length > 1;
+      const color = isFirst
+        ? '#6fbf73'
+        : isLast
+        ? '#ff5a00'
+        : '#d4a373';
+      const marker = new Marker({ color })
+        .setLngLat([p[1], p[0]])
+        .addTo(map);
+      draftMarkersRef.current.push(marker);
+    });
+
+    // Линия между вершинами
+    if (draftPoints.length >= 2) {
+      const coords = draftPoints.map((p) => [p[1], p[0]]);
+      map.addSource('draft-line', {
+        type: 'geojson',
+        data: {
+          type: 'Feature',
+          properties: {},
+          geometry: { type: 'LineString', coordinates: coords },
+        },
+      });
+      map.addLayer({
+        id: 'draft-line',
+        type: 'line',
+        source: 'draft-line',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: {
+          'line-color': '#d4a373',
+          'line-width': 3,
+          'line-dasharray': [2, 2],
+          'line-opacity': 0.9,
+        },
+      });
+    }
+  }, [draftPoints, drawMode, mapLoaded]);
+
+  // Escape → отмена режима рисования
+  useEffect(() => {
+    if (!drawMode) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setDrawMode(false);
+        setDraftPoints([]);
+        setSaveRefVisible(false);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [drawMode]);
 
   // ==================== Загрузка сохранённых тестовых отрезков ====================
 
@@ -589,8 +754,14 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
         testFinishMarkerRef.current.remove();
         testFinishMarkerRef.current = null;
       }
+      draftMarkersRef.current.forEach((m) => m.remove());
+      draftMarkersRef.current = [];
       markupClickHandlerRef.current = null;
+      drawClickHandlerRef.current = null;
       setMarkupMode(false);
+      setDrawMode(false);
+      setDraftPoints([]);
+      setSaveRefVisible(false);
       setMapLoaded(false);
     }
   }, [visible]);
@@ -1082,6 +1253,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
         hrDriftPct: segmentInfo.stats.hrDriftPct,
         cadenceAvg: segmentInfo.stats.cadenceAvg,
         note: null,
+        kind: 'intentional',
       });
       if (res?.success) {
         setSaveStatus('saved');
@@ -1204,6 +1376,71 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
       count: filteredSegments.length,
     };
   }, [filteredSegments]);
+
+  // ==================== Сохранение эталона ====================
+
+  const computeDraftLength = (): number => {
+    if (draftPoints.length < 2) return 0;
+    let total = 0;
+    for (let i = 1; i < draftPoints.length; i++) {
+      total += haversineM(
+        draftPoints[i - 1][0],
+        draftPoints[i - 1][1],
+        draftPoints[i][0],
+        draftPoints[i][1],
+      );
+    }
+    return Math.round(total);
+  };
+
+  const detectDraftKind = (): 'loop' | 'linear' => {
+    if (draftPoints.length < 3) return 'linear';
+    const first = draftPoints[0];
+    const last = draftPoints[draftPoints.length - 1];
+    const dist = haversineM(first[0], first[1], last[0], last[1]);
+    return dist < 50 ? 'loop' : 'linear';
+  };
+
+  const openSaveRefDialog = () => {
+    if (draftPoints.length < 2) return;
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const now = new Date();
+    setSaveRefName(
+      `Эталон ${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`,
+    );
+    setSaveRefStatus('idle');
+    setSaveRefError('');
+    setSaveRefVisible(true);
+  };
+
+  const handleSaveReference = async () => {
+    if (!saveRefName.trim() || draftPoints.length < 2) return;
+    setSaveRefStatus('saving');
+    setSaveRefError('');
+    try {
+      const api = (window as any).electronAPI;
+      const res = await api.pb.referenceTrackCreate({
+        name: saveRefName.trim(),
+        coords: draftPoints,
+        kind: detectDraftKind(),
+        notes: null,
+      });
+      if (res?.success) {
+        setSaveRefStatus('saved');
+        setTimeout(() => {
+          setSaveRefVisible(false);
+          setDrawMode(false);
+          setDraftPoints([]);
+        }, 1200);
+      } else {
+        setSaveRefError(res?.error ?? 'Не удалось сохранить');
+        setSaveRefStatus('error');
+      }
+    } catch (e) {
+      setSaveRefError((e as Error).message);
+      setSaveRefStatus('error');
+    }
+  };
 
   // ==================== Рендер ====================
 
@@ -1879,10 +2116,50 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                     icon="pi pi-map-marker"
                     text
                     className="pb-drawer__name-edit"
-                    onClick={() => setMarkupMode((v) => !v)}
+                    onClick={() => {
+                      if (drawMode) {
+                        setDrawMode(false);
+                        setDraftPoints([]);
+                        setSaveRefVisible(false);
+                      }
+                      setMarkupMode((v) => !v);
+                    }}
                     tooltip={markupMode ? 'Выйти из разметки' : 'Разметка: клик по карте — поставить точку старта'}
                     tooltipOptions={{ position: 'bottom' }}
                     style={{ color: markupMode ? 'var(--pb-accent)' : undefined }}
+                    disabled={drawMode}
+                  />
+                </div>
+
+                {/* Кнопка Рисовать эталон */}
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: drawMode ? 'rgba(212, 163, 115, 0.2)' : 'rgba(23, 33, 43, 0.85)',
+                  borderRadius: '6px',
+                  border: `1px solid ${drawMode ? 'var(--pb-accent)' : 'var(--surface-border)'}`,
+                  backdropFilter: 'blur(4px)', pointerEvents: 'auto', height: '2.5rem', width: '2.5rem', boxSizing: 'border-box'
+                }}>
+                  <Button
+                    icon="pi pi-pencil"
+                    text
+                    className="pb-drawer__name-edit"
+                    onClick={() => {
+                      if (markupMode) setMarkupMode(false);
+                      if (drawMode) {
+                        // Выход из режима рисования
+                        setDrawMode(false);
+                        setDraftPoints([]);
+                        setSaveRefVisible(false);
+                      } else {
+                        // Вход
+                        setDrawMode(true);
+                        setDraftPoints([]);
+                      }
+                    }}
+                    tooltip={drawMode ? 'Выйти из рисования (Esc)' : 'Нарисовать эталонный маршрут'}
+                    tooltipOptions={{ position: 'bottom' }}
+                    style={{ color: drawMode ? 'var(--pb-accent)' : undefined }}
+                    disabled={markupMode}
                   />
                 </div>
 
@@ -2147,6 +2424,84 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
             </div>
           )}
 
+                    {/* Панель рисования эталона */}
+          {drawMode && (
+            <div
+              style={{
+                position: 'absolute',
+                bottom: 10,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                zIndex: 5,
+                background: 'rgba(23, 33, 43, 0.92)',
+                border: '1px solid var(--pb-accent)',
+                borderRadius: 8,
+                padding: '0.5rem 0.75rem',
+                backdropFilter: 'blur(4px)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.4rem',
+                pointerEvents: 'auto',
+                minWidth: '280px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem' }}>
+                <i className="pi pi-pencil" style={{ color: 'var(--pb-accent)' }} />
+                <span style={{ color: 'var(--pb-accent)', fontWeight: 600 }}>
+                  Рисование эталона
+                </span>
+                <span className="pb-hint" style={{ marginLeft: 'auto', fontSize: '0.72rem' }}>
+                  Клик по карте — добавить вершину
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.75rem' }}>
+                <span>
+                  Точек: <b style={{ fontFamily: 'monospace' }}>{draftPoints.length}</b>
+                </span>
+                {draftPoints.length >= 2 && (
+                  <span>
+                    Длина:{' '}
+                    <b style={{ fontFamily: 'monospace' }}>
+                      {computeDraftLength().toLocaleString('ru-RU')} м
+                    </b>
+                  </span>
+                )}
+                <span style={{ marginLeft: 'auto', color: 'var(--tg-hint)', fontSize: '0.7rem' }}>
+                  Esc — отмена
+                </span>
+              </div>
+              <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.2rem' }}>
+                <Button
+                  label="Отменить последнюю"
+                  icon="pi pi-undo"
+                  className="pb-soft p-button-sm"
+                  onClick={() => setDraftPoints((prev) => prev.slice(0, -1))}
+                  disabled={draftPoints.length === 0}
+                  style={{ flex: 1 }}
+                />
+                <Button
+                  label="Отмена"
+                  icon="pi pi-times"
+                  className="pb-destructive-soft p-button-sm"
+                  onClick={() => {
+                    setDrawMode(false);
+                    setDraftPoints([]);
+                    setSaveRefVisible(false);
+                  }}
+                  style={{ flex: 1 }}
+                />
+                <Button
+                  label="Сохранить"
+                  icon="pi pi-check"
+                  className="pb p-button-sm"
+                  onClick={openSaveRefDialog}
+                  disabled={draftPoints.length < 2}
+                  style={{ flex: 1 }}
+                />
+              </div>
+            </div>
+          )}
+
           {/* Хинт: нет точки, но есть трек */}
           {!testPoint && streamsPayload?.latlng && (
             <div
@@ -2185,6 +2540,74 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
           }}
         />
       )}
+
+      {/* Диалог сохранения эталона */}
+      <Dialog
+        visible={saveRefVisible}
+        onHide={() => {
+          if (saveRefStatus !== 'saving') {
+            setSaveRefVisible(false);
+            setSaveRefError('');
+          }
+        }}
+        header="Сохранить эталонный маршрут"
+        style={{ width: '420px' }}
+        modal
+        className="pb-templates-dialog pb-settings-dialog"
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.25rem' }}>
+          <div>
+            <label className="pb-label" style={{ display: 'block', marginBottom: '0.35rem' }}>
+              Имя маршрута
+            </label>
+            <InputText
+              value={saveRefName}
+              onChange={(e) => setSaveRefName(e.target.value)}
+              className="w-full"
+              disabled={saveRefStatus === 'saving' || saveRefStatus === 'saved'}
+              placeholder="Например: Круг в Гольяново"
+            />
+          </div>
+
+          <div className="pb-hint" style={{ fontSize: '0.75rem' }}>
+            Точек: {draftPoints.length} · Длина:{' '}
+            {computeDraftLength().toLocaleString('ru-RU')} м · Тип:{' '}
+            {detectDraftKind() === 'loop' ? 'замкнутый' : 'линейный'}
+          </div>
+
+          {saveRefStatus === 'saved' && (
+            <div style={{ color: 'var(--tg-success)', fontSize: '0.85rem' }}>
+              <i className="pi pi-check-circle" /> Сохранено
+            </div>
+          )}
+          {saveRefError && (
+            <div style={{ color: 'var(--tg-destructive)', fontSize: '0.85rem' }}>
+              {saveRefError}
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
+          <Button
+            label="Отмена"
+            className="pb-soft p-button-sm"
+            onClick={() => setSaveRefVisible(false)}
+            disabled={saveRefStatus === 'saving' || saveRefStatus === 'saved'}
+          />
+          <Button
+            label={saveRefStatus === 'saving' ? 'Сохранение…' : 'Сохранить'}
+            icon={saveRefStatus === 'saving' ? 'pi pi-spin pi-spinner' : 'pi pi-check'}
+            className="pb p-button-sm"
+            onClick={handleSaveReference}
+            disabled={
+              !saveRefName.trim() ||
+              saveRefStatus === 'saving' ||
+              saveRefStatus === 'saved'
+            }
+            loading={saveRefStatus === 'saving'}
+          />
+        </div>
+      </Dialog>
 
       {selectedGroup && (
         <StoryGeneratorDialog
