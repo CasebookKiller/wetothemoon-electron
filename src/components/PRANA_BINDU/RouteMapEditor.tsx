@@ -32,6 +32,7 @@ import {
 } from './mapStyles';
 import { StoryGeneratorDialog } from './StoryGeneratorDialog';
 import { TestCandidatesDialog } from './TestCandidatesDialog';
+import { EditReferenceDialog } from './EditReferenceDialog';
 
 interface Props {
   visible: boolean;
@@ -486,6 +487,13 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
   >([]);
   const [refTracksLoading, setRefTracksLoading] = useState(false);
   const [selectedRefTrackId, setSelectedRefTrackId] = useState<number | null>(null);
+  const [editRefVisible, setEditRefVisible] = useState(false);
+  const [editRefItem, setEditRefItem] = useState<{
+    id: number;
+    name: string;
+    category: string | null;
+    tags: string[];
+  } | null>(null);
   // Отклонения для всех эталонов на текущем треке (кэшируется между ре-рендерами)
   const refDeviations = useMemo(() => {
     const result: Record<number, DeviationResult> = {};
@@ -504,13 +512,13 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
   const [saveRefVisible, setSaveRefVisible] = useState(false);
   const [saveRefName, setSaveRefName] = useState('');
   // Редактирование существующего эталона (имя, категория, теги)
-  const [editRefVisible, setEditRefVisible] = useState(false);
-  const [editRefId, setEditRefId] = useState<number | null>(null);
-  const [editRefName, setEditRefName] = useState('');
-  const [editRefCategory, setEditRefCategory] = useState<string | null>(null);
-  const [editRefTags, setEditRefTags] = useState('');
-  const [editRefStatus, setEditRefStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const [editRefError, setEditRefError] = useState('');
+  //const [editRefVisible, setEditRefVisible] = useState(false);
+  //const [editRefId, setEditRefId] = useState<number | null>(null);
+  //const [editRefName, setEditRefName] = useState('');
+  //const [editRefCategory, setEditRefCategory] = useState<string | null>(null);
+  //const [editRefTags, setEditRefTags] = useState('');
+  //const [editRefStatus, setEditRefStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  //const [editRefError, setEditRefError] = useState('');
   const [saveRefStatus, setSaveRefStatus] = useState<
     'idle' | 'saving' | 'saved' | 'error'
   >('idle');
@@ -1632,6 +1640,18 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     };
   }, [filteredSegments]);
 
+  // Опции для datalist категорий — базовые + все уже существующие в БД.
+  // useMemo, чтобы не пересоздавать на каждый keystroke (иначе datalist мигает).
+  const refCategoryOptions = useMemo(() => {
+    const base = ['loop', 'stairs', 'connector', 'segment', 'landmark'];
+    const existing = new Set(
+      referenceTracks
+        .map((r) => r.category)
+        .filter((c): c is string => c != null && c !== ''),
+    );
+    return Array.from(new Set([...base, ...Array.from(existing)]));
+  }, [referenceTracks]);
+
   // ==================== Сохранение эталона ====================
 
   const computeDraftLength = (): number => {
@@ -1751,16 +1771,16 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     category: string | null;
     tags: string[];
   }) => {
-    setEditRefId(ref.id);
-    setEditRefName(ref.name);
-    setEditRefCategory(ref.category);
-    setEditRefTags(ref.tags.join(', '));
-    setEditRefStatus('idle');
-    setEditRefError('');
+    setEditRefItem({
+      id: ref.id,
+      name: ref.name,
+      category: ref.category,
+      tags: ref.tags,
+    });
     setEditRefVisible(true);
   };
 
-  const handleSaveEditReference = async () => {
+  /*const handleSaveEditReference = async () => {
     if (!editRefId || !editRefName.trim()) return;
     setEditRefStatus('saving');
     setEditRefError('');
@@ -1788,7 +1808,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
       setEditRefError((e as Error).message);
       setEditRefStatus('error');
     }
-  };
+  };*/
 
   // ==================== Рендер ====================
 
@@ -3268,118 +3288,19 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
         </div>
       </Dialog>
 
-      {/* Диалог редактирования эталона */}
-      <Dialog
+      {/* Диалог редактирования эталона (изолирован для стабильности input'ов) */}
+      <EditReferenceDialog
         visible={editRefVisible}
+        refItem={editRefItem}
+        referenceTracks={referenceTracks}
         onHide={() => {
-          if (editRefStatus !== 'saving') {
-            setEditRefVisible(false);
-            setEditRefError('');
-          }
+          setEditRefVisible(false);
+          setEditRefItem(null);
         }}
-        header="Редактировать эталон"
-        style={{ width: '460px' }}
-        modal
-        className="pb-templates-dialog pb-settings-dialog"
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.25rem' }}>
-          <div>
-            <label className="pb-label" style={{ display: 'block', marginBottom: '0.35rem' }}>
-              Имя
-            </label>
-            <InputText
-              value={editRefName}
-              onChange={(e) => setEditRefName(e.target.value)}
-              className="w-full"
-              placeholder="Верхний круг по пруду"
-              disabled={editRefStatus === 'saving' || editRefStatus === 'saved'}
-            />
-          </div>
-
-          <div>
-            <label className="pb-label" style={{ display: 'block', marginBottom: '0.35rem' }}>
-              Категория
-            </label>
-            <input
-              type="text"
-              list="pb-ref-category-list"
-              value={editRefCategory ?? ''}
-              onChange={(e) =>
-                setEditRefCategory(e.target.value.trim() || null)
-              }
-              className="p-inputtext w-full"
-              placeholder="loop / stairs / connector / segment / landmark / своя…"
-              disabled={editRefStatus === 'saving' || editRefStatus === 'saved'}
-            />
-            <datalist id="pb-ref-category-list">
-              {(() => {
-                const base = ['loop', 'stairs', 'connector', 'segment', 'landmark'];
-                const existing = new Set(
-                  referenceTracks
-                    .map((r) => r.category)
-                    .filter((c): c is string => c != null && c !== ''),
-                );
-                const all = Array.from(
-                  new Set([...base, ...Array.from(existing)]),
-                );
-                return all.map((c) => <option key={c} value={c} />);
-              })()}
-            </datalist>
-            <small className="pb-hint" style={{ fontSize: '0.72rem' }}>
-              Введите базовую (loop, stairs, …) или свою категорию — она
-              запомнится в подсказках.
-            </small>
-          </div>
-
-          <div>
-            <label className="pb-label" style={{ display: 'block', marginBottom: '0.35rem' }}>
-              Теги (через запятую)
-            </label>
-            <InputText
-              value={editRefTags}
-              onChange={(e) => setEditRefTags(e.target.value)}
-              className="w-full"
-              placeholder="pond, north, upper"
-              disabled={editRefStatus === 'saving' || editRefStatus === 'saved'}
-            />
-            <small className="pb-hint" style={{ fontSize: '0.72rem' }}>
-              Для фильтрации. Например: «pond, north» — все эталоны у пруда на севере.
-            </small>
-          </div>
-
-          {editRefStatus === 'saved' && (
-            <div style={{ color: 'var(--tg-success)', fontSize: '0.85rem' }}>
-              <i className="pi pi-check-circle" /> Сохранено
-            </div>
-          )}
-          {editRefError && (
-            <div style={{ color: 'var(--tg-destructive)', fontSize: '0.85rem' }}>
-              {editRefError}
-            </div>
-          )}
-        </div>
-
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
-          <Button
-            label="Отмена"
-            className="pb-soft p-button-sm"
-            onClick={() => setEditRefVisible(false)}
-            disabled={editRefStatus === 'saving' || editRefStatus === 'saved'}
-          />
-          <Button
-            label={editRefStatus === 'saving' ? 'Сохранение…' : 'Сохранить'}
-            icon={editRefStatus === 'saving' ? 'pi pi-spin pi-spinner' : 'pi pi-check'}
-            className="pb p-button-sm"
-            onClick={handleSaveEditReference}
-            disabled={
-              !editRefName.trim() ||
-              editRefStatus === 'saving' ||
-              editRefStatus === 'saved'
-            }
-            loading={editRefStatus === 'saving'}
-          />
-        </div>
-      </Dialog>
+        onSaved={() => {
+          void loadReferenceTracks();
+        }}
+      />
 
       {selectedGroup && (
         <StoryGeneratorDialog
