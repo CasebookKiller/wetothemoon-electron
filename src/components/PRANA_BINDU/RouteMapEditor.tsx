@@ -39,7 +39,7 @@ interface Props {
   initialRunId?: number;
 }
 
-type TabType = 'runs' | 'filters' | 'thresholds';
+type TabType = 'runs' | 'filters' | 'thresholds' | 'refs';
 
 const HEADER_HEIGHT = 56;
 const CHUNK_SIZE = 25;
@@ -370,6 +370,20 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
   >([]);
   const [segmentsLoading, setSegmentsLoading] = useState(false);
   const [candidatesVisible, setCandidatesVisible] = useState(false);
+  // Эталонные маршруты (C.5, фаза A3)
+  const [referenceTracks, setReferenceTracks] = useState<
+    Array<{
+      id: number;
+      name: string;
+      coords: [number, number][];
+      lengthM: number;
+      kind: 'loop' | 'linear' | 'stadium' | null;
+      notes: string | null;
+      createdAt: string;
+    }>
+  >([]);
+  const [refTracksLoading, setRefTracksLoading] = useState(false);
+  const [selectedRefTrackId, setSelectedRefTrackId] = useState<number | null>(null);
   // Рисование эталонного маршрута (C.5, фаза A2)
   const [drawMode, setDrawMode] = useState(false);
   const [draftPoints, setDraftPoints] = useState<[number, number][]>([]);
@@ -716,6 +730,62 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     return () => window.removeEventListener('keydown', onKey);
   }, [drawMode]);
 
+    // ==================== Отрисовка выбранного эталона на карте ====================
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+
+    // Убираем старые слои
+    if (map.getLayer('ref-line-outline')) map.removeLayer('ref-line-outline');
+    if (map.getLayer('ref-line')) map.removeLayer('ref-line');
+    if (map.getSource('ref-line')) map.removeSource('ref-line');
+
+    // Не показываем эталон во время рисования (мешает)
+    if (!selectedRefTrackId || drawMode) return;
+
+    const ref = referenceTracks.find((r) => r.id === selectedRefTrackId);
+    if (!ref || ref.coords.length < 2) return;
+
+    const coords = ref.coords.map((p) => [p[1], p[0]]);
+
+    map.addSource('ref-line', {
+      type: 'geojson',
+      data: {
+        type: 'Feature',
+        properties: {},
+        geometry: { type: 'LineString', coordinates: coords },
+      },
+    });
+
+    // Тёмная подложка
+    map.addLayer({
+      id: 'ref-line-outline',
+      type: 'line',
+      source: 'ref-line',
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: {
+        'line-color': '#000000',
+        'line-width': trackSettingsRef.current.width + 6,
+        'line-opacity': 0.35,
+      },
+    });
+
+    // Основная линия эталона — синий пунктир
+    map.addLayer({
+      id: 'ref-line',
+      type: 'line',
+      source: 'ref-line',
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: {
+        'line-color': '#6ab2f2',
+        'line-width': trackSettingsRef.current.width + 1,
+        'line-opacity': 0.85,
+        'line-dasharray': [3, 2],
+      },
+    });
+  }, [selectedRefTrackId, referenceTracks, mapLoaded, drawMode]);
+
   // ==================== Загрузка сохранённых тестовых отрезков ====================
 
   const loadSegments = async () => {
@@ -737,6 +807,30 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
   useEffect(() => {
     if (visible && activeTab === 'thresholds') {
       void loadSegments();
+    }
+  }, [visible, activeTab]);
+
+    // ==================== Загрузка эталонных треков ====================
+
+  const loadReferenceTracks = async () => {
+    if (!api?.pb?.referenceTrackList) return;
+    setRefTracksLoading(true);
+    try {
+      const res = await api.pb.referenceTrackList();
+      if (res?.success) {
+        setReferenceTracks(res.items ?? []);
+      }
+    } catch (e) {
+      console.error('[pb-map] ref tracks load error:', e);
+    } finally {
+      setRefTracksLoading(false);
+    }
+  };
+
+  // Загружаем при открытии и при переключении на вкладку «Эталоны»
+  useEffect(() => {
+    if (visible && activeTab === 'refs') {
+      void loadReferenceTracks();
     }
   }, [visible, activeTab]);
 
@@ -762,6 +856,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
       setDrawMode(false);
       setDraftPoints([]);
       setSaveRefVisible(false);
+      setSelectedRefTrackId(null);
       setMapLoaded(false);
     }
   }, [visible]);
@@ -1427,10 +1522,14 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
       });
       if (res?.success) {
         setSaveRefStatus('saved');
+        const newId = res.id;
         setTimeout(() => {
           setSaveRefVisible(false);
           setDrawMode(false);
           setDraftPoints([]);
+          // Показать новый эталон на карте + обновить список
+          void loadReferenceTracks();
+          setSelectedRefTrackId(newId ?? null);
         }, 1200);
       } else {
         setSaveRefError(res?.error ?? 'Не удалось сохранить');
@@ -1440,6 +1539,44 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
       setSaveRefError((e as Error).message);
       setSaveRefStatus('error');
     }
+  };
+
+  const handleDeleteReference = async (id: number) => {
+    if (!window.confirm('Удалить этот эталонный маршрут?')) return;
+    try {
+      const res = await api.pb.referenceTrackDelete(id);
+      if (res?.success) {
+        setReferenceTracks((prev) => prev.filter((r) => r.id !== id));
+        if (selectedRefTrackId === id) setSelectedRefTrackId(null);
+      } else {
+        console.error('[pb-map] ref delete error:', res?.error);
+      }
+    } catch (e) {
+      console.error('[pb-map] ref delete:', e);
+    }
+  };
+
+  const fmtRefLength = (m: number): string => {
+    if (m < 1000) return `${Math.round(m)} м`;
+    return `${(m / 1000).toFixed(2)} км`;
+  };
+
+  const fmtRefDate = (iso: string): string => {
+    try {
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return iso;
+      const pad = (n: number) => String(n).padStart(2, '0');
+      return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}`;
+    } catch {
+      return iso;
+    }
+  };
+
+  const refKindLabel = (kind: 'loop' | 'linear' | 'stadium' | null): string => {
+    if (kind === 'loop') return 'замкнутый';
+    if (kind === 'linear') return 'линейный';
+    if (kind === 'stadium') return 'стадион';
+    return '—';
   };
 
   // ==================== Рендер ====================
@@ -1459,7 +1596,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
           <div style={{ width: '340px', borderRight: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', height: '100%' }}>
 
             <div style={{ padding: '0.75rem', borderBottom: '1px solid var(--surface-border)' }}>
-              <div className="pb-catalog__chips" style={{ marginBottom: 0 }}>
+              <div className="pb-catalog__chips" style={{ marginBottom: 0, flexWrap: 'wrap' }}>
                 <button
                   type="button"
                   className={`pb-catalog__chip ${activeTab === 'runs' ? 'is-on' : ''}`}
@@ -1480,6 +1617,13 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                   onClick={() => setActiveTab('thresholds')}
                 >
                   <i className="pi pi-chart-line" style={{ marginRight: '0.35rem' }} /> Пороги
+                </button>
+                <button
+                  type="button"
+                  className={`pb-catalog__chip ${activeTab === 'refs' ? 'is-on' : ''}`}
+                  onClick={() => setActiveTab('refs')}
+                >
+                  <i className="pi pi-pencil" style={{ marginRight: '0.35rem' }} /> Эталоны
                 </button>
               </div>
             </div>
@@ -2041,6 +2185,171 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                     и сохраните тест.
                   </div>
                 )}
+              </div>
+            )}
+
+            {activeTab === 'refs' && (
+              <div style={{ flex: 1, overflowY: 'auto', padding: '0.5rem' }}>
+                {/* Заголовок + кнопки */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    marginBottom: '0.75rem',
+                  }}
+                >
+                  <span className="pb-hint" style={{ fontSize: '0.75rem', flex: 1 }}>
+                    {referenceTracks.length === 0
+                      ? 'Нет сохранённых эталонов'
+                      : `Всего: ${referenceTracks.length}`}
+                  </span>
+                  <Button
+                    label="Рисовать"
+                    icon="pi pi-pencil"
+                    className={drawMode ? 'pb p-button-sm' : 'pb-soft p-button-sm'}
+                    onClick={() => {
+                      if (markupMode) setMarkupMode(false);
+                      if (drawMode) {
+                        setDrawMode(false);
+                        setDraftPoints([]);
+                        setSaveRefVisible(false);
+                      } else {
+                        setDrawMode(true);
+                        setDraftPoints([]);
+                        setSelectedRefTrackId(null);
+                      }
+                    }}
+                    tooltip="Нарисовать новый эталонный маршрут"
+                    tooltipOptions={{ position: 'bottom' }}
+                  />
+                  <Button
+                    icon="pi pi-refresh"
+                    text
+                    className="pb-soft p-button-sm"
+                    style={{
+                      padding: '0.1rem',
+                      width: '1.8rem',
+                      height: '1.8rem',
+                    }}
+                    onClick={() => void loadReferenceTracks()}
+                    disabled={refTracksLoading}
+                    tooltip="Обновить"
+                    tooltipOptions={{ position: 'bottom' }}
+                  />
+                </div>
+
+                {refTracksLoading && (
+                  <div className="pb-hint" style={{ textAlign: 'center', padding: '0.5rem' }}>
+                    <i className="pi pi-spin pi-spinner" /> Загрузка…
+                  </div>
+                )}
+
+                {/* Список эталонов */}
+                {!refTracksLoading && referenceTracks.length === 0 && (
+                  <div
+                    className="pb-hint"
+                    style={{
+                      padding: '0.75rem',
+                      fontSize: '0.75rem',
+                      textAlign: 'center',
+                      border: '1px dashed var(--surface-border)',
+                      borderRadius: 6,
+                    }}
+                  >
+                    Нарисуйте первый эталон: кнопка «Рисовать» → кликайте по карте → «Сохранить».
+                  </div>
+                )}
+
+                {!refTracksLoading &&
+                  referenceTracks.map((ref) => {
+                    const isSelected = selectedRefTrackId === ref.id;
+                    return (
+                      <div
+                        key={ref.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          padding: '0.5rem 0.6rem',
+                          borderRadius: 6,
+                          marginBottom: '0.3rem',
+                          background: isSelected
+                            ? 'rgba(106, 178, 242, 0.12)'
+                            : 'transparent',
+                          border: `1px solid ${
+                            isSelected ? '#6ab2f2' : 'var(--surface-border)'
+                          }`,
+                          cursor: 'pointer',
+                        }}
+                        onClick={() =>
+                          setSelectedRefTrackId(isSelected ? null : ref.id)
+                        }
+                      >
+                        <i
+                          className={
+                            isSelected ? 'pi pi-eye' : 'pi pi-eye-slash'
+                          }
+                          style={{
+                            color: isSelected ? '#6ab2f2' : 'var(--tg-hint)',
+                            fontSize: '0.85rem',
+                            flexShrink: 0,
+                          }}
+                          title={isSelected ? 'Скрыть с карты' : 'Показать на карте'}
+                        />
+                        <div
+                          style={{
+                            flex: 1,
+                            minWidth: 0,
+                            overflow: 'hidden',
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontWeight: 600,
+                              fontSize: '0.82rem',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                            }}
+                            title={ref.name}
+                          >
+                            {ref.name}
+                          </div>
+                          <div
+                            style={{
+                              display: 'flex',
+                              gap: '0.5rem',
+                              fontSize: '0.68rem',
+                              color: 'var(--tg-hint)',
+                              marginTop: '0.15rem',
+                            }}
+                          >
+                            <span>{fmtRefLength(ref.lengthM)}</span>
+                            <span>{refKindLabel(ref.kind)}</span>
+                            <span>{fmtRefDate(ref.createdAt)}</span>
+                          </div>
+                        </div>
+                        <Button
+                          icon="pi pi-trash"
+                          text
+                          className="pb-drawer__name-edit"
+                          style={{
+                            width: '1.8rem',
+                            height: '1.8rem',
+                            padding: 0,
+                            flexShrink: 0,
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void handleDeleteReference(ref.id);
+                          }}
+                          tooltip="Удалить"
+                          tooltipOptions={{ position: 'left' }}
+                        />
+                      </div>
+                    );
+                  })}
               </div>
             )}
           </div>
