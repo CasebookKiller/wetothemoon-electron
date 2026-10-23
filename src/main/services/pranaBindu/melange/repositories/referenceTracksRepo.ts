@@ -10,12 +10,29 @@ import type { DatabaseSync } from 'node:sqlite';
 
 export type ReferenceTrackKind = 'loop' | 'linear' | 'stadium';
 
+export type ReferenceTrackCategory =
+  | 'loop'
+  | 'stairs'
+  | 'connector'
+  | 'segment'
+  | 'landmark';
+
+export const REFERENCE_CATEGORY_LABELS: Record<ReferenceTrackCategory, string> = {
+  loop: 'Круг',
+  stairs: 'Лестница',
+  connector: 'Соединитель',
+  segment: 'Отрезок',
+  landmark: 'Ориентир',
+};
+
 export interface ReferenceTrack {
   id: number;
   name: string;
-  coords: [number, number][]; // [lat, lng]
+  coords: [number, number][];
   lengthM: number;
   kind: ReferenceTrackKind | null;
+  category: ReferenceTrackCategory | null;
+  tags: string[];
   notes: string | null;
   createdAt: string;
   updatedAt: string;
@@ -25,12 +42,16 @@ export interface CreateReferenceTrackInput {
   name: string;
   coords: [number, number][];
   kind?: ReferenceTrackKind | null;
+  category?: ReferenceTrackCategory | null;
+  tags?: string[];
   notes?: string | null;
 }
 
 export interface UpdateReferenceTrackPatch {
   name?: string;
   kind?: ReferenceTrackKind | null;
+  category?: ReferenceTrackCategory | null;
+  tags?: string[];
   notes?: string | null;
 }
 
@@ -42,6 +63,8 @@ interface ReferenceTrackRow {
   coords_json: string;
   length_m: number | null;
   kind: string | null;
+  category: string | null;
+  tags_json: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -63,12 +86,24 @@ function rowToDomain(row: ReferenceTrackRow): ReferenceTrack {
   } catch {
     /* ignore */
   }
+  let tags: string[] = [];
+  try {
+    const parsed = row.tags_json ? JSON.parse(row.tags_json) : [];
+    if (Array.isArray(parsed)) {
+      tags = parsed.filter((t): t is string => typeof t === 'string');
+    }
+  } catch {
+    /* ignore */
+  }
+
   return {
     id: row.id,
     name: row.name,
     coords,
     lengthM: row.length_m ?? 0,
     kind: (row.kind as ReferenceTrackKind) ?? null,
+    category: (row.category as ReferenceTrackCategory) ?? null,
+    tags,
     notes: row.notes,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -127,13 +162,15 @@ export function createReferenceTrack(
 
   const info = db.prepare(
     `INSERT INTO reference_tracks
-       (name, coords_json, length_m, kind, notes, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+       (name, coords_json, length_m, kind, category, tags_json, notes, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     input.name.trim(),
     coordsJson,
     lengthM,
     input.kind ?? null,
+    input.category ?? null,
+    input.tags && input.tags.length > 0 ? JSON.stringify(input.tags) : null,
     input.notes ?? null,
     now,
     now,
@@ -175,6 +212,16 @@ export function updateReferenceTrack(
   if (patch.kind !== undefined) {
     sets.push(`kind = ?`);
     values.push(patch.kind);
+  }
+  if (patch.category !== undefined) {
+    sets.push(`category = ?`);
+    values.push(patch.category);
+  }
+  if (patch.tags !== undefined) {
+    sets.push(`tags_json = ?`);
+    values.push(
+      patch.tags && patch.tags.length > 0 ? JSON.stringify(patch.tags) : null,
+    );
   }
   if (patch.notes !== undefined) {
     sets.push(`notes = ?`);

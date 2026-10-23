@@ -477,6 +477,8 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
       coords: [number, number][];
       lengthM: number;
       kind: 'loop' | 'linear' | 'stadium' | null;
+      category: 'loop' | 'stairs' | 'connector' | 'segment' | 'landmark' | null;
+      tags: string[];
       notes: string | null;
       createdAt: string;
     }>
@@ -500,6 +502,14 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
   const [draftPoints, setDraftPoints] = useState<[number, number][]>([]);
   const [saveRefVisible, setSaveRefVisible] = useState(false);
   const [saveRefName, setSaveRefName] = useState('');
+  // Редактирование существующего эталона (имя, категория, теги)
+  const [editRefVisible, setEditRefVisible] = useState(false);
+  const [editRefId, setEditRefId] = useState<number | null>(null);
+  const [editRefName, setEditRefName] = useState('');
+  const [editRefCategory, setEditRefCategory] = useState<string | null>(null);
+  const [editRefTags, setEditRefTags] = useState('');
+  const [editRefStatus, setEditRefStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [editRefError, setEditRefError] = useState('');
   const [saveRefStatus, setSaveRefStatus] = useState<
     'idle' | 'saving' | 'saved' | 'error'
   >('idle');
@@ -1649,9 +1659,15 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     if (draftPoints.length < 2) return;
     const pad = (n: number) => String(n).padStart(2, '0');
     const now = new Date();
-    setSaveRefName(
-      `Эталон ${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`,
-    );
+    const kind = detectDraftKind();
+    const lengthM = computeDraftLength();
+    const lengthStr =
+      lengthM >= 1000 ? `${(lengthM / 1000).toFixed(1)} км` : `${lengthM} м`;
+    const defaultName =
+      kind === 'loop'
+        ? `Круг ${lengthStr}`
+        : `Отрезок ${lengthStr}`;
+    setSaveRefName(defaultName);
     setSaveRefStatus('idle');
     setSaveRefError('');
     setSaveRefVisible(true);
@@ -1726,6 +1742,51 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     if (kind === 'linear') return 'линейный';
     if (kind === 'stadium') return 'стадион';
     return '—';
+  };
+
+    const openEditReference = (ref: {
+    id: number;
+    name: string;
+    category: 'loop' | 'stairs' | 'connector' | 'segment' | 'landmark' | null;
+    tags: string[];
+  }) => {
+    setEditRefId(ref.id);
+    setEditRefName(ref.name);
+    setEditRefCategory(ref.category);
+    setEditRefTags(ref.tags.join(', '));
+    setEditRefStatus('idle');
+    setEditRefError('');
+    setEditRefVisible(true);
+  };
+
+  const handleSaveEditReference = async () => {
+    if (!editRefId || !editRefName.trim()) return;
+    setEditRefStatus('saving');
+    setEditRefError('');
+    try {
+      const tags = editRefTags
+        .split(',')
+        .map((t) => t.trim())
+        .filter((t) => t.length > 0);
+      const res = await api.pb.referenceTrackUpdate(editRefId, {
+        name: editRefName.trim(),
+        category: editRefCategory,
+        tags,
+      });
+      if (res?.success) {
+        setEditRefStatus('saved');
+        setTimeout(() => {
+          setEditRefVisible(false);
+          void loadReferenceTracks();
+        }, 700);
+      } else {
+        setEditRefError(res?.error ?? 'Не удалось сохранить');
+        setEditRefStatus('error');
+      }
+    } catch (e) {
+      setEditRefError((e as Error).message);
+      setEditRefStatus('error');
+    }
   };
 
   // ==================== Рендер ====================
@@ -2471,15 +2532,37 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                         >
                           <div
                             style={{
-                              fontWeight: 600,
-                              fontSize: '0.82rem',
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.35rem',
                             }}
-                            title={ref.name}
                           >
-                            {ref.name}
+                            <span
+                              style={{
+                                fontWeight: 600,
+                                fontSize: '0.82rem',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                              }}
+                              title={ref.name}
+                            >
+                              {ref.name}
+                            </span>
+                            {ref.category && (
+                              <span
+                                style={{
+                                  fontSize: '0.62rem',
+                                  padding: '0.05rem 0.35rem',
+                                  borderRadius: 3,
+                                  background: 'rgba(212, 163, 115, 0.15)',
+                                  color: 'var(--pb-accent)',
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {ref.category}
+                              </span>
+                            )}
                           </div>
                           <div
                             style={{
@@ -2488,11 +2571,17 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                               fontSize: '0.68rem',
                               color: 'var(--tg-hint)',
                               marginTop: '0.15rem',
+                              flexWrap: 'wrap',
                             }}
                           >
                             <span>{fmtRefLength(ref.lengthM)}</span>
                             <span>{refKindLabel(ref.kind)}</span>
                             <span>{fmtRefDate(ref.createdAt)}</span>
+                            {ref.tags.length > 0 && (
+                              <span style={{ color: 'var(--pb-accent)', opacity: 0.7 }}>
+                                #{ref.tags.join(' #')}
+                              </span>
+                            )}
                           </div>
                           {refDeviations[ref.id] && (() => {
                             const dev = refDeviations[ref.id];
@@ -2541,6 +2630,25 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                             );
                           })()}
                         </div>
+
+                        <Button
+                          icon="pi pi-pencil"
+                          text
+                          className="pb-drawer__name-edit"
+                          style={{
+                            width: '1.8rem',
+                            height: '1.8rem',
+                            padding: 0,
+                            flexShrink: 0,
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEditReference(ref);
+                          }}
+                          tooltip="Переименовать / категория / теги"
+                          tooltipOptions={{ position: 'left' }}
+                        />
+
                         <Button
                           icon="pi pi-trash"
                           text
@@ -3155,6 +3263,105 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
               saveRefStatus === 'saved'
             }
             loading={saveRefStatus === 'saving'}
+          />
+        </div>
+      </Dialog>
+
+      {/* Диалог редактирования эталона */}
+      <Dialog
+        visible={editRefVisible}
+        onHide={() => {
+          if (editRefStatus !== 'saving') {
+            setEditRefVisible(false);
+            setEditRefError('');
+          }
+        }}
+        header="Редактировать эталон"
+        style={{ width: '460px' }}
+        modal
+        className="pb-templates-dialog pb-settings-dialog"
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.25rem' }}>
+          <div>
+            <label className="pb-label" style={{ display: 'block', marginBottom: '0.35rem' }}>
+              Имя
+            </label>
+            <InputText
+              value={editRefName}
+              onChange={(e) => setEditRefName(e.target.value)}
+              className="w-full"
+              placeholder="Верхний круг по пруду"
+              disabled={editRefStatus === 'saving' || editRefStatus === 'saved'}
+            />
+          </div>
+
+          <div>
+            <label className="pb-label" style={{ display: 'block', marginBottom: '0.35rem' }}>
+              Категория
+            </label>
+            <Dropdown
+              value={editRefCategory}
+              options={[
+                { label: '— (без категории)', value: null },
+                { label: 'Круг (loop)', value: 'loop' },
+                { label: 'Лестница (stairs)', value: 'stairs' },
+                { label: 'Соединитель (connector)', value: 'connector' },
+                { label: 'Отрезок (segment)', value: 'segment' },
+                { label: 'Ориентир (landmark)', value: 'landmark' },
+              ]}
+              onChange={(e) => setEditRefCategory(e.value)}
+              className="w-full"
+              panelClassName="pb-dropdown-panel"
+              disabled={editRefStatus === 'saving' || editRefStatus === 'saved'}
+            />
+          </div>
+
+          <div>
+            <label className="pb-label" style={{ display: 'block', marginBottom: '0.35rem' }}>
+              Теги (через запятую)
+            </label>
+            <InputText
+              value={editRefTags}
+              onChange={(e) => setEditRefTags(e.target.value)}
+              className="w-full"
+              placeholder="pond, north, upper"
+              disabled={editRefStatus === 'saving' || editRefStatus === 'saved'}
+            />
+            <small className="pb-hint" style={{ fontSize: '0.72rem' }}>
+              Для фильтрации. Например: «pond, north» — все эталоны у пруда на севере.
+            </small>
+          </div>
+
+          {editRefStatus === 'saved' && (
+            <div style={{ color: 'var(--tg-success)', fontSize: '0.85rem' }}>
+              <i className="pi pi-check-circle" /> Сохранено
+            </div>
+          )}
+          {editRefError && (
+            <div style={{ color: 'var(--tg-destructive)', fontSize: '0.85rem' }}>
+              {editRefError}
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
+          <Button
+            label="Отмена"
+            className="pb-soft p-button-sm"
+            onClick={() => setEditRefVisible(false)}
+            disabled={editRefStatus === 'saving' || editRefStatus === 'saved'}
+          />
+          <Button
+            label={editRefStatus === 'saving' ? 'Сохранение…' : 'Сохранить'}
+            icon={editRefStatus === 'saving' ? 'pi pi-spin pi-spinner' : 'pi pi-check'}
+            className="pb p-button-sm"
+            onClick={handleSaveEditReference}
+            disabled={
+              !editRefName.trim() ||
+              editRefStatus === 'saving' ||
+              editRefStatus === 'saved'
+            }
+            loading={editRefStatus === 'saving'}
           />
         </div>
       </Dialog>

@@ -17,7 +17,7 @@ import {
   MIGRATION_V24_AUTO_RANGE_DAYS,
 } from './schema';
 
-export const SCHEMA_VERSION = 28;
+export const SCHEMA_VERSION = 29;
 
 interface Migration {
   version: number;
@@ -663,6 +663,30 @@ const migrations: readonly Migration[] = [
            ON reference_tracks(created_at);`,
       );
       console.log('[Melange] v28: создана таблица reference_tracks');
+    },
+  },
+  {
+    version: 29,
+    apply: (db) => {
+      const tryAdd = (sql: string): boolean => {
+        try {
+          db.exec(sql);
+          return true;
+        } catch (e) {
+          if (String(e).includes('duplicate column name')) return false;
+          throw e;
+        }
+      };
+
+      tryAdd(`ALTER TABLE reference_tracks ADD COLUMN category TEXT;`);
+      tryAdd(`ALTER TABLE reference_tracks ADD COLUMN tags_json TEXT;`);
+
+      db.exec(
+        `CREATE INDEX IF NOT EXISTS idx_reference_tracks_category
+           ON reference_tracks(category);`,
+      );
+
+      console.log('[Melange] v29: reference_tracks.category + tags_json');
     },
   },
 ];
