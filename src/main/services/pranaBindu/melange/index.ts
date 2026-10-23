@@ -109,3 +109,17 @@ export type {
   CreateTestSegmentInput,
   TestSegmentDurationType,
 } from './repositories/testSegmentsRepo';
+
+export {
+  createReferenceTrack,
+  listReferenceTracks,
+  getReferenceTrackById,
+  updateReferenceTrack,
+  deleteReferenceTrack,
+} from './repositories/referenceTracksRepo';
+export type {
+  ReferenceTrack,
+  CreateReferenceTrackInput,
+  UpdateReferenceTrackPatch,
+  ReferenceTrackKind,
+} from './repositories/referenceTracksRepo';

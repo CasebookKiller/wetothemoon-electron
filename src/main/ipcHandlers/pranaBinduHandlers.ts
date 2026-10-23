@@ -68,6 +68,11 @@ import {
   createTestSegment,
   listTestSegments,
   deleteTestSegment,
+  createReferenceTrack,
+  listReferenceTracks,
+  getReferenceTrackById,
+  updateReferenceTrack,
+  deleteReferenceTrack,
 } from '../services/pranaBindu/melange';
 
 import {
@@ -5463,6 +5468,68 @@ export function registerPranaBinduHandlers(): void {
         return { success: false, error: 'id обязателен' };
       }
       const ok = deleteTestSegment(getMelange(), id);
+      return { success: ok };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+    // ==================== Reference Tracks ====================
+
+  ipcMain.handle('pb:reference-track-create', (_event, payload: any) => {
+    try {
+      if (!payload?.name?.trim()) {
+        return { success: false, error: 'name обязателен' };
+      }
+      if (!Array.isArray(payload.coords) || payload.coords.length < 2) {
+        return { success: false, error: 'coords: минимум 2 точки' };
+      }
+      const id = createReferenceTrack(getMelange(), payload);
+      return { success: true, id };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('pb:reference-track-list', () => {
+    try {
+      const items = listReferenceTracks(getMelange());
+      return { success: true, items };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('pb:reference-track-get', (_event, id: number) => {
+    try {
+      if (!Number.isFinite(id)) {
+        return { success: false, error: 'id обязателен' };
+      }
+      const item = getReferenceTrackById(getMelange(), id);
+      return { success: true, item };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('pb:reference-track-update', (_event, id: number, patch: any) => {
+    try {
+      if (!Number.isFinite(id)) {
+        return { success: false, error: 'id обязателен' };
+      }
+      const ok = updateReferenceTrack(getMelange(), id, patch ?? {});
+      return { success: ok };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('pb:reference-track-delete', (_event, id: number) => {
+    try {
+      if (!Number.isFinite(id)) {
+        return { success: false, error: 'id обязателен' };
+      }
+      const ok = deleteReferenceTrack(getMelange(), id);
       return { success: ok };
     } catch (e) {
       return { success: false, error: (e as Error).message };

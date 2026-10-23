@@ -17,7 +17,7 @@ import {
   MIGRATION_V24_AUTO_RANGE_DAYS,
 } from './schema';
 
-export const SCHEMA_VERSION = 26;
+export const SCHEMA_VERSION = 28;
 
 interface Migration {
   version: number;
@@ -610,6 +610,59 @@ const migrations: readonly Migration[] = [
            ON test_segments(created_at);`,
       );
       console.log('[Melange] v26: создана таблица test_segments');
+    },
+  },
+  {
+    version: 27,
+    apply: (db) => {
+      // Разделяем «настоящие тесты» (intentional) и «кандидатов» (candidate).
+      // Раньше все сохранённые отрезки считались одинаковыми, что приводило
+      // к замусориванию БД разминочными отрезками (см. 18_MAP_EDITOR.md).
+      const tryAdd = (sql: string): boolean => {
+        try {
+          db.exec(sql);
+          return true;
+        } catch (e) {
+          if (String(e).includes('duplicate column name')) return false;
+          throw e;
+        }
+      };
+
+      const added = tryAdd(
+        `ALTER TABLE test_segments ADD COLUMN kind TEXT NOT NULL DEFAULT 'candidate';`,
+      );
+
+      // Backfill: всё, что сохранено до v27, считаем candidate —
+      // безопасно, потому что реальные тесты пользователь переразметит.
+      db.exec(
+        `CREATE INDEX IF NOT EXISTS idx_test_segments_kind ON test_segments(kind);`,
+      );
+
+      console.log(
+        `[Melange] v27: test_segments.kind (${added ? 'добавлена' : 'уже есть'})`,
+      );
+    },
+  },
+  {
+    version: 28,
+    apply: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS reference_tracks (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          coords_json TEXT NOT NULL,
+          length_m REAL,
+          kind TEXT,
+          notes TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+      `);
+      db.exec(
+        `CREATE INDEX IF NOT EXISTS idx_reference_tracks_created
+           ON reference_tracks(created_at);`,
+      );
+      console.log('[Melange] v28: создана таблица reference_tracks');
     },
   },
 ];

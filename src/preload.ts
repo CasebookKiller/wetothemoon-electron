@@ -988,6 +988,17 @@ try {
       testSegmentDelete: (id: number) =>
         ipcRenderer.invoke('pb:test-segment-delete', id),
 
+      referenceTrackCreate: (payload: any) =>
+        ipcRenderer.invoke('pb:reference-track-create', payload),
+      referenceTrackList: () =>
+        ipcRenderer.invoke('pb:reference-track-list'),
+      referenceTrackGet: (id: number) =>
+        ipcRenderer.invoke('pb:reference-track-get', id),
+      referenceTrackUpdate: (id: number, patch: any) =>
+        ipcRenderer.invoke('pb:reference-track-update', id, patch),
+      referenceTrackDelete: (id: number) =>
+        ipcRenderer.invoke('pb:reference-track-delete', id),
+
     },
 
   });
