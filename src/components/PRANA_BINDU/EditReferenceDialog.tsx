@@ -112,22 +112,52 @@ export const EditReferenceDialog: React.FC<Props> = ({
           <label className="pb-label" style={{ display: 'block', marginBottom: '0.35rem' }}>
             Категория
           </label>
-          <input
-            type="text"
-            list="pb-ref-category-list"
+          <InputText
             value={category ?? ''}
-            onChange={(e) => setCategory(e.target.value === '' ? null : e.target.value)}
-            className="p-inputtext w-full"
-            placeholder="loop / stairs / connector / segment / landmark / своя…"
+            onChange={(e) =>
+              setCategory(e.target.value === '' ? null : e.target.value)
+            }
+            className="w-full"
+            placeholder="loop / stairs / … или своя"
             disabled={status === 'saving' || status === 'saved'}
           />
-          <datalist id="pb-ref-category-list">
-            {refCategoryOptions.map((c) => (
-              <option key={c} value={c} />
-            ))}
-          </datalist>
-          <small className="pb-hint" style={{ fontSize: '0.72rem' }}>
-            Введите базовую (loop, stairs, …) или свою категорию — она запомнится в подсказках.
+          {refCategoryOptions.length > 0 && (
+            <div
+              style={{
+                display: 'flex',
+                gap: '0.25rem',
+                flexWrap: 'wrap',
+                marginTop: '0.4rem',
+              }}
+            >
+              {refCategoryOptions.map((c) => {
+                const isActive = category === c;
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    className={`pb-catalog__chip ${isActive ? 'is-on' : ''}`}
+                    onClick={() => setCategory(isActive ? null : c)}
+                    style={{
+                      fontSize: '0.7rem',
+                      padding: '0.15rem 0.45rem',
+                      cursor: 'pointer',
+                    }}
+                    disabled={status === 'saving' || status === 'saved'}
+                    title={
+                      isActive
+                        ? `Снять категорию «${c}»`
+                        : `Установить категорию «${c}»`
+                    }
+                  >
+                    {c}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          <small className="pb-hint" style={{ fontSize: '0.72rem', marginTop: '0.3rem', display: 'block' }}>
+            Клик по чипу — быстрое назначение. Введи своё — запомнится в списке.
           </small>
         </div>
 
