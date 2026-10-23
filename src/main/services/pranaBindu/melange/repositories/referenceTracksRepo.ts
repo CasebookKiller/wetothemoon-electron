@@ -31,7 +31,8 @@ export interface ReferenceTrack {
   coords: [number, number][];
   lengthM: number;
   kind: ReferenceTrackKind | null;
-  category: ReferenceTrackCategory | null;
+  /** Свободная строка: базовая категория или кастомная (введена пользователем). */
+  category: string | null;
   tags: string[];
   notes: string | null;
   createdAt: string;
@@ -42,7 +43,7 @@ export interface CreateReferenceTrackInput {
   name: string;
   coords: [number, number][];
   kind?: ReferenceTrackKind | null;
-  category?: ReferenceTrackCategory | null;
+  category?: string | null;
   tags?: string[];
   notes?: string | null;
 }
@@ -50,7 +51,7 @@ export interface CreateReferenceTrackInput {
 export interface UpdateReferenceTrackPatch {
   name?: string;
   kind?: ReferenceTrackKind | null;
-  category?: ReferenceTrackCategory | null;
+  category?: string | null;
   tags?: string[];
   notes?: string | null;
 }
@@ -102,7 +103,7 @@ function rowToDomain(row: ReferenceTrackRow): ReferenceTrack {
     coords,
     lengthM: row.length_m ?? 0,
     kind: (row.kind as ReferenceTrackKind) ?? null,
-    category: (row.category as ReferenceTrackCategory) ?? null,
+    category: row.category ?? null,
     tags,
     notes: row.notes,
     createdAt: row.created_at,
@@ -160,6 +161,16 @@ export function createReferenceTrack(
   const lengthM = computeLengthM(input.coords);
   const coordsJson = JSON.stringify(input.coords);
 
+  // Авто-категоризация, если категория не передана явно
+  let category: string | null = input.category ?? null;
+  if (category == null) {
+    if (input.kind === 'loop' || input.kind === 'stadium') {
+      category = 'loop';
+    } else if (input.kind === 'linear') {
+      category = 'segment';
+    }
+  }
+
   const info = db.prepare(
     `INSERT INTO reference_tracks
        (name, coords_json, length_m, kind, category, tags_json, notes, created_at, updated_at)
@@ -169,7 +180,7 @@ export function createReferenceTrack(
     coordsJson,
     lengthM,
     input.kind ?? null,
-    input.category ?? null,
+    category,
     input.tags && input.tags.length > 0 ? JSON.stringify(input.tags) : null,
     input.notes ?? null,
     now,

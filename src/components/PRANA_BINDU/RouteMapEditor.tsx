@@ -477,7 +477,8 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
       coords: [number, number][];
       lengthM: number;
       kind: 'loop' | 'linear' | 'stadium' | null;
-      category: 'loop' | 'stairs' | 'connector' | 'segment' | 'landmark' | null;
+      /** Свободная строка: базовая или кастомная категория. */
+      category: string | null;
       tags: string[];
       notes: string | null;
       createdAt: string;
@@ -1744,10 +1745,10 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     return '—';
   };
 
-    const openEditReference = (ref: {
+  const openEditReference = (ref: {
     id: number;
     name: string;
-    category: 'loop' | 'stairs' | 'connector' | 'segment' | 'landmark' | null;
+    category: string | null;
     tags: string[];
   }) => {
     setEditRefId(ref.id);
@@ -3299,21 +3300,35 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
             <label className="pb-label" style={{ display: 'block', marginBottom: '0.35rem' }}>
               Категория
             </label>
-            <Dropdown
-              value={editRefCategory}
-              options={[
-                { label: '— (без категории)', value: null },
-                { label: 'Круг (loop)', value: 'loop' },
-                { label: 'Лестница (stairs)', value: 'stairs' },
-                { label: 'Соединитель (connector)', value: 'connector' },
-                { label: 'Отрезок (segment)', value: 'segment' },
-                { label: 'Ориентир (landmark)', value: 'landmark' },
-              ]}
-              onChange={(e) => setEditRefCategory(e.value)}
-              className="w-full"
-              panelClassName="pb-dropdown-panel"
+            <input
+              type="text"
+              list="pb-ref-category-list"
+              value={editRefCategory ?? ''}
+              onChange={(e) =>
+                setEditRefCategory(e.target.value.trim() || null)
+              }
+              className="p-inputtext w-full"
+              placeholder="loop / stairs / connector / segment / landmark / своя…"
               disabled={editRefStatus === 'saving' || editRefStatus === 'saved'}
             />
+            <datalist id="pb-ref-category-list">
+              {(() => {
+                const base = ['loop', 'stairs', 'connector', 'segment', 'landmark'];
+                const existing = new Set(
+                  referenceTracks
+                    .map((r) => r.category)
+                    .filter((c): c is string => c != null && c !== ''),
+                );
+                const all = Array.from(
+                  new Set([...base, ...Array.from(existing)]),
+                );
+                return all.map((c) => <option key={c} value={c} />);
+              })()}
+            </datalist>
+            <small className="pb-hint" style={{ fontSize: '0.72rem' }}>
+              Введите базовую (loop, stairs, …) или свою категорию — она
+              запомнится в подсказках.
+            </small>
           </div>
 
           <div>
