@@ -303,6 +303,87 @@ function fmtSecAsDuration(sec: number): string {
   return `${s}с`;
 }
 
+// ==================== Отклонение от эталона (C.5-A4a) ====================
+
+interface DeviationResult {
+  /** Медиана расстояния от каждой точки трека до ближайшей точки эталона. */
+  medianM: number;
+  /** 95-й перцентиль — выбросы (срезы, отходы от маршрута). */
+  p95M: number;
+  /** % точек эталона, покрытых треком (в радиусе 20 м). */
+  coveragePct: number;
+  /** Чистая пробежка: медиана < 15 м и coverage ≥ 90%. */
+  isClean: boolean;
+}
+
+/**
+ * Сравнивает трек с эталоном:
+ *  - track→ref: для каждой точки трека ищем ближайшую точку эталона,
+ *    медиана — насколько трек «приблизительно на маршруте».
+ *  - ref→track: для каждой точки эталона проверяем, что трек прошёл
+ *    рядом (20 м), — насколько маршрут покрыт.
+ *
+ * Трек сэмплируется до 200 точек, эталон остаётся как есть (обычно
+ * 10–100 вершин, этого достаточно).
+ */
+function computeDeviation(
+  trackLatlng: (number | null)[][],
+  refCoords: [number, number][],
+): DeviationResult | null {
+  const track = trackLatlng.filter(
+    (p): p is [number, number] =>
+      p != null && p[0] != null && p[1] != null,
+  );
+  if (track.length < 10) return null;
+  if (refCoords.length < 2) return null;
+
+  // Сэмплируем трек (медиана устойчива к сэмплированию)
+  const targetSamples = 200;
+  const step = Math.max(1, Math.floor(track.length / targetSamples));
+  const sampled: [number, number][] = [];
+  for (let i = 0; i < track.length; i += step) {
+    sampled.push(track[i]);
+  }
+
+  // 1. track → ref: медиана и p95
+  const devs: number[] = [];
+  for (const tp of sampled) {
+    let best = Infinity;
+    for (const rp of refCoords) {
+      const d = haversineM(tp[0], tp[1], rp[0], rp[1]);
+      if (d < best) {
+        best = d;
+        if (best < 1) break; // почти на точке — не ищем дальше
+      }
+    }
+    devs.push(best);
+  }
+  devs.sort((a, b) => a - b);
+  const median = devs[Math.floor(devs.length / 2)];
+  const p95 =
+    devs[Math.min(devs.length - 1, Math.floor(devs.length * 0.95))];
+
+  // 2. ref → track: coverage (20 м радиус)
+  const COVERAGE_RADIUS_M = 20;
+  let covered = 0;
+  for (const rp of refCoords) {
+    for (const tp of sampled) {
+      if (haversineM(rp[0], rp[1], tp[0], tp[1]) <= COVERAGE_RADIUS_M) {
+        covered++;
+        break;
+      }
+    }
+  }
+  const coveragePct = Math.round((covered / refCoords.length) * 100);
+
+  return {
+    medianM: Math.round(median),
+    p95M: Math.round(p95),
+    coveragePct,
+    isClean: median < 15 && coveragePct >= 90,
+  };
+}
+
 // ==================== Компонент ====================
 
 export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId }) => {
@@ -402,6 +483,18 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
   >([]);
   const [refTracksLoading, setRefTracksLoading] = useState(false);
   const [selectedRefTrackId, setSelectedRefTrackId] = useState<number | null>(null);
+  // Отклонения для всех эталонов на текущем треке (кэшируется между ре-рендерами)
+  const refDeviations = useMemo(() => {
+    const result: Record<number, DeviationResult> = {};
+    if (!streamsPayload?.latlng || referenceTracks.length === 0) {
+      return result;
+    }
+    for (const ref of referenceTracks) {
+      const dev = computeDeviation(streamsPayload.latlng, ref.coords);
+      if (dev) result[ref.id] = dev;
+    }
+    return result;
+  }, [streamsPayload, referenceTracks]);
   // Рисование эталонного маршрута (C.5, фаза A2)
   const [drawMode, setDrawMode] = useState(false);
   const [draftPoints, setDraftPoints] = useState<[number, number][]>([]);
@@ -2401,6 +2494,52 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                             <span>{refKindLabel(ref.kind)}</span>
                             <span>{fmtRefDate(ref.createdAt)}</span>
                           </div>
+                          {refDeviations[ref.id] && (() => {
+                            const dev = refDeviations[ref.id];
+                            return (
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.35rem',
+                                  fontSize: '0.7rem',
+                                  marginTop: '0.2rem',
+                                  color: dev.isClean
+                                    ? 'var(--tg-success)'
+                                    : 'var(--tg-hint)',
+                                }}
+                                title={
+                                  `Медиана отклонения: ${dev.medianM} м\n` +
+                                  `95-й перцентиль: ${dev.p95M} м (выбросы)\n` +
+                                  `Покрытие эталона: ${dev.coveragePct}%\n` +
+                                  (dev.isClean
+                                    ? '✓ Чистый — пробежка по эталону'
+                                    : '⚠ Есть отклонения — возможно, срезал или ушёл с маршрута')
+                                }
+                              >
+                                <i
+                                  className={`pi ${
+                                    dev.isClean
+                                      ? 'pi-check-circle'
+                                      : 'pi-exclamation-triangle'
+                                  }`}
+                                  style={{ fontSize: '0.72rem' }}
+                                />
+                                <span>{dev.medianM} м</span>
+                                <span style={{ opacity: 0.5 }}>·</span>
+                                <span>{dev.coveragePct}%</span>
+                                <span
+                                  style={{
+                                    marginLeft: 'auto',
+                                    fontFamily: 'monospace',
+                                    opacity: 0.7,
+                                  }}
+                                >
+                                  p95 {dev.p95M} м
+                                </span>
+                              </div>
+                            );
+                          })()}
                         </div>
                         <Button
                           icon="pi pi-trash"
