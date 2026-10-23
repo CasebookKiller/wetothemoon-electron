@@ -319,6 +319,18 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
   const [activeTab, setActiveTab] = useState<TabType>('runs');
   const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [leftPanelWidth, setLeftPanelWidth] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('pb.mapEditor.leftPanelWidth');
+      if (saved) {
+        const n = Number(saved);
+        if (n >= 280 && n <= 800) return n;
+      }
+    } catch {
+      /* ignore */
+    }
+    return 380;
+  });
 
   // Слои карты
   const [layers, setLayers] = useState<RasterLayer[]>(() => getSavedLayers());
@@ -334,6 +346,12 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
 
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
+  const editorContainerRef = useRef<HTMLDivElement | null>(null);
+  const isResizingRef = useRef(false);
+  const leftPanelWidthRef = useRef(leftPanelWidth);
+  useEffect(() => {
+    leftPanelWidthRef.current = leftPanelWidth;
+  }, [leftPanelWidth]);
 
   // Разметка / тестовая точка
   const [markupMode, setMarkupMode] = useState(false);
@@ -534,7 +552,45 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     }
   }, [isLeftPanelOpen]);
 
-    // ==================== Режим разметки: клик по карте ====================
+  // ==================== Ресайз левой панели ====================
+
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      if (!isResizingRef.current) return;
+      const container = editorContainerRef.current;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      const w = e.clientX - rect.left;
+      const clamped = Math.max(280, Math.min(800, w));
+      setLeftPanelWidth(clamped);
+      if (mapRef.current) mapRef.current.resize();
+    };
+
+    const onMouseUp = () => {
+      if (!isResizingRef.current) return;
+      isResizingRef.current = false;
+      document.body.style.cursor = '';
+      try {
+        localStorage.setItem(
+          'pb.mapEditor.leftPanelWidth',
+          String(leftPanelWidthRef.current),
+        );
+      } catch {
+        /* ignore */
+      }
+      // Финальный ресайз, когда отпустили мышь
+      if (mapRef.current) mapRef.current.resize();
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+  }, []);
+
+  // ==================== Режим разметки: клик по карте ====================
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1591,39 +1647,55 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
       className="pb-debug-dialog pb-map-editor-dialog"
       contentStyle={{ padding: 0, display: 'flex', overflow: 'hidden' }}
     >
-      <div style={{ display: 'flex', width: '100%', height: '100%' }}>
+      <div
+        ref={editorContainerRef}
+        style={{ display: 'flex', width: '100%', height: '100%' }}
+      >
         {!initialRunId && isLeftPanelOpen && (
-          <div style={{ width: '340px', borderRight: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <>
+            <div
+              style={{
+                width: `${leftPanelWidth}px`,
+                flexShrink: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                height: '100%',
+              }}
+            >
 
             <div style={{ padding: '0.75rem', borderBottom: '1px solid var(--surface-border)' }}>
-              <div className="pb-catalog__chips" style={{ marginBottom: 0, flexWrap: 'wrap' }}>
+              <div className="pb-catalog__chips" style={{ marginBottom: 0, flexWrap: 'wrap', gap: '0.25rem' }}>
                 <button
                   type="button"
                   className={`pb-catalog__chip ${activeTab === 'runs' ? 'is-on' : ''}`}
                   onClick={() => setActiveTab('runs')}
+                  style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
                 >
-                  <i className="pi pi-list" style={{ marginRight: '0.35rem' }} /> Треки
+                  Треки
                 </button>
                 <button
                   type="button"
                   className={`pb-catalog__chip ${activeTab === 'filters' ? 'is-on' : ''}`}
                   onClick={() => setActiveTab('filters')}
+                  style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
                 >
-                  <i className="pi pi-sliders-h" style={{ marginRight: '0.35rem' }} /> Стиль
+                  Стиль
                 </button>
                 <button
                   type="button"
                   className={`pb-catalog__chip ${activeTab === 'thresholds' ? 'is-on' : ''}`}
                   onClick={() => setActiveTab('thresholds')}
+                  style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
                 >
-                  <i className="pi pi-chart-line" style={{ marginRight: '0.35rem' }} /> Пороги
+                  Пороги
                 </button>
                 <button
                   type="button"
                   className={`pb-catalog__chip ${activeTab === 'refs' ? 'is-on' : ''}`}
                   onClick={() => setActiveTab('refs')}
+                  style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
                 >
-                  <i className="pi pi-pencil" style={{ marginRight: '0.35rem' }} /> Эталоны
+                  Эталоны
                 </button>
               </div>
             </div>
@@ -2275,10 +2347,10 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                           borderRadius: 6,
                           marginBottom: '0.3rem',
                           background: isSelected
-                            ? 'rgba(106, 178, 242, 0.12)'
+                            ? 'rgba(212, 163, 115, 0.12)'
                             : 'transparent',
                           border: `1px solid ${
-                            isSelected ? '#6ab2f2' : 'var(--surface-border)'
+                            isSelected ? 'var(--pb-accent)' : 'var(--surface-border)'
                           }`,
                           cursor: 'pointer',
                         }}
@@ -2291,7 +2363,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                             isSelected ? 'pi pi-eye' : 'pi pi-eye-slash'
                           }
                           style={{
-                            color: isSelected ? '#6ab2f2' : 'var(--tg-hint)',
+                            color: isSelected ? 'var(--pb-accent)' : 'var(--tg-hint)',
                             fontSize: '0.85rem',
                             flexShrink: 0,
                           }}
@@ -2352,7 +2424,37 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                   })}
               </div>
             )}
-          </div>
+            </div>
+
+            {/* Drag-handle для ресайза левой панели */}
+            <div
+              onMouseDown={(e) => {
+                e.preventDefault();
+                isResizingRef.current = true;
+                document.body.style.cursor = 'col-resize';
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLDivElement).style.background =
+                  'var(--pb-accent)';
+              }}
+              onMouseLeave={(e) => {
+                if (!isResizingRef.current) {
+                  (e.currentTarget as HTMLDivElement).style.background =
+                    'var(--surface-border)';
+                }
+              }}
+              style={{
+                width: '4px',
+                flexShrink: 0,
+                cursor: 'col-resize',
+                background: 'var(--surface-border)',
+                transition: 'background 0.15s ease',
+                position: 'relative',
+                zIndex: 1,
+              }}
+              title="Потяните, чтобы изменить ширину панели"
+            />
+          </>
         )}
 
         {/* Карта */}
