@@ -2968,7 +2968,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
 
             {activeTab === 'runs' && (
               <>
-                {selectedRunIds.size >= 2 && (
+                {selectedRunIds.size >= 1 && (
                   <div
                     style={{
                       padding: '0.5rem 0.75rem',
@@ -2998,8 +2998,16 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                       />
                     </div>
                     <Button
-                      label="Построить медианный трек"
-                      icon="pi pi-chart-line"
+                      label={
+                        selectedRunIds.size === 1
+                          ? 'Сохранить как эталон'
+                          : 'Построить медианный трек'
+                      }
+                      icon={
+                        selectedRunIds.size === 1
+                          ? 'pi pi-save'
+                          : 'pi pi-chart-line'
+                      }
                       className="pb p-button-sm w-full"
                       onClick={() => setMedianDialogVisible(true)}
                     />

@@ -69,8 +69,8 @@ export const MedianTrackDialog: React.FC<Props> = ({
   // Загрузка streams + первичное построение
   useEffect(() => {
     if (!visible) return;
-    if (selectedRuns.length < 2) {
-      setBuildError('Выберите минимум 2 пробежки');
+    if (selectedRuns.length < 1) {
+      setBuildError('Выберите хотя бы одну пробежку');
       return;
     }
     let cancelled = false;
@@ -98,13 +98,35 @@ export const MedianTrackDialog: React.FC<Props> = ({
         }
 
         if (cancelled) return;
-        if (loaded.length < 2) {
-          setBuildError('Не удалось загрузить минимум 2 трека с GPS');
+        if (loaded.length < 1) {
+          setBuildError('Не удалось загрузить трек с GPS');
           setLoading(false);
           return;
         }
 
-        const result = computeMedianTrack(loaded, 400, 0.6);
+        let result: {
+          coords: [number, number][];
+          isLoop: boolean;
+          usedCount: number;
+          discardedCount: number;
+        };
+
+        if (loaded.length === 1) {
+          // Одиночный трек — сохраняем как есть, без медианы и ресемпла.
+          // Определяем loop по замыканию старт/финиш.
+          const single = loaded[0].latlng;
+          const first = single[0];
+          const last = single[single.length - 1];
+          const distClose = geometricLength([first, last]);
+          result = {
+            coords: single,
+            isLoop: distClose < 50,
+            usedCount: 1,
+            discardedCount: 0,
+          };
+        } else {
+          result = computeMedianTrack(loaded, 400, 0.6);
+        }
         if (cancelled) return;
 
         setPreviewCoords(result.coords);
@@ -117,9 +139,17 @@ export const MedianTrackDialog: React.FC<Props> = ({
         // Автодефолт имени
         const now = new Date();
         const pad = (n: number) => String(n).padStart(2, '0');
-        setName(
-          `Медиана ${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`,
-        );
+        if (selectedRuns.length === 1) {
+          const singleName =
+            selectedRuns[0].name?.trim() || 'Трек';
+          setName(
+            `${singleName} ${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`,
+          );
+        } else {
+          setName(
+            `Медиана ${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`,
+          );
+        }
         setCategory(result.isLoop ? 'loop' : 'segment');
       } catch (e) {
         if (!cancelled) setBuildError((e as Error).message);
@@ -147,13 +177,16 @@ export const MedianTrackDialog: React.FC<Props> = ({
     setSaving(true);
     setSaveError('');
     try {
+      const isSingle = selectedRuns.length === 1;
       const res = await api.pb.referenceTrackCreate({
         name: name.trim(),
         coords: simplifiedCoords,
         kind: isLoop ? 'loop' : 'linear',
         category,
-        tags: ['median'],
-        notes: `Медиана из ${usedCount} треков`,
+        tags: isSingle ? ['single'] : ['median'],
+        notes: isSingle
+          ? 'Из одной пробежки'
+          : `Медиана из ${usedCount} треков`,
       });
       if (res?.success) {
         setSaveStatus('saved');
@@ -185,7 +218,11 @@ export const MedianTrackDialog: React.FC<Props> = ({
         if (saving || saveStatus === 'saved') return;
         onHide();
       }}
-      header="Построить медианный трек"
+      header={
+        selectedRuns.length === 1
+          ? 'Сохранить трек как эталон'
+          : 'Построить медианный трек'
+      }
       style={{ width: '520px', maxWidth: '96vw' }}
       modal
       className="pb-templates-dialog pb-settings-dialog"
@@ -285,7 +322,9 @@ export const MedianTrackDialog: React.FC<Props> = ({
           </div>
 
           <small className="pb-hint" style={{ fontSize: '0.72rem' }}>
-            Чем меньше эпсилон — тем больше точек сохранится. 5 м — оптимально для большинства маршрутов.
+            {selectedRuns.length === 1
+              ? 'Чем меньше эпсилон — тем точнее геометрия. 5 м — оптимально для большинства маршрутов.'
+              : 'Чем меньше эпсилон — тем больше точек сохранится. 5 м — оптимально для большинства маршрутов.'}
           </small>
 
           {saveStatus === 'saved' && (
