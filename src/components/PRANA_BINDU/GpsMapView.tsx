@@ -11,6 +11,7 @@ import {
   NavigationControl,
 } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { getSavedLayers, getOsmStyleObject } from './mapStyles';
 
 interface Props {
   latlng: ([number, number] | null)[];
@@ -24,24 +25,22 @@ interface Props {
 const STYLE_DARK = {
   version: 8 as const,
   sources: {
-    carto: {
+    esri: {
       type: 'raster' as const,
       tiles: [
-        'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
-        'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
-        'https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
+        'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
       ],
       tileSize: 256,
-      attribution: '© OpenStreetMap contributors, © CARTO',
+      attribution: '© Esri, HERE, Garmin, © OpenStreetMap contributors',
     },
   },
   layers: [
     {
-      id: 'carto-tiles',
+      id: 'esri-tiles',
       type: 'raster' as const,
-      source: 'carto',
+      source: 'esri',
       minzoom: 0,
-      maxzoom: 20,
+      maxzoom: 16,
     },
   ],
 };
@@ -60,9 +59,20 @@ export const GpsMapView: React.FC<Props> = ({
     if (!containerRef.current) return;
     if (mapRef.current) return;
 
+    // Читаем настройки слоёв, сохранённые в редакторе.
+    // Если там пусто — используем дефолтный стиль Eclipse.
+    const savedLayers = getSavedLayers();
+    const hasCustomLayers = savedLayers && savedLayers.length > 0;
+    
+    // Если хочешь, чтобы по умолчанию (без настроек редактора) был Eclipse,
+    // а с настройками — твой кастомный OSM, делаем так:
+    const initialStyle = hasCustomLayers 
+      ? getOsmStyleObject(savedLayers) 
+      : 'https://tiles.versatiles.org/styles/eclipse/style.json';
+
     const map = new MapLibreMap({
       container: containerRef.current,
-      style: 'https://tiles.openfreemap.org/styles/dark',
+      style: initialStyle, // <-- теперь используется динамический стиль
       center: [37.618423, 55.751244],
       zoom: 12,
       attributionControl: { compact: true },

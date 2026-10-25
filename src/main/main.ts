@@ -9,7 +9,7 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 import 'dotenv/config';
-import { app, BrowserWindow, dialog, ipcMain, Menu, MenuItemConstructorOptions, session } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, MenuItemConstructorOptions, session, protocol } from 'electron';
 import { createMainWindow } from './windows/mainWindow.ts';
 //import { setupMenu } from './menus/menuBuilder.ts.old';
 import { registerAIHandlers } from './ipcHandlers/aiHandlers.ts';
@@ -88,6 +88,7 @@ import { createGatewayWindow, getGatewayWindow } from './windows/gatewayWindow.t
 
 import { createDatabaseWindow, getDatabaseWindow } from './windows/databaseWindow';
 import { createPranaBinduWindow, getPranaBinduWindow } from './windows/pranaBinduWindow.ts';
+import { registerTileCacheProtocol } from '@/components/PRANA_BINDU/tileCache.ts';
 
 try {
   require('node:sqlite');
@@ -113,6 +114,20 @@ let ws: WebSocket | null = null;
 const getToken = () => {
   return process.env.VITE_TReadOnly || '';
 }
+
+// Регистрируем схему pb-tile как привилегированную (до app.whenReady)
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'pb-tile',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true, // <-- Разрешаем CORS для fetch из рендерера
+      bypassCSP: true,
+    },
+  },
+]);
 
 // Этот метод будет вызван после того, как Electron завершит 
 // инициализацию и будет готов к созданию окон браузера. 

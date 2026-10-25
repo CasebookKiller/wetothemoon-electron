@@ -635,34 +635,33 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
     const hr = fact.avg_hr ?? '—';
     const maxHr = fact.max_hr ?? '—';
 
-    const noBgLayout =
-      layout === 'receipt' || layout === 'minimal';
+        if (bgSource === 'photo' && photoImage) {
+      let scale = Math.max(CANVAS_WIDTH / photoImage.width, CANVAS_HEIGHT / photoImage.height);
+      scale *= photoScale;
+      const w = photoImage.width * scale;
+      const h = photoImage.height * scale;
+      const x = (CANVAS_WIDTH - w) / 2 + photoOffset.x;
+      const y = (CANVAS_HEIGHT - h) / 2 + photoOffset.y;
+      ctx.drawImage(photoImage, x, y, w, h);
+    }
 
-    if (noBgLayout) {
-      ctx.fillStyle = '#111111';
+    // Градиент (затемнение снизу) для карты или фото
+    const gradientFade = ctx.createLinearGradient(0, CANVAS_HEIGHT * 0.4, 0, CANVAS_HEIGHT);
+    gradientFade.addColorStop(0, 'rgba(0,0,0,0)');
+    gradientFade.addColorStop(1, 'rgba(0,0,0,0.85)');
+    ctx.fillStyle = gradientFade;
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+    // Затемнение для конкретных макетов, чтобы текст читался поверх фона
+    if (layout === 'splits') {
+      ctx.fillStyle = 'rgba(17, 17, 17, 0.45)';
       ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-    } else {
-      if (bgSource === 'photo' && photoImage) {
-        let scale = Math.max(CANVAS_WIDTH / photoImage.width, CANVAS_HEIGHT / photoImage.height);
-        scale *= photoScale;
-        const w = photoImage.width * scale;
-        const h = photoImage.height * scale;
-        const x = (CANVAS_WIDTH - w) / 2 + photoOffset.x;
-        const y = (CANVAS_HEIGHT - h) / 2 + photoOffset.y;
-        ctx.drawImage(photoImage, x, y, w, h);
-      }
-
-      const gradientFade = ctx.createLinearGradient(0, CANVAS_HEIGHT * 0.4, 0, CANVAS_HEIGHT);
-      gradientFade.addColorStop(0, 'rgba(0,0,0,0)');
-      gradientFade.addColorStop(1, 'rgba(0,0,0,0.85)');
-      ctx.fillStyle = gradientFade;
+    } else if (layout === 'receipt') {
+      ctx.fillStyle = 'rgba(17, 17, 17, 0.75)';
       ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-
-      // Для сплитов добавляем легкое затемнение, чтобы карта/фото были видны
-      if (layout === 'splits') {
-        ctx.fillStyle = 'rgba(17, 17, 17, 0.45)';
-        ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-      }
+    } else if (layout === 'minimal') {
+      ctx.fillStyle = 'rgba(17, 17, 17, 0.65)';
+      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     }
 
     ctx.fillStyle = '#ffffff';
@@ -693,13 +692,11 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
       ctx.fillText(fact.date, 80, 480);
       ctx.fillStyle = '#ffffff';
       const drawPill = (text: string, x: number, y: number) => {
-        // Уменьшили шрифт (45px) и высоту плашки (80px), 
-        // чтобы тексты гарантированно помещались и не наезжали.
         ctx.font = 'bold 45px Inter, sans-serif';
         const w = ctx.measureText(text).width + 80;
         ctx.beginPath();
         ctx.roundRect(x, y, w, 80, 40);
-        ctx.strokeStyle = '#ffffff';
+        ctx.strokeStyle = '#d4a373'; // полноцветный песочный бордер
         ctx.lineWidth = 4;
         ctx.stroke();
         ctx.fillText(text, x + 40, y + 55);
@@ -739,14 +736,17 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
         ctx.fillStyle = '#ffffff';
         ctx.fillText(String(s.km), 100, y + 45);
         
-        // Полоска (акцентный цвет Prana-Bindu)
+                // Полоска (полупрозрачная заливка + полноцветный бордер Prana-Bindu)
         const ratio =
           maxPace === minPace ? 1 : (maxPace - s.paceSec) / (maxPace - minPace);
         const barWidth = 100 + ratio * maxBarWidth;
-        ctx.fillStyle = '#d4a373';
+        ctx.fillStyle = 'rgba(212, 163, 115, 0.25)'; // #d4a373, 35% заливки
+        ctx.strokeStyle = '#d4a373';                  // полноцветный бордер
+        ctx.lineWidth = 3;
         ctx.beginPath();
         ctx.roundRect(160, y + 5, barWidth, 50, 25);
         ctx.fill();
+        ctx.stroke();
         
         // Время темпа
         ctx.fillStyle = '#ffffff';
@@ -854,16 +854,13 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
     const map = mapRef.current;
     if (!map) return;
 
-    // Убрали 'splits' из списка макетов без фона
-    const noBgLayout = layout === 'receipt' || layout === 'minimal';
-
     const outCanvas = document.createElement('canvas');
     outCanvas.width = CANVAS_WIDTH;
     outCanvas.height = CANVAS_HEIGHT;
     const outCtx = outCanvas.getContext('2d');
     if (!outCtx) return;
 
-    if (bgSource === 'map' && !noBgLayout) {
+    if (bgSource === 'map') {
       const mapCanvas = map.getCanvas();
       map.triggerRepaint();
       outCtx.drawImage(mapCanvas, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
