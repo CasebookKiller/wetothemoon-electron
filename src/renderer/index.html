@@ -11,30 +11,44 @@
                   https://*.supabase.co
                   http://localhost:11434
                   wss://invest-public-api.tbank.ru
+                  https://stamen-tiles.a.ssl.fastly.net
                   https://*.basemaps.cartocdn.com
                   https://*.tile.openstreetmap.org
-                  https://tiles.openfreemap.org 
+                  pb-tile:
+                  https://tiles.openfreemap.org
                   https://assets.openfreemap.org
                   https://*.openfreemap.org
+                  https://styles.waymorphic.com
+                  https://tiles.versatiles.org
                   https://esm.sh;
                script-src 'self' 'unsafe-inline' blob: 'unsafe-eval';
                worker-src 'self' blob: data:;
+               child-src 'self' blob: data:;
                style-src 'self' 'unsafe-inline';
                img-src 'self'
                   https://invest-brands.cdn-tinkoff.ru
                   data: https://static.deepseek.com
+                  https://stamen-tiles.a.ssl.fastly.net
                   https://*.basemaps.cartocdn.com
                   https://*.tile.openstreetmap.org
+                  pb-tile:
                   https://tiles.openfreemap.org
                   https://assets.openfreemap.org
                   https://*.openfreemap.org
+                  https://styles.waymorphic.com
+                  https://tiles.versatiles.org
                   ;
-               font-src 'self' data: https://fe-static.deepseek.com data: https://*.openfreemap.org;
+               font-src 'self' data: 
+                  https://fe-static.deepseek.com
+                  https://stamen-tiles.a.ssl.fastly.net
+                  https://*.openfreemap.org
+                  https://tiles.openfreemap.org
+                  https://styles.waymorphic.com;
       "
     >
     <script type="module" src="./renderer.ts"></script>
   </head>
   <body>
-    <div id="root"></div> <!-- Контейнер для React -->
+    <div id="root"></div>
   </body>
 </html>

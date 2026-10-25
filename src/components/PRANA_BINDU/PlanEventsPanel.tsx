@@ -42,6 +42,8 @@ interface Props {
   onOpenTemplates: () => void;
   onOpenEquivalences: () => void;
   onMassDelete: () => void;
+  /** Перечитать список плана после локального создания. */
+  onReload: () => void;
 }
 
 function fmtDistance(m?: number): string {
@@ -94,6 +96,7 @@ export const PlanEventsPanel: React.FC<Props> = ({
   onOpenEvent,
   onOpenTemplates,
   onOpenEquivalences,
+  onReload,
 }) => {
   const api = (window as any).electronAPI;
 
@@ -182,14 +185,6 @@ export const PlanEventsPanel: React.FC<Props> = ({
           onClick={onMassDelete}
           tooltip="Массовое удаление сгенерированных и ручных событий"
           tooltipOptions={{ position: 'bottom' }}
-        />
-        <Button
-          label="Упражнения"
-          icon="pi pi-book"
-          className="pb-soft p-button-sm"
-          onClick={onOpenTemplates}
-          disabled={syncing || clearing}
-          tooltip="Готовые шаблоны тренировок для конструктора ICU"
         />
         <Button
           label="Добавить"
@@ -304,7 +299,7 @@ export const PlanEventsPanel: React.FC<Props> = ({
         />
         <Column
           header="Факт"
-          style={{ width: '80px', textAlign: 'center' }}
+          style={{ width: '70px', textAlign: 'center' }}
           body={(r: PlanEventLite) =>
             r.pairedActivityId ? (
               <i
@@ -317,14 +312,51 @@ export const PlanEventsPanel: React.FC<Props> = ({
             )
           }
         />
+        <Column
+          header="ICU"
+          style={{ width: '70px', textAlign: 'center' }}
+          body={(r: PlanEventLite) => {
+            const isIcu = r.externalId?.startsWith('intervals-icu-event:');
+            const isLocal = r.externalId?.startsWith('local:');
+            if (isIcu) {
+              const icuId = r.externalId!.replace('intervals-icu-event:', '');
+              return (
+                <i
+                  className="pi pi-cloud"
+                  style={{ color: '#6fbf73' }}
+                  title={`Отправлено в ICU (id=${icuId})`}
+                />
+              );
+            }
+            if (isLocal) {
+              return (
+                <i
+                  className="pi pi-cloud-upload"
+                  style={{ color: '#d4a373', cursor: 'pointer' }}
+                  title="Локальное — не отправлено в ICU. Кликните для отправки."
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    const api = (window as any).electronAPI;
+                    const res = await api.pb.pushPlanEvent(r.id);
+                    if (res?.success) {
+                      onReload();
+                    } else {
+                      alert(`ICU: ${res?.error ?? 'ошибка'}`);
+                    }
+                  }}
+                />
+              );
+            }
+            return <i className="pi pi-minus" style={{ opacity: 0.25 }} />;
+          }}
+        />
       </DataTable>
 
       <AddPlanEventDialog
         visible={addVisible}
         onHide={() => setAddVisible(false)}
         onCreated={() => {
-          setAddVisible(false);
-          onSync(); // перезагрузить список
+          onReload();
         }}
       />
     </div>

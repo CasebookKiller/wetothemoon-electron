@@ -95,3 +95,33 @@ span.pb-destructive {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* --- disabled для .pb (primary outline) --- */
+.pb.p-button:disabled,
+.pb.p-button.p-disabled {
+  color: rgba(var(--module-accent-rgb), 0.5) !important;
+  background: var(--tg-theme-bg-color, #17212b) !important;
+  border: 1px solid rgba(var(--module-accent-rgb), 0.35) !important;
+  cursor: not-allowed;
+  opacity: 1 !important;
+}
+
+.pb.p-button:disabled .p-button-icon,
+.pb.p-button.p-disabled .p-button-icon {
+  color: rgba(var(--module-accent-rgb), 0.5) !important;
+}
+
+/* --- disabled для .pb-soft (secondary outline) --- */
+.pb-soft.p-button:disabled,
+.pb-soft.p-button.p-disabled {
+  color: rgba(var(--module-accent-rgb), 0.4) !important;
+  background: var(--tg-theme-bg-color, #17212b) !important;
+  border: 1px solid rgba(var(--module-accent-rgb), 0.25) !important;
+  cursor: not-allowed;
+  opacity: 1 !important;
+}
+
+.pb-soft.p-button:disabled .p-button-icon,
+.pb-soft.p-button.p-disabled .p-button-icon {
+  color: rgba(var(--module-accent-rgb), 0.4) !important;
+}

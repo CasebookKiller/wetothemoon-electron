@@ -12,12 +12,20 @@
   /* Цвета по умолчанию (для COMMON-компонентов) */
   --module-accent: #6ab2f2; /* Синий, как в OSINT */
   --module-accent-rgb: 106, 178, 242;
+
+  /* Универсальная высота инпутов / дропдаунов / календарей.
+     Меняется в одном месте — все модули подхватят. */
+  --control-height: 2.5rem;
 }
 
 /* Тема для конкретного модуля (Prana-Bindu) */
 [data-module="prana-bindu"], .pb-page-root {
   --module-accent: #d4a373;
   --module-accent-rgb: 212, 163, 115;
+
+  /* Убираем синий, который приходит от PrimeReact/Telegram в .p-panel-content */
+  --tg-theme-text-color: var(--tg-text, #f5f5f5);
+  --tg-theme-accent-text-color: var(--tg-text, #f5f5f5);
 }
 
 /* Тема для OSINT */

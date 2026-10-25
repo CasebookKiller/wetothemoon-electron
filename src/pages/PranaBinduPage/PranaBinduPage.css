@@ -5,6 +5,7 @@
 @import '@/styles/common/inputs.css';
 @import '@/styles/common/dialogs.css';
 @import '@/styles/common/tables.css';
+@import '@/styles/common/scrollbars.css';
 @import './styles/pb-layout.css';
 @import './styles/pb-components.css';
 
@@ -255,12 +256,20 @@ body[data-module='prana-bindu'],
 .pb-cal.pb-cal--full {
   width: 100% !important;
   max-width: none !important;
+  height: var(--control-height, 2.5rem) !important;
   display: flex !important;
-  border: 1px solid var(--surface-border, rgba(255, 255, 255, 0.08)) !important;
+  border: none !important;
+  /* рамка снаружи — не «съедает» высоту */
+  box-shadow: 0 0 0 1px var(--surface-border, rgba(255, 255, 255, 0.08)) !important;
   border-radius: 6px !important;
   overflow: hidden;
   background: var(--tg-theme-bg-color, #17212b) !important;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: box-shadow 0.15s ease !important;
+  box-sizing: border-box !important;
+}
+
+.pb-cal.pb-cal--full:focus-within {
+  box-shadow: 0 0 0 1px var(--pb-accent) !important;
 }
 
 .pb-cal.pb-cal--full:focus-within {
@@ -274,6 +283,8 @@ body[data-module='prana-bindu'],
   box-shadow: none !important;
   background: transparent !important;
   padding-left: 0.85rem;
+  height: var(--control-height, 2.5rem) !important;
+  box-sizing: border-box !important;
 }
 
 .pb-cal.pb-cal--full .p-inputtext:enabled:focus {
@@ -287,12 +298,13 @@ body[data-module='prana-bindu'],
   width: 2.5rem !important;
   min-width: 2.5rem !important;
   max-width: 2.5rem !important;
-  height: 2.5rem !important;
+  height: var(--control-height, 2.5rem) !important;
   border: none !important;
   border-left: 1px solid var(--surface-border, rgba(255, 255, 255, 0.08)) !important;
   border-radius: 0 !important;
   background: transparent !important;
   color: var(--pb-accent) !important;
+  box-sizing: border-box !important;
 }
 
 .pb-cal.pb-cal--full .p-datepicker-trigger:hover {

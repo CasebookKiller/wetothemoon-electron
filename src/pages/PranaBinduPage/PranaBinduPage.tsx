@@ -815,6 +815,10 @@ export const PranaBinduPage: React.FC = () => {
                       setTemplatesInitialMode('equivalences');
                       setTemplatesVisible(true);
                     }}
+                    onReload={() => {
+                      void loadPlanEvents();
+                      setRefreshKey((k) => k + 1);
+                    }}
                   />
                 ),
               },

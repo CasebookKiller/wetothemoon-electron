@@ -607,19 +607,6 @@
   scrollbar-color: color-mix(in srgb, var(--pb-accent) 45%, transparent) transparent;
 }
 
-.pb-drawer .p-tabview .p-tabview-nav::-webkit-scrollbar {
-  height: 4px;
-}
-
-.pb-drawer .p-tabview .p-tabview-nav::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--pb-accent) 45%, transparent);
-  border-radius: 2px;
-}
-
-.pb-drawer .p-tabview .p-tabview-nav::-webkit-scrollbar-track {
-  background: transparent;
-}
-
 .pb-drawer .p-tabview .p-tabview-nav li {
   margin-right: 0.25rem;
   flex-shrink: 0 !important;
@@ -764,14 +751,6 @@
   scrollbar-color: var(--pb-accent) transparent;
 }
 
-.pb-page .p-datatable .p-virtualscroller::-webkit-scrollbar {
-  width: 8px;
-}
-
-.pb-page .p-datatable .p-virtualscroller::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--pb-accent) 50%, transparent);
-  border-radius: 4px;
-}
 /* ============================================================
    Drag&drop зона FIT-архива
    ============================================================ */
@@ -841,11 +820,6 @@
   scrollbar-color: var(--pb-accent) transparent;
 }
 
-.pb-page .p-dropdown-panel .p-dropdown-items-wrapper::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--pb-accent) 45%, transparent);
-  border-radius: 4px;
-}
-
 /* ============================================================
    Dropdown: панель с опциями — в accent Prana-Bindu
    Панель рендерится через portal в body, поэтому стилизуем
@@ -870,11 +844,6 @@
 .pb-dropdown-panel .p-dropdown-items-wrapper {
   scrollbar-width: thin;
   scrollbar-color: var(--pb-accent) transparent;
-}
-
-.pb-dropdown-panel .p-dropdown-items-wrapper::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--pb-accent) 45%, transparent);
-  border-radius: 4px;
 }
 
 /* ============================================================
@@ -1736,19 +1705,6 @@ body[data-module='prana-bindu'] .p-tooltip.p-tooltip-bottom .p-tooltip-arrow {
   scrollbar-color: var(--pb-accent) transparent;
 }
 
-.pb-templates__list::-webkit-scrollbar {
-  width: 8px;
-}
-
-.pb-templates__list::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--pb-accent) 50%, transparent);
-  border-radius: 4px;
-}
-
-.pb-templates__list::-webkit-scrollbar-track {
-  background: transparent;
-}
-
 .pb-templates__preview {
   display: flex;
   flex-direction: column;
@@ -2257,12 +2213,6 @@ body[data-module='prana-bindu'] .p-tooltip.p-tooltip-bottom .p-tooltip-arrow {
   scrollbar-color: var(--pb-accent) transparent;
 }
 
-.pb-catalog::-webkit-scrollbar { width: 8px; }
-.pb-catalog::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--pb-accent) 50%, transparent);
-  border-radius: 4px;
-}
-
 .pb-catalog__chips {
   display: flex;
   gap: 0.35rem;
@@ -2559,7 +2509,6 @@ body[data-module='prana-bindu'] .p-tooltip.p-tooltip-bottom .p-tooltip-arrow {
   height: 3px;
   border-radius: 2px;
 }
-
 
 /* ============================================================
    Календари: override цвета «факта» на песочный accent модуля.
@@ -4418,15 +4367,6 @@ body[data-module='prana-bindu'] .p-tooltip.p-tooltip-bottom .p-tooltip-arrow {
   scrollbar-color: var(--pb-accent) transparent;
 }
 
-.pb-equiv__list::-webkit-scrollbar {
-  width: 8px;
-}
-
-.pb-equiv__list::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--pb-accent) 50%, transparent);
-  border-radius: 4px;
-}
-
 .pb-equiv__item {
   display: flex;
   align-items: center;
@@ -4527,15 +4467,6 @@ body[data-module='prana-bindu'] .p-tooltip.p-tooltip-bottom .p-tooltip-arrow {
   gap: 0.6rem;
   scrollbar-width: thin;
   scrollbar-color: var(--pb-accent) transparent;
-}
-
-.pb-equiv__detail::-webkit-scrollbar {
-  width: 8px;
-}
-
-.pb-equiv__detail::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--pb-accent) 50%, transparent);
-  border-radius: 4px;
 }
 
 .pb-equiv__title {
@@ -4674,14 +4605,6 @@ body[data-module='prana-bindu'] .p-tooltip.p-tooltip-bottom .p-tooltip-arrow {
   padding-right: 0.25rem;
   scrollbar-width: thin;
   scrollbar-color: var(--pb-accent) transparent;
-}
-
-.pb-catalog-picker__content::-webkit-scrollbar {
-  width: 8px;
-}
-.pb-catalog-picker__content::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--pb-accent) 50%, transparent);
-  border-radius: 4px;
 }
 
 .pb-catalog-picker__list {
@@ -4900,15 +4823,6 @@ body[data-module='prana-bindu'] .p-tooltip.p-tooltip-bottom .p-tooltip-arrow {
   border: none !important;
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--pb-accent) 45%, transparent) transparent;
-}
-
-.pb-settings-tabs .p-tabview-panels::-webkit-scrollbar {
-  width: 8px;
-}
-
-.pb-settings-tabs .p-tabview-panels::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--pb-accent) 45%, transparent);
-  border-radius: 4px;
 }
 
 .pb-settings-tab-content {

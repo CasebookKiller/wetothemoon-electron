@@ -3,3 +3,132 @@
    TODO: extract FullWeek, grids, toolbars, main layout here.
    Пока всё остаётся в PranaBinduPage.css.
    ============================================================ */
+
+   /* ============================================================
+   Prana-Bindu Layout & FullWeek
+   ============================================================ */
+
+/* --- Базовая сетка страницы --- */
+.pb-page__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+  width: 100%;
+}
+
+.pb-page__content > .grid {
+  align-self: stretch; 
+  width: 100%;
+}
+
+/* Сетка панелей */
+.pb-main-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  align-items: start;
+  width: 100%;
+  max-width: 800px; 
+  margin: 0 auto;
+}
+
+.pb-main-grid__col {
+  min-width: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.pb-main-grid__col > .p-panel,
+.pb-main-grid__col > .pb-panel,
+.pb-main-grid__col > div {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.pb-main-grid__col > .pb-panel {
+  max-width: 100% !important;
+}
+
+@media (min-width: 1200px) {
+  .pb-main-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-width: 1400px;
+  }
+}
+
+/* --- FullWeek --- */
+.pb-page-root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--tg-theme-bg-color, #17212b);
+}
+
+.pb-full-week {
+  position: relative;
+  z-index: 40;
+  background: var(--tg-theme-bg-color, #17212b);
+  border-bottom: 1px solid var(--surface-border, rgba(255, 255, 255, 0.08));
+  padding: 0.6rem 1rem 0.75rem 1rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.pb-full-week.is-pinned { position: sticky; top: 0; }
+.pb-full-week.is-unpinned { position: static; }
+.pb-full-week.is-collapsed { padding-bottom: 0.6rem; }
+
+.pb-full-week__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+  flex-wrap: nowrap; 
+}
+
+.pb-full-week__toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.pb-full-week__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--module-accent);
+  font-weight: 700;
+  font-size: 1.1rem;
+  white-space: nowrap;
+  margin-left: auto; 
+  margin-right: 0.5rem;
+}
+
+.pb-full-week__brand .pi { font-size: 1.25rem; }
+
+.pb-full-week__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+}
+
+/* Сетка 7 дней */
+.pb-full-week__grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.5rem;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(var(--module-accent-rgb), 0.45) transparent;
+  padding-bottom: 0.25rem;
+}
+
+@media (max-width: 1200px) {
+  .pb-full-week__grid { grid-template-columns: repeat(7, minmax(180px, 1fr)); }
+}

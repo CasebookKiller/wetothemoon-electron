@@ -89,6 +89,7 @@
     "jsoncrush": "^1.1.8",
     "lightweight-charts": "^5.2.0",
     "luxon": "^3.7.2",
+    "map-gl-offline": "^0.8.9",
     "maplibre-gl": "^6.11.2",
     "node-cron": "^4.2.1",
     "ollama": "^0.6.3",

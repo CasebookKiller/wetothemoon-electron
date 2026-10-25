@@ -6,6 +6,23 @@
    Пока все стили инпутов остаются в PranaBinduPage.css.
    ============================================================ */
 
+
+/* --- Универсальная высота --- */
+input.p-inputtext,
+.p-dropdown,
+.p-inputnumber-input,
+.p-calendar .p-inputtext {
+  min-height: var(--control-height, 2.5rem) !important;
+  height: var(--control-height, 2.5rem) !important;
+  box-sizing: border-box !important;
+}
+
+.p-dropdown .p-dropdown-label {
+  display: flex !important;
+  align-items: center !important;
+  height: 100% !important;
+}
+
    /* ============================================================
    COMMON Inputs (PrimeReact overrides)
    Используют --module-accent / --module-accent-rgb.
@@ -26,15 +43,36 @@ textarea.p-inputtextarea:enabled:hover {
 }
 
 /* --- Dropdown --- */
-.p-dropdown:not(.p-disabled).p-focus {
+body[data-module] {
+  /* Переопределяем внутренние переменные PrimeReact, чтобы синее кольцо стало акцентным */
+  --p-dropdown-focus-ring-color: var(--module-accent) !important;
+  --p-dropdown-focus-ring-shadow: 0 0 0 2px rgba(var(--module-accent-rgb), 0.2) !important;
+  --p-inputtext-focus-ring-color: var(--module-accent) !important;
+}
+
+/* Убираем синюю рамку у внутреннего span-элемента */
+.p-dropdown .p-dropdown-label.p-inputtext:focus,
+.p-dropdown .p-dropdown-label.p-inputtext:enabled:focus,
+.p-dropdown .p-dropdown-label.p-inputtext:active {
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/* Фокус и нажатие применяем к контейнеру дропдауна */
+.p-dropdown:not(.p-disabled).p-focus,
+.p-dropdown:not(.p-disabled):focus,
+.p-dropdown:not(.p-disabled):active,
+.p-dropdown:not(.p-disabled):focus-within,
+.p-dropdown.p-inputwrapper-focus {
   outline: 0 none !important;
   outline-offset: 0 !important;
-  box-shadow: 0 0 0 0.2rem rgba(var(--module-accent-rgb), 0.2) !important;
+  box-shadow: 0 0 0 2px rgba(var(--module-accent-rgb), 0.2) !important;
   border-color: var(--module-accent) !important;
 }
 
 .p-dropdown:not(.p-disabled):hover {
-  border-color: var(--module-accent);
+  border-color: var(--module-accent) !important;
 }
 
 /* Выбранный элемент в выпадающем списке */
@@ -79,10 +117,11 @@ textarea.p-inputtextarea:enabled:hover {
   background: var(--module-accent);
 }
 
-/* --- Calendar (только базовые цвета) --- */
+/* --- Calendar --- */
+/* Базовые цвета. Конкретный вид поля (.pb-cal) — в PranaBinduPage.css. */
 .p-calendar:not(.p-disabled).p-focus > .p-inputtext {
-  box-shadow: 0 0 0 0.2rem rgba(var(--module-accent-rgb), 0.2);
-  border-color: var(--module-accent);
+  box-shadow: 0 0 0 1px var(--module-accent) !important;
+  border-color: var(--module-accent) !important;
 }
 
 .p-datepicker .p-datepicker-header button,

@@ -1,0 +1,40 @@
+/* ============================================================
+   COMMON Scrollbars
+   Цвет берётся из --module-accent:
+     - PB:     песочный (#d4a373)
+     - OSINT:  синий (#6ab2f2)
+     - Trading/др.: наследуют свою тему
+   Работает для всех скроллируемых контейнеров внутри модуля.
+   ============================================================ */
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--module-accent, #708499);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--module-accent, #708499);
+  filter: brightness(1.15);
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:active {
+  background: var(--module-accent, #708499);
+  filter: brightness(0.9);
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}

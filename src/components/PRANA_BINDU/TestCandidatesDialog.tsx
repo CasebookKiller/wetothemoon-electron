@@ -61,6 +61,12 @@ export const TestCandidatesDialog: React.FC<Props> = ({
 }) => {
   const [windowDays, setWindowDays] = useState(90);
   const [items, setItems] = useState<Candidate[]>([]);
+  const [diagnostics, setDiagnostics] = useState<{
+    factsInWindow: number;
+    factsWithStreams: number;
+    factsWithLatlng: number;
+    candidatesAfterCompute: number;
+  } | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -91,6 +97,7 @@ export const TestCandidatesDialog: React.FC<Props> = ({
         return;
       }
       setItems(res.items ?? []);
+      setDiagnostics(res.diagnostics ?? null);
 
       // Автовыбор: canSave + clean + не alreadySaved
       const auto = new Set<number>();
@@ -156,6 +163,7 @@ export const TestCandidatesDialog: React.FC<Props> = ({
           hrDriftPct: c.hrDriftPct,
           cadenceAvg: c.cadenceAvg,
           note: 'из списка кандидатов',
+          kind: 'candidate',
         });
         if (res?.success) saved++;
       }
@@ -198,7 +206,19 @@ export const TestCandidatesDialog: React.FC<Props> = ({
         <span className="pb-hint" style={{ fontSize: '0.75rem', flex: 1 }}>
           {loading
             ? 'Сканируем…'
-            : `Найдено: ${items.length} · подходят: ${validCount} · выбрано: ${selected.size}`}
+            : (() => {
+                const d = diagnostics;
+                const parts: string[] = [];
+                if (d) {
+                  parts.push(`в окне: ${d.factsInWindow}`);
+                  parts.push(`с потоками: ${d.factsWithStreams}`);
+                  parts.push(`с GPS: ${d.factsWithLatlng}`);
+                  parts.push(`отрезков: ${d.candidatesAfterCompute}`);
+                }
+                parts.push(`подходят: ${validCount}`);
+                parts.push(`выбрано: ${selected.size}`);
+                return parts.join(' · ');
+              })()}
         </span>
         <Button
           label="Выбрать все валидные"
@@ -213,8 +233,25 @@ export const TestCandidatesDialog: React.FC<Props> = ({
 
       <div style={{ maxHeight: '60vh', overflowY: 'auto', border: '1px solid var(--surface-border)', borderRadius: 6 }}>
         {items.length === 0 && !loading && (
-          <div className="pb-hint" style={{ padding: '1rem', textAlign: 'center' }}>
-            За выбранное окно нет тренировок с потоками и подходящей длительностью
+          <div style={{ padding: '1rem', textAlign: 'center' }}>
+            <div className="pb-hint" style={{ marginBottom: '0.5rem' }}>
+              Кандидатов нет.
+            </div>
+            {diagnostics && (
+              <div className="pb-hint" style={{ fontSize: '0.75rem', lineHeight: 1.5 }}>
+                В окне {diagnostics.factsInWindow} тренировок,
+                с потоками — {diagnostics.factsWithStreams},
+                с GPS — {diagnostics.factsWithLatlng}.
+                {diagnostics.factsWithStreams > 0 && diagnostics.factsWithLatlng === 0 && (
+                  <> Похоже, потоки без `latlng` — нечего накладывать на точку.</>
+                )}
+                {diagnostics.factsWithLatlng > 0 && (
+                  <> Возможно, тренировки короче выбранной длительности
+                  ({durationType === 'time' ? `${Math.round(durationValue / 60)}м` : `${durationValue}м`}).
+                  Попробуйте сменить длительность в dropdown на 5м или 10м.</>
+                )}
+              </div>
+            )}
           </div>
         )}
         {items.length > 0 && (
@@ -246,11 +283,19 @@ export const TestCandidatesDialog: React.FC<Props> = ({
                     }}
                   >
                     <td style={{ padding: '0.4rem', textAlign: 'center' }}>
-                      <Checkbox
-                        checked={isSel}
-                        disabled={disabled}
-                        onChange={() => toggle(c.runFactId)}
-                      />
+                      <label
+                        className="pb-checkbox-dark"
+                        style={{
+                          display: 'inline-flex',
+                          cursor: disabled ? 'default' : 'pointer',
+                        }}
+                      >
+                        <Checkbox
+                          checked={isSel}
+                          disabled={disabled}
+                          onChange={() => toggle(c.runFactId)}
+                        />
+                      </label>
                     </td>
                     <td style={{ padding: '0.4rem', whiteSpace: 'nowrap', color: 'var(--tg-hint)' }}>
                       {c.date}

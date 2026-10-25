@@ -33,9 +33,10 @@ interface Props {
   onDayClick?: (date: string) => void;
   onOpenPlanEvent?: (eventId: number) => void;
   onOpenRunFact?: (factId: number) => void;
-  onOpenSettings?: () => void;       // ⭐ новое
-  onOpenExercises?: () => void;      // ⭐ новое
-  onOpenGraph?: () => void;          // ⭐ новое
+  onOpenSettings?: () => void;
+  onOpenExercises?: () => void;
+  onOpenGraph?: () => void;
+  onOpenMap?: () => void;            // ⭐ новое
   className?: string;
 }
 
@@ -118,6 +119,7 @@ export const FullWeek: React.FC<Props> = ({
   onOpenSettings,
   onOpenExercises,
   onOpenGraph,
+  onOpenMap,
   className,
 }) => {
   const api = (window as any).electronAPI;
@@ -362,7 +364,8 @@ export const FullWeek: React.FC<Props> = ({
     >
       {/* Toolbar */}
       <div className="pb-full-week__toolbar">
-        <div className="pb-full-week__pin-slot" ref={pinSlotRef}>
+        <div className="pb-full-week__toolbar-left">
+          <div className="pb-full-week__pin-slot" ref={pinSlotRef}>
           <Button
             icon={pinned ? 'pi pi-lock' : 'pi pi-lock-open'}
             className={`pb-soft p-button-sm pb-full-week__pin-btn ${
@@ -418,6 +421,12 @@ export const FullWeek: React.FC<Props> = ({
         {loading && (
           <i className="pi pi-spin pi-spinner pb-full-week__spin" />
         )}
+        </div>
+
+        <div className="pb-full-week__brand">
+          <i className="pi pi-wave-pulse" />
+          <span>Prana-Bindu</span>
+        </div>
 
         <div className="pb-full-week__actions">
           <Button
@@ -434,6 +443,14 @@ export const FullWeek: React.FC<Props> = ({
             onClick={onOpenExercises}
             disabled={!onOpenExercises}
             tooltip="Упражнения"
+            tooltipOptions={{ position: 'bottom' }}
+          />
+          <Button
+            icon="pi pi-map"
+            className="pb-soft p-button-sm"
+            onClick={onOpenMap}
+            disabled={!onOpenMap}
+            tooltip="Карта и разметка"
             tooltipOptions={{ position: 'bottom' }}
           />
           <Button

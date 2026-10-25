@@ -9,7 +9,7 @@ body[data-module] .p-dialog .p-dialog-header {
   color: var(--module-accent) !important;
   border: none !important;
   border-bottom: 1px solid var(--surface-border, rgba(255, 255, 255, 0.08)) !important;
-  padding: 0.75rem 1rem;
+  padding: 0.6rem 1rem !important;
 }
 
 body[data-module] .p-dialog .p-dialog-title {
@@ -103,27 +103,6 @@ body[data-module] .p-dialog .p-dropdown .p-dropdown-trigger {
 
 body[data-module] .p-dialog .p-dropdown .p-dropdown-trigger svg {
   fill: var(--module-accent) !important;
-}
-
-/* Скроллбар во всех диалогах модуля — уже и с отступом */
-body[data-module] .p-dialog ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-body[data-module] .p-dialog ::-webkit-scrollbar-track {
-  background: transparent;
-  border-radius: 3px;
-}
-body[data-module] .p-dialog ::-webkit-scrollbar-thumb {
-  background: var(--module-accent, #d4a373);
-  border-radius: 3px;
-}
-body[data-module] .p-dialog ::-webkit-scrollbar-thumb:hover {
-  background: var(--module-accent, #d4a373);
-  filter: brightness(1.15);
-}
-body[data-module] .p-dialog ::-webkit-scrollbar-corner {
-  background: transparent;
 }
 
 /* Слайдеры: отступ справа под ручку (translateX(-50%)) и от скроллбара */
