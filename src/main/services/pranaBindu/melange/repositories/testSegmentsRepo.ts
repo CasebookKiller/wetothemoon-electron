@@ -10,6 +10,8 @@ import type { DatabaseSync } from 'node:sqlite';
 
 export type TestSegmentDurationType = 'time' | 'distance';
 
+export type TestSegmentKind = 'intentional' | 'candidate';
+
 export interface TestSegment {
   id: number;
   runFactId: number;
@@ -27,6 +29,7 @@ export interface TestSegment {
   hrDriftPct: number | null;
   cadenceAvg: number | null;
   note: string | null;
+  kind: TestSegmentKind;
   createdAt: string;
 }
 
@@ -46,6 +49,7 @@ export interface CreateTestSegmentInput {
   hrDriftPct?: number | null;
   cadenceAvg?: number | null;
   note?: string | null;
+  kind?: TestSegmentKind;
 }
 
 // ==================== Row ====================
@@ -68,6 +72,7 @@ interface TestSegmentRow {
   cadence_avg: number | null;
   note: string | null;
   created_at: string;
+  kind: string;
 }
 
 function rowToDomain(row: TestSegmentRow): TestSegment {
@@ -88,6 +93,7 @@ function rowToDomain(row: TestSegmentRow): TestSegment {
     hrDriftPct: row.hr_drift_pct,
     cadenceAvg: row.cadence_avg,
     note: row.note,
+    kind: (row.kind as TestSegmentKind) ?? 'candidate',
     createdAt: row.created_at,
   };
 }
@@ -104,8 +110,8 @@ export function createTestSegment(
        (run_fact_id, start_lat, start_lng, start_idx, end_idx,
         duration_type, duration_value, distance_m, duration_sec,
         pace_sec_per_km, hr_avg, hr_max, hr_drift_pct, cadence_avg,
-        note, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        note, kind, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     input.runFactId,
     input.startLat,
@@ -122,6 +128,7 @@ export function createTestSegment(
     input.hrDriftPct ?? null,
     input.cadenceAvg ?? null,
     input.note ?? null,
+    input.kind ?? 'candidate',
     now
   );
   return Number(info.lastInsertRowid);
@@ -129,7 +136,7 @@ export function createTestSegment(
 
 export function listTestSegments(
   db: DatabaseSync,
-  opts?: { from?: string; to?: string; runFactId?: number }
+  opts?: { from?: string; to?: string; runFactId?: number; kind?: TestSegmentKind },
 ): TestSegment[] {
   const conds: string[] = [];
   const params: any[] = [];
@@ -137,6 +144,10 @@ export function listTestSegments(
   if (opts?.runFactId != null) {
     conds.push(`run_fact_id = ?`);
     params.push(opts.runFactId);
+  }
+  if (opts?.kind) {
+    conds.push(`kind = ?`);
+    params.push(opts.kind);
   }
   if (opts?.from) {
     conds.push(`substr(created_at, 1, 10) >= ?`);
