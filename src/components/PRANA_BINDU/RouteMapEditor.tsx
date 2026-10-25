@@ -48,6 +48,12 @@ import {
   DEFAULT_COVERAGE_THRESHOLDS,
   type CoverageThresholds,
 } from './UTILS/coverageThresholds';
+import {
+  getSavedAllRefsStyles,
+  saveAllRefsStyles,
+  DEFAULT_ALL_REFS_STYLES,
+  type AllRefsStyles,
+} from './UTILS/allRefsStyles';
 import { geometricLength, simplifyDP } from './UTILS/medianTrack';
 
 interface Props {
@@ -607,6 +613,14 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
   // --- Режим редактирования точек эталона (P1) ---
   const [editPointsMode, setEditPointsMode] = useState(false);
   const [editPointsRefId, setEditPointsRefId] = useState<number | null>(null);
+  const [showAllRefs, setShowAllRefs] = useState(false);
+  const [allRefsStyles, setAllRefsStyles] = useState<AllRefsStyles>(
+    () => getSavedAllRefsStyles(),
+  );
+  const allRefsStylesRef = useRef(allRefsStyles);
+  useEffect(() => {
+    allRefsStylesRef.current = allRefsStyles;
+  }, [allRefsStyles]);
   const [editPointsDraft, setEditPointsDraft] = useState<[number, number][]>([]);
   const [editPointsDpEpsilon, setEditPointsDpEpsilon] = useState<number>(5);
   const [editPointsSaveStatus, setEditPointsSaveStatus] = useState<
@@ -1331,7 +1345,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     return () => window.removeEventListener('keydown', onKey);
   }, [drawMode]);
 
-    // ==================== Отрисовка выбранного эталона на карте ====================
+  // ==================== Отрисовка выбранного эталона на карте ====================
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1634,6 +1648,197 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
   }, [batchCoverage, referenceTracks]);
 
 
+  // ==================== Отрисовка всех эталонов на карте ====================
+
+  // ==================== Отрисовка всех эталонов на карте ====================
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+
+    const cleanup = () => {
+      if (!map || map._removed) return;
+      ['all-refs-unused', 'all-refs-similar', 'all-refs-used'].forEach((id) => {
+        try {
+          if (map.getLayer(id)) map.removeLayer(id);
+        } catch (e) {
+          /* ignore */
+        }
+      });
+      try {
+        if (map.getSource('all-refs-source')) map.removeSource('all-refs-source');
+      } catch (e) {
+        /* ignore */
+      }
+    };
+
+    // Чистим перед добавлением (StrictMode, повторные рендеры)
+    cleanup();
+
+    // Восстанавливаем прозрачность трека, если режим выключен
+    if (!showAllRefs) {
+      if (map.getLayer('active-track')) {
+        map.setPaintProperty('active-track', 'line-opacity', trackSettingsRef.current.opacity);
+      }
+      return;
+    }
+
+    if (referenceTracks.length === 0) return;
+    if (!selectedGroup) return;
+
+    // Гасим текущий трек
+    if (map.getLayer('active-track')) {
+      map.setPaintProperty('active-track', 'line-opacity', 0.25);
+    }
+
+    const covs = batchCoverage.get(selectedGroup.primary.id) ?? [];
+    const covMap = new Map(covs.map((c) => [c.refId, c.cls]));
+
+    const features = referenceTracks
+      .filter((ref) => ref.coords.length >= 2)
+      .map((ref) => {
+        const cls = covMap.get(ref.id) ?? 'unused';
+        return {
+          type: 'Feature' as const,
+          properties: { refId: ref.id, status: cls },
+          geometry: {
+            type: 'LineString' as const,
+            coordinates: ref.coords.map((p) => [p[1], p[0]]),
+          },
+        };
+      });
+
+    try {
+      map.addSource('all-refs-source', {
+        type: 'geojson',
+        data: {
+          type: 'FeatureCollection' as const,
+          features,
+        },
+      });
+    } catch (e) {
+      console.warn('[pb-map] addSource all-refs failed (возможно уже существует):', e);
+    }
+
+    // Слои (с проверкой на существование)
+    const tryAddLayer = (config: any) => {
+      try {
+        if (!map.getLayer(config.id)) map.addLayer(config);
+      } catch (e) {
+        /* ignore */
+      }
+    };
+
+    const s = allRefsStylesRef.current;
+
+    const buildPaint = (st: { color: string; width: number; opacity: number; dashed: boolean }) => {
+      const base: any = {
+        'line-color': st.color,
+        'line-width': st.width,
+        'line-opacity': st.opacity,
+      };
+      if (st.dashed) base['line-dasharray'] = [3, 2];
+      return base;
+    };
+
+    tryAddLayer({
+      id: 'all-refs-unused',
+      type: 'line',
+      source: 'all-refs-source',
+      filter: ['==', ['get', 'status'], 'unused'],
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: buildPaint(s.unused),
+    });
+
+    tryAddLayer({
+      id: 'all-refs-similar',
+      type: 'line',
+      source: 'all-refs-source',
+      filter: ['==', ['get', 'status'], 'similar'],
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: buildPaint(s.similar),
+    });
+
+    tryAddLayer({
+      id: 'all-refs-used',
+      type: 'line',
+      source: 'all-refs-source',
+      filter: ['==', ['get', 'status'], 'used'],
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: buildPaint(s.used),
+    });
+
+    const onLayerClick = (e: any) => {
+      if (e.features && e.features.length > 0) {
+        const refId = e.features[0].properties.refId;
+        setSelectedRefTrackId(refId);
+        setActiveTab('refs');
+        setShowAllRefs(false);
+      }
+    };
+
+    const onMouseEnter = () => { map.getCanvas().style.cursor = 'pointer'; };
+    const onMouseLeave = () => { map.getCanvas().style.cursor = ''; };
+
+    try {
+      map.on('click', 'all-refs-unused', onLayerClick);
+      map.on('click', 'all-refs-similar', onLayerClick);
+      map.on('click', 'all-refs-used', onLayerClick);
+      map.on('mouseenter', 'all-refs-unused', onMouseEnter);
+      map.on('mouseenter', 'all-refs-similar', onMouseEnter);
+      map.on('mouseenter', 'all-refs-used', onMouseEnter);
+      map.on('mouseleave', 'all-refs-unused', onMouseLeave);
+      map.on('mouseleave', 'all-refs-similar', onMouseLeave);
+      map.on('mouseleave', 'all-refs-used', onMouseLeave);
+    } catch (e) {
+      /* ignore */
+    }
+
+    return () => {
+      try {
+        map.off('click', 'all-refs-unused', onLayerClick);
+        map.off('click', 'all-refs-similar', onLayerClick);
+        map.off('click', 'all-refs-used', onLayerClick);
+        map.off('mouseenter', 'all-refs-unused', onMouseEnter);
+        map.off('mouseenter', 'all-refs-similar', onMouseEnter);
+        map.off('mouseenter', 'all-refs-used', onMouseEnter);
+        map.off('mouseleave', 'all-refs-unused', onMouseLeave);
+        map.off('mouseleave', 'all-refs-similar', onMouseLeave);
+        map.off('mouseleave', 'all-refs-used', onMouseLeave);
+      } catch (e) {
+        /* ignore */
+      }
+      cleanup();
+    };
+  }, [showAllRefs, mapLoaded, referenceTracks, batchCoverage, selectedGroup]);
+
+
+  // Живое обновление стилей слоёв all-refs (без пересоздания)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+    if (!showAllRefs) return;
+
+    const apply = (layerId: string, st: { color: string; width: number; opacity: number; dashed: boolean }) => {
+      if (!map.getLayer(layerId)) return;
+      try {
+        map.setPaintProperty(layerId, 'line-color', st.color);
+        map.setPaintProperty(layerId, 'line-width', st.width);
+        map.setPaintProperty(layerId, 'line-opacity', st.opacity);
+        map.setPaintProperty(
+          layerId,
+          'line-dasharray',
+          (st.dashed ? [3, 2] : null) as any,
+        );
+      } catch (e) {
+        /* ignore */
+      }
+    };
+
+    apply('all-refs-unused', allRefsStyles.unused);
+    apply('all-refs-similar', allRefsStyles.similar);
+    apply('all-refs-used', allRefsStyles.used);
+  }, [allRefsStyles, mapLoaded, showAllRefs]);
+
   // Группировка видимых пробежек для левой панели
   const categorizedGroups = useMemo(() => {
     let list = [...visibleGroups];
@@ -1699,6 +1904,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
       setSplitBoundaries(new Set());
       setSplitSaveStatus('idle');
       setSplitSaveError('');
+      setShowAllRefs(false);
       setBatchLatlng(new Map());
       refIndexesCacheRef.current = new Map();
       coverageCacheRef.current = new Map();
@@ -3398,6 +3604,145 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                   </div>
                 </div>
 
+                {/* Стиль эталонов на карте */}
+                <div id="pb-all-refs-styles" className="pb-connections__block mt-2">
+                  <div className="pb-connections__title">
+                    <i className="pi pi-palette" /> Стиль эталонов на карте
+                  </div>
+
+                  <div className="pb-hint" style={{ fontSize: '0.7rem', marginBottom: '0.5rem' }}>
+                    Применяется в режиме «Все эталоны» (кнопка 🗺️ на карте).
+                  </div>
+
+                  {(
+                    [
+                      { key: 'used' as const, label: '🟢 Пройдено (used)' },
+                      { key: 'similar' as const, label: '🟡 Похоже (similar)' },
+                      { key: 'unused' as const, label: '⚪ Не пройдено (unused)' },
+                    ]
+                  ).map((cat) => {
+                    const st = allRefsStyles[cat.key];
+                    const update = (patch: Partial<typeof st>) => {
+                      const next = {
+                        ...allRefsStyles,
+                        [cat.key]: { ...st, ...patch },
+                      };
+                      setAllRefsStyles(next);
+                      saveAllRefsStyles(next);
+                    };
+                    return (
+                      <div
+                        key={cat.key}
+                        style={{
+                          marginTop: '0.75rem',
+                          paddingTop: '0.5rem',
+                          borderTop: '1px solid var(--surface-border)',
+                        }}
+                      >
+                        <div style={{ fontSize: '0.75rem', fontWeight: 600, marginBottom: '0.4rem' }}>
+                          {cat.label}
+                        </div>
+
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginTop: '0.3rem',
+                          }}
+                        >
+                          <span style={{ fontSize: '0.72rem', color: 'var(--tg-hint)' }}>Цвет</span>
+                          <input
+                            type="color"
+                            value={st.color}
+                            onChange={(e) => update({ color: e.target.value })}
+                            style={{
+                              width: '2.5rem',
+                              height: '1.5rem',
+                              border: 'none',
+                              background: 'transparent',
+                              cursor: 'pointer',
+                            }}
+                          />
+                        </div>
+
+                        <div style={{ marginTop: '0.4rem' }}>
+                          <div
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              fontSize: '0.7rem',
+                              color: 'var(--tg-hint)',
+                            }}
+                          >
+                            <span>Толщина</span>
+                            <span style={{ fontFamily: 'monospace' }}>{st.width}px</span>
+                          </div>
+                          <Slider
+                            value={st.width}
+                            min={1}
+                            max={10}
+                            step={1}
+                            onChange={(e) => update({ width: e.value as number })}
+                          />
+                        </div>
+
+                        <div style={{ marginTop: '0.4rem' }}>
+                          <div
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              fontSize: '0.7rem',
+                              color: 'var(--tg-hint)',
+                            }}
+                          >
+                            <span>Прозрачность</span>
+                            <span style={{ fontFamily: 'monospace' }}>{st.opacity.toFixed(1)}</span>
+                          </div>
+                          <Slider
+                            value={st.opacity}
+                            min={0.1}
+                            max={1}
+                            step={0.1}
+                            onChange={(e) => update({ opacity: e.value as number })}
+                          />
+                        </div>
+
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginTop: '0.4rem',
+                          }}
+                        >
+                          <span style={{ fontSize: '0.72rem', color: 'var(--tg-hint)' }}>Пунктир</span>
+                          <label
+                            className="pb-checkbox-dark"
+                            style={{ display: 'inline-flex', cursor: 'pointer' }}
+                          >
+                            <Checkbox
+                              checked={st.dashed}
+                              onChange={(e) => update({ dashed: !!e.checked })}
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  <Button
+                    label="Сбросить стили эталонов"
+                    icon="pi pi-refresh"
+                    className="pb-soft p-button-sm w-full mt-3"
+                    onClick={() => {
+                      const def = JSON.parse(JSON.stringify(DEFAULT_ALL_REFS_STYLES));
+                      setAllRefsStyles(def);
+                      saveAllRefsStyles(def);
+                    }}
+                  />
+                </div>
+
               </div>
             )}
 
@@ -4200,6 +4545,30 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                     tooltipOptions={{ position: 'bottom' }}
                     style={{ color: drawMode ? 'var(--pb-accent)' : undefined }}
                     disabled={markupMode}
+                  />
+                </div>
+
+                {/* Кнопка Показать все эталоны */}
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: showAllRefs ? 'rgba(212, 163, 115, 0.2)' : 'rgba(23, 33, 43, 0.85)',
+                  borderRadius: '6px',
+                  border: `1px solid ${showAllRefs ? 'var(--pb-accent)' : 'var(--surface-border)'}`,
+                  backdropFilter: 'blur(4px)', pointerEvents: 'auto', height: '2.5rem', width: '2.5rem', boxSizing: 'border-box'
+                }}>
+                  <Button
+                    icon="pi pi-map"
+                    text
+                    className="pb-drawer__name-edit"
+                    onClick={() => {
+                      if (markupMode) setMarkupMode(false);
+                      if (drawMode) { setDrawMode(false); setDraftPoints([]); }
+                      if (editPointsMode) closeEditPoints();
+                      setShowAllRefs(!showAllRefs);
+                    }}
+                    tooltip={showAllRefs ? 'Скрыть все эталоны' : 'Показать все эталоны (цвета: синий-used, жёлтый-similar, серый-unused)'}
+                    tooltipOptions={{ position: 'bottom' }}
+                    style={{ color: showAllRefs ? 'var(--pb-accent)' : undefined }}
                   />
                 </div>
 
