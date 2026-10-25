@@ -1449,6 +1449,17 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     }
   }, [visible, activeTab]);
 
+  // Скролл к выбранному атому в списке «Эталоны»
+  useEffect(() => {
+    if (!selectedRefTrackId) return;
+    if (activeTab !== 'refs') return;
+    const timer = setTimeout(() => {
+      const el = document.getElementById(`pb-ref-item-${selectedRefTrackId}`);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [selectedRefTrackId, activeTab]);
+
   // Пересборка grid-индексов при изменении эталонов или радиусов
   useEffect(() => {
     const next = new Map<number, RefIndex>();
@@ -1647,9 +1658,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     return result;
   }, [batchCoverage, referenceTracks]);
 
-
-  // ==================== Отрисовка всех эталонов на карте ====================
-
   // ==================== Отрисовка всех эталонов на карте ====================
   useEffect(() => {
     const map = mapRef.current;
@@ -1657,7 +1665,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
 
     const cleanup = () => {
       if (!map || map._removed) return;
-      ['all-refs-unused', 'all-refs-similar', 'all-refs-used'].forEach((id) => {
+      ['all-refs-unused', 'all-refs-similar', 'all-refs-used', 'all-refs-selected'].forEach((id) => {
         try {
           if (map.getLayer(id)) map.removeLayer(id);
         } catch (e) {
@@ -1767,12 +1775,26 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
       paint: buildPaint(s.used),
     });
 
+    // Оранжевый контур-подсветка выбранного атома
+    tryAddLayer({
+      id: 'all-refs-selected',
+      type: 'line',
+      source: 'all-refs-source',
+      filter: ['==', ['get', 'refId'], -1],
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: {
+        'line-color': '#ff5a00',
+        'line-width': 6,
+        'line-opacity': 0.75,
+      },
+    });
+
     const onLayerClick = (e: any) => {
       if (e.features && e.features.length > 0) {
-        const refId = e.features[0].properties.refId;
+        const refId = Number(e.features[0].properties.refId);
         setSelectedRefTrackId(refId);
         setActiveTab('refs');
-        setShowAllRefs(false);
+        // режим «Все эталоны» НЕ выключаем — можно кликать по следующим
       }
     };
 
@@ -1838,6 +1860,23 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     apply('all-refs-similar', allRefsStyles.similar);
     apply('all-refs-used', allRefsStyles.used);
   }, [allRefsStyles, mapLoaded, showAllRefs]);
+
+
+  // Подсветка выбранного атома в режиме «Все эталоны»
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+    if (!map.getLayer('all-refs-selected')) return;
+    try {
+      map.setFilter('all-refs-selected', [
+        '==',
+        ['get', 'refId'],
+        selectedRefTrackId ?? -1,
+      ]);
+    } catch (e) {
+      /* ignore */
+    }
+  }, [selectedRefTrackId, mapLoaded, showAllRefs]);
 
   // Группировка видимых пробежек для левой панели
   const categorizedGroups = useMemo(() => {
@@ -4165,6 +4204,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                     return (
                       <div
                         key={ref.id}
+                        id={`pb-ref-item-${ref.id}`}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
@@ -4173,12 +4213,16 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                           borderRadius: 6,
                           marginBottom: '0.3rem',
                           background: isSelected
-                            ? 'rgba(212, 163, 115, 0.12)'
+                            ? 'rgba(212, 163, 115, 0.25)'
                             : 'transparent',
-                          border: `1px solid ${
-                            isSelected ? 'var(--pb-accent)' : 'var(--surface-border)'
-                          }`,
+                          border: isSelected
+                            ? '2px solid var(--pb-accent)'
+                            : '1px solid var(--surface-border)',
+                          boxShadow: isSelected
+                            ? '0 0 12px rgba(212, 163, 115, 0.4)'
+                            : 'none',
                           cursor: 'pointer',
+                          transition: 'background 0.2s, box-shadow 0.2s',
                         }}
                         onClick={() =>
                           setSelectedRefTrackId(isSelected ? null : ref.id)
