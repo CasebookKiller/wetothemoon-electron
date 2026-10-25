@@ -17,6 +17,8 @@ export interface ComputeThresholdsOptions {
   topN?: number;
   /** Минимум тестов для расчёта (default 3). */
   minTests?: number;
+  /** Учитывать только «настоящие» тесты (intentional). Default — оба. */
+  intentionalOnly?: boolean;
 }
 
 export interface ComputedThresholds {
@@ -259,6 +261,7 @@ export function computeThresholds(
   // если пользователь вчера пакетно сохранил старые тесты, они не должны
   // «омолаживать» LTHR.
 
+  const kindFilter = opts.intentionalOnly ? `AND ts.kind = 'intentional'` : '';
   const testRows = db
     .prepare(
       `SELECT ts.hr_avg, ts.hr_max, ts.hr_drift_pct
@@ -266,7 +269,8 @@ export function computeThresholds(
          JOIN run_facts rf ON rf.id = ts.run_fact_id
         WHERE ts.duration_type = 'time'
           AND ts.duration_value = ?
-          AND rf.date >= ? AND rf.date <= ?`,
+          AND rf.date >= ? AND rf.date <= ?
+          ${kindFilter}`,
     )
     .all(lthrTestDuration, fromIso, toIso) as unknown as TestRow[];
 

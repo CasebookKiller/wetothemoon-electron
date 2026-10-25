@@ -17,7 +17,7 @@ import {
   MIGRATION_V24_AUTO_RANGE_DAYS,
 } from './schema';
 
-export const SCHEMA_VERSION = 29;
+export const SCHEMA_VERSION = 30;
 
 interface Migration {
   version: number;
@@ -689,7 +689,31 @@ const migrations: readonly Migration[] = [
       console.log('[Melange] v29: reference_tracks.category + tags_json');
     },
   },
+  {
+    version: 30,
+    apply: (db) => {
+      // Авто-категоризация для существующих эталонов:
+      //   kind='loop'   → category='loop'
+      //   kind='linear' → category='segment'
+      //   kind='stadium'→ category='loop'
+      // Затрагиваем только записи, где category ещё не задана (NULL).
+      db.exec(`
+        UPDATE reference_tracks
+           SET category = 'loop'
+         WHERE category IS NULL
+           AND kind IN ('loop', 'stadium');
+      `);
+      db.exec(`
+        UPDATE reference_tracks
+           SET category = 'segment'
+         WHERE category IS NULL
+           AND kind = 'linear';
+      `);
+      console.log('[Melange] v30: авто-категоризация reference_tracks по kind');
+    },
+  },
 ];
+
 
 function getCurrentVersion(db: DatabaseSync): number {
   const row = db
