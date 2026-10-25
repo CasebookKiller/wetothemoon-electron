@@ -709,6 +709,9 @@ try {
       listRunStreamsBatch: (runFactIds: number[]) =>
         ipcRenderer.invoke('pb:list-run-streams-batch', runFactIds),
 
+      runLatlngBatch: (runFactIds: number[], opts?: { samples?: number }) =>
+        ipcRenderer.invoke('pb:run-latlng-batch', runFactIds, opts),
+
       getRunStreams: (runFactId: number, source: string) =>
         ipcRenderer.invoke('pb:get-run-streams', runFactId, source),
 
@@ -999,6 +1002,20 @@ try {
       referenceTrackDelete: (id: number) =>
         ipcRenderer.invoke('pb:reference-track-delete', id),
 
+      referenceTrackSplit: (
+        sourceId: number,
+        parts: Array<{
+          startIdx: number;
+          endIdx: number;
+          name: string;
+          category?: string | null;
+          tags?: string[];
+        }>,
+        options?: { deleteSource?: boolean }
+      ) =>
+        ipcRenderer.invoke('pb:reference-track-split', sourceId, parts, options),
+ 
+        
     },
 
   });

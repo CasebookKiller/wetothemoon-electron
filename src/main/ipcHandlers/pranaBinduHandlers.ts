@@ -81,6 +81,7 @@ import {
   toDateOnly,
 } from '../services/pranaBindu/melange/repositories/runFactsRepo';
 
+import { detectLoopKind } from '../services/pranaBindu/melange/repositories/referenceTracksRepo';
 import { DodofoProvider } from '../services/pranaBindu/spice/providers/dodofoProvider';
 import { IntervalsIcuProvider } from '../services/pranaBindu/spice/providers/intervalsIcuProvider';
 import { parseFit } from '../services/pranaBindu/spice/parsers/fitParser';
@@ -251,6 +252,21 @@ let providersRegistered = false;
 let importFitCancelRequested = false;
 /** Флаг отмены текущей заливки потоков. */
 let syncStreamsCancelRequested = false;
+
+function haversineMBatch(
+  lat1: number, lng1: number,
+  lat2: number, lng2: number,
+): number {
+  const R = 6371000;
+  const φ1 = (lat1 * Math.PI) / 180;
+  const φ2 = (lat2 * Math.PI) / 180;
+  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+  const Δλ = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(Δφ / 2) ** 2 +
+    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 function getIntervalsAthleteId(): string | null {
   try {
@@ -5535,6 +5551,232 @@ export function registerPranaBinduHandlers(): void {
       return { success: false, error: (e as Error).message };
     }
   });
+
+  // -------- Batch: latlng + length для набора run_fact_id --------
+  // Используется для автоопределения пробежек по атомам (B.1).
+  // Возвращает subsampled до opts.samples точный lengthM по полному треку.
+  ipcMain.handle(
+    'pb:run-latlng-batch',
+    (
+      _event,
+      runFactIds: number[],
+      opts?: { samples?: number },
+    ) => {
+      try {
+        if (!Array.isArray(runFactIds) || runFactIds.length === 0) {
+          return { success: true, data: {} };
+        }
+        const db = getMelange();
+        const samples = Math.max(20, Math.min(500, opts?.samples ?? 100));
+        const ids = runFactIds
+          .filter((x) => Number.isFinite(x))
+          .slice(0, 300);
+
+        const result: Record<
+          number,
+          { latlng: [number, number][]; lengthM: number }
+        > = {};
+
+        for (const id of ids) {
+          const metaList = listRunStreams(db, id);
+          if (metaList.length === 0) continue;
+          const fit = metaList.find(
+            (m: { source: string }) => m.source === 'fit',
+          );
+          const src = fit ? 'fit' : metaList[0].source;
+
+          const stream = getRunStreamWithPayload(db, id, src);
+          if (!stream?.payload) continue;
+
+          const raw =
+            ((stream.payload as any).latlng as (number | null)[][]) ?? [];
+          const filtered: [number, number][] = [];
+          for (const p of raw) {
+            if (p != null && p[0] != null && p[1] != null) {
+              filtered.push([p[0], p[1]]);
+            }
+          }
+          if (filtered.length < 10) continue;
+
+          // Точная длина по полному треку
+          let lengthM = 0;
+          for (let i = 1; i < filtered.length; i++) {
+            lengthM += haversineMBatch(
+              filtered[i - 1][0],
+              filtered[i - 1][1],
+              filtered[i][0],
+              filtered[i][1],
+            );
+          }
+
+          // Subsample
+          const sampled: [number, number][] = [];
+          const step = Math.max(1, Math.floor(filtered.length / samples));
+          for (let i = 0; i < filtered.length; i += step) {
+            sampled.push(filtered[i]);
+          }
+          if (
+            sampled.length === 0 ||
+            sampled[sampled.length - 1][0] !== filtered[filtered.length - 1][0] ||
+            sampled[sampled.length - 1][1] !== filtered[filtered.length - 1][1]
+          ) {
+            sampled.push(filtered[filtered.length - 1]);
+          }
+
+          result[id] = {
+            latlng: sampled,
+            lengthM: Math.round(lengthM),
+          };
+        }
+
+        return { success: true, data: result };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    },
+  );
+
+    // -------- Разделение эталона на части --------
+
+  ipcMain.handle(
+    'pb:reference-track-split',
+    (
+      _event,
+      sourceId: number,
+      parts: Array<{
+        startIdx: number;
+        endIdx: number;
+        name: string;
+        category?: string | null;
+        tags?: string[];
+      }>,
+      options?: { deleteSource?: boolean },
+    ) => {
+      try {
+        if (!Number.isFinite(sourceId)) {
+          return { success: false, error: 'sourceId обязателен' };
+        }
+        if (!Array.isArray(parts) || parts.length < 2) {
+          return { success: false, error: 'parts: минимум 2 части' };
+        }
+
+        const db = getMelange();
+        const source = getReferenceTrackById(db, sourceId);
+        if (!source) {
+          return { success: false, error: `Эталон #${sourceId} не найден` };
+        }
+        if (source.coords.length < 2) {
+          return { success: false, error: 'У эталона нет геометрии' };
+        }
+
+        const maxIdx = source.coords.length - 1;
+
+        if (parts[0].startIdx !== 0) {
+          return { success: false, error: 'Первая часть должна начинаться с 0' };
+        }
+        if (parts[parts.length - 1].endIdx !== maxIdx) {
+          return {
+            success: false,
+            error: `Последняя часть должна заканчиваться на ${maxIdx}`,
+          };
+        }
+        for (let i = 0; i < parts.length; i++) {
+          const p = parts[i];
+          if (!Number.isInteger(p.startIdx) || !Number.isInteger(p.endIdx)) {
+            return {
+              success: false,
+              error: `parts[${i}]: startIdx/endIdx должны быть целыми`,
+            };
+          }
+          if (p.startIdx < 0 || p.endIdx > maxIdx) {
+            return {
+              success: false,
+              error: `parts[${i}]: индексы вне [0..${maxIdx}]`,
+            };
+          }
+          if (p.startIdx >= p.endIdx) {
+            return {
+              success: false,
+              error: `parts[${i}]: startIdx должен быть меньше endIdx`,
+            };
+          }
+          if (!p.name?.trim()) {
+            return { success: false, error: `parts[${i}]: name обязателен` };
+          }
+          if (i > 0 && p.startIdx !== parts[i - 1].endIdx) {
+            return {
+              success: false,
+              error: `parts[${i}]: должен начинаться с ${parts[i - 1].endIdx}`,
+            };
+          }
+        }
+
+        // Slug стабильный: по sourceId, не по имени.
+        // Иначе при повторном разделении группы разваливаются.
+        let rootSourceId = sourceId;
+        if (source.tags) {
+          const splitFromTag = source.tags.find((t) =>
+            t.startsWith('split-from:'),
+          );
+          if (splitFromTag) {
+            const parsed = Number(splitFromTag.slice('split-from:'.length));
+            if (Number.isFinite(parsed)) rootSourceId = parsed;
+          }
+        }
+        const groupSlug = `atom-${rootSourceId}`;
+
+        const deleteSource = options?.deleteSource !== false;
+        const createdIds: number[] = [];
+
+        db.exec('BEGIN');
+        try {
+          for (const p of parts) {
+            const partCoords = source.coords.slice(p.startIdx, p.endIdx + 1);
+            if (partCoords.length < 2) continue;
+
+            const kind = detectLoopKind(partCoords);
+            const tags = [
+              ...(p.tags ?? []),
+              `group:${groupSlug}`,
+              `split-from:${sourceId}`,
+            ];
+
+            const id = createReferenceTrack(db, {
+              name: p.name.trim(),
+              coords: partCoords,
+              kind,
+              category: p.category ?? source.category,
+              tags,
+              notes: source.notes ?? null,
+            });
+            createdIds.push(id);
+          }
+
+          if (deleteSource) {
+            deleteReferenceTrack(db, sourceId);
+          }
+
+          db.exec('COMMIT');
+        } catch (e) {
+          db.exec('ROLLBACK');
+          throw e;
+        }
+
+        console.log(
+          `[Prana-Bindu] ref-split #${sourceId} → [${createdIds.join(', ')}]` +
+            (deleteSource ? ` (source deleted)` : ' (source kept)'),
+        );
+
+        return {
+          success: true,
+          createdIds,
+          deletedId: deleteSource ? sourceId : null,
+        };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    },
+  );
 
   console.log('[Prana-Bindu] IPC-хендлеры зарегистрированы (pb:*)');
 }

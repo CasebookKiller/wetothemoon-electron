@@ -32,7 +32,23 @@ import {
 } from './mapStyles';
 import { StoryGeneratorDialog } from './StoryGeneratorDialog';
 import { TestCandidatesDialog } from './TestCandidatesDialog';
+import { MedianTrackDialog } from './MedianTrackDialog';
 import { EditReferenceDialog } from './EditReferenceDialog';
+import {
+  buildRefIndex,
+  computeDeviationFast,
+  classifyCoverage,
+  type RefIndex,
+  type FastDeviationResult,
+  type CoverageClass,
+} from './UTILS/coverageIndex';
+import {
+  getSavedCoverageThresholds,
+  saveCoverageThresholds,
+  DEFAULT_COVERAGE_THRESHOLDS,
+  type CoverageThresholds,
+} from './UTILS/coverageThresholds';
+import { geometricLength, simplifyDP } from './UTILS/medianTrack';
 
 interface Props {
   visible: boolean;
@@ -315,6 +331,12 @@ interface DeviationResult {
   coveragePct: number;
   /** Чистая пробежка: медиана < 15 м и coverage ≥ 90%. */
   isClean: boolean;
+  /** Суммарная длина трека, лежащего в радиусе 30 м от эталона. */
+  metersOnRef: number;
+  /** Точное число проходов эталона (медиана по точкам эталона). */
+  repeats: number;
+  /** Точное число проходов трека (медиана по точкам трека). */
+  checkpointPasses: number;
 }
 
 /**
@@ -346,20 +368,20 @@ function computeDeviation(
     sampled.push(track[i]);
   }
 
-  // 1. track → ref: медиана и p95
-  const devs: number[] = [];
+  // 1. track → ref: медиана, p95, и raw-отклонения в порядке sample
+  const devsBySample: number[] = [];
   for (const tp of sampled) {
     let best = Infinity;
     for (const rp of refCoords) {
       const d = haversineM(tp[0], tp[1], rp[0], rp[1]);
       if (d < best) {
         best = d;
-        if (best < 1) break; // почти на точке — не ищем дальше
+        if (best < 1) break;
       }
     }
-    devs.push(best);
+    devsBySample.push(best);
   }
-  devs.sort((a, b) => a - b);
+  const devs = [...devsBySample].sort((a, b) => a - b);
   const median = devs[Math.floor(devs.length / 2)];
   const p95 =
     devs[Math.min(devs.length - 1, Math.floor(devs.length * 0.95))];
@@ -377,11 +399,109 @@ function computeDeviation(
   }
   const coveragePct = Math.round((covered / refCoords.length) * 100);
 
+  // 3. metersOnRef: считаем по полному треку, gated isOnRef по сэмплу.
+  //    Радиус 50 м — эмпирически хорошо отделяет «на эталоне» от «рядом».
+  const ON_REF_RADIUS_M = 50;
+  const onRefSample = devsBySample.map((d) => d <= ON_REF_RADIUS_M);
+  let metersOnRefAcc = 0;
+  for (let i = 1; i < track.length; i++) {
+    const sampleIdx = Math.min(
+      sampled.length - 1,
+      Math.floor(i / step),
+    );
+    if (onRefSample[sampleIdx]) {
+      metersOnRefAcc += haversineM(
+        track[i - 1][0], track[i - 1][1],
+        track[i][0], track[i][1],
+      );
+    }
+  }
+
+  // 4. checkpointPasses: проходы через 4 контрольные точки
+  const cpFractions = [0.2, 0.4, 0.6, 0.8];
+  const passesArray: number[] = [];
+  
+  for (const frac of cpFractions) {
+    const cpIdx = Math.floor(refCoords.length * frac);
+    const cp = refCoords[cpIdx];
+    let passes = 0;
+    let state = 'far';
+    
+    for (const [tlat, tlng] of track) {
+      const d = haversineM(cp[0], cp[1], tlat, tlng);
+      if (d < 30) {
+        if (state !== 'near') {
+          passes++;
+          state = 'near';
+        }
+      } else if (d > 100) {
+        state = 'far';
+      }
+    }
+    passesArray.push(passes);
+  }
+  
+  passesArray.sort((a, b) => a - b);
+  const checkpointPasses = passesArray[Math.floor(passesArray.length / 2)] || 0;
+
+  // 5. repeats: длина трека на эталоне / длина эталона.
+  let refLengthM = 0;
+  for (let i = 1; i < refCoords.length; i++) {
+    refLengthM += haversineM(
+      refCoords[i - 1][0], refCoords[i - 1][1],
+      refCoords[i][0], refCoords[i][1],
+    );
+  }
+
+  const isLoop = haversineM(
+    refCoords[0][0], refCoords[0][1],
+    refCoords[refCoords.length - 1][0], refCoords[refCoords.length - 1][1]
+  ) < 50;
+
+  let repeats = 0;
+  if (refLengthM > 0) {
+    const rawRatio = metersOnRefAcc / refLengthM;
+    if (isLoop) {
+      repeats = Math.max(checkpointPasses, Math.floor(rawRatio));
+      if (coveragePct >= 90) {
+        const rounded = Math.round(rawRatio);
+        if (Math.abs(rawRatio - rounded) < 0.35) {
+          repeats = Math.max(repeats, rounded);
+        }
+      }
+    } else {
+      repeats = Math.floor(rawRatio);
+      if (coveragePct >= 90 && Math.abs(rawRatio - Math.round(rawRatio)) < 0.35) {
+        repeats = Math.round(rawRatio);
+      }
+    }
+  }
+  
+  if (repeats < 1 && coveragePct >= 70) {
+    repeats = 1;
+  }
+  if (refLengthM > 0) {
+    const rawRatio = metersOnRefAcc / refLengthM;
+    repeats = Math.floor(rawRatio);
+    if (coveragePct >= 90) {
+      const rounded = Math.round(rawRatio);
+      if (Math.abs(rawRatio - rounded) < 0.35) {
+        repeats = rounded;
+      }
+    }
+  }
+  if (repeats < 1 && coveragePct >= 70) {
+    repeats = 1;
+  }
+
   return {
     medianM: Math.round(median),
     p95M: Math.round(p95),
     coveragePct,
     isClean: median < 15 && coveragePct >= 90,
+    metersOnRef: Math.round(metersOnRefAcc),
+    repeats,
+    checkpointPasses,
   };
 }
 
@@ -470,6 +590,9 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
   >([]);
   const [segmentsLoading, setSegmentsLoading] = useState(false);
   const [candidatesVisible, setCandidatesVisible] = useState(false);
+  // Медианный трек
+  const [selectedRunIds, setSelectedRunIds] = useState<Set<number>>(new Set());
+  const [medianDialogVisible, setMedianDialogVisible] = useState(false);
   // Эталонные маршруты (C.5, фаза A3)
   const [referenceTracks, setReferenceTracks] = useState<
     Array<{
@@ -494,6 +617,39 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     category: string | null;
     tags: string[];
   } | null>(null);
+  // --- Режим редактирования точек эталона (P1) ---
+  const [editPointsMode, setEditPointsMode] = useState(false);
+  const [editPointsRefId, setEditPointsRefId] = useState<number | null>(null);
+  const [editPointsDraft, setEditPointsDraft] = useState<[number, number][]>([]);
+  const [editPointsDpEpsilon, setEditPointsDpEpsilon] = useState<number>(5);
+  const [editPointsSaveStatus, setEditPointsSaveStatus] = useState<
+    'idle' | 'saving' | 'saved' | 'error'
+  >('idle');
+  const [editPointsSaveError, setEditPointsSaveError] = useState('');
+    // --- Режим «Разделить на атомы» (внутри editPoints) ---
+  const [splitMode, setSplitMode] = useState(false);
+  const [splitBoundaries, setSplitBoundaries] = useState<Set<number>>(new Set());
+  const [splitDeleteSource, setSplitDeleteSource] = useState(true);
+  const [splitSaveStatus, setSplitSaveStatus] = useState<
+    'idle' | 'saving' | 'saved' | 'error'
+  >('idle');
+  // --- B.1: batch-coverage ---
+  const [coverageThresholds, setCoverageThresholds] =
+    useState<CoverageThresholds>(() => getSavedCoverageThresholds());
+  const [batchLatlng, setBatchLatlng] = useState<
+    Map<number, { latlng: [number, number][]; lengthM: number }>
+  >(new Map());
+  const refIndexesCacheRef = useRef<Map<number, RefIndex>>(new Map());
+  const coverageCacheRef = useRef<
+    Map<number, Map<number, FastDeviationResult>>
+  >(new Map());
+  const [splitSaveError, setSplitSaveError] = useState('');
+  const editMarkersRef = useRef<Marker[]>([]);
+  const editPointsDraftRef = useRef<[number, number][]>([]);
+  useEffect(() => {
+    editPointsDraftRef.current = editPointsDraft;
+  }, [editPointsDraft]);
+
   // Отклонения для всех эталонов на текущем треке (кэшируется между ре-рендерами)
   const refDeviations = useMemo(() => {
     const result: Record<number, DeviationResult> = {};
@@ -506,6 +662,43 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     }
     return result;
   }, [streamsPayload, referenceTracks]);
+  const editDraftLength = useMemo(
+    () => (editPointsMode ? geometricLength(editPointsDraft) : 0),
+    [editPointsMode, editPointsDraft],
+  );
+
+  const editPointsSourceAtom = useMemo(
+    () =>
+      editPointsRefId
+        ? referenceTracks.find((r) => r.id === editPointsRefId) ?? null
+        : null,
+    [editPointsRefId, referenceTracks],
+  );
+
+  const splitParts = useMemo(() => {
+    if (!splitMode || editPointsDraft.length < 2) return [];
+    const validBounds = [...splitBoundaries]
+      .filter((idx) => idx > 0 && idx < editPointsDraft.length - 1)
+      .sort((a, b) => a - b);
+    const indices = [0, ...validBounds, editPointsDraft.length - 1];
+    const parts: Array<{
+      startIdx: number;
+      endIdx: number;
+      lengthM: number;
+    }> = [];
+    for (let i = 0; i < indices.length - 1; i++) {
+      const startIdx = indices[i];
+      const endIdx = indices[i + 1];
+      if (endIdx <= startIdx) continue;
+      const coords = editPointsDraft.slice(startIdx, endIdx + 1);
+      parts.push({
+        startIdx,
+        endIdx,
+        lengthM: geometricLength(coords),
+      });
+    }
+    return parts;
+  }, [splitMode, editPointsDraft, splitBoundaries]);
   // Рисование эталонного маршрута (C.5, фаза A2)
   const [drawMode, setDrawMode] = useState(false);
   const [draftPoints, setDraftPoints] = useState<[number, number][]>([]);
@@ -884,6 +1077,240 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     }
   }, [draftPoints, drawMode, mapLoaded]);
 
+  // ==================== Режим редактирования точек эталона ====================
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+
+    // Очистка старых маркеров и линии
+    editMarkersRef.current.forEach((m) => m.remove());
+    editMarkersRef.current = [];
+    if (map.getLayer('edit-draft-line')) map.removeLayer('edit-draft-line');
+    if (map.getSource('edit-draft-line')) map.removeSource('edit-draft-line');
+
+    if (!editPointsMode) return;
+    if (editPointsDraft.length === 0) return;
+
+    // Маркеры
+    editPointsDraft.forEach((p, i) => {
+      const isStart = i === 0;
+      const isEnd = i === editPointsDraft.length - 1 && editPointsDraft.length > 1;
+      const isBoundary =
+        splitMode && splitBoundaries.has(i) && !isStart && !isEnd;
+      const color = isStart
+        ? '#6fbf73'
+        : isEnd
+        ? '#ff5a00'
+        : isBoundary
+        ? '#e53935'
+        : '#8a8a8a';
+      const marker = new Marker({ color, draggable: true })
+        .setLngLat([p[1], p[0]])
+        .addTo(map);
+      const idx = i;
+
+      marker.on('dragend', () => {
+        const ll = marker.getLngLat();
+        setEditPointsDraft((prev) => {
+          const next = [...prev];
+          next[idx] = [ll.lat, ll.lng];
+          return next;
+        });
+      });
+
+      const el = marker.getElement();
+      el.title = isStart
+        ? 'Старт (не удаляется, можно перетащить)'
+        : isEnd
+        ? 'Финиш (ПКМ — удалить, если останется ≥2 точек)'
+        : isBoundary
+        ? `Граница (клик — снять)`
+        : splitMode
+        ? `Клик — сделать границей · ПКМ — удалить`
+        : `Вершина ${idx + 1} (ПКМ — удалить)`;
+
+      el.addEventListener('click', (ev) => {
+        if (!splitMode || isStart || isEnd) return;
+        ev.stopPropagation();
+        setSplitBoundaries((prev) => {
+          const next = new Set(prev);
+          if (next.has(idx)) next.delete(idx);
+          else next.add(idx);
+          return next;
+        });
+      });
+
+      el.addEventListener('contextmenu', (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (isStart) return;
+        if (isEnd) {
+          setEditPointsDraft((prev) =>
+            prev.length > 2 ? prev.slice(0, -1) : prev,
+          );
+          if (splitMode) {
+            setSplitBoundaries((prev) => {
+              const next = new Set<number>();
+              for (const b of prev) {
+                if (b < editPointsDraft.length - 1) next.add(b);
+              }
+              return next;
+            });
+          }
+          return;
+        }
+        setEditPointsDraft((prev) => prev.filter((_, j) => j !== idx));
+        if (splitMode) {
+          setSplitBoundaries((prev) => {
+            const next = new Set<number>();
+            for (const b of prev) {
+              if (b === idx) continue;
+              next.add(b > idx ? b - 1 : b);
+            }
+            return next;
+          });
+        }
+      });
+
+      editMarkersRef.current.push(marker);
+    });
+
+    // Draft-линия
+    if (editPointsDraft.length >= 2) {
+      const coords = editPointsDraft.map((p) => [p[1], p[0]]);
+      map.addSource('edit-draft-line', {
+        type: 'geojson',
+        data: {
+          type: 'Feature',
+          properties: {},
+          geometry: { type: 'LineString', coordinates: coords },
+        },
+      });
+      map.addLayer({
+        id: 'edit-draft-line',
+        type: 'line',
+        source: 'edit-draft-line',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: {
+          'line-color': '#d4a373',
+          'line-width': 4,
+          'line-opacity': 0.75,
+          'line-dasharray': [2, 1],
+        },
+      });
+    }
+  }, [editPointsMode, editPointsDraft, mapLoaded, splitMode, splitBoundaries]);
+
+  // Клик / ПКМ по линии — вставить точку в ближайший сегмент.
+  // Отказались от dblclick: MapLibre требует два клика <300мс по одним
+  // координатам, тонкая линия плохо ловится hit-test'ом, пользователь
+  // кликает мимо. Ручной hit-test с допуском 20px работает стабильно.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded || !editPointsMode) return;
+
+    map.doubleClickZoom.disable();
+
+    const HIT_TOLERANCE_PX = 20;
+
+    // Расстояние от точки до отрезка в экранных координатах.
+    // Возвращает { distancePx, t } — t в [0,1] по длине отрезка.
+    const pointToSegmentPx = (
+      px: number,
+      py: number,
+      ax: number,
+      ay: number,
+      bx: number,
+      by: number,
+    ): { distancePx: number; t: number } => {
+      const dx = bx - ax;
+      const dy = by - ay;
+      const len2 = dx * dx + dy * dy;
+      let t = 0;
+      if (len2 > 0) {
+        t = ((px - ax) * dx + (py - ay) * dy) / len2;
+        t = Math.max(0, Math.min(1, t));
+      }
+      const projX = ax + t * dx;
+      const projY = ay + t * dy;
+      const ddx = px - projX;
+      const ddy = py - projY;
+      return { distancePx: Math.sqrt(ddx * ddx + ddy * ddy), t };
+    };
+
+    const handler = (e: any) => {
+      const draft = editPointsDraftRef.current;
+      if (draft.length < 2) return;
+
+      const px = e.point.x;
+      const py = e.point.y;
+
+      let bestIdx = -1;
+      let bestDist = Infinity;
+      for (let i = 0; i < draft.length - 1; i++) {
+        const a = map.project([draft[i][1], draft[i][0]]);
+        const b = map.project([draft[i + 1][1], draft[i + 1][0]]);
+        const r = pointToSegmentPx(px, py, a.x, a.y, b.x, b.y);
+        if (r.distancePx < bestDist) {
+          bestDist = r.distancePx;
+          bestIdx = i;
+        }
+      }
+
+      if (bestIdx < 0 || bestDist > HIT_TOLERANCE_PX) return;
+
+      const clickLat = e.lngLat.lat;
+      const clickLng = e.lngLat.lng;
+      const insertAt = bestIdx + 1;
+
+      setEditPointsDraft((prev) => {
+        const next = [...prev];
+        next.splice(insertAt, 0, [clickLat, clickLng]);
+        return next;
+      });
+      if (splitMode) {
+        setSplitBoundaries((prev) => {
+          const next = new Set<number>();
+          for (const b of prev) {
+            next.add(b >= insertAt ? b + 1 : b);
+          }
+          return next;
+        });
+      }
+    };
+
+    map.on('click', handler);
+    map.on('contextmenu', handler);
+
+    return () => {
+      map.off('click', handler);
+      map.off('contextmenu', handler);
+      map.doubleClickZoom.enable();
+    };
+  }, [editPointsMode, mapLoaded, splitMode]);
+
+  // Escape → отмена edit-режима
+  useEffect(() => {
+    if (!editPointsMode) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setEditPointsMode(false);
+        setEditPointsRefId(null);
+        setEditPointsDraft([]);
+        setEditPointsSaveStatus('idle');
+        setEditPointsSaveError('');
+        setSplitMode(false);
+        setSplitBoundaries(new Set());
+        setSplitSaveStatus('idle');
+        setSplitSaveError('');
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [editPointsMode]);
+
+
   // Escape → отмена режима рисования
   useEffect(() => {
     if (!drawMode) return;
@@ -1002,6 +1429,204 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     }
   }, [visible, activeTab]);
 
+  // Пересборка grid-индексов при изменении эталонов или радиусов
+  useEffect(() => {
+    const next = new Map<number, RefIndex>();
+    for (const ref of referenceTracks) {
+      if (ref.coords.length >= 2) {
+        next.set(ref.id, buildRefIndex(ref.coords));
+      }
+    }
+    refIndexesCacheRef.current = next;
+    // Инвалидируем кеш отклонений — атомы или радиусы изменились
+    coverageCacheRef.current = new Map();
+  }, [
+    referenceTracks, 
+    coverageThresholds.coverageRadiusM, 
+    coverageThresholds.onRefRadiusM
+  ]);
+
+  // Загрузка latlng для видимых пробежек (batch)
+  useEffect(() => {
+    if (!visible) return;
+    if (referenceTracks.length === 0) return;
+    if (visibleGroups.length === 0) return;
+
+    const missing: number[] = [];
+    for (const g of visibleGroups) {
+      if (!batchLatlng.has(g.primary.id)) {
+        missing.push(g.primary.id);
+      }
+    }
+    if (missing.length === 0) return;
+
+    let cancelled = false;
+    api.pb
+      .runLatlngBatch(missing, { samples: 1000 })
+      .then((res: any) => {
+        if (cancelled || !res?.success) return;
+        setBatchLatlng((prev) => {
+          const next = new Map(prev);
+          for (const [idStr, data] of Object.entries(res.data ?? {})) {
+            next.set(Number(idStr), data as any);
+          }
+          return next;
+        });
+      })
+      .catch((err: any) => {
+        console.error('[pb-map] run-latlng-batch error:', err);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [visible, visibleGroups, referenceTracks.length, batchLatlng, api]);
+
+  // Batch coverage для всех видимых пробежек
+  const batchCoverage = useMemo(() => {
+    const result = new Map<
+      number,
+      Array<{
+        refId: number;
+        cls: CoverageClass;
+        ratio: number;
+        repeats: number;
+        score: number;
+        dev: FastDeviationResult;
+      }>
+    >();
+    if (referenceTracks.length === 0) return result;
+    if (batchLatlng.size === 0) return result;
+
+    for (const g of visibleGroups) {
+      const factId = g.primary.id;
+      const track = batchLatlng.get(factId);
+      if (!track || track.latlng.length < 10) continue;
+
+      const arr: Array<{
+        refId: number;
+        cls: CoverageClass;
+        ratio: number;
+        repeats: number;
+        score: number;
+        dev: FastDeviationResult;
+      }> = [];
+
+      for (const ref of referenceTracks) {
+        const idx = refIndexesCacheRef.current.get(ref.id);
+        if (!idx) continue;
+
+        let dev = coverageCacheRef.current.get(factId)?.get(ref.id);
+        if (!dev) {
+          dev = computeDeviationFast(
+            track.latlng, 
+            idx, 
+            coverageThresholds.coverageRadiusM, 
+            coverageThresholds.onRefRadiusM
+          ) ?? undefined;
+          if (!dev) continue;
+          let m = coverageCacheRef.current.get(factId);
+          if (!m) {
+            m = new Map();
+            coverageCacheRef.current.set(factId, m);
+          }
+          m.set(ref.id, dev);
+        }
+
+        const clsRes = classifyCoverage(
+          {
+            coveragePct: dev.coveragePct,
+            medianM: dev.medianM,
+            metersOnRef: dev.metersOnRef,
+            atomLenM: ref.lengthM,
+            atomKind: ref.kind,
+            repeats: dev.repeats,
+          },
+          coverageThresholds,
+        );
+
+        arr.push({ refId: ref.id, ...clsRes, dev });
+      }
+
+      arr.sort((a, b) => b.score - a.score);
+      result.set(factId, arr);
+    }
+    return result;
+  }, [
+    visibleGroups,
+    referenceTracks,
+    batchLatlng,
+    coverageThresholds,
+  ]);
+
+  const primaryPerRun = useMemo(() => {
+    const result = new Map<
+      number,
+      {
+        refId: number;
+        name: string;
+        repeats: number;
+        coveragePct: number;
+        isLoop: boolean;
+        alsoUsed: Array<{
+          refId: number;
+          name: string;
+          coveragePct: number;
+          repeats: number;
+        }>;
+      }
+    >();
+
+    for (const [factId, arr] of batchCoverage.entries()) {
+      const used = arr.filter((x) => x.cls === 'used');
+      if (used.length === 0) continue;
+      
+      // primary = самый длинный пройденный эталон.
+      // Логика:
+      // 1. Сначала идут "идеальные" (coverage >= 95%). Среди них выигрывает самый длинный.
+      // 2. Потом остальные (coverage 70..94%). Выигрывает тот, у кого (coverage * length) больше.
+      // Это гарантирует, что 100% длинного круга победит 100% короткого,
+      // а 75% длинного проиграет 100% короткого.
+      const scored = used.map((u) => {
+        const r = referenceTracks.find((x) => x.id === u.refId);
+        const len = r?.lengthM || 0;
+        const isPerfect = u.dev.coveragePct >= 95;
+        const isLoop = r?.kind === 'loop' || r?.kind === 'stadium';
+        
+        return { 
+          ...u, 
+          ref: r, 
+          isLoop,
+          isPerfect,
+          sortScore: isPerfect ? len : u.dev.coveragePct * len 
+        };
+      });
+
+      scored.sort((a, b) => {
+        if (a.isPerfect && !b.isPerfect) return -1;
+        if (!a.isPerfect && b.isPerfect) return 1;
+        return b.sortScore - a.sortScore;
+      });
+      const best = scored[0];
+      if (!best.ref) continue;
+
+      result.set(factId, {
+        refId: best.ref.id,
+        name: best.ref.name,
+        repeats: best.repeats,
+        coveragePct: best.dev.coveragePct,
+        isLoop: best.isLoop,
+        alsoUsed: scored.slice(1).map((u) => ({
+          refId: u.refId,
+          name: u.ref?.name ?? `#${u.refId}`,
+          coveragePct: u.dev.coveragePct,
+          repeats: u.repeats,
+        })),
+      });
+    }
+    return result;
+  }, [batchCoverage, referenceTracks]);
+
   // Очистка
   useEffect(() => {
     if (!visible && mapRef.current) {
@@ -1026,6 +1651,20 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
       setSaveRefVisible(false);
       setSelectedRefTrackId(null);
       setMapLoaded(false);
+      setEditPointsMode(false);
+      setEditPointsRefId(null);
+      setEditPointsDraft([]);
+      setEditPointsSaveStatus('idle');
+      setEditPointsSaveError('');
+      setSplitMode(false);
+      setSplitBoundaries(new Set());
+      setSplitSaveStatus('idle');
+      setSplitSaveError('');
+      setBatchLatlng(new Map());
+      refIndexesCacheRef.current = new Map();
+      coverageCacheRef.current = new Map();
+      editMarkersRef.current.forEach((m) => m.remove());
+      editMarkersRef.current = [];
     }
   }, [visible]);
 
@@ -1742,6 +2381,139 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     }
   };
 
+  // ==================== Редактирование точек эталона ====================
+
+  const openEditPoints = (ref: {
+    id: number;
+    coords: [number, number][];
+  }) => {
+    if (drawMode) {
+      setDrawMode(false);
+      setDraftPoints([]);
+      setSaveRefVisible(false);
+    }
+    if (markupMode) setMarkupMode(false);
+    setSelectedRefTrackId(ref.id);
+    setEditPointsRefId(ref.id);
+    setEditPointsDraft(ref.coords.map((p) => [p[0], p[1]] as [number, number]));
+    setEditPointsSaveStatus('idle');
+    setEditPointsSaveError('');
+    setSplitMode(false);
+    setSplitBoundaries(new Set());
+    setSplitDeleteSource(true);
+    setSplitSaveStatus('idle');
+    setSplitSaveError('');
+    setEditPointsMode(true);
+  };
+
+  const closeEditPoints = () => {
+    setEditPointsMode(false);
+    setEditPointsRefId(null);
+    setEditPointsDraft([]);
+    setEditPointsSaveStatus('idle');
+    setEditPointsSaveError('');
+    setSplitMode(false);
+    setSplitBoundaries(new Set());
+    setSplitSaveStatus('idle');
+    setSplitSaveError('');
+  };
+
+  const toggleSplitMode = (on: boolean) => {
+    setSplitMode(on);
+    if (!on) {
+      setSplitBoundaries(new Set());
+      setSplitSaveStatus('idle');
+      setSplitSaveError('');
+    }
+  };
+
+  const handleOptimizeEditPoints = () => {
+    if (splitMode) return;
+    if (editPointsDraft.length < 3) return;
+    const simplified = simplifyDP(editPointsDraft, editPointsDpEpsilon);
+    setEditPointsDraft(simplified);
+  };
+
+  const handleSplitAtom = async () => {
+    if (!editPointsRefId || splitParts.length < 2) return;
+    setSplitSaveStatus('saving');
+    setSplitSaveError('');
+    try {
+      // Если оставляем исходный — сохраним геометрию (правки drag'ом)
+      if (!splitDeleteSource) {
+        const saveRes = await api.pb.referenceTrackUpdate(editPointsRefId, {
+          coords: editPointsDraft,
+        });
+        if (!saveRes?.success) {
+          setSplitSaveError(saveRes?.error ?? 'Не удалось сохранить геометрию');
+          setSplitSaveStatus('error');
+          return;
+        }
+      }
+
+      // Базовое имя без хвоста " · ч.N" — чтобы при повторном
+      // разделении не получалось "ч.2 · ч.1".
+      const rawName =
+        editPointsSourceAtom?.name ?? `#${editPointsRefId}`;
+      const sourceName = rawName.replace(/\s*·\s*ч\.\d+\s*$/u, '').trim();
+      const sourceCategory = editPointsSourceAtom?.category ?? null;
+
+      const parts = splitParts.map((p, i) => ({
+        startIdx: p.startIdx,
+        endIdx: p.endIdx,
+        name: `${sourceName} · ч.${i + 1}`,
+        category: sourceCategory,
+        tags: [],
+      }));
+
+      const res = await api.pb.referenceTrackSplit(editPointsRefId, parts, {
+        deleteSource: splitDeleteSource,
+      });
+
+      if (res?.success) {
+        setSplitSaveStatus('saved');
+        void loadReferenceTracks();
+        setActiveTab('refs');
+        setTimeout(() => {
+          closeEditPoints();
+        }, 800);
+      } else {
+        setSplitSaveError(res?.error ?? 'Не удалось разделить');
+        setSplitSaveStatus('error');
+      }
+    } catch (e) {
+      setSplitSaveError((e as Error).message);
+      setSplitSaveStatus('error');
+    }
+  };
+
+  const handleSaveEditPoints = async () => {
+    if (!editPointsRefId || editPointsDraft.length < 2) return;
+    setEditPointsSaveStatus('saving');
+    setEditPointsSaveError('');
+    try {
+      const res = await api.pb.referenceTrackUpdate(editPointsRefId, {
+        coords: editPointsDraft,
+      });
+      if (res?.success) {
+        setEditPointsSaveStatus('saved');
+        void loadReferenceTracks();
+        setTimeout(() => {
+          setEditPointsMode(false);
+          setEditPointsRefId(null);
+          setEditPointsDraft([]);
+          setEditPointsSaveStatus('idle');
+        }, 700);
+      } else {
+        setEditPointsSaveError(res?.error ?? 'Не удалось сохранить');
+        setEditPointsSaveStatus('error');
+      }
+    } catch (e) {
+      setEditPointsSaveError((e as Error).message);
+      setEditPointsSaveStatus('error');
+    }
+  };
+
   const fmtRefLength = (m: number): string => {
     if (m < 1000) return `${Math.round(m)} м`;
     return `${(m / 1000).toFixed(2)} км`;
@@ -1810,6 +2582,39 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     }
   };*/
 
+  const toggleRunSelection = (runFactId: number) => {
+    setSelectedRunIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(runFactId)) next.delete(runFactId);
+      else next.add(runFactId);
+      return next;
+    });
+  };
+
+  const selectedRunsForMedian = useMemo(() => {
+    const out: Array<{
+      runFactId: number;
+      name: string;
+      date: string;
+      source: string;
+      lengthM: number;
+    }> = [];
+    for (const g of groupedRuns) {
+      for (const it of g.items ?? []) {
+        if (selectedRunIds.has(it.id)) {
+          out.push({
+            runFactId: it.id,
+            name: g.displayName,
+            date: g.date,
+            source: it.source,
+            lengthM: (it.actual_km ?? 0) * 1000,
+          });
+        }
+      }
+    }
+    return out;
+  }, [groupedRuns, selectedRunIds]);
+
   // ==================== Рендер ====================
 
   return (
@@ -1875,8 +2680,47 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
               </div>
             </div>
 
+
+
             {activeTab === 'runs' && (
               <>
+                {selectedRunIds.size >= 2 && (
+                  <div
+                    style={{
+                      padding: '0.5rem 0.75rem',
+                      borderBottom: '1px solid var(--surface-border)',
+                      background: 'rgba(212, 163, 115, 0.08)',
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        marginBottom: '0.4rem',
+                        fontSize: '0.75rem',
+                      }}
+                    >
+                      <span style={{ color: 'var(--pb-accent)', fontWeight: 600 }}>
+                        Выбрано: {selectedRunIds.size}
+                      </span>
+                      <Button
+                        label="Снять"
+                        icon="pi pi-times"
+                        text
+                        className="pb-soft p-button-sm"
+                        onClick={() => setSelectedRunIds(new Set())}
+                        style={{ marginLeft: 'auto', padding: '0.1rem 0.5rem', fontSize: '0.7rem' }}
+                      />
+                    </div>
+                    <Button
+                      label="Построить медианный трек"
+                      icon="pi pi-chart-line"
+                      className="pb p-button-sm w-full"
+                      onClick={() => setMedianDialogVisible(true)}
+                    />
+                  </div>
+                )}
                 <div style={{ padding: '0.75rem', borderBottom: '1px solid var(--surface-border)' }}>
                   <div className="pb-run-filters__row">
                     <label className="pb-label">Поиск по названию</label>
@@ -1906,19 +2750,84 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                         padding: '0.5rem', cursor: 'pointer', borderRadius: '4px', marginBottom: '0.25rem',
                         background: isSelected ? 'rgba(212,163,115,0.15)' : 'transparent',
                         border: isSelected ? '1px solid var(--pb-accent)' : '1px solid transparent',
+                        display: 'flex',
+                        gap: '0.5rem',
+                        alignItems: 'flex-start',
                       }}
                     >
+                      <label
+                        className="pb-checkbox-dark"
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          display: 'inline-flex',
+                          cursor: 'pointer',
+                          marginTop: '0.1rem',
+                          flexShrink: 0,
+                        }}
+                        title="Отметить для построения медианного трека"
+                      >
+                        <Checkbox
+                          checked={selectedRunIds.has(g.primary.id)}
+                          onChange={() => toggleRunSelection(g.primary.id)}
+                        />
+                      </label>
+                      <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>{g.displayName}</span>
                         <span style={{ fontSize: '0.7rem', color: 'var(--tg-hint)' }}>{g.date}</span>
                       </div>
-                      <div className="pb-source-badges" style={{ marginTop: '0.25rem', alignItems: 'center' }}>
+                      <div className="pb-source-badges" style={{ marginTop: '0.25rem', alignItems: 'center', flexWrap: 'wrap', gap: '0.25rem' }}>
                         {g.sources.map((s: any) => (
                           <span key={s} className={`pb-source-badge pb-source-badge--${s}`}>{s}</span>
                         ))}
+                        {(() => {
+                          const prim = primaryPerRun.get(g.primary.id);
+                          if (!prim) return null;
+                          const tooltip =
+                            `Primary: ${prim.name} (${prim.isLoop ? `×${prim.repeats}, ` : ''}${prim.coveragePct}%)` +
+                            (prim.alsoUsed.length > 0
+                              ? '\nТакже на: ' +
+                                prim.alsoUsed
+                                  .map(
+                                    (u) =>
+                                      `${u.name} (${u.coveragePct}%)`,
+                                  )
+                                  .join(', ')
+                              : '');
+                          return (
+                            <span
+                              title={tooltip}
+                              style={{
+                                fontSize: '0.65rem',
+                                padding: '0.05rem 0.35rem',
+                                borderRadius: 3,
+                                background: 'rgba(106, 178, 242, 0.15)',
+                                color: '#6ab2f2',
+                                fontWeight: 600,
+                                cursor: 'help',
+                                maxWidth: '11rem',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                                display: 'inline-block',
+                              }}
+                            >
+                              {prim.isLoop && prim.repeats > 0
+                                ? `×${prim.repeats}`
+                                : `${prim.coveragePct}%`}
+                              {' · '}
+                              <span style={{ opacity: 0.85, fontWeight: 400 }}>
+                                {prim.name.length > 14
+                                  ? prim.name.slice(0, 14) + '…'
+                                  : prim.name}
+                              </span>
+                            </span>
+                          );
+                        })()}
                         <span style={{ fontSize: '0.7rem', color: 'var(--tg-hint)', marginLeft: 'auto' }}>
                           {g.primary.actual_km ? `${g.primary.actual_km.toFixed(2)} км` : ''}
                         </span>
+                      </div>
                       </div>
                     </div>
                   );
@@ -1990,7 +2899,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
 
                 {/* Настройки активного слоя */}
                 {activeLayer && (
-                  <div className="pb-connections__block">
+                  <div className="pb-connections__block mt-2">
                     <div className="pb-connections__title">Свойства: {activeLayer.name}</div>
                     {(['opacity','brightnessMin','brightnessMax','saturation','contrast','hueRotate'] as (keyof RasterLayer)[]).map(k => (
                       <div key={k} style={{ marginTop: '0.75rem' }}>
@@ -2016,7 +2925,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                 )}
 
                 {/* Настройки трека */}
-                <div className="pb-connections__block">
+                <div className="pb-connections__block mt-2">
                   <div className="pb-connections__title">Настройки трека</div>
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.75rem' }}>
@@ -2073,7 +2982,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                 </div>
 
                 {/* Градиент по данным */}
-                <div className="pb-connections__block">
+                <div className="pb-connections__block mt-2">
                   <div className="pb-connections__title">Градиент по данным</div>
 
                   <div style={{ marginTop: '0.75rem' }}>
@@ -2113,6 +3022,103 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                       )}
                     </>
                   )}
+                </div>
+
+                {/* Пороги автоопределения */}
+                <div id="pb-coverage-thresholds" className="pb-connections__block mt-2">
+                  <div className="pb-connections__title">
+                    <i className="pi pi-sliders-h" /> Пороги автоопределения
+                  </div>
+
+                  {(
+                    [
+                      {
+                        key: 'coverageUsed' as const,
+                        label: 'Coverage для used',
+                        min: 50, max: 95, step: 1, suffix: '%',
+                      },
+                      {
+                        key: 'coverageSimilar' as const,
+                        label: 'Coverage для similar',
+                        min: 20, max: 70, step: 1, suffix: '%',
+                      },
+                      {
+                        key: 'ratioLoopMin' as const,
+                        label: 'Ratio loop (мин.)',
+                        min: 0.7, max: 1.2, step: 0.05, suffix: '',
+                      },
+                      {
+                        key: 'ratioLinearMin' as const,
+                        label: 'Ratio linear (мин.)',
+                        min: 0.5, max: 1.0, step: 0.05, suffix: '',
+                      },
+                      {
+                        key: 'ratioLinearMax' as const,
+                        label: 'Ratio linear (макс.)',
+                        min: 1.0, max: 2.0, step: 0.05, suffix: '',
+                      },
+                      {
+                        key: 'medianMaxM' as const,
+                        label: 'Медиана откл. (макс., м)',
+                        min: 20, max: 200, step: 5, suffix: ' м',
+                      },
+                      {
+                        key: 'coverageRadiusM' as const,
+                        label: 'Радиус покрытия',
+                        min: 5, max: 50, step: 1, suffix: ' м',
+                      },
+                      {
+                        key: 'onRefRadiusM' as const,
+                        label: 'Радиус на эталоне',
+                        min: 10, max: 100, step: 5, suffix: ' м',
+                      },
+                    ] as const
+                  ).map((p) => (
+                    <div key={p.key} style={{ marginTop: '0.6rem' }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          fontSize: '0.72rem',
+                          color: 'var(--tg-hint)',
+                        }}
+                      >
+                        <span>{p.label}</span>
+                        <span style={{ fontFamily: 'monospace' }}>
+                          {coverageThresholds[p.key]}
+                          {p.suffix}
+                        </span>
+                      </div>
+                      <Slider
+                        value={coverageThresholds[p.key]}
+                        min={p.min}
+                        max={p.max}
+                        step={p.step}
+                        onChange={(e) => {
+                          const val = e.value as number;
+                          const next = {
+                            ...coverageThresholds,
+                            [p.key]: val,
+                          };
+                          setCoverageThresholds(next);
+                          saveCoverageThresholds(next);
+                        }}
+                      />
+                    </div>
+                  ))}
+
+                  <Button
+                    label="Сбросить к дефолтам"
+                    icon="pi pi-refresh"
+                    className="pb-soft p-button-sm w-full mt-3"
+                    onClick={() => {
+                      setCoverageThresholds(DEFAULT_COVERAGE_THRESHOLDS);
+                      saveCoverageThresholds(DEFAULT_COVERAGE_THRESHOLDS);
+                    }}
+                  />
+                  <div className="pb-hint" style={{ fontSize: '0.7rem', marginTop: '0.4rem' }}>
+                    Влияют на классификацию used / similar и выбор primary-атома. Пересчёт мгновенный.
+                  </div>
                 </div>
 
               </div>
@@ -2471,6 +3477,29 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                     tooltipOptions={{ position: 'bottom' }}
                   />
                   <Button
+                    icon="pi pi-sliders-h"
+                    text
+                    className="pb-soft p-button-sm"
+                    style={{
+                      padding: '0.1rem',
+                      width: '1.8rem',
+                      height: '1.8rem',
+                    }}
+                    onClick={() => {
+                      setActiveTab('filters');
+                      setTimeout(() => {
+                        document
+                          .getElementById('pb-coverage-thresholds')
+                          ?.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'start',
+                          });
+                      }, 150);
+                    }}
+                    tooltip="Пороги автоопределения"
+                    tooltipOptions={{ position: 'bottom' }}
+                  />
+                  <Button
                     icon="pi pi-refresh"
                     text
                     className="pb-soft p-button-sm"
@@ -2597,6 +3626,29 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                           >
                             <span>{fmtRefLength(ref.lengthM)}</span>
                             <span>{refKindLabel(ref.kind)}</span>
+                            {ref.kind === 'loop' &&
+                              refDeviations[ref.id] &&
+                              refDeviations[ref.id].repeats > 0 &&
+                              (() => {
+                                const repeats = refDeviations[ref.id].repeats;
+                                const coverage =
+                                  refDeviations[ref.id].coveragePct;
+                                return (
+                                  <span
+                                    style={{
+                                      fontSize: '0.65rem',
+                                      padding: '0.05rem 0.3rem',
+                                      borderRadius: 3,
+                                      background: 'rgba(106, 178, 242, 0.15)',
+                                      color: '#6ab2f2',
+                                      fontWeight: 600,
+                                    }}
+                                    title={`Кругов: ${repeats} (покрытие ${coverage}%)`}
+                                  >
+                                    ×{repeats}
+                                  </span>
+                                );
+                              })()}
                             <span>{fmtRefDate(ref.createdAt)}</span>
                             {ref.tags.length > 0 && (
                               <span style={{ color: 'var(--pb-accent)', opacity: 0.7 }}>
@@ -2824,6 +3876,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                     className="pb-drawer__name-edit"
                     onClick={() => {
                       if (markupMode) setMarkupMode(false);
+                      if (editPointsMode) closeEditPoints();
                       if (drawMode) {
                         // Выход из режима рисования
                         setDrawMode(false);
@@ -2839,6 +3892,52 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                     tooltipOptions={{ position: 'bottom' }}
                     style={{ color: drawMode ? 'var(--pb-accent)' : undefined }}
                     disabled={markupMode}
+                  />
+                </div>
+
+                {/* Кнопка Редактировать точки выбранного эталона */}
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: editPointsMode
+                    ? 'rgba(212, 163, 115, 0.2)'
+                    : 'rgba(23, 33, 43, 0.85)',
+                  borderRadius: '6px',
+                  border: `1px solid ${editPointsMode ? 'var(--pb-accent)' : 'var(--surface-border)'}`,
+                  backdropFilter: 'blur(4px)',
+                  pointerEvents: 'auto',
+                  height: '2.5rem',
+                  width: '2.5rem',
+                  boxSizing: 'border-box',
+                  opacity: selectedRefTrackId == null && !editPointsMode ? 0.5 : 1,
+                }}>
+                  <Button
+                    icon="pi pi-expand"
+                    text
+                    className="pb-drawer__name-edit"
+                    onClick={() => {
+                      if (editPointsMode) {
+                        closeEditPoints();
+                        return;
+                      }
+                      if (markupMode) setMarkupMode(false);
+                      if (drawMode) {
+                        setDrawMode(false);
+                        setDraftPoints([]);
+                        setSaveRefVisible(false);
+                      }
+                      const ref = referenceTracks.find((r) => r.id === selectedRefTrackId);
+                      if (ref) openEditPoints(ref);
+                    }}
+                    tooltip={
+                      editPointsMode
+                        ? 'Выйти из редактирования точек (Esc)'
+                        : selectedRefTrackId == null
+                        ? 'Сначала выберите эталон на карте'
+                        : 'Редактировать точки эталона'
+                    }
+                    tooltipOptions={{ position: 'bottom' }}
+                    style={{ color: editPointsMode ? 'var(--pb-accent)' : undefined }}
+                    disabled={selectedRefTrackId == null && !editPointsMode}
                   />
                 </div>
 
@@ -3103,7 +4202,277 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
             </div>
           )}
 
-                    {/* Панель рисования эталона */}
+          {/* Панель редактирования точек эталона */}
+          {editPointsMode && editPointsRefId && (
+            <div
+              style={{
+                position: 'absolute',
+                bottom: 10,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                zIndex: 5,
+                background: 'rgba(23, 33, 43, 0.92)',
+                border: '1px solid var(--pb-accent)',
+                borderRadius: 8,
+                padding: '0.5rem 0.75rem',
+                backdropFilter: 'blur(4px)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.4rem',
+                pointerEvents: 'auto',
+                minWidth: '340px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem' }}>
+                <i className="pi pi-expand" style={{ color: 'var(--pb-accent)' }} />
+                <span style={{ color: 'var(--pb-accent)', fontWeight: 600 }}>
+                  Редактирование точек
+                </span>
+                <span className="pb-hint" style={{ marginLeft: 'auto', fontSize: '0.72rem' }}>
+                  Drag · Клик по линии — добавить · ПКМ на точке — удалить
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.75rem', flexWrap: 'wrap' }}>
+                <span>
+                  Точек: <b style={{ fontFamily: 'monospace' }}>{editPointsDraft.length}</b>
+                </span>
+                <span>
+                  Длина: <b style={{ fontFamily: 'monospace' }}>{Math.round(editDraftLength).toLocaleString('ru-RU')} м</b>
+                </span>
+                <span style={{ color: 'var(--tg-hint)', fontSize: '0.7rem' }}>
+                  Esc — отмена
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span style={{ color: 'var(--tg-hint)', fontSize: '0.72rem' }}>DP:</span>
+                <select
+                  value={editPointsDpEpsilon}
+                  onChange={(e) => setEditPointsDpEpsilon(Number(e.target.value))}
+                  disabled={editPointsSaveStatus === 'saving' || splitMode}
+                  style={{
+                    background: 'rgba(0,0,0,0.3)',
+                    color: 'var(--tg-text)',
+                    border: '1px solid var(--surface-border)',
+                    borderRadius: 4,
+                    padding: '0.15rem 0.35rem',
+                    fontSize: '0.72rem',
+                  }}
+                >
+                  <option value={2}>2 м (точно)</option>
+                  <option value={5}>5 м (средне)</option>
+                  <option value={10}>10 м (грубо)</option>
+                  <option value={20}>20 м (оч. грубо)</option>
+                </select>
+                <Button
+                  label="Оптимизировать"
+                  icon="pi pi-filter"
+                  className="pb-soft p-button-sm"
+                  onClick={handleOptimizeEditPoints}
+                  disabled={
+                    editPointsDraft.length < 3 ||
+                    editPointsSaveStatus === 'saving' ||
+                    splitMode
+                  }
+                  tooltip={
+                    splitMode
+                      ? 'Недоступно в режиме разделения'
+                      : 'Удалить точки на прямых участках'
+                  }
+                  tooltipOptions={{ position: 'top' }}
+                />
+              </div>
+
+              {/* Разделение на атомы */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  paddingTop: '0.4rem',
+                  borderTop: '1px solid var(--surface-border)',
+                  marginTop: '0.2rem',
+                }}
+              >
+                <label
+                  className="pb-check-row pb-checkbox-dark"
+                  style={{ cursor: 'pointer', fontSize: '0.75rem' }}
+                >
+                  <Checkbox
+                    checked={splitMode}
+                    onChange={(e) => toggleSplitMode(!!e.checked)}
+                    disabled={
+                      editPointsSaveStatus === 'saving' ||
+                      splitSaveStatus === 'saving'
+                    }
+                  />
+                  <span>Разделить на атомы</span>
+                </label>
+                {splitMode && (
+                  <span
+                    className="pb-hint"
+                    style={{ fontSize: '0.7rem', marginLeft: 'auto' }}
+                  >
+                    Клик по серой вершине — граница
+                  </span>
+                )}
+              </div>
+
+              {splitMode && (
+                <>
+                  {splitParts.length >= 2 ? (
+                    <div
+                      style={{
+                        background: 'rgba(106, 178, 242, 0.08)',
+                        border: '1px solid rgba(106, 178, 242, 0.3)',
+                        borderRadius: 6,
+                        padding: '0.4rem 0.55rem',
+                        fontSize: '0.72rem',
+                      }}
+                    >
+                      <div
+                        style={{
+                          color: '#6ab2f2',
+                          fontWeight: 600,
+                          marginBottom: '0.25rem',
+                        }}
+                      >
+                        Границ: {splitParts.length - 1} →{' '}
+                        {splitParts.length}{' '}
+                        {splitParts.length === 1
+                          ? 'атом'
+                          : splitParts.length < 5
+                          ? 'атома'
+                          : 'атомов'}
+                      </div>
+                      <div
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.15rem',
+                        }}
+                      >
+                        {splitParts.map((p, i) => (
+                          <div
+                            key={i}
+                            style={{
+                              display: 'flex',
+                              gap: '0.4rem',
+                              color: 'var(--tg-hint)',
+                            }}
+                          >
+                            <span style={{ minWidth: '4.5rem' }}>ч.{i + 1}:</span>
+                            <span style={{ fontFamily: 'monospace' }}>
+                              {p.endIdx - p.startIdx + 1} точ. ·{' '}
+                              {Math.round(p.lengthM)} м
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                      <label
+                        className="pb-check-row pb-checkbox-dark"
+                        style={{
+                          cursor: 'pointer',
+                          fontSize: '0.72rem',
+                          marginTop: '0.3rem',
+                        }}
+                      >
+                        <Checkbox
+                          checked={splitDeleteSource}
+                          onChange={(e) => setSplitDeleteSource(!!e.checked)}
+                          disabled={splitSaveStatus === 'saving'}
+                        />
+                        <span>Удалить исходный атом после разделения</span>
+                      </label>
+                    </div>
+                  ) : (
+                    <div
+                      className="pb-hint"
+                      style={{
+                        fontSize: '0.72rem',
+                        textAlign: 'center',
+                        padding: '0.3rem',
+                      }}
+                    >
+                      Поставь хотя бы одну границу кликом по серой вершине
+                    </div>
+                  )}
+                </>
+              )}
+
+              <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.2rem' }}>
+                <Button
+                  label="Отмена"
+                  icon="pi pi-times"
+                  className="pb-destructive-soft p-button-sm"
+                  onClick={closeEditPoints}
+                  disabled={
+                    editPointsSaveStatus === 'saving' ||
+                    splitSaveStatus === 'saving'
+                  }
+                  style={{ flex: 1 }}
+                />
+                {splitMode ? (
+                  <Button
+                    label={
+                      splitSaveStatus === 'saving'
+                        ? 'Разделение…'
+                        : splitSaveStatus === 'saved'
+                        ? 'Разделено'
+                        : `Разделить (${splitParts.length})`
+                    }
+                    icon={
+                      splitSaveStatus === 'saving'
+                        ? 'pi pi-spin pi-spinner'
+                        : splitSaveStatus === 'saved'
+                        ? 'pi pi-check'
+                        : 'pi pi-sitemap'
+                    }
+                    className="pb p-button-sm"
+                    onClick={handleSplitAtom}
+                    disabled={
+                      splitParts.length < 2 ||
+                      splitSaveStatus === 'saving' ||
+                      splitSaveStatus === 'saved'
+                    }
+                    style={{ flex: 1 }}
+                  />
+                ) : (
+                  <Button
+                    label={
+                      editPointsSaveStatus === 'saving'
+                        ? 'Сохранение…'
+                        : editPointsSaveStatus === 'saved'
+                        ? 'Сохранено'
+                        : 'Сохранить'
+                    }
+                    icon={
+                      editPointsSaveStatus === 'saving'
+                        ? 'pi pi-spin pi-spinner'
+                        : editPointsSaveStatus === 'saved'
+                        ? 'pi pi-check'
+                        : 'pi pi-save'
+                    }
+                    className="pb p-button-sm"
+                    onClick={handleSaveEditPoints}
+                    disabled={
+                      editPointsDraft.length < 2 ||
+                      editPointsSaveStatus === 'saving' ||
+                      editPointsSaveStatus === 'saved'
+                    }
+                    style={{ flex: 1 }}
+                  />
+                )}
+              </div>
+              {(editPointsSaveStatus === 'error' ||
+                splitSaveStatus === 'error') && (
+                <div style={{ color: 'var(--tg-destructive)', fontSize: '0.72rem' }}>
+                  {editPointsSaveError || splitSaveError}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Панель рисования эталона */}
           {drawMode && (
             <div
               style={{
@@ -3207,7 +4576,19 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
         </div>
       </div>
 
-            {testPoint && (
+      <MedianTrackDialog
+        visible={medianDialogVisible}
+        onHide={() => setMedianDialogVisible(false)}
+        selectedRuns={selectedRunsForMedian}
+        onSaved={() => {
+          void loadReferenceTracks();
+          setSelectedRunIds(new Set());
+          // Переключаемся на вкладку «Эталоны» — сразу видно новый
+          setActiveTab('refs');
+        }}
+      />
+
+      {testPoint && (
         <TestCandidatesDialog
           visible={candidatesVisible}
           onHide={() => setCandidatesVisible(false)}

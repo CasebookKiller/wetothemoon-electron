@@ -50,6 +50,8 @@ export interface CreateReferenceTrackInput {
 
 export interface UpdateReferenceTrackPatch {
   name?: string;
+  /** Правка геометрии: при передаче пересчитывается length_m. */
+  coords?: [number, number][];
   kind?: ReferenceTrackKind | null;
   category?: string | null;
   tags?: string[];
@@ -144,6 +146,21 @@ function computeLengthM(coords: [number, number][]): number {
   return Math.round(total);
 }
 
+/**
+ * Определяет kind по совпадению старт/финиш.
+ * Возвращает 'loop', если замыкание < 50 м, иначе 'linear'.
+ */
+export function detectLoopKind(
+  coords: [number, number][],
+): 'loop' | 'linear' {
+  if (coords.length < 2) return 'linear';
+  const first = coords[0];
+  const last = coords[coords.length - 1];
+  return haversineM(first[0], first[1], last[0], last[1]) < 50
+    ? 'loop'
+    : 'linear';
+}
+
 // ==================== Repo ====================
 
 export function createReferenceTrack(
@@ -219,6 +236,28 @@ export function updateReferenceTrack(
     if (!patch.name.trim()) throw new Error('name не может быть пустым');
     sets.push(`name = ?`);
     values.push(patch.name.trim());
+  }
+  if (patch.coords !== undefined) {
+    if (!Array.isArray(patch.coords) || patch.coords.length < 2) {
+      throw new Error('coords: минимум 2 точки');
+    }
+    const cleaned = patch.coords
+      .filter(
+        (p): p is [number, number] =>
+          Array.isArray(p) &&
+          p.length === 2 &&
+          typeof p[0] === 'number' &&
+          typeof p[1] === 'number' &&
+          Number.isFinite(p[0]) &&
+          Number.isFinite(p[1]),
+      );
+    if (cleaned.length < 2) {
+      throw new Error('coords: после фильтрации меньше 2 валидных точек');
+    }
+    sets.push(`coords_json = ?`);
+    values.push(JSON.stringify(cleaned));
+    sets.push(`length_m = ?`);
+    values.push(computeLengthM(cleaned));
   }
   if (patch.kind !== undefined) {
     sets.push(`kind = ?`);
