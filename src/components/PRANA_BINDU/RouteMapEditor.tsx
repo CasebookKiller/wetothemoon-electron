@@ -625,6 +625,13 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     useState<CoverageThresholds>(() => getSavedCoverageThresholds());
   // --- B.3: Секции и фильтр по атому ---
   const [filterByRefId, setFilterByRefId] = useState<number | null>(null);
+    const [groupedRunsView, setGroupedRunsView] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('pb.mapEditor.groupedRuns') !== '0';
+    } catch {
+      return true;
+    }
+  });
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(
     new Set(['similar', 'unused'])
   );
@@ -931,7 +938,13 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     } catch { /* ignore */ }
   }, [testVisible]);
   
-    // ==================== Рисование эталона: клики ====================
+  useEffect(() => {
+    try {
+      localStorage.setItem('pb.mapEditor.groupedRuns', groupedRunsView ? '1' : '0');
+    } catch { /* ignore */ }
+  }, [groupedRunsView]);
+
+  // ==================== Рисование эталона: клики ====================
 
   useEffect(() => {
     const map = mapRef.current;
@@ -2760,6 +2773,27 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                       />
                     </span>
                   </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
+                    <Button
+                      icon={groupedRunsView ? 'pi pi-list' : 'pi pi-th-large'}
+                      label={groupedRunsView ? 'Список' : 'По группам'}
+                      className="pb-soft p-button-sm"
+                      style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem' }}
+                      onClick={() => setGroupedRunsView(!groupedRunsView)}
+                      tooltip={
+                        groupedRunsView
+                          ? 'Показать без секций'
+                          : 'Группировка по статусу (Пройдено / Похоже / Без маршрута)'
+                      }
+                      tooltipOptions={{ position: 'bottom' }}
+                      disabled={referenceTracks.length === 0}
+                    />
+                    {referenceTracks.length === 0 && (
+                      <span className="pb-hint" style={{ fontSize: '0.68rem' }}>
+                        Группировка недоступна
+                      </span>
+                    )}
+                  </div>
                 </div>
                 {filterByRefId !== null && (
                   <div
@@ -2795,7 +2829,85 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                       Загрузка...
                     </div>
                   )}
-                  {!loadingFacts && (() => {
+                  {!loadingFacts && !groupedRunsView && (() => {
+                    // Плоский список — без секций, без группировки
+                    const flat = filterByRefId !== null
+                      ? visibleGroups.filter((g) => {
+                          const covs = batchCoverage.get(g.primary.id);
+                          if (!covs) return false;
+                          const target = covs.find((c) => c.refId === filterByRefId);
+                          return target && (target.cls === 'used' || target.cls === 'similar');
+                        })
+                      : visibleGroups;
+                    return (
+                      <>
+                        {flat.map((g, idx) => {
+                          const isSelected = selectedGroup?.primary.id === g.primary.id && selectedGroup?.startTime === g.startTime;
+                          return (
+                            <div
+                              key={`${g.date}-${g.startTime ?? idx}-${g.primary.id}`}
+                              onClick={() => {
+                                setSelectedGroup(g);
+                                setSelectedSource(g.primary.source);
+                              }}
+                              style={{
+                                padding: '0.5rem',
+                                cursor: 'pointer',
+                                borderRadius: '4px',
+                                marginBottom: '0.25rem',
+                                background: isSelected ? 'rgba(212,163,115,0.15)' : 'transparent',
+                                border: isSelected ? '1px solid var(--pb-accent)' : '1px solid transparent',
+                                display: 'flex',
+                                gap: '0.5rem',
+                                alignItems: 'flex-start',
+                              }}
+                            >
+                              <label
+                                className="pb-checkbox-dark"
+                                onClick={(e) => e.stopPropagation()}
+                                style={{ display: 'inline-flex', cursor: 'pointer', marginTop: '0.1rem', flexShrink: 0 }}
+                                title="Отметить для построения медианного трека"
+                              >
+                                <Checkbox
+                                  checked={selectedRunIds.has(g.primary.id)}
+                                  onChange={() => toggleRunSelection(g.primary.id)}
+                                />
+                              </label>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                  <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>{g.displayName}</span>
+                                  <span style={{ fontSize: '0.7rem', color: 'var(--tg-hint)' }}>{g.date}</span>
+                                </div>
+                                <div className="pb-source-badges" style={{ marginTop: '0.25rem', alignItems: 'center', flexWrap: 'wrap', gap: '0.25rem' }}>
+                                  {g.sources.map((s: any) => (
+                                    <span key={s} className={`pb-source-badge pb-source-badge--${s}`}>{s}</span>
+                                  ))}
+                                  <span style={{ fontSize: '0.7rem', color: 'var(--tg-hint)', marginLeft: 'auto' }}>
+                                    {g.primary.actual_km ? `${g.primary.actual_km.toFixed(2)} км` : ''}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        {flat.length === 0 && (
+                          <div className="pb-hint" style={{ textAlign: 'center', padding: '1rem' }}>
+                            Нет пробежек под этот фильтр
+                          </div>
+                        )}
+                        {visibleCount < filteredGroups.length && filterByRefId === null && (
+                          <div style={{ textAlign: 'center', padding: '0.5rem' }}>
+                            <Button
+                              label="Показать ещё"
+                              className="pb-soft p-button-sm"
+                              onClick={() => setVisibleCount((prev) => prev + CHUNK_SIZE)}
+                            />
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                  {!loadingFacts && groupedRunsView && (() => {
                     const renderSection = (
                       key: string,
                       title: string,
