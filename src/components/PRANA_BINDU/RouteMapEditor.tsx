@@ -480,19 +480,6 @@ function computeDeviation(
   if (repeats < 1 && coveragePct >= 70) {
     repeats = 1;
   }
-  if (refLengthM > 0) {
-    const rawRatio = metersOnRefAcc / refLengthM;
-    repeats = Math.floor(rawRatio);
-    if (coveragePct >= 90) {
-      const rounded = Math.round(rawRatio);
-      if (Math.abs(rawRatio - rounded) < 0.35) {
-        repeats = rounded;
-      }
-    }
-  }
-  if (repeats < 1 && coveragePct >= 70) {
-    repeats = 1;
-  }
 
   return {
     medianM: Math.round(median),
@@ -636,6 +623,11 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
   // --- B.1: batch-coverage ---
   const [coverageThresholds, setCoverageThresholds] =
     useState<CoverageThresholds>(() => getSavedCoverageThresholds());
+  // --- B.3: Секции и фильтр по атому ---
+  const [filterByRefId, setFilterByRefId] = useState<number | null>(null);
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(
+    new Set(['similar', 'unused'])
+  );
   const [batchLatlng, setBatchLatlng] = useState<
     Map<number, { latlng: [number, number][]; lengthM: number }>
   >(new Map());
@@ -650,6 +642,11 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     editPointsDraftRef.current = editPointsDraft;
   }, [editPointsDraft]);
 
+  const editDraftLength = useMemo(
+    () => (editPointsMode ? geometricLength(editPointsDraft) : 0),
+    [editPointsMode, editPointsDraft],
+  );
+
   // Отклонения для всех эталонов на текущем треке (кэшируется между ре-рендерами)
   const refDeviations = useMemo(() => {
     const result: Record<number, DeviationResult> = {};
@@ -662,10 +659,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     }
     return result;
   }, [streamsPayload, referenceTracks]);
-  const editDraftLength = useMemo(
-    () => (editPointsMode ? geometricLength(editPointsDraft) : 0),
-    [editPointsMode, editPointsDraft],
-  );
 
   const editPointsSourceAtom = useMemo(
     () =>
@@ -1626,6 +1619,39 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     }
     return result;
   }, [batchCoverage, referenceTracks]);
+
+
+  // Группировка видимых пробежек для левой панели
+  const categorizedGroups = useMemo(() => {
+    let list = [...visibleGroups];
+
+    // 1. Фильтрация по атому
+    if (filterByRefId !== null) {
+      list = list.filter((g) => {
+        const covs = batchCoverage.get(g.primary.id);
+        if (!covs) return false;
+        const target = covs.find((c) => c.refId === filterByRefId);
+        return target && (target.cls === 'used' || target.cls === 'similar');
+      });
+    }
+
+    // 2. Разбиение на категории
+    const used: typeof list = [];
+    const similar: typeof list = [];
+    const unused: typeof list = [];
+
+    for (const g of list) {
+      const hasPrimary = primaryPerRun.has(g.primary.id);
+      const covs = batchCoverage.get(g.primary.id);
+      const hasSimilar = covs?.some((c) => c.cls === 'similar');
+
+      if (hasPrimary) used.push(g);
+      else if (hasSimilar) similar.push(g);
+      else unused.push(g);
+    }
+
+    return { used, similar, unused };
+  }, [visibleGroups, filterByRefId, batchCoverage, primaryPerRun]);
 
   // Очистка
   useEffect(() => {
@@ -2735,112 +2761,251 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                     </span>
                   </div>
                 </div>
-                <div ref={listRef} style={{ flex: 1, overflowY: 'auto', padding: '0.5rem' }}>
-                  {loadingFacts && <div className="pb-hint" style={{ textAlign: 'center', padding: '1rem' }}>Загрузка...</div>}
-                {!loadingFacts && visibleGroups.map((g, idx) => {
-                  const isSelected = selectedGroup?.primary.id === g.primary.id && selectedGroup?.startTime === g.startTime;
-                  return (
-                    <div
-                      key={`${g.date}-${g.startTime ?? idx}-${g.primary.id}`}
-                      onClick={() => {
-                        setSelectedGroup(g);
-                        setSelectedSource(g.primary.source);
-                      }}
-                      style={{
-                        padding: '0.5rem', cursor: 'pointer', borderRadius: '4px', marginBottom: '0.25rem',
-                        background: isSelected ? 'rgba(212,163,115,0.15)' : 'transparent',
-                        border: isSelected ? '1px solid var(--pb-accent)' : '1px solid transparent',
-                        display: 'flex',
-                        gap: '0.5rem',
-                        alignItems: 'flex-start',
-                      }}
-                    >
-                      <label
-                        className="pb-checkbox-dark"
-                        onClick={(e) => e.stopPropagation()}
-                        style={{
-                          display: 'inline-flex',
-                          cursor: 'pointer',
-                          marginTop: '0.1rem',
-                          flexShrink: 0,
-                        }}
-                        title="Отметить для построения медианного трека"
-                      >
-                        <Checkbox
-                          checked={selectedRunIds.has(g.primary.id)}
-                          onChange={() => toggleRunSelection(g.primary.id)}
-                        />
-                      </label>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>{g.displayName}</span>
-                        <span style={{ fontSize: '0.7rem', color: 'var(--tg-hint)' }}>{g.date}</span>
-                      </div>
-                      <div className="pb-source-badges" style={{ marginTop: '0.25rem', alignItems: 'center', flexWrap: 'wrap', gap: '0.25rem' }}>
-                        {g.sources.map((s: any) => (
-                          <span key={s} className={`pb-source-badge pb-source-badge--${s}`}>{s}</span>
-                        ))}
-                        {(() => {
-                          const prim = primaryPerRun.get(g.primary.id);
-                          if (!prim) return null;
-                          const tooltip =
-                            `Primary: ${prim.name} (${prim.isLoop ? `×${prim.repeats}, ` : ''}${prim.coveragePct}%)` +
-                            (prim.alsoUsed.length > 0
-                              ? '\nТакже на: ' +
-                                prim.alsoUsed
-                                  .map(
-                                    (u) =>
-                                      `${u.name} (${u.coveragePct}%)`,
-                                  )
-                                  .join(', ')
-                              : '');
-                          return (
-                            <span
-                              title={tooltip}
-                              style={{
-                                fontSize: '0.65rem',
-                                padding: '0.05rem 0.35rem',
-                                borderRadius: 3,
-                                background: 'rgba(106, 178, 242, 0.15)',
-                                color: '#6ab2f2',
-                                fontWeight: 600,
-                                cursor: 'help',
-                                maxWidth: '11rem',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
-                                display: 'inline-block',
-                              }}
-                            >
-                              {prim.isLoop && prim.repeats > 0
-                                ? `×${prim.repeats}`
-                                : `${prim.coveragePct}%`}
-                              {' · '}
-                              <span style={{ opacity: 0.85, fontWeight: 400 }}>
-                                {prim.name.length > 14
-                                  ? prim.name.slice(0, 14) + '…'
-                                  : prim.name}
-                              </span>
-                            </span>
-                          );
-                        })()}
-                        <span style={{ fontSize: '0.7rem', color: 'var(--tg-hint)', marginLeft: 'auto' }}>
-                          {g.primary.actual_km ? `${g.primary.actual_km.toFixed(2)} км` : ''}
-                        </span>
-                      </div>
-                      </div>
-                    </div>
-                  );
-                })}
-                {visibleCount < filteredGroups.length && (
-                  <div style={{ textAlign: 'center', padding: '0.5rem' }}>
+                {filterByRefId !== null && (
+                  <div
+                    style={{
+                      padding: '0.5rem 0.75rem',
+                      borderBottom: '1px solid var(--surface-border)',
+                      background: 'rgba(106, 178, 242, 0.1)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      fontSize: '0.75rem',
+                    }}
+                  >
+                    <i className="pi pi-filter" style={{ color: '#6ab2f2' }} />
+                    <span style={{ color: '#6ab2f2', fontWeight: 600 }}>
+                      Фильтр: {referenceTracks.find((r) => r.id === filterByRefId)?.name ?? '...'}
+                    </span>
                     <Button
-                      label="Показать ещё"
+                      icon="pi pi-times"
+                      text
                       className="pb-soft p-button-sm"
-                      onClick={() => setVisibleCount(prev => prev + CHUNK_SIZE)}
+                      style={{ marginLeft: 'auto', padding: '0.1rem', width: '1.8rem', height: '1.8rem' }}
+                      onClick={() => setFilterByRefId(null)}
+                      tooltip="Сбросить фильтр"
+                      tooltipOptions={{ position: 'bottom' }}
                     />
                   </div>
                 )}
+
+                                <div ref={listRef} style={{ flex: 1, overflowY: 'auto', padding: '0.5rem' }}>
+                  {loadingFacts && (
+                    <div className="pb-hint" style={{ textAlign: 'center', padding: '1rem' }}>
+                      Загрузка...
+                    </div>
+                  )}
+                  {!loadingFacts && (() => {
+                    const renderSection = (
+                      key: string,
+                      title: string,
+                      items: typeof categorizedGroups.used,
+                    ) => {
+                      if (items.length === 0) return null;
+                      const isCollapsed = collapsedSections.has(key);
+                      return (
+                        <div key={key} style={{ marginBottom: '0.5rem' }}>
+                          <div
+                            onClick={() => {
+                              const next = new Set(collapsedSections);
+                              if (next.has(key)) next.delete(key);
+                              else next.add(key);
+                              setCollapsedSections(next);
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.35rem',
+                              padding: '0.3rem 0.5rem',
+                              cursor: 'pointer',
+                              background: 'rgba(255,255,255,0.03)',
+                              borderRadius: 4,
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              color: 'var(--tg-hint)',
+                              userSelect: 'none',
+                            }}
+                          >
+                            <i
+                              className={`pi ${
+                                isCollapsed ? 'pi-chevron-right' : 'pi-chevron-down'
+                              }`}
+                              style={{ fontSize: '0.65rem' }}
+                            />
+                            {title}
+                            <span
+                              style={{
+                                marginLeft: 'auto',
+                                opacity: 0.6,
+                                fontFamily: 'monospace',
+                              }}
+                            >
+                              {items.length}
+                            </span>
+                          </div>
+                          {!isCollapsed && (
+                            <div style={{ marginTop: '0.3rem' }}>
+                              {items.map((g, idx) => {
+                                const isSelected =
+                                  selectedGroup?.primary.id === g.primary.id &&
+                                  selectedGroup?.startTime === g.startTime;
+                                return (
+                                  <div
+                                    key={`${g.date}-${g.startTime ?? idx}-${g.primary.id}`}
+                                    onClick={() => {
+                                      setSelectedGroup(g);
+                                      setSelectedSource(g.primary.source);
+                                    }}
+                                    style={{
+                                      padding: '0.5rem',
+                                      cursor: 'pointer',
+                                      borderRadius: '4px',
+                                      marginBottom: '0.25rem',
+                                      background: isSelected
+                                        ? 'rgba(212,163,115,0.15)'
+                                        : 'transparent',
+                                      border: isSelected
+                                        ? '1px solid var(--pb-accent)'
+                                        : '1px solid transparent',
+                                      display: 'flex',
+                                      gap: '0.5rem',
+                                      alignItems: 'flex-start',
+                                    }}
+                                  >
+                                    <label
+                                      className="pb-checkbox-dark"
+                                      onClick={(e) => e.stopPropagation()}
+                                      style={{
+                                        display: 'inline-flex',
+                                        cursor: 'pointer',
+                                        marginTop: '0.1rem',
+                                        flexShrink: 0,
+                                      }}
+                                      title="Отметить для построения медианного трека"
+                                    >
+                                      <Checkbox
+                                        checked={selectedRunIds.has(g.primary.id)}
+                                        onChange={() => toggleRunSelection(g.primary.id)}
+                                      />
+                                    </label>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>
+                                          {g.displayName}
+                                        </span>
+                                        <span style={{ fontSize: '0.7rem', color: 'var(--tg-hint)' }}>
+                                          {g.date}
+                                        </span>
+                                      </div>
+                                      <div
+                                        className="pb-source-badges"
+                                        style={{
+                                          marginTop: '0.25rem',
+                                          alignItems: 'center',
+                                          flexWrap: 'wrap',
+                                          gap: '0.25rem',
+                                        }}
+                                      >
+                                        {g.sources.map((s: any) => (
+                                          <span
+                                            key={s}
+                                            className={`pb-source-badge pb-source-badge--${s}`}
+                                          >
+                                            {s}
+                                          </span>
+                                        ))}
+                                        {(() => {
+                                          const prim = primaryPerRun.get(g.primary.id);
+                                          if (!prim) return null;
+                                          const tooltip =
+                                            `Primary: ${prim.name} (${
+                                              prim.isLoop ? `×${prim.repeats}, ` : ''
+                                            }${prim.coveragePct}%)` +
+                                            (prim.alsoUsed.length > 0
+                                              ? '\nТакже на: ' +
+                                                prim.alsoUsed
+                                                  .map((u) => `${u.name} (${u.coveragePct}%)`)
+                                                  .join(', ')
+                                              : '');
+                                          return (
+                                            <span
+                                              title={tooltip}
+                                              style={{
+                                                fontSize: '0.65rem',
+                                                padding: '0.05rem 0.35rem',
+                                                borderRadius: 3,
+                                                background: 'rgba(106, 178, 242, 0.15)',
+                                                color: '#6ab2f2',
+                                                fontWeight: 600,
+                                                cursor: 'help',
+                                                maxWidth: '11rem',
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis',
+                                                whiteSpace: 'nowrap',
+                                                display: 'inline-block',
+                                              }}
+                                            >
+                                              {prim.isLoop && prim.repeats > 0
+                                                ? `×${prim.repeats}`
+                                                : `${prim.coveragePct}%`}
+                                              {' · '}
+                                              <span style={{ opacity: 0.85, fontWeight: 400 }}>
+                                                {prim.name.length > 14
+                                                  ? prim.name.slice(0, 14) + '…'
+                                                  : prim.name}
+                                              </span>
+                                            </span>
+                                          );
+                                        })()}
+                                        <span
+                                          style={{
+                                            fontSize: '0.7rem',
+                                            color: 'var(--tg-hint)',
+                                            marginLeft: 'auto',
+                                          }}
+                                        >
+                                          {g.primary.actual_km
+                                            ? `${g.primary.actual_km.toFixed(2)} км`
+                                            : ''}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    };
+
+                    return (
+                      <>
+                        {renderSection('used', '🟢 Пройдено', categorizedGroups.used)}
+                        {renderSection('similar', '🟡 Похоже на маршрут', categorizedGroups.similar)}
+                        {renderSection('unused', '⚪ Без маршрута', categorizedGroups.unused)}
+                        {categorizedGroups.used.length === 0 &&
+                          categorizedGroups.similar.length === 0 &&
+                          categorizedGroups.unused.length === 0 && (
+                            <div
+                              className="pb-hint"
+                              style={{ textAlign: 'center', padding: '1rem' }}
+                            >
+                              Нет пробежек под этот фильтр
+                            </div>
+                          )}
+                        {visibleCount < filteredGroups.length && filterByRefId === null && (
+                          <div style={{ textAlign: 'center', padding: '0.5rem' }}>
+                            <Button
+                              label="Показать ещё"
+                              className="pb-soft p-button-sm"
+                              onClick={() => setVisibleCount((prev) => prev + CHUNK_SIZE)}
+                            />
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               </>
             )}
@@ -3658,6 +3823,18 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                           </div>
                           {refDeviations[ref.id] && (() => {
                             const dev = refDeviations[ref.id];
+                            let statusBadge = null;
+                            if (selectedGroup) {
+                              const covs = batchCoverage.get(selectedGroup.primary.id);
+                              const target = covs?.find((c) => c.refId === ref.id);
+                              if (target) {
+                                if (target.cls === 'used') {
+                                  statusBadge = <span style={{ fontSize: '0.6rem', padding: '0.05rem 0.25rem', borderRadius: 3, background: 'rgba(111, 191, 115, 0.2)', color: '#6fbf73', marginLeft: '0.35rem' }}>Primary</span>;
+                                } else if (target.cls === 'similar') {
+                                  statusBadge = <span style={{ fontSize: '0.6rem', padding: '0.05rem 0.25rem', borderRadius: 3, background: 'rgba(232, 168, 56, 0.2)', color: '#e8a838', marginLeft: '0.35rem' }}>Похоже</span>;
+                                }
+                              }
+                            }
                             return (
                               <div
                                 style={{
@@ -3688,6 +3865,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                                   style={{ fontSize: '0.72rem' }}
                                 />
                                 <span>{dev.medianM} м</span>
+                              {statusBadge}
                                 <span style={{ opacity: 0.5 }}>·</span>
                                 <span>{dev.coveragePct}%</span>
                                 <span
@@ -3703,6 +3881,24 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                             );
                           })()}
                         </div>
+                        <Button
+                          icon="pi pi-filter"
+                          text
+                          className="pb-drawer__name-edit"
+                          style={{
+                            width: '1.8rem',
+                            height: '1.8rem',
+                            padding: 0,
+                            flexShrink: 0,
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setFilterByRefId(ref.id);
+                            setActiveTab('runs');
+                          }}
+                          tooltip="Показать пробежки на этом эталоне"
+                          tooltipOptions={{ position: 'left' }}
+                        />
 
                         <Button
                           icon="pi pi-pencil"
