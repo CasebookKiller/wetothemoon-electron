@@ -639,7 +639,8 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     useState<CoverageThresholds>(() => getSavedCoverageThresholds());
   // --- B.3: Секции и фильтр по атому ---
   const [filterByRefId, setFilterByRefId] = useState<number | null>(null);
-    const [groupedRunsView, setGroupedRunsView] = useState<boolean>(() => {
+  const [expandedRefGroups, setExpandedRefGroups] = useState<Set<string>>(new Set());
+  const [groupedRunsView, setGroupedRunsView] = useState<boolean>(() => {
     try {
       return localStorage.getItem('pb.mapEditor.groupedRuns') !== '0';
     } catch {
@@ -2899,6 +2900,30 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     return out;
   }, [groupedRuns, selectedRunIds]);
 
+  // Группировка эталонов
+  const groupedRefs = useMemo(() => {
+    const groups: Record<string, typeof referenceTracks> = {};
+    const singles: typeof referenceTracks = [];
+
+    for (const ref of referenceTracks) {
+      const groupTag = ref.tags.find((t) => t.startsWith('group:'));
+      if (groupTag) {
+        const groupName = groupTag.replace('group:', '');
+        if (!groups[groupName]) groups[groupName] = [];
+        groups[groupName].push(ref);
+      } else {
+        singles.push(ref);
+      }
+    }
+
+    // Сортируем внутри групп по имени (ч.1, ч.2...)
+    for (const key of Object.keys(groups)) {
+      groups[key].sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    return { groups, singles };
+  }, [referenceTracks]);
+
   // ==================== Рендер ====================
 
   return (
@@ -4206,8 +4231,8 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                   </div>
                 )}
 
-                {!refTracksLoading &&
-                  referenceTracks.map((ref) => {
+                {!refTracksLoading && (() => {
+                  const renderRefItem = (ref: typeof referenceTracks[0], isChild = false) => {
                     const isSelected = selectedRefTrackId === ref.id;
                     return (
                       <div
@@ -4220,115 +4245,43 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                           padding: '0.5rem 0.6rem',
                           borderRadius: 6,
                           marginBottom: '0.3rem',
-                          background: isSelected
-                            ? 'rgba(212, 163, 115, 0.25)'
-                            : 'transparent',
-                          border: isSelected
-                            ? '2px solid var(--pb-accent)'
-                            : '1px solid var(--surface-border)',
-                          boxShadow: isSelected
-                            ? '0 0 12px rgba(212, 163, 115, 0.4)'
-                            : 'none',
+                          marginLeft: isChild ? '1.5rem' : 0,
+                          background: isSelected ? 'rgba(212, 163, 115, 0.25)' : 'transparent',
+                          border: isSelected ? '2px solid var(--pb-accent)' : '1px solid var(--surface-border)',
+                          boxShadow: isSelected ? '0 0 12px rgba(212, 163, 115, 0.4)' : 'none',
                           cursor: 'pointer',
                           transition: 'background 0.2s, box-shadow 0.2s',
                         }}
-                        onClick={() =>
-                          setSelectedRefTrackId(isSelected ? null : ref.id)
-                        }
+                        onClick={() => setSelectedRefTrackId(isSelected ? null : ref.id)}
                       >
                         <i
-                          className={
-                            isSelected ? 'pi pi-eye' : 'pi pi-eye-slash'
-                          }
-                          style={{
-                            color: isSelected ? 'var(--pb-accent)' : 'var(--tg-hint)',
-                            fontSize: '0.85rem',
-                            flexShrink: 0,
-                          }}
-                          title={isSelected ? 'Скрыть с карты' : 'Показать на карте'}
+                          className={isSelected ? 'pi pi-eye' : 'pi pi-eye-slash'}
+                          style={{ color: isSelected ? 'var(--pb-accent)' : 'var(--tg-hint)', fontSize: '0.85rem', flexShrink: 0 }}
                         />
-                        <div
-                          style={{
-                            flex: 1,
-                            minWidth: 0,
-                            overflow: 'hidden',
-                          }}
-                        >
-                          <div
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.35rem',
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontWeight: 600,
-                                fontSize: '0.82rem',
-                                whiteSpace: 'nowrap',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                              }}
-                              title={ref.name}
-                            >
+                        <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                            <span style={{ fontWeight: 600, fontSize: '0.82rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={ref.name}>
                               {ref.name}
                             </span>
                             {ref.category && (
-                              <span
-                                style={{
-                                  fontSize: '0.62rem',
-                                  padding: '0.05rem 0.35rem',
-                                  borderRadius: 3,
-                                  background: 'rgba(212, 163, 115, 0.15)',
-                                  color: 'var(--pb-accent)',
-                                  flexShrink: 0,
-                                }}
-                              >
+                              <span style={{ fontSize: '0.62rem', padding: '0.05rem 0.35rem', borderRadius: 3, background: 'rgba(212, 163, 115, 0.15)', color: 'var(--pb-accent)', flexShrink: 0 }}>
                                 {ref.category}
                               </span>
                             )}
                           </div>
-                          <div
-                            style={{
-                              display: 'flex',
-                              gap: '0.5rem',
-                              fontSize: '0.68rem',
-                              color: 'var(--tg-hint)',
-                              marginTop: '0.15rem',
-                              flexWrap: 'wrap',
-                            }}
-                          >
+                          <div style={{ display: 'flex', gap: '0.5rem', fontSize: '0.68rem', color: 'var(--tg-hint)', marginTop: '0.15rem', flexWrap: 'wrap' }}>
                             <span>{fmtRefLength(ref.lengthM)}</span>
                             <span>{refKindLabel(ref.kind)}</span>
-                            {ref.kind === 'loop' &&
-                              refDeviations[ref.id] &&
-                              refDeviations[ref.id].repeats > 0 &&
-                              (() => {
-                                const repeats = refDeviations[ref.id].repeats;
-                                const coverage =
-                                  refDeviations[ref.id].coveragePct;
-                                return (
-                                  <span
-                                    style={{
-                                      fontSize: '0.65rem',
-                                      padding: '0.05rem 0.3rem',
-                                      borderRadius: 3,
-                                      background: 'rgba(106, 178, 242, 0.15)',
-                                      color: '#6ab2f2',
-                                      fontWeight: 600,
-                                    }}
-                                    title={`Кругов: ${repeats} (покрытие ${coverage}%)`}
-                                  >
-                                    ×{repeats}
-                                  </span>
-                                );
-                              })()}
+                            {ref.kind === 'loop' && refDeviations[ref.id] && refDeviations[ref.id].repeats > 0 && (() => {
+                              const repeats = refDeviations[ref.id].repeats;
+                              const coverage = refDeviations[ref.id].coveragePct;
+                              return (
+                                <span style={{ fontSize: '0.65rem', padding: '0.05rem 0.3rem', borderRadius: 3, background: 'rgba(106, 178, 242, 0.15)', color: '#6ab2f2', fontWeight: 600 }} title={`Кругов: ${repeats} (покрытие ${coverage}%)`}>
+                                  ×{repeats}
+                                </span>
+                              );
+                            })()}
                             <span>{fmtRefDate(ref.createdAt)}</span>
-                            {ref.tags.length > 0 && (
-                              <span style={{ color: 'var(--pb-accent)', opacity: 0.7 }}>
-                                #{ref.tags.join(' #')}
-                              </span>
-                            )}
                           </div>
                           {refDeviations[ref.id] && (() => {
                             const dev = refDeviations[ref.id];
@@ -4345,108 +4298,66 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                               }
                             }
                             return (
-                              <div
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '0.35rem',
-                                  fontSize: '0.7rem',
-                                  marginTop: '0.2rem',
-                                  color: dev.isClean
-                                    ? 'var(--tg-success)'
-                                    : 'var(--tg-hint)',
-                                }}
-                                title={
-                                  `Медиана отклонения: ${dev.medianM} м\n` +
-                                  `95-й перцентиль: ${dev.p95M} м (выбросы)\n` +
-                                  `Покрытие эталона: ${dev.coveragePct}%\n` +
-                                  (dev.isClean
-                                    ? '✓ Чистый — пробежка по эталону'
-                                    : '⚠ Есть отклонения — возможно, срезал или ушёл с маршрута')
-                                }
-                              >
-                                <i
-                                  className={`pi ${
-                                    dev.isClean
-                                      ? 'pi-check-circle'
-                                      : 'pi-exclamation-triangle'
-                                  }`}
-                                  style={{ fontSize: '0.72rem' }}
-                                />
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.7rem', marginTop: '0.2rem', color: dev.isClean ? 'var(--tg-success)' : 'var(--tg-hint)' }} title={`Медиана: ${dev.medianM} м\nПокрытие: ${dev.coveragePct}%\n${dev.isClean ? '✓ Чистый' : '⚠ Есть отклонения'}`}>
+                                <i className={`pi ${dev.isClean ? 'pi-check-circle' : 'pi-exclamation-triangle'}`} style={{ fontSize: '0.72rem' }} />
                                 <span>{dev.medianM} м</span>
-                              {statusBadge}
+                                {statusBadge}
                                 <span style={{ opacity: 0.5 }}>·</span>
                                 <span>{dev.coveragePct}%</span>
-                                <span
-                                  style={{
-                                    marginLeft: 'auto',
-                                    fontFamily: 'monospace',
-                                    opacity: 0.7,
-                                  }}
-                                >
-                                  p95 {dev.p95M} м
-                                </span>
+                                <span style={{ marginLeft: 'auto', fontFamily: 'monospace', opacity: 0.7 }}>p95 {dev.p95M} м</span>
                               </div>
                             );
                           })()}
                         </div>
-                        <Button
-                          icon="pi pi-filter"
-                          text
-                          className="pb-drawer__name-edit"
-                          style={{
-                            width: '1.8rem',
-                            height: '1.8rem',
-                            padding: 0,
-                            flexShrink: 0,
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setFilterByRefId(ref.id);
-                            setActiveTab('runs');
-                          }}
-                          tooltip="Показать пробежки на этом эталоне"
-                          tooltipOptions={{ position: 'left' }}
-                        />
-
-                        <Button
-                          icon="pi pi-pencil"
-                          text
-                          className="pb-drawer__name-edit"
-                          style={{
-                            width: '1.8rem',
-                            height: '1.8rem',
-                            padding: 0,
-                            flexShrink: 0,
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openEditReference(ref);
-                          }}
-                          tooltip="Переименовать / категория / теги"
-                          tooltipOptions={{ position: 'left' }}
-                        />
-
-                        <Button
-                          icon="pi pi-trash"
-                          text
-                          className="pb-drawer__name-edit"
-                          style={{
-                            width: '1.8rem',
-                            height: '1.8rem',
-                            padding: 0,
-                            flexShrink: 0,
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            void handleDeleteReference(ref.id);
-                          }}
-                          tooltip="Удалить"
-                          tooltipOptions={{ position: 'left' }}
-                        />
+                        <Button icon="pi pi-filter" text className="pb-drawer__name-edit" style={{ width: '1.8rem', height: '1.8rem', padding: 0, flexShrink: 0 }} onClick={(e) => { e.stopPropagation(); setFilterByRefId(ref.id); setActiveTab('runs'); }} tooltip="Показать пробежки" tooltipOptions={{ position: 'left' }} />
+                        <Button icon="pi pi-pencil" text className="pb-drawer__name-edit" style={{ width: '1.8rem', height: '1.8rem', padding: 0, flexShrink: 0 }} onClick={(e) => { e.stopPropagation(); openEditReference(ref); }} tooltip="Редактировать" tooltipOptions={{ position: 'left' }} />
+                        <Button icon="pi pi-trash" text className="pb-drawer__name-edit" style={{ width: '1.8rem', height: '1.8rem', padding: 0, flexShrink: 0 }} onClick={(e) => { e.stopPropagation(); void handleDeleteReference(ref.id); }} tooltip="Удалить" tooltipOptions={{ position: 'left' }} />
                       </div>
                     );
-                  })}
+                  };
+
+                  return (
+                    <>
+                      {/* Группы */}
+                      {Object.entries(groupedRefs.groups).map(([groupName, refs]) => {
+                        const isExpanded = expandedRefGroups.has(groupName);
+                        // Ищем "корневой" атом, чтобы взять его имя (если оно не переименовано в ч.1)
+                        const rootName = refs[0]?.name.replace(/\s*·\s*ч\.\d+$/u, '') || groupName;
+                        return (
+                          <div key={groupName} style={{ marginBottom: '0.5rem', border: '1px solid var(--surface-border)', borderRadius: 6, overflow: 'hidden' }}>
+                            <div
+                              onClick={() => {
+                                const next = new Set(expandedRefGroups);
+                                if (next.has(groupName)) next.delete(groupName);
+                                else next.add(groupName);
+                                setExpandedRefGroups(next);
+                              }}
+                              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', background: 'rgba(255,255,255,0.03)', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600 }}
+                            >
+                              <i className={`pi ${isExpanded ? 'pi-folder-open' : 'pi-folder'}`} style={{ color: 'var(--pb-accent)' }} />
+                              <span style={{ flex: 1 }}>{rootName} <span style={{ color: 'var(--tg-hint)', fontWeight: 400 }}>({refs.length} ч.)</span></span>
+                              <i className={`pi ${isExpanded ? 'pi-chevron-up' : 'pi-chevron-down'}`} style={{ fontSize: '0.7rem', color: 'var(--tg-hint)' }} />
+                            </div>
+                            {isExpanded && (
+                              <div style={{ padding: '0.3rem' }}>
+                                {refs.map((r) => renderRefItem(r, true))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                      
+                      {/* Одиночные атомы */}
+                      {groupedRefs.singles.map((r) => renderRefItem(r, false))}
+                      
+                      {referenceTracks.length === 0 && (
+                        <div className="pb-hint" style={{ padding: '0.75rem', fontSize: '0.75rem', textAlign: 'center', border: '1px dashed var(--surface-border)', borderRadius: 6 }}>
+                          Нарисуйте первый эталон: кнопка «Рисовать» → кликайте по карте → «Сохранить».
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             )}
             </div>
