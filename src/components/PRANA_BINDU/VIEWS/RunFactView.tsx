@@ -12,6 +12,7 @@ import { TabView, TabPanel } from 'primereact/tabview';
 import { InputText } from 'primereact/inputtext';
 import { RunStreamsChart } from '../RunStreamsChart';
 import { GpsMapView } from '../GpsMapView';
+import { FullscreenChartsDialog } from '../FullscreenChartsDialog';
 import type { RunFactLite } from '../RunStreamsDrawer';
 
 /**
@@ -98,6 +99,9 @@ const SourcePanel: React.FC<{
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
+  
+  // --- НОВОЕ: Стейт для полноэкранного графика ---
+  const [fullscreenChart, setFullscreenChart] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -223,6 +227,7 @@ const SourcePanel: React.FC<{
             runFactId={fact.id}
             source={metas[0].source}
             refreshKey={metas[0].fetched_at}
+            onOpenFullscreen={() => setFullscreenChart(true)}
           />
         </>
       )}
@@ -284,6 +289,16 @@ const SourcePanel: React.FC<{
           disabled={syncing}
         />
       </div>
+
+      {/* НОВОЕ: Полноэкранный график */}
+      {metas[0] && (
+        <FullscreenChartsDialog
+          visible={fullscreenChart}
+          onHide={() => setFullscreenChart(false)}
+          runFactId={fact.id}
+          source={metas[0].source}
+        />
+      )}
     </div>
   );
 };

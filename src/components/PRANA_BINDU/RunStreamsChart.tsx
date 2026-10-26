@@ -11,11 +11,13 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Dropdown } from 'primereact/dropdown';
 import { Chart } from 'primereact/chart';
 import { Message } from 'primereact/message';
+import { Button } from 'primereact/button';
 
 interface Props {
   runFactId: number | null;
   source: string;
   refreshKey?: string | number;
+  onOpenFullscreen?: () => void;
 }
 
 interface StreamsPayload {
@@ -83,6 +85,7 @@ export const RunStreamsChart: React.FC<Props> = ({
   runFactId,
   source,
   refreshKey,
+  onOpenFullscreen,
 }) => {
   const api = (window as any).electronAPI;
 
@@ -447,6 +450,18 @@ export const RunStreamsChart: React.FC<Props> = ({
             className="pb-chart__dropdown"
           />
         </div>
+        {onOpenFullscreen && (
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'flex-end' }}>
+            <Button
+              icon="pi pi-window-maximize"
+              text
+              className="pb-soft p-button-sm"
+              onClick={onOpenFullscreen}
+              tooltip="Развернуть на весь экран"
+              tooltipOptions={{ position: 'left' }}
+            />
+          </div>
+        )}
       </div>
 
       {stats && (

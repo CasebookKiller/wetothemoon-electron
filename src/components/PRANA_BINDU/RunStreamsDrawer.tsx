@@ -12,6 +12,7 @@ import { TabView, TabPanel } from 'primereact/tabview';
 import { RunStreamsChart } from './RunStreamsChart';
 import { GpsMapView } from './GpsMapView';
 import { InputText } from 'primereact/inputtext';
+import { FullscreenChartsDialog } from './FullscreenChartsDialog';
 
 /**
  * Порог, при котором две записи считаются одной тренировкой
@@ -119,6 +120,8 @@ const SourcePanel: React.FC<{
   const [localUserName, setLocalUserName] = useState<string | null>(
     fact.user_name ?? null
   );
+
+  const [fullscreenChart, setFullscreenChart] = useState(false);
 
   useEffect(() => {
     setLocalUserName(fact.user_name ?? null);
@@ -269,6 +272,7 @@ const SourcePanel: React.FC<{
             runFactId={fact.id}
             source={metas[0].source}
             refreshKey={metas[0].fetched_at}
+            onOpenFullscreen={() => setFullscreenChart(true)}
           />
         </>
       )}
@@ -330,6 +334,14 @@ const SourcePanel: React.FC<{
           disabled={syncing}
         />
       </div>
+      {metas[0] && (
+        <FullscreenChartsDialog
+          visible={fullscreenChart}
+          onHide={() => setFullscreenChart(false)}
+          runFactId={fact.id}
+          source={metas[0].source}
+        />
+      )}
     </div>
   );
 };
