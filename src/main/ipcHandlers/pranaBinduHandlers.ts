@@ -85,6 +85,13 @@ import {
   listNutritionByDate,
   deleteNutrition,
   getNutritionTotalsByDate,
+  createChain,
+  getChainById,
+  listChains,
+  updateChainName,
+  replaceChainSlots,
+  deleteChain,
+  listChainsUsingAtom,
   getWaterTotalsForRange,
 } from '../services/pranaBindu/melange';
 
@@ -5893,6 +5900,104 @@ export function registerPranaBinduHandlers(): void {
     try {
       deleteNutrition(getMelange(), id);
       return { success: true };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+    // ==================== v32: Цепочки и слоты ====================
+
+  ipcMain.handle('pb:chain-create', (_event, input: any) => {
+    try {
+      if (!input?.name?.trim()) {
+        return { success: false, error: 'name обязателен' };
+      }
+      if (!Array.isArray(input.slots) || input.slots.length === 0) {
+        return { success: false, error: 'нужен минимум 1 слот' };
+      }
+      const id = createChain(getMelange(), input);
+      return { success: true, id };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('pb:chain-list', () => {
+    try {
+      const items = listChains(getMelange());
+      return { success: true, items };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('pb:chain-get', (_event, id: number) => {
+    try {
+      if (!Number.isFinite(id)) {
+        return { success: false, error: 'id обязателен' };
+      }
+      const item = getChainById(getMelange(), id);
+      if (!item) {
+        return { success: false, error: `Цепочка #${id} не найдена` };
+      }
+      return { success: true, item };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle(
+    'pb:chain-update-name',
+    (_event, id: number, name: string) => {
+      try {
+        if (!Number.isFinite(id)) {
+          return { success: false, error: 'id обязателен' };
+        }
+        const ok = updateChainName(getMelange(), id, name);
+        return { success: ok };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    'pb:chain-replace-slots',
+    (_event, id: number, slots: any[]) => {
+      try {
+        if (!Number.isFinite(id)) {
+          return { success: false, error: 'id обязателен' };
+        }
+        if (!Array.isArray(slots) || slots.length === 0) {
+          return { success: false, error: 'нужен минимум 1 слот' };
+        }
+        const count = replaceChainSlots(getMelange(), id, slots);
+        return { success: true, count };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    },
+  );
+
+  ipcMain.handle('pb:chain-delete', (_event, id: number) => {
+    try {
+      if (!Number.isFinite(id)) {
+        return { success: false, error: 'id обязателен' };
+      }
+      const ok = deleteChain(getMelange(), id);
+      return { success: ok };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('pb:chain-using-atom', (_event, atomId: number) => {
+    try {
+      if (!Number.isFinite(atomId)) {
+        return { success: false, error: 'atomId обязателен' };
+      }
+      const items = listChainsUsingAtom(getMelange(), atomId);
+      return { success: true, items };
     } catch (e) {
       return { success: false, error: (e as Error).message };
     }

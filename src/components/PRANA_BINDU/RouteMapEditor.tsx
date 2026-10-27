@@ -55,6 +55,7 @@ import {
   type AllRefsStyles,
 } from './UTILS/allRefsStyles';
 import { geometricLength, simplifyDP } from './UTILS/medianTrack';
+import { evaluateChain } from './UTILS/chainEvaluator';
 
 interface Props {
   visible: boolean;
@@ -338,6 +339,52 @@ function fmtSecAsDuration(sec: number): string {
 // (медиана 193–247 м в карточке против 30 м в бейдже).
 // Унифицировано 2026-10-27 (см. 18b_ATOM_CHAINS.md).
 
+// ==================== Цепочка из batchCoverage ====================
+
+interface ChainAtom {
+  refId: number;
+  name: string;
+  lengthM: number;
+  kind: 'loop' | 'linear' | 'stadium' | null;
+  coveragePct: number;
+  repeats: number;
+  cls: CoverageClass;
+}
+
+function buildChainFromCoverage(
+  covs: Array<{
+    refId: number;
+    cls: CoverageClass;
+    repeats: number;
+    dev: FastDeviationResult;
+  }>,
+  refTracks: Array<{
+    id: number;
+    name: string;
+    lengthM: number;
+    kind: 'loop' | 'linear' | 'stadium' | null;
+  }>,
+): ChainAtom[] {
+  const map = new Map(refTracks.map((r) => [r.id, r]));
+  return covs
+    .filter((c) => c.cls === 'used')
+    .map((c) => {
+      const r = map.get(c.refId);
+      if (!r) return null;
+      return {
+        refId: c.refId,
+        name: r.name,
+        lengthM: r.lengthM,
+        kind: r.kind,
+        coveragePct: c.dev.coveragePct,
+        repeats: c.repeats,
+        cls: c.cls,
+      };
+    })
+    .filter((x): x is ChainAtom => x !== null)
+    .sort((a, b) => b.lengthM - a.lengthM);
+}
+
 // ==================== Компонент ====================
 
 export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId }) => {
@@ -588,6 +635,29 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
 
   const [storyVisible, setStoryVisible] = useState(false);
   const [mapSnapshot, setMapSnapshot] = useState<string | null>(null);
+  // Плавающая панель цепочки атомов (правый верх карты)
+  const [chainPanelVisible, setChainPanelVisible] = useState(false);
+  const [chainPanelCollapsed, setChainPanelCollapsed] = useState(false);
+  // Минимальный coverage для показа атома в панели.
+  // 90% по умолчанию — ниже обычно «задетые» атомы, не входящие
+  // в цепочку (например, круги при пробежке по просекам).
+  const [chainMinCoverage, setChainMinCoverage] = useState<number>(() => {
+    try {
+      const v = Number(localStorage.getItem('pb.mapEditor.chainMinCoverage'));
+      if (Number.isFinite(v) && v >= 0 && v <= 100) return v;
+    } catch {
+      /* ignore */
+    }
+    return 90;
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('pb.mapEditor.chainMinCoverage', String(chainMinCoverage));
+    } catch {
+      /* ignore */
+    }
+  }, [chainMinCoverage]);
 
   // Ref для trackSettings — чтобы draw-эффект видел актуальное значение,
   // но не перерисовывался при каждом изменении width/opacity.
@@ -1405,6 +1475,20 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     batchLatlng,
     coverageThresholds,
   ]);
+
+  // Цепочка для выбранной пробежки (из batchCoverage, синхронно с порогами).
+  // Дополнительно фильтруем по chainMinCoverage: атомы с покрытием ниже
+  // порога не показываем (это обычно «задетые» атомы, не входящие в цепочку).
+  const currentChain = useMemo(() => {
+    if (!selectedGroup) return [];
+    const covs = batchCoverage.get(selectedGroup.primary.id);
+    if (!covs) return [];
+    const all = buildChainFromCoverage(covs, referenceTracks);
+    return all.filter((a) => a.coveragePct >= chainMinCoverage);
+  }, [selectedGroup, batchCoverage, referenceTracks, chainMinCoverage]);
+
+  const currentPrimary = currentChain[0] ?? null;
+  const currentAlsoUsed = currentChain.slice(1);
 
   const primaryPerRun = useMemo(() => {
     const result = new Map<
@@ -2675,6 +2759,67 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
 
     return { groups, singles };
   }, [referenceTracks]);
+
+  // DEBUG: временный хелпер для smoke-test цепочек из консоли.
+  // Удалить после проверки.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    (window as any).__pbDebugChain = async (
+      chainId: number,
+      runFactId: number,
+    ) => {
+      const chainRes = await api.pb.chainGet(chainId);
+      if (!chainRes?.success) return { error: 'chain not found' };
+
+      const latlngRes = await api.pb.runLatlngBatch([runFactId], {
+        samples: 1000,
+      });
+      const track = latlngRes?.data?.[runFactId]?.latlng;
+      if (!track || track.length < 10) return { error: 'no track' };
+
+      const refsRes = await api.pb.referenceTrackList();
+      const refs = refsRes?.items ?? [];
+
+      const thresholds = getSavedCoverageThresholds();
+      const result = evaluateChain(chainRes.item, track, refs, thresholds);
+
+      // Детали по каждому атому из слотов — для диагностики.
+      const atomDetails: any[] = [];
+      for (const slot of chainRes.item.slots) {
+        for (const atomId of slot.specificAtoms ?? []) {
+          const ref = refs.find((r: any) => r.id === atomId);
+          if (!ref) continue;
+          const idx = buildRefIndex(ref.coords);
+          const dev = computeDeviationFast(
+            track,
+            idx,
+            thresholds.coverageRadiusM,
+            thresholds.onRefRadiusM,
+            thresholds.checkpointCount ?? 6,
+          );
+          if (!dev) continue;
+          atomDetails.push({
+            atomId,
+            slotIndex: slot.orderIndex,
+            name: ref.name,
+            lengthM: ref.lengthM,
+            kind: ref.kind,
+            coveragePct: dev.coveragePct,
+            medianM: dev.medianM,
+            p95M: dev.p95M,
+            metersOnRef: dev.metersOnRef,
+            repeats_dev: dev.repeats,
+            checkpointPasses: dev.checkpointPasses,
+            ratio: +(dev.metersOnRef / ref.lengthM).toFixed(3),
+            trackPoints: track.length,
+            trackLengthM: latlngRes.data?.[runFactId]?.lengthM ?? null,
+          });
+        }
+      }
+
+      return { ...result, atomDetails };
+    };
+  }, [api]);
 
   // ==================== Рендер ====================
 
@@ -4269,6 +4414,25 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                   />
                 </div>
 
+                {/* Кнопка Цепочка атомов */}
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: chainPanelVisible ? 'rgba(212, 163, 115, 0.2)' : 'rgba(23, 33, 43, 0.85)',
+                  borderRadius: '6px',
+                  border: `1px solid ${chainPanelVisible ? 'var(--pb-accent)' : 'var(--surface-border)'}`,
+                  backdropFilter: 'blur(4px)', pointerEvents: 'auto', height: '2.5rem', width: '2.5rem', boxSizing: 'border-box'
+                }}>
+                  <Button
+                    icon="pi pi-sitemap"
+                    text
+                    className="pb-drawer__name-edit"
+                    onClick={() => setChainPanelVisible((v) => !v)}
+                    tooltip={chainPanelVisible ? 'Скрыть цепочку' : 'Показать цепочку атомов'}
+                    tooltipOptions={{ position: 'bottom' }}
+                    style={{ color: chainPanelVisible ? 'var(--pb-accent)' : undefined }}
+                  />
+                </div>
+
                 <div style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   background: showAllRefs ? 'rgba(212, 163, 115, 0.2)' : 'rgba(23, 33, 43, 0.85)',
@@ -4415,6 +4579,337 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
             </div>
           )}
 
+          {/* ==================== Плавающая панель цепочки ==================== */}
+          {selectedGroup && chainPanelVisible && (
+            <div
+              style={{
+                position: 'absolute',
+                top: 10,
+                right: 60,
+                zIndex: 6,
+                width: chainPanelCollapsed ? 'auto' : '340px',
+                maxWidth: '90vw',
+                maxHeight: chainPanelCollapsed ? 'auto' : '70vh',
+                background: 'rgba(23, 33, 43, 0.96)',
+                border: '1px solid var(--pb-accent)',
+                borderRadius: 8,
+                backdropFilter: 'blur(6px)',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+                pointerEvents: 'auto',
+              }}
+            >
+              {/* Заголовок */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  padding: '0.4rem 0.6rem',
+                  background: 'rgba(212, 163, 115, 0.12)',
+                  borderBottom: chainPanelCollapsed
+                    ? 'none'
+                    : '1px solid var(--surface-border)',
+                  flexShrink: 0,
+                }}
+              >
+                <i
+                  className="pi pi-sitemap"
+                  style={{ color: 'var(--pb-accent)', fontSize: '0.85rem' }}
+                />
+                <span
+                  style={{
+                    fontWeight: 600,
+                    fontSize: '0.8rem',
+                    color: 'var(--pb-accent)',
+                    flex: 1,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  Цепочка{currentChain.length > 0 ? ` (${currentChain.length})` : ''}
+                </span>
+                <Button
+                  icon={chainPanelCollapsed ? 'pi pi-chevron-down' : 'pi pi-chevron-up'}
+                  text
+                  className="pb-drawer__name-edit"
+                  style={{ width: '1.6rem', height: '1.6rem', padding: 0 }}
+                  onClick={() => setChainPanelCollapsed((v) => !v)}
+                  tooltip={chainPanelCollapsed ? 'Развернуть' : 'Свернуть'}
+                  tooltipOptions={{ position: 'left' }}
+                />
+                <Button
+                  icon="pi pi-times"
+                  text
+                  className="pb-drawer__name-edit"
+                  style={{ width: '1.6rem', height: '1.6rem', padding: 0 }}
+                  onClick={() => setChainPanelVisible(false)}
+                  tooltip="Закрыть"
+                  tooltipOptions={{ position: 'left' }}
+                />
+              </div>
+
+              {/* Тело */}
+              {!chainPanelCollapsed && (
+                <div
+                  style={{
+                    overflowY: 'auto',
+                    padding: '0.4rem 0.5rem',
+                    flex: 1,
+                    minHeight: 0,
+                  }}
+                >
+                  {/* Фильтр по покрытию */}
+                  <div
+                    style={{
+                      marginBottom: '0.5rem',
+                      paddingBottom: '0.4rem',
+                      borderBottom: '1px solid var(--surface-border)',
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        fontSize: '0.7rem',
+                        color: 'var(--tg-hint)',
+                        marginBottom: '0.2rem',
+                      }}
+                    >
+                      <span>Мин. покрытие</span>
+                      <span style={{ fontFamily: 'monospace', color: 'var(--pb-accent)' }}>
+                        {chainMinCoverage}%
+                      </span>
+                    </div>
+                    <Slider
+                      value={chainMinCoverage}
+                      min={0}
+                      max={100}
+                      step={5}
+                      onChange={(e) => setChainMinCoverage(e.value as number)}
+                    />
+                  </div>
+
+                  {currentChain.length === 0 ? (
+                    <div
+                      className="pb-hint"
+                      style={{
+                        fontSize: '0.75rem',
+                        padding: '0.75rem 0.5rem',
+                        textAlign: 'center',
+                      }}
+                    >
+                      Нет покрытых атомов. Загрузите потоки или проверьте пороги.
+                    </div>
+                  ) : (
+                    <>
+                      {/* Primary */}
+                      {currentPrimary && (
+                        <div
+                          style={{
+                            marginBottom: '0.5rem',
+                            padding: '0.45rem 0.55rem',
+                            background: 'rgba(111, 191, 115, 0.1)',
+                            border: '1px solid rgba(111, 191, 115, 0.35)',
+                            borderRadius: 6,
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontSize: '0.62rem',
+                              color: '#6fbf73',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.05em',
+                              fontWeight: 700,
+                              marginBottom: '0.2rem',
+                            }}
+                          >
+                            Primary
+                          </div>
+                          <div
+                            style={{
+                              fontSize: '0.8rem',
+                              fontWeight: 600,
+                              color: 'var(--tg-theme-text-color)',
+                              marginBottom: '0.15rem',
+                              lineHeight: 1.3,
+                            }}
+                          >
+                            {currentPrimary.name}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: '0.7rem',
+                              color: 'var(--tg-hint)',
+                              fontFamily: 'monospace',
+                            }}
+                          >
+                            {fmtRefLength(currentPrimary.lengthM)}
+                            {currentPrimary.repeats > 1
+                              ? ` · ×${currentPrimary.repeats}`
+                              : ''}
+                            {' · '}
+                            {currentPrimary.coveragePct}%
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Also used */}
+                      {currentAlsoUsed.length > 0 && (
+                        <>
+                          <div
+                            style={{
+                              fontSize: '0.62rem',
+                              color: 'var(--tg-hint)',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.05em',
+                              fontWeight: 600,
+                              marginTop: '0.3rem',
+                              marginBottom: '0.3rem',
+                              paddingLeft: '0.2rem',
+                            }}
+                          >
+                            Также на маршруте ({currentAlsoUsed.length})
+                          </div>
+                          {currentAlsoUsed.map((a) => {
+                            const isSelected = selectedRefTrackId === a.refId;
+                            return (
+                              <div
+                                key={a.refId}
+                                onClick={() => setSelectedRefTrackId(a.refId)}
+                                style={{
+                                  padding: '0.3rem 0.4rem',
+                                  marginBottom: '0.15rem',
+                                  borderRadius: 4,
+                                  cursor: 'pointer',
+                                  fontSize: '0.75rem',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.3rem',
+                                  background: isSelected
+                                    ? 'rgba(212, 163, 115, 0.18)'
+                                    : 'transparent',
+                                  border: isSelected
+                                    ? '1px solid var(--pb-accent)'
+                                    : '1px solid transparent',
+                                  transition: 'background 0.1s',
+                                }}
+                                onMouseEnter={(e) => {
+                                  if (!isSelected)
+                                    (e.currentTarget as HTMLDivElement).style.background =
+                                      'rgba(255,255,255,0.04)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  if (!isSelected)
+                                    (e.currentTarget as HTMLDivElement).style.background =
+                                      'transparent';
+                                }}
+                                title="Показать атом на карте"
+                              >
+                                <i
+                                  className="pi pi-link"
+                                  style={{
+                                    fontSize: '0.65rem',
+                                    color: 'var(--pb-accent)',
+                                    flexShrink: 0,
+                                  }}
+                                />
+                                <span
+                                  style={{
+                                    flex: 1,
+                                    minWidth: 0,
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                    color: 'var(--tg-theme-text-color)',
+                                  }}
+                                >
+                                  {a.name}
+                                </span>
+                                <span
+                                  style={{
+                                    fontSize: '0.68rem',
+                                    color: 'var(--tg-hint)',
+                                    fontFamily: 'monospace',
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  {fmtRefLength(a.lengthM)} · {a.coveragePct}%
+                                  {a.repeats > 1 ? ` ×${a.repeats}` : ''}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </>
+                      )}
+
+                      {/* Итого */}
+                      <div
+                        style={{
+                          marginTop: '0.5rem',
+                          paddingTop: '0.4rem',
+                          borderTop: '1px solid var(--surface-border)',
+                          fontSize: '0.7rem',
+                          color: 'var(--tg-hint)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.2rem',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>
+                            Пройдено по цепочке
+                            {currentChain.some((a) => a.repeats > 1) ? ' (с повторами)' : ''}:
+                          </span>
+                          <span
+                            style={{
+                              fontFamily: 'monospace',
+                              color: 'var(--pb-accent)',
+                              fontWeight: 600,
+                            }}
+                          >
+                            {fmtRefLength(
+                              currentChain.reduce(
+                                (s, a) => s + a.lengthM * Math.max(1, a.repeats),
+                                0,
+                              ),
+                            )}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>Длина трека:</span>
+                          <span
+                            style={{
+                              fontFamily: 'monospace',
+                              color: 'var(--tg-theme-text-color)',
+                              fontWeight: 600,
+                            }}
+                          >
+                            {selectedGroup?.primary?.actual_km != null
+                              ? `${selectedGroup.primary.actual_km.toFixed(2)} км`
+                              : '—'}
+                          </span>
+                        </div>
+                        <div
+                          style={{
+                            fontSize: '0.65rem',
+                            color: 'var(--tg-hint)',
+                            opacity: 0.7,
+                            marginTop: '0.1rem',
+                          }}
+                        >
+                          Разница — из-за повторов и перекрытий атомов.
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Панель метрик теста */}
           {testVisible && segmentInfo && (
               <div
                 style={{

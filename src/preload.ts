@@ -1040,6 +1040,22 @@ try {
         ipcRenderer.invoke('pb:nutrition-list', date),
       deleteNutrition: (id: number) =>
         ipcRenderer.invoke('pb:nutrition-delete', id),
+
+      // Цепочки (v32, C.12)
+      chainCreate: (input: any) =>
+        ipcRenderer.invoke('pb:chain-create', input),
+      chainList: () =>
+        ipcRenderer.invoke('pb:chain-list'),
+      chainGet: (id: number) =>
+        ipcRenderer.invoke('pb:chain-get', id),
+      chainUpdateName: (id: number, name: string) =>
+        ipcRenderer.invoke('pb:chain-update-name', id, name),
+      chainReplaceSlots: (id: number, slots: any[]) =>
+        ipcRenderer.invoke('pb:chain-replace-slots', id, slots),
+      chainDelete: (id: number) =>
+        ipcRenderer.invoke('pb:chain-delete', id),
+      chainUsingAtom: (atomId: number) =>
+        ipcRenderer.invoke('pb:chain-using-atom', atomId),
         
     },
 

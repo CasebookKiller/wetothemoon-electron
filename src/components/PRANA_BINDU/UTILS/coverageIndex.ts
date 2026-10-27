@@ -338,14 +338,16 @@ export function computeDeviationFast(
         repeats = Math.max(1, Math.round(rawRatio));
       }
     } else {
-      // Для linear: целочисленный подсчёт проходов.
-      // Out-and-back (ratio 2.0) = 2 прохода; один проход = 1.
-      repeats = Math.floor(rawRatio);
-      if (
-        coveragePct >= 90 &&
-        Math.abs(rawRatio - Math.round(rawRatio)) < 0.35
-      ) {
-        repeats = Math.round(rawRatio);
+      // Для linear: CPs-first (как для loop).
+      // Пробежка по просеке туда-обратно = 2 прохода через КП.
+      // Это надёжнее, чем ratio, потому что обратный путь может быть
+      // на 60-80 м в стороне от эталона (GPS-шум) → ratio падает до 1.5,
+      // а CPs честно видят 2 прохода.
+      // Fallback на ratio только если КП промахнулись (GPS-провал).
+      if (checkpointPasses >= 1) {
+        repeats = checkpointPasses;
+      } else if (coveragePct >= 70) {
+        repeats = Math.max(1, Math.round(rawRatio));
       }
     }
   }
@@ -398,16 +400,11 @@ export function classifyCoverage(
   const isLoop = input.atomKind === 'loop' || input.atomKind === 'stadium';
   const medianOk = input.medianM <= t.medianMaxM;
 
-  // Для linear — целочисленное число проходов.
-  // Допуск ±30% (ratio 1.9 → 2x, ratio 2.0 → 2x, ratio 0.5 → 0x).
-  // Это убирает жёсткий ratioLinearMax и позволяет out-and-back (ratio 2.0).
-  const integerRatio = Math.round(ratio);
-  const isNearInteger = Math.abs(ratio - integerRatio) < 0.3;
-  const repeatsLinear = isNearInteger ? Math.max(0, integerRatio) : 0;
-
-  const repeats = isLoop
-    ? Math.max(0, Math.floor(input.repeats))
-    : repeatsLinear;
+  // Для linear: используем repeats из computeDeviationFast (CPs-first).
+  // computeDeviationFast уже посчитал repeats надёжнее, чем ratio
+  // (для out-and-back CPs = 2, даже если ratio из-за GPS-шума = 1.5).
+  // Здесь ничего не пересчитываем — только floor (защита от float).
+  const repeats = Math.max(0, Math.floor(input.repeats));
 
   let used = false;
   if (isLoop) {
@@ -416,12 +413,12 @@ export function classifyCoverage(
       repeats >= 1 &&
       medianOk;
   } else {
-    // Для linear: целочисленное repeats (1x, 2x, 3x, ...) + минимальное покрытие.
-    // ratioLinearMax больше НЕ проверяется — out-and-back (ratio 2.0) проходит.
-    // ratioLinearMin оставлен как нижняя граница покрытия (≥ 75%).
+    // Для linear: repeats из CPs (уже посчитан в computeDeviationFast).
+    // ratioLinearMax больше не проверяется — out-and-back проходит.
+    // ratioLinearMin — защита от случая, когда трек прошёл мимо (ratio < 0.75).
     used =
       input.coveragePct >= t.coverageUsed &&
-      repeatsLinear >= 1 &&
+      repeats >= 1 &&
       ratio >= t.ratioLinearMin &&
       medianOk;
   }
@@ -443,10 +440,9 @@ export function classifyCoverage(
       const base = Math.max(1, repeats);
       match = 1 - Math.abs(ratio - base) / base;
     } else {
-      // Для linear — match относительно целого числа проходов (2x, 3x, ...)
-      // ratio 2.0 → match 1.0 (точно 2 прохода)
-      // ratio 1.9 → match 0.95
-      const nearestInt = Math.max(1, repeatsLinear);
+      // Для linear — match относительно фактического числа проходов (из CPs).
+      // Если CPs дали 2, а ratio 1.5 — match по ratio, но база 2.
+      const nearestInt = Math.max(1, repeats);
       match = 1 - Math.abs(ratio - nearestInt) / nearestInt;
     }
     match = Math.max(0, Math.min(1, match));
