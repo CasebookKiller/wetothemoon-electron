@@ -2827,11 +2827,15 @@ ul#ullist.p-datascroller-list {
 .p-checkbox .p-checkbox-box {
   width: 20px;
   height: 20px;
+  border-radius: 2px !important; /* <- Строгий квадрат везде */
 }
 
-.p-checkbox.p-highlight .p-checkbox-box {
-  border-color: var(--app-theme-link-color);
-  background: var(--app-theme-link-color);
+/* Задаем цвет галочки для залитых чекбоксов (темный) */
+.p-checkbox.p-highlight .p-checkbox-box,
+.p-radiobutton.p-highlight .p-radiobutton-box {
+  background: var(--module-accent, var(--app-theme-link-color)) !important;
+  border-color: var(--module-accent, var(--app-theme-link-color)) !important;
+  border-radius: 2px !important; /* Квадратная форма */
 }
 
 .p-disabled, .p-disabled * {

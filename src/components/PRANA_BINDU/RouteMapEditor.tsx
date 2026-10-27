@@ -56,6 +56,12 @@ import {
 } from './UTILS/allRefsStyles';
 import { geometricLength, simplifyDP } from './UTILS/medianTrack';
 import { evaluateChain } from './UTILS/chainEvaluator';
+import { RunChainBadge } from './RunChainBadge';
+import { ChainsPanel } from './PANELS/ChainsPanel/ChainsPanel';
+import {
+  ChainEditorDialog,
+  type ChainDraft,
+} from './PANELS/ChainsPanel/ChainEditorDialog';
 
 interface Props {
   visible: boolean;
@@ -63,7 +69,7 @@ interface Props {
   initialRunId?: number;
 }
 
-type TabType = 'runs' | 'filters' | 'thresholds' | 'refs';
+type TabType = 'runs' | 'filters' | 'thresholds' | 'refs' | 'chains';
 
 const HEADER_HEIGHT = 56;
 const CHUNK_SIZE = 25;
@@ -490,6 +496,18 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
   >([]);
   const [refTracksLoading, setRefTracksLoading] = useState(false);
   const [selectedRefTrackId, setSelectedRefTrackId] = useState<number | null>(null);
+  // ==================== Цепочки (C.12) ====================
+  const [chains, setChains] = useState<
+    Array<{ id: number; name: string; ordered: boolean; createdAt: string; updatedAt: string }>
+  >([]);
+  const [chainsLoading, setChainsLoading] = useState(false);
+  const [activeChainId, setActiveChainId] = useState<number | null>(null);
+  // Диалог создания/редактирования цепочки
+  const [chainDialogVisible, setChainDialogVisible] = useState(false);
+  const [chainDialogMode, setChainDialogMode] = useState<'create' | 'edit'>('create');
+  const [chainDialogInitial, setChainDialogInitial] = useState<ChainDraft | null>(null);
+  const [chainSaving, setChainSaving] = useState(false);
+  const [chainSaveError, setChainSaveError] = useState('');
   const [editRefVisible, setEditRefVisible] = useState(false);
   const [editRefItem, setEditRefItem] = useState<{
     id: number;
@@ -1329,10 +1347,135 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
   };
 
   useEffect(() => {
-    if (visible && activeTab === 'refs') {
+    if (visible && (activeTab === 'refs' || activeTab === 'chains')) {
       void loadReferenceTracks();
     }
   }, [visible, activeTab]);
+
+  // ==================== Загрузка цепочек ====================
+  const loadChains = async () => {
+    if (!api?.pb?.chainList) return;
+    setChainsLoading(true);
+    try {
+      const res = await api.pb.chainList();
+      if (res?.success) setChains(res.items ?? []);
+    } catch (e) {
+      console.error('[pb-map] chain list error:', e);
+    } finally {
+      setChainsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (visible && activeTab === 'chains') {
+      void loadChains();
+    }
+  }, [visible, activeTab]);
+
+  // ==================== Обработчики цепочек ====================
+  const handleCreateChain = () => {
+    setChainDialogMode('create');
+    setChainDialogInitial(null);
+    setChainSaveError('');
+    setChainDialogVisible(true);
+  };
+
+  const handleEditChain = async (id: number) => {
+    try {
+      const res = await api.pb.chainGet(id);
+      if (!res?.success || !res.item) {
+        console.error('[pb-map] chain get error:', res?.error);
+        return;
+      }
+      const chain = res.item;
+      // Приводим к ChainDraft
+      const draft: ChainDraft = {
+        id: chain.id,
+        name: chain.name,
+        ordered: chain.ordered,
+        slots: chain.slots.map((s: any) => ({
+          orderIndex: s.orderIndex,
+          expectedRepeatsMin: s.expectedRepeatsMin,
+          expectedRepeatsMax: s.expectedRepeatsMax,
+          aggregate: s.aggregate,
+          minCoverage: s.minCoverage,
+          optional: s.optional,
+          clusters: s.clusters,
+          specificAtoms: s.specificAtoms,
+          type: s.clusters.length > 0 ? 'clusters' : 'atoms',
+        })),
+      };
+      setChainDialogMode('edit');
+      setChainDialogInitial(draft);
+      setChainSaveError('');
+      setChainDialogVisible(true);
+    } catch (e) {
+      console.error('[pb-map] chain get:', e);
+    }
+  };
+
+  const handleSaveChain = async (draft: ChainDraft) => {
+    setChainSaving(true);
+    setChainSaveError('');
+    try {
+      if (chainDialogMode === 'create') {
+        const res = await api.pb.chainCreate({
+          name: draft.name,
+          ordered: draft.ordered,
+          slots: draft.slots,
+        });
+        if (!res?.success) {
+          setChainSaveError(res?.error ?? 'Не удалось создать');
+          return;
+        }
+        setChainDialogVisible(false);
+        await loadChains();
+        if (res.id) setActiveChainId(res.id);
+      } else {
+        if (!draft.id) {
+          setChainSaveError('Нет id цепочки');
+          return;
+        }
+        const nameRes = await api.pb.chainUpdateName(draft.id, draft.name);
+        if (!nameRes?.success) {
+          setChainSaveError(nameRes?.error ?? 'Не удалось обновить название');
+          return;
+        }
+        const slotsRes = await api.pb.chainReplaceSlots(draft.id, draft.slots);
+        if (!slotsRes?.success) {
+          setChainSaveError(slotsRes?.error ?? 'Не удалось обновить слоты');
+          return;
+        }
+        setChainDialogVisible(false);
+        await loadChains();
+      }
+    } catch (e) {
+      setChainSaveError((e as Error).message);
+    } finally {
+      setChainSaving(false);
+    }
+  };
+
+  const handleDeleteChain = async (id: number) => {
+    if (!window.confirm(`Удалить цепочку #${id}?`)) return;
+    try {
+      const res = await api.pb.chainDelete(id);
+      if (res?.success) {
+        setChains((prev) => prev.filter((c) => c.id !== id));
+        if (activeChainId === id) setActiveChainId(null);
+      } else {
+        console.error('[pb-map] chain delete error:', res?.error);
+      }
+    } catch (e) {
+      console.error('[pb-map] chain delete:', e);
+    }
+  };
+
+  const handleApplyChain = (id: number) => {
+    setActiveChainId(id);
+    // Панель цепочки в HUD (B.5) будет использовать activeChainId
+    // для показа слотов через evaluateChain.
+  };
 
   useEffect(() => {
     if (!selectedRefTrackId) return;
@@ -2883,6 +3026,14 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                 >
                   Эталоны
                 </button>
+                <button
+                  type="button"
+                  className={`pb-catalog__chip ${activeTab === 'chains' ? 'is-on' : ''}`}
+                  onClick={() => setActiveTab('chains')}
+                  style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                >
+                  Цепочки
+                </button>
               </div>
             </div>
 
@@ -4274,6 +4425,19 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                 })()}
               </div>
             )}
+
+            {activeTab === 'chains' && (
+              <ChainsPanel
+                chains={chains}
+                loading={chainsLoading}
+                activeChainId={activeChainId}
+                onApply={handleApplyChain}
+                onEdit={handleEditChain}
+                onDelete={handleDeleteChain}
+                onCreate={handleCreateChain}
+                onRefresh={loadChains}
+              />
+            )}
             </div>
 
             <div
@@ -5467,6 +5631,22 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
           setSelectedRunIds(new Set());
           setActiveTab('refs');
         }}
+      />
+
+      <ChainEditorDialog
+        visible={chainDialogVisible}
+        mode={chainDialogMode}
+        initial={chainDialogInitial}
+        refTracks={referenceTracks}
+        saving={chainSaving}
+        error={chainSaveError}
+        onHide={() => {
+          if (!chainSaving) {
+            setChainDialogVisible(false);
+            setChainSaveError('');
+          }
+        }}
+        onSave={handleSaveChain}
       />
 
       {testPoint && (
