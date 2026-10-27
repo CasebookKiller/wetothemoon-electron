@@ -155,3 +155,18 @@ export type {
   CreateNutritionInput,
   NutritionDayTotals,
 } from './repositories/nutritionRepo';
+
+// ==================== v32: Цепочки ====================
+export {
+  createChain,
+  getChainById,
+  listChains,
+  updateChainName,
+  replaceChainSlots,
+  deleteChain,
+  listChainsUsingAtom,
+} from './repositories/chainsRepo';
+export type {
+  CreateChainInput,
+  CreateChainSlotInput,
+} from './repositories/chainsRepo';

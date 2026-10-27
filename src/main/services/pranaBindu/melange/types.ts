@@ -190,3 +190,65 @@ export interface NutritionLog {
   source: string;
   createdAt: string;
 }
+
+// ==================== v32: Цепочки и слоты ====================
+
+export type ChainAggregate = 'best' | 'sum';
+
+export interface Chain {
+  id: number;
+  name: string;
+  /** Порядок слотов важен? false = набор (по умолчанию). */
+  ordered: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChainSlot {
+  id: number;
+  chainId: number;
+  /** Позиция в цепочке (0, 1, 2, ...). */
+  orderIndex: number;
+  /** Минимум проходов (для out-and-back = 2). */
+  expectedRepeatsMin: number;
+  /** Максимум проходов (может быть > min, если допустимо 1 или 2). */
+  expectedRepeatsMax: number;
+  /** 'best' = выбрать один лучший атом из кластера; 'sum' = суммировать проходы. */
+  aggregate: ChainAggregate;
+  /** Минимальный coverage атома, чтобы засчитать в слот (%). */
+  minCoverage: number;
+  /** Можно ли пропустить слот. */
+  optional: boolean;
+  /** Имена кластеров (теги group:*) — альтернативные атомы. */
+  clusters: string[];
+  /** Явные id атомов (если не через кластер). */
+  specificAtoms: number[];
+  /** Свободная заметка. */
+  notes: string | null;
+}
+
+export interface ChainWithSlots extends Chain {
+  slots: ChainSlot[];
+}
+
+export interface ChainSlotRow {
+  id: number;
+  chain_id: number;
+  order_index: number;
+  expected_repeats_min: number;
+  expected_repeats_max: number;
+  aggregate: string;
+  min_coverage: number;
+  optional: number;
+  clusters_json: string | null;
+  specific_atoms_json: string | null;
+  notes: string | null;
+}
+
+export interface ChainRow {
+  id: number;
+  name: string;
+  ordered: number;
+  created_at: string;
+  updated_at: string;
+}

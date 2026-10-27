@@ -17,7 +17,7 @@ import {
   MIGRATION_V24_AUTO_RANGE_DAYS,
 } from './schema';
 
-export const SCHEMA_VERSION = 31;
+export const SCHEMA_VERSION = 32;
 
 interface Migration {
   version: number;
@@ -757,6 +757,47 @@ const migrations: readonly Migration[] = [
       console.log('[Melange] v31: созданы таблицы water_logs, weight_logs, nutrition_logs');
     },
   },
+  {
+    version: 32,
+    apply: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS chains (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          ordered INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+      `);
+      db.exec(
+        `CREATE INDEX IF NOT EXISTS idx_chains_name ON chains(name);`,
+      );
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS chain_slots (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          chain_id INTEGER NOT NULL,
+          order_index INTEGER NOT NULL,
+          expected_repeats_min REAL NOT NULL DEFAULT 1,
+          expected_repeats_max REAL NOT NULL DEFAULT 1,
+          aggregate TEXT NOT NULL DEFAULT 'best',
+          min_coverage REAL NOT NULL DEFAULT 90,
+          optional INTEGER NOT NULL DEFAULT 0,
+          clusters_json TEXT,
+          specific_atoms_json TEXT,
+          notes TEXT,
+          FOREIGN KEY (chain_id) REFERENCES chains(id) ON DELETE CASCADE
+        );
+      `);
+      db.exec(
+        `CREATE INDEX IF NOT EXISTS idx_chain_slots_chain
+           ON chain_slots(chain_id, order_index);`,
+      );
+
+      console.log('[Melange] v32: chains + chain_slots');
+    },
+  },
+
 ];
 
 
