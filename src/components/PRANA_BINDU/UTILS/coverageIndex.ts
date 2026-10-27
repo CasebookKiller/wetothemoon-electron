@@ -113,14 +113,19 @@ export interface FastDeviationResult {
 /**
  * Быстрое отклонение трека от эталона через grid-хэш.
  *
- * @param trackLatlng — сэмплированный трек (уже ~1000 точек).
- * @param refIndex     — заранее построенный RefIndex эталона.
+ * @param trackLatlng      — сэмплированный трек (уже ~1000 точек).
+ * @param refIndex          — заранее построенный RefIndex эталона.
+ * @param covRadiusM        — радиус покрытия (для coveragePct).
+ * @param onRefRadiusM      — радиус «на эталоне» (для metersOnRef + gated median).
+ * @param checkpointCount   — количество контрольных точек (3..12).
+ *                            Для сложных маршрутов с детурами увеличивать.
  */
 export function computeDeviationFast(
   trackLatlng: [number, number][],
   refIndex: RefIndex,
   covRadiusM = 20,
   onRefRadiusM = 50,
+  checkpointCount = 6,
 ): FastDeviationResult | null {
   if (trackLatlng.length < 10) return null;
   if (refIndex.coords.length < 2) return null;
@@ -193,13 +198,31 @@ export function computeDeviationFast(
     if (i % MEDIAN_STEP === 0) devsForMedian.push(best);
   }
 
-  const devsSorted = [...devsForMedian].sort((a, b) => a - b);
-  const medianM = devsSorted[Math.floor(devsSorted.length / 2)] ?? 0;
-  const p95M =
-    devsSorted[Math.min(devsSorted.length - 1, Math.floor(devsSorted.length * 0.95))] ??
-    0;
+  // 3. Gated median: считаем медиану только по точкам трека, лежащим
+  //    в радиусе onRefRadiusM от эталона. Точки разминки/заминки (в стороне)
+  //    не должны раздувать медиану.
+  //
+  //    Пример (1068): из 1000 точек 400 — разминка/заминка (500-1300 м),
+  //    600 — на круге (20-40 м). Полная медиана = 247 м (артефакт).
+  //    Gated медиана = 30 м (правда).
+  //
+  //    Если «рядом» оказалось < 5 точек (трек почти не пересекается с эталоном),
+  //    fallback на полную медиану — иначе получим бессмысленное число.
+  const gatedForMedian = devsForMedian.filter((d) => d <= ON_REF_RADIUS_M);
+  const sourceForMedian =
+    gatedForMedian.length >= 5 ? gatedForMedian : devsForMedian;
 
-  // 3. ref → track (grid по треку для быстрого «покрыто?»)
+  const devsSorted = [...sourceForMedian].sort((a, b) => a - b);
+  const medianM = devsSorted[Math.floor(devsSorted.length / 2)] ?? 0;
+
+  // p95 считаем по ПОЛНОМУ набору, чтобы видеть выбросы (разминка/заминка)
+  const devsSortedFull = [...devsForMedian].sort((a, b) => a - b);
+  const p95M =
+    devsSortedFull[
+      Math.min(devsSortedFull.length - 1, Math.floor(devsSortedFull.length * 0.95))
+    ] ?? 0;
+
+  // 4. ref → track (grid по треку для быстрого «покрыто?»)
   const trkCells = new Map<string, number[]>();
   trackLatlng.forEach(([lat, lng], idx) => {
     const { cx, cy } = latLngToCell(lat, lng, cosLat);
@@ -233,7 +256,7 @@ export function computeDeviationFast(
   }
   const coveragePct = Math.round((covered / refCoords.length) * 100);
 
-  // 4. metersOnRef: считаем по всем точкам, gated по devsAll.
+  // 5. metersOnRef: считаем по всем точкам, gated по devsAll.
   let metersOnRef = 0;
   for (let i = 1; i < trackLatlng.length; i++) {
     if (
@@ -247,16 +270,24 @@ export function computeDeviationFast(
     }
   }
 
-    // 5. checkpointPasses: проходы через 4 контрольные точки
-  const cpFractions = [0.2, 0.4, 0.6, 0.8];
+  // 6. checkpointPasses: динамическое количество КП (3..12).
+  //    cpCount=4 → [0.2, 0.4, 0.6, 0.8]
+  //    cpCount=6 → [1/7, 2/7, ..., 6/7]
+  //    cpCount=8 → [1/9, 2/9, ..., 8/9]
+  const safeCpCount = Math.max(3, Math.min(12, Math.floor(checkpointCount)));
+  const cpFractions: number[] = [];
+  for (let i = 1; i <= safeCpCount; i++) {
+    cpFractions.push(i / (safeCpCount + 1));
+  }
+
   const passesArray: number[] = [];
-  
+
   for (const frac of cpFractions) {
     const cpIdx = Math.floor(refCoords.length * frac);
     const cp = refCoords[cpIdx];
     let passes = 0;
     let state = 'far';
-    
+
     for (const [tlat, tlng] of trackLatlng) {
       const d = haversineM(cp[0], cp[1], tlat, tlng);
       if (d < 30) {
@@ -270,11 +301,16 @@ export function computeDeviationFast(
     }
     passesArray.push(passes);
   }
-  
-  passesArray.sort((a, b) => a - b);
-  const checkpointPasses = passesArray[Math.floor(passesArray.length / 2)] || 0;
 
-  // 6. repeats
+  passesArray.sort((a, b) => a - b);
+  // 25-й перцентиль вместо медианы. Медиана ломается, если трек
+  // проходит половину КП дважды (детур на лестницы/фотозону):
+  //   [1, 1, 1, 2, 2, 2] → медиана 2 (неверно), 25-й перцентиль 1 (верно).
+  // 25-й перцентиль устойчив и к детурам (+), и к срезам (-).
+  const checkpointPasses =
+    passesArray[Math.floor(passesArray.length * 0.25)] || 0;
+
+  // 7. repeats
   let refLengthM = 0;
   for (let i = 1; i < refCoords.length; i++) {
     refLengthM += haversineM(
@@ -292,23 +328,28 @@ export function computeDeviationFast(
   if (refLengthM > 0) {
     const rawRatio = metersOnRef / refLengthM;
     if (isLoop) {
-      // Берем максимум из пройденных метров и КП. КП спасают от потери GPS.
-      repeats = Math.max(checkpointPasses, Math.floor(rawRatio));
-      if (coveragePct >= 90) {
-        const rounded = Math.round(rawRatio);
-        if (Math.abs(rawRatio - rounded) < 0.35) {
-          repeats = Math.max(repeats, rounded);
-        }
+      // CPs - главный источник правды для loop.
+      // Защищает от детуров, которые раздувают rawRatio (1065: прошёл круг
+      // + маленький разворот на лестницы → rawRatio ≈ 2.0, но кругов 1).
+      // Fallback на rawRatio только если КП промахнулись (GPS-провал).
+      if (checkpointPasses >= 1) {
+        repeats = checkpointPasses;
+      } else if (coveragePct >= 70) {
+        repeats = Math.max(1, Math.round(rawRatio));
       }
     } else {
-      // Для прямых (linear) считаем только по метрам.
+      // Для linear: целочисленный подсчёт проходов.
+      // Out-and-back (ratio 2.0) = 2 прохода; один проход = 1.
       repeats = Math.floor(rawRatio);
-      if (coveragePct >= 90 && Math.abs(rawRatio - Math.round(rawRatio)) < 0.35) {
+      if (
+        coveragePct >= 90 &&
+        Math.abs(rawRatio - Math.round(rawRatio)) < 0.35
+      ) {
         repeats = Math.round(rawRatio);
       }
     }
   }
-  
+
   if (repeats < 1 && coveragePct >= 70) {
     repeats = 1;
   }
@@ -350,15 +391,23 @@ export function classifyCoverage(
   input: ClassifyInput,
   t: CoverageThresholds,
 ): ClassifyResult {
-  // ratio теперь считается от длины трека, лежащего на эталоне (metersOnRef),
-  // а не от общей длины трека. Это игнорирует разминку/заминку.
+  // ratio = сколько длин эталона покрыто треком.
+  // Для loop - "сколько раз пробежал круг".
+  // Для linear - "сколько раз прошёл отрезок" (1x, 2x, 3x, ...).
   const ratio = input.atomLenM > 0 ? input.metersOnRef / input.atomLenM : 0;
   const isLoop = input.atomKind === 'loop' || input.atomKind === 'stadium';
   const medianOk = input.medianM <= t.medianMaxM;
 
+  // Для linear — целочисленное число проходов.
+  // Допуск ±30% (ratio 1.9 → 2x, ratio 2.0 → 2x, ratio 0.5 → 0x).
+  // Это убирает жёсткий ratioLinearMax и позволяет out-and-back (ratio 2.0).
+  const integerRatio = Math.round(ratio);
+  const isNearInteger = Math.abs(ratio - integerRatio) < 0.3;
+  const repeatsLinear = isNearInteger ? Math.max(0, integerRatio) : 0;
+
   const repeats = isLoop
     ? Math.max(0, Math.floor(input.repeats))
-    : Math.min(1, Math.max(0, Math.floor(input.repeats || (ratio >= 0.9 ? 1 : 0))));
+    : repeatsLinear;
 
   let used = false;
   if (isLoop) {
@@ -367,10 +416,13 @@ export function classifyCoverage(
       repeats >= 1 &&
       medianOk;
   } else {
+    // Для linear: целочисленное repeats (1x, 2x, 3x, ...) + минимальное покрытие.
+    // ratioLinearMax больше НЕ проверяется — out-and-back (ratio 2.0) проходит.
+    // ratioLinearMin оставлен как нижняя граница покрытия (≥ 75%).
     used =
       input.coveragePct >= t.coverageUsed &&
+      repeatsLinear >= 1 &&
       ratio >= t.ratioLinearMin &&
-      ratio <= t.ratioLinearMax &&
       medianOk;
   }
 
@@ -391,7 +443,11 @@ export function classifyCoverage(
       const base = Math.max(1, repeats);
       match = 1 - Math.abs(ratio - base) / base;
     } else {
-      match = 1 - Math.abs(ratio - 1.0);
+      // Для linear — match относительно целого числа проходов (2x, 3x, ...)
+      // ratio 2.0 → match 1.0 (точно 2 прохода)
+      // ratio 1.9 → match 0.95
+      const nearestInt = Math.max(1, repeatsLinear);
+      match = 1 - Math.abs(ratio - nearestInt) / nearestInt;
     }
     match = Math.max(0, Math.min(1, match));
 

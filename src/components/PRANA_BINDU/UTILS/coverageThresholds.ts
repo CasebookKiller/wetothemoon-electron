@@ -20,6 +20,8 @@ export interface CoverageThresholds {
   coverageRadiusM: number;
   /** Радиус (м) для расчета метров на эталоне (metersOnRef). */
   onRefRadiusM: number;
+  /** Количество контрольных точек для подсчёта поворотов (3..12). */
+  checkpointCount: number;
 }
 
 export const DEFAULT_COVERAGE_THRESHOLDS: CoverageThresholds = {
@@ -31,6 +33,9 @@ export const DEFAULT_COVERAGE_THRESHOLDS: CoverageThresholds = {
   medianMaxM: 100,
   coverageRadiusM: 20,
   onRefRadiusM: 50,
+  // 6 КП вместо захардкоженных 4: для сложных маршрутов с детурами
+  // (круг с лестницами, восьмёрка) медиана по 6 точкам точнее.
+  checkpointCount: 6,
 };
 
 const KEY = 'pb.coverageThresholds';
@@ -43,7 +48,8 @@ export function getSavedCoverageThresholds(): CoverageThresholds {
     if (!parsed || typeof parsed !== 'object') {
       return { ...DEFAULT_COVERAGE_THRESHOLDS };
     }
-    // Merge с дефолтами — чтобы новые поля автоматически подхватились.
+    // Merge с дефолтами — чтобы новые поля автоматически подхватились
+    // (например, checkpointCount появился позже, чем первые сохранения).
     return { ...DEFAULT_COVERAGE_THRESHOLDS, ...parsed };
   } catch {
     return { ...DEFAULT_COVERAGE_THRESHOLDS };

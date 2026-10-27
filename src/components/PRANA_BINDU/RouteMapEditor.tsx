@@ -328,175 +328,15 @@ function fmtSecAsDuration(sec: number): string {
 
 // ==================== Отклонение от эталона (C.5-A4a) ====================
 
-interface DeviationResult {
-  /** Медиана расстояния от каждой точки трека до ближайшей точки эталона. */
-  medianM: number;
-  /** 95-й перцентиль — выбросы (срезы, отходы от маршрута). */
-  p95M: number;
-  /** % точек эталона, покрытых треком (в радиусе 20 м). */
-  coveragePct: number;
-  /** Чистая пробежка: медиана < 15 м и coverage ≥ 90%. */
-  isClean: boolean;
-  /** Суммарная длина трека, лежащего в радиусе 30 м от эталона. */
-  metersOnRef: number;
-  /** Точное число проходов эталона (медиана по точкам эталона). */
-  repeats: number;
-  /** Точное число проходов трека (медиана по точкам трека). */
-  checkpointPasses: number;
-}
-
-/**
- * Сравнивает трек с эталоном:
- *  - track→ref: для каждой точки трека ищем ближайшую точку эталона,
- *    медиана — насколько трек «приблизительно на маршруте».
- *  - ref→track: для каждой точки эталона проверяем, что трек прошёл
- *    рядом (20 м), — насколько маршрут покрыт.
- *
- * Трек сэмплируется до 200 точек, эталон остаётся как есть (обычно
- * 10–100 вершин, этого достаточно).
- */
-function computeDeviation(
-  trackLatlng: (number | null)[][],
-  refCoords: [number, number][],
-): DeviationResult | null {
-  const track = trackLatlng.filter(
-    (p): p is [number, number] =>
-      p != null && p[0] != null && p[1] != null,
-  );
-  if (track.length < 10) return null;
-  if (refCoords.length < 2) return null;
-
-  // Сэмплируем трек (медиана устойчива к сэмплированию)
-  const targetSamples = 200;
-  const step = Math.max(1, Math.floor(track.length / targetSamples));
-  const sampled: [number, number][] = [];
-  for (let i = 0; i < track.length; i += step) {
-    sampled.push(track[i]);
-  }
-
-  // 1. track → ref: медиана, p95, и raw-отклонения в порядке sample
-  const devsBySample: number[] = [];
-  for (const tp of sampled) {
-    let best = Infinity;
-    for (const rp of refCoords) {
-      const d = haversineM(tp[0], tp[1], rp[0], rp[1]);
-      if (d < best) {
-        best = d;
-        if (best < 1) break;
-      }
-    }
-    devsBySample.push(best);
-  }
-  const devs = [...devsBySample].sort((a, b) => a - b);
-  const median = devs[Math.floor(devs.length / 2)];
-  const p95 =
-    devs[Math.min(devs.length - 1, Math.floor(devs.length * 0.95))];
-
-  // 2. ref → track: coverage (20 м радиус)
-  const COVERAGE_RADIUS_M = 20;
-  let covered = 0;
-  for (const rp of refCoords) {
-    for (const tp of sampled) {
-      if (haversineM(rp[0], rp[1], tp[0], tp[1]) <= COVERAGE_RADIUS_M) {
-        covered++;
-        break;
-      }
-    }
-  }
-  const coveragePct = Math.round((covered / refCoords.length) * 100);
-
-  // 3. metersOnRef: считаем по полному треку, gated isOnRef по сэмплу.
-  //    Радиус 50 м — эмпирически хорошо отделяет «на эталоне» от «рядом».
-  const ON_REF_RADIUS_M = 50;
-  const onRefSample = devsBySample.map((d) => d <= ON_REF_RADIUS_M);
-  let metersOnRefAcc = 0;
-  for (let i = 1; i < track.length; i++) {
-    const sampleIdx = Math.min(
-      sampled.length - 1,
-      Math.floor(i / step),
-    );
-    if (onRefSample[sampleIdx]) {
-      metersOnRefAcc += haversineM(
-        track[i - 1][0], track[i - 1][1],
-        track[i][0], track[i][1],
-      );
-    }
-  }
-
-  // 4. checkpointPasses: проходы через 4 контрольные точки
-  const cpFractions = [0.2, 0.4, 0.6, 0.8];
-  const passesArray: number[] = [];
-  
-  for (const frac of cpFractions) {
-    const cpIdx = Math.floor(refCoords.length * frac);
-    const cp = refCoords[cpIdx];
-    let passes = 0;
-    let state = 'far';
-    
-    for (const [tlat, tlng] of track) {
-      const d = haversineM(cp[0], cp[1], tlat, tlng);
-      if (d < 30) {
-        if (state !== 'near') {
-          passes++;
-          state = 'near';
-        }
-      } else if (d > 100) {
-        state = 'far';
-      }
-    }
-    passesArray.push(passes);
-  }
-  
-  passesArray.sort((a, b) => a - b);
-  const checkpointPasses = passesArray[Math.floor(passesArray.length / 2)] || 0;
-
-  // 5. repeats: длина трека на эталоне / длина эталона.
-  let refLengthM = 0;
-  for (let i = 1; i < refCoords.length; i++) {
-    refLengthM += haversineM(
-      refCoords[i - 1][0], refCoords[i - 1][1],
-      refCoords[i][0], refCoords[i][1],
-    );
-  }
-
-  const isLoop = haversineM(
-    refCoords[0][0], refCoords[0][1],
-    refCoords[refCoords.length - 1][0], refCoords[refCoords.length - 1][1]
-  ) < 50;
-
-  let repeats = 0;
-  if (refLengthM > 0) {
-    const rawRatio = metersOnRefAcc / refLengthM;
-    if (isLoop) {
-      repeats = Math.max(checkpointPasses, Math.floor(rawRatio));
-      if (coveragePct >= 90) {
-        const rounded = Math.round(rawRatio);
-        if (Math.abs(rawRatio - rounded) < 0.35) {
-          repeats = Math.max(repeats, rounded);
-        }
-      }
-    } else {
-      repeats = Math.floor(rawRatio);
-      if (coveragePct >= 90 && Math.abs(rawRatio - Math.round(rawRatio)) < 0.35) {
-        repeats = Math.round(rawRatio);
-      }
-    }
-  }
-  
-  if (repeats < 1 && coveragePct >= 70) {
-    repeats = 1;
-  }
-
-  return {
-    medianM: Math.round(median),
-    p95M: Math.round(p95),
-    coveragePct,
-    isClean: median < 15 && coveragePct >= 90,
-    metersOnRef: Math.round(metersOnRefAcc),
-    repeats,
-    checkpointPasses,
-  };
-}
+// Метрики конкретного атома для текущего выбранного трека.
+// Берутся из того же `batchCoverage` (computeDeviationFast),
+// что и классификация used/similar, — поэтому цифры в карточке
+// совпадают с бейджем «Пройдено / Похоже».
+//
+// Раньше здесь жила отдельная `computeDeviation` (полная медиана по
+// всем точкам трека), что давало расхождения с классификатором
+// (медиана 193–247 м в карточке против 30 м в бейдже).
+// Унифицировано 2026-10-27 (см. 18b_ATOM_CHAINS.md).
 
 // ==================== Компонент ====================
 
@@ -639,6 +479,16 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     useState<CoverageThresholds>(() => getSavedCoverageThresholds());
   // --- B.3: Секции и фильтр по атому ---
   const [filterByRefId, setFilterByRefId] = useState<number | null>(null);
+  // Когда фильтр по атому включён: показывать только пробежки, где
+  // этот атом — primary (а не просто «задет»). По умолчанию false —
+  // показываем все «задетые» (старое поведение).
+  const [filterOnlyPrimary, setFilterOnlyPrimary] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('pb.mapEditor.onlyPrimaryFilter') === '1';
+    } catch {
+      return false;
+    }
+  });
   const [expandedRefGroups, setExpandedRefGroups] = useState<Set<string>>(new Set());
   const [groupedRunsView, setGroupedRunsView] = useState<boolean>(() => {
     try {
@@ -669,18 +519,14 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     [editPointsMode, editPointsDraft],
   );
 
-  // Отклонения для всех эталонов на текущем треке (кэшируется между ре-рендерами)
-  const refDeviations = useMemo(() => {
-    const result: Record<number, DeviationResult> = {};
-    if (!streamsPayload?.latlng || referenceTracks.length === 0) {
-      return result;
-    }
-    for (const ref of referenceTracks) {
-      const dev = computeDeviation(streamsPayload.latlng, ref.coords);
-      if (dev) result[ref.id] = dev;
-    }
-    return result;
-  }, [streamsPayload, referenceTracks]);
+  // Хелпер: метрики конкретного атома для текущего выбранного трека.
+  // Источник — batchCoverage (тот же computeDeviationFast, что и бейдж),
+  // поэтому цифры совпадают с классификацией.
+  const getRefCoverage = (refId: number) => {
+    if (!selectedGroup) return null;
+    const covs = batchCoverage.get(selectedGroup.primary.id);
+    return covs?.find((c) => c.refId === refId) ?? null;
+  };
 
   const editPointsSourceAtom = useMemo(
     () =>
@@ -719,14 +565,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
   const [draftPoints, setDraftPoints] = useState<[number, number][]>([]);
   const [saveRefVisible, setSaveRefVisible] = useState(false);
   const [saveRefName, setSaveRefName] = useState('');
-  // Редактирование существующего эталона (имя, категория, теги)
-  //const [editRefVisible, setEditRefVisible] = useState(false);
-  //const [editRefId, setEditRefId] = useState<number | null>(null);
-  //const [editRefName, setEditRefName] = useState('');
-  //const [editRefCategory, setEditRefCategory] = useState<string | null>(null);
-  //const [editRefTags, setEditRefTags] = useState('');
-  //const [editRefStatus, setEditRefStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  //const [editRefError, setEditRefError] = useState('');
   const [saveRefStatus, setSaveRefStatus] = useState<
     'idle' | 'saving' | 'saved' | 'error'
   >('idle');
@@ -847,7 +685,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
           zoom: 12,
           attributionControl: { compact: true },
           canvasContextAttributes: {
-            preserveDrawingBuffer: true, 
+            preserveDrawingBuffer: true,
           },
         } as any);
         map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
@@ -864,7 +702,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
   // Ресайз карты при сворачивании/разворачивании левой панели
   useEffect(() => {
     if (mapRef.current) {
-      // Небольшая задержка, чтобы CSS успел применить изменения ширины
       const t = setTimeout(() => {
         mapRef.current?.resize();
       }, 100);
@@ -898,7 +735,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
       } catch {
         /* ignore */
       }
-      // Финальный ресайз, когда отпустили мышь
       if (mapRef.current) mapRef.current.resize();
     };
 
@@ -916,13 +752,11 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     const map = mapRef.current;
     if (!map || !mapLoaded) return;
 
-    // Снимаем предыдущий обработчик
     if (markupClickHandlerRef.current) {
       map.off('click', markupClickHandlerRef.current);
       markupClickHandlerRef.current = null;
     }
 
-    // Меняем курсор
     const canvas = map.getCanvas();
     canvas.style.cursor = markupMode ? 'crosshair' : '';
 
@@ -952,12 +786,18 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
       localStorage.setItem('pb.testVisible', testVisible ? '1' : '0');
     } catch { /* ignore */ }
   }, [testVisible]);
-  
+
   useEffect(() => {
     try {
       localStorage.setItem('pb.mapEditor.groupedRuns', groupedRunsView ? '1' : '0');
     } catch { /* ignore */ }
   }, [groupedRunsView]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('pb.mapEditor.onlyPrimaryFilter', filterOnlyPrimary ? '1' : '0');
+    } catch { /* ignore */ }
+  }, [filterOnlyPrimary]);
 
   // ==================== Рисование эталона: клики ====================
 
@@ -965,7 +805,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     const map = mapRef.current;
     if (!map || !mapLoaded) return;
 
-    // Снимаем предыдущий обработчик
     if (drawClickHandlerRef.current) {
       map.off('click', drawClickHandlerRef.current);
       drawClickHandlerRef.current = null;
@@ -975,7 +814,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
 
     if (!drawMode) {
       canvas.style.cursor = markupMode ? 'crosshair' : '';
-      // Восстанавливаем видимость трека и тестового отрезка
       if (map.getLayer('active-track')) {
         map.setLayoutProperty(
           'active-track',
@@ -1001,10 +839,8 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
       return;
     }
 
-    // Включаем режим рисования
     canvas.style.cursor = 'crosshair';
 
-    // Скрываем трек и тестовый отрезок — чтобы не мешали
     if (map.getLayer('active-track')) {
       map.setLayoutProperty('active-track', 'visibility', 'none');
     }
@@ -1021,7 +857,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     const handler = (e: any) => {
       const { lat, lng } = e.lngLat;
       setDraftPoints((prev) => {
-        // Пропускаем дубли (dblclick = 2 click + dblclick)
         const last = prev[prev.length - 1];
         if (last) {
           const d = haversineM(last[0], last[1], lat, lng);
@@ -1047,7 +882,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     const map = mapRef.current;
     if (!map || !mapLoaded) return;
 
-    // Очищаем старые маркеры и линию
     draftMarkersRef.current.forEach((m) => m.remove());
     draftMarkersRef.current = [];
 
@@ -1057,7 +891,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     if (!drawMode) return;
     if (draftPoints.length === 0) return;
 
-    // Маркеры вершин
     draftPoints.forEach((p, i) => {
       const isFirst = i === 0;
       const isLast = i === draftPoints.length - 1 && draftPoints.length > 1;
@@ -1072,7 +905,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
       draftMarkersRef.current.push(marker);
     });
 
-    // Линия между вершинами
     if (draftPoints.length >= 2) {
       const coords = draftPoints.map((p) => [p[1], p[0]]);
       map.addSource('draft-line', {
@@ -1104,7 +936,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     const map = mapRef.current;
     if (!map || !mapLoaded) return;
 
-    // Очистка старых маркеров и линии
     editMarkersRef.current.forEach((m) => m.remove());
     editMarkersRef.current = [];
     if (map.getLayer('edit-draft-line')) map.removeLayer('edit-draft-line');
@@ -1113,7 +944,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     if (!editPointsMode) return;
     if (editPointsDraft.length === 0) return;
 
-    // Маркеры
     editPointsDraft.forEach((p, i) => {
       const isStart = i === 0;
       const isEnd = i === editPointsDraft.length - 1 && editPointsDraft.length > 1;
@@ -1197,7 +1027,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
       editMarkersRef.current.push(marker);
     });
 
-    // Draft-линия
     if (editPointsDraft.length >= 2) {
       const coords = editPointsDraft.map((p) => [p[1], p[0]]);
       map.addSource('edit-draft-line', {
@@ -1223,10 +1052,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     }
   }, [editPointsMode, editPointsDraft, mapLoaded, splitMode, splitBoundaries]);
 
-  // Клик / ПКМ по линии — вставить точку в ближайший сегмент.
-  // Отказались от dblclick: MapLibre требует два клика <300мс по одним
-  // координатам, тонкая линия плохо ловится hit-test'ом, пользователь
-  // кликает мимо. Ручной hit-test с допуском 20px работает стабильно.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapLoaded || !editPointsMode) return;
@@ -1235,8 +1060,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
 
     const HIT_TOLERANCE_PX = 20;
 
-    // Расстояние от точки до отрезка в экранных координатах.
-    // Возвращает { distancePx, t } — t в [0,1] по длине отрезка.
     const pointToSegmentPx = (
       px: number,
       py: number,
@@ -1311,7 +1134,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     };
   }, [editPointsMode, mapLoaded, splitMode]);
 
-  // Escape → отмена edit-режима
   useEffect(() => {
     if (!editPointsMode) return;
     const onKey = (e: KeyboardEvent) => {
@@ -1331,8 +1153,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     return () => window.removeEventListener('keydown', onKey);
   }, [editPointsMode]);
 
-
-  // Escape → отмена режима рисования
   useEffect(() => {
     if (!drawMode) return;
     const onKey = (e: KeyboardEvent) => {
@@ -1352,12 +1172,10 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     const map = mapRef.current;
     if (!map || !mapLoaded) return;
 
-    // Убираем старые слои
     if (map.getLayer('ref-line-outline')) map.removeLayer('ref-line-outline');
     if (map.getLayer('ref-line')) map.removeLayer('ref-line');
     if (map.getSource('ref-line')) map.removeSource('ref-line');
 
-    // Не показываем эталон во время рисования (мешает)
     if (!selectedRefTrackId || drawMode) return;
 
     const ref = referenceTracks.find((r) => r.id === selectedRefTrackId);
@@ -1374,7 +1192,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
       },
     });
 
-    // Тёмная подложка
     map.addLayer({
       id: 'ref-line-outline',
       type: 'line',
@@ -1387,7 +1204,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
       },
     });
 
-    // Основная линия эталона — синий пунктир
     map.addLayer({
       id: 'ref-line',
       type: 'line',
@@ -1419,14 +1235,13 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     }
   };
 
-  // Загружаем при переключении на вкладку «Пороги» или при открытии
   useEffect(() => {
     if (visible && activeTab === 'thresholds') {
       void loadSegments();
     }
   }, [visible, activeTab]);
 
-    // ==================== Загрузка эталонных треков ====================
+  // ==================== Загрузка эталонных треков ====================
 
   const loadReferenceTracks = async () => {
     if (!api?.pb?.referenceTrackList) return;
@@ -1443,14 +1258,12 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     }
   };
 
-  // Загружаем при открытии и при переключении на вкладку «Эталоны»
   useEffect(() => {
     if (visible && activeTab === 'refs') {
       void loadReferenceTracks();
     }
   }, [visible, activeTab]);
 
-  // Скролл к выбранному атому в списке «Эталоны»
   useEffect(() => {
     if (!selectedRefTrackId) return;
     if (activeTab !== 'refs') return;
@@ -1470,12 +1283,12 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
       }
     }
     refIndexesCacheRef.current = next;
-    // Инвалидируем кеш отклонений — атомы или радиусы изменились
     coverageCacheRef.current = new Map();
   }, [
-    referenceTracks, 
-    coverageThresholds.coverageRadiusM, 
-    coverageThresholds.onRefRadiusM
+    referenceTracks,
+    coverageThresholds.coverageRadiusM,
+    coverageThresholds.onRefRadiusM,
+    coverageThresholds.checkpointCount,
   ]);
 
   // Загрузка latlng для видимых пробежек (batch)
@@ -1550,11 +1363,13 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
 
         let dev = coverageCacheRef.current.get(factId)?.get(ref.id);
         if (!dev) {
+          // Передаём checkpointCount из настроек (по умолчанию 6)
           dev = computeDeviationFast(
-            track.latlng, 
-            idx, 
-            coverageThresholds.coverageRadiusM, 
-            coverageThresholds.onRefRadiusM
+            track.latlng,
+            idx,
+            coverageThresholds.coverageRadiusM,
+            coverageThresholds.onRefRadiusM,
+            coverageThresholds.checkpointCount ?? 6,
           ) ?? undefined;
           if (!dev) continue;
           let m = coverageCacheRef.current.get(factId);
@@ -1612,25 +1427,19 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     for (const [factId, arr] of batchCoverage.entries()) {
       const used = arr.filter((x) => x.cls === 'used');
       if (used.length === 0) continue;
-      
-      // primary = самый длинный пройденный эталон.
-      // Логика:
-      // 1. Сначала идут "идеальные" (coverage >= 95%). Среди них выигрывает самый длинный.
-      // 2. Потом остальные (coverage 70..94%). Выигрывает тот, у кого (coverage * length) больше.
-      // Это гарантирует, что 100% длинного круга победит 100% короткого,
-      // а 75% длинного проиграет 100% короткого.
+
       const scored = used.map((u) => {
         const r = referenceTracks.find((x) => x.id === u.refId);
         const len = r?.lengthM || 0;
         const isPerfect = u.dev.coveragePct >= 95;
         const isLoop = r?.kind === 'loop' || r?.kind === 'stadium';
-        
-        return { 
-          ...u, 
-          ref: r, 
+
+        return {
+          ...u,
+          ref: r,
           isLoop,
           isPerfect,
-          sortScore: isPerfect ? len : u.dev.coveragePct * len 
+          sortScore: isPerfect ? len : u.dev.coveragePct * len
         };
       });
 
@@ -1680,10 +1489,8 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
       }
     };
 
-    // Чистим перед добавлением (StrictMode, повторные рендеры)
     cleanup();
 
-    // Восстанавливаем прозрачность трека, если режим выключен
     if (!showAllRefs) {
       if (map.getLayer('active-track')) {
         map.setPaintProperty('active-track', 'line-opacity', trackSettingsRef.current.opacity);
@@ -1694,7 +1501,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     if (referenceTracks.length === 0) return;
     if (!selectedGroup) return;
 
-    // Гасим текущий трек
     if (map.getLayer('active-track')) {
       map.setPaintProperty('active-track', 'line-opacity', 0.25);
     }
@@ -1725,10 +1531,9 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
         },
       });
     } catch (e) {
-      console.warn('[pb-map] addSource all-refs failed (возможно уже существует):', e);
+      console.warn('[pb-map] addSource all-refs failed:', e);
     }
 
-    // Слои (с проверкой на существование)
     const tryAddLayer = (config: any) => {
       try {
         if (!map.getLayer(config.id)) map.addLayer(config);
@@ -1776,7 +1581,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
       paint: buildPaint(s.used),
     });
 
-    // Оранжевый контур-подсветка выбранного атома
     tryAddLayer({
       id: 'all-refs-selected',
       type: 'line',
@@ -1795,7 +1599,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
         const refId = Number(e.features[0].properties.refId);
         setSelectedRefTrackId(refId);
         setActiveTab('refs');
-        // режим «Все эталоны» НЕ выключаем — можно кликать по следующим
       }
     };
 
@@ -1834,8 +1637,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     };
   }, [showAllRefs, mapLoaded, referenceTracks, batchCoverage, selectedGroup]);
 
-
-  // Живое обновление стилей слоёв all-refs (без пересоздания)
+  // Живое обновление стилей слоёв all-refs
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapLoaded) return;
@@ -1862,7 +1664,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     apply('all-refs-used', allRefsStyles.used);
   }, [allRefsStyles, mapLoaded, showAllRefs]);
 
-
   // Подсветка выбранного атома в режиме «Все эталоны»
   useEffect(() => {
     const map = mapRef.current;
@@ -1883,17 +1684,25 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
   const categorizedGroups = useMemo(() => {
     let list = [...visibleGroups];
 
-    // 1. Фильтрация по атому
+        // 1. Фильтрация по атому
     if (filterByRefId !== null) {
       list = list.filter((g) => {
         const covs = batchCoverage.get(g.primary.id);
         if (!covs) return false;
+
+        // «Только primary» — оставляем лишь пробежки, где этот атом
+        // выбран primaryPerRun как главный маршрут.
+        if (filterOnlyPrimary) {
+          const prim = primaryPerRun.get(g.primary.id);
+          return prim?.refId === filterByRefId;
+        }
+
+        // Обычный фильтр: атом задет (used или similar), неважно, primary ли он.
         const target = covs.find((c) => c.refId === filterByRefId);
         return target && (target.cls === 'used' || target.cls === 'similar');
       });
     }
 
-    // 2. Разбиение на категории
     const used: typeof list = [];
     const similar: typeof list = [];
     const unused: typeof list = [];
@@ -1909,7 +1718,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     }
 
     return { used, similar, unused };
-  }, [visibleGroups, filterByRefId, batchCoverage, primaryPerRun]);
+  }, [visibleGroups, filterByRefId, filterOnlyPrimary, batchCoverage, primaryPerRun]);
 
   // Очистка
   useEffect(() => {
@@ -2008,7 +1817,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     const map = mapRef.current;
     if (!map || !mapLoaded) return;
 
-    // Очищаем старые слои и маркеры
     markersRef.current.forEach(m => m.remove());
     markersRef.current = [];
     if (map.getLayer('active-track-glow')) map.removeLayer('active-track-glow');
@@ -2028,14 +1836,12 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     let colorExpr: any = ts.color;
 
     if (gradient.channel === 'none') {
-      // Одна линия (простой случай)
       sourceData = {
         type: 'Feature',
         properties: {},
         geometry: { type: 'LineString', coordinates: coords },
       };
     } else {
-      // Сегменты с градиентом
       const channelValues = streamsPayload[gradient.channel] as (number | null)[] | undefined;
       const stats = computeStats(channelValues);
       if (stats) {
@@ -2073,13 +1879,11 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
       type: 'geojson',
       data: sourceData,
     });
-    
-    // Если трек скрыт, не рисуем его
+
     if (!ts.visible) {
-       return; // или просто не добавляем слои
+      return;
     }
 
-    // Glow (опционально)
     if (ts.glow) {
       map.addLayer({
         id: 'active-track-glow',
@@ -2095,13 +1899,12 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
       });
     }
 
-    // Основной трек
     map.addLayer({
       id: 'active-track',
       type: 'line',
       source: 'active-track',
-      layout: { 
-        'line-join': 'round', 
+      layout: {
+        'line-join': 'round',
         'line-cap': 'round',
         'visibility': ts.visible ? 'visible' : 'none'
       },
@@ -2136,7 +1939,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     const map = mapRef.current;
     if (!map || !mapLoaded) return;
 
-    // Убираем старые слои/маркеры
     if (map.getLayer('test-segment-outline')) map.removeLayer('test-segment-outline');
     if (map.getLayer('test-segment')) map.removeLayer('test-segment');
     if (map.getSource('test-segment')) map.removeSource('test-segment');
@@ -2149,12 +1951,9 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
       testFinishMarkerRef.current = null;
     }
 
-    // Полностью скрыто чекбоксом «Тест» — не отрисовываем ничего
     if (!testVisible) return;
-
     if (!testPoint) return;
 
-    // Маркер старта (перетаскиваемый)
     const startMarker = new Marker({
       color: '#d4a373',
       draggable: true,
@@ -2171,7 +1970,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
 
     testMarkerRef.current = startMarker;
 
-    // Ищем отрезок на треке
     const latlng = streamsPayload?.latlng as (number | null)[][] | undefined;
     if (!latlng || latlng.length < 2) return;
 
@@ -2191,7 +1989,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     }
     if (endIdx <= startIdx) return;
 
-    // Геометрия отрезка (в формате MapLibre [lng, lat])
     const segCoords: [number, number][] = [];
     for (let i = startIdx; i <= endIdx; i++) {
       const p = latlng[i];
@@ -2210,7 +2007,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
       },
     });
 
-    // Тёмная подложка под отрезком (чтобы читался на любом цвете трека)
     map.addLayer({
       id: 'test-segment-outline',
       type: 'line',
@@ -2235,7 +2031,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
       },
     });
 
-    // Маркер финиша
     const last = latlng[endIdx];
     if (last && last[0] != null && last[1] != null) {
       const finishMarker = new Marker({ color: '#ff5a00' })
@@ -2293,7 +2088,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
       if (map.getLayer('active-track')) map.setPaintProperty('active-track', 'line-opacity', val);
       if (map.getLayer('active-track-glow')) map.setPaintProperty('active-track-glow', 'line-opacity', val * 0.3);
     } else if (key === 'visible') {
-      // Мгновенно скрываем/показываем слои трека
       if (map.getLayer('active-track')) {
         map.setLayoutProperty('active-track', 'visibility', val ? 'visible' : 'none');
       }
@@ -2301,7 +2095,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
         map.setLayoutProperty('active-track-glow', 'visibility', val ? 'visible' : 'none');
       }
     }
-    // color и glow обрабатываются через перерисовку (в deps draw-эффекта)
   };
 
   const updateGradient = (patch: Partial<GradientSettings>) => {
@@ -2310,7 +2103,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     saveGradient(next);
   };
 
-  // Показываем min/max выбранного канала
   const gradientStats = useMemo(() => {
     if (gradient.channel === 'none' || !streamsPayload) return null;
     const values = streamsPayload[gradient.channel] as (number | null)[] | undefined;
@@ -2445,7 +2237,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
       if (res?.success) {
         setSaveStatus('saved');
         setTimeout(() => setSaveStatus('idle'), 3000);
-        void loadSegments(); // обновим список
+        void loadSegments();
       } else {
         console.error('[pb-map] test-segment save error:', res?.error);
         setSaveStatus('error');
@@ -2516,7 +2308,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
       : sorted[mid];
   };
 
-  // Название трека по runFactId (fallback — #id)
   const getFactInfo = (runFactId: number): { date: string; name: string } => {
     const fact = rawFacts.find((f) => f.id === runFactId);
     if (!fact) return { date: '—', name: `#${runFactId}` };
@@ -2524,7 +2315,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     return { date: fact.date || '—', name };
   };
 
-  // Фильтрация
   const filteredSegments = useMemo(() => {
     if (segmentFilter === 'all') return segments;
     if (segmentFilter === 'distance') {
@@ -2544,7 +2334,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     );
   }, [segments, segmentFilter]);
 
-  // Медианы по отфильтрованным
   const segmentMedians = useMemo(() => {
     if (filteredSegments.length === 0) return null;
     const hrs = filteredSegments
@@ -2564,8 +2353,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     };
   }, [filteredSegments]);
 
-  // Опции для datalist категорий — базовые + все уже существующие в БД.
-  // useMemo, чтобы не пересоздавать на каждый keystroke (иначе datalist мигает).
   const refCategoryOptions = useMemo(() => {
     const base = ['loop', 'stairs', 'connector', 'segment', 'landmark'];
     const existing = new Set(
@@ -2637,7 +2424,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
           setSaveRefVisible(false);
           setDrawMode(false);
           setDraftPoints([]);
-          // Показать новый эталон на карте + обновить список
           void loadReferenceTracks();
           setSelectedRefTrackId(newId ?? null);
         }, 1200);
@@ -2724,7 +2510,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     setSplitSaveStatus('saving');
     setSplitSaveError('');
     try {
-      // Если оставляем исходный — сохраним геометрию (правки drag'ом)
       if (!splitDeleteSource) {
         const saveRes = await api.pb.referenceTrackUpdate(editPointsRefId, {
           coords: editPointsDraft,
@@ -2736,8 +2521,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
         }
       }
 
-      // Базовое имя без хвоста " · ч.N" — чтобы при повторном
-      // разделении не получалось "ч.2 · ч.1".
       const rawName =
         editPointsSourceAtom?.name ?? `#${editPointsRefId}`;
       const sourceName = rawName.replace(/\s*·\s*ч\.\d+\s*$/u, '').trim();
@@ -2837,36 +2620,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     setEditRefVisible(true);
   };
 
-  /*const handleSaveEditReference = async () => {
-    if (!editRefId || !editRefName.trim()) return;
-    setEditRefStatus('saving');
-    setEditRefError('');
-    try {
-      const tags = editRefTags
-        .split(',')
-        .map((t) => t.trim())
-        .filter((t) => t.length > 0);
-      const res = await api.pb.referenceTrackUpdate(editRefId, {
-        name: editRefName.trim(),
-        category: editRefCategory,
-        tags,
-      });
-      if (res?.success) {
-        setEditRefStatus('saved');
-        setTimeout(() => {
-          setEditRefVisible(false);
-          void loadReferenceTracks();
-        }, 700);
-      } else {
-        setEditRefError(res?.error ?? 'Не удалось сохранить');
-        setEditRefStatus('error');
-      }
-    } catch (e) {
-      setEditRefError((e as Error).message);
-      setEditRefStatus('error');
-    }
-  };*/
-
   const toggleRunSelection = (runFactId: number) => {
     setSelectedRunIds((prev) => {
       const next = new Set(prev);
@@ -2916,7 +2669,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
       }
     }
 
-    // Сортируем внутри групп по имени (ч.1, ч.2...)
     for (const key of Object.keys(groups)) {
       groups[key].sort((a, b) => a.name.localeCompare(b.name));
     }
@@ -3083,12 +2835,26 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                       alignItems: 'center',
                       gap: '0.5rem',
                       fontSize: '0.75rem',
+                      flexWrap: 'wrap',
                     }}
                   >
                     <i className="pi pi-filter" style={{ color: '#6ab2f2' }} />
                     <span style={{ color: '#6ab2f2', fontWeight: 600 }}>
                       Фильтр: {referenceTracks.find((r) => r.id === filterByRefId)?.name ?? '...'}
                     </span>
+
+                    <label
+                      className="pb-check-row pb-checkbox-dark"
+                      style={{ fontSize: '0.72rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                      title="Показывать только те пробежки, где этот атом — главный маршрут"
+                    >
+                      <Checkbox
+                        checked={filterOnlyPrimary}
+                        onChange={(e) => setFilterOnlyPrimary(!!e.checked)}
+                      />
+                      <span>Только primary</span>
+                    </label>
+
                     <Button
                       icon="pi pi-times"
                       text
@@ -3101,7 +2867,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                   </div>
                 )}
 
-                                <div ref={listRef} style={{ flex: 1, overflowY: 'auto', padding: '0.5rem' }}>
+                <div ref={listRef} style={{ flex: 1, overflowY: 'auto', padding: '0.5rem' }}>
                   {loadingFacts && (
                     <div className="pb-hint" style={{ textAlign: 'center', padding: '1rem' }}>
                       Загрузка...
@@ -3113,6 +2879,10 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                       ? visibleGroups.filter((g) => {
                           const covs = batchCoverage.get(g.primary.id);
                           if (!covs) return false;
+                          if (filterOnlyPrimary) {
+                            const prim = primaryPerRun.get(g.primary.id);
+                            return prim?.refId === filterByRefId;
+                          }
                           const target = covs.find((c) => c.refId === filterByRefId);
                           return target && (target.cls === 'used' || target.cls === 'similar');
                         })
@@ -3627,6 +3397,11 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                         label: 'Радиус на эталоне',
                         min: 10, max: 100, step: 5, suffix: ' м',
                       },
+                      {
+                        key: 'checkpointCount' as const,
+                        label: 'Количество КП',
+                        min: 3, max: 12, step: 1, suffix: '',
+                      },
                     ] as const
                   ).map((p) => (
                     <div key={p.key} style={{ marginTop: '0.6rem' }}>
@@ -3640,12 +3415,12 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                       >
                         <span>{p.label}</span>
                         <span style={{ fontFamily: 'monospace' }}>
-                          {coverageThresholds[p.key]}
+                          {coverageThresholds[p.key] ?? '—'}
                           {p.suffix}
                         </span>
                       </div>
                       <Slider
-                        value={coverageThresholds[p.key]}
+                        value={(coverageThresholds[p.key] as number) ?? p.min}
                         min={p.min}
                         max={p.max}
                         step={p.step}
@@ -3673,6 +3448,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                   />
                   <div className="pb-hint" style={{ fontSize: '0.7rem', marginTop: '0.4rem' }}>
                     Влияют на классификацию used / similar и выбор primary-атома. Пересчёт мгновенный.
+                    Больше КП — точнее подсчёт кругов на сложных маршрутах (детуры, петли).
                   </div>
                 </div>
 
@@ -3820,7 +3596,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
 
             {activeTab === 'thresholds' && (
               <div style={{ flex: 1, overflowY: 'auto', padding: '0.5rem' }}>
-                {/* Заголовок + обновить */}
                 <div
                   style={{
                     display: 'flex',
@@ -3862,7 +3637,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                   />
                 </div>
 
-                {/* Фильтр по длительности */}
                 <div
                   className="pb-catalog__chips"
                   style={{ marginBottom: '0.75rem', flexWrap: 'wrap' }}
@@ -3901,7 +3675,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                   </div>
                 )}
 
-                {/* Медианы */}
                 {segmentMedians && segmentMedians.count > 0 && (
                   <div
                     style={{
@@ -3965,7 +3738,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                   </div>
                 )}
 
-                {/* Таблица */}
                 {filteredSegments.length > 0 && (
                   <div style={{ overflowX: 'auto' }}>
                     <table
@@ -4137,7 +3909,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
 
             {activeTab === 'refs' && (
               <div style={{ flex: 1, overflowY: 'auto', padding: '0.5rem' }}>
-                {/* Заголовок + кнопки */}
                 <div
                   style={{
                     display: 'flex',
@@ -4215,7 +3986,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                   </div>
                 )}
 
-                {/* Список эталонов */}
                 {!refTracksLoading && referenceTracks.length === 0 && (
                   <div
                     className="pb-hint"
@@ -4272,33 +4042,35 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                           <div style={{ display: 'flex', gap: '0.5rem', fontSize: '0.68rem', color: 'var(--tg-hint)', marginTop: '0.15rem', flexWrap: 'wrap' }}>
                             <span>{fmtRefLength(ref.lengthM)}</span>
                             <span>{refKindLabel(ref.kind)}</span>
-                            {ref.kind === 'loop' && refDeviations[ref.id] && refDeviations[ref.id].repeats > 0 && (() => {
-                              const repeats = refDeviations[ref.id].repeats;
-                              const coverage = refDeviations[ref.id].coveragePct;
+                            {(() => {
+                              const cov = getRefCoverage(ref.id);
+                              if (!cov || ref.kind !== 'loop' || cov.repeats <= 0) return null;
                               return (
-                                <span style={{ fontSize: '0.65rem', padding: '0.05rem 0.3rem', borderRadius: 3, background: 'rgba(106, 178, 242, 0.15)', color: '#6ab2f2', fontWeight: 600 }} title={`Кругов: ${repeats} (покрытие ${coverage}%)`}>
-                                  ×{repeats}
+                                <span
+                                  style={{ fontSize: '0.65rem', padding: '0.05rem 0.3rem', borderRadius: 3, background: 'rgba(106, 178, 242, 0.15)', color: '#6ab2f2', fontWeight: 600 }}
+                                  title={`Кругов: ${cov.repeats} (покрытие ${cov.dev.coveragePct}%)`}
+                                >
+                                  ×{cov.repeats}
                                 </span>
                               );
                             })()}
                             <span>{fmtRefDate(ref.createdAt)}</span>
                           </div>
-                          {refDeviations[ref.id] && (() => {
-                            const dev = refDeviations[ref.id];
+                          {(() => {
+                            const cov = getRefCoverage(ref.id);
+                            if (!cov) return null;
+                            const dev = cov.dev;
                             let statusBadge = null;
-                            if (selectedGroup) {
-                              const covs = batchCoverage.get(selectedGroup.primary.id);
-                              const target = covs?.find((c) => c.refId === ref.id);
-                              if (target) {
-                                if (target.cls === 'used') {
-                                  statusBadge = <span style={{ fontSize: '0.6rem', padding: '0.05rem 0.25rem', borderRadius: 3, background: 'rgba(111, 191, 115, 0.2)', color: '#6fbf73', marginLeft: '0.35rem' }}>Primary</span>;
-                                } else if (target.cls === 'similar') {
-                                  statusBadge = <span style={{ fontSize: '0.6rem', padding: '0.05rem 0.25rem', borderRadius: 3, background: 'rgba(232, 168, 56, 0.2)', color: '#e8a838', marginLeft: '0.35rem' }}>Похоже</span>;
-                                }
-                              }
+                            if (cov.cls === 'used') {
+                              statusBadge = <span style={{ fontSize: '0.6rem', padding: '0.05rem 0.25rem', borderRadius: 3, background: 'rgba(111, 191, 115, 0.2)', color: '#6fbf73', marginLeft: '0.35rem' }}>Primary</span>;
+                            } else if (cov.cls === 'similar') {
+                              statusBadge = <span style={{ fontSize: '0.6rem', padding: '0.05rem 0.25rem', borderRadius: 3, background: 'rgba(232, 168, 56, 0.2)', color: '#e8a838', marginLeft: '0.35rem' }}>Похоже</span>;
                             }
                             return (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.7rem', marginTop: '0.2rem', color: dev.isClean ? 'var(--tg-success)' : 'var(--tg-hint)' }} title={`Медиана: ${dev.medianM} м\nПокрытие: ${dev.coveragePct}%\n${dev.isClean ? '✓ Чистый' : '⚠ Есть отклонения'}`}>
+                              <div
+                                style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.7rem', marginTop: '0.2rem', color: dev.isClean ? 'var(--tg-success)' : 'var(--tg-hint)' }}
+                                title={`Медиана: ${dev.medianM} м\nПокрытие: ${dev.coveragePct}%\n${dev.isClean ? '✓ Чистый' : '⚠ Есть отклонения'}`}
+                              >
                                 <i className={`pi ${dev.isClean ? 'pi-check-circle' : 'pi-exclamation-triangle'}`} style={{ fontSize: '0.72rem' }} />
                                 <span>{dev.medianM} м</span>
                                 {statusBadge}
@@ -4318,10 +4090,8 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
 
                   return (
                     <>
-                      {/* Группы */}
                       {Object.entries(groupedRefs.groups).map(([groupName, refs]) => {
                         const isExpanded = expandedRefGroups.has(groupName);
-                        // Ищем "корневой" атом, чтобы взять его имя (если оно не переименовано в ч.1)
                         const rootName = refs[0]?.name.replace(/\s*·\s*ч\.\d+$/u, '') || groupName;
                         return (
                           <div key={groupName} style={{ marginBottom: '0.5rem', border: '1px solid var(--surface-border)', borderRadius: 6, overflow: 'hidden' }}>
@@ -4346,10 +4116,9 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                           </div>
                         );
                       })}
-                      
-                      {/* Одиночные атомы */}
+
                       {groupedRefs.singles.map((r) => renderRefItem(r, false))}
-                      
+
                       {referenceTracks.length === 0 && (
                         <div className="pb-hint" style={{ padding: '0.75rem', fontSize: '0.75rem', textAlign: 'center', border: '1px dashed var(--surface-border)', borderRadius: 6 }}>
                           Нарисуйте первый эталон: кнопка «Рисовать» → кликайте по карте → «Сохранить».
@@ -4362,7 +4131,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
             )}
             </div>
 
-            {/* Drag-handle для ресайза левой панели */}
             <div
               onMouseDown={(e) => {
                 e.preventDefault();
@@ -4393,7 +4161,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
           </>
         )}
 
-        {/* Карта */}
         <div style={{ flex: 1, position: 'relative', height: '100%' }}>
 
           {loadingStreams && (
@@ -4402,18 +4169,15 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
             </div>
           )}
 
-          {/* Плавающий HUD на карте (Навигация + Источник + Слои) */}
           {selectedGroup && (
             <div style={{
               position: 'absolute', top: 10, left: 10, zIndex: 5,
-              display: 'flex', flexDirection: 'column', gap: '0.5rem', 
-              pointerEvents: 'none' // Контейнер не перехватывает клики
+              display: 'flex', flexDirection: 'column', gap: '0.5rem',
+              pointerEvents: 'none'
             }}>
-              
-              {/* ВЕРХНЯЯ СТРОКА: Свернуть + Навигация + Источник */}
+
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-                
-                {/* Кнопка сворачивания левой панели */}
+
                 {!initialRunId && (
                   <div style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -4431,7 +4195,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                   </div>
                 )}
 
-                {/* Кнопка Сторис */}
                 <div style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   background: 'rgba(23, 33, 43, 0.85)', borderRadius: '6px', border: '1px solid var(--surface-border)',
@@ -4442,7 +4205,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                     text
                     className="pb-drawer__name-edit"
                     onClick={() => {
-                      // Всю работу по снимку теперь делает сам StoryGeneratorDialog
                       setMapSnapshot(null);
                       setStoryVisible(true);
                     }}
@@ -4451,7 +4213,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                   />
                 </div>
 
-                                {/* Кнопка Разметка */}
                 <div style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   background: markupMode ? 'rgba(212, 163, 115, 0.2)' : 'rgba(23, 33, 43, 0.85)',
@@ -4478,7 +4239,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                   />
                 </div>
 
-                {/* Кнопка Рисовать эталон */}
                 <div style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   background: drawMode ? 'rgba(212, 163, 115, 0.2)' : 'rgba(23, 33, 43, 0.85)',
@@ -4494,12 +4254,10 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                       if (markupMode) setMarkupMode(false);
                       if (editPointsMode) closeEditPoints();
                       if (drawMode) {
-                        // Выход из режима рисования
                         setDrawMode(false);
                         setDraftPoints([]);
                         setSaveRefVisible(false);
                       } else {
-                        // Вход
                         setDrawMode(true);
                         setDraftPoints([]);
                       }
@@ -4511,7 +4269,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                   />
                 </div>
 
-                {/* Кнопка Показать все эталоны */}
                 <div style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   background: showAllRefs ? 'rgba(212, 163, 115, 0.2)' : 'rgba(23, 33, 43, 0.85)',
@@ -4535,7 +4292,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                   />
                 </div>
 
-                {/* Кнопка Редактировать точки выбранного эталона */}
                 <div style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   background: editPointsMode
@@ -4581,20 +4337,19 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                   />
                 </div>
 
-                {/* Панель навигации по трекам */}
-                <div style={{ 
-                  display: 'flex', alignItems: 'center', gap: '0.25rem', 
-                  background: 'rgba(23, 33, 43, 0.85)', padding: '0.25rem', 
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: '0.25rem',
+                  background: 'rgba(23, 33, 43, 0.85)', padding: '0.25rem',
                   borderRadius: '6px', border: '1px solid var(--surface-border)',
                   backdropFilter: 'blur(4px)',
                   pointerEvents: 'auto', width: 'fit-content', height: '2.5rem', boxSizing: 'border-box'
                 }}>
-                  <Button icon="pi pi-chevron-left" text className="pb-drawer__name-edit" 
+                  <Button icon="pi pi-chevron-left" text className="pb-drawer__name-edit"
                     onClick={handlePrevTrack} disabled={filteredGroups[0]?.primary.id === selectedGroup.primary.id}
                     tooltip="Предыдущий трек" tooltipOptions={{ position: 'bottom' }}
                   />
                   <div style={{ fontSize: '0.75rem', color: 'var(--pb-accent)', minWidth: '7rem', textAlign: 'center', lineHeight: 1.2 }}>
-                    {selectedGroup.displayName} <br/> 
+                    {selectedGroup.displayName} <br/>
                     <span style={{ color: 'var(--tg-hint)', fontSize: '0.65rem' }}>{selectedGroup.date}</span>
                   </div>
                   <Button icon="pi pi-chevron-right" text className="pb-drawer__name-edit"
@@ -4603,7 +4358,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                   />
                 </div>
 
-                {/* Панель выбора источника (если их >1) */}
                 {sourceOptions.length > 1 && (
                   <div style={{
                     display: 'flex', alignItems: 'center', gap: '0.5rem',
@@ -4625,7 +4379,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                 )}
               </div>
 
-              {/* НИЖНЯЯ ПАНЕЛЬ: Слои и Трек (в строку) */}
               <div style={{
                 display: 'flex', flexDirection: 'row', gap: '0.75rem', alignItems: 'center',
                 background: 'rgba(23, 33, 43, 0.85)', padding: '0.4rem 0.75rem',
@@ -4634,26 +4387,26 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                 pointerEvents: 'auto', width: 'fit-content'
               }}>
                 <label className="pb-check-row pb-checkbox-dark" style={{ fontSize: '0.75rem', cursor: 'pointer' }}>
-                  <Checkbox 
-                    checked={trackSettings.visible} 
-                    onChange={(e) => updateTrackSetting('visible', !!e.checked)} 
+                  <Checkbox
+                    checked={trackSettings.visible}
+                    onChange={(e) => updateTrackSetting('visible', !!e.checked)}
                   />
                   <span>Трек</span>
                 </label>
                 {layers.map(l => (
                   <label key={l.id} className="pb-check-row pb-checkbox-dark" style={{ fontSize: '0.75rem', cursor: 'pointer' }}>
-                    <Checkbox 
-                      checked={l.visible} 
-                      onChange={() => toggleLayerVisibility(l.id)} 
+                    <Checkbox
+                      checked={l.visible}
+                      onChange={() => toggleLayerVisibility(l.id)}
                     />
                     <span>{l.name}</span>
                   </label>
                 ))}
                 {testPoint && (
                   <label className="pb-check-row pb-checkbox-dark" style={{ fontSize: '0.75rem', cursor: 'pointer' }}>
-                    <Checkbox 
-                      checked={testVisible} 
-                      onChange={(e) => setTestVisible(!!e.checked)} 
+                    <Checkbox
+                      checked={testVisible}
+                      onChange={(e) => setTestVisible(!!e.checked)}
                     />
                     <span>Тест</span>
                   </label>
@@ -4662,7 +4415,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
             </div>
           )}
 
-          {/* Панель метрик теста */}
           {testVisible && segmentInfo && (
               <div
                 style={{
@@ -4745,7 +4497,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
               </div>
           )}
 
-          {/* Панель выбора длительности */}
           {testVisible && testPoint && streamsPayload?.latlng && (
             <div
               style={{
@@ -4842,7 +4593,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
             </div>
           )}
 
-          {/* Панель редактирования точек эталона */}
           {editPointsMode && editPointsRefId && (
             <div
               style={{
@@ -4922,7 +4672,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                 />
               </div>
 
-              {/* Разделение на атомы */}
               <div
                 style={{
                   display: 'flex',
@@ -5112,7 +4861,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
             </div>
           )}
 
-          {/* Панель рисования эталона */}
           {drawMode && (
             <div
               style={{
@@ -5190,7 +4938,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
             </div>
           )}
 
-          {/* Хинт: нет точки, но есть трек */}
           {!testPoint && streamsPayload?.latlng && (
             <div
               style={{
@@ -5223,7 +4970,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
         onSaved={() => {
           void loadReferenceTracks();
           setSelectedRunIds(new Set());
-          // Переключаемся на вкладку «Эталоны» — сразу видно новый
           setActiveTab('refs');
         }}
       />
@@ -5241,7 +4987,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
         />
       )}
 
-      {/* Диалог сохранения эталона */}
       <Dialog
         visible={saveRefVisible}
         onHide={() => {
@@ -5309,7 +5054,6 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
         </div>
       </Dialog>
 
-      {/* Диалог редактирования эталона (изолирован для стабильности input'ов) */}
       <EditReferenceDialog
         visible={editRefVisible}
         refItem={editRefItem}
@@ -5330,6 +5074,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
           mapRef={mapRef}
           initialSnapshot={mapSnapshot}
           fact={selectedGroup.primary}
+          displayName={selectedGroup.displayName}
           streams={streamsPayload}
           initialTrackSettings={trackSettings}
           gradient={gradient}

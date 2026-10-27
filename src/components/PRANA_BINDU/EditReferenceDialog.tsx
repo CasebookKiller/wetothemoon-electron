@@ -169,12 +169,30 @@ export const EditReferenceDialog: React.FC<Props> = ({
             value={tags}
             onChange={(e) => setTags(e.target.value)}
             className="w-full"
-            placeholder="pond, north, upper"
+            placeholder="group:гольяново, вечер, лес"
             disabled={status === 'saving' || status === 'saved'}
           />
-          <small className="pb-hint" style={{ fontSize: '0.72rem' }}>
-            Для фильтрации: «pond, north» — все эталоны у пруда на севере.
-          </small>
+          
+          {/* Информационная плашка про группировку */}
+          <div
+            style={{
+              marginTop: '0.5rem',
+              padding: '0.5rem 0.6rem',
+              background: 'rgba(106, 178, 242, 0.08)',
+              border: '1px solid rgba(106, 178, 242, 0.2)',
+              borderRadius: 6,
+              fontSize: '0.72rem',
+              lineHeight: 1.4,
+              color: 'var(--tg-hint)',
+            }}
+          >
+            <div style={{ color: '#6ab2f2', fontWeight: 600, marginBottom: '0.2rem' }}>
+              <i className="pi pi-info-circle" /> Как объединить в папку?
+            </div>
+            Добавьте одинаковый тег с префиксом <b>group:</b> (например, <i>group:гольяново</i>), 
+            и эталоны свернутся в одну папку. 
+            Остальные теги (например, <i>вечер</i>) служат только для фильтрации.
+          </div>
         </div>
 
         {status === 'saved' && (
