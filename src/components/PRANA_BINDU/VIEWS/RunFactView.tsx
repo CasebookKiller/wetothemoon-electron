@@ -13,6 +13,7 @@ import { InputText } from 'primereact/inputtext';
 import { RunStreamsChart } from '../RunStreamsChart';
 import { GpsMapView } from '../GpsMapView';
 import { FullscreenChartsDialog } from '../FullscreenChartsDialog';
+import { RunChainBadge } from '../RunChainBadge';
 import type { RunFactLite } from '../RunStreamsDrawer';
 
 /**
@@ -506,6 +507,15 @@ export const RunFactView: React.FC<Props> = ({
           </div>
         );
       })()}
+
+      {/* Цепочка атомов для этой тренировки.
+          fact.id — primary-источник (тот, по которому кликнули).
+          Бейдж относится ко всей тренировке, не к конкретному источнику. */}
+      {!loadingFacts && fact && (
+        <div style={{ marginBottom: '0.75rem' }}>
+          <RunChainBadge runFactId={fact.id} />
+        </div>
+      )}
 
       {loadingFacts && (
         <div className="pb-drawer__hint">Загрузка источников…</div>

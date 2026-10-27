@@ -8,4 +8,4 @@ export * from './syncRepo';
 export * from './waterRepo';
 export * from './weightRepo';
 export * from './nutritionRepo';
-export * from './chainsRepo';
+export * as chainsRepo from './chainsRepo';

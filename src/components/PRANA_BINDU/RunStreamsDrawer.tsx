@@ -13,6 +13,7 @@ import { RunStreamsChart } from './RunStreamsChart';
 import { GpsMapView } from './GpsMapView';
 import { InputText } from 'primereact/inputtext';
 import { FullscreenChartsDialog } from './FullscreenChartsDialog';
+import { RunChainBadge } from './RunChainBadge';
 
 /**
  * Порог, при котором две записи считаются одной тренировкой
@@ -573,6 +574,15 @@ export const RunStreamsDrawer: React.FC<Props> = ({
         </div>
         );
       })()}
+      
+      {/* Цепочка атомов для этой тренировки.
+          Считается по runFactId из родителя — он не меняется при
+          переключении вкладок fit/dodofo/zepp. */}
+      {runFact && (
+        <div style={{ marginBottom: '0.75rem' }}>
+          <RunChainBadge runFactId={runFact.id} />
+        </div>
+      )}
 
       {loadingFacts && (
         <div className="pb-drawer__hint">Загрузка источников…</div>
