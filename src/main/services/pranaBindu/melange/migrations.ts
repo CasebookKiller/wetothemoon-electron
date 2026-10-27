@@ -17,7 +17,7 @@ import {
   MIGRATION_V24_AUTO_RANGE_DAYS,
 } from './schema';
 
-export const SCHEMA_VERSION = 30;
+export const SCHEMA_VERSION = 31;
 
 interface Migration {
   version: number;
@@ -710,6 +710,51 @@ const migrations: readonly Migration[] = [
            AND kind = 'linear';
       `);
       console.log('[Melange] v30: авто-категоризация reference_tracks по kind');
+    },
+  },
+  {
+    version: 31,
+    apply: (db) => {
+      // Вода
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS water_logs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          date TEXT NOT NULL,
+          amount_ml INTEGER NOT NULL,
+          created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_water_logs_date ON water_logs(date);
+      `);
+
+      // Вес
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS weight_logs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          date TEXT NOT NULL,
+          weight_kg REAL NOT NULL,
+          created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_weight_logs_date ON weight_logs(date);
+      `);
+
+      // Питание
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS nutrition_logs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          date TEXT NOT NULL,
+          meal_type TEXT NOT NULL,
+          food_name TEXT NOT NULL,
+          calories INTEGER,
+          protein_g REAL,
+          fat_g REAL,
+          carbs_g REAL,
+          source TEXT NOT NULL DEFAULT 'manual',
+          created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_nutrition_logs_date ON nutrition_logs(date);
+      `);
+
+      console.log('[Melange] v31: созданы таблицы water_logs, weight_logs, nutrition_logs');
     },
   },
 ];

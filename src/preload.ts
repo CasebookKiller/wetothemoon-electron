@@ -1015,6 +1015,31 @@ try {
       ) =>
         ipcRenderer.invoke('pb:reference-track-split', sourceId, parts, options),
  
+            // Вода
+      addWater: (date: string, amountMl: number) =>
+        ipcRenderer.invoke('pb:water-add', date, amountMl),
+      listWater: (date: string) =>
+        ipcRenderer.invoke('pb:water-list', date),
+      deleteWater: (id: number) =>
+        ipcRenderer.invoke('pb:water-delete', id),
+      getWaterRange: (from: string, to: string) =>
+        ipcRenderer.invoke('pb:water-range', from, to),
+
+      // Вес
+      addWeight: (date: string, weightKg: number) =>
+        ipcRenderer.invoke('pb:weight-add', date, weightKg),
+      listWeights: (limitDays?: number) =>
+        ipcRenderer.invoke('pb:weight-list', limitDays),
+      deleteWeight: (id: number) =>
+        ipcRenderer.invoke('pb:weight-delete', id),
+
+      // Питание
+      addNutrition: (input: any) =>
+        ipcRenderer.invoke('pb:nutrition-add', input),
+      listNutrition: (date: string) =>
+        ipcRenderer.invoke('pb:nutrition-list', date),
+      deleteNutrition: (id: number) =>
+        ipcRenderer.invoke('pb:nutrition-delete', id),
         
     },
 

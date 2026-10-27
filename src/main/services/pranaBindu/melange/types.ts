@@ -159,3 +159,34 @@ export interface EquivalenceRow {
   created_at: string;
   updated_at: string;
 }
+
+// ==================== v31: Вода, Вес, Питание ====================
+
+export interface WaterLog {
+  id: number;
+  date: string;
+  amountMl: number;
+  createdAt: string;
+}
+
+export interface WeightLog {
+  id: number;
+  date: string;
+  weightKg: number;
+  createdAt: string;
+}
+
+export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
+
+export interface NutritionLog {
+  id: number;
+  date: string;
+  mealType: MealType;
+  foodName: string;
+  calories: number | null;
+  proteinG: number | null;
+  fatG: number | null;
+  carbsG: number | null;
+  source: string;
+  createdAt: string;
+}

@@ -73,6 +73,19 @@ import {
   getReferenceTrackById,
   updateReferenceTrack,
   deleteReferenceTrack,
+  addWater,
+  listWaterByDate,
+  getWaterTotalByDate,
+  deleteWater,
+  addWeight,
+  listWeights,
+  getLatestWeight,
+  deleteWeight,
+  addNutrition,
+  listNutritionByDate,
+  deleteNutrition,
+  getNutritionTotalsByDate,
+  getWaterTotalsForRange,
 } from '../services/pranaBindu/melange';
 
 import {
@@ -5777,6 +5790,113 @@ export function registerPranaBinduHandlers(): void {
       }
     },
   );
+
+    // ==================== v31: Вода, Вес, Питание ====================
+
+  // Вода
+  ipcMain.handle('pb:water-add', (_event, date: string, amountMl: number) => {
+    try {
+      if (!date || amountMl <= 0) {
+        return { success: false, error: 'date и положительный amountMl обязательны' };
+      }
+      const item = addWater(getMelange(), date, amountMl);
+      return { success: true, item };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('pb:water-list', (_event, date: string) => {
+    try {
+      const items = listWaterByDate(getMelange(), date);
+      const total = getWaterTotalByDate(getMelange(), date);
+      return { success: true, items, total };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('pb:water-delete', (_event, id: number) => {
+    try {
+      deleteWater(getMelange(), id);
+      return { success: true };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('pb:water-range', (_event, from: string, to: string) => {
+    try {
+      const data = getWaterTotalsForRange(getMelange(), from, to);
+      return { success: true, data };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  // Вес
+  ipcMain.handle('pb:weight-add', (_event, date: string, weightKg: number) => {
+    try {
+      if (!date || weightKg <= 0) {
+        return { success: false, error: 'date и положительный weightKg обязательны' };
+      }
+      const item = addWeight(getMelange(), date, weightKg);
+      return { success: true, item };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('pb:weight-list', (_event, limitDays?: number) => {
+    try {
+      const items = listWeights(getMelange(), limitDays);
+      const latest = getLatestWeight(getMelange());
+      return { success: true, items, latest };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('pb:weight-delete', (_event, id: number) => {
+    try {
+      deleteWeight(getMelange(), id);
+      return { success: true };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  // Питание
+  ipcMain.handle('pb:nutrition-add', (_event, input: any) => {
+    try {
+      if (!input?.date || !input?.mealType || !input?.foodName) {
+        return { success: false, error: 'date, mealType, foodName обязательны' };
+      }
+      const item = addNutrition(getMelange(), input);
+      return { success: true, item };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('pb:nutrition-list', (_event, date: string) => {
+    try {
+      const items = listNutritionByDate(getMelange(), date);
+      const totals = getNutritionTotalsByDate(getMelange(), date);
+      return { success: true, items, totals };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('pb:nutrition-delete', (_event, id: number) => {
+    try {
+      deleteNutrition(getMelange(), id);
+      return { success: true };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
 
   console.log('[Prana-Bindu] IPC-хендлеры зарегистрированы (pb:*)');
 }

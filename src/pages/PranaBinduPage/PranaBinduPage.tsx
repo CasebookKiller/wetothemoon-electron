@@ -56,6 +56,7 @@ import { Toast } from 'primereact/toast';
 import { ExerciseGraphDialog } from '@/components/PRANA_BINDU/ExerciseGraph/ExerciseGraphDialog';
 import { SettingsDialog } from '@/components/PRANA_BINDU/SettingsDialog/SettingsDialog';
 import { RouteMapEditor } from '@/components/PRANA_BINDU/RouteMapEditor';
+import { NutritionPanel } from '@/components/PRANA_BINDU/PANELS/NutritionPanel/NutritionPanel';
 
 const MODULES = [
   { name: 'Stillsuit', description: 'Марафон: пульс, темп, экономичность' },
@@ -776,6 +777,7 @@ export const PranaBinduPage: React.FC = () => {
           <div className="pb-main-grid">
             <div className="pb-main-grid__col">
               <WellnessPanel ref={wellnessPanelRef} from={syncFrom} to={syncTo} />
+              <NutritionPanel />
             </div>
             <div className="pb-main-grid__col">
               <TrainingTabs

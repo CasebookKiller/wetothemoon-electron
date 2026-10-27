@@ -123,3 +123,35 @@ export type {
   UpdateReferenceTrackPatch,
   ReferenceTrackKind,
 } from './repositories/referenceTracksRepo';
+
+// ==================== v31: Вода ====================
+export {
+  addWater,
+  listWaterByDate,
+  getWaterTotalByDate,
+  getWaterTotalsForRange, // <- добавить
+  deleteWater,
+} from './repositories/waterRepo';
+export type { WaterLogRow } from './repositories/waterRepo';
+
+// ==================== v31: Вес ====================
+export {
+  addWeight,
+  listWeights,
+  getLatestWeight,
+  deleteWeight,
+} from './repositories/weightRepo';
+export type { WeightLogRow } from './repositories/weightRepo';
+
+// ==================== v31: Питание ====================
+export {
+  addNutrition,
+  listNutritionByDate,
+  deleteNutrition,
+  getNutritionTotalsByDate,
+} from './repositories/nutritionRepo';
+export type {
+  NutritionLogRow,
+  CreateNutritionInput,
+  NutritionDayTotals,
+} from './repositories/nutritionRepo';
