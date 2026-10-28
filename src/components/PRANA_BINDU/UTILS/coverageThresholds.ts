@@ -22,6 +22,8 @@ export interface CoverageThresholds {
   onRefRadiusM: number;
   /** Количество контрольных точек для подсчёта поворотов (3..12). */
   checkpointCount: number;
+  /** Допустимое отклонение направления при прохождении КП (в градусах). */
+  directionToleranceDeg: number;
 }
 
 export const DEFAULT_COVERAGE_THRESHOLDS: CoverageThresholds = {
@@ -35,7 +37,8 @@ export const DEFAULT_COVERAGE_THRESHOLDS: CoverageThresholds = {
   onRefRadiusM: 50,
   // 6 КП вместо захардкоженных 4: для сложных маршрутов с детурами
   // (круг с лестницами, восьмёрка) медиана по 6 точкам точнее.
-  checkpointCount: 6,
+  checkpointCount: 12,
+  directionToleranceDeg: 45, // 45 градусов — стандартный допуск для GPS-азимута
 };
 
 const KEY = 'pb.coverageThresholds';

@@ -136,13 +136,8 @@ export const EditReferenceDialog: React.FC<Props> = ({
                   <button
                     key={c}
                     type="button"
-                    className={`pb-catalog__chip ${isActive ? 'is-on' : ''}`}
+                    className={`pb-ref-category-chip ${isActive ? 'is-active' : ''}`}
                     onClick={() => setCategory(isActive ? null : c)}
-                    style={{
-                      fontSize: '0.7rem',
-                      padding: '0.15rem 0.45rem',
-                      cursor: 'pointer',
-                    }}
                     disabled={status === 'saving' || status === 'saved'}
                     title={
                       isActive
@@ -178,20 +173,20 @@ export const EditReferenceDialog: React.FC<Props> = ({
             style={{
               marginTop: '0.5rem',
               padding: '0.5rem 0.6rem',
-              background: 'rgba(106, 178, 242, 0.08)',
-              border: '1px solid rgba(106, 178, 242, 0.2)',
+              background: 'rgba(212, 163, 115, 0.08)',
+              border: '1px solid rgba(212, 163, 115, 0.2)',
               borderRadius: 6,
               fontSize: '0.72rem',
               lineHeight: 1.4,
               color: 'var(--tg-hint)',
             }}
           >
-            <div style={{ color: '#6ab2f2', fontWeight: 600, marginBottom: '0.2rem' }}>
+            <div style={{ color: 'var(--pb-accent)', fontWeight: 600, marginBottom: '0.2rem' }}>
               <i className="pi pi-info-circle" /> Как объединить в папку?
             </div>
             Добавьте одинаковый тег с префиксом <b>group:</b> (например, <i>group:гольяново</i>), 
-            и эталоны свернутся в одну папку. 
-            Остальные теги (например, <i>вечер</i>) служат только для фильтрации.
+            и эталоны свернутся в одну папку.<br/>
+            Чтобы задать <b>красивое имя папки</b>, добавьте тег <b>group-title:Ваше название</b> (например, <i>group-title:Пруд</i>).
           </div>
         </div>
 

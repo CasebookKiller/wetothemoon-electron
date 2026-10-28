@@ -17,7 +17,7 @@ import {
   MIGRATION_V24_AUTO_RANGE_DAYS,
 } from './schema';
 
-export const SCHEMA_VERSION = 32;
+export const SCHEMA_VERSION = 33;
 
 interface Migration {
   version: number;
@@ -797,7 +797,26 @@ const migrations: readonly Migration[] = [
       console.log('[Melange] v32: chains + chain_slots');
     },
   },
+  {
+    version: 33,
+    apply: (db) => {
+      const tryAdd = (sql: string): boolean => {
+        try {
+          db.exec(sql);
+          return true;
+        } catch (e) {
+          if (String(e).includes('duplicate column name')) return false;
+          throw e;
+        }
+      };
+      
+      tryAdd(
+        `ALTER TABLE chain_slots ADD COLUMN direction TEXT DEFAULT 'any';`
+      );
 
+      console.log('[Melange] v33: chain_slots.direction');
+    },
+  },
 ];
 
 

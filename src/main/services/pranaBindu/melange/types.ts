@@ -219,6 +219,8 @@ export interface ChainSlot {
   minCoverage: number;
   /** Можно ли пропустить слот. */
   optional: boolean;
+  /** Направление, в котором должен быть пройден слот. */
+  direction?: 'any' | 'forward' | 'backward';
   /** Имена кластеров (теги group:*) — альтернативные атомы. */
   clusters: string[];
   /** Явные id атомов (если не через кластер). */
@@ -240,6 +242,7 @@ export interface ChainSlotRow {
   aggregate: string;
   min_coverage: number;
   optional: number;
+  direction: string | null;
   clusters_json: string | null;
   specific_atoms_json: string | null;
   notes: string | null;

@@ -4953,3 +4953,213 @@ body[data-module='prana-bindu'] .p-tooltip.p-tooltip-bottom .p-tooltip-arrow {
 .pb-settings-dialog .p-inline-message .p-inline-message-icon {
   font-size: 1rem !important;
 }
+
+/* ============================================================
+   Бейджи категорий в EditReferenceDialog
+   ============================================================ */
+.pb-ref-category-chip {
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--pb-accent) 35%, transparent);
+  border-radius: 4px;
+  color: var(--pb-accent);
+  padding: 0.15rem 0.5rem;
+  font: inherit;
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pb-ref-category-chip:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--pb-accent) 10%, transparent);
+  border-color: var(--pb-accent);
+}
+
+.pb-ref-category-chip.is-active {
+  background: color-mix(in srgb, var(--pb-accent) 20%, transparent);
+  border-color: var(--pb-accent);
+  font-weight: 600;
+}
+
+/* Жестко перебиваем дефолтные стили disabled от браузера и PrimeReact */
+.pb-ref-category-chip:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: transparent !important;
+  color: var(--pb-accent) !important; /* Оставляем песочный текст */
+  border-color: color-mix(in srgb, var(--pb-accent) 20%, transparent) !important; /* Бледная рамка */
+}
+
+.pb-ref-category-chip.is-active:disabled {
+  background: color-mix(in srgb, var(--pb-accent) 12%, transparent) !important; /* Легкая заливка для активного */
+  color: var(--pb-accent) !important;
+  border-color: color-mix(in srgb, var(--pb-accent) 40%, transparent) !important;
+}
+
+/* ============================================================
+   Кнопки +/- для InputNumber в стиле Prana-Bindu
+   (решает проблему белого фона в диалогах и панелях)
+   ============================================================ */
+
+/* Общие настройки для кнопок */
+.p-inputnumber .p-inputnumber-button {
+  background: var(--tg-theme-bg-color, #17212b) !important;
+  color: var(--pb-accent) !important;
+  border: 1px solid color-mix(in srgb, var(--pb-accent) 45%, transparent) !important;
+  transition: all 0.15s ease !important;
+}
+
+/* При наведении */
+.p-inputnumber .p-inputnumber-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--pb-accent) 15%, transparent) !important;
+  color: var(--pb-accent) !important;
+  border-color: var(--pb-accent) !important;
+}
+
+/* При выключенном состоянии */
+.p-inputnumber .p-inputnumber-button:disabled {
+  opacity: 0.4 !important;
+  background: transparent !important;
+  border-color: color-mix(in srgb, var(--pb-accent) 20%, transparent) !important;
+}
+
+/* Иконки внутри кнопок */
+.p-inputnumber .p-inputnumber-button .pi {
+  color: var(--pb-accent) !important;
+  font-size: 0.8rem;
+}
+
+/* Фикс скруглений для вертикального (stacked) расположения */
+.p-inputnumber.p-inputnumber-stacked .p-inputnumber-button-up {
+  border-bottom: none !important;
+  border-top-left-radius: 6px !important;
+  border-top-right-radius: 6px !important;
+  border-bottom-left-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+
+.p-inputnumber.p-inputnumber-stacked .p-inputnumber-button-down {
+  border-top: 1px solid color-mix(in srgb, var(--pb-accent) 45%, transparent) !important;
+  border-top-left-radius: 0 !important;
+  border-top-right-radius: 0 !important;
+  border-bottom-left-radius: 6px !important;
+  border-bottom-right-radius: 6px !important;
+}
+
+/* Фикс скруглений для горизонтального расположения */
+.p-inputnumber.p-inputnumber-horizontal .p-inputnumber-button-up {
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+  border-top-right-radius: 6px !important;
+  border-bottom-right-radius: 6px !important;
+  border-left: none !important;
+}
+
+.p-inputnumber.p-inputnumber-horizontal .p-inputnumber-button-down {
+  border-top-left-radius: 6px !important;
+  border-bottom-left-radius: 6px !important;
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+  border-right: none !important;
+}
+
+/* ============================================================
+   MapLibre Controls (Зум) в стиле Prana-Bindu
+   ============================================================ */
+
+/* Контейнер кнопок */
+.maplibregl-ctrl-group {
+  background: var(--tg-theme-bg-color, #17212b) !important;
+  border: 1px solid color-mix(in srgb, var(--pb-accent) 45%, transparent) !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4) !important;
+  border-radius: 6px !important;
+  overflow: hidden !important;
+}
+
+/* Сами кнопки */
+.maplibregl-ctrl-group button {
+  background: transparent !important;
+  width: 2.5rem !important;  /* Чуть увеличим для удобства */
+  height: 2.5rem !important;
+  border: none !important;
+  border-bottom: 1px solid color-mix(in srgb, var(--pb-accent) 20%, transparent) !important;
+  transition: background 0.15s ease !important;
+}
+
+.maplibregl-ctrl-group button:last-child {
+  border-bottom: none !important;
+}
+
+/* При наведении */
+.maplibregl-ctrl-group button:hover {
+  background: color-mix(in srgb, var(--pb-accent) 15%, transparent) !important;
+}
+
+/* 
+   Перекрашиваем черные SVG-иконки в песочный цвет (var(--pb-accent)).
+   CSS-фильтры применяются к background-image внутри кнопок MapLibre.
+*/
+.maplibregl-ctrl-group button .maplibregl-ctrl-icon {
+  filter: invert(77%) sepia(20%) saturate(905%) hue-rotate(345deg) brightness(91%) contrast(85%) !important;
+  opacity: 0.9 !important;
+}
+
+.maplibregl-ctrl-group button:hover .maplibregl-ctrl-icon {
+  opacity: 1 !important;
+}
+
+/* Убираем стандартную рамку фокуса */
+.maplibregl-ctrl-group button:focus {
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/* ============================================================
+   MapLibre Controls (Зум) — вариант с фоном Prana-Bindu
+   ============================================================ */
+
+/* Контейнер кнопок */
+.maplibregl-ctrl-group {
+  background: var(--module-accent) !important;
+  border: 1px solid color-mix(in srgb, var(--module-accent) 80%, black) !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
+  border-radius: 6px !important;
+  overflow: hidden !important;
+}
+
+/* Сами кнопки */
+.maplibregl-ctrl-group button {
+  background: transparent !important;
+  width: 2rem !important;
+  height: 2rem !important;
+  border: none !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1) !important; /* Темная линия-разделитель */
+  transition: background 0.15s ease !important;
+}
+
+.maplibregl-ctrl-group button:last-child {
+  border-bottom: none !important;
+}
+
+/* При наведении делаем чуть темнее */
+.maplibregl-ctrl-group button:hover {
+  background: rgba(0, 0, 0, 0.1) !important;
+}
+
+/* 
+   Отключаем фильтры, которые мы писали ранее. 
+   Иконки останутся черными (по умолчанию), что идеально для песочного фона.
+*/
+.maplibregl-ctrl-group button .maplibregl-ctrl-icon {
+  filter: none !important; 
+  opacity: 0.85 !important;
+}
+
+.maplibregl-ctrl-group button:hover .maplibregl-ctrl-icon {
+  opacity: 1 !important;
+}
+
+/* Убираем рамку фокуса */
+.maplibregl-ctrl-group button:focus {
+  box-shadow: none !important;
+  outline: none !important;
+}

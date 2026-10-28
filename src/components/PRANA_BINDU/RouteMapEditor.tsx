@@ -497,9 +497,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
   const [refTracksLoading, setRefTracksLoading] = useState(false);
   const [selectedRefTrackId, setSelectedRefTrackId] = useState<number | null>(null);
   // ==================== Цепочки (C.12) ====================
-  const [chains, setChains] = useState<
-    Array<{ id: number; name: string; ordered: boolean; createdAt: string; updatedAt: string }>
-  >([]);
+  const [chains, setChains] = useState<any[]>([]); // Используем any, чтобы не тянуть типы из main процесса
   const [chainsLoading, setChainsLoading] = useState(false);
   const [activeChainId, setActiveChainId] = useState<number | null>(null);
   // Диалог создания/редактирования цепочки
@@ -1358,7 +1356,16 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     setChainsLoading(true);
     try {
       const res = await api.pb.chainList();
-      if (res?.success) setChains(res.items ?? []);
+      if (res?.success && res.items) {
+        // Для каждой цепочки грузим её слоты
+        const fullChains = await Promise.all(
+          res.items.map(async (c: any) => {
+            const detail = await api.pb.chainGet(c.id);
+            return detail.success ? detail.item : c;
+          })
+        );
+        setChains(fullChains);
+      }
     } catch (e) {
       console.error('[pb-map] chain list error:', e);
     } finally {
@@ -1400,6 +1407,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
           aggregate: s.aggregate,
           minCoverage: s.minCoverage,
           optional: s.optional,
+          direction: s.direction ?? 'any',
           clusters: s.clusters,
           specificAtoms: s.specificAtoms,
           type: s.clusters.length > 0 ? 'clusters' : 'atoms',
@@ -1618,6 +1626,51 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
     batchLatlng,
     coverageThresholds,
   ]);
+
+  // Рассчитываем, какие цепочки подходят к каждой видимой пробежке
+  const evaluatedChains = useMemo(() => {
+    const result = new Map<number, Array<{ id: number, name: string, status: string }>>();
+    if (chains.length === 0 || batchCoverage.size === 0) return result;
+
+    for (const g of visibleGroups) {
+      const factId = g.primary.id;
+      const covs = batchCoverage.get(factId);
+      if (!covs) continue;
+
+      const covMap = new Map(covs.map((c) => [c.refId, c]));
+
+      const getCov = (atomId: number) => {
+        const c = covMap.get(atomId);
+        if (!c) return null;
+        return {
+          coveragePct: c.dev.coveragePct,
+          repeats: c.repeats,
+          forwardPasses: c.dev.forwardPasses ?? 0,
+          backwardPasses: c.dev.backwardPasses ?? 0,
+          score: c.score,
+          cls: c.cls,
+        };
+      };
+
+      const matched = [];
+      for (const chain of chains) {
+        if (!chain.slots) continue;
+        const evalRes = evaluateChain(chain, [], referenceTracks, coverageThresholds, getCov);
+        if (evalRes.overallStatus === 'complete' || evalRes.overallStatus === 'partial') {
+          matched.push({
+            id: chain.id,
+            name: chain.name,
+            status: evalRes.overallStatus,
+          });
+        }
+      }
+
+      if (matched.length > 0) {
+        result.set(factId, matched);
+      }
+    }
+    return result;
+  }, [visibleGroups, chains, batchCoverage, referenceTracks, coverageThresholds]);
 
   // Цепочка для выбранной пробежки (из batchCoverage, синхронно с порогами).
   // Дополнительно фильтруем по chainMinCoverage: атомы с покрытием ниже
@@ -2883,14 +2936,24 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
   // Группировка эталонов
   const groupedRefs = useMemo(() => {
     const groups: Record<string, typeof referenceTracks> = {};
+    const groupNames: Record<string, string> = {}; // Читаемые имена
     const singles: typeof referenceTracks = [];
 
     for (const ref of referenceTracks) {
       const groupTag = ref.tags.find((t) => t.startsWith('group:'));
       if (groupTag) {
-        const groupName = groupTag.replace('group:', '');
-        if (!groups[groupName]) groups[groupName] = [];
-        groups[groupName].push(ref);
+        const groupKey = groupTag.replace('group:', '');
+        if (!groups[groupKey]) groups[groupKey] = [];
+        groups[groupKey].push(ref);
+
+        // Приоритет 1: тег group-title:
+        const titleTag = ref.tags.find((t) => t.startsWith('group-title:'));
+        if (titleTag) {
+          groupNames[groupKey] = titleTag.replace('group-title:', '');
+        } else if (!groupNames[groupKey]) {
+          // Приоритет 2: корень имени (старая логика)
+          groupNames[groupKey] = ref.name.replace(/\s*·\s*ч\.\d+$/u, '').trim();
+        }
       } else {
         singles.push(ref);
       }
@@ -2900,7 +2963,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
       groups[key].sort((a, b) => a.name.localeCompare(b.name));
     }
 
-    return { groups, singles };
+    return { groups, groupNames, singles };
   }, [referenceTracks]);
 
   // DEBUG: временный хелпер для smoke-test цепочек из консоли.
@@ -3412,6 +3475,33 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                                               </span>
                                             </span>
                                           );
+                                        })()}
+
+                                        {(() => {
+                                          const matched = evaluatedChains.get(g.primary.id);
+                                          if (!matched) return null;
+                                          return matched.map((m) => (
+                                            <span
+                                              key={m.id}
+                                              title={`Цепочка: ${m.name} (${m.status === 'complete' ? 'Пройдена' : 'Частично'})`}
+                                              style={{
+                                                fontSize: '0.65rem',
+                                                padding: '0.05rem 0.35rem',
+                                                borderRadius: 3,
+                                                background: m.status === 'complete' ? 'rgba(111, 191, 115, 0.15)' : 'rgba(232, 168, 56, 0.15)',
+                                                color: m.status === 'complete' ? '#6fbf73' : '#e8a838',
+                                                fontWeight: 600,
+                                                cursor: 'help',
+                                                maxWidth: '11rem',
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis',
+                                                whiteSpace: 'nowrap',
+                                                display: 'inline-block',
+                                              }}
+                                            >
+                                              ⛓️ {m.name}
+                                            </span>
+                                          ));
                                         })()}
                                         <span
                                           style={{
@@ -4340,7 +4430,20 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                             <span>{refKindLabel(ref.kind)}</span>
                             {(() => {
                               const cov = getRefCoverage(ref.id);
-                              if (!cov || ref.kind !== 'loop' || cov.repeats <= 0) return null;
+                              if (!cov || cov.repeats <= 0) return null;
+                              
+                              // Для линейных атомов показываем направление
+                              if (ref.kind === 'linear') {
+                                return (
+                                  <span
+                                    style={{ fontSize: '0.65rem', padding: '0.05rem 0.3rem', borderRadius: 3, background: 'rgba(111, 191, 115, 0.15)', color: '#6fbf73', fontWeight: 600 }}
+                                    title={`Туда: ${cov.dev.forwardPasses}, Обратно: ${cov.dev.backwardPasses}`}
+                                  >
+                                    → {cov.dev.forwardPasses} · ← {cov.dev.backwardPasses}
+                                  </span>
+                                );
+                              }
+                              // Для loop оставляем как было
                               return (
                                 <span
                                   style={{ fontSize: '0.65rem', padding: '0.05rem 0.3rem', borderRadius: 3, background: 'rgba(106, 178, 242, 0.15)', color: '#6ab2f2', fontWeight: 600 }}
@@ -4386,22 +4489,22 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
 
                   return (
                     <>
-                      {Object.entries(groupedRefs.groups).map(([groupName, refs]) => {
-                        const isExpanded = expandedRefGroups.has(groupName);
-                        const rootName = refs[0]?.name.replace(/\s*·\s*ч\.\d+$/u, '') || groupName;
+                      {Object.entries(groupedRefs.groups).map(([groupKey, refs]) => {
+                        const isExpanded = expandedRefGroups.has(groupKey);
+                        const displayName = groupedRefs.groupNames[groupKey] || groupKey;
                         return (
-                          <div key={groupName} style={{ marginBottom: '0.5rem', border: '1px solid var(--surface-border)', borderRadius: 6, overflow: 'hidden' }}>
+                          <div key={groupKey} style={{ marginBottom: '0.5rem', border: '1px solid var(--surface-border)', borderRadius: 6, overflow: 'hidden' }}>
                             <div
                               onClick={() => {
                                 const next = new Set(expandedRefGroups);
-                                if (next.has(groupName)) next.delete(groupName);
-                                else next.add(groupName);
+                                if (next.has(groupKey)) next.delete(groupKey);
+                                else next.add(groupKey);
                                 setExpandedRefGroups(next);
                               }}
                               style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', background: 'rgba(255,255,255,0.03)', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600 }}
                             >
                               <i className={`pi ${isExpanded ? 'pi-folder-open' : 'pi-folder'}`} style={{ color: 'var(--pb-accent)' }} />
-                              <span style={{ flex: 1 }}>{rootName} <span style={{ color: 'var(--tg-hint)', fontWeight: 400 }}>({refs.length} ч.)</span></span>
+                              <span style={{ flex: 1 }}>{displayName} <span style={{ color: 'var(--tg-hint)', fontWeight: 400 }}>({refs.length} ч.)</span></span>
                               <i className={`pi ${isExpanded ? 'pi-chevron-up' : 'pi-chevron-down'}`} style={{ fontSize: '0.7rem', color: 'var(--tg-hint)' }} />
                             </div>
                             {isExpanded && (

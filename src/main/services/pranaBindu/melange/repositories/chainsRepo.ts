@@ -58,6 +58,7 @@ function rowToSlot(row: ChainSlotRow): ChainSlot {
     aggregate: (row.aggregate as ChainAggregate) ?? 'best',
     minCoverage: row.min_coverage,
     optional: row.optional === 1,
+    direction: (row.direction as any) || 'any',
     clusters: safeParseStringArray(row.clusters_json),
     specificAtoms: safeParseNumberArray(row.specific_atoms_json),
     notes: row.notes,
@@ -73,6 +74,7 @@ export interface CreateChainSlotInput {
   aggregate?: ChainAggregate;
   minCoverage?: number;
   optional?: boolean;
+  direction?: 'any' | 'forward' | 'backward';
   clusters?: string[];
   specificAtoms?: number[];
   notes?: string | null;
@@ -126,9 +128,9 @@ function insertSlots(
   const stmt = db.prepare(
     `INSERT INTO chain_slots
        (chain_id, order_index, expected_repeats_min, expected_repeats_max,
-        aggregate, min_coverage, optional, clusters_json, specific_atoms_json,
+        aggregate, min_coverage, optional, direction, clusters_json, specific_atoms_json,
         notes)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
 
   const sorted = [...slots].sort(
@@ -153,6 +155,7 @@ function insertSlots(
       s.aggregate ?? 'best',
       s.minCoverage ?? 90,
       s.optional ? 1 : 0,
+      s.direction ?? 'any',
       clusters.length > 0 ? JSON.stringify(clusters) : null,
       atoms.length > 0 ? JSON.stringify(atoms) : null,
       s.notes ?? null,

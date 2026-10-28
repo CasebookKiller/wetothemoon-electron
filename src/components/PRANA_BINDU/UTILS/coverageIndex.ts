@@ -23,6 +23,16 @@ function haversineM(
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+/** Возвращает угол направления в градусах (0-360). */
+function getBearing(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const φ1 = (lat1 * Math.PI) / 180;
+  const φ2 = (lat2 * Math.PI) / 180;
+  const Δλ = ((lng2 - lng1) * Math.PI) / 180;
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  return (Math.atan2(y, x) * 180) / Math.PI + 360; // 0..360
+}
+
 // ==================== Grid-индекс эталона ====================
 
 const CELL_SIZE_M = 50;
@@ -107,6 +117,10 @@ export interface FastDeviationResult {
   repeats: number;
   /** Количество проходов через контрольные точки (медиана). */
   checkpointPasses: number;
+  /** Проходы в прямом направлении (от старта к финишу). */
+  forwardPasses: number;
+  /** Проходы в обратном направлении (от финиша к старту). */
+  backwardPasses: number;
   isClean: boolean;
 }
 
@@ -125,7 +139,8 @@ export function computeDeviationFast(
   refIndex: RefIndex,
   covRadiusM = 20,
   onRefRadiusM = 50,
-  checkpointCount = 6,
+  checkpointCount = 12,
+  directionToleranceDeg = 45,
 ): FastDeviationResult | null {
   if (trackLatlng.length < 10) return null;
   if (refIndex.coords.length < 2) return null;
@@ -158,6 +173,8 @@ export function computeDeviationFast(
       metersOnRef: 0,
       repeats: 0,
       checkpointPasses: 0,
+      forwardPasses: 0,
+      backwardPasses: 0,
       isClean: false,
     };
   }
@@ -223,6 +240,22 @@ export function computeDeviationFast(
     ] ?? 0;
 
   // 4. ref → track (grid по треку для быстрого «покрыто?»)
+    // Предрасчет направлений (азимутов)
+  const trackBearings: number[] = new Array(trackLatlng.length).fill(0);
+  for (let i = 0; i < trackLatlng.length; i++) {
+    const p1 = trackLatlng[Math.max(0, i - 2)];
+    const p2 = trackLatlng[Math.min(trackLatlng.length - 1, i + 2)];
+    trackBearings[i] = getBearing(p1[0], p1[1], p2[0], p2[1]);
+  }
+
+  const refBearings: number[] = new Array(refCoords.length).fill(0);
+  for (let i = 0; i < refCoords.length; i++) {
+    const p1 = refCoords[Math.max(0, i - 1)];
+    const p2 = refCoords[Math.min(refCoords.length - 1, i + 1)];
+    refBearings[i] = getBearing(p1[0], p1[1], p2[0], p2[1]);
+  }
+
+  // 4. ref -> track (Direction-aware покрытие)
   const trkCells = new Map<string, number[]>();
   trackLatlng.forEach(([lat, lng], idx) => {
     const { cx, cy } = latLngToCell(lat, lng, cosLat);
@@ -236,23 +269,41 @@ export function computeDeviationFast(
   });
 
   let covered = 0;
-  for (const [rlat, rlng] of refCoords) {
+  for (let rIdx = 0; rIdx < refCoords.length; rIdx++) {
+    const [rlat, rlng] = refCoords[rIdx];
+    const refBearing = refBearings[rIdx];
+    
+    let closestDist = Infinity;
+    let bestTrackIdx = -1;
+
     const { cx, cy } = latLngToCell(rlat, rlng, cosLat);
-    let hit = false;
-    for (let dx = -1; dx <= 1 && !hit; dx++) {
-      for (let dy = -1; dy <= 1 && !hit; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
         const arr = trkCells.get(cellKey(cx + dx, cy + dy));
         if (!arr) continue;
         for (const idx of arr) {
           const [tlat, tlng] = trackLatlng[idx];
-          if (haversineM(rlat, rlng, tlat, tlng) <= covRadiusM) {
-            hit = true;
-            break;
+          const d = haversineM(rlat, rlng, tlat, tlng);
+          if (d < closestDist) {
+            closestDist = d;
+            bestTrackIdx = idx;
           }
         }
       }
     }
-    if (hit) covered++;
+
+    if (bestTrackIdx !== -1 && closestDist <= covRadiusM) {
+      const trackBearing = trackBearings[bestTrackIdx];
+      const angleDiff = Math.abs((trackBearing - refBearing + 360) % 360);
+      
+      const isForward = angleDiff < directionToleranceDeg || angleDiff > 360 - directionToleranceDeg;
+      const isBackward = angleDiff > 180 - directionToleranceDeg && angleDiff < 180 + directionToleranceDeg;
+
+      // Если направление совпадает (туда или обратно) — точка покрыта
+      if (isForward || isBackward) {
+        covered++;
+      }
+    }
   }
   const coveragePct = Math.round((covered / refCoords.length) * 100);
 
@@ -270,45 +321,74 @@ export function computeDeviationFast(
     }
   }
 
-  // 6. checkpointPasses: динамическое количество КП (3..12).
-  //    cpCount=4 → [0.2, 0.4, 0.6, 0.8]
-  //    cpCount=6 → [1/7, 2/7, ..., 6/7]
-  //    cpCount=8 → [1/9, 2/9, ..., 8/9]
+  // 6. Direction-aware checkpointPasses
   const safeCpCount = Math.max(3, Math.min(12, Math.floor(checkpointCount)));
   const cpFractions: number[] = [];
   for (let i = 1; i <= safeCpCount; i++) {
     cpFractions.push(i / (safeCpCount + 1));
   }
 
-  const passesArray: number[] = [];
+  const isLoop = haversineM(
+    refCoords[0][0], refCoords[0][1],
+    refCoords[refCoords.length - 1][0], refCoords[refCoords.length - 1][1]
+  ) < 50;
 
+  const cpList: { lat: number; lng: number; bearing: number }[] = [];
   for (const frac of cpFractions) {
     const cpIdx = Math.floor(refCoords.length * frac);
-    const cp = refCoords[cpIdx];
-    let passes = 0;
-    let state = 'far';
-
-    for (const [tlat, tlng] of trackLatlng) {
-      const d = haversineM(cp[0], cp[1], tlat, tlng);
-      if (d < 30) {
-        if (state !== 'near') {
-          passes++;
-          state = 'near';
-        }
-      } else if (d > 100) {
-        state = 'far';
-      }
-    }
-    passesArray.push(passes);
+    const p1 = refCoords[Math.max(0, cpIdx - 1)];
+    const p2 = refCoords[Math.min(refCoords.length - 1, cpIdx + 1)];
+    const bearing = getBearing(p1[0], p1[1], p2[0], p2[1]);
+    cpList.push({ lat: refCoords[cpIdx][0], lng: refCoords[cpIdx][1], bearing });
   }
 
-  passesArray.sort((a, b) => a - b);
-  // 25-й перцентиль вместо медианы. Медиана ломается, если трек
-  // проходит половину КП дважды (детур на лестницы/фотозону):
-  //   [1, 1, 1, 2, 2, 2] → медиана 2 (неверно), 25-й перцентиль 1 (верно).
-  // 25-й перцентиль устойчив и к детурам (+), и к срезам (-).
-  const checkpointPasses =
-    passesArray[Math.floor(passesArray.length * 0.25)] || 0;
+  const fwdHits = new Array(safeCpCount).fill(0);
+  const bwdHits = new Array(safeCpCount).fill(0);
+  const cpStates = new Array(safeCpCount).fill(false);
+
+  for (let i = 0; i < trackLatlng.length; i++) {
+    const [tlat, tlng] = trackLatlng[i];
+    const trackBearing = trackBearings[i];
+
+    for (let c = 0; c < safeCpCount; c++) {
+      const cp = cpList[c];
+      const d = haversineM(cp.lat, cp.lng, tlat, tlng);
+      
+      if (d < 30 && !cpStates[c]) {
+        cpStates[c] = true;
+        const angleDiff = Math.abs((trackBearing - cp.bearing + 360) % 360);
+        const isForward = angleDiff < directionToleranceDeg || angleDiff > 360 - directionToleranceDeg;
+        const isBackward = angleDiff > 180 - directionToleranceDeg && angleDiff < 180 + directionToleranceDeg;
+
+        if (isForward) {
+          fwdHits[c]++;
+        } else if (isBackward) {
+          bwdHits[c]++;
+        }
+      } else if (d > 80 && cpStates[c]) {
+        cpStates[c] = false;
+      }
+    }
+  }
+
+  const fwdSorted = [...fwdHits].sort((a, b) => a - b);
+  const bwdSorted = [...bwdHits].sort((a, b) => a - b);
+  const fwdPasses = fwdSorted[Math.floor(fwdSorted.length * 0.25)] || 0;
+  const bwdPasses = bwdSorted[Math.floor(bwdSorted.length * 0.25)] || 0;
+  
+  let checkpointPasses = 0;
+  if (isLoop) {
+    checkpointPasses = Math.max(fwdPasses, bwdPasses);
+  } else {
+    checkpointPasses = fwdPasses + bwdPasses;
+  }
+
+  // Для UI сохраняем, сколько было "туда" и сколько "обратно"
+  const finalForwardPasses = isLoop ? fwdPasses : fwdPasses;
+  const finalBackwardPasses = isLoop ? bwdPasses : bwdPasses;
+
+  // Если КП вообще не пройдены, но coverage высокий — страховка
+  const finalCpPasses = checkpointPasses === 0 && coveragePct >= 70 ? 1 : checkpointPasses;
 
   // 7. repeats
   let refLengthM = 0;
@@ -319,33 +399,19 @@ export function computeDeviationFast(
     );
   }
 
-  const isLoop = haversineM(
-    refCoords[0][0], refCoords[0][1],
-    refCoords[refCoords.length - 1][0], refCoords[refCoords.length - 1][1]
-  ) < 50;
 
   let repeats = 0;
   if (refLengthM > 0) {
     const rawRatio = metersOnRef / refLengthM;
     if (isLoop) {
-      // CPs - главный источник правды для loop.
-      // Защищает от детуров, которые раздувают rawRatio (1065: прошёл круг
-      // + маленький разворот на лестницы → rawRatio ≈ 2.0, но кругов 1).
-      // Fallback на rawRatio только если КП промахнулись (GPS-провал).
-      if (checkpointPasses >= 1) {
-        repeats = checkpointPasses;
+      if (finalCpPasses >= 1) {
+        repeats = finalCpPasses;
       } else if (coveragePct >= 70) {
         repeats = Math.max(1, Math.round(rawRatio));
       }
     } else {
-      // Для linear: CPs-first (как для loop).
-      // Пробежка по просеке туда-обратно = 2 прохода через КП.
-      // Это надёжнее, чем ratio, потому что обратный путь может быть
-      // на 60-80 м в стороне от эталона (GPS-шум) → ratio падает до 1.5,
-      // а CPs честно видят 2 прохода.
-      // Fallback на ratio только если КП промахнулись (GPS-провал).
-      if (checkpointPasses >= 1) {
-        repeats = checkpointPasses;
+      if (finalCpPasses >= 1) {
+        repeats = finalCpPasses;
       } else if (coveragePct >= 70) {
         repeats = Math.max(1, Math.round(rawRatio));
       }
@@ -362,7 +428,9 @@ export function computeDeviationFast(
     coveragePct,
     metersOnRef: Math.round(metersOnRef),
     repeats,
-    checkpointPasses,
+    checkpointPasses: finalCpPasses,
+    forwardPasses: finalForwardPasses,
+    backwardPasses: finalBackwardPasses,
     isClean: medianM < 15 && coveragePct >= 90,
   };
 }

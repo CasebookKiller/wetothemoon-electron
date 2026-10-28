@@ -35,6 +35,7 @@ export interface SlotForEval {
   aggregate: 'best' | 'sum';
   minCoverage: number;
   optional: boolean;
+  direction?: 'any' | 'forward' | 'backward';
   clusters: string[];
   specificAtoms: number[];
 }
@@ -63,6 +64,8 @@ export interface SelectedAtom {
   lengthM: number;
   coveragePct: number;
   repeats: number;
+  forwardPasses: number;
+  backwardPasses: number;
   score: number;
 }
 
@@ -101,14 +104,24 @@ export interface ChainEvaluation {
 
 // ==================== Основная функция ====================
 
+export type CoverageGetter = (atomId: number) => {
+  coveragePct: number;
+  repeats: number;
+  forwardPasses: number;
+  backwardPasses: number;
+  score: number;
+  cls: 'used' | 'similar' | 'unused';
+} | null;
+
 export function evaluateChain(
   chain: ChainForEval,
   trackLatlng: [number, number][],
   refTracks: RefTrackForEval[],
   thresholds: CoverageThresholds,
+  getCoverage?: CoverageGetter,
 ): ChainEvaluation {
   const slots: SlotEvaluation[] = chain.slots.map((slot, idx) =>
-    evaluateSlot(idx, slot, trackLatlng, refTracks, thresholds),
+    evaluateSlot(idx, slot, trackLatlng, refTracks, thresholds, getCoverage),
   );
 
   const summary = {
@@ -149,12 +162,14 @@ function evaluateSlot(
   trackLatlng: [number, number][],
   refTracks: RefTrackForEval[],
   thresholds: CoverageThresholds,
+  getCoverage?: CoverageGetter,
 ): SlotEvaluation {
   const candidates = collectCandidates(
     slot,
     trackLatlng,
     refTracks,
     thresholds,
+    getCoverage,
   );
 
   const empty: SlotEvaluation = {
@@ -176,7 +191,14 @@ function evaluateSlot(
     candidates.sort((a, b) => b.score - a.score);
     const best = candidates[0];
     const alternatives = candidates.slice(1);
-    const actualRepeats = best.repeats;
+    
+    let actualRepeats = best.repeats;
+    if (slot.direction === 'forward') {
+      actualRepeats = best.forwardPasses;
+    } else if (slot.direction === 'backward') {
+      actualRepeats = best.backwardPasses;
+    }
+
     const status = computeStatus(
       actualRepeats,
       slot.expectedRepeatsMin,
@@ -193,7 +215,16 @@ function evaluateSlot(
   }
 
   // aggregate === 'sum'
-  const actualRepeats = candidates.reduce((s, c) => s + c.repeats, 0);
+  let actualRepeats = 0;
+  for (const c of candidates) {
+    if (slot.direction === 'forward') {
+      actualRepeats += c.forwardPasses;
+    } else if (slot.direction === 'backward') {
+      actualRepeats += c.backwardPasses;
+    } else {
+      actualRepeats += c.repeats;
+    }
+  }
   const status = computeStatus(
     actualRepeats,
     slot.expectedRepeatsMin,
@@ -214,6 +245,7 @@ function collectCandidates(
   trackLatlng: [number, number][],
   refTracks: RefTrackForEval[],
   thresholds: CoverageThresholds,
+  getCoverage?: CoverageGetter,
 ): SelectedAtom[] {
   // Собираем id атомов: specificAtoms + все, у кого есть нужный group:*
   const atomIds = new Set<number>(slot.specificAtoms);
@@ -235,6 +267,25 @@ function collectCandidates(
     const ref = refTracks.find((r) => r.id === atomId);
     if (!ref || ref.coords.length < 2) continue;
 
+    if (getCoverage) {
+      const pre = getCoverage(atomId);
+      if (!pre || pre.cls === 'unused') continue;
+      if (pre.coveragePct < slot.minCoverage) continue;
+
+      result.push({
+        refId: ref.id,
+        name: ref.name,
+        lengthM: ref.lengthM,
+        coveragePct: pre.coveragePct,
+        repeats: pre.repeats,
+        forwardPasses: pre.forwardPasses,
+        backwardPasses: pre.backwardPasses,
+        score: pre.score,
+      });
+      continue;
+    }
+
+    // Fallback на вычисление на лету (если getCoverage не передан)
     const idx = buildRefIndex(ref.coords);
     const dev = computeDeviationFast(
       trackLatlng,
@@ -267,6 +318,8 @@ function collectCandidates(
       lengthM: ref.lengthM,
       coveragePct: dev.coveragePct,
       repeats: cls.repeats,
+      forwardPasses: dev.forwardPasses ?? 0,
+      backwardPasses: dev.backwardPasses ?? 0,
       score: cls.score,
     });
   }
