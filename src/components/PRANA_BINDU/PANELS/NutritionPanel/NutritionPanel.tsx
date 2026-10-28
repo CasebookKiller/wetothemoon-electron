@@ -101,8 +101,9 @@ export const NutritionPanel: React.FC<Props> = ({ className }) => {
     (async () => {
       if (!api?.pb?.listWeights) return;
       const res = await api.pb.listWeights(30);
-      if (res?.success && res.latest?.weightKg) {
-        setWaterGoal(Math.round(res.latest.weightKg * 30));
+      const w = res?.latest?.weight_kg ?? res?.latest?.weightKg;
+      if (res?.success && w) {
+        setWaterGoal(Math.round(w * 30));
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -43,6 +43,8 @@ export const ThresholdsTimelineChart: React.FC<Props> = ({
   const [showLthr, setShowLthr] = useState(true);
   const [showHrmax, setShowHrmax] = useState(true);
   const [showResthr, setShowResthr] = useState(true);
+  const [showWeight, setShowWeight] = useState(false); // По умолчанию выключен
+  const [weights, setWeights] = useState<Record<string, number>>({});
 
   const [points, setPoints] = useState<TimelinePoint[]>([]);
   const [loading, setLoading] = useState(false);
@@ -76,6 +78,21 @@ export const ThresholdsTimelineChart: React.FC<Props> = ({
         return;
       }
       setPoints(res.items ?? []);
+      
+      // Загружаем веса за тот же период (для правой оси Y1)
+      try {
+        const wRes = await api.pb.listWeights(periodMonths * 31);
+        if (wRes?.success && wRes.items) {
+          const wMap: Record<string, number> = {};
+          for (const w of wRes.items) {
+            wMap[w.date] = w.weight_kg;
+          }
+          setWeights(wMap);
+        }
+      } catch (err) {
+        console.warn('Не удалось загрузить веса для графика', err);
+      }
+
       // Диагностика: сколько тестов по каждой длительности в БД (всё время)
       try {
         const allMeta = await api.pb.testSegmentList({});
@@ -150,9 +167,24 @@ export const ThresholdsTimelineChart: React.FC<Props> = ({
         pointBackgroundColor: '#6ab2f2',
       });
     }
+    if (showWeight) {
+      datasets.push({
+        label: 'Вес (кг)',
+        data: points.map((p) => weights[p.date] || null),
+        borderColor: '#6fbf73',
+        backgroundColor: 'rgba(111, 191, 115, 0.1)',
+        borderWidth: 2,
+        tension: 0.3,
+        spanGaps: true,
+        pointRadius: 3,
+        pointHoverRadius: 6,
+        pointBackgroundColor: '#6fbf73',
+        yAxisID: 'y1', // Привязываем к правой оси
+      });
+    }
 
     return { labels, datasets };
-  }, [points, showLthr, showHrmax, showResthr]);
+  }, [points, showLthr, showHrmax, showResthr, showWeight, weights]);
 
   const chartOptions = useMemo(() => {
     const rootStyles = getComputedStyle(document.body);
@@ -208,13 +240,19 @@ export const ThresholdsTimelineChart: React.FC<Props> = ({
         y: {
           grid: { color: borderColor },
           ticks: { color: hintColor, font: { size: 10 } },
-          // Разный диапазон для LTHR/HRmax (100-200) и RestHR (40-70),
-          // поэтому оставляем авто-масштаб по видимым линиям
+          beginAtZero: false,
+        },
+        y1: {
+          type: 'linear' as const,
+          display: showWeight,
+          position: 'right' as const,
+          grid: { drawOnChartArea: false }, // Чтобы сетка не перекрещивалась
+          ticks: { color: '#6fbf73', font: { size: 10 } },
           beginAtZero: false,
         },
       },
     };
-  }, [points]);
+  }, [points, showWeight]);
 
   // Нет данных для порогов — если нет ни одной точки LTHR и HRmax.
   // RestHR может быть (он из recovery_logs), но без порогов график бесполезен.
@@ -272,6 +310,10 @@ export const ThresholdsTimelineChart: React.FC<Props> = ({
         <label className="pb-check-row pb-checkbox-dark" style={{ fontSize: '0.8rem', cursor: 'pointer' }}>
           <Checkbox checked={showResthr} onChange={(e) => setShowResthr(!!e.checked)} />
           <span style={{ marginLeft: '0.3rem' }}>RestHR</span>
+        </label>
+        <label className="pb-check-row pb-checkbox-dark" style={{ fontSize: '0.8rem', cursor: 'pointer' }}>
+          <Checkbox checked={showWeight} onChange={(e) => setShowWeight(!!e.checked)} />
+          <span style={{ marginLeft: '0.3rem' }}>Вес</span>
         </label>
 
         <span
