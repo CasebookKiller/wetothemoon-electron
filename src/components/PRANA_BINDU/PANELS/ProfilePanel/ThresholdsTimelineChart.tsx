@@ -44,7 +44,7 @@ export const ThresholdsTimelineChart: React.FC<Props> = ({
   const [showHrmax, setShowHrmax] = useState(true);
   const [showResthr, setShowResthr] = useState(true);
   const [showWeight, setShowWeight] = useState(false); // По умолчанию выключен
-  const [weights, setWeights] = useState<Record<string, number>>({});
+  const [allWeights, setAllWeights] = useState<Array<{ date: string; weight_kg: number }>>([]);
 
   const [points, setPoints] = useState<TimelinePoint[]>([]);
   const [loading, setLoading] = useState(false);
@@ -83,11 +83,9 @@ export const ThresholdsTimelineChart: React.FC<Props> = ({
       try {
         const wRes = await api.pb.listWeights(periodMonths * 31);
         if (wRes?.success && wRes.items) {
-          const wMap: Record<string, number> = {};
-          for (const w of wRes.items) {
-            wMap[w.date] = w.weight_kg;
-          }
-          setWeights(wMap);
+          // listWeights возвращает отсортированный массив (DESC), 
+          // сохраняем как есть для поиска ближайшего
+          setAllWeights(wRes.items);
         }
       } catch (err) {
         console.warn('Не удалось загрузить веса для графика', err);
@@ -119,13 +117,47 @@ export const ThresholdsTimelineChart: React.FC<Props> = ({
   }, [periodMonths, windowDays, lthrTestDuration, onlyClean, onlyIntensePct, topN, minTests]);
 
   const chartData = useMemo(() => {
-    const labels = points.map((p) => p.date);
+    // 1. Принудительно добавляем сегодняшний день в конец графика,
+    // чтобы на него попал последний записанный вес.
+    const todayStr = new Date().toISOString().slice(0, 10);
+    let displayPoints = [...points];
+    if (displayPoints.length > 0 && displayPoints[displayPoints.length - 1].date < todayStr) {
+      displayPoints.push({
+        date: todayStr,
+        lthr: null,
+        hrmax: null,
+        resthr: null,
+        testsUsed: 0,
+        source: 'insufficient'
+      });
+    }
+
+    const labels = displayPoints.map((p) => p.date);
     const datasets: any[] = [];
+
+    // 2. "Протягиваем" последнее известное значение LTHR/HRmax/RestHR до конца,
+    // чтобы линии не обрывались.
+    let lastLthr: number | null = null;
+    let lastHrmax: number | null = null;
+    let lastResthr: number | null = null;
+
+    const lthrSeries = displayPoints.map((p) => {
+      if (p.lthr != null) lastLthr = p.lthr;
+      return lastLthr;
+    });
+    const hrmaxSeries = displayPoints.map((p) => {
+      if (p.hrmax != null) lastHrmax = p.hrmax;
+      return lastHrmax;
+    });
+    const resthrSeries = displayPoints.map((p) => {
+      if (p.resthr != null) lastResthr = p.resthr;
+      return lastResthr;
+    });
 
     if (showLthr) {
       datasets.push({
         label: 'LTHR',
-        data: points.map((p) => p.lthr),
+        data: lthrSeries,
         borderColor: '#d4a373',
         backgroundColor: 'rgba(212, 163, 115, 0.15)',
         borderWidth: 2.5,
@@ -134,14 +166,13 @@ export const ThresholdsTimelineChart: React.FC<Props> = ({
         pointRadius: 3,
         pointHoverRadius: 6,
         pointBackgroundColor: '#d4a373',
-        // Привязываем «N тестов» к точке для tooltip
-        testsUsed: points.map((p) => p.testsUsed),
+        testsUsed: displayPoints.map((p) => p.testsUsed),
       } as any);
     }
     if (showHrmax) {
       datasets.push({
         label: 'HRmax',
-        data: points.map((p) => p.hrmax),
+        data: hrmaxSeries,
         borderColor: '#ff6b6b',
         backgroundColor: 'transparent',
         borderWidth: 1.5,
@@ -156,7 +187,7 @@ export const ThresholdsTimelineChart: React.FC<Props> = ({
     if (showResthr) {
       datasets.push({
         label: 'RestHR',
-        data: points.map((p) => p.resthr),
+        data: resthrSeries,
         borderColor: '#6ab2f2',
         backgroundColor: 'transparent',
         borderWidth: 1.5,
@@ -168,9 +199,28 @@ export const ThresholdsTimelineChart: React.FC<Props> = ({
       });
     }
     if (showWeight) {
+      // 3. Ищем ближайший вес (по абсолютной разнице дат), чтобы график не рвался.
+      const weightData = displayPoints.map((p) => {
+        if (allWeights.length === 0) return null;
+        let closest = allWeights[0];
+        let minDiff = Math.abs(new Date(closest.date).getTime() - new Date(p.date).getTime());
+        for (const w of allWeights) {
+          const diff = Math.abs(new Date(w.date).getTime() - new Date(p.date).getTime());
+          if (diff < minDiff) {
+            minDiff = diff;
+            closest = w;
+          }
+        }
+        // Берем вес, если он записан в пределах 14 дней от точки графика
+        if (minDiff < 14 * 24 * 3600 * 1000) {
+          return closest.weight_kg;
+        }
+        return null;
+      });
+
       datasets.push({
         label: 'Вес (кг)',
-        data: points.map((p) => weights[p.date] || null),
+        data: weightData,
         borderColor: '#6fbf73',
         backgroundColor: 'rgba(111, 191, 115, 0.1)',
         borderWidth: 2,
@@ -179,12 +229,12 @@ export const ThresholdsTimelineChart: React.FC<Props> = ({
         pointRadius: 3,
         pointHoverRadius: 6,
         pointBackgroundColor: '#6fbf73',
-        yAxisID: 'y1', // Привязываем к правой оси
+        yAxisID: 'y1',
       });
     }
 
     return { labels, datasets };
-  }, [points, showLthr, showHrmax, showResthr, showWeight, weights]);
+  }, [points, showLthr, showHrmax, showResthr, showWeight, allWeights]);
 
   const chartOptions = useMemo(() => {
     const rootStyles = getComputedStyle(document.body);
@@ -265,6 +315,19 @@ export const ThresholdsTimelineChart: React.FC<Props> = ({
     !hasThresholdData;
 
   const isEmpty = !loading && points.length > 0 && points.every((p) => p.lthr == null && p.hrmax == null && p.resthr == null);
+
+  // DEBUG: смотрим, что приходит в компонент
+  useEffect(() => {
+    if (!showWeight) return;
+    console.log('--- WEIGHT DEBUG ---');
+    console.log('All weights from DB:', allWeights);
+    console.log('Points for chart:', points);
+    const weightData = points.map((p) => {
+      const closest = allWeights.find((w) => w.date <= p.date);
+      return { date: p.date, weight: closest?.weight_kg ?? null };
+    });
+    console.log('Calculated weightData for chart:', weightData);
+  }, [allWeights, points, showWeight]);
 
   return (
     <div style={{ marginTop: '1rem' }}>

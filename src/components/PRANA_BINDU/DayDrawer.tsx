@@ -136,6 +136,8 @@ export const DayDrawer: React.FC<Props> = ({
   const [facts, setFacts] = useState<RunFactLite[]>([]);
   const [sessions, setSessions] = useState<WorkoutSession[]>([]);
   const [wellness, setWellness] = useState<WellnessLogLite | null>(null);
+  const [waterTotal, setWaterTotal] = useState<number>(0);
+  const [waterGoal, setWaterGoal] = useState<number | undefined>(undefined);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -152,11 +154,13 @@ export const DayDrawer: React.FC<Props> = ({
     setLoading(true);
     setError('');
     try {
-      const [pRes, rRes, wRes, sRes] = await Promise.all([
+      const [pRes, rRes, wRes, sRes, watRes, weightRes] = await Promise.all([
         api.pb.listPlanEvents(date, date),
         api.pb.listRunFacts(date, date),
         api.pb.listRecoveryLogs(date, date),
         api.pb.listWorkoutSessions(date, date),
+        api.pb.listWater(date),
+        api.pb.listWeights(30)
       ]);
       if (pRes?.success) setPlans(pRes.items ?? []);
       else setPlans([]);
@@ -166,6 +170,12 @@ export const DayDrawer: React.FC<Props> = ({
       else setWellness(null);
       if (sRes?.success) setSessions(sRes.items ?? []);
       else setSessions([]);
+      
+      if (watRes?.success) setWaterTotal(watRes.total ?? 0);
+      
+      const weight = weightRes?.latest?.weight_kg ?? wRes?.items?.[0]?.weight_kg ?? 70;
+      const hasRun = (rRes?.items?.length > 0) || (pRes?.items?.some((p: any) => p.sport && p.sport.toLowerCase().includes('run')));
+      setWaterGoal(Math.round(weight * 30 + (hasRun ? 500 : 0)));
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -321,7 +331,11 @@ export const DayDrawer: React.FC<Props> = ({
         </div>
       </div>
 
-      <DaySummary log={wellness as unknown as SummaryLogLite | null} />
+      <DaySummary 
+        log={wellness as unknown as SummaryLogLite | null} 
+        waterTotal={waterTotal} 
+        waterGoal={waterGoal} 
+      />
 
       {loading && <div className="pb-drawer__hint">Загрузка…</div>}
       {error && <Message severity="error" text={error} className="w-full mt-2" />}

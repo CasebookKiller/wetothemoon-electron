@@ -74,6 +74,8 @@ interface DayCellData {
   plans: PlanEventLite[];
   factGroups: GroupedRunFact[];
   wellness: RecoveryLogLite | null;
+  waterTotal: number;
+  waterGoal: number;
 }
 
 const DOW_SHORT = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
@@ -130,6 +132,8 @@ export const FullWeek: React.FC<Props> = ({
   const [plans, setPlans] = useState<PlanEventLite[]>([]);
   const [facts, setFacts] = useState<RunFactLite[]>([]);
   const [wellness, setWellness] = useState<RecoveryLogLite[]>([]);
+  const [waterTotals, setWaterTotals] = useState<Record<string, number>>({});
+  const [latestWeight, setLatestWeight] = useState<number>(70);
   const [loading, setLoading] = useState(false);
 
   const [collapsed, setCollapsed] = useState<boolean>(() => {
@@ -187,15 +191,21 @@ export const FullWeek: React.FC<Props> = ({
     setLoading(true);
     (async () => {
       try {
-        const [pRes, rRes, wRes] = await Promise.all([
+        const [pRes, rRes, wRes, watRes, weightRes] = await Promise.all([
           api.pb.listPlanEvents(range.from, range.to),
           api.pb.listRunFacts(range.from, range.to),
           api.pb.listRecoveryLogs(range.from, range.to),
+          api.pb.getWaterRange(range.from, range.to),
+          api.pb.listWeights(30)
         ]);
         if (!alive) return;
         setPlans(pRes?.success ? pRes.items ?? [] : []);
         setFacts(rRes?.success ? rRes.items ?? [] : []);
         setWellness(wRes?.success ? wRes.items ?? [] : []);
+        setWaterTotals(watRes?.success ? watRes.data ?? {} : {});
+        if (weightRes?.success && weightRes.latest?.weight_kg) {
+          setLatestWeight(weightRes.latest.weight_kg);
+        }
       } catch {
         if (!alive) return;
         setPlans([]);
@@ -336,18 +346,29 @@ export const FullWeek: React.FC<Props> = ({
       const iso = addDays(centerIso, i - 3);
       const d = parseIso(iso);
       const dowIdx = (d.getDay() + 6) % 7;
+      
+      const dayPlans = planByDate.get(iso) ?? [];
+      const dayFacts = factByDate.get(iso) ?? [];
+      const dayWellness = wellnessByDate.get(iso) ?? null;
+      
+      const hasRun = dayFacts.length > 0 || dayPlans.some(p => p.sport && p.sport.toLowerCase().includes('run'));
+      const w = dayWellness?.weight_kg ?? latestWeight;
+      const waterGoal = Math.round(w * 30 + (hasRun ? 500 : 0));
+
       return {
         iso,
         dowShort: DOW_SHORT[dowIdx],
         dayNum: d.getDate(),
         monthShort: MONTH_SHORT[d.getMonth()],
         isToday: iso === todayIso,
-        plans: planByDate.get(iso) ?? [],
-        factGroups: factByDate.get(iso) ?? [],
-        wellness: wellnessByDate.get(iso) ?? null,
+        plans: dayPlans,
+        factGroups: dayFacts,
+        wellness: dayWellness,
+        waterTotal: waterTotals[iso] ?? 0,
+        waterGoal,
       };
     });
-  }, [centerIso, plans, facts, wellness, todayIso]);
+  }, [centerIso, plans, facts, wellness, todayIso, waterTotals, latestWeight]);
 
   return (
     <div
@@ -497,7 +518,7 @@ export const FullWeek: React.FC<Props> = ({
                 />
               </div>
 
-              <DaySummary log={c.wellness} />
+              <DaySummary log={c.wellness} waterTotal={c.waterTotal} waterGoal={c.waterGoal} />
 
               {c.plans.length > 0 && (
                 <div className="pb-full-week__section">
