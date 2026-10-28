@@ -34,6 +34,7 @@ export const NutritionPanel: React.FC<Props> = ({ className }) => {
   const [waterTotal, setWaterTotal] = useState(0);
   const [waterLoading, setWaterLoading] = useState(false);
   const [waterGoal, setWaterGoal] = useState(2100); // Дефолт, если нет веса
+  const [hasRunToday, setHasRunToday] = useState(false); // Новое состояние
   const [weekWater, setWeekWater] = useState<Record<string, number>>({});
 
   // ==================== Вес ====================
@@ -97,16 +98,41 @@ export const NutritionPanel: React.FC<Props> = ({ className }) => {
     void loadWeight();
     void loadNutrition();
 
-    // Расчёт цели воды от последнего веса (30 мл/кг)
+        // Расчёт цели воды от последнего веса + бонус за тренировку
     (async () => {
       if (!api?.pb?.listWeights) return;
       const res = await api.pb.listWeights(30);
       const w = res?.latest?.weight_kg ?? res?.latest?.weightKg;
+      
       if (res?.success && w) {
-        setWaterGoal(Math.round(w * 30));
+        // Проверяем, есть ли сегодня пробежка или план на бег
+        let hasRun = false;
+        try {
+          const [factsRes, plansRes] = await Promise.all([
+            api.pb.listRunFacts(today, today),
+            api.pb.listPlanEvents(today, today)
+          ]);
+          const hasFacts = factsRes?.success && factsRes.items?.length > 0;
+          const hasPlanRun = plansRes?.success && plansRes.items?.some((p: any) => p.sport && p.sport.toLowerCase().includes('run'));
+          hasRun = hasFacts || hasPlanRun;
+        } catch (e) {
+          console.warn('Не удалось проверить наличие тренировок для цели воды', e);
+        }
+
+        setHasRunToday(hasRun); // Сохраняем для подсказки
+        setWaterGoal(Math.round(w * 30 + (hasRun ? 500 : 0)));
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Обновляем воду, когда окно возвращается в фокус (например, после закрытия drawer'а)
+  useEffect(() => {
+    const handleFocus = () => {
+      void loadWater();
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
   // ==================== Обработчики ====================
@@ -238,8 +264,12 @@ export const NutritionPanel: React.FC<Props> = ({ className }) => {
               );
             })}
           </div>
-          <small style={{ display: 'block', marginTop: '0.5rem', fontSize: '0.7rem', color: 'var(--tg-hint)' }}>
-            Цель {waterGoal} мл (30 мл на кг веса). Выпивайте стакан после пробуждения.
+          <small style={{ display: 'block', marginTop: '0.5rem', fontSize: '0.7rem', color: 'var(--tg-hint)', lineHeight: 1.4 }}>
+            Цель: <b style={{ color: 'var(--pb-accent)' }}>{waterGoal} мл</b> = 30 мл × кг веса 
+            {hasRunToday 
+              ? ' + 500 мл (на тренировку сегодня).' 
+              : ' (день без тренировок).'}
+            <br/>Выпивайте стакан после пробуждения.
           </small>
         </div>
 
