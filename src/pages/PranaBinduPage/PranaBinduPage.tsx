@@ -5,6 +5,7 @@ import { FullWeek } from '@/components/PRANA_BINDU/FullWeek';
 import { Dashboard } from '@/components/PRANA_BINDU/PANELS/Dashboard/Dashboard';
 import { TrainingDialog } from '@/components/PRANA_BINDU/PANELS/TrainingDialog/TrainingDialog';
 import { HealthDialog } from '@/components/PRANA_BINDU/PANELS/HealthDialog/HealthDialog';
+import { HealthDashboardDialog } from '@/components/PRANA_BINDU/PANELS/HealthDashboard/HealthDashboardDialog';
 import { SettingsDialog } from '@/components/PRANA_BINDU/SettingsDialog/SettingsDialog';
 import { DayDrawer } from '@/components/PRANA_BINDU/DayDrawer';
 import { RouteMapEditor } from '@/components/PRANA_BINDU/RouteMapEditor';
@@ -47,6 +48,7 @@ export const PranaBinduPage: React.FC = () => {
 
   const [healthVisible, setHealthVisible] = useState(false);
   const [healthTab, setHealthTab] = useState<'wellness' | 'nutrition'>('wellness');
+  const [analyticsVisible, setAnalyticsVisible] = useState(false);
 
   // Drawer'ы
   const [dayDrawerDate, setDayDrawerDate] = useState<string | null>(null);
@@ -95,6 +97,7 @@ export const PranaBinduPage: React.FC = () => {
             refreshKey={refreshKey}
             onOpenTraining={handleOpenTraining}
             onOpenHealth={handleOpenHealth}
+            onOpenAnalytics={() => setAnalyticsVisible(true)}
           />
 
           {/* 2. Карточки модулей (Stillsuit, Crysknife и т.д.) */}
@@ -138,6 +141,11 @@ export const PranaBinduPage: React.FC = () => {
         onHide={() => setHealthVisible(false)}
         syncFrom={syncFrom}
         syncTo={syncTo}
+      />
+
+      <HealthDashboardDialog
+        visible={analyticsVisible}
+        onHide={() => setAnalyticsVisible(false)}
       />
 
       <SettingsDialog

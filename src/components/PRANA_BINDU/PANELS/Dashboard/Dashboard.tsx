@@ -4,9 +4,10 @@ interface Props {
   onOpenTraining: (tab: 'runs' | 'plan' | 'calendar') => void;
   onOpenHealth: (tab: 'wellness' | 'nutrition') => void;
   refreshKey?: number;
+  onOpenAnalytics: () => void;
 }
 
-export const Dashboard: React.FC<Props> = ({ onOpenTraining, onOpenHealth, refreshKey }) => {
+export const Dashboard: React.FC<Props> = ({ onOpenTraining, onOpenHealth, refreshKey, onOpenAnalytics }) => {
   const api = (window as any).electronAPI;
   const [lastRun, setLastRun] = useState<any>(null);
   const [todayPlans, setTodayPlans] = useState<any[]>([]);
@@ -107,10 +108,22 @@ export const Dashboard: React.FC<Props> = ({ onOpenTraining, onOpenHealth, refre
 
       {/* 2. ОБЪЕДИНЕННЫЙ ВИДЖЕТ: ЗДОРОВЬЕ И ВОДА (50%) */}
       <div className="col-12 lg:col-6 p-2">
-        <div className={cardClass} onClick={() => onOpenHealth('wellness')}>
-          <div className="pb-module-name flex justify-content-between">
-            <span><i className="pi pi-heart mr-2" style={{ color: 'var(--pb-accent)' }} />Здоровье и Вода</span>
-            <i className="pi pi-arrow-right text-xs" style={{ opacity: 0.5 }} />
+        <div className={cardClass}>
+          <div className="pb-module-name flex align-items-center justify-content-between" style={{ gap: '0.5rem', width: '100%' }}>
+            <span style={{ whiteSpace: 'nowrap' }}>
+              <i className="pi pi-heart mr-2" style={{ color: 'var(--pb-accent)' }} />
+              Здоровье и Вода
+            </span>
+            <div className="flex align-items-center gap-1" style={{ flexShrink: 0 }}>
+              <button 
+                className="pb-ref-category-chip" 
+                style={{ padding: '0.2rem 0.4rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.7rem' }}
+                onClick={(e) => { e.stopPropagation(); onOpenAnalytics(); }}
+              >
+                <i className="pi pi-chart-pie" /> Аналитика
+              </button>
+              <i className="pi pi-arrow-right text-xs" style={{ opacity: 0.5 }} />
+            </div>
           </div>
           
           <div className="mt-3 grid">
