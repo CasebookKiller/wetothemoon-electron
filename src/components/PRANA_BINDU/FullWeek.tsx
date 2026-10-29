@@ -31,12 +31,12 @@ import { LogWorkoutSessionDialog } from './LogWorkoutSessionDialog';
 
 interface Props {
   onDayClick?: (date: string) => void;
-  onOpenPlanEvent?: (eventId: number) => void;
-  onOpenRunFact?: (factId: number) => void;
+  onOpenPlanEvent?: (event: any) => void;
+  onOpenRunFact?: (fact: any) => void;
   onOpenSettings?: () => void;
   onOpenExercises?: () => void;
   onOpenGraph?: () => void;
-  onOpenMap?: () => void;            // ⭐ новое
+  onOpenMap?: () => void;
   className?: string;
 }
 
@@ -531,7 +531,7 @@ export const FullWeek: React.FC<Props> = ({
                         className="pb-full-week__item pb-full-week__item--plan"
                         onClick={
                           onOpenPlanEvent
-                            ? () => onOpenPlanEvent(p.id)
+                            ? () => onOpenPlanEvent(p)
                             : undefined
                         }
                       >
@@ -569,7 +569,7 @@ export const FullWeek: React.FC<Props> = ({
                         className="pb-full-week__item pb-full-week__item--fact"
                         onClick={
                           onOpenRunFact
-                            ? () => onOpenRunFact(g.primary.id)
+                            ? () => onOpenRunFact(g.primary)
                             : undefined
                         }
                       >

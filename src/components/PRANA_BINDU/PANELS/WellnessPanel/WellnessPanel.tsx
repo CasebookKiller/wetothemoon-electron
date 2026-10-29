@@ -1,34 +1,20 @@
 // src/components/PRANA_BINDU/PANELS/WellnessPanel/WellnessPanel.tsx
-//
-// Панель «Здоровье · intervals.icu»: таблица recovery_logs за период,
-// клик по строке открывает WellnessDrawer.
-//
-// Диапазон приходит пропсами (from/to) — родитель хранит его для
-// других панелей. Родитель может вызвать reload() через ref после
-// sync-wellness.
 
-import React, {
-  forwardRef,
-  useEffect,
-  useImperativeHandle,
-  useState,
-} from 'react';
+import React, { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import { Panel } from 'primereact/panel';
-import {
-  WellnessDrawer,
-  type RecoveryLogLite,
-} from '@/components/PRANA_BINDU/WellnessDrawer';
+import { DataTable } from 'primereact/datatable';
+import { Column } from 'primereact/column';
+import { WellnessDrawer, type RecoveryLogLite } from '@/components/PRANA_BINDU/WellnessDrawer';
 
 export interface WellnessPanelHandle {
   reload: () => Promise<void>;
 }
 
 interface Props {
-  /** Нижняя граница диапазона. */
   from: Date;
-  /** Верхняя граница диапазона. */
   to: Date;
   className?: string;
+  embedded?: boolean;
 }
 
 function toIsoDate(d: Date): string {
@@ -39,7 +25,7 @@ function toIsoDate(d: Date): string {
 }
 
 export const WellnessPanel = forwardRef<WellnessPanelHandle, Props>(
-  ({ from, to, className }, ref) => {
+  ({ from, to, className, embedded }, ref) => {
     const api = (window as any).electronAPI;
 
     const [logs, setLogs] = useState<any[]>([]);
@@ -72,85 +58,96 @@ export const WellnessPanel = forwardRef<WellnessPanelHandle, Props>(
         0
       ) / (logs.filter((x) => x.resting_hr != null).length || 1);
 
-    return (
-      <Panel
-        header="Здоровье · intervals.icu"
-        className={`shadow-5 mb-3 pb-panel ${className ?? ''}`}
-      >
-        {logs.length === 0 ? (
-          <small className="pb-hint">
-            Нет данных за выбранный диапазон. Нажмите «Подтянуть здоровье»
-            в панели «Синхронизация (API)».
-          </small>
-        ) : (
-          <div className="pb-wellness-table pb-wellness-table--scrollable">
-            <div className="pb-wellness-table__header">
-              <span>Дата</span>
-              <span title="Пульс покоя">RHR</span>
-              <span title="Сон, часов">Сон</span>
-              <span title="Sleep score">Score</span>
-              <span title="Шаги">Шаги</span>
-              <span title="Chronic Training Load">CTL</span>
-              <span title="Acute Training Load">ATL</span>
-            </div>
-            <div className="pb-wellness-table__body">
-              {logs.map((r) => {
-                const rhrCls =
-                  r.resting_hr == null
-                    ? ''
-                    : r.resting_hr <= avgRhr - 2
-                    ? 'pb-wellness-table__val--good'
-                    : r.resting_hr >= avgRhr + 3
-                    ? 'pb-wellness-table__val--warn'
-                    : '';
-
-                return (
-                  <div
-                    key={r.date}
-                    className="pb-wellness-table__row pb-wellness-table__row--clickable"
-                    onClick={() => {
-                      setSelected(r as RecoveryLogLite);
-                      setDrawerVisible(true);
-                    }}
-                    title="Открыть полную карточку дня"
-                  >
-                    <span className="pb-wellness-table__date">
-                      {r.date}
-                    </span>
-                    <span className={`pb-wellness-table__val ${rhrCls}`}>
-                      {r.resting_hr ?? '—'}
-                    </span>
-                    <span className="pb-wellness-table__val">
-                      {r.sleep_hours != null
-                        ? r.sleep_hours.toFixed(1)
-                        : '—'}
-                    </span>
-                    <span className="pb-wellness-table__val">
-                      {r.sleep_score ?? '—'}
-                    </span>
-                    <span className="pb-wellness-table__val">
-                      {r.steps != null
-                        ? r.steps.toLocaleString('ru-RU')
-                        : '—'}
-                    </span>
-                    <span className="pb-wellness-table__val pb-wellness-table__val--dim">
-                      {r.ctl != null ? r.ctl.toFixed(1) : '—'}
-                    </span>
-                    <span className="pb-wellness-table__val pb-wellness-table__val--dim">
-                      {r.atl != null ? r.atl.toFixed(1) : '—'}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+    const content = (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, width: '100%' }}>
+        <DataTable
+          value={logs}
+          size="small"
+          stripedRows
+          scrollable
+          // ЖЕСТКАЯ ВЫСОТА ДЛЯ ТЕСТА (85vh диалога минус шапка и табы)
+          scrollHeight="flex" 
+          emptyMessage="Нет данных за выбранный диапазон. Нажмите «Подтянуть здоровье» в панели «Синхронизация (API)»."
+          className="p-datatable-sm pb-runs-table"
+          selectionMode="single"
+          onRowClick={(e) => {
+            setSelected(e.data as RecoveryLogLite);
+            setDrawerVisible(true);
+          }}
+        >
+          <Column field="date" header="Дата" style={{ width: '110px' }} />
+          <Column
+            header="RHR"
+            style={{ width: '70px' }}
+            body={(r) => {
+              const rhrCls =
+                r.resting_hr == null
+                  ? ''
+                  : r.resting_hr <= avgRhr - 2
+                  ? 'pb-wellness-table__val--good'
+                  : r.resting_hr >= avgRhr + 3
+                  ? 'pb-wellness-table__val--warn'
+                  : '';
+              return <span className={rhrCls}>{r.resting_hr ?? '—'}</span>;
+            }}
+          />
+          <Column
+            header="Сон"
+            style={{ width: '70px' }}
+            body={(r) => (r.sleep_hours != null ? r.sleep_hours.toFixed(1) : '—')}
+          />
+          <Column
+            header="Score"
+            style={{ width: '80px' }}
+            body={(r) => r.sleep_score ?? '—'}
+          />
+          <Column
+            header="Шаги"
+            style={{ width: '100px' }}
+            body={(r) => (r.steps != null ? r.steps.toLocaleString('ru-RU') : '—')}
+          />
+          <Column
+            header="CTL"
+            style={{ width: '70px' }}
+            body={(r) => (
+              <span className="pb-wellness-table__val--dim">
+                {r.ctl != null ? r.ctl.toFixed(1) : '—'}
+              </span>
+            )}
+          />
+          <Column
+            header="ATL"
+            style={{ width: '70px' }}
+            body={(r) => (
+              <span className="pb-wellness-table__val--dim">
+                {r.atl != null ? r.atl.toFixed(1) : '—'}
+              </span>
+            )}
+          />
+        </DataTable>
 
         <WellnessDrawer
           visible={drawerVisible}
           log={selected}
           onHide={() => setDrawerVisible(false)}
         />
+      </div>
+    );
+
+    if (embedded) {
+      return (
+        <div className={className ?? ''} style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+          {content}
+        </div>
+      );
+    }
+
+    return (
+      <Panel
+        header="Здоровье · intervals.icu"
+        className={`shadow-5 mb-3 pb-panel ${className ?? ''}`}
+      >
+        {content}
       </Panel>
     );
   }

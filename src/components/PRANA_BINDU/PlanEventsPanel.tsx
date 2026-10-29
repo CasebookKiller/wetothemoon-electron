@@ -161,8 +161,10 @@ export const PlanEventsPanel: React.FC<Props> = ({
     mappedCount < totalCount;
 
   return (
-    <div className="pb-plan-panel">
-      <div className="pb-plan__toolbar">
+    <div className="pb-plan-panel" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+      
+      {/* Тулбар */}
+      <div className="pb-plan__toolbar" style={{ flexShrink: 0 }}>
         <Button
           label={syncing ? 'Обновление…' : 'Обновить из ICU'}
           icon={syncing ? 'pi pi-spin pi-spinner' : 'pi pi-cloud-download'}
@@ -197,8 +199,8 @@ export const PlanEventsPanel: React.FC<Props> = ({
         />
       </div>
 
-            {showBanner && (
-        <div className="pb-equiv-banner">
+      {showBanner && (
+        <div className="pb-equiv-banner" style={{ flexShrink: 0 }}>
           <i className="pi pi-info-circle pb-equiv-banner__icon" />
           <div className="pb-equiv-banner__body">
             <span className="pb-equiv-banner__title">
@@ -227,130 +229,127 @@ export const PlanEventsPanel: React.FC<Props> = ({
         </div>
       )}
 
-      {error && (
-        <Message severity="error" text={error} className="w-full mt-2 mb-2" />
-      )}
-      {syncResult && (
-        <Message
-          severity="success"
-          text={syncResult}
-          className="w-full mt-2 mb-2"
-        />
+      {(error || syncResult) && (
+        <div style={{ flexShrink: 0 }}>
+          {error && <Message severity="error" text={error} className="w-full mt-2 mb-2" />}
+          {syncResult && <Message severity="success" text={syncResult} className="w-full mt-2 mb-2" />}
+        </div>
       )}
 
-      <DataTable
-        value={events}
-        loading={loading}
-        size="small"
-        stripedRows
-        scrollable
-        scrollHeight="360px"
-        virtualScrollerOptions={{ itemSize: 34 }}
-        emptyMessage="Плана нет за выбранный период. Нажмите «Обновить из ICU»."
-        className="p-datatable-sm"
-        selectionMode="single"
-        onRowClick={(e) => onOpenEvent(e.data as PlanEventLite)}
-      >
-        <Column
-          field="date"
-          header="Дата"
-          style={{ width: '110px' }}
-          body={(r: PlanEventLite) => r.date}
-        />
-        <Column
-          header="Спорт"
-          style={{ width: '90px' }}
-          body={(r: PlanEventLite) => {
-            const { label, cls } = sportBadge(r.sport, r.generatorCategory);
-            return (
-              <span className={`pb-source-badge ${cls}`}>{label}</span>
-            );
-          }}
-        />
-        <Column
-          field="name"
-          header="Название"
-          style={{ width: '220px' }}
-          body={(r: PlanEventLite) => r.name}
-        />
-        <Column
-          header="Шаги"
-          style={{ width: '70px' }}
-          body={(r: PlanEventLite) =>
-            r.steps && r.steps.length > 0 ? String(r.steps.length) : '—'
-          }
-        />
-        <Column
-          header="Дистанция"
-          style={{ width: '100px' }}
-          body={(r: PlanEventLite) => fmtDistance(r.distanceM)}
-        />
-        <Column
-          header="Время"
-          style={{ width: '90px' }}
-          body={(r: PlanEventLite) => fmtDuration(r.durationSec)}
-        />
-        <Column
-          header="Нагрузка"
-          style={{ width: '90px' }}
-          body={(r: PlanEventLite) =>
-            r.plannedLoad != null ? Math.round(r.plannedLoad) : '—'
-          }
-        />
-        <Column
-          header="Факт"
-          style={{ width: '70px', textAlign: 'center' }}
-          body={(r: PlanEventLite) =>
-            r.pairedActivityId ? (
-              <i
-                className="pi pi-check-circle"
-                style={{ color: '#6fbf73' }}
-                title={`Связано с run_fact #${r.pairedActivityId}`}
-              />
-            ) : (
-              <i className="pi pi-minus" style={{ opacity: 0.25 }} />
-            )
-          }
-        />
-        <Column
-          header="ICU"
-          style={{ width: '70px', textAlign: 'center' }}
-          body={(r: PlanEventLite) => {
-            const isIcu = r.externalId?.startsWith('intervals-icu-event:');
-            const isLocal = r.externalId?.startsWith('local:');
-            if (isIcu) {
-              const icuId = r.externalId!.replace('intervals-icu-event:', '');
+      <div style={{ flex: 1, minHeight: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
+        <DataTable
+          value={events}
+          loading={loading}
+          size="small"
+          stripedRows
+          scrollable
+          scrollHeight="flex"
+          emptyMessage="Плана нет за выбранный период. Нажмите «Обновить из ICU»."
+          className="p-datatable-sm"
+          selectionMode="single"
+          onRowClick={(e) => onOpenEvent(e.data as PlanEventLite)}
+        >
+          <Column
+            field="date"
+            header="Дата"
+            style={{ width: '110px' }}
+            body={(r: PlanEventLite) => r.date}
+          />
+          <Column
+            header="Спорт"
+            style={{ width: '90px' }}
+            body={(r: PlanEventLite) => {
+              const { label, cls } = sportBadge(r.sport, r.generatorCategory);
               return (
+                <span className={`pb-source-badge ${cls}`}>{label}</span>
+              );
+            }}
+          />
+          <Column
+            field="name"
+            header="Название"
+            style={{ width: '220px' }}
+            body={(r: PlanEventLite) => r.name}
+          />
+          <Column
+            header="Шаги"
+            style={{ width: '70px' }}
+            body={(r: PlanEventLite) =>
+              r.steps && r.steps.length > 0 ? String(r.steps.length) : '—'
+            }
+          />
+          <Column
+            header="Дистанция"
+            style={{ width: '100px' }}
+            body={(r: PlanEventLite) => fmtDistance(r.distanceM)}
+          />
+          <Column
+            header="Время"
+            style={{ width: '90px' }}
+            body={(r: PlanEventLite) => fmtDuration(r.durationSec)}
+          />
+          <Column
+            header="Нагрузка"
+            style={{ width: '90px' }}
+            body={(r: PlanEventLite) =>
+              r.plannedLoad != null ? Math.round(r.plannedLoad) : '—'
+            }
+          />
+          <Column
+            header="Факт"
+            style={{ width: '70px', textAlign: 'center' }}
+            body={(r: PlanEventLite) =>
+              r.pairedActivityId ? (
                 <i
-                  className="pi pi-cloud"
+                  className="pi pi-check-circle"
                   style={{ color: '#6fbf73' }}
-                  title={`Отправлено в ICU (id=${icuId})`}
+                  title={`Связано с run_fact #${r.pairedActivityId}`}
                 />
-              );
+              ) : (
+                <i className="pi pi-minus" style={{ opacity: 0.25 }} />
+              )
             }
-            if (isLocal) {
-              return (
-                <i
-                  className="pi pi-cloud-upload"
-                  style={{ color: '#d4a373', cursor: 'pointer' }}
-                  title="Локальное — не отправлено в ICU. Кликните для отправки."
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    const api = (window as any).electronAPI;
-                    const res = await api.pb.pushPlanEvent(r.id);
-                    if (res?.success) {
-                      onReload();
-                    } else {
-                      alert(`ICU: ${res?.error ?? 'ошибка'}`);
-                    }
-                  }}
-                />
-              );
-            }
-            return <i className="pi pi-minus" style={{ opacity: 0.25 }} />;
-          }}
-        />
-      </DataTable>
+          />
+          <Column
+            header="ICU"
+            style={{ width: '70px', textAlign: 'center' }}
+            body={(r: PlanEventLite) => {
+              const isIcu = r.externalId?.startsWith('intervals-icu-event:');
+              const isLocal = r.externalId?.startsWith('local:');
+              if (isIcu) {
+                const icuId = r.externalId!.replace('intervals-icu-event:', '');
+                return (
+                  <i
+                    className="pi pi-cloud"
+                    style={{ color: '#6fbf73' }}
+                    title={`Отправлено в ICU (id=${icuId})`}
+                  />
+                );
+              }
+              if (isLocal) {
+                return (
+                  <i
+                    className="pi pi-cloud-upload"
+                    style={{ color: '#d4a373', cursor: 'pointer' }}
+                    title="Локальное — не отправлено в ICU. Кликните для отправки."
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      const api = (window as any).electronAPI;
+                      const res = await api.pb.pushPlanEvent(r.id);
+                      if (res?.success) {
+                        onReload();
+                      } else {
+                        alert(`ICU: ${res?.error ?? 'ошибка'}`);
+                      }
+                    }}
+                  />
+                );
+              }
+              return <i className="pi pi-minus" style={{ opacity: 0.25 }} />;
+            }}
+          />
+        </DataTable>
+      </div>
 
       <AddPlanEventDialog
         visible={addVisible}

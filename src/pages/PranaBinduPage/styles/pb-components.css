@@ -4818,6 +4818,8 @@ body[data-module='prana-bindu'] .p-tooltip.p-tooltip-bottom .p-tooltip-arrow {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
   background: transparent !important;
   padding: 0 !important;
   border: none !important;
@@ -5162,4 +5164,35 @@ body[data-module='prana-bindu'] .p-tooltip.p-tooltip-bottom .p-tooltip-arrow {
 .maplibregl-ctrl-group button:focus {
   box-shadow: none !important;
   outline: none !important;
+}
+
+/* Фикс: делаем TabView во флекс-контейнерах резиновым */
+.pb-settings-tabs {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.pb-settings-tabs .p-tabview-panels {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* Убираем двойной скролл */
+}
+
+.pb-settings-tabs .p-tabview-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.pb-settings-tab-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
