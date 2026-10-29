@@ -16,6 +16,7 @@ import { classNames } from '@/css/classnames';
 interface GatewayMessageAssistantProps {
   thinking?: string;
   blocks: { type: 'text' | 'code'; content: string; language?: string }[];
+  fullHtml?: string;
   selectMode?: boolean;
   isSelected?: boolean;
   onToggleSelect?: () => void;
@@ -29,6 +30,7 @@ interface GatewayMessageAssistantProps {
 export const GatewayMessageAssistant: React.FC<GatewayMessageAssistantProps> = ({
   thinking,
   blocks,
+  fullHtml,
   selectMode = false,
   isSelected = false,
   onToggleSelect,
@@ -215,30 +217,41 @@ export const GatewayMessageAssistant: React.FC<GatewayMessageAssistantProps> = (
         )}
 
         {/* Основной контент */}
-        <div
-          className={classNames({
-            'ds-markdown': true,
-            'ds-assistant-message-main-content': true,
-            'pointer-events-none': selectMode,
-          })}
-        >
-          {blocks.map((block, idx) => {
-            if (block.type === 'code') {
+        {fullHtml ? (
+          <div
+            className={classNames({
+              'ds-markdown': true,
+              'ds-assistant-message-main-content': true,
+              'pointer-events-none': selectMode,
+            })}
+            dangerouslySetInnerHTML={{ __html: fullHtml }}
+          />
+        ) : (
+          <div
+            className={classNames({
+              'ds-markdown': true,
+              'ds-assistant-message-main-content': true,
+              'pointer-events-none': selectMode,
+            })}
+          >
+            {blocks.map((block, idx) => {
+              if (block.type === 'code') {
+                return (
+                  <div className={classNames({ 'md-code-block': true, 'md-code-block-dark': true })} key={idx}>
+                    <pre>
+                      <code className={`language-${block.language || 'text'}`}>{block.content}</code>
+                    </pre>
+                  </div>
+                );
+              }
               return (
-                <div className={classNames({ 'md-code-block': true, 'md-code-block-dark': true })} key={idx}>
-                  <pre>
-                    <code className={`language-${block.language || 'text'}`}>{block.content}</code>
-                  </pre>
-                </div>
+                <p className={classNames({ 'ds-markdown-paragraph': true })} key={idx}>
+                  {block.content}
+                </p>
               );
-            }
-            return (
-              <p className={classNames({ 'ds-markdown-paragraph': true })} key={idx}>
-                {block.content}
-              </p>
-            );
-          })}
-        </div>
+            })}
+          </div>
+        )}
       </div>
 
       {/* Панель кнопок */}

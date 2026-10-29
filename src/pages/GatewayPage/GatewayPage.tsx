@@ -8,11 +8,7 @@ import { GatewayChatHeader } from '@/components/GATEWAY/GatewayChatHeader/Gatewa
 import { GatewayMessageUser } from '@/components/GATEWAY/GatewayMessageUser/GatewayMessageUser';
 import { GatewayMessageAssistant } from '@/components/GATEWAY/GatewayMessageAssistant/GatewayMessageAssistant';
 import { GatewayInputArea } from '@/components/GATEWAY/GatewayInputArea/GatewayInputArea';
-
-//import './GatewayPage.css';
-//import '@/themes/deepseek-theme/main.css';
-//import '@/themes/deepseek-theme/katex.css';
-import { GatewayModeSelector } from '@/components/GATEWAY/GatewayModeSelector/GatewayModeSelector';
+import { GatewayWelcome } from '@/components/GATEWAY/GatewayWelcome/GatewayWelcome';
 import GatewayShareModal from '@/components/GATEWAY/GatewayShareModal/GatewayShareModal';
 import { GatewaySelectionPreview } from '@/components/GATEWAY/GatewaySelectionPreview/GatewaySelectionPreview';
 import GatewayDeepseekShadowRoot from '@/components/GATEWAY/GatewayDeepseekShadowRoot/GatewayDeepseekShadowRoot';
@@ -22,6 +18,7 @@ interface ChatMessage {
   role: 'user' | 'assistant';
   thinking?: string;
   blocks: { type: 'text' | 'code'; content: string; language?: string }[];
+  fullHtml?: string;
 }
 
 export const GatewayPage: React.FC = () => {
@@ -31,7 +28,6 @@ export const GatewayPage: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversations, setConversations] = useState<{ id: string; title: string }[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
-  const [modelType, setModelType] = useState<'default' | 'expert' | 'vision'>('default');
   const [deepThinking, setDeepThinking] = useState(true);
   const [search, setSearch] = useState(true);
   const [error, setError] = useState('');
@@ -39,9 +35,7 @@ export const GatewayPage: React.FC = () => {
   const [sending, setSending] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
-  const [isCreatingLink, setIsCreatingLink] = useState(false);
   const [shareModalVisible, setShareModalVisible] = useState(false);
-  const [shareUrl, setShareUrl] = useState('');
   const [topPanelOpen, setTopPanelOpen] = useState(false);
   const [panelHovered, setPanelHovered] = useState(false);
 
@@ -56,6 +50,11 @@ export const GatewayPage: React.FC = () => {
       // ignore
     }
   };
+
+  useEffect(() => {
+    document.body.setAttribute('data-module', 'gateway');
+    return () => document.body.removeAttribute('data-module');
+  }, []);
 
   useEffect(() => {
     updateStatus();
@@ -85,12 +84,10 @@ export const GatewayPage: React.FC = () => {
     };
     window.addEventListener('mousemove', handleMouseMove);
     return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, [panelHovered]); // зависимость от panelHovered
+  }, [panelHovered]);
 
-  const syncModelState = async () => {
+  const syncToggleState = async () => {
     try {
-      const model = await api.gatewayGetCurrentModel();
-      if (model.success) setModelType(model.data);
       const dt = await api.gatewayGetDeepThinking();
       if (dt.success) setDeepThinking(dt.data);
       const st = await api.gatewayGetSearch();
@@ -102,7 +99,7 @@ export const GatewayPage: React.FC = () => {
 
   useEffect(() => {
     if (isLoggedIn) {
-      syncModelState();
+      syncToggleState();
       handleRefreshConversations();
     }
   }, [isLoggedIn]);
@@ -186,17 +183,6 @@ export const GatewayPage: React.FC = () => {
     }
   };
 
-  const handleSelectModel = async (value: 'default' | 'expert' | 'vision') => {
-    setModelType(value);
-    if (value === 'expert') setSearch(false);
-    try {
-      await api.gatewaySelectModel(value);
-      await syncModelState();
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  };
-
   const handleDeepThinkingChange = async (value: boolean) => {
     setDeepThinking(value);
     try {
@@ -249,10 +235,8 @@ export const GatewayPage: React.FC = () => {
       setSelectionMode(true);
       await api.gatewayStartSelectionMode().catch(() => {});
 
-      // Даём интерфейсу DeepSeek время переключиться в режим выбора
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      // Выбираем все сообщения
       const allIndices = messages.map((_, idx) => idx);
       setSelectedIndices(new Set(allIndices));
       await api.gatewaySelectMessages(allIndices).catch(() => {});
@@ -272,7 +256,6 @@ export const GatewayPage: React.FC = () => {
 
   const handleSelectAll = async () => {
     if (selectedIndices.size === messages.length && messages.length > 0) {
-      // Снять выделение со всех
       setSelectedIndices(new Set());
       await api.gatewaySelectMessages([]).catch(() => {});
     } else {
@@ -291,37 +274,9 @@ export const GatewayPage: React.FC = () => {
   };
 
   const handleCreatePublicLink = () => {
-    console.log('Opening share modal');
     if (!selectedIndices.size) return;
     setShareModalVisible(true);
   };
-
-  /*
-  const handleCreatePublicLink = async () => {
-    console.log('handleCreatePublicLink called, selectedIndices:', selectedIndices);  
-    if (!selectedIndices.size) return;
-    setIsCreatingLink(true);
-    try {
-      await api.gatewaySelectMessages(Array.from(selectedIndices));
-      await new Promise(resolve => setTimeout(resolve, 500)); // даём интерфейсу обновиться
-      const result = await api.gatewayCreatePublicLink();
-      console.log('gatewayCreatePublicLink result:', result);
-      if (result.success) {
-        setShareUrl(result.data);
-        setShareModalVisible(true);
-        setSelectionMode(false);
-        setSelectedIndices(new Set());
-        await api.gatewayCancelSelectionMode().catch(() => {});
-      } else {
-        setError(result.error || 'Ошибка создания ссылки');
-      }
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setIsCreatingLink(false);
-    }
-  };
-  */
 
   const handleCopyMessage = (text: string) => {
     navigator.clipboard.writeText(text).catch((err) => {
@@ -330,7 +285,6 @@ export const GatewayPage: React.FC = () => {
   };
 
   const handleEditMessage = () => {
-    // TODO: Реализовать редактирование сообщения (возможно, вызов IPC)
     console.warn('Редактирование сообщения пока не реализовано');
   };
 
@@ -341,7 +295,6 @@ export const GatewayPage: React.FC = () => {
     }
     try {
       await api.gatewayRegenerateMessage(conversationId, messageIndex);
-      // Обновляем сообщения после регенерации
       const result = await api.gatewayGetConversationMessages();
       if (result.success) {
         setMessages(result.data);
@@ -358,7 +311,6 @@ export const GatewayPage: React.FC = () => {
     }
     try {
       await api.gatewaySendFeedback(conversationId, messageIndex, type);
-      // Локально состояние уже обновлено в компоненте, дополнительно ничего не делаем
     } catch (e) {
       setError((e as Error).message);
     }
@@ -384,12 +336,9 @@ export const GatewayPage: React.FC = () => {
         loading={loading}
         sending={sending}
         onLaunch={handleLaunch}
-        //onClose={handleClose}
         onRefreshConversations={handleRefreshConversations}
-        onSelectModel={handleSelectModel}
         onToggleDeepThinking={handleDeepThinkingChange}
         onToggleSearch={handleSearchChange}
-        modelType={modelType}
         deepThinking={deepThinking}
         search={search}
         isOpen={topPanelOpen}
@@ -456,7 +405,7 @@ export const GatewayPage: React.FC = () => {
                       width: '100%',
                     }}
                   >
-                    <GatewayModeSelector modelType={modelType} onSelectModel={handleSelectModel} />
+                    <GatewayWelcome />
                     <div style={{ width: '100%', maxWidth: '780px', margin: '0 auto' }}>
                       <GatewayInputArea
                         value={message}
@@ -468,14 +417,12 @@ export const GatewayPage: React.FC = () => {
                         search={search}
                         onToggleDeepThinking={() => handleDeepThinkingChange(!deepThinking)}
                         onToggleSearch={() => handleSearchChange(!search)}
-                        isExpert={modelType === 'expert'}
                       />
                     </div>
                   </div>
                 </div>
               ) : (
                 <>
-                  {/* Основная колонка */}
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
                     <div className="_765a5cd" style={{ flexShrink: 0, width: '100%' }}>
                       <GatewayChatHeader
@@ -484,14 +431,11 @@ export const GatewayPage: React.FC = () => {
                             ? conversations.find(c => c.id === selectedConversation)?.title || 'Диалог'
                             : 'Новый чат'
                         }
-                        modelType={modelType}
-                        onSelectModel={handleSelectModel}
                         showTitle={true}
                         onToggleSelectMode={handleToggleSelectMode}
                       />
                     </div>
 
-                    {/* Список сообщений */}
                     <div
                       className="ds-virtual-list ds-virtual-list--printable"
                       style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', minHeight: 0 }}
@@ -526,6 +470,7 @@ export const GatewayPage: React.FC = () => {
                                 key={idx}
                                 thinking={msg.thinking}
                                 blocks={msg.blocks}
+                                fullHtml={msg.fullHtml}
                                 selectMode={selectionMode}
                                 isSelected={selectedIndices.has(idx)}
                                 onToggleSelect={() => handleToggleMessageSelect(idx)}
@@ -541,7 +486,6 @@ export const GatewayPage: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Поле ввода и подпись скрыты в режиме выбора */}
                     {!selectionMode && (
                       <>
                         <div className="_871cbca">
@@ -556,7 +500,6 @@ export const GatewayPage: React.FC = () => {
                             search={search}
                             onToggleDeepThinking={() => handleDeepThinkingChange(!deepThinking)}
                             onToggleSearch={() => handleSearchChange(!search)}
-                            isExpert={modelType === 'expert'}
                           />
                         </div>
                         <div className="_0fcaa63" style={{ width: '100%', flexShrink: 0 }}>
@@ -565,7 +508,6 @@ export const GatewayPage: React.FC = () => {
                       </>
                     )}
 
-                    {/* Нижняя панель выбора */}
                     {selectionMode && (
                       <div className="_43d222b _117e7c4">
                         <div className="_9f86274">
@@ -631,7 +573,6 @@ export const GatewayPage: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Правая панель предпросмотра */}
                   {selectionMode && (
                     <GatewaySelectionPreview messages={messages} selectedIndices={selectedIndices} />
                   )}

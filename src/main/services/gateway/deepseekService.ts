@@ -35,6 +35,7 @@ export interface GatewayChatMessage {
   role: 'user' | 'assistant';
   thinking?: string;
   blocks: GatewayChatBlock[];
+  fullHtml?: string;   // точный HTML ассистентского ответа для рендера 1:1
 }
 
 export class DeepSeekService {
@@ -435,6 +436,9 @@ export class DeepSeekService {
         }
       }
 
+      // Сохраняем HTML как есть — для точного рендера в нашем окне
+      const fullHtml = el.innerHTML;
+
       const blocks: any[] = [];
 
       // Проходим по дочерним узлам основного markdown-контента в исходном порядке
@@ -489,6 +493,7 @@ export class DeepSeekService {
         role: 'assistant',
         thinking,
         blocks,
+        fullHtml,
       } as GatewayChatMessage;
     });
 
@@ -703,6 +708,7 @@ export class DeepSeekService {
           role: 'assistant',
           thinking,
           blocks,
+          fullHtml: (assistantMain as HTMLElement).innerHTML,
         });
       });
 
