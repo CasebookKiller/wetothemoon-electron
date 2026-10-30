@@ -8,6 +8,9 @@ import path from 'path';
 import { getCredentials, setCredentials } from '../osint/credentials'; // переиспользуем
 import * as dotenv from 'dotenv';
 import { SelectorProfileService } from './selectorProfiles/SelectorProfileService';
+import { EventEmitter } from 'events';
+import { INJECTED_SCRIPT } from './bridge/injectedScript';
+import type { GatewayBridgeEvent } from './bridge/BridgeEvents';
 
 dotenv.config();
 
@@ -45,6 +48,10 @@ export class DeepSeekService {
   private context: BrowserContext | null = null;
   private page: Page | null = null;
   private isLoggedIn = false;
+  private bridgeEmitter = new EventEmitter();
+  private lastContentTs = 0;
+  private pendingContentHtml = '';
+  private pendingContentTimer: NodeJS.Timeout | null = null;
 
   private constructor() {
     this.profileService = new SelectorProfileService('deepseek');
@@ -55,6 +62,108 @@ export class DeepSeekService {
       DeepSeekService.instance = new DeepSeekService();
     }
     return DeepSeekService.instance;
+  }
+
+  /**
+   * EventEmitter, через который сервис публикует события из браузера.
+   * Подписчик: gatewayHandlers.ts
+   */
+  getBridgeEmitter(): EventEmitter {
+    return this.bridgeEmitter;
+  }
+
+  /**
+   * Устанавливает мост между страницей Playwright и Node.
+   * 1. exposeFunction('__gatewayBridge', ...) — функция доступна в window страницы
+   * 2. addInitScript — для всех будущих навигаций
+   * 3. evaluate(INJECTED_SCRIPT) — для уже загруженной страницы
+   *
+   * ВАЖНО: вызывать ДО первой навигации.
+   */
+  private async setupBridge(): Promise<void> {
+    if (!this.page) return;
+
+    // 1. Экспонируем функцию
+    try {
+      await this.page.exposeFunction(
+        '__gatewayBridge',
+        (type: string, payload: any) => {
+          // Coalesce: assistant:content-update не чаще 100 мс,
+          // но последнее значение всегда уходит
+          if (type === 'assistant:content-update') {
+            const now = Date.now();
+            const elapsed = now - this.lastContentTs;
+
+            if (elapsed >= 100) {
+              this.lastContentTs = now;
+              this.pendingContentHtml = '';
+              if (this.pendingContentTimer) {
+                clearTimeout(this.pendingContentTimer);
+                this.pendingContentTimer = null;
+              }
+              this.bridgeEmitter.emit('event', {
+                type: type as any,
+                payload,
+                ts: now,
+              });
+            } else {
+              this.pendingContentHtml = payload.html;
+              if (!this.pendingContentTimer) {
+                this.pendingContentTimer = setTimeout(() => {
+                  this.pendingContentTimer = null;
+                  if (this.pendingContentHtml) {
+                    const html = this.pendingContentHtml;
+                    this.pendingContentHtml = '';
+                    this.lastContentTs = Date.now();
+                    this.bridgeEmitter.emit('event', {
+                      type: 'assistant:content-update' as any,
+                      payload: { html },
+                      ts: Date.now(),
+                    });
+                  }
+                }, 100 - elapsed);
+              }
+            }
+            return;
+          }
+
+          const event: GatewayBridgeEvent = {
+            type: type as any,
+            payload,
+            ts: Date.now(),
+          };
+          this.bridgeEmitter.emit('event', event);
+        }
+      );
+      console.log('[DeepSeek] bridge exposeFunction установлен');
+    } catch (e) {
+      console.warn(
+        '[DeepSeek] exposeFunction ошибка (уже установлен?):',
+        (e as Error).message
+      );
+    }
+
+    // 2. Для будущих навигаций
+    try {
+      await this.page.addInitScript({ content: INJECTED_SCRIPT });
+    } catch (e) {
+      console.warn(
+        '[DeepSeek] addInitScript ошибка:',
+        (e as Error).message
+      );
+    }
+
+    // 3. Для текущей страницы
+    try {
+      await this.page.evaluate(INJECTED_SCRIPT);
+      console.log('[DeepSeek] injectedScript применён на текущей странице');
+    } catch (e) {
+      // нормально, если страница ещё about:blank
+      console.warn(
+        '[DeepSeek] injectedScript на текущей странице:',
+        (e as Error).message
+      );
+    }
   }
 
   private getStoragePath(): string {
@@ -313,6 +422,10 @@ export class DeepSeekService {
     }
 
     this.page = await this.context!.newPage();
+
+    // Мост событий — ДО первой навигации
+    await this.setupBridge();
+
     console.log('[DeepSeek] Открываем главную страницу');
     await this.gotoWithTimeout(DEEPSEEK_URL, 20000);
     await this.page.waitForTimeout(3000);
@@ -420,8 +533,35 @@ export class DeepSeekService {
       { timeout: 60000 }
     );
 
-    // Небольшая пауза для полной отрисовки
-    await this.page.waitForTimeout(1000);
+    // Ждём стабилизации содержимого — стрим завершён, когда HTML
+    // не меняется 3 проверки подряд по 300 мс (≈900 мс)
+    try {
+      await this.page.waitForFunction(
+        ({ selector }) => {
+          const els = document.querySelectorAll(selector);
+          const last = els[els.length - 1] as HTMLElement | null;
+          if (!last) return false;
+          const w = window as any;
+          const current = last.innerHTML;
+          if (!current) return false;
+          if (current === w.__lastStableHtml) {
+            w.__stableCount = (w.__stableCount || 0) + 1;
+            return w.__stableCount >= 3;
+          }
+          w.__lastStableHtml = current;
+          w.__stableCount = 0;
+          return false;
+        },
+        { selector: assistantMessageSelector },
+        { timeout: 120000, polling: 300 }
+      );
+      console.log('[DeepSeek] Ответ стабилизирован, читаем финальный HTML');
+    } catch (e) {
+      console.warn(
+        '[DeepSeek] Стабилизация ответа не дождалась, читаем что есть:',
+        (e as Error).message
+      );
+    }
 
     const lastMessage = this.page.locator(assistantMessageSelector).last();
 
@@ -627,51 +767,118 @@ export class DeepSeekService {
       const container = document.querySelector('div.ds-virtual-list.ds-virtual-list--printable') as HTMLElement | null;
       if (!container) return [];
 
-      // Прокручиваем до верха для подгрузки всех элементов
-      let prevCount = 0;
-      let stableCount = 0;
-      const maxAttempts = 10;
-      for (let i = 0; i < maxAttempts; i++) {
-        container.scrollTop = 0;
-        await new Promise((resolve) => setTimeout(resolve, 1200));
+      // ============================================================
+      // Собираем ВСЕ сообщения через скролл вверх-вниз.
+      // Виртуальный список DeepSeek держит в DOM только видимую часть,
+      // поэтому нужно проскроллить весь диапазон и собрать по ходу.
+      // ============================================================
+
+      const messageByKey = new Map<string, { key: number; html: string; role: 'user' | 'assistant' }>();
+
+      const collectVisible = () => {
         const items = container.querySelectorAll('div[data-virtual-list-item-key]');
-        const currentCount = items.length;
-        if (currentCount === prevCount) {
-          stableCount++;
-          if (stableCount >= 2) break;
-        } else {
-          prevCount = currentCount;
+        items.forEach((item) => {
+          const keyAttr = item.getAttribute('data-virtual-list-item-key');
+          if (!keyAttr) return;
+          const keyNum = parseInt(keyAttr, 10);
+          if (isNaN(keyNum)) return;
+
+          if (messageByKey.has(keyAttr)) return;
+
+          const userContent = item.querySelector('div.fbb737a4');
+          if (userContent) {
+            // Для user берём html из .d29f3d7d (обёртка ds-message)
+            const msgEl = item.querySelector('div.ds-message.d29f3d7d');
+            messageByKey.set(keyAttr, {
+              key: keyNum,
+              html: msgEl ? (msgEl as HTMLElement).innerHTML : (item as HTMLElement).innerHTML,
+              role: 'user',
+            });
+            return;
+          }
+
+          const assistantMain = item.querySelector('div.ds-markdown.ds-assistant-message-main-content');
+          if (assistantMain) {
+            const parentMessage = item as HTMLElement;
+            const fullHtml = parentMessage.innerHTML;
+            messageByKey.set(keyAttr, {
+              key: keyNum,
+              html: fullHtml,
+              role: 'assistant',
+            });
+          }
+        });
+      };
+
+      // 1. Собираем текущую позицию
+      collectVisible();
+
+      // 2. Скролл до самого верха с подгрузкой
+      let prevHeight = 0;
+      let stableCount = 0;
+      let attempts = 0;
+      const maxTopAttempts = 25;
+
+      while (stableCount < 3 && attempts < maxTopAttempts) {
+        attempts++;
+        container.scrollTop = 0;
+        await new Promise((resolve) => setTimeout(resolve, 700));
+        collectVisible();
+        const nowHeight = container.scrollHeight;
+        if (nowHeight === prevHeight) stableCount++;
+        else {
           stableCount = 0;
+          prevHeight = nowHeight;
         }
       }
 
-      const result: GatewayChatMessage[] = [];
-      const messageItems = container.querySelectorAll('div[data-virtual-list-item-key]');
+      // 3. Медленный скролл вниз — собираем всё видимое
+      const totalRange = container.scrollHeight - container.clientHeight;
+      const steps = Math.max(10, Math.ceil(totalRange / 400)); // каждые ~400px
+      for (let i = 0; i <= steps; i++) {
+        container.scrollTop = (totalRange * i) / steps;
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        collectVisible();
+      }
 
-      messageItems.forEach((item) => {
-        // Пользовательское сообщение
-        const userContent = item.querySelector('div.fbb737a4');
-        if (userContent) {
-          result.push({
-            role: 'user',
-            blocks: [{ type: 'text', content: userContent.textContent?.trim() || '' }],
-          });
-          return;
+      // 4. Возвращаем вниз
+      container.scrollTop = container.scrollHeight;
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+      // 5. Парсим каждое сообщение в GatewayChatMessage по его HTML
+      const sorted = Array.from(messageByKey.values()).sort((a, b) => a.key - b.key);
+
+      const result: GatewayChatMessage[] = [];
+
+      for (const entry of sorted) {
+        // Создаём временный контейнер для парсинга
+        const div = document.createElement('div');
+        div.innerHTML = entry.html;
+
+        if (entry.role === 'user') {
+          // Для user — извлекаем .fbb737a4
+          const fbb = div.querySelector('.fbb737a4');
+          const content = fbb?.textContent?.trim() || div.textContent?.trim() || '';
+          if (content) {
+            result.push({
+              role: 'user',
+              blocks: [{ type: 'text', content }],
+            });
+          }
+          continue;
         }
 
-        // Ассистентское сообщение
-        const assistantMain = item.querySelector('div.ds-markdown.ds-assistant-message-main-content');
-        if (!assistantMain) return;
-
-        // Извлекаем размышление
+        // Assistant: извлекаем thinking + main content
         let thinking: string | undefined;
-        const thinkingEl = item.querySelector('div.e1675d8b.ds-think-content');
+        const thinkingEl = div.querySelector('div.e1675d8b.ds-think-content');
         if (thinkingEl) {
           thinking = thinkingEl.textContent?.trim() || '';
         }
 
-        // Извлекаем блоки в исходном порядке
-        const blocks: GatewayChatBlock[] = [];
+        const assistantMain = div.querySelector('div.ds-markdown.ds-assistant-message-main-content');
+        if (!assistantMain) continue;
+
+        const blocks: any[] = [];
         assistantMain.childNodes.forEach((node) => {
           if (node.nodeType === Node.ELEMENT_NODE) {
             const element = node as HTMLElement;
@@ -710,20 +917,9 @@ export class DeepSeekService {
           blocks,
           fullHtml: (assistantMain as HTMLElement).innerHTML,
         });
-      });
-
-      // Дедупликация
-      const seen = new Set<string>();
-      const unique: GatewayChatMessage[] = [];
-      for (const msg of result) {
-        const key = `${msg.role}:${JSON.stringify(msg.blocks)}:${msg.thinking || ''}`;
-        if (!seen.has(key)) {
-          seen.add(key);
-          unique.push(msg);
-        }
       }
 
-      return unique;
+      return result;
     });
 
     return messages as GatewayChatMessage[];
