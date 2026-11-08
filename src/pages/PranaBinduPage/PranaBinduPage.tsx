@@ -89,8 +89,8 @@ export const PranaBinduPage: React.FC = () => {
         onOpenMap={() => { setStandaloneRunId(null); setMapVisible(true); }}
       />
 
-      <div className="pb-page p-4">
-        <div className="pb-page__content" style={{ maxWidth: '1400px', margin: '0 auto' }}>
+      <div className="pb-page p-4" style={{ overflowX: 'hidden' }}>
+        <div className="pb-page__content" style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 0.5rem' }}>
           
           {/* 1. Новый Дашборд с виджетами */}
           <Dashboard

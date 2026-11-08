@@ -17,7 +17,7 @@ import {
   MIGRATION_V24_AUTO_RANGE_DAYS,
 } from './schema';
 
-export const SCHEMA_VERSION = 33;
+export const SCHEMA_VERSION = 36;
 
 interface Migration {
   version: number;
@@ -815,6 +815,63 @@ const migrations: readonly Migration[] = [
       );
 
       console.log('[Melange] v33: chain_slots.direction');
+    },
+  },
+  {
+    version: 34,
+    apply: (db) => {
+      const tryAdd = (sql: string): boolean => {
+        try {
+          db.exec(sql);
+          return true;
+        } catch (e) {
+          if (String(e).includes('duplicate column name')) return false;
+          throw e;
+        }
+      };
+      
+      // Добавляем рост в профиль
+      tryAdd(`ALTER TABLE profile ADD COLUMN height_cm REAL;`);
+      
+      console.log('[Melange] v34: profile.height_cm');
+    },
+  },
+  {
+    version: 35,
+    apply: (db) => {
+      const tryAdd = (sql: string): boolean => {
+        try {
+          db.exec(sql);
+          return true;
+        } catch (e) {
+          if (String(e).includes('duplicate column name')) return false;
+          throw e;
+        }
+      };
+      
+      // Добавляем пол в профиль
+      tryAdd(`ALTER TABLE profile ADD COLUMN gender TEXT DEFAULT 'male';`);
+      
+      console.log('[Melange] v35: profile.gender');
+    },
+  },
+  {
+    version: 36,
+    apply: (db) => {
+      const tryAdd = (sql: string): boolean => {
+        try {
+          db.exec(sql);
+          return true;
+        } catch (e) {
+          if (String(e).includes('duplicate column name')) return false;
+          throw e;
+        }
+      };
+      
+      // Храним дату рождения в формате YYYY-MM-DD
+      tryAdd(`ALTER TABLE profile ADD COLUMN birth_date TEXT;`);
+      
+      console.log('[Melange] v36: profile.birth_date');
     },
   },
 ];

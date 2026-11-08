@@ -1,13 +1,15 @@
+// src/components/PRANA_BINDU/PANELS/Dashboard/Dashboard.tsx
+
 import React, { useEffect, useState } from 'react';
 
 interface Props {
   onOpenTraining: (tab: 'runs' | 'plan' | 'calendar') => void;
   onOpenHealth: (tab: 'wellness' | 'nutrition') => void;
-  refreshKey?: number;
   onOpenAnalytics: () => void;
+  refreshKey?: number;
 }
 
-export const Dashboard: React.FC<Props> = ({ onOpenTraining, onOpenHealth, refreshKey, onOpenAnalytics }) => {
+export const Dashboard: React.FC<Props> = ({ onOpenTraining, onOpenHealth, onOpenAnalytics, refreshKey }) => {
   const api = (window as any).electronAPI;
   const [lastRun, setLastRun] = useState<any>(null);
   const [todayPlans, setTodayPlans] = useState<any[]>([]);
@@ -57,12 +59,12 @@ export const Dashboard: React.FC<Props> = ({ onOpenTraining, onOpenHealth, refre
   const cardClass = "surface-card p-4 shadow-2 border-round h-full cursor-pointer transition-colors transition-duration-150 hover:bg-primary-reverse hover:text-primary";
 
   return (
-    <div className="grid mt-2 mb-4">
+    <div className="flex flex-wrap mt-2 mb-4" style={{ margin: '0 -0.5rem' }}>
       
-      {/* 1. ОБЪЕДИНЕННЫЙ ВИДЖЕТ: ТРЕНИРОВКИ (50%) */}
+      {/* 1. ТРЕНИРОВКИ (50%) */}
       <div className="col-12 lg:col-6 p-2">
         <div className={cardClass} onClick={() => onOpenTraining('runs')}>
-          <div className="pb-module-name flex justify-content-between">
+          <div className="pb-module-name flex justify-content-between align-items-center">
             <span><i className="pi pi-chart-bar mr-2" style={{ color: 'var(--pb-accent)' }} />Тренировки</span>
             <i className="pi pi-arrow-right text-xs" style={{ opacity: 0.5 }} />
           </div>
@@ -106,29 +108,31 @@ export const Dashboard: React.FC<Props> = ({ onOpenTraining, onOpenHealth, refre
         </div>
       </div>
 
-      {/* 2. ОБЪЕДИНЕННЫЙ ВИДЖЕТ: ЗДОРОВЬЕ И ВОДА (50%) */}
+      {/* 2. ЗДОРОВЬЕ И ВОДА (50%) */}
       <div className="col-12 lg:col-6 p-2">
-        <div className={cardClass}>
-          <div className="pb-module-name flex align-items-center justify-content-between" style={{ gap: '0.5rem', width: '100%' }}>
-            <span style={{ whiteSpace: 'nowrap' }}>
+        <div className={cardClass} onClick={() => onOpenHealth('wellness')}>
+          
+          {/* Шапка виджета */}
+          <div className="pb-module-name flex align-items-center justify-content-between" style={{ gap: '0.5rem' }}>
+            <span style={{ whiteSpace: 'nowrap', flexShrink: 1 }}>
               <i className="pi pi-heart mr-2" style={{ color: 'var(--pb-accent)' }} />
               Здоровье и Вода
             </span>
-            <div className="flex align-items-center gap-1" style={{ flexShrink: 0 }}>
+            <div style={{ flexShrink: 0 }}>
               <button 
                 className="pb-ref-category-chip" 
-                style={{ padding: '0.2rem 0.4rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.7rem' }}
+                style={{ padding: '0.2rem 0.5rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.75rem' }}
                 onClick={(e) => { e.stopPropagation(); onOpenAnalytics(); }}
               >
                 <i className="pi pi-chart-pie" /> Аналитика
               </button>
-              <i className="pi pi-arrow-right text-xs" style={{ opacity: 0.5 }} />
             </div>
           </div>
           
-          <div className="mt-3 grid">
+          {/* Контент (используем flex вместо PrimeFlex grid, чтобы не было горизонтальной прокрутки) */}
+          <div className="mt-3 flex flex-column md:flex-row gap-3">
             {/* Левая колонка: Здоровье */}
-            <div className="col-12 md:col-6 flex flex-column gap-2">
+            <div className="flex flex-column gap-2" style={{ flex: 1, minWidth: 0 }}>
               <div className="text-xs pb-hint uppercase tracking-wide">Здоровье</div>
               {health ? (
                 <>
@@ -148,7 +152,7 @@ export const Dashboard: React.FC<Props> = ({ onOpenTraining, onOpenHealth, refre
             </div>
 
             {/* Правая колонка: Вода */}
-            <div className="col-12 md:col-6 flex flex-column gap-2" style={{ borderLeft: '1px solid var(--surface-border)' }}>
+            <div className="flex flex-column gap-2" style={{ flex: 1, minWidth: 0, borderLeft: '1px solid var(--surface-border)', paddingLeft: '1rem' }}>
               <div className="text-xs pb-hint uppercase tracking-wide">Вода</div>
               <div>
                 <div className="text-2xl font-bold" style={{ color: todayWater.total >= todayWater.goal ? '#6fbf73' : '#6ab2f2' }}>

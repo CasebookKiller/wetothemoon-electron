@@ -48,6 +48,9 @@ export interface ProfileRow {
   lthr: number | null;
   resting_hr: number | null;
   weight_kg: number | null;
+  height_cm: number | null;
+  birth_date: string | null;
+  gender: string | null;
   goal_marathon_date: string | null;
   notes: string | null;
   created_at: string | null;

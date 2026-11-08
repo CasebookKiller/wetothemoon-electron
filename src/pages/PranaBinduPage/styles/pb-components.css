@@ -5179,7 +5179,7 @@ body[data-module='prana-bindu'] .p-tooltip.p-tooltip-bottom .p-tooltip-arrow {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden; /* Убираем двойной скролл */
+  overflow-y: auto; /* Возвращаем прокрутку для обычных форм в Настройках */
 }
 
 .pb-settings-tabs .p-tabview-panel {
@@ -5194,5 +5194,5 @@ body[data-module='prana-bindu'] .p-tooltip.p-tooltip-bottom .p-tooltip-arrow {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  /* Убрали overflow: hidden, чтобы формы могли прокручиваться */
 }

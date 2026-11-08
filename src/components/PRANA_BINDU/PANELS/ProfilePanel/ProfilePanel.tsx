@@ -13,6 +13,7 @@ import { Message } from 'primereact/message';
 import { Panel } from 'primereact/panel';
 import { ThresholdsTimelineChart } from './ThresholdsTimelineChart';
 import { Checkbox } from 'primereact/checkbox';
+import { Calendar } from 'primereact/calendar';
 
 export interface ProfilePanelHandle {
   /** Перечитать профиль из БД. */
@@ -20,6 +21,9 @@ export interface ProfilePanelHandle {
 }
 
 interface ProfileState {
+  birthDate: Date | null;
+  heightCm: number | null;
+  gender: string | null;
   maxHr: number | null;
   lthr: number | null;
   restingHr: number | null;
@@ -53,6 +57,9 @@ export const ProfilePanel = forwardRef<ProfilePanelHandle, Props>(
     const api = (window as any).electronAPI;
 
     const [profile, setProfile] = useState<ProfileState>({
+      birthDate: null,
+      heightCm: null,
+      gender: 'male',
       maxHr: null,
       lthr: null,
       restingHr: null,
@@ -89,6 +96,9 @@ export const ProfilePanel = forwardRef<ProfilePanelHandle, Props>(
         if (res?.success) {
           const d = res.data ?? {};
           setProfile({
+            birthDate: d.birthDate ? new Date(d.birthDate) : null,
+            heightCm: d.heightCm ?? null,
+            gender: d.gender ?? 'male',
             maxHr: d.maxHr ?? null,
             lthr: d.lactateThresholdHr ?? d.lthr ?? null,
             restingHr: d.restingHr ?? null,
@@ -170,6 +180,12 @@ export const ProfilePanel = forwardRef<ProfilePanelHandle, Props>(
       setSaved(false);
       try {
         const res = await api.pb.updateProfile({
+          // Конвертируем Date в строку YYYY-MM-DD
+          birthDate: profile.birthDate 
+            ? profile.birthDate.toISOString().slice(0, 10) 
+            : null,
+          heightCm: profile.heightCm,
+          gender: profile.gender,
           maxHr: profile.maxHr,
           lactateThresholdHr: profile.lthr,
           restingHr: profile.restingHr,
@@ -196,6 +212,67 @@ export const ProfilePanel = forwardRef<ProfilePanelHandle, Props>(
             : `shadow-5 mb-3 pb-panel ${className ?? ''}`
         }
       >
+        <div className="pb-profile__grid" style={{ marginBottom: '1rem' }}>
+                    {/* Дата рождения */}
+          <div className="pb-profile__field">
+            <label className="pb-label" htmlFor="pb-profile-birthdate">
+              Дата рождения
+            </label>
+            <Calendar
+              inputId="pb-profile-birthdate"
+              value={profile.birthDate}
+              onChange={(e) => setProfile((p) => ({ ...p, birthDate: e.value as Date ?? null }))}
+              dateFormat="dd.mm.yy"
+              showIcon
+              placeholder="Выберите дату"
+              className="pb-cal pb-cal--full"
+              panelClassName="pb-dropdown-panel"
+            />
+            <small className="pb-hint">
+              Возраст: <b>{profile.birthDate ? (new Date().getFullYear() - profile.birthDate.getFullYear()) : '—'}</b> лет (для BMR)
+            </small>
+          </div>
+
+          {/* Рост */}
+          <div className="pb-profile__field">
+            <label className="pb-label" htmlFor="pb-profile-height">
+              Рост (см)
+            </label>
+            <InputNumber
+              inputId="pb-profile-height"
+              value={profile.heightCm}
+              onValueChange={(e) => setProfile((p) => ({ ...p, heightCm: e.value ?? null }))}
+              placeholder="напр. 180"
+              min={100}
+              max={250}
+              showButtons
+              buttonLayout="horizontal"
+              incrementButtonIcon="pi pi-plus"
+              decrementButtonIcon="pi pi-minus"
+              className="pb-debug__input"
+            />
+            <small className="pb-hint">Для расчёта BMR</small>
+          </div>
+
+          {/* Пол */}
+          <div className="pb-profile__field">
+            <label className="pb-label" htmlFor="pb-profile-gender">
+              Пол
+            </label>
+            <Dropdown
+              inputId="pb-profile-gender"
+              value={profile.gender}
+              options={[
+                { label: 'Мужской', value: 'male' },
+                { label: 'Женский', value: 'female' },
+              ]}
+              onChange={(e) => setProfile((p) => ({ ...p, gender: e.value }))}
+              className="pb-wade-programs__dd w-full"
+              panelClassName="pb-dropdown-panel"
+            />
+            <small className="pb-hint">Для расчёта BMR</small>
+          </div>
+        </div>
         <div className="pb-profile__grid">
           <div className="pb-profile__field">
             <label className="pb-label" htmlFor="pb-profile-hrmax">

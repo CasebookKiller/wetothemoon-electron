@@ -1,11 +1,11 @@
 /* src/components/COMMON/AppIcon/AppIcon.css */
 
 /* ============================================================
-   Универсальная иконка.
-   Цвет:
-     1. --app-icon-color (если задан у родителя);
-     2. семантический класс (--accent / --muted / --success / ...);
-     3. иначе — наследует (currentColor).
+   Универсальная иконка (шрифт + SVG).
+   Цвет приоритетно:
+     1. --app-icon-color / .app-icon--accent и т.п.;
+     2. --module-accent (переключается через [data-module="..."]);
+     3. хардкод-fallback.
    ============================================================ */
 
 .app-icon {
@@ -15,28 +15,36 @@
   justify-content: center;
   line-height: 1;
   vertical-align: middle;
+  flex-shrink: 0;
 }
 
-/* Размеры */
-.app-icon--xs { font-size: 0.65rem; }
-.app-icon--sm { font-size: 0.8rem; }
-.app-icon--md { font-size: 1rem; }
-.app-icon--lg { font-size: 1.25rem; }
-.app-icon--xl { font-size: 1.5rem; }
+/* SVG-вариант: размер задаётся через width/height атрибуты, но пусть
+   inline-flex не даёт схлопнуться в flex-контейнерах. */
+.app-icon--svg {
+  display: inline-block;
+  vertical-align: middle;
+}
 
-/* Семантические цвета. Работают через модульные переменные,
-   если они заданы; иначе — разумные fallback. */
+/* Плейсхолдер для отсутствующих иконок (не рвёт вёрстку). */
+.app-icon--placeholder {
+  background: transparent;
+  /* при желании можно добавить outline для дебага:
+     outline: 1px dashed rgba(255,0,0,0.3); */
+}
+
+/* ---------- Семантические цвета ---------- */
+/* accent — var(--module-accent), переключается per-module (PB/OSINT). */
 .app-icon--accent {
-  color: var(--app-icon-accent, var(--pb-accent, #d4a574));
+  color: var(--app-icon-accent, var(--module-accent, #d4a574));
 }
 
 .app-icon--muted {
-  color: var(--tg-theme-hint-color, #708499);
+  color: var(--app-icon-muted, var(--tg-hint, #708499));
   opacity: 0.85;
 }
 
 .app-icon--success {
-  color: var(--app-icon-success, #6fbf73);
+  color: var(--app-icon-success, var(--tg-success, #6fbf73));
 }
 
 .app-icon--warning {
@@ -44,5 +52,20 @@
 }
 
 .app-icon--danger {
-  color: var(--app-icon-danger, #ec3942);
+  color: var(--app-icon-danger, var(--tg-destructive, #ec3942));
+}
+
+/* ---------- Вращение ---------- */
+.app-icon--spin {
+  animation: app-icon-spin 1s linear infinite;
+}
+
+@keyframes app-icon-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* SVG внутри обёртки не должен добавлять baseline-отступ */
+.app-icon > svg {
+  display: block;
 }

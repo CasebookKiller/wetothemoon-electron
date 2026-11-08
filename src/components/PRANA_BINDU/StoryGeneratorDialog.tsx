@@ -13,9 +13,11 @@ import { getSavedChartColors } from './UTILS/chartColors';
 import {
   STORY_PRESETS,
   StoryPlatformId,
+  StoryFormat,
   LogoPosition,
   LOGO_POSITION_LABELS,
   getPreset,
+  REFERENCE_HEIGHT,
 } from './UTILS/storyPresets';
 
 // ==================== Типы ====================
@@ -36,7 +38,7 @@ interface StoryElements {
   showTitle: boolean;
   titleText: string;
   titleOffsetY: number;
-  titleEmbed: boolean; // ← НОВОЕ: встроить в макет
+  titleEmbed: boolean;
   showMap: boolean;
   showLogo: boolean;
   logoText: string;
@@ -72,7 +74,9 @@ interface StoryElements {
   };
 }
 
-type LayoutType = 'classic' | 'pills' | 'splits' | 'dotted' | 'receipt' | 'minimal' | 'charts' | 'poster' | 'grid' | 'load' | 'zones';
+type LayoutType =
+  | 'classic' | 'pills' | 'splits' | 'dotted' | 'receipt' | 'minimal'
+  | 'charts' | 'poster' | 'grid' | 'load' | 'zones';
 
 interface CustomStoryPreset {
   id: string;
@@ -109,11 +113,52 @@ const DEFAULT_ELEMENTS: StoryElements = {
 
 const CUSTOM_PRESETS_KEY = 'pb.story.customPresets';
 
-const CANVAS_WIDTH = 1080;
-const CANVAS_HEIGHT = 1920;
 const PAN_LIMIT = 500;
 const ZOOM_MIN = 0.3;
 const ZOOM_MAX = 3;
+
+// ==================== Совместимость макетов и форматов ====================
+
+/** В каких форматах макет рендерится корректно. */
+const LAYOUT_FORMATS: Record<LayoutType, StoryFormat[]> = {
+  classic:  ['story', 'portrait', 'square'],
+  pills:    ['story', 'portrait', 'square', 'landscape'],
+  splits:   ['story', 'portrait'],
+  dotted:   ['story', 'portrait', 'square'],
+  receipt:  ['story', 'portrait'],
+  minimal:  ['story', 'portrait', 'square', 'landscape'],
+  charts:   ['story', 'portrait', 'square', 'landscape'],
+  poster:   ['story', 'portrait', 'square', 'landscape'],
+  grid:     ['story', 'portrait', 'square'],
+  load:     ['story', 'portrait'],
+  zones:    ['story', 'portrait'],
+};
+
+/** Какой макет ставить по умолчанию для формата. */
+const FORMAT_DEFAULT_LAYOUT: Record<StoryFormat, LayoutType> = {
+  story:     'classic',
+  portrait:  'classic',
+  square:    'poster',
+  landscape: 'minimal',
+};
+
+const LAYOUT_OPTIONS: { label: string; value: LayoutType }[] = [
+  { label: 'Классика', value: 'classic' },
+  { label: 'Плашки', value: 'pills' },
+  { label: 'Сплиты по км', value: 'splits' },
+  { label: 'Точечный', value: 'dotted' },
+  { label: 'Чек (билет)', value: 'receipt' },
+  { label: 'Минимализм', value: 'minimal' },
+  { label: 'Графики', value: 'charts' },
+  { label: 'Постер (Карточка)', value: 'poster' },
+  { label: 'Сетка (Дашборд)', value: 'grid' },
+  { label: 'Нагрузка (TSS)', value: 'load' },
+  { label: 'Пульсовые зоны', value: 'zones' },
+];
+
+// Хранилище полного снапшота настроек для каждой пары platform+layout
+type StoryStatesMap = Record<string, StoryElements>;
+const STORY_STATES_KEY = 'pb.story.states.v1';
 
 // ==================== Утилиты для градиента ====================
 
@@ -384,6 +429,12 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
 
   const [resetCounter, setResetCounter] = useState(0);
   const [layout, setLayout] = useState<LayoutType>('classic');
+  const [storyStates, setStoryStates] = useState<StoryStatesMap>(() => {
+    try {
+      const raw = localStorage.getItem(STORY_STATES_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch { return {}; }
+  });
   const chartColors = useMemo(() => getSavedChartColors(), []);
 
   const [bgSource, setBgSource] = useState<'map' | 'photo'>('map');
@@ -418,20 +469,72 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
     try { localStorage.setItem('pb.story.platform', platformId); } catch { /* ignore */ }
   }, [platformId]);
 
+  useEffect(() => {
+    try { localStorage.setItem(STORY_STATES_KEY, JSON.stringify(storyStates)); } catch { /* ignore */ }
+  }, [storyStates]);
+
   // ==================== Элементы на сторис ====================
   const [elements, setElements] = useState<StoryElements>(() => {
+    // Определяем стартовые platform и layout (они сохраняются отдельными ключами)
+    let initPlatform: StoryPlatformId = 'reels';
+    let initLayout: LayoutType = 'classic';
     try {
-      const raw = localStorage.getItem('pb.story.elements');
-      if (raw) return normalizeElements(JSON.parse(raw));
+      const p = localStorage.getItem('pb.story.platform');
+      if (p && STORY_PRESETS.some((x) => x.id === p)) initPlatform = p as StoryPlatformId;
+      const l = localStorage.getItem('pb.story.layout.v1');
+      if (l && LAYOUT_OPTIONS.some((x) => x.value === l)) initLayout = l as LayoutType;
     } catch { /* ignore */ }
-    return normalizeElements({
-      titleText: resolveFactTitle(fact, displayName),
-    });
+
+    // Пробуем восстановить полный снапшот по ключу
+    const key = `${initPlatform}::${initLayout}`;
+    try {
+      const raw = localStorage.getItem(STORY_STATES_KEY);
+      if (raw) {
+        const states = JSON.parse(raw) as StoryStatesMap;
+        if (states[key]) return normalizeElements(states[key]);
+      }
+    } catch { /* ignore */ }
+
+    // Fallback: старый формат или дефолт
+    try {
+      const rawEl = localStorage.getItem('pb.story.elements');
+      if (rawEl) return normalizeElements(JSON.parse(rawEl));
+    } catch { /* ignore */ }
+
+    return normalizeElements({ titleText: resolveFactTitle(fact, displayName) });
   });
 
   useEffect(() => {
     try { localStorage.setItem('pb.story.elements', JSON.stringify(elements)); } catch { /* ignore */ }
   }, [elements]);
+
+  // Автосохранение текущего снапшота в ключ platform::layout
+  useEffect(() => {
+    const key = `${platformId}::${layout}`;
+    setStoryStates((prev) => {
+      if (prev[key] === elements) return prev;
+      return { ...prev, [key]: elements };
+    });
+  }, [elements, platformId, layout]);
+
+  // Safety net: если макет несовместим с текущим форматом — откатываемся к дефолтному.
+  // Обычно сюда не попадаем: handlePlatformChange и switchTo уже это делают.
+  useEffect(() => {
+    const supported = LAYOUT_FORMATS[layout]?.includes(preset.format);
+    if (!supported) {
+      const fallback = FORMAT_DEFAULT_LAYOUT[preset.format];
+      const oldKey = `${platformId}::${layout}`;
+      const newKey = `${platformId}::${fallback}`;
+      setStoryStates((prev) => ({ ...prev, [oldKey]: elements }));
+      const saved = storyStates[newKey];
+      const merged = saved ? normalizeElements(saved) : normalizeElements({});
+      merged.titleText = elements.titleText;
+      merged.logoText = elements.logoText;
+      setLayout(fallback);
+      setElements(merged);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preset.format, layout]);
 
   // ==================== Синхронизация названия ====================
   useEffect(() => {
@@ -672,15 +775,24 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
   useEffect(() => {
     if (!visible || !canvasReady || !textCanvasRef.current) return;
     setIsRendering(true);
-    
+
+    const CW = preset.width;
+    const CH = preset.height;
+    const heightScale = CH / REFERENCE_HEIGHT;
+    const sy = (v: number) => v * heightScale;
+    // fs — масштаб для шрифтов. У всех форматов ширина 1080, поэтому по высоте
+    // текст сжимать нельзя: для landscape sy(48) = 14px (невидимо), fs(48) ≈ 31px.
+    const fs = (v: number) => v * Math.max(heightScale, 0.65);
+    const titleOffsetY = sy(elements.titleOffsetY);
+
     const canvas = textCanvasRef.current;
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = CANVAS_WIDTH * dpr;
-    canvas.height = CANVAS_HEIGHT * dpr;
+    canvas.width = CW * dpr;
+    canvas.height = CH * dpr;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    ctx.clearRect(0, 0, CW, CH);
 
     const km = fmtKm(fact.actual_km);
     const time = fmtDuration(fact.duration_sec);
@@ -688,170 +800,191 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
     const hr = fact.avg_hr ?? '—';
     const maxHr = fact.max_hr ?? '—';
 
+    // ---------- ФОН: фото ----------
     if (bgSource === 'photo' && photoImage) {
-      let scale = Math.max(CANVAS_WIDTH / photoImage.width, CANVAS_HEIGHT / photoImage.height);
+      let scale = Math.max(CW / photoImage.width, CH / photoImage.height);
       scale *= photoScale;
       const w = photoImage.width * scale;
       const h = photoImage.height * scale;
-      const x = (CANVAS_WIDTH - w) / 2 + photoOffset.x;
-      const y = (CANVAS_HEIGHT - h) / 2 + photoOffset.y;
+      const x = (CW - w) / 2 + photoOffset.x;
+      const y = (CH - h) / 2 + photoOffset.y;
       ctx.drawImage(photoImage, x, y, w, h);
     }
 
     if (elements.globalDarkening > 0) {
       ctx.fillStyle = `rgba(0, 0, 0, ${elements.globalDarkening})`;
-      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      ctx.fillRect(0, 0, CW, CH);
     }
 
-    const gradientFade = ctx.createLinearGradient(0, CANVAS_HEIGHT * 0.4, 0, CANVAS_HEIGHT);
+    const gradientFade = ctx.createLinearGradient(0, CH * 0.4, 0, CH);
     gradientFade.addColorStop(0, 'rgba(0,0,0,0)');
     gradientFade.addColorStop(1, 'rgba(0,0,0,0.85)');
     ctx.fillStyle = gradientFade;
-    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    ctx.fillRect(0, 0, CW, CH);
 
     if (layout === 'splits') {
-      ctx.fillStyle = 'rgba(17, 17, 17, 0.45)'; ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      ctx.fillStyle = 'rgba(17, 17, 17, 0.45)'; ctx.fillRect(0, 0, CW, CH);
     } else if (layout === 'receipt') {
-      ctx.fillStyle = 'rgba(17, 17, 17, 0.75)'; ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      ctx.fillStyle = 'rgba(17, 17, 17, 0.75)'; ctx.fillRect(0, 0, CW, CH);
     } else if (layout === 'minimal') {
-      ctx.fillStyle = 'rgba(17, 17, 17, 0.65)'; ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      ctx.fillStyle = 'rgba(17, 17, 17, 0.65)'; ctx.fillRect(0, 0, CW, CH);
     }
 
     ctx.fillStyle = '#ffffff';
     ctx.textAlign = 'left';
 
     ctx.save();
-    if (elements.contentOffsetY !== 0) ctx.translate(0, elements.contentOffsetY);
-    
+    if (elements.contentOffsetY !== 0) ctx.translate(0, sy(elements.contentOffsetY));
+
     if (layout !== 'charts') {
       if (layout === 'classic') {
-        // Встраиваем название над дистанцией, чтобы оно было частью блока
         if (elements.titleEmbed && elements.showTitle && elements.titleText) {
           ctx.textAlign = 'left';
-          ctx.font = 'bold 48px Inter, sans-serif';
+          ctx.font = `bold ${sy(48)}px Inter, sans-serif`;
           ctx.fillStyle = '#ffffff';
           ctx.shadowColor = 'rgba(0,0,0,0.8)';
           ctx.shadowBlur = 10;
-          // y=1460 — прямо над цифрой 5,60 (которая на 1550)
-          ctx.fillText(elements.titleText, 80, 1460 + elements.titleOffsetY);
-          ctx.shadowBlur = 0; // Сбрасываем тень
+          ctx.fillText(elements.titleText, 80, sy(1460) + titleOffsetY);
+          ctx.shadowBlur = 0;
         }
-        
-        ctx.font = 'bold 140px Inter, sans-serif';
+
+        ctx.font = `bold ${sy(140)}px Inter, sans-serif`;
         ctx.fillStyle = '#ffffff';
         const kmWidth = ctx.measureText(km).width;
-        ctx.fillText(km, 80, 1550);
-        ctx.font = 'bold 50px Inter, sans-serif';
-        ctx.fillText('км', 80 + kmWidth + 15, 1550);
-        ctx.font = 'bold 60px Inter, sans-serif';
-        ctx.fillText(`${time}`, 80, 1650);
-        ctx.fillText(`${pace} / км`, 80, 1730);
-        ctx.font = '40px Inter, sans-serif';
+        ctx.fillText(km, 80, sy(1550));
+        ctx.font = `bold ${sy(50)}px Inter, sans-serif`;
+        ctx.fillText('км', 80 + kmWidth + 15, sy(1550));
+        ctx.font = `bold ${sy(60)}px Inter, sans-serif`;
+        ctx.fillText(`${time}`, 80, sy(1650));
+        ctx.fillText(`${pace} / км`, 80, sy(1730));
+        ctx.font = `${sy(40)}px Inter, sans-serif`;
         ctx.fillStyle = '#d4a373';
-        ctx.fillText(`Ср. пульс: ${hr} уд / мин`, 80, 1810);
+        ctx.fillText(`Ср. пульс: ${hr} уд / мин`, 80, sy(1810));
+
       } else if (layout === 'pills') {
         if (elements.titleEmbed && elements.showTitle && elements.titleText) {
           ctx.textAlign = 'center';
-          ctx.font = 'bold 55px Inter, sans-serif';
+          ctx.font = `bold ${sy(55)}px Inter, sans-serif`;
           ctx.fillStyle = '#ffffff';
-          ctx.fillText(elements.titleText, CANVAS_WIDTH / 2, 380 + elements.titleOffsetY);
+          ctx.fillText(elements.titleText, CW / 2, sy(380) + titleOffsetY);
         }
         ctx.textAlign = 'left';
-        ctx.font = '50px Inter, sans-serif'; ctx.fillStyle = '#aaaaaa'; ctx.fillText(fact.date, 80, 480); ctx.fillStyle = '#ffffff';
-        
+        ctx.font = `${sy(50)}px Inter, sans-serif`;
+        ctx.fillStyle = '#aaaaaa';
+        ctx.fillText(fact.date, 80, sy(480));
+        ctx.fillStyle = '#ffffff';
+
         const pillTexts: string[] = [];
         if (elements.metricsItems.distance) pillTexts.push(`РАССТОЯНИЕ ${km} КМ`);
         if (elements.metricsItems.time) pillTexts.push(`ВРЕМЯ ${time}`);
         if (elements.metricsItems.pace) pillTexts.push(`ТЕМП ${pace} / КМ`);
         if (elements.metricsItems.hr && fact.avg_hr) pillTexts.push(`СР. ПУЛЬС ${hr} УД / МИН`);
         if (elements.metricsItems.elevation && elevationGain > 0) pillTexts.push(`НАБОР ${elevationGain} М`);
-        
+
+        const pillH = sy(80);
+        const pillRadius = sy(40);
         const drawPill = (text: string, x: number, y: number) => {
-          ctx.font = 'bold 45px Inter, sans-serif';
+          ctx.font = `bold ${sy(45)}px Inter, sans-serif`;
           const w = ctx.measureText(text).width + 80;
-          ctx.beginPath(); 
-          ctx.roundRect(x, y, w, 80, 40);
-          ctx.fillStyle = 'rgba(23, 33, 43, 0.6)'; 
+          ctx.beginPath();
+          ctx.roundRect(x, y, w, pillH, pillRadius);
+          ctx.fillStyle = 'rgba(23, 33, 43, 0.6)';
           ctx.fill();
           ctx.strokeStyle = '#d4a373'; ctx.lineWidth = 4; ctx.stroke();
           ctx.fillStyle = '#ffffff';
-          ctx.fillText(text, x + 40, y + 55);
+          ctx.fillText(text, x + 40, y + sy(55));
         };
-        
-        let pillY = 580;
+
+        let pillY = sy(580);
         for (const text of pillTexts) {
           drawPill(text, 80, pillY);
-          pillY += 100;
+          pillY += sy(100);
         }
+
       } else if (layout === 'splits') {
-        const headerY = 170 + elements.titleOffsetY;
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)'; ctx.beginPath(); ctx.roundRect(60, headerY, 960, 100, 20); ctx.fill();
-        ctx.font = 'bold 55px Inter, sans-serif'; ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center';
-        const headerText = (elements.titleEmbed && elements.showTitle && elements.titleText) 
-          ? elements.titleText 
+        const headerY = sy(170) + titleOffsetY;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        ctx.beginPath();
+        ctx.roundRect(60, headerY, 960, sy(100), sy(20));
+        ctx.fill();
+        ctx.font = `bold ${sy(55)}px Inter, sans-serif`;
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'center';
+        const headerText = (elements.titleEmbed && elements.showTitle && elements.titleText)
+          ? elements.titleText
           : 'Промежуточное время по км';
-        ctx.fillText(headerText, CANVAS_WIDTH / 2, headerY + 65);
-        ctx.font = 'bold 50px Inter, sans-serif';
-        
-        const topY = 350;
-        const bottomY = CANVAS_HEIGHT - preset.safeBottom - 100;
+        ctx.fillText(headerText, CW / 2, headerY + sy(65));
+        ctx.font = `bold ${sy(50)}px Inter, sans-serif`;
+
+        const topY = sy(350);
+        const bottomY = CH - preset.safeBottom - sy(100);
         const availableHeight = bottomY - topY;
-        const rowHeight = Math.min(95, availableHeight / splits.length);
+        const rowHeight = Math.min(sy(95), availableHeight / splits.length);
         const barHeight = rowHeight * 0.6;
         const barYOffset = rowHeight * 0.2;
-        
+
         let y = topY;
         const maxBarWidth = 350;
         const maxPace = splits.length > 0 ? Math.max(...splits.map((s) => s.paceSec)) : 0;
         const minPace = splits.length > 0 ? Math.min(...splits.map((s) => s.paceSec)) : 0;
-        
+
         splits.forEach((s) => {
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'; 
-          ctx.beginPath(); 
-          ctx.roundRect(60, y - 10, 960, rowHeight, 40); 
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+          ctx.beginPath();
+          ctx.roundRect(60, y - sy(10), 960, rowHeight, sy(40));
           ctx.fill();
-          
-          ctx.textAlign = 'left'; ctx.fillStyle = '#ffffff'; 
+
+          ctx.textAlign = 'left'; ctx.fillStyle = '#ffffff';
           ctx.fillText(String(s.km), 100, y + rowHeight * 0.6);
-          
+
           const ratio = maxPace === minPace ? 1 : (maxPace - s.paceSec) / (maxPace - minPace);
           const barWidth = 100 + ratio * maxBarWidth;
-          
+
           ctx.shadowColor = 'rgba(212, 163, 115, 0.5)';
           ctx.shadowBlur = 10;
-          
-          ctx.fillStyle = 'rgba(212, 163, 115, 0.25)'; 
-          ctx.strokeStyle = '#d4a373'; 
+
+          ctx.fillStyle = 'rgba(212, 163, 115, 0.25)';
+          ctx.strokeStyle = '#d4a373';
           ctx.lineWidth = 3;
-          ctx.beginPath(); 
-          ctx.roundRect(160, y + barYOffset, barWidth, barHeight, barHeight / 2); 
-          ctx.fill(); 
+          ctx.beginPath();
+          ctx.roundRect(160, y + barYOffset, barWidth, barHeight, barHeight / 2);
+          ctx.fill();
           ctx.stroke();
-          
+
           ctx.shadowBlur = 0;
-          
-          ctx.fillStyle = '#ffffff'; ctx.textAlign = 'right'; 
-          ctx.fillText(secToPaceStr(s.paceSec), CANVAS_WIDTH - 100, y + rowHeight * 0.6);
-          
+
+          ctx.fillStyle = '#ffffff';
+          ctx.textAlign = 'right';
+          ctx.fillText(secToPaceStr(s.paceSec), CW - 100, y + rowHeight * 0.6);
+
           y += rowHeight;
         });
+
       } else if (layout === 'dotted') {
         if (elements.titleEmbed && elements.showTitle && elements.titleText) {
           ctx.textAlign = 'center';
-          ctx.font = 'bold 60px Inter, sans-serif';
+          ctx.font = `bold ${sy(60)}px Inter, sans-serif`;
           ctx.fillStyle = '#ffffff';
-          ctx.fillText(elements.titleText, CANVAS_WIDTH / 2, 450 + elements.titleOffsetY);
+          ctx.fillText(elements.titleText, CW / 2, sy(450) + titleOffsetY);
           ctx.textAlign = 'left';
         }
-        const drawDotted = (label: string, value: string, y: number) => {
-          ctx.font = '50px Inter, sans-serif'; ctx.fillStyle = '#ffffff'; ctx.textAlign = 'left';
+        const drawDotted = (label: string, value: string, refY: number) => {
+          const y = sy(refY);
+          ctx.font = `${sy(50)}px Inter, sans-serif`;
+          ctx.fillStyle = '#ffffff';
+          ctx.textAlign = 'left';
           ctx.fillText(label, 80, y);
           const valWidth = ctx.measureText(value).width;
-          ctx.fillText(value, CANVAS_WIDTH - 80 - valWidth, y);
+          ctx.fillText(value, CW - 80 - valWidth, y);
           const labelWidth = ctx.measureText(label).width;
-          const startX = 80 + labelWidth + 20; const endX = CANVAS_WIDTH - 80 - valWidth - 20;
-          ctx.beginPath(); ctx.setLineDash([5, 15]); ctx.moveTo(startX, y - 15); ctx.lineTo(endX, y - 15);
-          ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 4; ctx.stroke(); ctx.setLineDash([]);
+          const startX = 80 + labelWidth + 20;
+          const endX = CW - 80 - valWidth - 20;
+          ctx.beginPath();
+          ctx.setLineDash([5, 15]);
+          ctx.moveTo(startX, y - sy(15));
+          ctx.lineTo(endX, y - sy(15));
+          ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 4; ctx.stroke();
+          ctx.setLineDash([]);
         };
         drawDotted('Расстояние', `${km} км`, 700);
         drawDotted('Темп', `${pace} / км`, 800);
@@ -859,107 +992,157 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
         drawDotted('Набор высоты', `${elevationGain} м`, 1000);
         drawDotted('Ср. пульс', `${hr} уд / мин`, 1100);
         drawDotted('Макс. пульс', `${maxHr} уд / мин`, 1200);
+
       } else if (layout === 'receipt') {
-        const w = 800; const h = 1200;
-        const x = (CANVAS_WIDTH - w) / 2; const y = (CANVAS_HEIGHT - h) / 2;
-        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + h - 40);
-        for (let i = w; i > 0; i -= 40) { ctx.lineTo(x + i - 20, y + h); ctx.lineTo(x + i - 40, y + h - 40); }
-        ctx.lineTo(x, y + h - 40); ctx.closePath(); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 4; ctx.stroke();
-        ctx.textAlign = 'center'; ctx.font = '100px sans-serif'; ctx.fillStyle = '#ffffff'; ctx.fillText('👟', CANVAS_WIDTH / 2, y + 350);
-        ctx.font = 'bold 70px Inter, sans-serif'; 
-        const receiptTitle = (elements.titleEmbed && elements.showTitle && elements.titleText) ? elements.titleText : 'ВТОРНИК';
-        ctx.fillText(receiptTitle, CANVAS_WIDTH / 2, y + 550 + elements.titleOffsetY);
-        ctx.font = '50px Inter, sans-serif'; ctx.fillText(fact.date, CANVAS_WIDTH / 2, y + 630);
-        ctx.font = 'bold 100px Inter, sans-serif'; ctx.fillText(km, CANVAS_WIDTH / 2, y + 850);
-        ctx.font = '50px Inter, sans-serif'; ctx.fillText('км', CANVAS_WIDTH / 2, y + 910);
+        const w = 800;
+        const h = sy(1200);
+        const x = (CW - w) / 2;
+        const y = (CH - h) / 2;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + w, y);
+        ctx.lineTo(x + w, y + h - sy(40));
+        for (let i = w; i > 0; i -= 40) {
+          ctx.lineTo(x + i - 20, y + h);
+          ctx.lineTo(x + i - 40, y + h - sy(40));
+        }
+        ctx.lineTo(x, y + h - sy(40));
+        ctx.closePath();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 4;
+        ctx.stroke();
+        ctx.textAlign = 'center';
+        ctx.font = `${sy(100)}px sans-serif`;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText('👟', CW / 2, y + sy(350));
+        ctx.font = `bold ${sy(70)}px Inter, sans-serif`;
+        const receiptTitle = (elements.titleEmbed && elements.showTitle && elements.titleText)
+          ? elements.titleText
+          : 'ВТОРНИК';
+        ctx.fillText(receiptTitle, CW / 2, y + sy(550) + titleOffsetY);
+        ctx.font = `${sy(50)}px Inter, sans-serif`;
+        ctx.fillText(fact.date, CW / 2, y + sy(630));
+        ctx.font = `bold ${sy(100)}px Inter, sans-serif`;
+        ctx.fillText(km, CW / 2, y + sy(850));
+        ctx.font = `${sy(50)}px Inter, sans-serif`;
+        ctx.fillText('км', CW / 2, y + sy(910));
+
       } else if (layout === 'minimal') {
         if (elements.titleEmbed && elements.showTitle && elements.titleText) {
           ctx.textAlign = 'center';
-          ctx.font = 'bold 50px Inter, sans-serif';
+          ctx.font = `bold ${sy(50)}px Inter, sans-serif`;
           ctx.fillStyle = '#ffffff';
-          ctx.fillText(elements.titleText, CANVAS_WIDTH / 2, 250 + elements.titleOffsetY);
+          ctx.fillText(elements.titleText, CW / 2, sy(250) + titleOffsetY);
         }
         ctx.textAlign = 'center';
-        const drawCentered = (label: string, value: string, y: number, valueSize: number) => {
-          ctx.font = '50px Inter, sans-serif'; ctx.fillStyle = '#aaaaaa'; ctx.fillText(label, CANVAS_WIDTH / 2, y);
-          ctx.font = `bold ${valueSize}px Inter, sans-serif`; ctx.fillStyle = '#ffffff'; ctx.fillText(value, CANVAS_WIDTH / 2, y + valueSize + 20);
+        const drawCentered = (label: string, value: string, refY: number, refValueSize: number) => {
+          const y = sy(refY);
+          const valueSize = sy(refValueSize);
+          ctx.font = `${sy(50)}px Inter, sans-serif`;
+          ctx.fillStyle = '#aaaaaa';
+          ctx.fillText(label, CW / 2, y);
+          ctx.font = `bold ${valueSize}px Inter, sans-serif`;
+          ctx.fillStyle = '#ffffff';
+          ctx.fillText(value, CW / 2, y + valueSize + sy(20));
         };
         drawCentered('Расстояние', `${km} км`, 400, 120);
         drawCentered('Темп', `${pace} /км`, 800, 90);
         drawCentered('Время', time, 1150, 90);
+
       } else if (layout === 'poster') {
-        // ---- ПОСТЕР (КАРТОЧКА) ----
         const cardW = 840;
-        const cardH = 1000;
-        const cardX = (CANVAS_WIDTH - cardW) / 2;
-        const cardY = (CANVAS_HEIGHT - cardH) / 2;
+        const cardH = sy(1000);
+        const cardX = (CW - cardW) / 2;
+        const cardY = (CH - cardH) / 2;
 
         ctx.fillStyle = 'rgba(23, 33, 43, 0.85)';
-        ctx.beginPath(); ctx.roundRect(cardX, cardY, cardW, cardH, 40); ctx.fill();
-        ctx.strokeStyle = 'rgba(212, 163, 115, 0.3)'; ctx.lineWidth = 4; ctx.stroke();
+        ctx.beginPath();
+        ctx.roundRect(cardX, cardY, cardW, cardH, sy(40));
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(212, 163, 115, 0.3)';
+        ctx.lineWidth = 4;
+        ctx.stroke();
 
         ctx.textAlign = 'center';
         ctx.fillStyle = '#d4a373';
-        ctx.font = 'bold 36px Inter, sans-serif';
-        ctx.fillText((elements.titleText || fact.date).toUpperCase(), CANVAS_WIDTH / 2, cardY + 100);
+        ctx.font = `bold ${sy(36)}px Inter, sans-serif`;
+        ctx.fillText((elements.titleText || fact.date).toUpperCase(), CW / 2, cardY + sy(100) + titleOffsetY);
 
         ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 220px Inter, sans-serif';
-        ctx.fillText(km, CANVAS_WIDTH / 2, cardY + 360);
-        ctx.font = 'bold 60px Inter, sans-serif';
+        ctx.font = `bold ${sy(220)}px Inter, sans-serif`;
+        ctx.fillText(km, CW / 2, cardY + sy(360));
+        ctx.font = `bold ${sy(60)}px Inter, sans-serif`;
         ctx.fillStyle = '#aaaaaa';
-        ctx.fillText('КМ', CANVAS_WIDTH / 2, cardY + 430);
+        ctx.fillText('КМ', CW / 2, cardY + sy(430));
 
         ctx.beginPath();
-        ctx.moveTo(cardX + 100, cardY + 500); ctx.lineTo(cardX + cardW - 100, cardY + 500);
-        ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.moveTo(cardX + 100, cardY + sy(500));
+        ctx.lineTo(cardX + cardW - 100, cardY + sy(500));
+        ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
 
         ctx.textAlign = 'left';
-        ctx.font = 'bold 60px Inter, sans-serif'; // Уменьшили шрифт
+        ctx.font = `bold ${sy(80)}px Inter, sans-serif`;
         ctx.fillStyle = '#ffffff';
-        ctx.fillText(time, cardX + 80, cardY + 620);
-        
+        ctx.fillText(time, cardX + 100, cardY + sy(620));
+
         ctx.textAlign = 'right';
         ctx.fillStyle = '#d4a373';
-        ctx.fillText(`${pace} /км`, cardX + cardW - 80, cardY + 620);
+        ctx.fillText(`${pace} /км`, cardX + cardW - 100, cardY + sy(620));
 
         ctx.textAlign = 'center';
-        ctx.font = 'bold 40px Inter, sans-serif';
+        ctx.font = `bold ${sy(40)}px Inter, sans-serif`;
         ctx.fillStyle = '#aaaaaa';
         let extraStr = `❤️ ${hr} уд/мин`;
         if (elevationGain > 0) extraStr += `   ⛰ ${elevationGain} м`;
-        ctx.fillText(extraStr, CANVAS_WIDTH / 2, cardY + 800);
-      } else if (layout === 'grid') {
-        // ---- СЕТКА (ДАШБОРД) ----
-        const gridX = 80; const gridY = 600;
-        const cellW = (CANVAS_WIDTH - gridX * 2 - 40) / 2;
-        const cellH = 280;
-        const gap = 40;
+        ctx.fillText(extraStr, CW / 2, cardY + sy(800));
 
-        // Парсим калории и метаданные
-        let cals = null;
+      } else if (layout === 'grid') {
+        const gridX = 80;
+        const gridY = sy(600);
+        const cellW = (CW - gridX * 2 - 40) / 2;
+        const cellH = sy(280);
+        const gap = sy(40);
+
+        let cals: any = null;
         try {
           const raw = typeof fact.raw_json === 'string' ? JSON.parse(fact.raw_json) : fact.raw_json;
           cals = (raw?.raw || raw)?.calories || raw?.calories;
-        } catch (e) { /* ignore */ }
+        } catch { /* ignore */ }
 
         const drawCell = (col: number, row: number, label: string, value: string, color: string) => {
-          const x = gridX + col * (cellW + gap); const y = gridY + row * (cellH + gap);
-          ctx.fillStyle = 'rgba(23, 33, 43, 0.7)'; ctx.beginPath(); ctx.roundRect(x, y, cellW, cellH, 24); ctx.fill();
-          ctx.fillStyle = color; ctx.beginPath(); ctx.roundRect(x, y + 40, 8, cellH - 80, 4); ctx.fill();
-          ctx.textAlign = 'left'; ctx.fillStyle = '#aaaaaa'; ctx.font = 'bold 28px Inter, sans-serif'; ctx.fillText(label, x + 40, y + 80);
-          
-          // Умный подбор шрифта в зависимости от длины строки
-          let fontSize = 70;
-          if (value.length > 8) fontSize = 50;
-          if (value.length > 12) fontSize = 40;
-          
-          ctx.fillStyle = '#ffffff'; ctx.font = `bold ${fontSize}px Inter, sans-serif`; ctx.fillText(value, x + 40, y + 200);
+          const x = gridX + col * (cellW + gap);
+          const y = gridY + row * (cellH + gap);
+          ctx.fillStyle = 'rgba(23, 33, 43, 0.7)';
+          ctx.beginPath();
+          ctx.roundRect(x, y, cellW, cellH, sy(24));
+          ctx.fill();
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.roundRect(x, y + sy(40), 8, cellH - sy(80), 4);
+          ctx.fill();
+          ctx.textAlign = 'left';
+          ctx.fillStyle = '#aaaaaa';
+          ctx.font = `bold ${sy(28)}px Inter, sans-serif`;
+          ctx.fillText(label, x + 40, y + sy(80));
+
+          let fontSize = sy(70);
+          if (value.length > 8) fontSize = sy(50);
+          if (value.length > 12) fontSize = sy(40);
+
+          ctx.fillStyle = '#ffffff';
+          ctx.font = `bold ${fontSize}px Inter, sans-serif`;
+          ctx.fillText(value, x + 40, y + sy(200));
         };
 
-        ctx.textAlign = 'center'; ctx.fillStyle = '#ffffff'; ctx.font = 'bold 60px Inter, sans-serif';
-        ctx.fillText(elements.titleText || 'Тренировка', CANVAS_WIDTH / 2, 400);
-        ctx.font = '40px Inter, sans-serif'; ctx.fillStyle = '#d4a373'; ctx.fillText(fact.date, CANVAS_WIDTH / 2, 470);
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#ffffff';
+        ctx.font = `bold ${sy(60)}px Inter, sans-serif`;
+        ctx.fillText(elements.titleText || 'Тренировка', CW / 2, sy(400) + titleOffsetY);
+        ctx.font = `${sy(40)}px Inter, sans-serif`;
+        ctx.fillStyle = '#d4a373';
+        ctx.fillText(fact.date, CW / 2, sy(470));
 
         drawCell(0, 0, 'ДИСТАНЦИЯ', `${km} км`, '#e53935');
         drawCell(1, 0, 'ВРЕМЯ', fmtDurationShort(fact.duration_sec), '#4fc3f7');
@@ -967,77 +1150,74 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
         drawCell(1, 1, 'СР. ПУЛЬС', `${hr}`, '#ff40ff');
         drawCell(0, 2, 'КАЛОРИИ', cals ? `${cals} ккал` : '—', '#ffb800');
         drawCell(1, 2, 'НАБОР', elevationGain > 0 ? `${elevationGain} м` : '—', '#6fbf73');
+
       } else if (layout === 'load') {
-        // ---- НАГРУЗКА (TSS, CTL, ATL) ----
         let tss = 0, ctl = 0, atl = 0;
         try {
           const raw = typeof fact.raw_json === 'string' ? JSON.parse(fact.raw_json) : fact.raw_json;
           const meta = raw?.raw || raw;
-          // Ищем во всех возможных местах
           tss = meta?.training_load ?? meta?.icu_training_load ?? 0;
           ctl = meta?.ctl ?? meta?.icu_ctl ?? 0;
           atl = meta?.atl ?? meta?.icu_atl ?? 0;
-        } catch (e) { /* ignore */ }
+        } catch { /* ignore */ }
 
         ctx.textAlign = 'center';
-        
-        // Заголовок
         ctx.fillStyle = '#aaaaaa';
-        ctx.font = 'bold 50px Inter, sans-serif';
-        ctx.fillText('НАГРУЗКА (TSS)', CANVAS_WIDTH / 2, 400);
+        ctx.font = `bold ${sy(50)}px Inter, sans-serif`;
+        ctx.fillText('НАГРУЗКА (TSS)', CW / 2, sy(400));
 
-        // Огромная цифра
         ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 300px Inter, sans-serif';
-        ctx.fillText(String(Math.round(tss)), CANVAS_WIDTH / 2, 700);
+        ctx.font = `bold ${sy(300)}px Inter, sans-serif`;
+        ctx.fillText(String(Math.round(tss)), CW / 2, sy(700));
 
-        // CTL и ATL
-        const barY = 1000;
         const barW = 600;
-        const barX = (CANVAS_WIDTH - barW) / 2;
+        const barX = (CW - barW) / 2;
+        const barY = sy(1000);
 
-        // CTL (Фитнес)
-        ctx.textAlign = 'left'; ctx.fillStyle = '#6fbf73'; ctx.font = 'bold 40px Inter, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#6fbf73';
+        ctx.font = `bold ${sy(40)}px Inter, sans-serif`;
         ctx.fillText(`Фитнес (CTL): ${ctl.toFixed(1)}`, barX, barY);
-        ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.beginPath(); ctx.roundRect(barX, barY + 20, barW, 30, 15); ctx.fill();
-        ctx.fillStyle = '#6fbf73'; ctx.beginPath(); ctx.roundRect(barX, barY + 20, Math.min(barW, (ctl / 100) * barW), 30, 15); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.1)';
+        ctx.beginPath();
+        ctx.roundRect(barX, barY + sy(20), barW, sy(30), sy(15));
+        ctx.fill();
+        ctx.fillStyle = '#6fbf73';
+        ctx.beginPath();
+        ctx.roundRect(barX, barY + sy(20), Math.min(barW, (ctl / 100) * barW), sy(30), sy(15));
+        ctx.fill();
 
-        // ATL (Усталость)
-        ctx.textAlign = 'left'; ctx.fillStyle = '#ec3942'; ctx.font = 'bold 40px Inter, sans-serif';
-        ctx.fillText(`Усталость (ATL): ${atl.toFixed(1)}`, barX, barY + 150);
-        ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.beginPath(); ctx.roundRect(barX, barY + 170, barW, 30, 15); ctx.fill();
-        ctx.fillStyle = '#ec3942'; ctx.beginPath(); ctx.roundRect(barX, barY + 170, Math.min(barW, (atl / 100) * barW), 30, 15); ctx.fill();
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#ec3942';
+        ctx.font = `bold ${sy(40)}px Inter, sans-serif`;
+        ctx.fillText(`Усталость (ATL): ${atl.toFixed(1)}`, barX, barY + sy(150));
+        ctx.fillStyle = 'rgba(255,255,255,0.1)';
+        ctx.beginPath();
+        ctx.roundRect(barX, barY + sy(170), barW, sy(30), sy(15));
+        ctx.fill();
+        ctx.fillStyle = '#ec3942';
+        ctx.beginPath();
+        ctx.roundRect(barX, barY + sy(170), Math.min(barW, (atl / 100) * barW), sy(30), sy(15));
+        ctx.fill();
+
       } else if (layout === 'zones') {
-        // ---- ПУЛЬСОВЫЕ ЗОНЫ ----
-        let hrZones: number[] = []; // Границы зон (bpm)
-        let zoneTimes: number[] = []; // Время в зонах (сек)
-
+        let hrZones: number[] = [];
+        let zoneTimes: number[] = [];
         try {
           const raw = typeof fact.raw_json === 'string' ? JSON.parse(fact.raw_json) : fact.raw_json;
           const meta = raw?.raw || raw;
-          
-          // 1. Пробуем взять готовые данные
           hrZones = meta?.hr_zones ?? meta?.icu_hr_zones ?? [];
           const rawTimes = meta?.icu_zone_times ?? meta?.hr_zone_times;
-          
           if (Array.isArray(rawTimes)) {
             if (typeof rawTimes[0] === 'number') zoneTimes = rawTimes;
             else if (typeof rawTimes[0] === 'object') zoneTimes = rawTimes.map((z: any) => z.secs || 0);
           }
-
-          // 2. Если данных нет, но есть пульс — считаем сами!
           if (zoneTimes.length === 0 && hrZones.length > 0 && streams?.hr && streams?.secT) {
-            // Создаем массив для 7 зон (Z1-Z7)
             zoneTimes = new Array(hrZones.length + 1).fill(0);
-            
             for (let i = 0; i < streams.hr.length; i++) {
               const h = streams.hr[i];
               if (h == null) continue;
-              
-              // Длительность точки (1 сек по умолчанию)
-              const dt = i > 0 ? (streams.secT[i] - streams.secT[i-1]) : 1;
-              
-              // Определяем зону
+              const dt = i > 0 ? (streams.secT[i] - streams.secT[i - 1]) : 1;
               let z = 0;
               for (let j = 0; j < hrZones.length; j++) {
                 if (h >= hrZones[j]) z = j + 1;
@@ -1045,228 +1225,73 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
               zoneTimes[z] += dt;
             }
           }
-        } catch (e) { /* ignore */ }
+        } catch { /* ignore */ }
 
         ctx.textAlign = 'center';
         ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 70px Inter, sans-serif';
-        ctx.fillText('Время в зонах', CANVAS_WIDTH / 2, 400);
+        ctx.font = `bold ${sy(70)}px Inter, sans-serif`;
+        ctx.fillText('Время в зонах', CW / 2, sy(400));
 
         if (zoneTimes.length > 0) {
-          // Считаем сумму, чтобы найти проценты
           const total = zoneTimes.reduce((acc, val) => acc + (val || 0), 0);
           const zoneColors = ['#708499', '#6fbf73', '#d4a373', '#ffb800', '#ec3942', '#a6298c', '#5c3c92'];
-          
-          const startY = 600;
-          const rowH = Math.min(120, 1000 / zoneTimes.length); // Сжимаем, если зон много
-          
+          const startY = sy(600);
+          const rowH = Math.min(sy(120), sy(1000) / zoneTimes.length);
+
           zoneTimes.forEach((secs, i) => {
             const percent = total > 0 ? (secs / total) * 100 : 0;
             const y = startY + i * rowH;
-            
-            // Название зоны (Z1, Z2...)
+
             ctx.textAlign = 'left';
             ctx.fillStyle = zoneColors[i % zoneColors.length];
-            ctx.font = 'bold 40px Inter, sans-serif';
-            ctx.fillText(`Z${i + 1}`, 100, y + 40);
+            ctx.font = `bold ${sy(40)}px Inter, sans-serif`;
+            ctx.fillText(`Z${i + 1}`, 100, y + sy(40));
 
-            // Полоска (фон)
             ctx.fillStyle = 'rgba(255,255,255,0.05)';
-            ctx.beginPath(); ctx.roundRect(200, y, 700, 60, 30); ctx.fill();
+            ctx.beginPath();
+            ctx.roundRect(200, y, 700, sy(60), sy(30));
+            ctx.fill();
 
-            // Полоска (заполнение)
             if (percent > 0) {
               ctx.fillStyle = zoneColors[i % zoneColors.length];
-              ctx.beginPath(); ctx.roundRect(200, y, Math.max(10, (percent / 100) * 700), 60, 30); ctx.fill();
+              ctx.beginPath();
+              ctx.roundRect(200, y, Math.max(10, (percent / 100) * 700), sy(60), sy(30));
+              ctx.fill();
             }
 
-            // Процент
             ctx.textAlign = 'left';
             ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 36px Inter, sans-serif';
-            ctx.fillText(`${Math.round(percent)}%`, 940, y + 45);
+            ctx.font = `bold ${sy(36)}px Inter, sans-serif`;
+            ctx.fillText(`${Math.round(percent)}%`, 940, y + sy(45));
           });
         } else {
           ctx.fillStyle = '#aaaaaa';
-          ctx.font = '40px Inter, sans-serif';
-          ctx.fillText('Нет данных о зонах (и потоках пульса)', CANVAS_WIDTH / 2, 700);
-        }
-      } else if (layout === 'poster') {
-        // ---- ПОСТЕР (КАРТОЧКА) ----
-        const cardW = 840;
-        const cardH = 1000;
-        const cardX = (CANVAS_WIDTH - cardW) / 2;
-        const cardY = (CANVAS_HEIGHT - cardH) / 2;
-
-        ctx.fillStyle = 'rgba(23, 33, 43, 0.85)';
-        ctx.beginPath(); ctx.roundRect(cardX, cardY, cardW, cardH, 40); ctx.fill();
-        ctx.strokeStyle = 'rgba(212, 163, 115, 0.3)'; ctx.lineWidth = 4; ctx.stroke();
-
-        ctx.textAlign = 'center';
-        ctx.fillStyle = '#d4a373';
-        ctx.font = 'bold 36px Inter, sans-serif';
-        ctx.fillText((elements.titleText || fact.date).toUpperCase(), CANVAS_WIDTH / 2, cardY + 100);
-
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 220px Inter, sans-serif';
-        ctx.fillText(km, CANVAS_WIDTH / 2, cardY + 360);
-        ctx.font = 'bold 60px Inter, sans-serif';
-        ctx.fillStyle = '#aaaaaa';
-        ctx.fillText('КМ', CANVAS_WIDTH / 2, cardY + 430);
-
-        ctx.beginPath();
-        ctx.moveTo(cardX + 100, cardY + 500); ctx.lineTo(cardX + cardW - 100, cardY + 500);
-        ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.lineWidth = 2; ctx.stroke();
-
-        ctx.textAlign = 'left';
-        ctx.font = 'bold 80px Inter, sans-serif';
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText(time, cardX + 100, cardY + 620);
-        
-        ctx.textAlign = 'right';
-        ctx.fillStyle = '#d4a373';
-        ctx.fillText(`${pace} /км`, cardX + cardW - 100, cardY + 620);
-
-        ctx.textAlign = 'center';
-        ctx.font = 'bold 40px Inter, sans-serif';
-        ctx.fillStyle = '#aaaaaa';
-        let extraStr = `❤️ ${hr} уд/мин`;
-        if (elevationGain > 0) extraStr += `   ⛰ ${elevationGain} м`;
-        ctx.fillText(extraStr, CANVAS_WIDTH / 2, cardY + 800);
-      } else if (layout === 'grid') {
-        // ---- СЕТКА (ДАШБОРД) ----
-        const gridX = 80; const gridY = 600;
-        const cellW = (CANVAS_WIDTH - gridX * 2 - 40) / 2;
-        const cellH = 280;
-        const gap = 40;
-
-        // Парсим калории и метаданные
-        let cals = null;
-        try {
-          const raw = typeof fact.raw_json === 'string' ? JSON.parse(fact.raw_json) : fact.raw_json;
-          cals = (raw?.raw || raw)?.calories || raw?.calories;
-        } catch (e) { /* ignore */ }
-
-        const drawCell = (col: number, row: number, label: string, value: string, color: string) => {
-          const x = gridX + col * (cellW + gap); const y = gridY + row * (cellH + gap);
-          ctx.fillStyle = 'rgba(23, 33, 43, 0.7)'; ctx.beginPath(); ctx.roundRect(x, y, cellW, cellH, 24); ctx.fill();
-          ctx.fillStyle = color; ctx.beginPath(); ctx.roundRect(x, y + 40, 8, cellH - 80, 4); ctx.fill();
-          ctx.textAlign = 'left'; ctx.fillStyle = '#aaaaaa'; ctx.font = 'bold 28px Inter, sans-serif'; ctx.fillText(label, x + 40, y + 80);
-          ctx.fillStyle = '#ffffff'; ctx.font = 'bold 70px Inter, sans-serif'; ctx.fillText(value, x + 40, y + 200);
-        };
-
-        ctx.textAlign = 'center'; ctx.fillStyle = '#ffffff'; ctx.font = 'bold 60px Inter, sans-serif';
-        ctx.fillText(elements.titleText || 'Тренировка', CANVAS_WIDTH / 2, 400);
-        ctx.font = '40px Inter, sans-serif'; ctx.fillStyle = '#d4a373'; ctx.fillText(fact.date, CANVAS_WIDTH / 2, 470);
-
-        drawCell(0, 0, 'ДИСТАНЦИЯ', `${km} км`, '#e53935');
-        drawCell(1, 0, 'ВРЕМЯ', time, '#4fc3f7');
-        drawCell(0, 1, 'ТЕМП', `${pace} /км`, '#d4a373');
-        drawCell(1, 1, 'СР. ПУЛЬС', `${hr}`, '#ff40ff');
-        drawCell(0, 2, 'КАЛОРИИ', cals ? `${cals} ккал` : '—', '#ffb800');
-        drawCell(1, 2, 'НАБОР', elevationGain > 0 ? `${elevationGain} м` : '—', '#6fbf73');
-      } else if (layout === 'load') {
-        // ---- НАГРУЗКА (TSS, CTL, ATL) ----
-        let tss = 0, ctl = 0, atl = 0;
-        try {
-          const raw = typeof fact.raw_json === 'string' ? JSON.parse(fact.raw_json) : fact.raw_json;
-          const meta = raw?.raw || raw;
-          tss = meta?.training_load || 0;
-          ctl = meta?.ctl || 0;
-          atl = meta?.atl || 0;
-        } catch (e) { /* ignore */ }
-
-        ctx.textAlign = 'center';
-        
-        // Заголовок
-        ctx.fillStyle = '#aaaaaa';
-        ctx.font = 'bold 50px Inter, sans-serif';
-        ctx.fillText('НАГРУЗКА (TSS)', CANVAS_WIDTH / 2, 400);
-
-        // Огромная цифра
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 300px Inter, sans-serif';
-        ctx.fillText(String(Math.round(tss)), CANVAS_WIDTH / 2, 700);
-
-        // CTL и ATL
-        const barY = 1000;
-        const barW = 600;
-        const barX = (CANVAS_WIDTH - barW) / 2;
-
-        // CTL (Фитнес)
-        ctx.textAlign = 'left'; ctx.fillStyle = '#6fbf73'; ctx.font = 'bold 40px Inter, sans-serif';
-        ctx.fillText(`Фитнес (CTL): ${ctl.toFixed(1)}`, barX, barY);
-        ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.beginPath(); ctx.roundRect(barX, barY + 20, barW, 30, 15); ctx.fill();
-        ctx.fillStyle = '#6fbf73'; ctx.beginPath(); ctx.roundRect(barX, barY + 20, Math.min(barW, (ctl / 100) * barW), 30, 15); ctx.fill();
-
-        // ATL (Усталость)
-        ctx.textAlign = 'left'; ctx.fillStyle = '#ec3942'; ctx.font = 'bold 40px Inter, sans-serif';
-        ctx.fillText(`Усталость (ATL): ${atl.toFixed(1)}`, barX, barY + 150);
-        ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.beginPath(); ctx.roundRect(barX, barY + 170, barW, 30, 15); ctx.fill();
-        ctx.fillStyle = '#ec3942'; ctx.beginPath(); ctx.roundRect(barX, barY + 170, Math.min(barW, (atl / 100) * barW), 30, 15); ctx.fill();
-      } else if (layout === 'zones') {
-        // ---- ПУЛЬСОВЫЕ ЗОНЫ ----
-        let hrZones: number[] = [];
-        try {
-          const raw = typeof fact.raw_json === 'string' ? JSON.parse(fact.raw_json) : fact.raw_json;
-          hrZones = (raw?.raw || raw)?.hr_zones || [];
-        } catch (e) { /* ignore */ }
-
-        ctx.textAlign = 'center';
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 70px Inter, sans-serif';
-        ctx.fillText('Время в зонах', CANVAS_WIDTH / 2, 400);
-
-        if (hrZones.length > 0) {
-          // Считаем сумму, чтобы найти проценты
-          const total = hrZones.reduce((acc, val) => acc + (val || 0), 0);
-          const zoneColors = ['#708499', '#6fbf73', '#d4a373', '#ffb800', '#ec3942', '#a6298c', '#5c3c92'];
-          
-          const startY = 600;
-          const rowH = 120;
-          
-          hrZones.forEach((secs, i) => {
-            const percent = total > 0 ? (secs / total) * 100 : 0;
-            const y = startY + i * rowH;
-            
-            // Название зоны (Z1, Z2...)
-            ctx.textAlign = 'left';
-            ctx.fillStyle = zoneColors[i % zoneColors.length];
-            ctx.font = 'bold 40px Inter, sans-serif';
-            ctx.fillText(`Z${i + 1}`, 100, y + 40);
-
-            // Полоска (фон)
-            ctx.fillStyle = 'rgba(255,255,255,0.05)';
-            ctx.beginPath(); ctx.roundRect(200, y, 700, 60, 30); ctx.fill();
-
-            // Полоска (заполнение)
-            if (percent > 0) {
-              ctx.fillStyle = zoneColors[i % zoneColors.length];
-              ctx.beginPath(); ctx.roundRect(200, y, Math.max(10, (percent / 100) * 700), 60, 30); ctx.fill();
-            }
-
-            // Процент
-            ctx.textAlign = 'left';
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 36px Inter, sans-serif';
-            ctx.fillText(`${Math.round(percent)}%`, 940, y + 45);
-          });
-        } else {
-          ctx.fillStyle = '#aaaaaa';
-          ctx.font = '40px Inter, sans-serif';
-          ctx.fillText('Нет данных о зонах', CANVAS_WIDTH / 2, 700);
+          ctx.font = `${sy(40)}px Inter, sans-serif`;
+          ctx.fillText('Нет данных о зонах (и потоках пульса)', CW / 2, sy(700));
         }
       }
     }
     ctx.restore();
 
+    // ---------- ЗАГОЛОВОК / ГРАФИКИ / МЕТРИКИ / ЛОГО ----------
     ctx.textAlign = 'left';
     ctx.textBaseline = 'alphabetic';
     ctx.fillStyle = '#ffffff';
 
-    let titleBottomY = preset.safeTop + 20;
-    if (!elements.titleEmbed && elements.showTitle && elements.titleText) {
-      titleBottomY = preset.safeTop + 70 + 20; 
+    // Для layout='charts' встроенный заголовок отсутствует, поэтому рисуем его
+    // через общий блок всегда — даже если titleEmbed=true.
+    const shouldDrawTitle =
+      elements.showTitle && !!elements.titleText && (!elements.titleEmbed || layout === 'charts');
+    let titleBottomY = preset.safeTop + sy(20);
+    if (shouldDrawTitle) {
+      titleBottomY = preset.safeTop + sy(90);
+    }
+
+    // Для layout='charts' основной блок пропускается, поэтому contentOffsetY применяем отдельно
+    const applyChartContentOffset = layout === 'charts' && elements.contentOffsetY !== 0;
+    if (applyChartContentOffset) {
+      ctx.save();
+      ctx.translate(0, sy(elements.contentOffsetY));
     }
 
     const panels: ChartPanelConfig[] = [];
@@ -1277,9 +1302,9 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
 
     if (panels.length > 0 && streams) {
       ctx.save();
-      if (elements.chartsOffsetY !== 0) ctx.translate(0, elements.chartsOffsetY);
+      if (elements.chartsOffsetY !== 0) ctx.translate(0, sy(elements.chartsOffsetY));
 
-      const cw = CANVAS_WIDTH - preset.safeLeft - preset.safeRight - 40;
+      const cw = CW - preset.safeLeft - preset.safeRight - 40;
       const cx = preset.safeLeft + 20;
       const isFullHeight = elements.chartsFullHeight || layout === 'charts';
       const dpr = window.devicePixelRatio || 1;
@@ -1291,14 +1316,16 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
       const drawPanel = (p: any, currentY: number, h: number) => {
         ctx.save();
         ctx.fillStyle = 'rgba(0,0,0,0.45)';
-        ctx.beginPath(); ctx.roundRect(cx, currentY, cw, h, 12); ctx.fill();
+        ctx.beginPath();
+        ctx.roundRect(cx, currentY, cw, h, sy(12));
+        ctx.fill();
         ctx.clip();
 
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = chartW * dpr;
         tempCanvas.height = h * dpr;
         const tempCtx = tempCanvas.getContext('2d');
-        
+
         if (tempCtx) {
           tempCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
           drawMultiChart(tempCtx, {
@@ -1313,25 +1340,27 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
         ctx.save();
         ctx.translate(cx + LABEL_WIDTH / 2, currentY + h / 2);
         ctx.rotate(-Math.PI / 2);
-        ctx.font = 'bold 36px Inter, sans-serif';
+        ctx.font = `bold ${sy(36)}px Inter, sans-serif`;
         ctx.fillStyle = chartColors[p.channel as keyof typeof chartColors] || '#ffffff';
-        ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 8;
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.shadowColor = 'rgba(0,0,0,0.9)';
+        ctx.shadowBlur = 8;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
         ctx.fillText(p.label, 0, 0);
         ctx.restore();
       };
 
       if (isFullHeight) {
-        const topY = titleBottomY + 20 + elements.chartsMarginTop;
-        const bottomY = CANVAS_HEIGHT - preset.safeBottom - 20 - elements.chartsMarginBottom;
-        const metricsHeight = elements.metricsShow ? 80 : 0;
+        const topY = titleBottomY + sy(20) + sy(elements.chartsMarginTop);
+        const bottomY = CH - preset.safeBottom - sy(20) - sy(elements.chartsMarginBottom);
+        const metricsHeight = elements.metricsShow ? sy(80) : 0;
         const availableHeight = bottomY - topY - metricsHeight;
 
         if (availableHeight > 0) {
           const ratios = panels.map((p) => p.heightRatio || 1);
           const sumRatios = ratios.reduce((a, b) => a + b, 0);
           let currentY = topY;
-          const gap = 10;
+          const gap = sy(10);
 
           for (let i = 0; i < panels.length; i++) {
             const p = panels[i];
@@ -1341,9 +1370,9 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
           }
         }
       } else {
-        const chartH = panels.length > 2 ? 100 : 130;
-        const gap = 14;
-        let cy = titleBottomY + 20;
+        const chartH = panels.length > 2 ? sy(100) : sy(130);
+        const gap = sy(14);
+        let cy = titleBottomY + sy(20);
         for (const p of panels) {
           drawPanel(p, cy, chartH);
           cy += chartH + gap;
@@ -1354,9 +1383,9 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
 
     if (elements.metricsShow) {
       ctx.save();
-      ctx.translate(0, elements.metricsOffsetY);
-      
-      ctx.font = 'bold 36px Inter, sans-serif';
+      ctx.translate(0, sy(elements.metricsOffsetY));
+
+      ctx.font = `bold ${sy(36)}px Inter, sans-serif`;
       ctx.fillStyle = '#ffffff';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'bottom';
@@ -1370,43 +1399,48 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
 
       const text = parts.join('  ·  ');
       const textWidth = ctx.measureText(text).width;
-      const x = (CANVAS_WIDTH - textWidth) / 2;
-      const y = CANVAS_HEIGHT - preset.safeBottom - 20;
+      const x = (CW - textWidth) / 2;
+      const y = CH - preset.safeBottom - sy(20);
       ctx.fillText(text, x, y);
       ctx.restore();
     }
 
-    // Заголовок поверх всего (только если НЕ включено встраивание)
-    if (!elements.titleEmbed && elements.showTitle && elements.titleText) {
+    if (applyChartContentOffset) ctx.restore();
+
+    if (shouldDrawTitle) {
       ctx.save();
-      ctx.font = 'bold 48px Inter, sans-serif';
+      ctx.font = `bold ${fs(48)}px Inter, sans-serif`;
       ctx.fillStyle = '#ffffff';
-      ctx.shadowColor = 'rgba(0,0,0,0.85)'; ctx.shadowBlur = 12; ctx.shadowOffsetY = 2;
+      ctx.shadowColor = 'rgba(0,0,0,0.85)';
+      ctx.shadowBlur = 12;
+      ctx.shadowOffsetY = 2;
       ctx.textAlign = 'center';
-      const titleY = preset.safeTop + 70 + elements.titleOffsetY;
-      ctx.fillText(elements.titleText, CANVAS_WIDTH / 2, titleY);
+      const titleY = preset.safeTop + sy(70) + titleOffsetY;
+      ctx.fillText(elements.titleText, CW / 2, titleY);
       ctx.restore();
     }
 
     if (elements.showLogo && elements.logoText) {
       ctx.save();
-      ctx.font = `bold ${elements.logoSize}px Inter, sans-serif`;
+      ctx.font = `bold ${sy(elements.logoSize)}px Inter, sans-serif`;
       ctx.fillStyle = 'rgba(255,255,255,0.9)';
-      ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = 8;
-      const pad = 30;
+      ctx.shadowColor = 'rgba(0,0,0,0.7)';
+      ctx.shadowBlur = 8;
+      const padX = 30;
+      const padY = sy(30);
       const pos = elements.logoPosition;
       if (pos === 'br') {
         ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
-        ctx.fillText(elements.logoText, CANVAS_WIDTH - preset.safeRight - pad, CANVAS_HEIGHT - preset.safeBottom - pad);
+        ctx.fillText(elements.logoText, CW - preset.safeRight - padX, CH - preset.safeBottom - padY);
       } else if (pos === 'bl') {
         ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
-        ctx.fillText(elements.logoText, preset.safeLeft + pad, CANVAS_HEIGHT - preset.safeBottom - pad);
+        ctx.fillText(elements.logoText, preset.safeLeft + padX, CH - preset.safeBottom - padY);
       } else if (pos === 'tr') {
         ctx.textAlign = 'right'; ctx.textBaseline = 'top';
-        ctx.fillText(elements.logoText, CANVAS_WIDTH - preset.safeRight - pad, preset.safeTop + pad);
+        ctx.fillText(elements.logoText, CW - preset.safeRight - padX, preset.safeTop + padY);
       } else if (pos === 'tl') {
         ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-        ctx.fillText(elements.logoText, preset.safeLeft + pad, preset.safeTop + pad);
+        ctx.fillText(elements.logoText, preset.safeLeft + padX, preset.safeTop + padY);
       }
       ctx.restore();
     }
@@ -1414,24 +1448,27 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
     setIsRendering(false);
   }, [
     visible, canvasReady, bgSource, photoImage, layout, fact, elevationGain,
-    splits, photoOffset, photoScale, elements, preset, streams, chartColors
+    splits, photoOffset, photoScale, elements, preset, streams, chartColors,
   ]);
 
   const handleDownload = () => {
     const outCanvas = document.createElement('canvas');
-    outCanvas.width = CANVAS_WIDTH;
-    outCanvas.height = CANVAS_HEIGHT;
+    outCanvas.width = preset.width;
+    outCanvas.height = preset.height;
     const outCtx = outCanvas.getContext('2d');
     if (!outCtx) return;
 
     if (bgSource === 'map' && elements.showMap && mapRef.current) {
       const mapCanvas = mapRef.current.getCanvas();
       mapRef.current.triggerRepaint();
-      outCtx.drawImage(mapCanvas, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      outCtx.drawImage(mapCanvas, 0, 0, preset.width, preset.height);
     } else {
-      outCtx.fillStyle = '#0d0d0d'; outCtx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      outCtx.fillStyle = '#0d0d0d';
+      outCtx.fillRect(0, 0, preset.width, preset.height);
     }
-    if (textCanvasRef.current) outCtx.drawImage(textCanvasRef.current, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    if (textCanvasRef.current) {
+      outCtx.drawImage(textCanvasRef.current, 0, 0, preset.width, preset.height);
+    }
 
     const mime = preset.recommendedFormat === 'jpg' ? 'image/jpeg' : 'image/png';
     const ext = preset.recommendedFormat === 'jpg' ? 'jpg' : 'png';
@@ -1444,13 +1481,18 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (bgSource !== 'photo') return;
-    const startX = e.clientX; const startY = e.clientY;
+    const startX = e.clientX;
+    const startY = e.clientY;
     const startOffset = { ...photoOffset };
     const onMouseMove = (ev: MouseEvent) => {
       const rect = textCanvasRef.current?.getBoundingClientRect();
       if (!rect) return;
-      const scaleX = CANVAS_WIDTH / rect.width; const scaleY = CANVAS_HEIGHT / rect.height;
-      setPhotoOffset({ x: startOffset.x + (ev.clientX - startX) * scaleX, y: startOffset.y + (ev.clientY - startY) * scaleY });
+      const scaleX = preset.width / rect.width;
+      const scaleY = preset.height / rect.height;
+      setPhotoOffset({
+        x: startOffset.x + (ev.clientX - startX) * scaleX,
+        y: startOffset.y + (ev.clientY - startY) * scaleY,
+      });
     };
     const onMouseUp = () => {
       document.removeEventListener('mousemove', onMouseMove);
@@ -1464,6 +1506,42 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
     if (bgSource !== 'photo') return;
     setPhotoScale((prev) => Math.max(0.5, Math.min(5, prev - e.deltaY * 0.001)));
   };
+
+  const switchTo = (newPlatformId: StoryPlatformId, newLayout: LayoutType) => {
+    if (newPlatformId === platformId && newLayout === layout) return;
+
+    // 1. Сохраняем текущий снапшот
+    const oldKey = `${platformId}::${layout}`;
+    setStoryStates((prev) => ({ ...prev, [oldKey]: elements }));
+
+    // 2. Загружаем целевой (или дефолт)
+    const newKey = `${newPlatformId}::${newLayout}`;
+    const saved = storyStates[newKey];
+    const merged = saved ? normalizeElements(saved) : normalizeElements({});
+
+    // 3. Переносим глобальные поля (пользовательские тексты)
+    merged.titleText = elements.titleText;
+    merged.logoText = elements.logoText;
+
+    setPlatformId(newPlatformId);
+    setLayout(newLayout);
+    setElements(merged);
+  };
+
+  const switchLayout = (newLayout: LayoutType) => {
+    switchTo(platformId, newLayout);
+  };
+
+  const handlePlatformChange = (newPlatformId: StoryPlatformId) => {
+    const newFormat = getPreset(newPlatformId).format;
+    const supported = LAYOUT_FORMATS[layout]?.includes(newFormat);
+    switchTo(newPlatformId, supported ? layout : FORMAT_DEFAULT_LAYOUT[newFormat]);
+  };
+
+  const availableLayouts = useMemo(
+    () => LAYOUT_OPTIONS.filter((opt) => LAYOUT_FORMATS[opt.value]?.includes(preset.format)),
+    [preset.format],
+  );
 
   const resetMapSettings = () => {
     setMapPadding(DEFAULT_STORY_MAP.mapPadding);
@@ -1480,7 +1558,7 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
       header={
         <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <i className="pi pi-camera" style={{ fontSize: '1.05rem', color: 'var(--pb-accent)' }} />
-          Генератор сторис
+          Генератор историй и постов
         </span>
       }
       style={{ width: '1000px', maxWidth: '95vw' }}
@@ -1495,7 +1573,18 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
           {/* ---- Платформа ---- */}
           <div className="pb-connections__block">
             <div className="pb-connections__title">Платформа</div>
-            <Dropdown value={platformId} options={STORY_PRESETS.map((p) => ({ label: p.label, value: p.id }))} onChange={(e) => setPlatformId(e.value)} panelClassName="pb-dropdown-panel" style={{ width: '100%', marginTop: '0.5rem' }} />
+            <Dropdown
+              value={platformId}
+              options={[
+                { label: '── Сторис (9:16) ──', value: '__sep_story', disabled: true },
+                ...STORY_PRESETS.filter((p) => p.format === 'story').map((p) => ({ label: p.label, value: p.id })),
+                { label: '── Посты ──', value: '__sep_post', disabled: true },
+                ...STORY_PRESETS.filter((p) => p.format !== 'story').map((p) => ({ label: p.label, value: p.id })),
+              ]}
+              onChange={(e) => handlePlatformChange(e.value)}
+              panelClassName="pb-dropdown-panel"
+              style={{ width: '100%', marginTop: '0.5rem' }}
+            />
             <label className="pb-checkbox-dark" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '0.5rem', cursor: 'pointer' }}>
               <Checkbox checked={showSafeZones} onChange={(e) => setShowSafeZones(!!e.checked)} />
               <span>Показать safe zones</span>
@@ -1538,7 +1627,6 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
               <Button label="Карта" icon="pi pi-map" className={bgSource === 'map' ? 'pb p-button-sm' : 'pb-soft p-button-sm'} onClick={() => setBgSource('map')} />
               <Button label="Загрузить фото" icon="pi pi-camera" className={bgSource === 'photo' ? 'pb p-button-sm' : 'pb-soft p-button-sm'} onClick={handlePickImage} />
 
-              {/* Ползунок затемнения */}
               <div style={{ marginTop: '0.5rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--tg-hint)', marginBottom: '0.4rem' }}>
                   <span>Затемнение фона</span>
@@ -1564,26 +1652,21 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
           {/* ---- Макет ---- */}
           <div className="pb-connections__block">
             <div className="pb-connections__title">Макет</div>
-            <Dropdown value={layout} options={[
-              { label: 'Классика', value: 'classic' }, 
-              { label: 'Плашки', value: 'pills' }, 
-              { label: 'Сплиты по км', value: 'splits' }, 
-              { label: 'Точечный', value: 'dotted' }, 
-              { label: 'Чек (билет)', value: 'receipt' }, 
-              { label: 'Минимализм', value: 'minimal' }, 
-              { label: 'Графики', value: 'charts' },
-              { label: 'Постер (Карточка)', value: 'poster' },
-              { label: 'Сетка (Дашборд)', value: 'grid' },
-              { label: 'Нагрузка (TSS)', value: 'load' },
-              { label: 'Пульсовые зоны', value: 'zones' }
-            ]} onChange={(e) => setLayout(e.value)} panelClassName="pb-dropdown-panel" />
+            <Dropdown
+              value={layout}
+              options={availableLayouts}
+              onChange={(e) => switchLayout(e.value)}
+              panelClassName="pb-dropdown-panel"
+            />
+            <small className="pb-hint" style={{ display: 'block', marginTop: '0.35rem', fontSize: '0.7rem' }}>
+              Для формата «{preset.format}» доступно {availableLayouts.length} макетов.
+            </small>
           </div>
 
           {/* ---- Элементы ---- */}
           <div className="pb-connections__block">
             <div className="pb-connections__title">Элементы на сторис</div>
 
-            {/* Название */}
             <label className="pb-checkbox-dark" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '0.5rem', cursor: 'pointer' }}>
               <Checkbox checked={elements.showTitle} onChange={(e) => setElements({ ...elements, showTitle: !!e.checked })} />
               <span>Название пробежки</span>
@@ -1595,23 +1678,23 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
                   <Checkbox checked={elements.titleEmbed} onChange={(e) => setElements({ ...elements, titleEmbed: !!e.checked })} />
                   <span>Встроить в дизайн макета</span>
                 </label>
-                <div style={{ marginTop: '0.5rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--tg-hint)', marginBottom: '0.4rem' }}>
-                    <span>Смещение названия (Y)</span>
-                    <span style={{ fontFamily: 'monospace' }}>{elements.titleOffsetY > 0 ? '+' : ''}{Math.round(elements.titleOffsetY)} px</span>
+                {(layout === 'classic' || layout === 'pills' || layout === 'splits' || layout === 'dotted' || layout === 'receipt' || layout === 'minimal' || layout === 'poster' || layout === 'grid') && (
+                  <div style={{ marginTop: '0.5rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--tg-hint)', marginBottom: '0.4rem' }}>
+                      <span>Смещение названия (Y)</span>
+                      <span style={{ fontFamily: 'monospace' }}>{elements.titleOffsetY > 0 ? '+' : ''}{Math.round(elements.titleOffsetY)} px</span>
+                    </div>
+                    <Slider value={elements.titleOffsetY} min={-500} max={1000} step={20} onChange={(e) => setElements({ ...elements, titleOffsetY: e.value as number })} />
                   </div>
-                  <Slider value={elements.titleOffsetY} min={-500} max={1000} step={20} onChange={(e) => setElements({ ...elements, titleOffsetY: e.value as number })} />
-                </div>
+                )}
               </>
             )}
 
-            {/* Карта */}
             <label className="pb-checkbox-dark" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '0.75rem', cursor: 'pointer' }}>
               <Checkbox checked={elements.showMap} onChange={(e) => setElements({ ...elements, showMap: !!e.checked })} />
               <span>Трек на карте</span>
             </label>
 
-            {/* Графики */}
             <div style={{ marginTop: '0.75rem', fontSize: '0.75rem', color: 'var(--tg-hint)', marginBottom: '0.35rem' }}>Графики:</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.35rem' }}>
               {([['hr', 'Пульс'], ['pace', 'Скорость'], ['cadence', 'Каденс'], ['elevation', 'Высота']] as const).map(([key, label]) => (
@@ -1622,7 +1705,6 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
               ))}
             </div>
 
-            {/* Настройки графиков */}
             <div style={{ marginTop: '0.75rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--tg-hint)', marginBottom: '0.4rem' }}>
                 <span>Прозрачность заливки</span>
@@ -1652,16 +1734,14 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
               </div>
             )}
 
-            {/* Метрики */}
             <div style={{ marginTop: '1rem', borderTop: '1px solid var(--surface-border)', paddingTop: '1rem' }}>
               <label className="pb-checkbox-dark" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', cursor: 'pointer' }}>
                 <Checkbox checked={elements.metricsShow} onChange={(e) => setElements({ ...elements, metricsShow: !!e.checked })} />
                 <span>Показывать метрики</span>
               </label>
-              
+
               {elements.metricsShow && (
                 <div style={{ marginTop: '0.75rem' }}>
-                  {/* Смещение метрик */}
                   <div style={{ marginBottom: '1rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--tg-hint)', marginBottom: '0.4rem' }}>
                       <span>Смещение метрик (Y)</span>
@@ -1670,7 +1750,6 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
                     <Slider value={elements.metricsOffsetY} min={-1000} max={1000} step={20} onChange={(e) => setElements({ ...elements, metricsOffsetY: e.value as number })} />
                   </div>
 
-                  {/* Сетка чекбоксов */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem 0.2rem' }}>
                     {([['distance', 'Расстояние'], ['time', 'Время'], ['pace', 'Темп'], ['hr', 'Пульс'], ['elevation', 'Набор']] as const).map(([key, label]) => (
                       <label key={key} className="pb-checkbox-dark" style={{ display: 'flex', gap: '0.3rem', alignItems: 'center', cursor: 'pointer', margin: 0 }}>
@@ -1683,7 +1762,6 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
               )}
             </div>
 
-            {/* Лого */}
             <label className="pb-checkbox-dark" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '1rem', cursor: 'pointer', borderTop: '1px solid var(--surface-border)', paddingTop: '1rem' }}>
               <Checkbox checked={elements.showLogo} onChange={(e) => setElements({ ...elements, showLogo: !!e.checked })} />
               <span>Логотип / Водяной знак</span>
@@ -1692,7 +1770,7 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
               <div style={{ marginTop: '0.5rem', paddingLeft: '1.5rem' }}>
                 <InputText value={elements.logoText} onChange={(e) => setElements({ ...elements, logoText: e.target.value })} style={{ width: '100%' }} placeholder="smth.run" />
                 <Dropdown value={elements.logoPosition} options={(Object.keys(LOGO_POSITION_LABELS) as LogoPosition[]).map((k) => ({ label: LOGO_POSITION_LABELS[k], value: k }))} onChange={(e) => setElements({ ...elements, logoPosition: e.value })} panelClassName="pb-dropdown-panel" style={{ width: '100%', marginTop: '0.5rem' }} />
-                
+
                 <div style={{ marginTop: '1rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--tg-hint)', marginBottom: '0.4rem' }}>
                     <span>Размер логотипа</span><span style={{ fontFamily: 'monospace' }}>{elements.logoSize}px</span>
@@ -1707,10 +1785,12 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
           <div className="pb-connections__block">
             <div className="pb-connections__title">Смещения</div>
             <small className="pb-hint" style={{ display: 'block', marginTop: '0.25rem', fontSize: '0.7rem' }}>Двигайте блоки по вертикали, чтобы они не наезжали друг на друга.</small>
-            <div style={{ marginTop: '0.75rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--tg-hint)', marginBottom: '0.4rem' }}><span>Контент макета (Y)</span><span style={{ fontFamily: 'monospace' }}>{elements.contentOffsetY > 0 ? '+' : ''}{Math.round(elements.contentOffsetY)} px</span></div>
-              <Slider value={elements.contentOffsetY} min={-1000} max={1200} step={20} onChange={(e) => setElements({ ...elements, contentOffsetY: e.value as number })} />
-            </div>
+            {layout !== 'charts' && (
+              <div style={{ marginTop: '0.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--tg-hint)', marginBottom: '0.4rem' }}><span>Контент макета (Y)</span><span style={{ fontFamily: 'monospace' }}>{elements.contentOffsetY > 0 ? '+' : ''}{Math.round(elements.contentOffsetY)} px</span></div>
+                <Slider value={elements.contentOffsetY} min={-1000} max={1200} step={20} onChange={(e) => setElements({ ...elements, contentOffsetY: e.value as number })} />
+              </div>
+            )}
             <div style={{ marginTop: '0.75rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--tg-hint)', marginBottom: '0.4rem' }}><span>Графики (Y)</span><span style={{ fontFamily: 'monospace' }}>{elements.chartsOffsetY > 0 ? '+' : ''}{Math.round(elements.chartsOffsetY)} px</span></div>
               <Slider value={elements.chartsOffsetY} min={-1000} max={1200} step={20} onChange={(e) => setElements({ ...elements, chartsOffsetY: e.value as number })} />
@@ -1731,17 +1811,31 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
             <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.5rem' }}>
               <InputText value={presetNameInput} onChange={(e) => setPresetNameInput(e.target.value)} placeholder="Название пресета" style={{ flex: 1 }} />
               <Button icon="pi pi-save" tooltip="Сохранить" tooltipOptions={{ position: 'bottom' }} className="pb-soft p-button-sm" style={{ width: '2.8rem', padding: 0 }} onClick={() => {
-                  const name = presetNameInput.trim(); if (!name) return;
-                  setCustomPresets([{ id: `preset-${Date.now()}`, name, layout, platformId, elements: { ...elements, charts: { ...elements.charts } }, savedAt: new Date().toISOString() }, ...customPresets]);
-                  setPresetNameInput('');
-                }} disabled={!presetNameInput.trim()} />
+                const name = presetNameInput.trim(); if (!name) return;
+                setCustomPresets([{ id: `preset-${Date.now()}`, name, layout, platformId, elements: { ...elements, charts: { ...elements.charts } }, savedAt: new Date().toISOString() }, ...customPresets]);
+                setPresetNameInput('');
+              }} disabled={!presetNameInput.trim()} />
             </div>
             {customPresets.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '0.5rem' }}>
                 {customPresets.map((p) => (
                   <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.35rem 0.5rem', border: '1px solid var(--pb-border, #333)', borderRadius: '6px' }}>
                     <span style={{ flex: 1, fontSize: '0.8rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
-                    <Button icon="pi pi-check" className="pb-soft p-button-sm" style={{ width: '2.5rem', height: '2.5rem', padding: 0 }} tooltip="Применить" tooltipOptions={{ position: 'bottom' }} onClick={() => { setLayout(p.layout); setPlatformId(p.platformId); setElements(normalizeElements(p.elements)); }} />
+                    <Button
+                      icon="pi pi-check"
+                      className="pb-soft p-button-sm"
+                      style={{ width: '2.5rem', height: '2.5rem', padding: 0 }}
+                      tooltip="Применить"
+                      tooltipOptions={{ position: 'bottom' }}
+                      onClick={() => {
+                        const targetFormat = getPreset(p.platformId).format;
+                        const compatible = LAYOUT_FORMATS[p.layout]?.includes(targetFormat)
+                          ? p.layout
+                          : FORMAT_DEFAULT_LAYOUT[targetFormat];
+                        switchTo(p.platformId, compatible);
+                        setElements(normalizeElements(p.elements));
+                      }}
+                    />
                     <Button icon="pi pi-trash" className="pb-destructive-soft p-button-sm" style={{ width: '2.5rem', height: '2.5rem', padding: 0 }} tooltip="Удалить" tooltipOptions={{ position: 'bottom' }} onClick={() => setCustomPresets(customPresets.filter((x) => x.id !== p.id))} />
                   </div>
                 ))}
@@ -1756,24 +1850,30 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
 
         {/* ==================== ПРЕВЬЮ ==================== */}
         <div style={{ flex: 1, background: '#000', borderRadius: '8px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-          <div style={{ position: 'relative', aspectRatio: '9 / 16', height: '100%', maxWidth: '100%', overflow: 'hidden' }} onMouseDown={handleMouseDown} onWheel={handleWheel}>
-            {/* ЖИВАЯ КАРТА */}
+          <div
+            style={{
+              position: 'relative',
+              aspectRatio: `${preset.width} / ${preset.height}`,
+              height: '100%',
+              maxWidth: '100%',
+              overflow: 'hidden',
+            }}
+            onMouseDown={handleMouseDown}
+            onWheel={handleWheel}
+          >
             <div ref={mapContainerRef} style={{ position: 'absolute', inset: 0, zIndex: 1, opacity: bgSource === 'map' && elements.showMap ? 1 : 0, pointerEvents: bgSource === 'map' && elements.showMap ? 'auto' : 'none', transition: 'opacity 0.2s' }} />
 
-            {/* Чёрный фон под фото/текст, если карта выключена */}
             {!(bgSource === 'map' && elements.showMap) && (<div style={{ position: 'absolute', inset: 0, background: '#0d0d0d', zIndex: 0 }} />)}
 
-            {/* ТЕКСТ И ФОТО */}
             <canvas ref={(el) => { textCanvasRef.current = el; if (el && !canvasReady) setCanvasReady(true); }} style={{ position: 'absolute', inset: 0, zIndex: 2, width: '100%', height: '100%', pointerEvents: 'none' }} />
 
-            {/* SAFE ZONES */}
             {showSafeZones && (
               <div style={{ position: 'absolute', inset: 0, zIndex: 3, pointerEvents: 'none' }}>
-                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: `${(preset.safeTop / CANVAS_HEIGHT) * 100}%`, background: 'rgba(255,60,60,0.16)' }} />
-                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: `${(preset.safeBottom / CANVAS_HEIGHT) * 100}%`, background: 'rgba(255,60,60,0.16)' }} />
-                <div style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: `${(preset.safeLeft / CANVAS_WIDTH) * 100}%`, background: 'rgba(255,60,60,0.16)' }} />
-                <div style={{ position: 'absolute', top: 0, bottom: 0, right: 0, width: `${(preset.safeRight / CANVAS_WIDTH) * 100}%`, background: 'rgba(255,60,60,0.16)' }} />
-                <div style={{ position: 'absolute', top: `${(preset.safeTop / CANVAS_HEIGHT) * 100}%`, bottom: `${(preset.safeBottom / CANVAS_HEIGHT) * 100}%`, left: `${(preset.safeLeft / CANVAS_WIDTH) * 100}%`, right: `${(preset.safeRight / CANVAS_WIDTH) * 100}%`, border: '3px dashed rgba(255,255,255,0.7)' }} />
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: `${(preset.safeTop / preset.height) * 100}%`, background: 'rgba(255,60,60,0.16)' }} />
+                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: `${(preset.safeBottom / preset.height) * 100}%`, background: 'rgba(255,60,60,0.16)' }} />
+                <div style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: `${(preset.safeLeft / preset.width) * 100}%`, background: 'rgba(255,60,60,0.16)' }} />
+                <div style={{ position: 'absolute', top: 0, bottom: 0, right: 0, width: `${(preset.safeRight / preset.width) * 100}%`, background: 'rgba(255,60,60,0.16)' }} />
+                <div style={{ position: 'absolute', top: `${(preset.safeTop / preset.height) * 100}%`, bottom: `${(preset.safeBottom / preset.height) * 100}%`, left: `${(preset.safeLeft / preset.width) * 100}%`, right: `${(preset.safeRight / preset.width) * 100}%`, border: '3px dashed rgba(255,255,255,0.7)' }} />
               </div>
             )}
           </div>

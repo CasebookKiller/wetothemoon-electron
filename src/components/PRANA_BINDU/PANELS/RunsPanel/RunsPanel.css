@@ -1,5 +1,12 @@
 /* src/components/PRANA_BINDU/RunsPanel/RunsPanel.css */
 
+.pb-runs-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
 /* --- Тулбар: фильтры слева, переключатель справа --- */
 
 .pb-runs-panel__toolbar {
@@ -139,13 +146,6 @@
    Обёртка таблицы — фиксированная высота, чтобы при смене
    страницы пагинации контейнер не «дышал» (не прыгал).
    ============================================================ */
-
-.pb-runs-table-wrap {
-  height: 620px;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
 
 .pb-runs-table-wrap .p-datatable {
   flex: 1 1 auto;
@@ -307,10 +307,11 @@
    ============================================================ */
 
 .pb-runs-table-wrap {
-  height: 680px;
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  height: 100%;
 }
 
 .pb-runs-table-wrap .p-datatable {
@@ -417,4 +418,35 @@
   font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
   font-size: 0.78rem;
   color: var(--pb-accent);
+}
+
+/* Когда таблица внутри диалога — она занимает всё место */
+.pb-runs-table-wrap .p-datatable {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.pb-runs-table-wrap .p-datatable .p-datatable-wrapper {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* Правильная резиновая обертка для таблицы внутри диалога */
+.pb-runs-table-wrap {
+  flex: 1 1 auto;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.pb-runs-table-wrap .p-datatable {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.pb-runs-table-wrap .p-datatable .p-datatable-wrapper {
+  flex: 1 1 auto;
+  min-height: 0;
 }

@@ -25,6 +25,9 @@ export interface Profile {
   /** Пульс покоя, уд/мин */
   restingHr?: number;
   weightKg?: number;
+  heightCm?: number;
+  birthDate?: string;
+  gender?: string;
   /** Порог лактата, уд/мин (опционально) */
   lactateThresholdHr?: number;
   /** Целевая дата марафона, ISO (YYYY-MM-DD) */

@@ -10,6 +10,9 @@ function rowToDomain(row: ProfileRow): Profile {
     maxHr: row.max_hr ?? undefined,
     restingHr: row.resting_hr ?? undefined,
     weightKg: row.weight_kg ?? undefined,
+    heightCm: row.height_cm ?? undefined,
+    birthDate: row.birth_date ?? undefined,
+    gender: row.gender ?? undefined,
     lactateThresholdHr: row.lthr ?? undefined,
     marathonDate: row.goal_marathon_date ?? undefined,
     lthrSource: row.lthr_source ?? undefined,
@@ -119,6 +122,9 @@ export function updateProfile(db: DatabaseSync, patch: Partial<Profile>): Profil
     lthr: lthr.value,
     resting_hr: restHr.value,
     weight_kg: patch.weightKg ?? current?.weight_kg ?? null,
+    height_cm: patch.heightCm ?? current?.height_cm ?? null,
+    birth_date: patch.birthDate ?? current?.birth_date ?? null,
+    gender: patch.gender ?? current?.gender ?? null,
     goal_marathon_date: patch.marathonDate ?? current?.goal_marathon_date ?? null,
     lthr_source: lthr.source,
     max_hr_source: maxHr.source,
@@ -134,14 +140,15 @@ export function updateProfile(db: DatabaseSync, patch: Partial<Profile>): Profil
   if (!current) {
     db.prepare(
       `INSERT INTO profile (id, age, max_hr, lthr, resting_hr, weight_kg,
+        height_cm, birth_date, gender,
         goal_marathon_date, lthr_source, max_hr_source, resting_hr_source,
         hr_zones_json, hr_zones_source,
         pace_zones_json, pace_zones_source, threshold_pace_ms,
         created_at, updated_at)
-      VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       merged.age, merged.max_hr, merged.lthr, merged.resting_hr,
-      merged.weight_kg, merged.goal_marathon_date,
+      merged.weight_kg, merged.height_cm, merged.birth_date, merged.gender, merged.goal_marathon_date,
       merged.lthr_source, merged.max_hr_source, merged.resting_hr_source,
       merged.hr_zones_json, merged.hr_zones_source,
       merged.pace_zones_json, merged.pace_zones_source, merged.threshold_pace_ms,
@@ -151,6 +158,7 @@ export function updateProfile(db: DatabaseSync, patch: Partial<Profile>): Profil
     db.prepare(
       `UPDATE profile SET
         age = ?, max_hr = ?, lthr = ?, resting_hr = ?, weight_kg = ?,
+        height_cm = ?, birth_date = ?, gender = ?,
         goal_marathon_date = ?,
         lthr_source = ?, max_hr_source = ?, resting_hr_source = ?,
         hr_zones_json = ?, hr_zones_source = ?,
@@ -159,7 +167,7 @@ export function updateProfile(db: DatabaseSync, patch: Partial<Profile>): Profil
        WHERE id = 1`
     ).run(
       merged.age, merged.max_hr, merged.lthr, merged.resting_hr,
-      merged.weight_kg, merged.goal_marathon_date,
+      merged.weight_kg, merged.height_cm, merged.birth_date, merged.gender, merged.goal_marathon_date,
       merged.lthr_source, merged.max_hr_source, merged.resting_hr_source,
       merged.hr_zones_json, merged.hr_zones_source,
       merged.pace_zones_json, merged.pace_zones_source, merged.threshold_pace_ms,

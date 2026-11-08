@@ -33,6 +33,7 @@ import { createOsintWindow, getOsintWindow } from './windows/osintWindow';
 import { registerOsintHandlers } from './ipcHandlers/osintHandlers';
 import { registerPranaBinduHandlers } from './ipcHandlers/pranaBinduHandlers.ts';
 import { openMelange, seed as seedMelange } from './services/pranaBindu/melange';
+import { openGatewayCache, closeGatewayCache } from './services/gateway/cache/db';
 
 import fs from 'fs';
 import path from 'path';
@@ -298,6 +299,23 @@ app.whenReady().then(() => {
 
   registerOsintHandlers();
 
+  // Gateway Cache: открываем БД ДО регистрации хендлеров,
+  // чтобы gatewayHandlers сразу имели доступ к кэшу.
+  openGatewayCache(
+    path.join(app.getPath('userData'), 'gateway.db')
+  );
+
+  // GC для file_blobs с ref_count <= 0 старше 24ч — в фоне, не блокирует старт
+  import('./services/gateway/cache/GatewayFileService')
+    .then(({ GatewayFileService }) => {
+      GatewayFileService.getInstance().gc(24).catch((e) => {
+        console.warn('[GatewayFile] gc при старте упал:', e);
+      });
+    })
+    .catch(() => {
+      /* ignore */
+    });
+
   registerGatewayHandlers();
   
   // Melange: открываем БД ДО регистрации хендлеров,
@@ -358,6 +376,7 @@ app.on('activate', () => {
 
 app.on('before-quit', () => {
   scheduler.stop();
+  closeGatewayCache();
 });
 
 const aiWindow = getAIWindow();
