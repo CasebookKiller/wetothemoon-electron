@@ -15,7 +15,7 @@ import { classNames } from '@/css/classnames';
 
 interface GatewayMessageAssistantProps {
   thinking?: string;
-  blocks: { type: 'text' | 'code'; content: string; language?: string }[];
+  blocks: Array<{ type: 'text' | 'code' | 'file'; content: string; language?: string }>;
   fullHtml?: string;
   selectMode?: boolean;
   isSelected?: boolean;
@@ -25,6 +25,10 @@ interface GatewayMessageAssistantProps {
   onRegenerate?: () => void;
   onFeedback?: (type: 'like' | 'dislike') => void;
   onShare?: () => void;
+  // 5.7: branching (наследуется бэкендом, но в UI не рендерится)
+  branchTotal?: number;
+  branchIndex?: number;
+  onBranchSwitch?: (direction: 'prev' | 'next') => void;
 }
 
 export const GatewayMessageAssistant: React.FC<GatewayMessageAssistantProps> = ({
@@ -39,6 +43,9 @@ export const GatewayMessageAssistant: React.FC<GatewayMessageAssistantProps> = (
   onRegenerate,
   onFeedback,
   onShare,
+  branchTotal,
+  branchIndex,
+  onBranchSwitch,
 }) => {
   const [thinkingExpanded, setThinkingExpanded] = useState(false);
   const [hovered, setHovered] = useState(false);
@@ -67,9 +74,10 @@ export const GatewayMessageAssistant: React.FC<GatewayMessageAssistantProps> = (
     if (onFeedback) onFeedback('dislike');
   };
 
+  const hasBranch = branchTotal != null && branchTotal > 1;
   const actionsStyle: React.CSSProperties = {
-    visibility: selectMode ? 'hidden' : isLast || hovered ? 'visible' : 'hidden',
-    opacity: selectMode ? 0 : isLast || hovered ? 1 : 0,
+    visibility: selectMode ? 'hidden' : hasBranch || isLast || hovered ? 'visible' : 'hidden',
+    opacity: selectMode ? 0 : hasBranch || isLast || hovered ? 1 : 0,
     transition: 'opacity 0.01s ease, visibility 0.01s ease',
     pointerEvents: selectMode ? 'none' : 'auto',
   };
@@ -264,6 +272,76 @@ export const GatewayMessageAssistant: React.FC<GatewayMessageAssistantProps> = (
           flexWrap: 'wrap-reverse',
         }}
       >
+        {branchTotal != null && branchTotal > 1 && (
+          <div
+            className={classNames({ 'ds-flex': true, _965abe9: true, _54866f7: true })}
+            style={{ alignItems: 'center', gap: 4 }}
+          >
+            <div
+              role="button"
+              className={classNames({
+                'ds-button': true,
+                'ds-button--iconLabelTertiary': true,
+                'ds-button--icon': true,
+                'ds-button--capsule': true,
+                'ds-button--xs': true,
+                'ds-button--icon-relative-l': true,
+              })}
+              tabIndex={0}
+              onClick={() => {
+                if (branchIndex != null && branchIndex > 1) onBranchSwitch?.('prev');
+              }}
+              style={{ opacity: branchIndex === 1 ? 0.35 : 1 }}
+              aria-label="Предыдущая ветка"
+            >
+              <div className={classNames({ 'ds-button__background': true })} />
+              <div className={classNames({ 'ds-button__icon': true, 'ds-button__icon--last-child': true })}>
+                <div style={{ transform: 'rotate(-90deg)', display: 'flex' }}>
+                  <ChevronIcon size={14} expanded={true} />
+                </div>
+              </div>
+            </div>
+            <span
+              className="dd7e4fda"
+              style={{
+                fontSize: 12,
+                color: 'var(--dsw-alias-label-secondary, #999)',
+                minWidth: 28,
+                textAlign: 'center',
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              {branchIndex} / {branchTotal}
+            </span>
+            <div
+              role="button"
+              className={classNames({
+                'ds-button': true,
+                'ds-button--iconLabelTertiary': true,
+                'ds-button--icon': true,
+                'ds-button--capsule': true,
+                'ds-button--xs': true,
+                'ds-button--icon-relative-l': true,
+              })}
+              tabIndex={0}
+              onClick={() => {
+                if (branchIndex != null && branchTotal != null && branchIndex < branchTotal) {
+                  onBranchSwitch?.('next');
+                }
+              }}
+              style={{ opacity: branchIndex === branchTotal ? 0.35 : 1 }}
+              aria-label="Следующая ветка"
+            >
+              <div className={classNames({ 'ds-button__background': true })} />
+              <div className={classNames({ 'ds-button__icon': true, 'ds-button__icon--last-child': true })}>
+                <div style={{ transform: 'rotate(90deg)', display: 'flex' }}>
+                  <ChevronIcon size={14} expanded={true} />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className={classNames({ 'ds-flex': true, _965abe9: true, _54866f7: true })} style={{ alignItems: 'center', gap: 10 }}>
           {/* Кнопка копирования */}
           <div
@@ -343,7 +421,7 @@ export const GatewayMessageAssistant: React.FC<GatewayMessageAssistantProps> = (
             })}
             tabIndex={0}
             onClick={handleDislike}
-            style={{ color: disliked ? 'var(--dsw-alias-brand-primary)' : undefined }}
+            style={{ color: disliked ? 'var(--ds-alias-brand-primary)' : undefined }}
           >
             <div className={classNames({ 'ds-button__background': true })} />
             <div className={classNames({ 'ds-button__icon': true, 'ds-button__icon--last-child': true })}>

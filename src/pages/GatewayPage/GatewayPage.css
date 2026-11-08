@@ -2,20 +2,6 @@
   --dsw-alias-bg-multi-select: #212123; /* тёмный фон, можно заменить на свой */
 }
 
-/* Ширина поля ввода */
-/*._871cbca {
-  width: 100%;
-  margin: 0 auto;
-  padding-bottom: 24px;
-}*/
-
-/*.aaff8b8f,
-._9a2f8e4 {
-  max-width: 780px;
-  width: 100%;
-  margin: 0 auto;
-}*/
-
 /* Строка "Сгенерировано ИИ" */
 ._0fcaa63 {
   position: static !important;
@@ -24,18 +10,1833 @@
   flex-shrink: 0;
 }
 
-/* Убираем лишние отступы у шапки */
+/* Сброс только для внешних обёрток.
+   Внутренние (_2be88ba, _1aa2651, .f8d1e4c0) — НЕ трогаем,
+   у них свои стили в main.css (высота 60px, padding и т.п.). */
 ._765a5cd,
-._660ca72,
-._2be88ba,
-._1aa2651,
-.f8d1e4c0 {
+._660ca72 {
   padding: 0;
   margin: 0;
-  height: auto;
-  min-height: 0;
+}
+
+/* Восстанавливаем оригинальную высоту шапки диалога.
+   min-height: 60px — защита от flex-shrink со стороны родителя. */
+._2be88ba {
+  height: 60px !important;
+  min-height: 60px !important;
+  box-sizing: border-box !important;
 }
 
 .ds-virtual-list {
   overflow-x: hidden;
+}
+
+/* ============================================================
+   GatewaySidebar — контекстное меню (Шаг 7)
+   ============================================================ */
+.gateway-sidebar-actions {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.gateway-sidebar-menu {
+  position: absolute;
+  /* Привязываем к кнопке (она по центру), а не к низу строки */
+  top: 32px; 
+  right: -8px;
+  margin-top: 4px;
+  min-width: 180px;
+  white-space: nowrap;
+  /* Делаем фон плотным, чтобы текст не просвечивал */
+  background: rgba(42, 42, 46, 0.98) !important; 
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 4px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  z-index: 1001 !important;
+  pointer-events: auto !important;
+}
+
+.gateway-sidebar-menu__item {
+  display: flex;
+  align-items: center;
+  padding: 8px 10px;
+  height: 40px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 24px;
+  color: var(--dsw-alias-text-primary, #f5f5f5);
+  transition: background-color 0.15s ease;
+  user-select: none;
+  pointer-events: auto !important;
+  white-space: nowrap; /* Запрещаем перенос текста */
+}
+
+/* Иконка в пункте меню */
+.gateway-sidebar-menu__item svg {
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.gateway-sidebar-menu__item:hover {
+  background: var(--dsw-alias-bg-layer-3, #3a3a3e);
+}
+
+.gateway-sidebar-menu__item--danger {
+  color: #ec3942;
+}
+
+.gateway-sidebar-menu__item--danger:hover {
+  background: rgba(236, 57, 66, 0.1);
+}
+
+/* ============================================================
+   GatewayMessageNavigation (Шаг 9)
+   ============================================================ */
+.gateway-message-nav {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1000;
+  width: 34px;
+  height: 300px;
+  pointer-events: auto;
+  background: rgba(21, 21, 23, 0.6);
+  border-radius: 17px;
+  transition: width 0.2s ease, background 0.2s ease, border-radius 0.2s ease, box-shadow 0.2s ease;
+  /* Важно: разрешаем тултипу вылезать за пределы контейнера */
+  overflow: visible !important; 
+}
+
+.gateway-message-nav--hovered {
+  width: 242px;
+  background: var(--dsw-alias-bg-layer-2, #232324) !important;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.08));
+}
+
+.gateway-message-nav__popup {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 242px;
+  height: 300px;
+  z-index: 1000;
+  pointer-events: none;
+  transition: pointer-events 0.15s ease;
+}
+
+.gateway-message-nav--hovered .gateway-message-nav__popup {
+  pointer-events: auto;
+}
+
+.gateway-message-nav__list {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  height: 100%;
+  padding: 4px 7px 4px 25px;
+  box-sizing: border-box;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.gateway-message-nav__list::-webkit-scrollbar {
+  display: none;
+}
+
+.gateway-message-nav__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 30px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+  border-radius: 6px;
+}
+
+.gateway-message-nav__item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.gateway-message-nav__preview {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 12px;
+  line-height: 20px;
+  height: 20px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.gateway-message-nav--hovered .gateway-message-nav__preview {
+  opacity: 1;
+}
+
+.gateway-message-nav__stripe-wrap {
+  width: 16px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.gateway-message-nav__stripe {
+  width: 8px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 1px;
+  transition: width 0.15s ease, height 0.15s ease, background 0.15s ease;
+}
+
+.gateway-message-nav__item--active .gateway-message-nav__stripe {
+  width: 12px;
+  height: 3px;
+  background: var(--dsw-alias-brand-primary, rgb(103, 158, 254));
+}
+
+/* ============================================================
+   Кастомный тултип
+   ============================================================ */
+.gateway-message-nav__tooltip {
+  position: absolute;
+  right: calc(100% + 12px); /* Отступ слева от панели */
+  transform: translateY(-50%);
+  background: var(--dsw-alias-bg-layer-3, #2a2a2e);
+  color: var(--dsw-alias-text-primary, #f5f5f5);
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.4;
+  
+  /* ЖЕСТКО ЗАДАЕМ ШИРИНУ, чтобы текст не ломался вертикально */
+  width: max-content !important;
+  min-width: 200px !important;
+  max-width: 280px !important;
+  
+  white-space: normal !important;
+  word-break: break-word !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  z-index: 9999 !important; /* Поверх всего */
+  border: 1px solid var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.08));
+}
+
+.gateway-message-nav__tooltip::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 100%;
+  transform: translateY(-50%);
+  border: 6px solid transparent;
+  border-left-color: var(--dsw-alias-bg-layer-3, #2a2a2e);
+}
+
+/* ============================================================
+   Якорь скролла для плавной подгрузки истории (Шаг 11)
+   ============================================================ */
+.ds-virtual-list {
+  overflow-anchor: auto !important;
+}
+.ds-virtual-list-items {
+  overflow-anchor: auto !important;
+}
+.ds-virtual-list-visible-items {
+  overflow-anchor: auto !important;
+}
+.ds-virtual-list-visible-items > div {
+  overflow-anchor: auto !important;
+}
+/* Отключаем якорь только для инпута и футера, чтобы они не мешали */
+._871cbca, ._0fcaa63 {
+  overflow-anchor: none !important;
+}
+
+/* ============================================================
+   GatewayCacheManager (Шаг 10)
+   ============================================================ */
+.gateway-cache-modal {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  z-index: 9999999 !important; /* Максимальный приоритет */
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: rgba(0, 0, 0, 0.45) !important;
+  isolation: isolate;
+}
+
+.gateway-cache-modal__content {
+  background: rgba(30, 30, 32, 0.4) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.gateway-cache-modal__focus-lock {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gateway-cache-modal__content {
+  max-width: 720px !important;
+  width: 90vw !important;
+  max-height: 80vh !important;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+.gateway-cache-modal .ds-modal-content__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.gateway-cache-modal__title-icon {
+  display: inline-flex;
+  color: var(--dsw-alias-brand-primary, rgb(103, 158, 254));
+}
+
+.gateway-cache-modal__tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.08));
+  flex-shrink: 0;
+}
+
+.gateway-cache-modal__tab {
+  background: transparent;
+  border: none;
+  color: var(--dsw-alias-text-secondary, #b0b0b5);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 10px 14px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.gateway-cache-modal__tab:hover {
+  color: var(--dsw-alias-text-primary, #f5f5f5);
+}
+
+.gateway-cache-modal__tab--active {
+  color: var(--dsw-alias-text-primary, #f5f5f5);
+  border-bottom-color: var(--dsw-alias-brand-primary, rgb(103, 158, 254));
+}
+
+.gateway-cache-modal__banner {
+  padding: 8px 20px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.gateway-cache-modal__banner--error {
+  background: rgba(236, 57, 66, 0.1);
+  color: #ec3942;
+}
+
+.gateway-cache-modal__banner--info {
+  background: rgba(77, 107, 254, 0.1);
+  color: var(--dsw-alias-brand-primary, rgb(103, 158, 254));
+}
+
+.gateway-cache-modal__main {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 200px;
+  max-height: calc(80vh - 140px);
+}
+
+.gateway-cache-modal__loading,
+.gateway-cache-modal__empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--dsw-alias-text-secondary, #8a8a8f);
+  font-size: 13px;
+}
+
+/* Overview */
+.gateway-cache-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 20px;
+}
+
+.gateway-cache-overview__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--dsw-alias-border-l3, rgba(255, 255, 255, 0.05));
+}
+
+.gateway-cache-overview__row:last-child {
+  border-bottom: none;
+}
+
+.gateway-cache-overview__label {
+  color: var(--dsw-alias-text-secondary, #b0b0b5);
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.gateway-cache-overview__value {
+  color: var(--dsw-alias-text-primary, #f5f5f5);
+  font-size: 13px;
+  text-align: right;
+  word-break: break-all;
+}
+
+.gateway-cache-overview__value--mono {
+  font-family: monospace;
+  font-size: 12px;
+}
+
+/* Conversations */
+.gateway-cache-conversations {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 0;
+}
+
+.gateway-cache-conversations__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--dsw-alias-border-l3, rgba(255, 255, 255, 0.05));
+}
+
+.gateway-cache-conversations__row:last-child {
+  border-bottom: none;
+}
+
+.gateway-cache-conversations__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.gateway-cache-conversations__title {
+  color: var(--dsw-alias-text-primary, #f5f5f5);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gateway-cache-conversations__meta {
+  color: var(--dsw-alias-text-secondary, #8a8a8f);
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.gateway-cache-conversations__actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.gateway-cache-conversations__btn {
+  font-size: 12px !important;
+  height: 30px !important;
+  min-width: 32px !important;
+  padding: 0 10px !important;
+}
+
+/* Actions */
+.gateway-cache-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 20px;
+}
+
+.gateway-cache-actions__card {
+  background: var(--dsw-alias-bg-layer-2, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--dsw-alias-border-l3, rgba(255, 255, 255, 0.08));
+  border-radius: 8px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gateway-cache-actions__title {
+  color: var(--dsw-alias-text-primary, #f5f5f5);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.gateway-cache-actions__desc {
+  color: var(--dsw-alias-text-secondary, #8a8a8f);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* ============================================================
+   GatewayInputModal
+   ============================================================ */
+.gateway-input-modal {
+  position: fixed !important;
+  top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
+  z-index: 99999999 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: rgba(0, 0, 0, 0.45) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.gateway-input-modal__content {
+  max-width: 400px !important;
+  width: 90vw !important;
+  border-radius: 12px;
+  background: rgba(30, 30, 32, 0.5) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.gateway-input-modal__input {
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--dsw-alias-bg-layer-1, #1e1e20);
+  border: 1px solid var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.1));
+  border-radius: 8px;
+  color: var(--dsw-alias-text-primary, #f5f5f5);
+  font-size: 14px;
+  outline: none;
+}
+
+.gateway-input-modal__input:focus {
+  border-color: var(--dsw-alias-brand-primary, rgb(103, 158, 254));
+}
+
+/* ============================================================
+   Фикс сайдбара: текст не наезжает на кнопку "три точки"
+   ============================================================ */
+._546d736 {
+  position: relative !important;
+}
+
+.c08e6e93 {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-right: 36px !important; /* Место под кнопку */
+}
+
+._254829d {
+  position: absolute !important;
+  right: 8px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+/* Показываем кнопку при наведении или у выбранного диалога */
+._546d736:hover ._254829d,
+._546d736.b64fb9ae ._254829d,
+._546d736:focus-within ._254829d {
+  opacity: 1 !important;
+}
+
+/* ============================================================
+   ФИКС: Правильное позиционирование кнопки "три точки"
+   ============================================================ */
+.gateway-sidebar-actions {
+  position: absolute !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  right: 0 !important;
+  width: 56px !important; /* Как в оригинале */
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+  /* Убираем flex-центрирование */
+  display: block !important;
+}
+
+/* Показываем при наведении или если выбран */
+._546d736:hover .gateway-sidebar-actions,
+._546d736.b64fb9ae .gateway-sidebar-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Прижимаем саму кнопку к правому краю с отступом 4px (как в PW) */
+.gateway-sidebar-actions ._2090548 {
+  position: absolute !important;
+  right: 4px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  margin: 0 !important;
+  opacity: 1 !important;
+}
+
+/* Круглые чекбоксы в режиме выбора чатов */
+.ds-checkbox--circle {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+
+.ds-checkbox--circle.ds-checkbox--active {
+  background: var(--dsw-alias-brand-primary, rgb(103, 158, 254));
+  border-color: var(--dsw-alias-brand-primary, rgb(103, 158, 254));
+  color: #fff;
+}
+
+.ds-checkbox--circle:hover {
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+.ca6d4be1 {
+  width: 60px;
+  flex-shrink: 0;
+  background: var(--dsw-alias-bg-layer-1, #1e1e20);
+  border-right: 1px solid rgba(255,255,255,0.06);
+  height: 100%;
+}
+
+._4f3769f {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: var(--dsw-alias-text-secondary, #b0b0b5);
+  cursor: pointer;
+}
+._4f3769f:hover {
+  background: rgba(255,255,255,0.06);
+}
+/* Выравнивание иконок в шапке сайдбара */
+._23e1c55 .ds-button {
+  margin: 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+._23e1c55 .ds-button .ds-icon {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+.ds-icon svg {
+  display: block !important;
+}
+
+/* ============================================================
+   Свернутая панель сайдбара (Пилюля)
+   ============================================================ *//* ============================================================
+   Свернутая панель сайдбара (Горизонтальная)
+   ============================================================ */
+.ca6d4be1 {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin: 12px 0px 0px 16px;
+  height: 40px;
+  flex-shrink: 0;
+  background: transparent;
+}
+
+._6acebc2 {
+  display: block;
+  width: 27px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.e5bf614e {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 2px;
+  padding: 0 3px 0 0;
+  margin-left: 16px;
+  background: rgb(53, 54, 56);
+  border-radius: 100px;
+  height: 40px;
+}
+
+._4f3769f {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  color: var(--dsw-alias-text-secondary, #b0b0b5);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+._4f3769f:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--dsw-alias-text-primary, #f5f5f5);
+}
+
+/* ============================================================
+   Модалка поиска (GatewaySearchModal) — стили из PW
+   ============================================================ */
+.gateway-search-modal {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 9999998 !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  padding: 0 !important;
+  background: rgba(0, 0, 0, 0.6) !important;
+  backdrop-filter: blur(2px);
+}
+
+.gateway-search-modal__focus-lock {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.gateway-search-modal__content {
+  width: 660px !important;
+  max-width: 90vw !important;
+  max-height: 518px !important;
+  border-radius: 20px !important;
+  background: rgb(44, 44, 46) !important;
+  box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.04), 0 4px 10px 0 rgba(0, 0, 0, 0.02) !important;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Инпут-обёртка */
+.gateway-search-modal__input-wrapper {
+  display: flex;
+  align-items: center;
+  padding: 12px 12px 12px 8px !important;
+  gap: 0 !important;
+  flex-shrink: 0;
+  /* Убрали border-bottom */
+}
+
+/* Иконка внутри — кружок 36x36 */
+.gateway-search-modal__input-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: rgb(173, 178, 184);
+}
+
+/* Сам инпут */
+.gateway-search-modal__input {
+  flex: 1;
+  padding: 0 !important;
+  font-size: 16px !important;
+  line-height: 24px !important;
+  color: rgb(249, 250, 251) !important;
+  caret-color: rgb(249, 250, 251);
+  background: transparent;
+  border: none;
+  outline: none;
+  min-width: 0;
+}
+
+.gateway-search-modal__input::placeholder {
+  color: rgb(136, 136, 136);
+}
+
+/* Разделитель перед крестиком */
+.gateway-search-modal__divider {
+  width: 1px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.06);
+  margin: 0 12px;
+  flex-shrink: 0;
+}
+
+/* Кнопка закрытия */
+.gateway-search-modal__close {
+  width: 32px !important;
+  height: 28px !important;
+  border-radius: 28px !important;
+  background: transparent !important;
+  color: rgb(173, 178, 184) !important;
+  padding: 0 !important;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.gateway-search-modal__close:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Контейнер результатов */
+.gateway-search-modal__results {
+  padding: 0 !important;
+  overflow-y: auto !important;
+  flex: 1;
+  min-height: 0;
+}
+
+.gateway-search-modal__empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: rgb(136, 136, 136);
+  font-size: 14px;
+}
+
+/* Элемент результата */
+.gateway-search-modal__item {
+  display: flex;
+  gap: 12px !important;
+  padding: 10px 12px 10px 10px !important;
+  border-radius: 16px !important;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.gateway-search-modal__item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* Иконка результата */
+.gateway-search-modal__item-icon {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgb(173, 178, 184);
+  flex-shrink: 0;
+  padding-top: 0 !important;
+}
+
+.gateway-search-modal__item-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.gateway-search-modal__item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.gateway-search-modal__item-title {
+  font-size: 15px !important;
+  line-height: 25px !important;
+  font-weight: 400 !important;
+  color: rgb(249, 250, 251);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+/* В PW title для conversation тоже 400 (не жирный) */
+.gateway-search-modal__item--conversation .gateway-search-modal__item-title {
+  font-weight: 400 !important;
+}
+
+.gateway-search-modal__item-date {
+  font-size: 13px !important;
+  line-height: 20px !important;
+  color: rgb(173, 178, 184) !important;
+  flex-shrink: 0;
+}
+
+.gateway-search-modal__item-snippet {
+  font-size: 13px !important;
+  line-height: 20px !important;
+  color: rgb(207, 211, 214) !important;
+  margin-top: 4px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* Подсветка совпадений */
+.gateway-search-modal__hl {
+  background: rgba(77, 107, 254, 0.25) !important;
+  color: inherit;
+  padding: 0 1px;
+  border-radius: 2px;
+}
+
+/* ───── Gateway: file chips inside user messages (PW-exact) ───── */
+.gateway-file-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.gateway-file-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 240px;
+  height: 64px;
+  min-height: 64px;
+  padding: 0 12px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  border-radius: 16px;
+  background: #2c2c2e;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  overflow: hidden;
+}
+
+.gateway-file-chip:hover {
+  background: #353638;
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.gateway-file-chip__icon {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gateway-file-chip__thumb {
+  width: 28px;
+  height: 28px;
+  object-fit: cover;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+/* Имя __content (не __body), чтобы не попасть под глобальную замену
+   "body → .gateway-deepseek-root" при сборке стилей DeepSeek.
+   flex: 1 1 0% + width: 0 + min-width: 0 = фиксированная ширина,
+   доступная для ellipsis внутри. */
+.gateway-file-chip__content {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0%;
+  width: 0;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+/* Ellipsis работает только на элементе с ограниченной шириной.
+   width: 100% от __body (который ограничен через flex-basis: 0)
+   = гарантированная обрезка с «…». */
+.gateway-file-chip__name {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 22px;
+  color: #f9fafb;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gateway-file-chip__meta {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 15px;
+  color: #adb2b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ───── Gateway: file chip loaded/failed states ───── */
+.gateway-file-chip--loaded {
+  border-color: var(--dsw-alias-brand-primary, #5686fe) !important;
+}
+
+.gateway-file-chip--loaded:hover {
+  border-color: var(--dsw-alias-brand-primary, #5686fe) !important;
+  background: #303032;
+}
+
+.gateway-file-chip--failed {
+  border-color: rgba(236, 57, 66, 0.6) !important;
+}
+
+/* ───── Gateway: file viewer modal ───── */
+.gateway-file-viewer-modal {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 9999998 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: rgba(0, 0, 0, 0.6) !important;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+.gateway-file-viewer-modal__content {
+  width: 90vw !important;
+  max-width: 900px !important;
+  height: 85vh !important;
+  max-height: 800px !important;
+  background: var(--dsw-alias-bg-layer-1, #1e1e20) !important;
+  border-radius: 12px;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.1));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.gateway-file-viewer-modal__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.08));
+  flex-shrink: 0;
+}
+
+.gateway-file-viewer-modal__title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.gateway-file-viewer-modal__icon {
+  color: var(--dsw-alias-brand-primary, #5686fe);
+  flex-shrink: 0;
+}
+
+.gateway-file-viewer-modal__title {
+  color: var(--dsw-alias-text-primary, #f9fafb);
+  font-size: 14px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gateway-file-viewer-modal__meta {
+  color: var(--dsw-alias-text-secondary, #adb2b8);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.gateway-file-viewer-modal__close {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: var(--dsw-alias-text-secondary, #adb2b8);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.gateway-file-viewer-modal__close:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--dsw-alias-text-primary, #f9fafb);
+}
+
+.gateway-file-viewer-modal__body {
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+  min-height: 0;
+}
+
+.gateway-file-viewer-modal__pre {
+  margin: 0;
+  font-family: 'Menlo', 'Monaco', 'Consolas', 'Ubuntu Mono', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--dsw-alias-text-primary, #f9fafb);
+  white-space: pre-wrap;
+  word-break: break-word;
+  tab-size: 2;
+}
+
+.gateway-file-viewer-modal__image {
+  display: block;
+  margin: 0 auto;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.gateway-file-viewer-modal__loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  color: var(--dsw-alias-text-secondary, #adb2b8);
+  font-size: 13px;
+  text-align: center;
+}
+
+.gateway-file-viewer-modal__spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top-color: var(--dsw-alias-brand-primary, #5686fe);
+  border-radius: 50%;
+  animation: gateway-file-spin 0.8s linear infinite;
+  margin-bottom: 14px;
+}
+
+@keyframes gateway-file-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.gateway-file-viewer-modal__hint {
+  font-size: 12px;
+  color: var(--dsw-alias-text-tertiary, #8a8a8f);
+  margin-top: 8px;
+}
+
+.gateway-file-viewer-modal__error {
+  padding: 40px 20px;
+  text-align: center;
+  color: #ec3942;
+  font-size: 13px;
+}
+
+.gateway-file-viewer-modal__binary {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--dsw-alias-text-secondary, #adb2b8);
+  font-size: 13px;
+}
+
+.gateway-file-viewer-modal__binary-hint {
+  font-size: 11px;
+  color: var(--dsw-alias-text-tertiary, #8a8a8f);
+  margin-top: 6px;
+  font-family: monospace;
+}
+
+.gateway-file-viewer-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.08));
+  flex-shrink: 0;
+}
+
+/* ───── Gateway: file panel (шторка справа, как в PW) ───── */
+.gateway-file-panel-wrapper {
+  position: relative;
+  height: 100%;
+  flex-shrink: 0;
+  background: rgb(21, 21, 23);
+  border-left: 1px solid rgba(255, 255, 255, 0.06);
+  animation: gateway-file-panel-slide-in 0.2s ease;
+}
+
+@keyframes gateway-file-panel-slide-in {
+  from {
+    transform: translateX(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.gateway-file-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background: rgb(21, 21, 23);
+}
+
+.gateway-file-panel__handle {
+  position: absolute;
+  left: -6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 12px;
+  height: 32px;
+  background: rgb(44, 44, 46);
+  border-radius: 6px;
+  cursor: col-resize;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease;
+}
+
+.gateway-file-panel__handle:hover {
+  background: rgb(60, 60, 62);
+}
+
+.gateway-file-panel__handle-grip {
+  width: 2px;
+  height: 16px;
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 1px;
+}
+
+.gateway-file-panel__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.08));
+  flex-shrink: 0;
+}
+
+.gateway-file-panel__title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.gateway-file-panel__icon {
+  color: var(--dsw-alias-brand-primary, #5686fe);
+  flex-shrink: 0;
+}
+
+.gateway-file-panel__title {
+  color: var(--dsw-alias-text-primary, #f9fafb);
+  font-size: 14px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gateway-file-panel__meta {
+  color: var(--dsw-alias-text-secondary, #adb2b8);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.gateway-file-panel__close {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: var(--dsw-alias-text-secondary, #adb2b8);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.gateway-file-panel__close:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--dsw-alias-text-primary, #f9fafb);
+}
+
+.gateway-file-panel__body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+  padding: 0;
+  /* Кастомный скроллбар как в PW */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+/* Webkit скроллбар (Electron/Chromium) */
+.gateway-file-panel__body::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.gateway-file-panel__body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.gateway-file-panel__body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+.gateway-file-panel__body::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.gateway-file-panel__content {
+  margin: 14px 20px;
+  font-family: "quote-cjk-patch", "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+  font-size: 14px;
+  line-height: 21px;
+  color: rgb(235, 238, 242);
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: normal;
+}
+
+.gateway-file-panel__image {
+  display: block;
+  margin: 0 auto;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.gateway-file-panel__loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  color: var(--dsw-alias-text-secondary, #adb2b8);
+  font-size: 13px;
+  text-align: center;
+}
+
+.gateway-file-panel__spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top-color: var(--dsw-alias-brand-primary, #5686fe);
+  border-radius: 50%;
+  animation: gateway-file-spin 0.8s linear infinite;
+  margin-bottom: 14px;
+}
+
+@keyframes gateway-file-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.gateway-file-panel__hint {
+  font-size: 12px;
+  color: var(--dsw-alias-text-tertiary, #8a8a8f);
+  margin-top: 8px;
+}
+
+.gateway-file-panel__error {
+  padding: 40px 20px;
+  text-align: center;
+  color: #ec3942;
+  font-size: 13px;
+}
+
+.gateway-file-panel__binary {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--dsw-alias-text-secondary, #adb2b8);
+  font-size: 13px;
+}
+
+.gateway-file-panel__binary-hint {
+  font-size: 11px;
+  color: var(--dsw-alias-text-tertiary, #8a8a8f);
+  margin-top: 6px;
+  font-family: monospace;
+}
+
+.gateway-file-panel__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.08));
+  flex-shrink: 0;
+}
+
+/* ───── Gateway Cache Manager: автозагрузка файлов ───── */
+.gateway-cache-actions__radio-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 4px 0 6px;
+}
+
+.gateway-cache-actions__radio {
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.12));
+  background: transparent;
+  color: var(--dsw-alias-text-secondary, #b0b0b5);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 20px;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.gateway-cache-actions__radio:hover {
+  border-color: var(--dsw-alias-border-l3, rgba(255, 255, 255, 0.2));
+  color: var(--dsw-alias-text-primary, #f5f5f5);
+}
+
+.gateway-cache-actions__radio--active {
+  border-color: var(--dsw-alias-brand-primary, #5686fe);
+  color: var(--dsw-alias-brand-primary, #5686fe);
+  background: rgba(86, 134, 254, 0.08);
+}
+
+.gateway-cache-actions__hint {
+  font-size: 12px;
+  color: var(--dsw-alias-text-tertiary, #8a8a8f);
+  margin-top: 8px;
+  line-height: 1.4;
+}
+
+/* ───── Gateway: draggable progress toast для batch-загрузки ───── */
+.gateway-progress-toast {
+  position: fixed;
+  z-index: 9999990;
+  width: 320px;
+  background: rgba(30, 30, 32, 0.4) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.12));
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  user-select: none;
+  animation: gateway-progress-toast-in 0.2s ease;
+}
+
+@keyframes gateway-progress-toast-in {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.gateway-progress-toast__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  cursor: grab;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.gateway-progress-toast__header:active {
+  cursor: grabbing;
+}
+
+.gateway-progress-toast__title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--dsw-alias-text-primary, #f9fafb);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gateway-progress-toast__failed {
+  color: #ec3942;
+  font-weight: 400;
+}
+
+.gateway-progress-toast__close {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: var(--dsw-alias-text-secondary, #adb2b8);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.gateway-progress-toast__close:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--dsw-alias-text-primary, #f9fafb);
+}
+
+.gateway-progress-toast__body {
+  padding: 10px 12px 8px;
+}
+
+.gateway-progress-toast__current {
+  font-size: 12px;
+  color: var(--dsw-alias-text-secondary, #adb2b8);
+  margin-bottom: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gateway-progress-toast__error {
+  font-size: 12px;
+  color: #ec3942;
+  margin-bottom: 8px;
+}
+
+.gateway-progress-toast__bar {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.gateway-progress-toast__bar-fill {
+  height: 100%;
+  background: var(--dsw-alias-brand-primary, #5686fe);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.gateway-progress-toast__actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 12px 10px;
+}
+
+.gateway-progress-toast__cancel {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  color: var(--dsw-alias-text-secondary, #adb2b8);
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.gateway-progress-toast__cancel:hover {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ec3942;
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+/* ───── Gateway Cache Manager: file badges ───── */
+.gateway-cache-conversations__files-ok {
+  color: var(--dsw-alias-state-success-primary, #22c55e);
+}
+
+.gateway-cache-conversations__files-pending {
+  color: var(--dsw-alias-brand-primary, #5686fe);
+  font-weight: 500;
+}
+
+.gateway-cache-conversations__all-loaded {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 8px;
+  height: 30px;
+  font-size: 12px;
+  color: var(--dsw-alias-state-success-primary, #22c55e);
+  white-space: nowrap;
+}
+
+/* ───── Gateway: dialog load toast ───── */
+.gateway-dialog-load-toast {
+  position: fixed;
+  z-index: 9999990;
+  width: 320px;
+  background: rgba(30, 30, 32, 0.4) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.12));
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  user-select: none;
+  animation: gateway-progress-toast-in 0.2s ease;
+}
+
+.gateway-dialog-load-toast__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  cursor: grab;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.gateway-dialog-load-toast__header:active {
+  cursor: grabbing;
+}
+
+.gateway-dialog-load-toast__title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--dsw-alias-text-primary, #f9fafb);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gateway-dialog-load-toast__title-icon {
+  display: inline-flex;
+  color: var(--dsw-alias-state-success-primary, #22c55e);
+  flex-shrink: 0;
+}
+
+.gateway-dialog-load-toast__close {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: var(--dsw-alias-text-secondary, #adb2b8);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.gateway-dialog-load-toast__close:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--dsw-alias-text-primary, #f9fafb);
+}
+
+.gateway-dialog-load-toast__body {
+  padding: 10px 12px 8px;
+}
+
+.gateway-dialog-load-toast__name {
+  font-size: 12px;
+  color: var(--dsw-alias-text-primary, #f9fafb);
+  margin-bottom: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.gateway-dialog-load-toast__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.gateway-dialog-load-toast__label {
+  color: var(--dsw-alias-text-secondary, #adb2b8);
+}
+
+.gateway-dialog-load-toast__value {
+  color: var(--dsw-alias-text-primary, #f9fafb);
+  font-weight: 500;
+}
+
+.gateway-dialog-load-toast__failed {
+  color: #ec3942;
+  font-weight: 400;
+}
+
+.gateway-dialog-load-toast__ok {
+  color: var(--dsw-alias-state-success-primary, #22c55e);
+}
+
+.gateway-dialog-load-toast__pending-hint {
+  font-size: 11px;
+  color: var(--dsw-alias-brand-primary, #5686fe);
+  margin-top: 4px;
+}
+
+.gateway-dialog-load-toast__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 0 12px 10px;
+}
+
+.gateway-dialog-load-toast__action {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  color: var(--dsw-alias-text-secondary, #adb2b8);
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: background 0.15s ease, color 0.15s ease;
+  user-select: none;
+}
+
+.gateway-dialog-load-toast__action:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--dsw-alias-text-primary, #f9fafb);
+}
+
+.gateway-dialog-load-toast__action--primary {
+  color: var(--dsw-alias-brand-primary, #5686fe);
+  border-color: rgba(86, 134, 254, 0.4);
+  background: rgba(86, 134, 254, 0.08);
+}
+
+.gateway-dialog-load-toast__action--primary:hover {
+  background: rgba(86, 134, 254, 0.16);
+  border-color: var(--dsw-alias-brand-primary, #5686fe);
+  color: var(--dsw-alias-brand-primary, #5686fe);
+}
+
+.gateway-dialog-load-toast__action--loading {
+  color: var(--dsw-alias-text-tertiary, #8a8a8f);
+  border-color: rgba(255, 255, 255, 0.06);
+  cursor: default;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.gateway-dialog-load-toast__current {
+  font-size: 11px;
+  color: var(--dsw-alias-text-tertiary, #8a8a8f);
+  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-style: italic;
+}
+
+/* ───── 5.8.2 (fixed): Auto-hide scrollbar в GatewayFilePanel ─────
+   Старые правила .gateway-file-panel__body::-webkit-scrollbar-thumb
+   дают постоянный background: rgba(255,255,255,0.15). Переопределяем. */
+.gateway-file-panel__body::-webkit-scrollbar {
+  width: 8px !important;
+  height: 8px !important;
+}
+.gateway-file-panel__body::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+.gateway-file-panel__body::-webkit-scrollbar-thumb {
+  background: transparent !important;
+  border-radius: 4px !important;
+  transition: background 0.2s ease;
+}
+.gateway-file-panel-wrapper:hover .gateway-file-panel__body::-webkit-scrollbar-thumb,
+.gateway-file-panel__body.is-scrolling::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15) !important;
+}
+.gateway-file-panel__body.is-scrolling::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.25) !important;
+}
+
+/* 5.8.5: Поднимаем строку, в которой открыто меню,
+   чтобы следующие элементы не перекрывали выпадашку */
+._546d736:has(.gateway-sidebar-menu) {
+  z-index: 1000 !important;
+}
+
+/* ============================================================
+   5.8.6 (v3): GatewayConfirmModal — стекло
+   Принцип: overlay — только тёмная вуаль без blur.
+   Сама карточка — единственный слой с backdrop-filter.
+   Дочерние элементы — прозрачные (иначе фон складывается).
+   ============================================================ */
+
+/* Overlay: тёмная вуаль, БЕЗ blur */
+.gateway-confirm-modal {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 99999999 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: rgba(0, 0, 0, 0.4) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Карточка: стекло — blur именно того, что видно СКВОЗЬ неё */
+.gateway-confirm-modal .ds-modal-content,
+.gateway-confirm-modal .ds-modal-content--dialog,
+.gateway-confirm-modal .gateway-confirm-modal__content {
+  max-width: 420px !important;
+  min-width: 320px !important;
+  border-radius: 12px !important;
+  background: rgba(20, 20, 22, 0.4) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6) !important;
+}
+
+/* Дочерние: полностью прозрачные, без собственного blur */
+.gateway-confirm-modal .ds-modal-content__header-wrapper,
+.gateway-confirm-modal .ds-modal-content__main,
+.gateway-confirm-modal .ds-modal-content__title,
+.gateway-confirm-modal .ds-modal-focus-lock {
+  background: transparent !important;
+  background-color: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }

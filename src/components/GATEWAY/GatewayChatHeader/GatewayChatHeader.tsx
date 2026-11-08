@@ -4,58 +4,25 @@ import React from 'react';
 
 interface GatewayChatHeaderProps {
   title: string;
-  modelType: 'default' | 'expert' | 'vision';
-  onSelectModel: (model: 'default' | 'expert' | 'vision') => void;
   showTitle?: boolean;
   onToggleSelectMode?: () => void;
 }
 
 export const GatewayChatHeader: React.FC<GatewayChatHeaderProps> = ({
   title,
-  modelType,
-  onSelectModel,
   showTitle = true,
   onToggleSelectMode,
 }) => {
-  const modeLabel =
-    modelType === 'default' ? 'Быстрый' : modelType === 'expert' ? 'Эксперт' : 'Распознавание';
-
-  // Оригинальные SVG-иконки
-  const expertIcon = (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M11.0289 2.0918C11.6941 2.09186 12.3154 2.42299 12.6871 2.97461L14.8414 6.1709C15.0959 6.54892 15.0625 7.05142 14.7604 7.39258L8.74866 14.1768C8.35077 14.6257 7.64952 14.6257 7.25159 14.1768L1.23987 7.39258C0.937742 7.05136 0.905152 6.54892 1.15979 6.1709L3.31213 2.97461C3.68383 2.42281 4.306 2.0918 4.97131 2.0918H11.0289ZM3.41858 5.46484V6.76562H12.5817V5.46484H3.41858Z" fill="currentColor" />
-    </svg>
-  );
-
-  const fastIcon = (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M13.1631 6.76904L6.6497 14.7572C6.52129 14.9147 6.26708 14.8025 6.29685 14.6015L7.00998 9.78665C7.02788 9.66585 6.93427 9.55735 6.81214 9.55735L2.99201 9.55735C2.82344 9.55735 2.73048 9.36161 2.837 9.23096L9.35037 1.2428C9.47879 1.08531 9.73299 1.19748 9.70322 1.39849L8.99009 6.21335C8.9722 6.33416 9.06581 6.44265 9.18793 6.44265L13.0081 6.44265C13.1766 6.44265 13.2696 6.6384 13.1631 6.76904Z" stroke="currentColor" strokeWidth="1.3" />
-    </svg>
-  );
-
-  const visionIcon = (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="1.274" y="2.115" width="13.452" height="11.771" rx="3.2" stroke="currentColor" strokeWidth="1.3" />
-      <path d="M12.2037 6.31862C12.2037 7.24729 11.4509 8.00013 10.5222 8.00013C9.59353 8.00013 8.8407 7.24729 8.8407 6.31862C8.8407 5.38995 9.59353 4.63712 10.5222 4.63712C11.4509 4.63712 12.2037 5.38995 12.2037 6.31862Z" stroke="currentColor" strokeWidth="1.3" />
-      <path d="M1.27393 9.68155C2.48594 8.77254 3.09194 8.31804 3.74872 8.18241C4.28996 8.07064 4.85155 8.11055 5.37154 8.29774C6.00254 8.52489 6.53818 9.06052 7.60945 10.1318L11.363 13.8853" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
-    </svg>
-  );
-
-  const modeIcon = modelType === 'expert' ? expertIcon : modelType === 'vision' ? visionIcon : fastIcon;
-
   return (
-    <div className={`_2be88ba ${showTitle ? '' : '_1551317'}`}>
+    <div
+      className={`_2be88ba ${showTitle ? '' : '_1551317'}`}
+      style={{ height: 60, minHeight: 60, boxSizing: 'border-box' }}
+    >
       {showTitle && (
         <div className="f8d1e4c0 the-header">
           <div className="_9fcbeda _7ee190f">
-            <div className="afa34042 e0a1edb7 e37a04e4 _5a50d80" tabIndex={0}>
+            <div className="afa34042 e0a1edb7 e37a04e4" tabIndex={0}>
               {title}
-            </div>
-            <div className="c03d486a">
-              <div className="ds-icon a1ac5b47" style={{ fontSize: 12, width: 12, height: 12 }}>
-                {modeIcon}
-              </div>
-              <span className="_46a12ab">{modeLabel}</span>
             </div>
           </div>
         </div>
@@ -69,22 +36,16 @@ export const GatewayChatHeader: React.FC<GatewayChatHeaderProps> = ({
           onClick={onToggleSelectMode}
           style={{ '--dsl-button-height': '34px' } as React.CSSProperties}
         >
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M17.2027 4.90034V6.43655H2.79724V4.90034H17.2027Z" fill="currentColor" />
-              <path d="M10.9603 13.0634V14.5996H2.79724V13.0634H10.9603Z" fill="currentColor" />
-            </svg>
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M17.2027 4.90034V6.43655H2.79724V4.90034H17.2027Z" fill="currentColor" />
+            <path d="M10.9603 13.0634V14.5996H2.79724V13.0634H10.9603Z" fill="currentColor" />
+          </svg>
         </div>
 
         {showTitle ? (
           <>
             <div className="_9986c0c">
               <div className="d00ed9c9">{title}</div>
-              <div className="c03d486a">
-                <div className="ds-icon a1ac5b47" style={{ fontSize: 12, width: 12, height: 12 }}>
-                  {modeIcon}
-                </div>
-                <span className="_46a12ab">{modeLabel}</span>
-              </div>
             </div>
             <div className="_19943ce" />
             <div className="_348bebe" />
@@ -101,7 +62,7 @@ export const GatewayChatHeader: React.FC<GatewayChatHeaderProps> = ({
           role="button"
           className="ds-button ds-button--iconLabelPrimary ds-button--icon ds-button--capsule ds-button--xl ds-button--icon-relative-m"
           tabIndex={0}
-          onClick={onToggleSelectMode}   // <-- ЭТУ СТРОКУ ДОБАВИТЬ
+          onClick={onToggleSelectMode}
           style={{ minWidth: 44 }}
         >
           <div className="ds-button__background" />
@@ -121,7 +82,7 @@ export const GatewayChatHeader: React.FC<GatewayChatHeaderProps> = ({
           role="button"
           className="ds-button ds-button--iconLabelPrimary ds-button--icon ds-button--capsule ds-button--l ds-button--icon-relative-m _57370c5 _5dedc1e"
           tabIndex={0}
-          onClick={onToggleSelectMode}   // <-- ЭТУ СТРОКУ ДОБАВИТЬ
+          onClick={onToggleSelectMode}
           style={{ '--dsl-button-height': '34px' } as React.CSSProperties}
         >
           <div className="ds-button__background" />

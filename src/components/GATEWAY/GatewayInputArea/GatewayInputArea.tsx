@@ -13,7 +13,6 @@ interface GatewayInputAreaProps {
   search: boolean;
   onToggleDeepThinking: () => void;
   onToggleSearch: () => void;
-  isExpert: boolean;
 }
 
 export const GatewayInputArea: React.FC<GatewayInputAreaProps> = ({
@@ -26,7 +25,6 @@ export const GatewayInputArea: React.FC<GatewayInputAreaProps> = ({
   search,
   onToggleDeepThinking,
   onToggleSearch,
-  isExpert,
 }) => {
   return (
     <div className="aaff8b8f">
@@ -67,24 +65,22 @@ export const GatewayInputArea: React.FC<GatewayInputAreaProps> = ({
               </div>
 
               {/* Кнопка "Умный поиск" */}
-              {!isExpert && (
-                <div
-                  tabIndex={0}
-                  aria-pressed={search}
-                  className={`f79352dc ds-toggle-button ds-toggle-button--m ${
-                    search ? 'ds-toggle-button--selected' : ''
-                  }`}
-                  onClick={onToggleSearch}
-                >
-                  <div className="ds-toggle-button__icon">
-                    <div className="ds-icon" style={{ fontSize: 'inherit' }}>
-                      <WebSearchIcon size={16} />
-                    </div>
+              <div
+                tabIndex={0}
+                aria-pressed={search}
+                className={`f79352dc ds-toggle-button ds-toggle-button--m ${
+                  search ? 'ds-toggle-button--selected' : ''
+                }`}
+                onClick={onToggleSearch}
+              >
+                <div className="ds-toggle-button__icon">
+                  <div className="ds-icon" style={{ fontSize: 'inherit' }}>
+                    <WebSearchIcon size={16} />
                   </div>
-                  <span className="_6dbc175">Умный поиск</span>
-                  <div className="ds-focus-ring" style={{ '--dsl-focus-ring-offset': '-1px' } as React.CSSProperties} />
                 </div>
-                )}
+                <span className="_6dbc175">Умный поиск</span>
+                <div className="ds-focus-ring" style={{ '--dsl-focus-ring-offset': '-1px' } as React.CSSProperties} />
+              </div>
             </div>
 
             {/* Кнопка отправки */}

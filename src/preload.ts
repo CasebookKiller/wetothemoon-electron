@@ -424,13 +424,42 @@ try {
     gatewaySendMessage: (message: string) => ipcRenderer.invoke('gateway:send-message', message),
     gatewayGetConversations: () => ipcRenderer.invoke('gateway:get-conversations'),
     gatewayOpenConversation: (id: string) => ipcRenderer.invoke('gateway:open-conversation', id),
-    gatewaySelectModel: (modelType: string) => ipcRenderer.invoke('gateway:select-model', modelType),
+
+    // 5.6: публичный запуск scroll+sync (без повторного parse видимого окна)
+    gatewayScrollHistory: (
+      convId: string,
+      opts?: { prune?: boolean; collectInactive?: boolean }
+    ) => ipcRenderer.invoke('gateway:scroll-history', convId, opts),
+
+    gatewaySwitchBranch: (
+      messageKey: string,
+      direction: 'prev' | 'next',
+      opts?: {
+        branchTotal?: number;
+        branchIndex?: number;
+        role?: 'user' | 'assistant';
+      }
+    ) => ipcRenderer.invoke('gateway:switch-branch', messageKey, direction, opts),
+
+    gatewayDeactivateByHashes: (convId: string, hashes: string[]) =>
+      ipcRenderer.invoke('gateway:deactivate-by-hashes', convId, hashes),
+
     gatewaySetDeepThinking: (enabled: boolean) => ipcRenderer.invoke('gateway:set-deep-thinking', enabled),
     gatewaySetSearch: (enabled: boolean) => ipcRenderer.invoke('gateway:set-search', enabled),
-    gatewayGetCurrentModel: () => ipcRenderer.invoke('gateway:get-current-model'),
+
     gatewayGetDeepThinking: () => ipcRenderer.invoke('gateway:get-deep-thinking'),
     gatewayGetSearch: () => ipcRenderer.invoke('gateway:get-search'),
-    gatewayGetConversationMessages: () => ipcRenderer.invoke('gateway:get-conversation-messages'),
+    gatewayGetConversationMessages: (
+      convId?: string,
+      title?: string,
+      opts?: { skipBackgroundScroll?: boolean; prune?: boolean }
+    ) =>
+      ipcRenderer.invoke(
+        'gateway:get-conversation-messages',
+        convId,
+        title,
+        opts
+      ),
     gatewayStartSelectionMode: () => ipcRenderer.invoke('gateway:start-selection-mode'),
     gatewaySelectMessages: (indices: number[]) => ipcRenderer.invoke('gateway:select-messages', indices),
     gatewayCancelSelectionMode: () => ipcRenderer.invoke('gateway:cancel-selection-mode'),
@@ -440,6 +469,123 @@ try {
     gatewaySendFeedback: (conversationId: string, messageIndex: number, type: 'like' | 'dislike') =>
       ipcRenderer.invoke('gateway:send-feedback', conversationId, messageIndex, type),
     gatewayDebugDump: (name: string) => ipcRenderer.invoke('gateway:debug-dump', name),
+    gatewayDebugDumpPWState: () => ipcRenderer.invoke('gateway:debug-dump-pw-state'),
+    gatewayDebugDeletePhantoms: (convId: string) =>
+      ipcRenderer.invoke('gateway:debug-delete-phantoms', convId),
+    gatewayReconFileChip: (convId?: string, chipIndex?: number) =>
+      ipcRenderer.invoke('gateway:recon-file-chip', convId, chipIndex),
+    gatewayFileFetch: (
+      convId: string,
+      pwKeyOrNull: string | null,
+      chipName: string,
+      chipIndex: number
+    ) =>
+      ipcRenderer.invoke(
+        'gateway:file-fetch',
+        convId,
+        pwKeyOrNull,
+        chipName,
+        chipIndex
+      ),
+          gatewayFileSave: (input: {
+      conversationId: string;
+      messageHash: string;
+      chipIndex: number;
+      name: string;
+      mime?: string;
+      sizeDisplay?: string;
+      fileKind: 'text' | 'image' | 'binary';
+      fileId: string;
+      content: string;
+      originUrl?: string;
+    }) => ipcRenderer.invoke('gateway:file-save', input),
+
+    gatewayFileContent: (
+      convId: string,
+      messageHash: string,
+      chipIndex: number
+    ) =>
+      ipcRenderer.invoke(
+        'gateway:file-content',
+        convId,
+        messageHash,
+        chipIndex
+      ),
+
+    gatewayFileStatuses: (
+      convId: string,
+      items: Array<{ messageHash: string; chipIndex: number }>
+    ) => ipcRenderer.invoke('gateway:file-statuses', convId, items),
+
+    gatewayFileStatsBulk: () =>
+      ipcRenderer.invoke('gateway:file-stats-bulk'),
+
+    gatewayFileMarkFailed: (
+      convId: string,
+      messageHash: string,
+      chipIndex: number,
+      errorMessage: string,
+      fileId?: string
+    ) =>
+      ipcRenderer.invoke(
+        'gateway:file-mark-failed',
+        convId,
+        messageHash,
+        chipIndex,
+        errorMessage,
+        fileId
+      ),
+
+    gatewayFileGc: (olderThanHours?: number) =>
+      ipcRenderer.invoke('gateway:file-gc', olderThanHours),
+
+    gatewayFileCleanupOrphans: () =>
+      ipcRenderer.invoke('gateway:file-cleanup-orphans'),
+    
+    gatewayFileFetchBatch: (convId: string, count: number) =>
+      ipcRenderer.invoke('gateway:file-fetch-batch', convId, count),
+
+    gatewayFileFetchCancel: (convId: string) =>
+      ipcRenderer.invoke('gateway:file-fetch-cancel', convId),
+
+    gatewayFileBatchState: (convId: string) =>
+      ipcRenderer.invoke('gateway:file-batch-state', convId),
+
+    gatewayReconFileChipStyles: (convId?: string) =>
+      ipcRenderer.invoke('gateway:recon-file-chip-styles', convId),
+
+    gatewayReconBranches: (convId?: string) =>
+      ipcRenderer.invoke('gateway:recon-branches', convId),
+
+    gatewayDiagnoseBranches: (convId: string, convTitle?: string) =>
+      ipcRenderer.invoke('gateway:diagnose-branches', convId, convTitle),
+
+    gatewayReconFilePanel: (convId?: string, chipIndex?: number) =>
+      ipcRenderer.invoke('gateway:recon-file-panel', convId, chipIndex),
+
+    gatewayReconFilePanelV2: (convId?: string, chipIndex?: number) =>
+      ipcRenderer.invoke('gateway:recon-file-panel-v2', convId, chipIndex),
+
+    gatewayReconFilePanelContentStyles: (convId?: string, chipIndex?: number) =>
+      ipcRenderer.invoke(
+        'gateway:recon-file-panel-content-styles',
+        convId,
+        chipIndex
+      ),
+
+    /**
+     * Подписка на события из Playwright (bridge).
+     * Возвращает функцию отписки.
+     */
+    onGatewayBridgeEvent: (
+      callback: (event: { type: string; payload: any; ts: number }) => void
+    ) => {
+      const handler = (_e: Electron.IpcRendererEvent, data: any) => callback(data);
+      ipcRenderer.on('gateway:bridge-event', handler);
+      return () => {
+        ipcRenderer.removeListener('gateway:bridge-event', handler);
+      };
+    },
 
     saveCompany: (companyId: string, companyInn: string, data: any) =>
       ipcRenderer.invoke('osint:save-company', companyId, companyInn, data),
@@ -1058,6 +1204,34 @@ try {
         ipcRenderer.invoke('pb:chain-using-atom', atomId),
         
     },
+
+    gatewayRenameConversation: (id: string, newTitle: string) =>
+      ipcRenderer.invoke('gateway:rename-conversation', id, newTitle),
+
+    gatewayPinConversation: (id: string, pin: boolean) =>
+      ipcRenderer.invoke('gateway:pin-conversation', id, pin),
+
+    gatewayDeleteConversation: (id: string) =>
+      ipcRenderer.invoke('gateway:delete-conversation', id),
+
+    // ==================== Gateway Cache API ====================
+    gatewayDebugMessagesAll: (convId: string) =>
+      ipcRenderer.invoke('gateway:debug-messages-all', convId),
+    gatewayCacheList: () => ipcRenderer.invoke('gateway:cache-list'),
+    gatewayCacheMessages: (convId: string) =>
+      ipcRenderer.invoke('gateway:cache-messages', convId),
+    gatewayCacheSearch: (query: string, limit?: number) =>
+      ipcRenderer.invoke('gateway:cache-search', query, limit),
+    gatewayCacheSave: (
+      convId: string,
+      title: string,
+      messages: any[]
+    ) => ipcRenderer.invoke('gateway:cache-save', convId, title, messages),
+    gatewayCacheExportMd: (convId: string) =>
+      ipcRenderer.invoke('gateway:cache-export-md', convId),
+    gatewayCacheStats: () => ipcRenderer.invoke('gateway:cache-stats'),
+    gatewayCacheDelete: (convId: string) => ipcRenderer.invoke('gateway:cache-delete-conversation', convId),
+    gatewayCacheClear: () => ipcRenderer.invoke('gateway:cache-clear'),
 
   });
 

@@ -3,7 +3,19 @@
 import React from 'react';
 
 interface GatewaySelectionPreviewProps {
-  messages: { role: 'user' | 'assistant'; blocks: { type: 'text' | 'code'; content: string; language?: string }[] }[];
+  messages: {
+    role: 'user' | 'assistant';
+    blocks: Array<{
+      type: 'text' | 'code' | 'file';
+      content: string;
+      language?: string;
+      size?: string;
+      mime?: string;
+      fileKind?: 'text' | 'image' | 'binary';
+      thumbUrl?: string;
+      fileId?: string;
+    }>;
+  }[];
   selectedIndices: Set<number>;
 }
 

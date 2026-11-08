@@ -1,5 +1,552 @@
 # GATEWAY ROADMAP
 
+_Обновлено: 2026-11-04 (после v3 + files feature)_
+
+## ✅ Выполнено
+
+### Ядро и управление Playwright
+- [x] Запуск окна «Шлюз» и управление браузером через Playwright
+- [x] Авторизация и восстановление сессии DeepSeek (storageState)
+- [x] Обработка закрытия PW руками (`disconnected` listener)
+- [x] Отправка сообщений (thinking + blocks + fullHtml)
+- [x] Загрузка списка диалогов и истории
+- [x] Переключатели «Глубокое мышление» и «Умный поиск»
+- [x] Стриминг (`assistant:content-update`, `reasoning:update`)
+- [x] Отлов ошибок (`message:error` → `TopControlPanel`)
+- [x] Прогресс истории (`history:progress`, `history:complete`)
+- [x] Удаление диалогов (waitForResponse на `/chat_session/delete`, `code===0`)
+- [x] Переименование / Закрепление
+- [x] Multi-select (bulk-pin, bulk-delete)
+
+### Архитектура и UI
+- [x] Стили DeepSeek в Shadow DOM
+- [x] `GatewayIcons` — все SVG
+- [x] `TopControlPanel`, `GatewaySidebar` (группировка, меню, свернутый вид)
+- [x] `GatewayMessageNavigation` (мини-карта)
+- [x] `GatewaySearchModal` (FTS5)
+- [x] `GatewayConfirmModal`, `GatewayInputModal`, `GatewayCacheManager`
+- [x] Share modal, выбор сообщений, копирование/regenerate/like/dislike/share
+- [x] Автоскролл с сохранением позиции (`overflow-anchor` + `useLayoutEffect`)
+
+### Кэш и БД (v1 → v3)
+- [x] SQLite `gateway.db` (node:sqlite, WAL, миграции через `PRAGMA user_version`)
+- [x] **Миграция v2**: `message_hash`, `pw_key`, `last_synced_at`, `pending_edits`
+  - [x] `computeMessageHash(convId, role, contentPlain, parentHash)` — sha256, 16 hex
+  - [x] `parentHash`-цепочка (stable при partial/full sync)
+  - [x] `salt = pw_key ?? parentHash`
+  - [x] `sequence = idx` (не parseInt(pw_key))
+  - [x] Lookup 3 уровня: hash → pw_key(numeric) → (role, content_plain)
+  - [x] `prune: true` только на `history:complete`
+  - [x] `ensureAllMessagesHashed` в `db.ts` (backfill при старте)
+- [x] **Миграция v3**: `file_blobs`, `message_files`, триггеры `ref_count`
+  - [x] Дедуп по sha256 + `ref_count` через `message_files_ai` / `_ad`
+  - [x] `userData/gateway_files/<sha[:2]>/<sha>.<ext>`
+  - [x] Text < 512 KB → `content_text`, иначе → `content_path`
+- [x] `GatewayCacheService`: syncConversation, getMessages, listConversations, deleteConversation, getMessageByHash, markConversationSynced, searchMessages (FTS5+LIKE), getStats, clearAll, exportMarkdown
+- [x] Автосохранение при `getConversationMessages` и bridge-событиях
+- [x] Fallback на БД при недоступном PW
+
+### Файлы (5.4c — закрыто)
+- [x] `fetchFileContent` — клик по чипу, PoW 20-30с (до 60с), `file_id` из URL
+- [x] `GatewayFileService`: saveFile (dedup), getContent, getStatusesBulk, getStatsBulk (**через JOIN messages** — защита от orphaned), listPendingFiles, markFailed, gc
+- [x] `FileBatchService`: MAX_BATCH_SIZE=30, последовательно, пауза 300мс, отмена после текущего PoW, `onPwDisconnected`
+- [x] Порядок batch — `sequence ASC`
+- [x] IPC: `file-fetch`, `file-save`, `file-content`, `file-statuses`, `file-stats-bulk`, `file-mark-failed`, `file-gc`, `file-fetch-batch`, `file-fetch-cancel`, `file-batch-state`
+- [x] `GatewayMessageUser` — file-чипы, accent border, fingerprint merge для non-numeric id
+- [x] `GatewayFilePanel` — drawer справа, resize-handle, localStorage ширины, inline overflow (CSS из GatewayPage.css не долетает в ShadowRoot)
+- [x] `GatewayProgressToast` — draggable, auto-dismiss 3с, отмена
+- [x] `GatewayDialogLoadToast` — draggable, до крестика, live-счётчики, «Загрузить оставшиеся», clamp loaded≤total
+- [x] Autofetch при открытии (опционально, `localStorage['gateway.autoFetchFileCount']` 0/3/5/10, дефолт 0)
+- [x] `GatewayCacheManager`: бейдж «файлы: N/M», кнопки «⬇ Загрузить» / «✓ все файлы», radio автозагрузки
+
+---
+
+## 📋 В работе / Ближайшие задачи
+
+### 🎯 5.6 — Skip scroll + history:changed (СЛЕДУЮЩЕЕ)
+
+**Цель:** открытие свежего диалога за ~2с вместо 12-13с, если БД актуальна и файлы загружены.
+
+**Логика `handleOpenConversation`:**
+
+```
+1. БД → UI (мгновенно)
+2. Параллельно:
+   - api.gatewayGetConversationMessages(id, title, { skipBackgroundScroll: true })
+   - api.gatewayFileStatsBulk()
+3. Сравнение fingerprint(last):
+   - dbLast vs pwLast + prev.length === pwVisible.length
+4. Решение:
+   - lastMatches && pending===0 → skip всё (~2с)
+   - lastMatches && pending>0  → scrollHistory + sync({prune:false})
+   - !lastMatches                → scrollHistory + sync({prune:true})
+```
+
+**Что добавить:**
+
+- [ ] `deepseekService.getConversationMessages(opts?: {skipBackgroundScroll})`
+- [ ] `deepseekService.scrollHistory()` — публичная обёртка над `backgroundScrollAndEmit`
+- [ ] IPC `gateway:scroll-history(convId)`
+- [ ] preload `gatewayScrollHistory`
+- [ ] типы в `types/gateway.d.ts`
+- [ ] `GatewayPage.handleOpenConversation` — новая логика
+- [ ] Auto-fetch: проверка `gatewayGetStatus().status === 'running'` перед batch
+- [ ] InjectedScript polling last fingerprint 1с → `history:changed`
+- [ ] `BridgeEvents.ts` — `history:changed`
+- [ ] `GatewayPage` — обработчик `history:changed` с дебаунсом 1.5с
+- [ ] `__gatewayIsScrolling` флаг (выставляется из `backgroundScrollAndEmit`)
+- [ ] `batchRunningRef` — игнорировать `message:count-changed` во время batch
+
+**Fingerprint для сравнения last (без thumbUrl/mime/size/fileId):**
+
+```typescript
+const messageFingerprint = (msg: ChatMessage): string => {
+  const parts = msg.blocks
+    .filter(b => b.type === 'text' || b.type === 'file')
+    .map(b => `${b.type}:${b.content}`)
+    .join('\u0001');
+  return `${msg.role}\u0002${parts}`;
+};
+```
+
+### 🎯 5.7 — Branching (отложено)
+
+**Проблема:** regenerate/edit в PW создают ветки (`1/2 ← →`), БД flat — старые ветки теряются при `prune`.
+
+**Миграция v4:**
+
+```sql
+ALTER TABLE messages ADD COLUMN parent_hash TEXT;
+ALTER TABLE messages ADD COLUMN branch_index INTEGER DEFAULT 0;
+ALTER TABLE messages ADD COLUMN branch_total INTEGER DEFAULT 1;
+ALTER TABLE messages ADD COLUMN is_active INTEGER DEFAULT 1;
+```
+
+**Sync при `prune:true`:** вместо DELETE → `UPDATE messages SET is_active=0`, потом INSERT/UPDATE активной ветки с `is_active=1`.
+
+**UI:** `1/2 ← →` под ответом, клик → `switchBranchInPW(branchIndex)` → sync.
+
+**Recon:** как PW переключает ветки (endpoint, branch index в payload).
+
+### 🎯 5.5 — File picker из архива в InputArea (отложено)
+
+Из требования: «выбирать из файлов, которые уже отправляли, чтобы исключить дубли».
+
+- [ ] `GatewayFilePickerModal` — поиск по имени, фильтр по типу/mime, превью, чекбоксы
+- [ ] IPC `gateway:file-picker-list(query, limit)` → distinct по sha256
+- [ ] Отправка в PW: `page.setInputFiles()` или drag&drop (нужен recon attach-механизма)
+
+### 🎯 5.8 — Полировка
+
+- [ ] Подсветка кода в **старых** сообщениях (фикс: переоткрыть → sync перезапишет content_html)
+- [ ] AppIcon вместо своих SVG
+- [ ] Auto-hide скроллбар в FilePanel (hover → показать, 1с простоя → скрыть)
+- [ ] Меню профиля внизу сайдбара (Настройки / Выйти)
+- [ ] `cleanupOrphans` для orphaned `message_files` (кнопка в CacheManager)
+- [ ] `handleEditMessage` — синхронизация edit с PW
+
+### 🎯 Приоритет 2 — Синхронизация GW ↔ PW (частично покрыто 5.6)
+
+- [ ] `conversation:active-changed` bridge-событие (если юзер переключил чат в PW)
+- [ ] `activeConvId` в main — sync при переключении
+- [ ] «PW закрыт руками» → fallback из БД (проверить `isHistoryLoading=false` корректно)
+
+### 🧩 Плагин селекторов (адаптация под изменения DeepSeek)
+
+- [ ] `dumpCurrentPage` — вызывать при сбое селектора (есть в deepseekService)
+- [ ] `deepseek.v1.json` — цепочки с фолбэками для всех критичных селекторов
+- [ ] Автосохранение HTML-дампа при сбое
+- [ ] Окно «Редактор селекторов» (Проверить / Сохранить / Импорт / Экспорт)
+- [ ] Обновление профиля без пересборки
+
+---
+
+## 🚀 Схема БД (v3 — актуальная)
+
+```sql
+-- v1: conversations, messages, messages_fts (FTS5)
+-- v2: + messages.message_hash, messages.pw_key, conversations.last_synced_at, pending_edits
+--     + UNIQUE INDEX idx_messages_hash
+-- v3: + file_blobs, message_files, триггеры ref_count
+
+CREATE TABLE file_blobs (
+  sha256 TEXT PRIMARY KEY,
+  content_text TEXT,           -- text < 512KB
+  content_path TEXT,           -- text ≥ 512KB, image, binary
+  content_size_bytes INTEGER NOT NULL,
+  file_kind TEXT NOT NULL CHECK (file_kind IN ('text', 'image', 'binary')),
+  mime TEXT,
+  created_at INTEGER NOT NULL,
+  ref_count INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE message_files (
+  file_id TEXT NOT NULL,
+  conversation_id TEXT NOT NULL,
+  message_hash TEXT NOT NULL,
+  chip_index INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  size_display TEXT,
+  mime_display TEXT,
+  blob_sha256 TEXT NOT NULL,
+  fetch_status TEXT NOT NULL DEFAULT 'pending',  -- 'pending'|'ok'|'failed'
+  fetch_error TEXT,
+  fetched_at INTEGER,
+  last_accessed_at INTEGER,
+  origin_url TEXT,
+  UNIQUE(file_id, conversation_id, message_hash, chip_index),
+  FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
+  FOREIGN KEY (blob_sha256) REFERENCES file_blobs(sha256)
+);
+
+-- Триггеры: message_files_ai (INSERT → ref_count+1),
+--           message_files_ad (DELETE → ref_count-1)
+```
+
+**Файлы на диске:** `userData/gateway_files/<sha[:2]>/<sha>.<ext>`
+
+---
+
+## 🚀 Роадмап hash-ID (✅ ЗАКРЫТО в v2)
+
+- [x] `message_hash = sha256(convId + role + contentPlain + parentHash)` — 16 hex
+- [x] `pw_key` параллельно (numeric `data-virtual-list-item-key`)
+- [x] `syncConversation` по `message_hash`
+- [x] `getMessageByHash` в `GatewayCacheService`
+- [x] `markConversationSynced`
+- [ ] `locateMessage(pwKeyOrHash)` в `deepseekService` — отложено (для 5.5/5.7)
+- [ ] IPC `gateway:message-locate-by-hash` — отложено
+
+---
+
+## 📌 Известные проблемы (технический долг)
+
+1. **Orphaned `message_files`** после `prune` — `getStatsBulk` через JOIN уже корректно считает, UI не ломается. `cleanupOrphans` — отложен.
+2. **`__body` в CSS-классах** — запрещено! Regex `body → .gateway-deepseek-root` при сборке ломает. Использовать `__content`, `__scroll`, `__inner`.
+3. **CSS из `GatewayPage.css` не долетает в ShadowRoot** для некоторых компонентов → inline-стили в JSX (FilePanel, Toasts).
+4. **Stale closures в bridge-useEffect** (`[]` deps) → использовать `useRef` (`selectedConversationRef`, `sendingRef`, `messagesRef`, `dialogLoadToastRef`).
+5. **PW переиспользует HTMLElement** → дедуп по `simpleHash(html)` через `Map<string>`, не `Map<HTMLElement>`.
+6. **`message:count-changed` во время PoW** — ложные события, ломают скролл в batch → игнорировать через `batchRunningRef` (в 5.6).
+7. **`selectMessages`/`regenerate`/`sendFeedback`** — `nth(index)`, не работают на виртуалке.
+8. **`setRussianLanguage`** — отключён (нет селекторов Settings).
+9. **FTS5** — проверено, работает (ENABLE_FTS3, ENABLE_FTS3_PARENTHESIS, ENABLE_FTS5).
+
+---
+
+## 🔮 Будущее: GenericBrowserController (условия для старта)
+
+- [ ] Завершены все текущие задачи (5.6, 5.7, 5.8)
+- [ ] Есть второй агент (Yandex Alisa / GigaChat / Ollama)
+- [ ] Подтверждена боль от частоты изменений селекторов (>1 раза в месяц)
+
+**Что уже покрыто:** JSON-профили + фолбэки (`deepseek.v1.json`), `dumpCurrentPage`, мультиагентность.
+**Что нового:** единый контроллер вместо копипасты, универсальный React-пульт, анти-детект, JSON-профили с instrumentation.js.
+
+---
+
+## 🛠 Полезные команды
+
+```bash
+npm run check:ts-gateway
+npm run start
+rm -rf node_modules/.vite && npm run start
+```
+
+---
+
+## 📎 Связанные документы
+
+- Промпт для нового чата (полный контекст, архитектурные решения, состояние файлов) — отдельный файл, вставляется при необходимости.
+- `PROJECT_STATE.md` (Prana-Bindu, v36) — общий контекст проекта.
+
+
+===============================================================
+
+# Промпт для нового чата — GATEWAY (продолжение разработки, v2)
+
+Скопируйте целиком в новый чат.
+
+---
+
+## 0. Задача
+
+Продолжаем разработку окна «Шлюз» в Electron-проекте `wetothemoon-electron`.
+Задача окна — автоматизировать DeepSeek (https://chat.deepseek.com) через Playwright и воспроизводить интерфейс DeepSeek 1:1 в React.
+
+**Текущий фокус:** умная синхронизация (skip scroll при актуальной БД) + детекция изменений в PW через injectedScript. Дальше — branching, file picker из архива, полировка.
+
+---
+
+## 1. Контекст проекта
+
+**Стек:**
+- Electron (Electron Forge) + Vite + TypeScript
+- React 19 (hooks, `useLayoutEffect`, `useRef`)
+- Playwright (Chromium, non-headless)
+- `node:sqlite` (`DatabaseSync`), **НЕ** `better-sqlite3`
+- PrimeReact / PrimeFlex (только для `TopControlPanel`, кнопки `.pb` / `.pb-soft`)
+- CSS-классы через `classNames` из `@/css/classnames`
+
+**Пути:**
+- Окно: `src/pages/GatewayPage/GatewayPage.tsx`
+- Компоненты: `src/components/GATEWAY/*` (в каждом своя папка)
+- Main-сервисы: `src/main/services/gateway/*`
+- Cache-сервисы: `src/main/services/gateway/cache/*`
+- IPC: `src/main/ipcHandlers/gatewayHandlers.ts`
+- Preload: `src/preload.ts`
+- Типы IPC: `src/types/gateway.d.ts` (declaration merging с `types.d.ts`)
+- CSS: `src/pages/GatewayPage/GatewayPage.css` + `src/themes/deepseek-theme/main.css` (raw import через `?raw`)
+
+**Стили:**
+- Все DeepSeek стили изолированы в Shadow DOM (`GatewayDeepseekShadowRoot`)
+- Замены при сборке: `:root → :host`, `body → .gateway-deepseek-root`
+- ⚠️ **НИКОГДА не используй `__body` в именах CSS-классов** — замена `body → .gateway-deepseek-root` превращает `.foo__body` в невалидный `.foo__.gateway-deepseek-root`. Используй `__content`, `__scroll`, `__inner`, `__main`, `__area`.
+- Если CSS из `GatewayPage.css` не долетает до элемента внутри ShadowRoot — используй **inline-стили** в JSX (у нас так сделано для `GatewayFilePanel`, `GatewayProgressToast`, `GatewayDialogLoadToast`)
+- Тема через `[data-module="gateway"]`, акцент `#4d6bfe`
+- Наши доп. стили — **в конец** `GatewayPage.css`
+- Не трогать `main.css` (это стили DeepSeek)
+
+**БД (`gateway.db`):**
+- Файл `app.getPath('userData')/gateway.db` (Linux: `~/.config/wetothemoon-electron/gateway.db`)
+- WAL-режим, `PRAGMA foreign_keys = ON`, миграции через `PRAGMA user_version`
+- **v3**: `conversations`, `messages`, `messages_fts` (FTS5), `file_blobs`, `message_files`
+- Файлы на диске: `<userData>/gateway_files/<sha[:2]>/<sha>.<ext>`
+
+**Файлы для кэша `gateway_files`**:
+- Text < 512 KB → `file_blobs.content_text` (в БД)
+- Text ≥ 512 KB, image, binary → `file_blobs.content_path` (на диске, с дедупом по sha256)
+- Дедуп через `ref_count` (триггеры на `message_files` INSERT/DELETE)
+- GC: `file_blobs` с `ref_count=0` старше 24ч → удаление с диска
+
+---
+
+## 2. Ключевые архитектурные решения (НЕ ЛОМАТЬ)
+
+### 2.1 Bridge Playwright ⇄ Node ⇄ IPC ⇄ React
+
+- `page.exposeFunction('__gatewayBridge', ...)` — функция в window страницы
+- `page.addInitScript({content: INJECTED_SCRIPT})` — для будущих навигаций
+- `page.evaluate(INJECTED_SCRIPT)` — для текущей страницы
+- Bridge-события → `gw.webContents.send('gateway:bridge-event', event)`
+- GW подписывается через `api.onGatewayBridgeEvent(cb)` в `useEffect` (⚠️ stale closures на `selectedConversation` — использовать `selectedConversationRef` или `useEffect` + состояния, не замыкание из `[]`)
+
+**Типы событий (`BridgeEvents.ts`):**
+````typescript
+type GatewayBridgeEventType =
+  | 'network:online'
+  | 'network:offline'
+  | 'fetch:error'
+  | 'reasoning:update'         // payload: { text }
+  | 'message:count-changed'    // payload: { current, prev }
+  | 'message:error'            // payload: { text, count }
+  | 'history:progress'         // payload: { rawMessages: [...] }
+  | 'history:complete'         // payload: { rawMessages: [...] }
+  | 'conversation:list-changed'// payload: { current, prev }
+  | 'assistant:content-update' // payload: { html }
+  | 'file:batch-started'       // payload: { convId, total, skipped }
+  | 'file:batch-progress'      // payload: { convId, current, total, ok, failed, name, status, messageHash, chipIndex, error? }
+  | 'file:batch-complete';     // payload: { convId, processed, total, ok, failed, status }
+
+
+=================
+
+# GATEWAY ROADMAP
+
+## ✅ Выполнено
+
+### Ядро и управление Playwright
+- [x] Запуск окна «Шлюз» и управление браузером через Playwright
+- [x] Авторизация и восстановление сессии DeepSeek (storageState)
+- [x] Корректная обработка закрытия PW руками (`disconnected` listener → `browser=null`)
+- [x] Отправка сообщений и получение ответов (thinking + blocks + fullHtml)
+- [x] Загрузка списка диалогов и истории сообщений
+- [x] Переключатели «Глубокое мышление» и «Умный поиск»
+- [x] Стриминг ответа в реальном времени через bridge (`assistant:content-update`, `reasoning:update`)
+- [x] Отлов ошибок сети/сервера (`message:error` → `TopControlPanel`)
+- [x] Прокрутка истории с трансляцией прогресса (`history:progress`, `history:complete`)
+- [x] Удаление диалогов с подтверждением через `POST /api/v0/chat_session/delete`
+- [x] Переименование диалогов
+- [x] Закрепление/открепление диалогов
+- [x] Выбор нескольких диалогов (bulk-pin, bulk-delete) с чекбоксами
+
+### Архитектура и UI
+- [x] Стили DeepSeek изолированы в Shadow DOM (`GatewayDeepseekShadowRoot`)
+- [x] Единый компонент `GatewayIcons` для всех SVG (logo, nav, action icons и т.д.)
+- [x] `TopControlPanel` (launch, refresh, кэш, toggles)
+- [x] `GatewaySidebar`: группировка по датам, сворачиваемые группы, меню диалога (rename/pin/delete), режим выбора чатов, свернутый вид («пилюля» с 3 кнопками)
+- [x] `GatewayMessageNavigation`: правая «мини-карта» со штрихами по сообщениям, hover-tooltip, клик-переход
+- [x] `GatewaySearchModal`: глобальный поиск по названиям и содержимому (FTS5)
+- [x] `GatewayConfirmModal`, `GatewayInputModal`, `GatewayCacheManager`
+- [x] Модалка Share (публичная ссылка), режим выбора сообщений
+- [x] Копирование/редактирование(заглушка)/regenerate/like/dislike/share под сообщениями
+- [x] Сворачивание длинных сообщений как в оригинале
+- [x] Автоскролл с «умной» корректировкой позиции при подгрузке истории (`overflow-anchor` + `useLayoutEffect`)
+
+### Кэш и БД
+- [x] SQLite-БД `gateway.db` (node:sqlite, WAL, миграции через `PRAGMA user_version`)
+- [x] `GatewayCacheService`: `syncConversation`, `getMessages`, `listConversations`, `deleteConversation`, `searchMessages` (FTS5 + LIKE-fallback), `getStats`, `clearAll`, `exportMarkdown`
+- [x] Автосохранение сообщений при открытии диалога (после `getConversationMessages`)
+- [x] Fallback на БД, если Playwright недоступен
+- [x] IPC-каналы `gateway:cache-*` + `gateway:delete-conversation`
+- [x] Префикс `convId_<key>` в `messages.id` (защита от UNIQUE-конфликта)
+
+---
+
+## 📋 В работе / Ближайшие задачи
+
+### 🎯 Приоритет 1 — Долговременная память и уникальные hash ID
+
+Формат «JSON-файлы» из прошлой версии **не используется** — кэш уже на SQLite.
+Правим принципиальную схему идентификации и синхронизации.
+
+#### 1. Уникальный хэш-ID сообщения
+- [ ] Ввести канонический `message_hash = sha256(convId + role + contentPlain + parentHash)` (16 hex-символов)
+- [ ] Хранить в БД колонку `message_hash TEXT UNIQUE` (индекс)
+- [ ] Хранить параллельно `pw_key` (значение `data-virtual-list-item-key` из DOM Playwright)
+- [ ] При загрузке из PW заполнять оба поля; при чтении из БД — оставлять `pw_key` как есть
+- [ ] При `syncConversation` сопоставлять по `message_hash`, чтобы избежать дублей при повторных открытиях диалога
+
+#### 2. Двусторонняя связь БД ↔ PW
+- [ ] IPC `gateway:message-locate-by-hash(hash)` → Playwright скроллит к сообщению и возвращает `pw_key` + boundingBox
+- [ ] Использовать для будущей фичи «Открыть в оригинале»
+- [ ] Использовать для скролла к сообщению из результатов поиска
+
+#### 3. Осмысленная работа с сохранёнными диалогами
+- [ ] При открытии диалога: сначала грузим из БД (мгновенно), параллельно — из PW
+- [ ] Мержим: новые сообщения (по `message_hash`) → добавляем; изменённые/удалённые — по политике (оставляем в БД как архив)
+- [ ] Показывать в UI индикатор «синхронизировано N сообщений» / «есть локальные правки»
+- [ ] В `GatewayCacheManager` → вкладка «Диалоги»:
+  - [ ] Кнопка «Открыть в оригинале» (через `gateway:message-locate-by-hash` для первого сообщения)
+  - [ ] Кнопка «Синхронизировать с PW»
+  - [ ] Показ `last_synced_at`, `message_count`, `pending_edits`
+- [ ] Экспорт Markdown — доработать (заголовки по ролям, язык кода, thinking в `<details>`)
+- [ ] Удалить один диалог из БД (сейчас есть, но проверить UI)
+
+#### 4. FTS-поиск
+- [ ] Настроить триггеры на реиндекс при `UPDATE` сообщения
+- [ ] Тестировать поиск с разными языками (ru/en/mixed)
+- [ ] Fallback на LIKE, если FTS5 недоступен
+
+---
+
+### 🎯 Приоритет 2 — Стабилизация синхронизации GW ↔ PW
+
+- [ ] Гарантировать, что удаление в PW → БД (уже сделано)
+- [ ] Гарантировать, что удаление в БД **не** удаляет в PW (уже сделано — даём выбор)
+- [ ] При `message:count-changed` из PW — корректно подтягивать новые сообщения без двойной загрузки
+- [ ] При переключении вкладки «Диалоги» в GW ↔ PW — синхронизировать `activeConversationId` (сейчас расхождение возможно)
+- [ ] Протестировать сценарий: PW закрыт руками → GW показывает из БД, а не ошибку
+
+---
+
+### 🎯 Приоритет 3 — Полировка (не критично)
+
+#### Сайдбар / меню профиля
+- [ ] Нижнее меню профиля: аватар, имя, «Настройки», «Выйти»
+- [ ] Экран/модалка настроек (язык, тема, hotkeys)
+
+#### Редактирование сообщений
+- [ ] Подключить `handleEditMessage` (сейчас `console.warn`) — синхронизировать с PW через `selectMessages`/`editMessage`
+
+#### Визуальные мелочи
+- [ ] Точная подгонка `GatewaySearchModal` под PW (после правок сверить повторно)
+- [ ] Проверить hover-состояния и фокус-ринги в сайдбаре и навигации
+- [ ] Мобильная/узкая ширина окна (проверить, что не ломается)
+
+#### Проверка IPC
+- [ ] Все `gateway:*` каналы покрыты try/catch
+- [ ] Все ошибки возвращаются в UI через `TopControlPanel`
+- [ ] Прелоад синхронизирован с `types.d.ts`
+
+---
+
+### 🧩 Плагин селекторов (адаптация под изменения DeepSeek)
+
+- [ ] `dumpCurrentPage` + IPC `gateway:debug-dump` — уже есть в `deepseekService`, проверить, что вызывается при сбое
+- [ ] `SelectorProfileService` + `deepseek.v1.json`:
+  - [ ] `shareButton`, `publicLinkButton`, `reasoningToggle`, `searchToggle`, `messageInput`, `sendButton`, `conversationsList`
+  - [ ] Каждый селектор — цепочка с фолбэками (`findWithFallback`)
+- [ ] Автосохранение HTML-дампа при сбое поиска селектора
+- [ ] Окно «Редактор селекторов» (Проверить / Сохранить / Импорт / Экспорт)
+- [ ] Возможность обновлять профиль без пересборки приложения
+
+---
+
+## 🚀 Роадмап памяти и хэш-ID (детализация)
+
+### Схема БД (требует миграции)
+
+```sql
+-- Новая колонка в messages
+ALTER TABLE messages ADD COLUMN message_hash TEXT;
+ALTER TABLE messages ADD COLUMN pw_key TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_hash ON messages(message_hash);
+
+-- Метаданные диалога
+ALTER TABLE conversations ADD COLUMN last_synced_at INTEGER;
+ALTER TABLE conversations ADD COLUMN pending_edits INTEGER DEFAULT 0;
+```
+
+### Сервисные методы `GatewayCacheService` (дополнить)
+
+- `getByHash(hash): CachedMessage | null`
+- `updatePwKey(hash, pwKey): void`
+- `getConversationMeta(convId): { lastSyncedAt, pendingEdits, messageCount }`
+- `markSynced(convId): void`
+
+### IPC
+
+- `gateway:cache-get-by-hash(hash)`
+- `gateway:cache-mark-synced(convId)`
+- `gateway:message-locate-by-hash(hash)` → проксирует в `deepseekService`
+
+### `deepseekService.locateMessage(hash)`
+
+```ts
+async locateMessage(pwKeyOrHash: string): Promise<{
+  pwKey: string;
+  boundingBox: { x, y, width, height };
+  screenshotBase64?: string;
+}>;
+```
+
+Скроллит `ds-virtual-list`, ищет `[data-virtual-list-item-key="..."]`, возвращает координаты.
+
+### Пользовательский сценарий
+
+1. Пользователь открывает «Кэш» → «Диалоги» → «Открыть в оригинале» у любого диалога.
+2. GW вызывает `gateway:message-locate-by-hash(hash)`.
+3. Playwright скроллит к сообщению, возвращает координаты.
+4. GW (по желанию) делает скриншот области и показывает превью.
+
+---
+
+## 🔮 Будущее (не сейчас): Универсальный GenericBrowserController
+
+Промпт от внешнего ИИ предлагает создать универсальный движок для контроля
+любых сайтов с JSON-профилями, instrumentation.js, SQLite-снапшотами и
+анти-детект мерами. Изоляция от `deepseekService`.
+
+**Условия для старта:**
+- Завершены все текущие задачи из GATEWAY_ROADMAP
+- Есть второй агент (Yandex Alisa / GigaChat / Ollama)
+- Подтверждена боль от частоты изменений селекторов (>1 раза в месяц)
+
+**Что уже покрыто текущим подходом:**
+- JSON-профили с фолбэками → `deepseek.v1.json` + `findWithFallback`
+- Диагностика → `dumpCurrentPage`
+- Мультиагентность → `GatewayCacheService(agentName)`
+
+**Что нового может дать:**
+- Единый контроллер вместо копипасты `deepseekService`
+- Универсальный React-пульт
+- Более чистая архитектура для второго/третьего агента
+
+
+=================
+
+# GATEWAY ROADMAP
+
 ## ✅ Выполнено
 
 - [x] Запуск окна «Шлюз» и управление браузером через Playwright
@@ -134,6 +681,29 @@ deepseek_conversations/
    - Правильность `saved_at`
    - Сравнение кэша с Playwright (новые сообщения появляются только при их реальном появлении)
 6. [ ] Оптимизация: асинхронная запись файлов, обработка больших объёмов, предотвращение дублирования.
+
+
+## 🔮 Будущее (не сейчас): Универсальный GenericBrowserController
+
+Промпт от внешнего ИИ предлагает создать универсальный движок для контроля 
+любых сайтов с JSON-профилями, instrumentation.js, SQLite-снапшотами и 
+анти-детект мерами. Изоляция от deepseekService.
+
+**Условия для старта:**
+- Завершены все текущие задачи из GATEWAY_ROADMAP
+- Есть второй агент (Yandex Alisa / GigaChat / Ollama)
+- Подтверждена боль от частоты изменений селекторов (>1 раза в месяц)
+
+**Что уже покрыто текущим подходом:**
+- JSON-профили с фолбэками → deepseek.v1.json + findWithFallback
+- Диагностика → dumpCurrentPage
+- Мультиагентность → ConversationCacheService(agentName)
+
+**Что нового может дать:**
+- Единый контроллер вместо копипасты deepseekService
+- Универсальный React-пульт
+- Более чистая архитектура для второго/третьего агента
+
 
   --- Промпт для нового чата
 
