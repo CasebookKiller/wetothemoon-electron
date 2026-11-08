@@ -387,17 +387,17 @@ export const PlanEventDrawer: React.FC<Props> = ({
         )}
         {event.distanceM != null && event.distanceM > 0 && (
           <span className="pb-plan-event__chip">
-            <i className="pi pi-map-marker" /> {fmtDistance(event.distanceM)}
+            <AppIcon name="map-marker" /> {fmtDistance(event.distanceM)}
           </span>
         )}
         {event.durationSec != null && event.durationSec > 0 && (
           <span className="pb-plan-event__chip">
-            <i className="pi pi-clock" /> {fmtSec(event.durationSec)}
+            <AppIcon name="clock" /> {fmtSec(event.durationSec)}
           </span>
         )}
         {event.plannedLoad != null && (
           <span className="pb-plan-event__chip">
-            <i className="pi pi-bolt" /> {Math.round(event.plannedLoad)} TSS
+            <AppIcon name="bolt" /> {Math.round(event.plannedLoad)} TSS
           </span>
         )}
       </div>

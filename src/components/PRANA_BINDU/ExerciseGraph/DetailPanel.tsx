@@ -11,6 +11,7 @@ import type {
   PatternProps,
 } from '@/main/services/pranaBindu/mentat/graph/ontology';
 import CloseIcon from '@/components/COMMON/CloseIcon/CloseIcon';
+import AppIcon from '../../COMMON/AppIcon/AppIcon';
 
 interface Props {
   graph: ExerciseGraph;
@@ -90,7 +91,7 @@ export const DetailPanel: React.FC<Props> = ({
               title="Изменить"
               onClick={() => onEditNode(node)}
             >
-              <i className="pi pi-pencil" />
+              <AppIcon name="pencil" />
             </button>
           )}
           {onDeleteNode && (node.kind === 'pattern' || node.kind === 'exercise') && (
@@ -100,7 +101,7 @@ export const DetailPanel: React.FC<Props> = ({
               title="Удалить"
               onClick={() => onDeleteNode(node)}
             >
-              <i className="pi pi-trash" />
+              <AppIcon name="trash" />
             </button>
           )}
           <CloseIcon size="md" onClick={onClose} />

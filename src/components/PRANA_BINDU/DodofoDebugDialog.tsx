@@ -9,6 +9,7 @@ import { Dialog } from 'primereact/dialog';
 import { TabView, TabPanel } from 'primereact/tabview';
 import { InputNumber } from 'primereact/inputnumber';
 import { Message } from 'primereact/message';
+import AppIcon from '../COMMON/AppIcon/AppIcon';
 
 interface Props {
   visible: boolean;
@@ -335,7 +336,7 @@ export const DodofoDebugDialog: React.FC<Props> = ({
       onHide={onHide}
       header={
         <span className="p-dialog-title" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-          <i className="pi pi-code" />
+          <AppIcon name="code" />
           Отладка dodofo API
         </span>
       }

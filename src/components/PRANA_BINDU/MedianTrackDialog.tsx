@@ -9,6 +9,7 @@ import {
   geometricLength,
   simplifyDP,
 } from './UTILS/medianTrack';
+import AppIcon from '../COMMON/AppIcon/AppIcon';
 
 interface SelectedRun {
   runFactId: number;
@@ -229,7 +230,7 @@ export const MedianTrackDialog: React.FC<Props> = ({
     >
       {loading && (
         <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--tg-hint)' }}>
-          <i className="pi pi-spin pi-spinner" /> Загрузка GPS из {selectedRuns.length} пробежек…
+          <AppIcon name="spinner" spin /> Загрузка GPS из {selectedRuns.length} пробежек…
         </div>
       )}
 
@@ -252,7 +253,7 @@ export const MedianTrackDialog: React.FC<Props> = ({
             }}
           >
             <div style={{ color: 'var(--pb-accent)', fontWeight: 600, marginBottom: '0.3rem' }}>
-              <i className="pi pi-info-circle" /> Сводка
+              <AppIcon name="info-circle" /> Сводка
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '0.2rem 0.5rem' }}>
               <span style={{ color: 'var(--tg-hint)' }}>Использовано треков:</span>
@@ -329,7 +330,7 @@ export const MedianTrackDialog: React.FC<Props> = ({
 
           {saveStatus === 'saved' && (
             <div style={{ color: 'var(--tg-success)', fontSize: '0.85rem' }}>
-              <i className="pi pi-check-circle" /> Сохранено
+              <AppIcon name="check-circle" color="success" /> Сохранено
             </div>
           )}
           {saveError && (

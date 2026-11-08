@@ -4,6 +4,7 @@ import React from 'react';
 import { InputText } from 'primereact/inputtext';
 import { InputSwitch } from 'primereact/inputswitch';
 import type { Filters } from './types';
+import AppIcon from '@/components/COMMON/AppIcon/AppIcon';
 
 export type LayoutMode = 'linear' | 'radial';
 
@@ -57,7 +58,7 @@ export const FiltersBar: React.FC<Props> = ({
       {/* Строка 1: поиск, тумблеры, режим */}
       <div className="pb-graph-view__toolbar">
         <span className="pb-templates__search-wrap">
-          <i className="pi pi-search" />
+          <AppIcon name="search" />
           <InputText
             value={filters.search}
             onChange={(e) => onChange({ ...filters, search: e.target.value })}
@@ -115,7 +116,7 @@ export const FiltersBar: React.FC<Props> = ({
             onClick={() => onLayoutModeChange('linear')}
             title="Линейная раскладка (dagre)"
           >
-            <i className="pi pi-align-left" /> Слои
+            <AppIcon name="align-left" /> Слои
           </button>
           <button
             type="button"
@@ -123,7 +124,7 @@ export const FiltersBar: React.FC<Props> = ({
             onClick={() => onLayoutModeChange('radial')}
             title="Радиальная раскладка"
           >
-            <i className="pi pi-circle" /> Круг
+            <AppIcon name="circle" /> Круг
           </button>
         </div>
 
@@ -133,7 +134,7 @@ export const FiltersBar: React.FC<Props> = ({
           onClick={onRefresh}
           title="Перезагрузить граф"
         >
-          <i className="pi pi-refresh" />
+          <AppIcon name="refresh" />
         </button>
         <button
           type="button"
@@ -141,7 +142,7 @@ export const FiltersBar: React.FC<Props> = ({
           onClick={onReset}
           title="Сбросить к эталону (удалить user.json)"
         >
-          <i className="pi pi-undo" />
+          <AppIcon name="undo" />
         </button>
 
         <button
@@ -150,7 +151,7 @@ export const FiltersBar: React.FC<Props> = ({
           onClick={() => onOpenCreate?.('pattern')}
           title="Добавить паттерн (семью)"
         >
-          <i className="pi pi-plus" /> Паттерн
+          <AppIcon name="plus" /> Паттерн
         </button>
         <button
           type="button"
@@ -158,7 +159,7 @@ export const FiltersBar: React.FC<Props> = ({
           onClick={() => onOpenCreate?.('canonical')}
           title="Добавить группу (canonical)"
         >
-          <i className="pi pi-plus" /> Группа
+          <AppIcon name="plus" /> Группа
         </button>
         <button
           type="button"
@@ -166,7 +167,7 @@ export const FiltersBar: React.FC<Props> = ({
           onClick={() => onOpenCreate?.('exercise')}
           title="Добавить упражнение"
         >
-          <i className="pi pi-plus" /> Упражнение
+          <AppIcon name="plus" /> Упражнение
         </button>
 
         <button
@@ -175,7 +176,7 @@ export const FiltersBar: React.FC<Props> = ({
           onClick={onToggleSide}
           title={sideOpen ? 'Скрыть панель' : 'Показать панель'}
         >
-          <i className={sideOpen ? 'pi pi-angle-double-right' : 'pi pi-angle-double-left'} />
+          <AppIcon name={sideOpen ? 'angle-double-right' : 'angle-double-left'} />
         </button>
         <span className="pb-graph-view__count pb-hint">
           {visibleCount} / {totalCount}

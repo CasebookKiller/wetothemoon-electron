@@ -6,6 +6,7 @@ import { ProgressSpinner } from 'primereact/progressspinner';
 import { ExerciseGraphView } from './ExerciseGraphView';
 import type { ExerciseGraph } from '@/main/services/pranaBindu/mentat/graph/ontology';
 import './ExerciseGraph.css';
+import AppIcon from '@/components/COMMON/AppIcon/AppIcon';
 
 interface Props {
   visible: boolean;
@@ -44,7 +45,7 @@ export const ExerciseGraphDialog: React.FC<Props> = ({ visible, onHide }) => {
       onHide={onHide}
       header={
         <span className="p-dialog-title pb-templates__title">
-          <i className="pi pi-share-alt" /> Exercise Graph
+          <AppIcon name="share-alt" /> Exercise Graph
         </span>
       }
       maximizable

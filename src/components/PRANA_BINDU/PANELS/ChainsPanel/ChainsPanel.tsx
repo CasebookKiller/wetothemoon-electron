@@ -6,6 +6,7 @@
 
 import React from 'react';
 import { Button } from 'primereact/button';
+import AppIcon from '@/components/COMMON/AppIcon/AppIcon';
 
 export interface ChainLite {
   id: number;
@@ -72,7 +73,7 @@ export const ChainsPanel: React.FC<Props> = ({
 
       {loading && (
         <div className="pb-hint" style={{ textAlign: 'center', padding: '0.5rem' }}>
-          <i className="pi pi-spin pi-spinner" /> Загрузка…
+          <AppIcon name="spinner" spin color="accent" /> Загрузка…
         </div>
       )}
 

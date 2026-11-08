@@ -13,6 +13,7 @@ import { RunsTableGrouped } from './RunsTableGrouped';
 import type { RunsPanelProps, RunsViewMode } from './types';
 
 import './RunsPanel.css';
+import AppIcon from '@/components/COMMON/AppIcon/AppIcon';
 
 const VIEW_MODE_KEY = 'pb.runsViewMode';
 
@@ -80,7 +81,7 @@ export const RunsPanel: React.FC<RunsPanelProps> = ({
             onClick={() => changeMode('flat')}
             title="Плоский — одна строка на группу источников"
           >
-            <i className="pi pi-list" /> Список
+            <AppIcon name="list" color="accent" /> Список
           </button>
           <button
             type="button"
@@ -88,7 +89,7 @@ export const RunsPanel: React.FC<RunsPanelProps> = ({
             onClick={() => changeMode('grouped')}
             title="С группировкой по дням — заголовок дня"
           >
-            <i className="pi pi-calendar" /> По дням
+            <AppIcon name="calendar" color="accent" /> По дням
           </button>
         </div>
       </div>

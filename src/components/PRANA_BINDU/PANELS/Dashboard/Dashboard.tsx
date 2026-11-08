@@ -1,5 +1,6 @@
 // src/components/PRANA_BINDU/PANELS/Dashboard/Dashboard.tsx
 
+import AppIcon from '@/components/COMMON/AppIcon/AppIcon';
 import React, { useEffect, useState } from 'react';
 
 interface Props {
@@ -65,8 +66,8 @@ export const Dashboard: React.FC<Props> = ({ onOpenTraining, onOpenHealth, onOpe
       <div className="col-12 lg:col-6 p-2">
         <div className={cardClass} onClick={() => onOpenTraining('runs')}>
           <div className="pb-module-name flex justify-content-between align-items-center">
-            <span><i className="pi pi-chart-bar mr-2" style={{ color: 'var(--pb-accent)' }} />Тренировки</span>
-            <i className="pi pi-arrow-right text-xs" style={{ opacity: 0.5 }} />
+            <span><AppIcon name="chart-bar" color="accent" className="mr-2" />Тренировки</span>
+            <AppIcon name="arrow-right" className="text-xs" style={{ opacity: 0.5 }} />
           </div>
           
           <div className="mt-3 flex flex-column gap-3">
@@ -115,7 +116,7 @@ export const Dashboard: React.FC<Props> = ({ onOpenTraining, onOpenHealth, onOpe
           {/* Шапка виджета */}
           <div className="pb-module-name flex align-items-center justify-content-between" style={{ gap: '0.5rem' }}>
             <span style={{ whiteSpace: 'nowrap', flexShrink: 1 }}>
-              <i className="pi pi-heart mr-2" style={{ color: 'var(--pb-accent)' }} />
+              <AppIcon name="heart" color="accent" className="mr-2" />
               Здоровье и Вода
             </span>
             <div style={{ flexShrink: 0 }}>
@@ -124,7 +125,7 @@ export const Dashboard: React.FC<Props> = ({ onOpenTraining, onOpenHealth, onOpe
                 style={{ padding: '0.2rem 0.5rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.75rem' }}
                 onClick={(e) => { e.stopPropagation(); onOpenAnalytics(); }}
               >
-                <i className="pi pi-chart-pie" /> Аналитика
+                <AppIcon name="chart-pie" color="accent" /> Аналитика
               </button>
             </div>
           </div>

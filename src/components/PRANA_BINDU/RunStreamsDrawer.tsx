@@ -14,6 +14,7 @@ import { GpsMapView } from './GpsMapView';
 import { InputText } from 'primereact/inputtext';
 import { FullscreenChartsDialog } from './FullscreenChartsDialog';
 import { RunChainBadge } from './RunChainBadge';
+import AppIcon from '../COMMON/AppIcon/AppIcon';
 
 /**
  * Порог, при котором две записи считаются одной тренировкой
@@ -299,7 +300,7 @@ const SourcePanel: React.FC<{
               className="pb-drawer__stream-item"
             >
               <div className="pb-drawer__stream-source">
-                <i className="pi pi-database" /> {m.source}
+                <AppIcon name="database" /> {m.source}
               </div>
               <div className="pb-drawer__stream-meta">
                 <span>{m.point_count ?? '—'} точек</span>

@@ -12,6 +12,7 @@ import {
 } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { getSavedLayers, getOsmStyleObject } from './mapStyles';
+import AppIcon from '../COMMON/AppIcon/AppIcon';
 
 interface Props {
   latlng: ([number, number] | null)[];
@@ -167,7 +168,7 @@ export const GpsMapView: React.FC<Props> = ({
   if (gpsQuality === 'lost') {
     return (
       <div className="pb-map pb-map--lost" style={{ height }}>
-        <i className="pi pi-map" />
+        <AppIcon name="map" />
         <div>Трек недоступен</div>
         <small>GPS потерян на всей тренировке</small>
       </div>

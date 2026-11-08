@@ -151,7 +151,7 @@ export const WorkoutTemplatesDialog: React.FC<Props> = ({
       onHide={onHide}
       header={
         <span className="p-dialog-title pb-templates__title">
-          <i className="pi pi-book" /> Упражнения
+          <AppIcon name="book" /> Упражнения
         </span>
       }
       style={{ width: '960px', maxWidth: '96vw' }}
@@ -207,7 +207,7 @@ export const WorkoutTemplatesDialog: React.FC<Props> = ({
                 panelClassName="pb-dropdown-panel"
               />
               <span className="pb-templates__search-wrap">
-                <i className="pi pi-search" />
+                <AppIcon name="search" />
                 <InputText
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
@@ -303,7 +303,7 @@ export const WorkoutTemplatesDialog: React.FC<Props> = ({
                 {selected.usage && (
                   <div className="pb-templates__usage">
                     <div className="pb-templates__usage-title">
-                      <i className="pi pi-info-circle" /> Как использовать
+                      <AppIcon name="info-circle" /> Как использовать
                     </div>
                     <div className="pb-templates__usage-text">
                       {selected.usage

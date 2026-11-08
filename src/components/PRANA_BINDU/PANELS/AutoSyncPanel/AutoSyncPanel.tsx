@@ -19,6 +19,7 @@ import {
   type AutoSyncProvider,
 } from '@/main/services/pranaBindu/spice/types';
 import { Dropdown } from 'primereact/dropdown';
+import AppIcon from '@/components/COMMON/AppIcon/AppIcon';
 
 interface Props {
   /** Вызывается после успешного прогона автосинка. */
@@ -276,7 +277,7 @@ export const AutoSyncPanel: React.FC<Props> = ({ onAfterSync }) => {
   return (
     <div className="pb-connections__block">
       <div className="pb-connections__title">
-        <i className="pi pi-sync" /> Автосинхронизация
+        <AppIcon name="sync" color="accent" /> Автосинхронизация
         {autoSyncLastAt && (
           <span className="pb-label-ok" style={{ marginLeft: 'auto' }}>
             {autoSyncLastStatus === 'error'

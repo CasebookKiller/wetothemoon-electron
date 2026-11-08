@@ -28,6 +28,7 @@ import { DaySummary } from './DaySummary';
 import type { RecoveryLogLite } from './WellnessDrawer';
 import { groupRunFacts, type GroupedRunFact } from './UTILS/groupRunFacts';
 import { LogWorkoutSessionDialog } from './LogWorkoutSessionDialog';
+import AppIcon from '../COMMON/AppIcon/AppIcon';
 
 interface Props {
   onDayClick?: (date: string) => void;
@@ -445,7 +446,7 @@ export const FullWeek: React.FC<Props> = ({
         </div>
 
         <div className="pb-full-week__brand">
-          <i className="pi pi-wave-pulse" />
+          <AppIcon name="wave-pulse" />
           <span>Prana-Bindu</span>
         </div>
 

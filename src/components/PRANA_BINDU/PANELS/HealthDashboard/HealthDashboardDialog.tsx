@@ -4,6 +4,7 @@ import { Chart } from 'primereact/chart';
 import { TabView, TabPanel } from 'primereact/tabview';
 import { Dropdown } from 'primereact/dropdown';
 import { groupRunFacts } from '@/components/PRANA_BINDU/UTILS/groupRunFacts';
+import AppIcon from '@/components/COMMON/AppIcon/AppIcon';
 
 interface Props {
   visible: boolean;
@@ -220,7 +221,7 @@ export const HealthDashboardDialog: React.FC<Props> = ({ visible, onHide }) => {
     <Dialog
       visible={visible}
       onHide={onHide}
-      header={<span className="p-dialog-title pb-templates__title"><i className="pi pi-chart-pie" /> Полная аналитика</span>}
+      header={<span className="p-dialog-title pb-templates__title"><AppIcon name="chart-pie" color="accent" /> Полная аналитика</span>}
       style={{ width: '95vw', height: '90vh' }}
       maximizable
       modal

@@ -132,7 +132,7 @@ export const RunFiltersPanel: React.FC<Props> = ({
           <div className="pb-run-filters__row">
             <label className="pb-label">Поиск по названию</label>
             <span className="pb-run-filters__search-wrap">
-              <i className="pi pi-search" />
+              <AppIcon name="search" />
               <InputText
                 value={nameInput}
                 onChange={(e) => setNameInput(e.target.value)}
@@ -172,7 +172,7 @@ export const RunFiltersPanel: React.FC<Props> = ({
                   onClick={() => upd('sources', [])}
                   title="Снять все источники"
                 >
-                  <i className="pi pi-times" />
+                  <AppIcon name="times" />
                 </button>
               )}
             </div>

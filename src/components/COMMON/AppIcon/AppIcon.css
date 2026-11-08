@@ -18,6 +18,30 @@
   flex-shrink: 0;
 }
 
+/* ---- Material Symbols (шрифтовой режим, лигатуры) ---- */
+/* Класс .material-symbols-outlined — стандартный контракт Google.
+   font-variation-settings переопределяется inline-стилем из AppIcon. */
+.app-icon--material,
+.material-symbols-outlined {
+  font-family:
+    'Material Symbols Outlined Variable',
+    'Material Symbols Outlined',
+    sans-serif;
+  font-weight: normal;
+  font-style: normal;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: 'liga';
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
 /* SVG-вариант: размер задаётся через width/height атрибуты, но пусть
    inline-flex не даёт схлопнуться в flex-контейнерах. */
 .app-icon--svg {

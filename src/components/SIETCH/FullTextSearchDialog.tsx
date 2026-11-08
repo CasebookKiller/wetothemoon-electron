@@ -7,6 +7,7 @@ import { InputText } from 'primereact/inputtext';
 import { Dropdown } from 'primereact/dropdown';
 
 import type { DialogType } from './Breadcrumb';
+import AppIcon from '../COMMON/AppIcon/AppIcon';
 
 interface SearchHit {
   kind: 'entity' | 'relation' | 'observation' | 'source';
@@ -139,7 +140,7 @@ export const FullTextSearchDialog: React.FC<FullTextSearchDialogProps> = ({
 
           <div style={{ minWidth: '260px', flex: 1 }}>
             <span className="p-input-icon-left w-full search-input-with-icon">
-              <i className="pi pi-search" />
+              <AppIcon name="search" />
               <InputText
                 ref={inputRef}
                 value={query}

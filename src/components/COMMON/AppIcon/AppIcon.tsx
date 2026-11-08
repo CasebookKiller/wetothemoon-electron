@@ -21,7 +21,6 @@
 import React from 'react';
 import './AppIcon.css';
 import { CUSTOM_ICONS } from './icons/custom';
-import { MATERIAL_ICONS } from './icons/material';
 
 export type AppIconSet = 'prime' | 'material' | 'custom';
 
@@ -50,6 +49,14 @@ interface Props {
   color?: AppIconColor;
   /** Крутить (spinner, sync, refresh). */
   spin?: boolean;
+  /** material: заливка (0 — контур, 1 — залитая). */
+  filled?: boolean;
+  /** material: толщина линии 100–700. */
+  weight?: number;
+  /** material: оптический размер 20–48. */
+  opticalSize?: number;
+  /** material: grade/акцент -25..200. */
+  grade?: number;
   className?: string;
   style?: React.CSSProperties;
   title?: string;
@@ -104,6 +111,10 @@ export const AppIcon: React.FC<Props> = ({
   size = 'md',
   color = 'inherit',
   spin = false,
+  filled = false,
+  weight,
+  opticalSize,
+  grade,
   className,
   style,
   title,
@@ -163,12 +174,51 @@ export const AppIcon: React.FC<Props> = ({
     );
   }
 
-  // ---- SVG (custom / material) ----------------------------------------
-  const dict = set === 'custom' ? CUSTOM_ICONS : MATERIAL_ICONS;
-  const child = dict[name];
+  // ---- Material Symbols (шрифт, лигатуры) -----------------------------
+  if (set === 'material') {
+    const cls = [
+      'material-symbols-outlined',
+      'app-icon',
+      'app-icon--material',
+      colorPreset ? COLOR_CLASS[color as AppIconColorPreset] : '',
+      spin ? 'app-icon--spin' : '',
+      className ?? '',
+    ]
+      .filter(Boolean)
+      .join(' ');
+
+    const variation = [
+      `'FILL' ${filled ? 1 : 0}`,
+      weight != null ? `'wght' ${weight}` : null,
+      opticalSize != null ? `'opsz' ${opticalSize}` : null,
+      grade != null ? `'GRAD' ${grade}` : null,
+    ]
+      .filter(Boolean)
+      .join(', ');
+
+    return (
+      <span
+        className={cls}
+        style={{
+          ...baseStyle,
+          fontSize: `${px}px`,
+          ...(variation ? { fontVariationSettings: variation } : null),
+        }}
+        title={title}
+        onClick={onClick}
+        onKeyDown={handleKeyDown}
+        {...ariaProps}
+      >
+        {name}
+      </span>
+    );
+  }
+
+  // ---- SVG (custom) ---------------------------------------------------
+  const child = CUSTOM_ICONS[name];
 
   if (!child) {
-    warnOnce(`${set}:${name}`, `иконка "${name}" не найдена в наборе "${set}"`);
+    warnOnce(`custom:${name}`, `иконка "${name}" не найдена в наборе "custom"`);
     return (
       <span
         className={`app-icon app-icon--placeholder ${className ?? ''}`}

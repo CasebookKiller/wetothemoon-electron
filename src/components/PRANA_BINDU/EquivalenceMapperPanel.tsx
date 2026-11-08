@@ -24,6 +24,7 @@ import {
   PROGRESSIONS_CATALOG,
   findProgressionsByKey,
 } from '@/main/services/pranaBindu/mentat/exerciseCatalog';
+import AppIcon from '../COMMON/AppIcon/AppIcon';
 
 const LEVELS: ThenicsLevel[] = [
   'Beginner',
@@ -292,7 +293,7 @@ export const EquivalenceMapperPanel: React.FC<Props> = ({
         </span>
         <span className="pb-equiv__spacer" />
         <span className="pb-equiv__search-wrap">
-          <i className="pi pi-search" />
+          <AppIcon name="search" />
           <InputText
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -487,7 +488,7 @@ export const EquivalenceMapperPanel: React.FC<Props> = ({
 
               {targetKey && targetLevel != null && (
                 <div className="pb-equiv__preview">
-                  <i className="pi pi-arrow-right" />{' '}
+                  <AppIcon name="arrow-right" />{' '}
                   <b>{selectedEntry.name}</b>{' '}
                   <span className="pb-hint">({selectedEntry.level})</span> ≈{' '}
                   <b>{targetProgLabel} L{targetLevel}</b>{' '}

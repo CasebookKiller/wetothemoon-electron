@@ -10,6 +10,7 @@ import type { RunFilters } from '../RunsPanel/RunFiltersPanel';
 import type { GroupedRunFact } from '@/components/PRANA_BINDU/UTILS/groupRunFacts';
 import { groupRunFacts } from '@/components/PRANA_BINDU/UTILS/groupRunFacts';
 import type { RunFactLite } from '@/components/PRANA_BINDU/RunStreamsDrawer';
+import AppIcon from '@/components/COMMON/AppIcon/AppIcon';
 
 interface Props {
   visible: boolean;
@@ -148,7 +149,7 @@ export const TrainingDialog: React.FC<Props> = ({
     <Dialog
       visible={visible}
       onHide={onHide}
-      header={<span className="p-dialog-title pb-templates__title"><i className="pi pi-chart-bar" /> Тренировки</span>}
+      header={<span className="p-dialog-title pb-templates__title"><AppIcon name="chart-bar" color="accent" /> Тренировки</span>}
       style={{ width: '60vw', height: '90vh', maxWidth: '1000px', minWidth: '700px' }}
       contentStyle={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
       maximizable

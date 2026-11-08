@@ -16,6 +16,7 @@ import type {
   NamedExerciseCategory,
   ExerciseCategory,
 } from '@/main/services/pranaBindu/mentat/types';
+import AppIcon from '../COMMON/AppIcon/AppIcon';
 
 interface Props {
   onCopy: (line: string) => void;
@@ -179,7 +180,7 @@ export const ExerciseCatalog: React.FC<Props> = ({ onCopy, className }) => {
                             onClick={() => onCopy(line)}
                             title={`Копировать: ${line}`}
                           >
-                            <i className="pi pi-arrow-right" />
+                            <AppIcon name="arrow-right" />
                           </button>
                         </div>
                       );
@@ -215,7 +216,7 @@ export const ExerciseCatalog: React.FC<Props> = ({ onCopy, className }) => {
                     onClick={() => onCopy(line)}
                     title={`Копировать: ${line}`}
                   >
-                    <i className="pi pi-arrow-right" />
+                    <AppIcon name="arrow-right" />
                   </button>
                 </div>
               );

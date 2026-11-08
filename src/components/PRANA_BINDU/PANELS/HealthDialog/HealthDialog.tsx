@@ -3,6 +3,7 @@ import { Dialog } from 'primereact/dialog';
 import { TabView, TabPanel } from 'primereact/tabview';
 import { WellnessPanel } from '../WellnessPanel/WellnessPanel';
 import { NutritionPanel } from '../NutritionPanel/NutritionPanel';
+import AppIcon from '@/components/COMMON/AppIcon/AppIcon';
 
 interface Props {
   visible: boolean;
@@ -24,7 +25,7 @@ export const HealthDialog: React.FC<Props> = ({ visible, onHide, initialTab, syn
     <Dialog
       visible={visible}
       onHide={onHide}
-      header={<span className="p-dialog-title pb-templates__title"><i className="pi pi-heart" /> Здоровье и Восстановление</span>}
+      header={<span className="p-dialog-title pb-templates__title"><AppIcon name="heart" color="accent" /> Здоровье и Восстановление</span>}
       style={{ width: '900px', height: '85vh', maxWidth: '96vw' }}
       maximizable
       modal

@@ -8,6 +8,7 @@ import { Calendar } from 'primereact/calendar';
 import { Dialog } from 'primereact/dialog';
 import { DetailFields } from '@/components/SIETCH/DetailFields';
 import { AuditLogTable, type AuditLogEntry } from './AuditLogTable';
+import AppIcon from '../COMMON/AppIcon/AppIcon';
 
 const PAGE_SIZE = 200;
 
@@ -123,7 +124,7 @@ export const AuditLogTab: React.FC = () => {
 
         <div style={{ minWidth: '200px', flex: 1 }}>
           <span className="p-input-icon-left w-full search-input-with-icon">
-            <i className="pi pi-search" />
+            <AppIcon name="search" />
             <InputText
               value={filterSearch}
               onChange={(e) => setFilterSearch(e.target.value)}

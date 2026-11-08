@@ -9,6 +9,7 @@ import React, { useEffect, useState } from 'react';
 import { Button } from 'primereact/button';
 import { Dialog } from 'primereact/dialog';
 import { Checkbox } from 'primereact/checkbox';
+import AppIcon from '../COMMON/AppIcon/AppIcon';
 
 export interface StaleCandidate {
   id: number;
@@ -120,7 +121,7 @@ export const MirrorDeleteDialog: React.FC<Props> = ({
 
         {candidates.length >= 5 && (
           <div className="pb-mirror-delete-dialog__warning">
-            <i className="pi pi-exclamation-triangle" />
+            <AppIcon name="exclamation-triangle" />
             <span>
               <b>{candidates.length}</b> событий под удаление — это много.
               Проверьте, что в ICU действительно нет этих тренировок,

@@ -9,6 +9,7 @@ import { Button } from 'primereact/button';
 import { InputText } from 'primereact/inputtext';
 import { Message } from 'primereact/message';
 import { Panel } from 'primereact/panel';
+import AppIcon from '@/components/COMMON/AppIcon/AppIcon';
 
 interface Props {
   className?: string;
@@ -184,7 +185,7 @@ export const ConnectionsPanel: React.FC<Props> = ({ className, embedded }) => {
         {/* --- dodofo --- */}
         <div className="pb-connections__block">
           <div className="pb-connections__title">
-            <i className="pi pi-link" /> dodofo
+            <AppIcon name="link" color="accent" /> dodofo
             {hasDodofoToken && (
               <span className="pb-label-ok">✓ сохранён</span>
             )}
@@ -227,7 +228,7 @@ export const ConnectionsPanel: React.FC<Props> = ({ className, embedded }) => {
         {/* --- intervals.icu --- */}
         <div className="pb-connections__block">
           <div className="pb-connections__title">
-            <i className="pi pi-heart" /> intervals.icu
+            <AppIcon name="heart" color="accent" /> intervals.icu
             {intervalsHasKey && (
               <span className="pb-label-ok">✓ сохранён</span>
             )}
@@ -290,7 +291,7 @@ export const ConnectionsPanel: React.FC<Props> = ({ className, embedded }) => {
         {/* --- Zepp (резерв) --- */}
         <div className="pb-connections__block pb-connections__block--collapsed">
           <div className="pb-connections__title">
-            <i className="pi pi-mobile" /> Zepp (резерв)
+            <AppIcon name="mobile" color="accent" /> Zepp (резерв)
           </div>
           <div className="flex flex-column gap-2">
             <InputText

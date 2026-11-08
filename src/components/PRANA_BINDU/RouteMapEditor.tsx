@@ -62,6 +62,7 @@ import {
   ChainEditorDialog,
   type ChainDraft,
 } from './PANELS/ChainsPanel/ChainEditorDialog';
+import AppIcon from '../COMMON/AppIcon/AppIcon';
 
 interface Props {
   visible: boolean;
@@ -3153,7 +3154,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                   <div className="pb-run-filters__row">
                     <label className="pb-label">Поиск по названию</label>
                     <span className="pb-run-filters__search-wrap">
-                      <i className="pi pi-search" />
+                      <AppIcon name="search" />
                       <InputText
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
@@ -3562,7 +3563,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                 {/* Слои */}
                 <div className="pb-connections__block">
                   <div className="pb-connections__title">
-                    <i className="pi pi-clone" /> Слои карты
+                    <AppIcon name="clone" /> Слои карты
                     <Button
                       icon="pi pi-plus"
                       text
@@ -3738,7 +3739,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                 {/* Пороги автоопределения */}
                 <div id="pb-coverage-thresholds" className="pb-connections__block mt-2">
                   <div className="pb-connections__title">
-                    <i className="pi pi-sliders-h" /> Пороги автоопределения
+                    <AppIcon name="sliders-h" /> Пороги автоопределения
                   </div>
 
                   {(
@@ -3841,7 +3842,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                 {/* Стиль эталонов на карте */}
                 <div id="pb-all-refs-styles" className="pb-connections__block mt-2">
                   <div className="pb-connections__title">
-                    <i className="pi pi-palette" /> Стиль эталонов на карте
+                    <AppIcon name="palette" /> Стиль эталонов на карте
                   </div>
 
                   <div className="pb-hint" style={{ fontSize: '0.7rem', marginBottom: '0.5rem' }}>
@@ -4057,7 +4058,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                     className="pb-hint"
                     style={{ textAlign: 'center', padding: '0.5rem' }}
                   >
-                    <i className="pi pi-spin pi-spinner" /> Загрузка…
+                    <AppIcon name="spinner" spin color="accent" /> Загрузка…
                   </div>
                 )}
 
@@ -4368,7 +4369,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
 
                 {refTracksLoading && (
                   <div className="pb-hint" style={{ textAlign: 'center', padding: '0.5rem' }}>
-                    <i className="pi pi-spin pi-spinner" /> Загрузка…
+                    <AppIcon name="spinner" spin color="accent" /> Загрузка…
                   </div>
                 )}
 
@@ -4577,7 +4578,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
 
           {loadingStreams && (
             <div style={{ position: 'absolute', top: 10, right: 10, zIndex: 5, background: 'rgba(0,0,0,0.5)', padding: '5px 10px', borderRadius: '4px' }}>
-              <i className="pi pi-spin pi-spinner" />
+              <AppIcon name="spinner" spin />
             </div>
           )}
 
@@ -5376,7 +5377,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem' }}>
-                <i className="pi pi-expand" style={{ color: 'var(--pb-accent)' }} />
+                <AppIcon name="expand" color="accent" />
                 <span style={{ color: 'var(--pb-accent)', fontWeight: 600 }}>
                   Редактирование точек
                 </span>
@@ -5644,7 +5645,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem' }}>
-                <i className="pi pi-pencil" style={{ color: 'var(--pb-accent)' }} />
+                <AppIcon name="pencil" color="accent" />
                 <span style={{ color: 'var(--pb-accent)', fontWeight: 600 }}>
                   Рисование эталона
                 </span>
@@ -5800,7 +5801,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
 
           {saveRefStatus === 'saved' && (
             <div style={{ color: 'var(--tg-success)', fontSize: '0.85rem' }}>
-              <i className="pi pi-check-circle" /> Сохранено
+              <AppIcon name="check-circle" color="success" /> Сохранено
             </div>
           )}
           {saveRefError && (

@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Dialog } from 'primereact/dialog';
 import { Button } from 'primereact/button';
 import { InputText } from 'primereact/inputtext';
+import AppIcon from '../COMMON/AppIcon/AppIcon';
 
 interface RefItem {
   id: number;
@@ -182,7 +183,7 @@ export const EditReferenceDialog: React.FC<Props> = ({
             }}
           >
             <div style={{ color: 'var(--pb-accent)', fontWeight: 600, marginBottom: '0.2rem' }}>
-              <i className="pi pi-info-circle" /> Как объединить в папку?
+              <AppIcon name="info-circle" /> Как объединить в папку?
             </div>
             Добавьте одинаковый тег с префиксом <b>group:</b> (например, <i>group:гольяново</i>), 
             и эталоны свернутся в одну папку.<br/>
@@ -192,7 +193,7 @@ export const EditReferenceDialog: React.FC<Props> = ({
 
         {status === 'saved' && (
           <div style={{ color: 'var(--tg-success)', fontSize: '0.85rem' }}>
-            <i className="pi pi-check-circle" /> Сохранено
+            <AppIcon name="check-circle" color="success" /> Сохранено
           </div>
         )}
         {error && (

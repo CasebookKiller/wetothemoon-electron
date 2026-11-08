@@ -14,6 +14,7 @@ import { Panel } from 'primereact/panel';
 import { ThresholdsTimelineChart } from './ThresholdsTimelineChart';
 import { Checkbox } from 'primereact/checkbox';
 import { Calendar } from 'primereact/calendar';
+import AppIcon from '@/components/COMMON/AppIcon/AppIcon';
 
 export interface ProfilePanelHandle {
   /** Перечитать профиль из БД. */
@@ -528,7 +529,7 @@ export const ProfilePanel = forwardRef<ProfilePanelHandle, Props>(
           <div className="pb-profile__computed mt-3 p-3 border-round" style={{ border: '1px solid var(--pb-accent)', background: 'rgba(212, 163, 115, 0.05)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
               <span style={{ fontWeight: 600, color: 'var(--pb-accent)' }}>
-                <i className="pi pi-calculator" /> Результат расчёта
+                <AppIcon name="calculator" /> Результат расчёта
               </span>
               {computed.source === 'test_segments' && computed.testsUsed >= 3 ? (
                 <span
@@ -635,7 +636,7 @@ export const ProfilePanel = forwardRef<ProfilePanelHandle, Props>(
         <div className="mt-3">
           <details style={{ cursor: 'pointer', fontSize: '0.8rem', color: 'var(--tg-theme-hint-color)' }}>
             <summary style={{ color: 'var(--pb-accent)', marginBottom: '0.5rem', fontWeight: 600 }}>
-              <i className="pi pi-info-circle" /> Как мы считаем пороги
+              <AppIcon name="info-circle" /> Как мы считаем пороги
             </summary>
             <div className="pb-hint" style={{ lineHeight: '1.4', marginTop: '0.5rem' }}>
               <ul style={{ paddingLeft: '1.2rem', margin: 0 }}>

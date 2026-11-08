@@ -7,6 +7,7 @@ import { Chart } from 'primereact/chart';
 import { Checkbox } from 'primereact/checkbox';
 import { Dropdown } from 'primereact/dropdown';
 import { Button } from 'primereact/button';
+import AppIcon from '@/components/COMMON/AppIcon/AppIcon';
 
 interface TimelinePoint {
   date: string;
@@ -333,7 +334,7 @@ export const ThresholdsTimelineChart: React.FC<Props> = ({
     <div style={{ marginTop: '1rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
         <span style={{ fontWeight: 600, color: 'var(--pb-accent)' }}>
-          <i className="pi pi-chart-line" /> Динамика порогов
+          <AppIcon name="chart-line" /> Динамика порогов
         </span>
 
         <Dropdown
@@ -426,7 +427,7 @@ export const ThresholdsTimelineChart: React.FC<Props> = ({
 
       {loading && (
         <div style={{ height: '280px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--tg-hint)' }}>
-          <i className="pi pi-spin pi-spinner" style={{ marginRight: '0.5rem' }} />
+          <AppIcon name="spinner" spin style={{ marginRight: '0.5rem' }} />
           Считаем…
         </div>
       )}
@@ -462,7 +463,7 @@ export const ThresholdsTimelineChart: React.FC<Props> = ({
             color: 'var(--tg-hint)',
           }}
         >
-          <i className="pi pi-info-circle" style={{ color: '#e8a838', marginRight: '0.4rem' }} />
+          <AppIcon name="info-circle" color="#e8a838" style={{ marginRight: '0.4rem' }} />
           Нет тестов длительности{' '}
           {lthrTestDuration < 60
             ? `${lthrTestDuration}с`

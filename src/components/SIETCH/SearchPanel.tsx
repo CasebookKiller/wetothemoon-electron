@@ -5,6 +5,7 @@ import { Panel } from 'primereact/panel';
 import { Button } from 'primereact/button';
 import { InputText } from 'primereact/inputtext';
 import { Dropdown } from 'primereact/dropdown';
+import AppIcon from '../COMMON/AppIcon/AppIcon';
 
 export interface SearchPanelProps {
   query: string;
@@ -80,7 +81,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
       <div className="flex flex-wrap align-items-center gap-2 audit-log-filters">
         <div style={{ minWidth: '240px', flex: 1 }}>
           <span className="p-input-icon-left w-full search-input-with-icon">
-            <i className="pi pi-search" />
+            <AppIcon name="search" />
             <InputText
               value={query}
               onChange={(e) => onQueryChange(e.target.value)}

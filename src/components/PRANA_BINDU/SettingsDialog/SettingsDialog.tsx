@@ -22,6 +22,7 @@ import {
 import { ConnectionsPanel } from '../PANELS/ConnectionsPanel/ConnectionsPanel';
 import { SyncPanel } from '../PANELS/SyncPanel/SyncPanel';
 import { ImportPanel } from '../PANELS/ImportPanel/ImportPanel';
+import AppIcon from '@/components/COMMON/AppIcon/AppIcon';
 
 interface Props {
   visible: boolean;
@@ -60,7 +61,7 @@ export const SettingsDialog: React.FC<Props> = ({
       onHide={onHide}
       header={
         <span className="p-dialog-title pb-templates__title">
-          <i className="pi pi-cog" /> Настройки
+          <AppIcon name="cog" color="accent" /> Настройки
         </span>
       }
       style={{ width: '960px', height: '85vh', maxWidth: '96vw' }}

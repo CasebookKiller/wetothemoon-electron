@@ -866,7 +866,7 @@ export const ExerciseGraphView: React.FC<Props> = ({ graph, onGraphChanged }) =>
                 }
                 title="Поменять местами начало и конец"
               >
-                <i className="pi pi-sort-arrow-down" /> Поменять
+                <AppIcon name="sort-arrow-down" /> Поменять
               </button>
               <div className="pb-edge-dialog__row">
                 <div className="pb-edge-dialog__label">Куда</div>

@@ -7,6 +7,7 @@ import { InputText } from 'primereact/inputtext';
 import { Dropdown } from 'primereact/dropdown';
 import { DataTable, DataTablePageEvent } from 'primereact/datatable';
 import { Column } from 'primereact/column';
+import AppIcon from '../COMMON/AppIcon/AppIcon';
 
 export interface JudgesDirectoryDialogProps {
   visible: boolean;
@@ -219,7 +220,7 @@ export const JudgesDirectoryDialog: React.FC<JudgesDirectoryDialogProps> = ({
         <div className="flex flex-wrap align-items-center gap-2 audit-log-filters">
           <div style={{ minWidth: '240px', flex: 1 }}>
             <span className="p-input-icon-left w-full search-input-with-icon">
-              <i className="pi pi-search" />
+              <AppIcon name="search" />
               <InputText
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}

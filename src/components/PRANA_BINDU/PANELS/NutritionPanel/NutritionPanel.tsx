@@ -6,6 +6,7 @@ import { Button } from 'primereact/button';
 import { InputText } from 'primereact/inputtext';
 import { InputNumber } from 'primereact/inputnumber';
 import { Dropdown } from 'primereact/dropdown';
+import AppIcon from '@/components/COMMON/AppIcon/AppIcon';
 
 interface Props {
   className?: string;
@@ -219,7 +220,7 @@ export const NutritionPanel: React.FC<Props> = ({ className, embedded }) => {
       {/* ВОДА */}
       <div className="pb-connections__block">
         <div className="pb-connections__title">
-          <i className="pi pi-tint" /> Вода
+          <AppIcon name="tint" color="accent" /> Вода
           <span style={{ marginLeft: 'auto', fontFamily: 'monospace', fontSize: '0.9rem' }}>
             {waterTotal} / {waterGoal} мл
           </span>
@@ -262,7 +263,7 @@ export const NutritionPanel: React.FC<Props> = ({ className, embedded }) => {
       {/* ВЕС и BMR */}
       <div className="pb-connections__block">
         <div className="pb-connections__title">
-          <i className="pi pi-chart-line" /> Вес
+          <AppIcon name="chart-line" color="accent" /> Вес
           {latestWeight != null && (
             <span style={{ marginLeft: 'auto', fontFamily: 'monospace', fontSize: '0.9rem' }}>{latestWeight.toFixed(1)} кг</span>
           )}
@@ -288,7 +289,7 @@ export const NutritionPanel: React.FC<Props> = ({ className, embedded }) => {
 
       {/* ПИТАНИЕ */}
       <div className="pb-connections__block">
-        <div className="pb-connections__title"><i className="pi pi-apple" /> Питание</div>
+        <div className="pb-connections__title"><AppIcon name="apple" color="accent" /> Питание</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
           <Dropdown value={mealType} options={MEAL_OPTIONS} onChange={(e) => setMealType(e.value)} panelClassName="pb-dropdown-panel" className="w-full" />
           <InputText value={foodName} onChange={(e) => setFoodName(e.target.value)} placeholder="Что съели?" className="w-full" />

@@ -6,6 +6,7 @@
 
 import React from 'react';
 import { useRunChain } from './HOOKS/useRunChain';
+import AppIcon from '../COMMON/AppIcon/AppIcon';
 
 interface Props {
   runFactId: number | null;
@@ -19,7 +20,7 @@ export const RunChainBadge: React.FC<Props> = ({ runFactId, compact = false }) =
   if (loading) {
     return (
       <small className="pb-hint" style={{ fontSize: '0.72rem', opacity: 0.7 }}>
-        <i className="pi pi-spin pi-spinner" style={{ fontSize: '0.7rem' }} /> Цепочка…
+        <AppIcon name="spinner" spin style={{ fontSize: '0.7rem' }} /> Цепочка…
       </small>
     );
   }
@@ -77,7 +78,7 @@ export const RunChainBadge: React.FC<Props> = ({ runFactId, compact = false }) =
           maxWidth: '100%',
         }}
       >
-        <i className="pi pi-link" style={{ fontSize: '0.65rem', marginRight: 4 }} />
+        <AppIcon name="link" style={{ fontSize: '0.65rem', marginRight: 4 }} />
         {primary.kind === 'loop' ? `×${primary.repeats} · ` : ''}
         {primary.name}
         {alsoUsed.length > 0 ? ` +${alsoUsed.length}` : ''}
@@ -102,7 +103,7 @@ export const RunChainBadge: React.FC<Props> = ({ runFactId, compact = false }) =
         overflow: 'hidden',
       }}
     >
-      <i className="pi pi-link" style={{ color: '#6ab2f2', fontSize: '0.8rem', flexShrink: 0 }} />
+      <AppIcon name="link" color="#6ab2f2" size={13} style={{ flexShrink: 0 }} />
       <span
         style={{
           color: '#6ab2f2',
