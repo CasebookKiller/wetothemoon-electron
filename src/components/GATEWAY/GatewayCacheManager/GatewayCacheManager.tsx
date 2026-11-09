@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { CloseIcon, TrashIcon, DatabaseIcon } from '../GatewayIcons/GatewayIcons';
 import { GatewayConfirmModal } from '../GatewayConfirmModal/GatewayConfirmModal';
 import { GatewayDiagnosticModal } from './GatewayDiagnosticModal';
+import AppIcon from '@/components/COMMON/AppIcon/AppIcon';
 
 interface GatewayCacheManagerProps {
   visible: boolean;
@@ -434,12 +435,15 @@ export const GatewayCacheManager: React.FC<GatewayCacheManagerProps> = ({
                                 style={{ pointerEvents: isBatching ? 'none' : 'auto', opacity: isBatching ? 0.6 : 1 }}
                                 title={`Загрузить все недокачанные файлы (${pending})`}
                               >
-                                {isBatching ? '⬇ …' : `⬇ Загрузить (${pending})`}
+                                {isBatching 
+                                  ? <><AppIcon name="download" set="material" spin /> …</>
+                                  : <><AppIcon name="download" set="material" /> Загрузить ({pending})</>
+                                }
                               </div>
                             )}
                             {hasFiles && allLoaded && (
                               <div className="gateway-cache-conversations__all-loaded">
-                                ✓ все файлы
+                                <AppIcon name="check" set="material" color="success" /> все файлы
                               </div>
                             )}
                             <div
@@ -448,7 +452,7 @@ export const GatewayCacheManager: React.FC<GatewayCacheManagerProps> = ({
                               onClick={() => runDiagnostic(conv.id, conv.title)}
                               title="Диагностика веток (read-only)"
                             >
-                              🔍 Диагностика
+                              <AppIcon name="search" set="material" /> Диагностика
                             </div>
                             <div
                               role="button"

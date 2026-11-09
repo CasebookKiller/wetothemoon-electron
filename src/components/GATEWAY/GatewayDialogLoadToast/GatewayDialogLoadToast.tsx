@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { CloseIcon, CheckIcon } from '@/components/GATEWAY/GatewayIcons/GatewayIcons';
+import AppIcon from '@/components/COMMON/AppIcon/AppIcon';
 
 export interface DialogLoadInfo {
   convId: string;
@@ -158,7 +159,9 @@ export const GatewayDialogLoadToast: React.FC<GatewayDialogLoadToastProps> = ({
               </span>
             )}
             {allFilesLoaded && (
-              <span className="gateway-dialog-load-toast__ok"> ✓</span>
+              <span className="gateway-dialog-load-toast__ok" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                <AppIcon name="check" set="material" color="success" size={14} />
+              </span>
             )}
           </span>
         </div>
@@ -180,7 +183,7 @@ export const GatewayDialogLoadToast: React.FC<GatewayDialogLoadToastProps> = ({
       <div className="gateway-dialog-load-toast__actions">
         {batchProgress && batchProgress.total > 0 ? (
           <div className="gateway-dialog-load-toast__action gateway-dialog-load-toast__action--loading">
-            ⏳ Загрузка {batchProgress.current}/{batchProgress.total}…
+            <AppIcon name="hourglass_top" set="material" spin /> Загрузка {batchProgress.current}/{batchProgress.total}…
           </div>
         ) : pending > 0 && onLoadRemaining ? (
           <div

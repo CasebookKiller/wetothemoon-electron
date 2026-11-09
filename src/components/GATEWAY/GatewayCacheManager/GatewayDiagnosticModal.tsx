@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { classNames } from '@/css/classnames';
+import AppIcon from '@/components/COMMON/AppIcon/AppIcon';
 
 export interface DiagnosticReportModalProps {
   visible: boolean;
@@ -57,12 +58,22 @@ export const GatewayDiagnosticModal: React.FC<DiagnosticReportModalProps> = ({
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-          <h3 style={{ margin: 0, fontSize: 16 }}>🔍 Диагностика веток</h3>
-          <button onClick={onClose} style={{ background: 'transparent', border: '1px solid #555', color: '#eee', padding: '4px 10px', borderRadius: 6, cursor: 'pointer' }}>✕</button>
+          <h3 style={{ margin: 0, fontSize: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <AppIcon name="search" set="material" color="accent" /> Диагностика веток
+          </h3>
+          <button onClick={onClose} style={{ background: 'transparent', border: '1px solid #555', color: '#eee', padding: '4px 10px', borderRadius: 6, cursor: 'pointer' }}><AppIcon name="close" set="material" /></button>
         </div>
 
-        {loading && <div style={{ color: '#4d6bfe' }}>⏳ Собираю отчёт (PW-скролл может занять 30-90 сек)…</div>}
-        {error && <div style={{ color: '#ff6b6b' }}>❌ {error}</div>}
+        {loading && (
+          <div style={{ color: '#4d6bfe', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <AppIcon name="hourglass_top" set="material" spin /> Собираю отчёт (PW-скролл может занять 30-90 сек)…
+          </div>
+        )}
+        {error && (
+          <div style={{ color: '#ff6b6b', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <AppIcon name="error" set="material" /> {error}
+          </div>
+        )}
 
         {report && !loading && (
           <>
@@ -70,7 +81,11 @@ export const GatewayDiagnosticModal: React.FC<DiagnosticReportModalProps> = ({
               background: report.verdict.ok ? 'rgba(76,175,80,0.15)' : 'rgba(255,82,82,0.15)',
               border: `1px solid ${report.verdict.ok ? '#4caf50' : '#ff5252'}`,
             }}>
-              <strong>{report.verdict.ok ? '✅ OK' : '❌ ПРОБЛЕМЫ'}</strong>
+              <strong style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                {report.verdict.ok 
+                  ? <><AppIcon name="check_circle" set="material" color="success" filled /> OK</>
+                  : <><AppIcon name="error" set="material" color="danger" /> ПРОБЛЕМЫ</>}
+              </strong>
               {!report.verdict.ok && (
                 <ul style={{ margin: '8px 0 0 20px' }}>
                   {report.verdict.problems.map((p: string, i: number) => (
@@ -112,10 +127,13 @@ export const GatewayDiagnosticModal: React.FC<DiagnosticReportModalProps> = ({
 
             <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
               <button onClick={handleCopy} style={{ padding: '6px 12px', borderRadius: 6, cursor: 'pointer', background: '#4d6bfe', color: 'white', border: 'none' }}>
-                {copied ? '✅ Скопировано' : '📋 Скопировать JSON'}
+                {copied 
+                  ? <><AppIcon name="check" set="material" color="success" /> Скопировано</>
+                  : <><AppIcon name="content_copy" set="material" /> Скопировать JSON</>
+                }
               </button>
               <button onClick={handleDownload} style={{ padding: '6px 12px', borderRadius: 6, cursor: 'pointer', background: '#444', color: 'white', border: 'none' }}>
-                💾 Скачать JSON
+                <AppIcon name="download" set="material" /> Скачать JSON
               </button>
             </div>
           </>
