@@ -18,6 +18,7 @@ import { useLocalStorage } from '@/hooks/useLocalStorage';
 
 import './BondDetailPage.css';
 import MarketStreamTest from '@/components/BONDS/MarketStreamTest/MarketStreamTest';
+import AppIcon from '@/components/COMMON/AppIcon/AppIcon';
 
 interface iedate {
   date: string;
@@ -48,7 +49,7 @@ function SafeBackButton({ fallback = '/' }) {
         color: 'var(--tg-theme-accent-text-color)'
       }}
     >
-      ← Назад
+      <AppIcon name="arrow-left" /> Назад
     </Button>
   );
 }

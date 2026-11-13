@@ -10,6 +10,7 @@ import type { RunFactLite } from '../../RunStreamsDrawer';
 import type { GroupedRunFact } from '../../UTILS/groupRunFacts';
 import type { RunsTableProps } from './types';
 import { fmtDuration, fmtKm } from './utils';
+import AppIcon from '@/components/COMMON/AppIcon/AppIcon';
 
 const RunsTableFlatInner: React.FC<RunsTableProps> = ({
   items,
@@ -41,14 +42,11 @@ const RunsTableFlatInner: React.FC<RunsTableProps> = ({
         style={{ width: '40px', textAlign: 'center' }}
         body={(r: GroupedRunFact) =>
           r.hasStreams ? (
-            <i
-              className="pi pi-chart-line"
-              style={{ color: 'var(--pb-accent)' }}
-              title="Есть потоки"
-            />
+            <AppIcon name="chart-line" className="pb-drawer__icon" style={{color: 'var(--pb-accent)'}} title="Есть потоки" />
           ) : (
-            <i
-              className="pi pi-minus"
+            <AppIcon
+              name="minus"
+              className="pb-drawer__icon" 
               style={{ opacity: 0.25 }}
               title="Потоков нет"
             />

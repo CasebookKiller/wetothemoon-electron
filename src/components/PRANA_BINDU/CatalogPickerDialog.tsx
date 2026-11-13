@@ -19,6 +19,7 @@ import type {
   CatalogEntry,
   NamedExercise,
 } from '@/main/services/pranaBindu/mentat/types';
+import AppIcon from '../COMMON/AppIcon/AppIcon';
 
 export interface PickedExercise {
   movementKey: string;
@@ -328,7 +329,7 @@ export const CatalogPickerDialog: React.FC<Props> = ({
           <span className="pb-catalog__level-hint">{hint}</span>
         )}
         {isPicked && (
-          <i className="pi pi-check" style={{ color: 'var(--pb-accent)', fontSize: '0.85rem', marginLeft: '0.5rem' }} />
+          <AppIcon name="check" color="accent" size={14} style={{ marginLeft: '0.5rem' }} />
         )}
       </label>
     );

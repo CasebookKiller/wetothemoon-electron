@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Dialog } from 'primereact/dialog';
 import { Button } from 'primereact/button';
 import { InputText } from 'primereact/inputtext';
+import AppIcon from '../COMMON/AppIcon/AppIcon';
 
 export type DangerMode = 'tables' | 'dumps' | 'both';
 
@@ -78,7 +79,7 @@ export const DangerZoneDialog: React.FC<DangerZoneDialogProps> = ({
           className="p-panel-title"
           style={{ color: 'var(--tg-theme-destructive-text-color, #ec3942)' }}
         >
-          <i className="pi pi-exclamation-octagon mr-2" />
+          <AppIcon name="exclamation-octagon" className="mr-2" />
           Опасная зона
         </span>
       }
@@ -109,7 +110,7 @@ export const DangerZoneDialog: React.FC<DangerZoneDialogProps> = ({
             border: '1px solid rgba(236, 57, 66, 0.4)',
           }}
         >
-          <i className="pi pi-exclamation-triangle mt-1" style={{ color: '#ec3942' }} />
+          <AppIcon name="exclamation-triangle" color="#ec3942" className="mt-1" />
           <div className="text-sm">
             <b>Операция необратима.</b> Отмены и восстановления не будет.
             Перед выполнением убедитесь, что сделали резервную копию базы

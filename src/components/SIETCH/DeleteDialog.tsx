@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Dialog } from 'primereact/dialog';
 import { Button } from 'primereact/button';
+import AppIcon from '../COMMON/AppIcon/AppIcon';
 
 export type DeleteTargetType = 'entity' | 'relation' | 'observation' | 'source';
 
@@ -113,7 +114,7 @@ export const DeleteDialog: React.FC<DeleteDialogProps> = ({
                 border: '1px solid rgba(236, 57, 66, 0.4)',
               }}
             >
-              <i className="pi pi-exclamation-triangle mt-1" style={{ color: '#ec3942' }} />
+              <AppIcon name="exclamation-triangle" color="#ec3942" className="mt-1" />
               <div className="text-sm">
                 {target.type === 'entity' ? (
                   <>

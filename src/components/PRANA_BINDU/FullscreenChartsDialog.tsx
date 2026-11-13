@@ -17,6 +17,7 @@ import {
   resetChartColors,
   type ChannelColorSet,
 } from './UTILS/chartColors';
+import AppIcon from '../COMMON/AppIcon/AppIcon';
 
 interface Props {
   visible: boolean;
@@ -442,7 +443,7 @@ export const FullscreenChartsDialog: React.FC<Props> = ({
               overflow: 'hidden',
             }}
           >
-            {loading && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><i className="pi pi-spin pi-spinner" style={{ fontSize: '2rem', color: 'var(--pb-accent)' }} /></div>}
+            {loading && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><AppIcon name="spinner" spin color="accent" size={32} /></div>}
             {error && <div style={{ color: 'var(--tg-destructive)', margin: 'auto' }}>{error}</div>}
             {!loading && !error && payload && (
               <canvas

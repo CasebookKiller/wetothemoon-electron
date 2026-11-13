@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Dialog } from 'primereact/dialog';
 import { Button } from 'primereact/button';
 import { DetailFields, type DetailField } from '@/components/SIETCH/DetailFields';
+import AppIcon from '../COMMON/AppIcon/AppIcon';
 
 export interface RepresentativeDialogProps {
   visible: boolean;
@@ -285,7 +286,7 @@ export const RepresentativeDialog: React.FC<RepresentativeDialogProps> = ({
       onHide={onHide}
       header={
         <span className="p-panel-title">
-          <i className="pi pi-user-plus mr-2" />
+          <AppIcon name="user-plus" className="mr-2" />
           Добавить представителя
         </span>
       }

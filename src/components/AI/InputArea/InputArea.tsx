@@ -4,6 +4,7 @@ import { FloatLabel } from 'primereact/floatlabel';
 import { InputTextarea } from 'primereact/inputtextarea';
 
 import './InputArea.css'
+import AppIcon from '@/components/COMMON/AppIcon/AppIcon';
 
 interface InputAreaProps {
   onSend: (text: string) => void;
@@ -148,9 +149,9 @@ const InputArea: React.FC<InputAreaProps> = ({
             className="p-3 border-round bg-primary border-none cursor-pointer flex-none align-items-center justify-content-center"
           >
             {isLoading ? (
-              <i className="pi pi-spin pi-spinner" />
+              <AppIcon name="spinner" spin />
             ) : (
-              <i className="pi pi-send" />
+              <AppIcon name="send" />
             )}
           </button>
           {/* Кнопка прерывания */}
@@ -160,7 +161,7 @@ const InputArea: React.FC<InputAreaProps> = ({
             disabled={!isLoading || isAborted}
             className="ml-2 p-3 border-round bg-danger border-none cursor-pointer flex-none align-items-center justify-content-center abort-button"
           >
-            <i className="pi pi-stop" />
+            <AppIcon name="stop" />
           </button>
           {/* Кнопка загрузки файлов */}
           <button
@@ -179,7 +180,7 @@ const InputArea: React.FC<InputAreaProps> = ({
               cursor: FileLoading ? 'not-allowed' : 'pointer'
             }}
           >
-            { FileLoading ? <i className='pi pi-spin pi-spinner'/> : <i className="pi pi-file-import" /> }
+            { FileLoading ? <AppIcon name="spinner" spin /> : <AppIcon name="file-import" /> }
           </button>
           
         </div>

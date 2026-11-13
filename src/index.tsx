@@ -9,6 +9,7 @@ import { init } from '@/init.ts';
 
 // Вариативный шрифт с поддержкой всех осей (FILL, wght, GRAD, opsz)
 import '@fontsource-variable/material-symbols-outlined';
+import '@fontsource-variable/material-symbols-outlined/full.css';
 
 // CSS
 import 'primereact/resources/themes/lara-dark-cyan/theme.css';

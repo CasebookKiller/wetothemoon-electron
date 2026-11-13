@@ -6,6 +6,7 @@
 
 import React from 'react';
 import { Sidebar } from 'primereact/sidebar';
+import AppIcon from '../COMMON/AppIcon/AppIcon';
 
 export interface RecoveryLogLite {
   date: string;
@@ -148,7 +149,7 @@ export const WellnessDrawer: React.FC<Props> = ({
     >
       <div className="pb-drawer__header">
         <div className="pb-drawer__title">
-          <i className="pi pi-heart pb-drawer__icon" />
+          <AppIcon name="heart" className="pb-drawer__icon" />
           {log.date}
           {parseSources(log).map((s, i) => (
             <span

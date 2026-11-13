@@ -19,6 +19,7 @@ import {
   getPreset,
   REFERENCE_HEIGHT,
 } from './UTILS/storyPresets';
+import AppIcon from '../COMMON/AppIcon/AppIcon';
 
 // ==================== Типы ====================
 
@@ -1557,7 +1558,7 @@ export const StoryGeneratorDialog: React.FC<Props> = ({
       onHide={onHide}
       header={
         <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <i className="pi pi-camera" style={{ fontSize: '1.05rem', color: 'var(--pb-accent)' }} />
+          <AppIcon name="camera" color="accent" size={17} />
           Генератор историй и постов
         </span>
       }

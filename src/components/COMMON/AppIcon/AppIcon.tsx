@@ -202,6 +202,8 @@ export const AppIcon: React.FC<Props> = ({
         style={{
           ...baseStyle,
           fontSize: `${px}px`,
+          // 👇 ДОБАВЛЯЕМ ЭТУ СТРОКУ 👇
+          fontFamily: "'Material Symbols Outlined Variable', 'Material Symbols Outlined', sans-serif",
           ...(variation ? { fontVariationSettings: variation } : null),
         }}
         title={title}

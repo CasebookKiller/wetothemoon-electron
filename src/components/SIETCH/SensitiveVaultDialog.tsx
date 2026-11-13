@@ -11,6 +11,7 @@ import { Column } from 'primereact/column';
 import { Checkbox } from 'primereact/checkbox';
 import { Tag } from 'primereact/tag';
 import { SensitiveEditDialog } from './SensitiveEditDialog';
+import AppIcon from '../COMMON/AppIcon/AppIcon';
 
 export interface SensitiveVaultDialogProps {
   visible: boolean;
@@ -443,7 +444,7 @@ export const SensitiveVaultDialog: React.FC<SensitiveVaultDialogProps> = ({
               border: '1px solid rgba(236, 156, 66, 0.4)',
             }}
           >
-            <i className="pi pi-shield mt-1" style={{ color: '#ec9c42' }} />
+            <AppIcon name="shield" color="#ec9c42" className="mt-1" />
             <div className="text-sm">
               <b>Чувствительные данные</b> хранятся в отдельной зашифрованной базе.
               Выберите, как будет защищено хранилище. <b>Паспорт, СНИЛС, домашний
@@ -567,7 +568,7 @@ export const SensitiveVaultDialog: React.FC<SensitiveVaultDialogProps> = ({
                   border: '1px solid rgba(236, 57, 66, 0.4)',
                 }}
               >
-                <i className="pi pi-exclamation-triangle mt-1" style={{ color: '#ec3942' }} />
+                <AppIcon name="exclamation-triangle" color="#ec3942" className="mt-1" />
                 <div className="text-sm">
                   <b>Сохраните фразу в надёжном месте.</b> Без неё данные восстановить
                   нельзя. Не передавайте фразу вместе с файлами sensitive_data.db.
@@ -608,7 +609,7 @@ export const SensitiveVaultDialog: React.FC<SensitiveVaultDialogProps> = ({
               border: '1px solid rgba(236, 156, 66, 0.4)',
             }}
           >
-            <i className="pi pi-lock mt-1" style={{ color: '#ec9c42' }} />
+            <AppIcon name="lock" color="#ec9c42" className="mt-1" />
             <div className="text-sm">
               Хранилище защищено режимом{' '}
               <b>{status?.mode === 'passphrase' ? 'фразы восстановления' : 'системного ключа'}</b>.
@@ -830,7 +831,7 @@ export const SensitiveVaultDialog: React.FC<SensitiveVaultDialogProps> = ({
       onHide={onHide}
       header={
         <span className="p-panel-title">
-          <i className="pi pi-shield mr-2" />
+          <AppIcon name="shield" className="mr-2" />
           Чувствительные данные
         </span>
       }
@@ -844,7 +845,7 @@ export const SensitiveVaultDialog: React.FC<SensitiveVaultDialogProps> = ({
         onHide={() => { if (!resetBusy) setResetConfirmVisible(false); }}
         header={
           <span className="p-panel-title" style={{ color: 'var(--tg-theme-destructive-text-color, #ec3942)' }}>
-            <i className="pi pi-exclamation-triangle mr-2" />
+            <AppIcon name="exclamation-triangle" className="mr-2" />
             Сбросить хранилище
           </span>
         }
@@ -875,8 +876,7 @@ export const SensitiveVaultDialog: React.FC<SensitiveVaultDialogProps> = ({
               border: '1px solid rgba(236, 57, 66, 0.4)',
             }}
           >
-            <i className="pi pi-exclamation-triangle mt-1" style={{ color: '#ec3942' }} />
-            <div className="text-sm">
+            <AppIcon name="exclamation-triangle" color="#ec3942" className="mt-1" />            <div className="text-sm">
               <b>Все sensitive-данные будут безвозвратно удалены.</b> Файл
               <code> sensitive_data.db</code>, WAL/SHM и сохранённая в keyring фраза
               будут стёрты. После сброса хранилище вернётся в режим настройки —

@@ -105,6 +105,13 @@ export const GatewayCacheManager: React.FC<GatewayCacheManagerProps> = ({
     } catch {}
     return 'normal';
   });
+  const [scrollMode, setScrollMode] = useState<'snapshot' | 'normal' | 'deep'>(() => {
+    try {
+      const v = localStorage.getItem('gateway.scrollMode');
+      if (v === 'snapshot' || v === 'normal' || v === 'deep') return v;
+    } catch {}
+    return 'snapshot';
+  });
   const handleScrollSpeedChange = (v: 'fast' | 'normal' | 'slow') => {
     setScrollSpeed(v);
     try { localStorage.setItem('gateway.scrollSpeed', v); } catch {}
@@ -544,27 +551,30 @@ export const GatewayCacheManager: React.FC<GatewayCacheManagerProps> = ({
 
                   {/* 5.7.24: Сбор веток */}
                   <div className="gateway-cache-actions__card">
-                    <div className="gateway-cache-actions__title">Сбор веток</div>
+                    <div className="gateway-cache-actions__title">Режим синхронизации</div>
                     <div className="gateway-cache-actions__desc">
-                      При полном скролле (Ctrl+Alt+R) сохранять только
-                      активную ветку (быстро) или обходить все
-                      альтернативные версии (медленнее, но полная история).
+                      Snapshot — из локального кэша IndexedDB за ~1с (fallback на traverse).
+                      Обычный — visible + gaps. Глубокий — полный traverse веток.
                     </div>
                     <div className="gateway-cache-actions__radio-group">
-                      {[
-                        { v: false, label: 'Только активные' },
-                        { v: true, label: 'Все ветки' },
-                      ].map(({ v, label }) => (
+                      {(
+                        [
+                          { v: 'snapshot', label: 'Snapshot (быстро)' },
+                          { v: 'normal', label: 'Обычный' },
+                          { v: 'deep', label: 'Глубокий' },
+                        ] as Array<{ v: 'snapshot' | 'normal' | 'deep'; label: string }>
+                      ).map(({ v, label }) => (
                         <div
-                          key={String(v)}
+                          key={v}
                           role="button"
                           tabIndex={0}
                           className={`gateway-cache-actions__radio${
-                            collectAllBranches === v
-                              ? ' gateway-cache-actions__radio--active'
-                              : ''
+                            scrollMode === v ? ' gateway-cache-actions__radio--active' : ''
                           }`}
-                          onClick={() => handleToggleCollectBranches(v)}
+                          onClick={() => {
+                            setScrollMode(v);
+                            try { localStorage.setItem('gateway.scrollMode', v); } catch {}
+                          }}
                         >
                           {label}
                         </div>

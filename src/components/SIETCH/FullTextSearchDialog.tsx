@@ -110,7 +110,7 @@ export const FullTextSearchDialog: React.FC<FullTextSearchDialogProps> = ({
       onHide={onHide}
       header={
         <span className="p-panel-title">
-          <i className="pi pi-search-plus mr-2" />
+          <AppIcon name="search-plus" className="mr-2" />
           Полнотекстовый поиск
         </span>
       }
@@ -208,7 +208,7 @@ export const FullTextSearchDialog: React.FC<FullTextSearchDialogProps> = ({
                     </span>
                     <span className="font-medium">{truncate(hit.title, 70)}</span>
                     <span className="text-xs text-500 ml-auto" style={{ textAlign: 'right' }}>
-                      <i className="pi pi-tag mr-1" />
+                      <AppIcon name="tag" className="mr-1" />
                       {hit.matched_field}: {truncate(hit.matched_value, 60)}
                     </span>
                   </div>

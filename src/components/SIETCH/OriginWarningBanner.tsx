@@ -1,6 +1,7 @@
 // src/components/SIETCH/OriginWarningBanner.tsx
 
 import React from 'react';
+import AppIcon from '../COMMON/AppIcon/AppIcon';
 
 export const OriginWarningBanner: React.FC<{ origin?: string | null }> = ({ origin }) => (
   <div
@@ -10,7 +11,7 @@ export const OriginWarningBanner: React.FC<{ origin?: string | null }> = ({ orig
       border: '1px solid rgba(236, 156, 66, 0.4)',
     }}
   >
-    <i className="pi pi-exclamation-triangle mt-1" style={{ color: '#ec9c42' }} />
+    <AppIcon name="exclamation-triangle" color="#ec9c42" className="mt-1" />
     <div className="text-sm">
       {origin === 'manual' ? (
         <><b>Ручная запись.</b> Изменения сохраняются, скрапер её не перезапишет.</>

@@ -11,6 +11,7 @@ import { DataTable } from 'primereact/datatable';
 import { Message } from 'primereact/message';
 import { THENICS_CATALOG } from '@/main/services/pranaBindu/mentat/thenicsCatalog';
 import { AddPlanEventDialog } from './AddPlanEventDialog';
+import AppIcon from '../COMMON/AppIcon/AppIcon';
 
 export interface PlanEventLite {
   id: number;
@@ -201,7 +202,7 @@ export const PlanEventsPanel: React.FC<Props> = ({
 
       {showBanner && (
         <div className="pb-equiv-banner" style={{ flexShrink: 0 }}>
-          <i className="pi pi-info-circle pb-equiv-banner__icon" />
+          <AppIcon name="info-circle" className="pb-equiv-banner__icon" />
           <div className="pb-equiv-banner__body">
             <span className="pb-equiv-banner__title">
               Упражнения Thenics не размечены
@@ -306,7 +307,7 @@ export const PlanEventsPanel: React.FC<Props> = ({
                   title={`Связано с run_fact #${r.pairedActivityId}`}
                 />
               ) : (
-                <i className="pi pi-minus" style={{ opacity: 0.25 }} />
+                <AppIcon name="minus" style={{ opacity: 0.25 }} />
               )
             }
           />
@@ -345,7 +346,7 @@ export const PlanEventsPanel: React.FC<Props> = ({
                   />
                 );
               }
-              return <i className="pi pi-minus" style={{ opacity: 0.25 }} />;
+              return <AppIcon name="minus" style={{ opacity: 0.25 }} />;
             }}
           />
         </DataTable>

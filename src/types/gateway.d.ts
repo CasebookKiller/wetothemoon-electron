@@ -71,6 +71,13 @@ declare global {
         convId: string,
         opts?: { prune?: boolean }
       ) => Promise<GatewayIpcResult<void>>;
+      gatewaySnapshotHistory(
+        convId?: string
+      ): Promise<{
+        success: boolean;
+        data?: { source: 'indexeddb' | 'traverse' };
+        error?: string;
+      }>;
       gatewaySwitchBranch(
         messageKey: string,
         direction: 'prev' | 'next',
@@ -84,6 +91,7 @@ declare global {
         convId: string,
         hashes: string[]
       ) => Promise<GatewayIpcResult<{ deactivated: number }>>;
+      gatewayCancelTraverse(): Promise<{ success: boolean; error?: string }>;
       gatewayGetConversationMessages: (
         convId?: string,
         title?: string,

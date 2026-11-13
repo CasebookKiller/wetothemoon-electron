@@ -187,7 +187,9 @@ export const ConnectionsPanel: React.FC<Props> = ({ className, embedded }) => {
           <div className="pb-connections__title">
             <AppIcon name="link" color="accent" /> dodofo
             {hasDodofoToken && (
-              <span className="pb-label-ok">✓ сохранён</span>
+              <span className="pb-label-ok" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <AppIcon name="check" set="material" color="success" size={14} /> сохранён
+              </span>
             )}
           </div>
           <div className="flex flex-column gap-2">
@@ -230,7 +232,9 @@ export const ConnectionsPanel: React.FC<Props> = ({ className, embedded }) => {
           <div className="pb-connections__title">
             <AppIcon name="heart" color="accent" /> intervals.icu
             {intervalsHasKey && (
-              <span className="pb-label-ok">✓ сохранён</span>
+              <span className="pb-label-ok" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <AppIcon name="check" set="material" color="success" size={14} /> сохранён
+              </span>
             )}
           </div>
           <div className="flex flex-column gap-2">

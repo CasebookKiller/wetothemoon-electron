@@ -19,6 +19,7 @@ import {
   fmtKm,
   pluralRun,
 } from './utils';
+import AppIcon from '@/components/COMMON/AppIcon/AppIcon';
 
 const CHUNK_SIZE = 25;
 const SCROLL_THRESHOLD_PX = 50;
@@ -87,7 +88,7 @@ const RunsTableGroupedInner: React.FC<RunsTableProps> = ({
           const n = runsPerDay[data.date] ?? 1;
           return (
             <div className="pb-runs-day-header">
-              <i className="pi pi-calendar pb-runs-day-header__icon" />
+              <AppIcon name="calendar" className="pb-runs-day-header__icon" />
               <span className="pb-runs-day-header__date">{date}</span>
               <span className="pb-runs-day-header__dow">{dow}</span>
               <span className="pb-runs-day-header__count">

@@ -1,6 +1,7 @@
 // src/components/SIETCH/Breadcrumb.tsx
 
 import React from 'react';
+import AppIcon from '../COMMON/AppIcon/AppIcon';
 
 export type DialogType = 'entity' | 'relation' | 'observation' | 'source';
 
@@ -58,7 +59,7 @@ export const Breadcrumb: React.FC<BreadcrumbProps> = ({
                 >
                   {label}
                 </a>
-                <i className="pi pi-angle-right text-500" />
+                <AppIcon name="angle-right" className="text-500" />
               </>
             )}
           </React.Fragment>

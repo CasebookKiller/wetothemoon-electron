@@ -5,6 +5,7 @@ import { Dialog } from 'primereact/dialog';
 import { Button } from 'primereact/button';
 import { InputText } from 'primereact/inputtext';
 import { InputTextarea } from 'primereact/inputtextarea';
+import AppIcon from '../COMMON/AppIcon/AppIcon';
 
 export interface SensitiveRecordMeta {
   id: number;
@@ -107,7 +108,7 @@ export const SensitiveEditDialog: React.FC<SensitiveEditDialogProps> = ({
       onHide={onHide}
       header={
         <span className="p-panel-title">
-          <i className="pi pi-pencil mr-2" />
+          <AppIcon name="pencil" className="mr-2" />
           Редактировать sensitive-запись #{record.id}
         </span>
       }
@@ -138,7 +139,7 @@ export const SensitiveEditDialog: React.FC<SensitiveEditDialogProps> = ({
             border: '1px solid rgba(59, 130, 246, 0.4)',
           }}
         >
-          <i className="pi pi-info-circle mt-1" style={{ color: '#3b82f6' }} />
+          <AppIcon name="info-circle" color="#3b82f6" className="mt-1" />
           <div className="text-sm">
             <b>Поле:</b> <code>{record.field_name}</code> · <b>Сущность:</b>{' '}
             <code>#{record.entity_id}</code>. <br />

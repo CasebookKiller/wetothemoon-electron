@@ -76,6 +76,46 @@ function parseActualSets(text: string): number[] | undefined {
 }
 
 /**
+ * Распознать движение по строке-метке.
+ * Единая точка правды: initial buildRows и inline-edit в UI.
+ *
+ * Порядок:
+ *   1. findLevelByName       — точное имя уровня (напр. "Bench Dip" → dips/L1)
+ *   2. findProgressionByIcuName — по icuName, level из W/L-префикса
+ *   3. findNamedByName       — named-упражнения (drill/plyo/warmup/…)
+ *   4. unknown
+ */
+function resolveMovement(
+  label: string,
+  prefixLevel?: number
+): { movementKey: string; level?: number } {
+  const stripped = label
+    .replace(/(?:\s*\([^)]*\))+\s*$/, '')  // safety-net: трейлинг-аннотация
+    .replace(/\s+[WL]\d+\s*$/, '')
+    .trim();
+  if (!stripped) return { movementKey: 'unknown' };
+
+  const found = findLevelByName(stripped);
+  if (found) return { movementKey: found.entry.key, level: found.level };
+
+  const canon = findProgressionByIcuName(stripped);
+  if (canon) {
+    return {
+      movementKey: canon.key,
+      level:
+        prefixLevel != null
+          ? Math.min(prefixLevel, canon.levels.length)
+          : undefined,
+    };
+  }
+
+  const named = findNamedByName(stripped);
+  if (named) return { movementKey: named.key };
+
+  return { movementKey: 'unknown' };
+}
+
+/**
  * Превратить текст тренировки в массив Row.
  * source: 'plan' → actualText пустой (пользователь вводит);
  *         'text' → actualText = target (пользователь подтверждает).
@@ -105,39 +145,10 @@ function buildRows(
       target = `${step.distanceM}mtr`;
     }
 
-    let movementKey: string | undefined;
-    let level: number | undefined;
-    const stripped = step.label.replace(/\s+[WL]\d+\s*$/, '').trim();
-
-    // 1. Прогрессия по точному имени уровня (с учётом aliases).
-    //    Вызывается всегда — префикс W/L не обязателен.
-    //    Пример: 'Bench Dip' → dips, level=1.
-    {
-      const found = findLevelByName(stripped);
-      if (found) {
-        movementKey = found.entry.key;
-        level = found.level;
-      }
-    }
-
-    // 2. Прогрессия по icuName (с учётом aliases прогрессии).
-    //    Уровень берём из префикса, если он был.
-    if (!movementKey) {
-      const canon = findProgressionByIcuName(stripped);
-      if (canon) {
-        movementKey = canon.key;
-        if (step.prefixLevel != null) {
-          level = Math.min(step.prefixLevel, canon.levels.length);
-        }
-      }
-    }
-
-    // 3. Named (с учётом aliases).
-    if (!movementKey) {
-      const named = findNamedByName(stripped);
-      if (named) movementKey = named.key;
-    }
-    if (!movementKey) movementKey = 'unknown';
+    const { movementKey, level } = resolveMovement(
+      step.label,
+      step.prefixLevel
+    );
 
     const isTimeBased =
       step.sets == null &&
@@ -196,6 +207,10 @@ export const LogWorkoutSessionDialog: React.FC<Props> = ({
   const [catalogPickerOpen, setCatalogPickerOpen] = useState(false);
   const [addUnknownRowId, setAddUnknownRowId] = useState<string | null>(null);
 
+  // Inline-редактирование метки строки (для ре-матчинга с каталогом).
+  const [editingRowId, setEditingRowId] = useState<string | null>(null);
+  const [editingLabel, setEditingLabel] = useState('');
+
   // Сброс при открытии
   useEffect(() => {
     if (!visible) return;
@@ -248,6 +263,40 @@ export const LogWorkoutSessionDialog: React.FC<Props> = ({
     setRows((prev) =>
       prev.map((r) => (r.id === id ? { ...r, skipped: !r.skipped } : r))
     );
+  };
+
+  // --------- Inline-правка метки ---------
+
+  const beginLabelEdit = (row: Row) => {
+    setEditingRowId(row.id);
+    setEditingLabel(row.label);
+  };
+
+  const cancelLabelEdit = () => {
+    setEditingRowId(null);
+    setEditingLabel('');
+  };
+
+  const commitLabelEdit = (rowId: string) => {
+    const newLabel = editingLabel.trim();
+    if (!newLabel) {
+      cancelLabelEdit();
+      return;
+    }
+
+    // Если пользователь оставил/добавил W/L-префикс — берём уровень из
+    // него. Если убрал — уровень будет из каталога (или undefined для
+    // progression без уровня).
+    const prefixMatch = newLabel.match(/\b[WL](\d+)\b/);
+    const prefixLevel = prefixMatch ? Number(prefixMatch[1]) : undefined;
+
+    const { movementKey, level } = resolveMovement(newLabel, prefixLevel);
+    updateRow(rowId, {
+      label: newLabel,
+      movementKey,
+      level: movementKey === 'unknown' ? undefined : level,
+    });
+    cancelLabelEdit();
   };
 
   const handleCatalogPick = (items: PickedExercise[]) => {
@@ -472,7 +521,43 @@ export const LogWorkoutSessionDialog: React.FC<Props> = ({
                         style={{ marginRight: '0.35rem', opacity: 0.6 }}
                       />
                     )}
-                    {r.label}
+
+                    {editingRowId === r.id ? (
+                      <InputText
+                        value={editingLabel}
+                        onChange={(e) => setEditingLabel(e.target.value)}
+                        onBlur={() => commitLabelEdit(r.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') commitLabelEdit(r.id);
+                          if (e.key === 'Escape') cancelLabelEdit();
+                        }}
+                        autoFocus
+                        style={{
+                          padding: '0.1rem 0.35rem',
+                          fontSize: 'inherit',
+                        }}
+                        disabled={saving}
+                      />
+                    ) : (
+                      <>
+                        <span
+                          onDoubleClick={() => beginLabelEdit(r)}
+                          title="Двойной клик — редактировать метку"
+                        >
+                          {r.label}
+                        </span>
+                        <Button
+                          icon="pi pi-pencil"
+                          text
+                          className="pb-drawer__name-edit"
+                          onClick={() => beginLabelEdit(r)}
+                          disabled={saving}
+                          tooltip="Изменить метку (для распознавания)"
+                          tooltipOptions={{ position: 'left' }}
+                          style={{ marginLeft: '0.35rem', opacity: 0.55 }}
+                        />
+                      </>
+                    )}
                   </div>
                   {r.target && (
                     <div className="pb-log-workout-dialog__row-target">

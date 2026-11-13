@@ -138,7 +138,7 @@ export class GatewayCacheService {
         pw_key = excluded.pw_key,
         sequence = excluded.sequence,
         content_plain = excluded.content_plain,
-        content_html = excluded.content_html,
+        content_html = COALESCE(excluded.content_html, messages.content_html),
         thinking = excluded.thinking,
         blocks_json = excluded.blocks_json,
         saved_at = excluded.saved_at,
@@ -149,7 +149,7 @@ export class GatewayCacheService {
     const updateStmt = db.prepare(`
       UPDATE messages
       SET message_hash = ?, pw_key = ?, sequence = ?, content_plain = ?,
-          content_html = ?, thinking = ?, blocks_json = ?,
+          content_html = COALESCE(?, content_html), thinking = ?, blocks_json = ?,
           branch_total = ?, branch_index = ?, is_active = ?
       WHERE id = ?
     `);
@@ -289,12 +289,19 @@ export class GatewayCacheService {
                 `new.active=${isActive} new.br=${branchIndex}/${branchTotal}`
             );
           }
+          // 5.8.3: contentHtml=null (snapshot из IndexedDB) НЕ считается
+          // изменением — иначе UPDATE перезапишет COALESCE (хотя и вернёт
+          // прежнее значение, но потратит время и обновит saved_at).
+          const contentHtmlChanged =
+            contentHtml !== null &&
+            (existing.content_html ?? null) !== contentHtml;
+
           const changed =
             existing.message_hash !== messageHash ||
             existing.pw_key !== numericKey ||
             existing.sequence !== sequence ||
             existing.content_plain !== contentPlain ||
-            (existing.content_html ?? null) !== contentHtml ||
+            contentHtmlChanged ||
             (existing.thinking ?? null) !== thinking ||
             (existing.blocks_json ?? null) !== blocksJson ||
             (existing.branch_total ?? 1) !== branchTotal ||

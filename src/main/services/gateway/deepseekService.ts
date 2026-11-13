@@ -60,6 +60,8 @@ export class DeepSeekService {
   private pendingContentTimer: NodeJS.Timeout | null = null;
   private navigationInFlight = false;
   private backgroundScrollInFlight: Promise<void> | null = null;
+  // 5.8.2: флаг отмены traverse (устанавливается IPC gateway:cancel-traverse)
+  private cancelTraverseRequested = false;
 
   private constructor() {
     this.profileService = new SelectorProfileService('deepseek');
@@ -147,6 +149,18 @@ export class DeepSeekService {
     } catch (e) {
       console.warn(
         '[DeepSeek] exposeFunction ошибка (уже установлен?):',
+        (e as Error).message
+      );
+    }
+
+    // 2.5: 5.8.2 — флаг отмены traverse
+    try {
+      await this.page.exposeFunction('__gatewayCancelCheck', () =>
+        this.cancelTraverseRequested
+      );
+    } catch (e) {
+      console.warn(
+        '[DeepSeek] exposeFunction __gatewayCancelCheck ошибка:',
         (e as Error).message
       );
     }
@@ -512,6 +526,16 @@ export class DeepSeekService {
       this.isLoggedIn = false;
       console.log('Браузер DeepSeek закрыт, сессия сохранена');
     }
+  }
+
+  /**
+   * 5.8.2: запрос отмены текущего doBackgroundScroll.
+   * Устанавливает флаг, который проверяется в page.evaluate через
+   * exposeFunction('__gatewayCancelCheck'). Сбрасывается в finally.
+   */
+  cancelTraverse(): void {
+    this.cancelTraverseRequested = true;
+    console.log('[DeepSeek] cancelTraverse requested');
   }
 
   /**
@@ -1161,6 +1185,327 @@ export class DeepSeekService {
     );
   }
 
+  /**
+   * 5.8.3-snapshot: читает ВСЕ ветки диалога из IndexedDB (deepseek-chat).
+   * За <1с получает полное дерево сообщений (chat_messages с parent_id)
+   * без кликов switcher'ов и без PoW.
+   *
+   * Fallback на doBackgroundScroll(traverse) при ошибке — достигнутый
+   * прогресс не теряется.
+   */
+  async snapshotHistory(opts?: {
+    fallbackOnError?: boolean;
+  }): Promise<'indexeddb' | 'traverse'> {
+    if (!this.page) throw new Error('Браузер не запущен');
+
+    // Определяем активный convId по URL
+    const url = this.page.url();
+    const m = url.match(/\/a\/chat\/s\/([a-f0-9-]+)/i);
+    if (!m) {
+      throw new Error('Не удалось определить convId из URL PW');
+    }
+    const convId = m[1];
+    console.log(`[snapshot] convId=${convId}`);
+
+    const t0 = Date.now();
+    try {
+      const raw = await this.page.evaluate(async (id: string) => {
+        const db = await new Promise<IDBDatabase>((res, rej) => {
+          const req = indexedDB.open('deepseek-chat');
+          req.onsuccess = () => res(req.result);
+          req.onerror = () => rej(req.error);
+        });
+        try {
+          if (!db.objectStoreNames.contains('history-message')) {
+            return { ok: false, error: 'store history-message not found' };
+          }
+          const tx = db.transaction('history-message', 'readonly');
+          const store = tx.objectStore('history-message');
+          const value = await new Promise<any>((res, rej) => {
+            const req = store.get(id);
+            req.onsuccess = () => res(req.result);
+            req.onerror = () => rej(req.error);
+          });
+          if (!value) return { ok: false, error: 'no entry for ' + id };
+          return { ok: true, data: value };
+        } finally {
+          db.close();
+        }
+      }, convId);
+
+      if (!raw || !raw.ok) {
+        throw new Error(`IndexedDB: ${raw?.error || 'empty result'}`);
+      }
+
+      const parsed = this.parseIndexedDbSnapshot(raw.data);
+      console.log(
+        `[snapshot] IndexedDB OK: ${parsed.length} msgs, ${
+          Date.now() - t0
+        }ms`
+      );
+
+      // Отправляем через bridgeEmitter как 'history:complete'
+      this.bridgeEmitter.emit('event', {
+        type: 'history:complete',
+        payload: {
+          rawMessages: parsed,
+          source: 'indexeddb',
+          elapsedMs: Date.now() - t0,
+        },
+        ts: Date.now(),
+      });
+
+      return 'indexeddb';
+    } catch (e) {
+      console.warn(
+        `[snapshot] IndexedDB failed (${(e as Error).message}), fallback to traverse`
+      );
+      if (opts?.fallbackOnError === false) {
+        throw e;
+      }
+      await this.backgroundScrollAndEmit(true, 'normal');
+      return 'traverse';
+    }
+  }
+
+  /**
+   * 5.8.3: минимальный markdown → HTML для snapshot из IndexedDB.
+   * Использует CSS-классы DeepSeek (.ds-markdown-paragraph, .md-code-block),
+   * чтобы тема применилась к нашему HTML.
+   *
+   * Поддержка: code blocks, inline code, headers, bold, italic,
+   * blockquote, ul, ol, параграфы.
+   *
+   * НЕ идеален: таблицы, math, сложные списки — без обработки.
+   * Для точного HTML видимых сообщений — visible-sync обновит из PW DOM.
+   */
+  private markdownToHtml(md: string): string {
+    if (!md) return '';
+    let html = md;
+
+    // 1. Code blocks: ```lang\ncode\n```
+    html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_m, lang, code) => {
+      const escaped = String(code)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+      const langLabel = lang
+        ? `<span class="d813de27">${lang}</span>`
+        : '';
+      const langClass = lang ? ` class="language-${lang}"` : '';
+      return (
+        `<div class="md-code-block md-code-block-dark">` +
+        langLabel +
+        `<pre><code${langClass}>${escaped}</code></pre></div>`
+      );
+    });
+
+    // 2. Inline code
+    html = html.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+
+    // 3. Headers
+    html = html.replace(/^###### (.*)$/gm, '<h6>$1</h6>');
+    html = html.replace(/^##### (.*)$/gm, '<h5>$1</h5>');
+    html = html.replace(/^#### (.*)$/gm, '<h4>$1</h4>');
+    html = html.replace(/^### (.*)$/gm, '<h3>$1</h3>');
+    html = html.replace(/^## (.*)$/gm, '<h2>$1</h2>');
+    html = html.replace(/^# (.*)$/gm, '<h1>$1</h1>');
+
+    // 4. Bold / italic
+    html = html.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+
+    // 5. Blockquote
+    html = html.replace(
+      /^> (.*)$/gm,
+      '<blockquote class="ds-markdown-blockquote">$1</blockquote>'
+    );
+
+    // 6. Unordered list (группа строк "- ...")
+    html = html.replace(/(?:^- .+$\n?)+/gm, (match) => {
+      const items = match
+        .trim()
+        .split('\n')
+        .map((l) => l.replace(/^- /, ''))
+        .map((l) => `<li>${l}</li>`)
+        .join('');
+      return `<ul>${items}</ul>`;
+    });
+
+    // 7. Ordered list
+    html = html.replace(/(?:^\d+\. .+$\n?)+/gm, (match) => {
+      const items = match
+        .trim()
+        .split('\n')
+        .map((l) => l.replace(/^\d+\. /, ''))
+        .map((l) => `<li>${l}</li>`)
+        .join('');
+      return `<ol>${items}</ol>`;
+    });
+
+    // 8. Параграфы: разбиваем по пустым строкам, каждый не-тег → <p>
+    const blocks = html.split(/\n{2,}/);
+    html = blocks
+      .map((block) => {
+        const trimmed = block.trim();
+        if (!trimmed) return '';
+        // Уже HTML-тег?
+        if (/^<(h[1-6]|ul|ol|blockquote|div|pre|p)\b/i.test(trimmed)) {
+          return trimmed;
+        }
+        return `<p class="ds-markdown-paragraph">${trimmed.replace(
+          /\n/g,
+          '<br>'
+        )}</p>`;
+      })
+      .join('');
+
+    return html;
+  }
+
+  /**
+   * Парсер IndexedDB snapshot → GatewayChatMessage[].
+   * Восстанавливает дерево веток через parent_id + current_message_id.
+   */
+  private parseIndexedDbSnapshot(raw: any): GatewayChatMessage[] {
+    const data = raw?.data || raw;
+    const chatSession = data?.chat_session || {};
+    const chatMessages = (data?.chat_messages || []) as any[];
+    const currentMessageId = chatSession?.current_message_id as
+      | number
+      | undefined;
+
+    if (!Array.isArray(chatMessages) || chatMessages.length === 0) {
+      return [];
+    }
+
+    // 1. Индексируем по message_id
+    const byId = new Map<number, any>();
+    for (const m of chatMessages) {
+      const id = Number(m?.message_id);
+      if (!isNaN(id)) byId.set(id, m);
+    }
+
+    // 2. Группируем по parent_id → siblings = switcher'ы
+    const byParent = new Map<number | null, number[]>();
+    for (const [id, m] of byId) {
+      const pRaw = m?.parent_id;
+      const parentId =
+        pRaw == null || pRaw === '' ? null : Number(pRaw);
+      if (parentId !== null && isNaN(parentId)) continue;
+      if (!byParent.has(parentId)) byParent.set(parentId, []);
+      byParent.get(parentId)!.push(id);
+    }
+    // Сортируем siblings по message_id (стабильный порядок: старая → новая)
+    for (const arr of byParent.values()) arr.sort((a, b) => a - b);
+
+    // 3. Восстанавливаем "active path" от current_message_id вверх
+    const activePath = new Set<number>();
+    if (currentMessageId != null && byId.has(currentMessageId)) {
+      let cur: number | null = currentMessageId;
+      const safety = new Set<number>();
+      while (cur != null && byId.has(cur) && !safety.has(cur)) {
+        safety.add(cur);
+        activePath.add(cur);
+        const pRaw: any = byId.get(cur)?.parent_id;
+        const parent: number | null =
+          pRaw == null || pRaw === '' ? null : Number(pRaw);
+        cur = parent;
+      }
+    }
+
+    // 4. Для каждого сообщения — branchTotal/branchIndex/isActive
+    const result: GatewayChatMessage[] = [];
+
+    for (const m of chatMessages) {
+      const messageId = Number(m?.message_id);
+      if (isNaN(messageId)) continue;
+
+      const pRaw = m?.parent_id;
+      const parentId = pRaw == null || pRaw === '' ? null : Number(pRaw);
+      const siblings =
+        parentId !== null || byParent.has(null)
+          ? byParent.get(parentId) || []
+          : [messageId];
+
+      const branchTotal = Math.max(1, siblings.length);
+      const branchIndex =
+        branchTotal > 1 ? siblings.indexOf(messageId) + 1 : 1;
+
+      const roleRaw = String(m?.role || '').toUpperCase();
+      const role: 'user' | 'assistant' =
+        roleRaw === 'USER' ? 'user' : 'assistant';
+
+      // fragments
+      const fragments = (m?.fragments || []) as any[];
+      let thinking: string | undefined;
+      let userText = '';
+      let assistantText = '';
+      const files: any[] = [];
+
+      for (const f of fragments) {
+        const type = String(f?.type || '').toUpperCase();
+        const content = f?.content || '';
+        if (type === 'THINK') {
+          thinking = (thinking || '') + String(content);
+        } else if (type === 'REQUEST') {
+          userText += String(content);
+        } else if (type === 'RESPONSE') {
+          assistantText += String(content);
+        } else if (type === 'FILE' || type === 'ATTACHMENT') {
+          files.push({
+            type: 'file' as const,
+            content: String(f?.name || 'file'),
+            mime: f?.mime,
+            size: f?.size,
+          });
+        }
+      }
+
+      // blocks
+      const blocks: any[] = [];
+      if (role === 'user') {
+        if (files.length > 0) blocks.push(...files);
+        if (userText) blocks.push({ type: 'text', content: userText.trim() });
+      } else {
+        // Ассистент: markdown-контент → plain text (fallback, visible-sync
+        // потом подтянет полный HTML из PW DOM)
+        if (assistantText) {
+          blocks.push({ type: 'text', content: assistantText.trim() });
+        }
+      }
+
+      if (blocks.length === 0) continue;
+
+      // 5.8.3: генерируем HTML из markdown для assistant-сообщений.
+      // Без этого UI рендерит plain text (fallback из blocks), и всё
+      // форматирование (код, заголовки, списки) теряется.
+      const fullHtml =
+        role === 'assistant' && assistantText
+          ? this.markdownToHtml(assistantText)
+          : undefined;
+
+      result.push({
+        id: String(messageId),
+        role,
+        thinking,
+        blocks,
+        fullHtml,
+        branchTotal,
+        branchIndex,
+        isActive: activePath.has(messageId) ? 1 : 0,
+      });
+    }
+
+    // Сортируем по message_id (порядок в дереве — от корня к листьям)
+    result.sort((a, b) => {
+      const an = parseInt(a.id || '0', 10);
+      const bn = parseInt(b.id || '0', 10);
+      return an - bn;
+    });
+
+    return result;
+  }
 
   private async backgroundScrollAndEmit(
     collectInactive = false,
@@ -1197,7 +1542,26 @@ export class DeepSeekService {
       await this.page.evaluate(async (args: { collectInactive: boolean; speed: string }) => {
         const collectInactiveArg = args.collectInactive;
         const speed = args.speed;
+        // 5.8.2: время начала сбора (для elapsedMs)
+        const startTs = Date.now();
         
+        // 5.8.2: флаг отмены + helper. Вызывается из каждого цикла.
+        let wasCancelled = false;
+        const checkCancel = async (): Promise<boolean> => {
+          try {
+            const fn = (window as any).__gatewayCancelCheck;
+            if (typeof fn !== 'function') return false;
+            const c = await fn();
+            if (c) {
+              wasCancelled = true;
+              console.log('[bg-scroll] cancel detected, breaking');
+            }
+            return !!c;
+          } catch {
+            return false;
+          }
+        };
+
         // 5.8.3: скорость скроллинга
         const speedConfig = {
           fast: { step: 400, delay: 300 },
@@ -1458,7 +1822,29 @@ export class DeepSeekService {
             });
         };
 
-        const send = (isComplete: boolean) => {
+        // 5.8.2: throttle для progress-событий (не спамить IPC)
+        let lastProgressTs = 0;
+        const THROTTLE_MS = 500;
+
+        const send = (
+          isComplete: boolean,
+          progress?: {
+            phase:
+              | 'bottom-up'
+              | 'top-down'
+              | 'final'
+              | 'gaps'
+              | 'traverse'
+              | 'verify';
+            direction: 'up' | 'down' | 'bidir';
+            pass: number;
+            totalPasses: number;
+            currentPwKey?: string;
+            branchTotal?: number;
+            branchDone?: number;
+          },
+          cancelled?: boolean
+        ) => {
           const arr = Array.from(map.values()).sort((a, b) => {
             if (a.numericKey !== null && b.numericKey !== null) {
               return a.numericKey - b.numericKey;
@@ -1530,9 +1916,32 @@ export class DeepSeekService {
             );
           }
           if (typeof (window as any).__gatewayBridge === 'function') {
+            // 5.8.2: собираем scrollProgress, если задан и не complete
+            let scrollProgress: any = undefined;
+            if (progress && !isComplete) {
+              const now = Date.now();
+              if (now - lastProgressTs >= THROTTLE_MS) {
+                lastProgressTs = now;
+                scrollProgress = {
+                  phase: progress.phase,
+                  direction: progress.direction,
+                  pass: progress.pass,
+                  totalPasses: progress.totalPasses,
+                  elapsedMs: now - startTs,
+                  collectedCount: map.size,
+                  branchTotal: progress.branchTotal ?? 0,
+                  branchDone: progress.branchDone ?? 0,
+                  currentPwKey: progress.currentPwKey,
+                };
+              }
+            }
             (window as any).__gatewayBridge(
               isComplete ? 'history:complete' : 'history:progress',
-              { rawMessages: parsed }
+              {
+                rawMessages: parsed,
+                scrollProgress,
+                cancelled: cancelled === true,
+              }
             );
           }
         };
@@ -1558,83 +1967,113 @@ export class DeepSeekService {
           // Снизу вверх
           let pos = container.scrollHeight;
           while (pos >= 0) {
+            if (await checkCancel()) break;
             container.scrollTop = pos;
             try { container.dispatchEvent(new Event('scroll', { bubbles: true })); } catch {}
             await new Promise((r) => setTimeout(r, speedConfig.delay));
             collect();
+            send(false, {
+              phase: 'bottom-up',
+              direction: 'up',
+              pass: 1,
+              totalPasses: 1,
+            });
             pos -= speedConfig.step;
           }
 
-          // Сверху вниз
-          pos = 0;
-          while (pos <= container.scrollHeight) {
-            container.scrollTop = pos;
+          // 5.8.2: top-down НЕ нужен — bottom-up уже прогрел все lazy-load
+          // элементы, virtual-list переиспользует их. Дублирование = -25с.
+          if (!wasCancelled) {
+            container.scrollTop = 0;
             try { container.dispatchEvent(new Event('scroll', { bubbles: true })); } catch {}
             await new Promise((r) => setTimeout(r, speedConfig.delay));
             collect();
-            pos += speedConfig.step;
+            send(false, {
+              phase: 'top-down',
+              direction: 'down',
+              pass: 1,
+              totalPasses: 1,
+            });
           }
 
-          // Финальный сбор
-          // 5.7.6: финальный медленный проход для lazy-контента
-          // (switcher и длинные ответы ассистента появляются с задержкой)
-          container.scrollTop = 0;
-          await new Promise((r) => setTimeout(r, 2000));
-          collect();
-          for (let p = 0; p <= container.scrollHeight; p += 200) {
-            container.scrollTop = p;
-            await new Promise((r) => setTimeout(r, 500));
+          if (!wasCancelled) {
+            // Финальный проход
+            // 5.8.2: final — короткий проход для lazy-load switcher'ов.
+            // Шаг 400/300мс вместо 200/500 = -50с на больших диалогах.
+            container.scrollTop = 0;
+            await new Promise((r) => setTimeout(r, 1500));
             collect();
-            pos += speedConfig.step;
+            for (let p = 0; p <= container.scrollHeight; p += 400) {
+              if (await checkCancel()) break;
+              container.scrollTop = p;
+              await new Promise((r) => setTimeout(r, 300));
+              collect();
+              send(false, {
+                phase: 'final',
+                direction: 'down',
+                pass: 1,
+                totalPasses: 1,
+              });
+            }
           }
 
-          // 5.7.6: точечный скролл к «дыркам» в числовых ключах
-          // 5.7.15: до 3 проходов по пробелам, чтобы PW успел отрендерить
-          for (let pass = 0; pass < 3; pass++) {
-            const numericKeys = Array.from(map.values())
-              .map((e) => e.numericKey)
-              .filter((k): k is number => k !== null)
-              .sort((a, b) => a - b);
+          if (!wasCancelled) {
+            // 5.7.6: точечный скролл к «дыркам» в числовых ключах
+            // 5.7.15: до 3 проходов по пробелам, чтобы PW успел отрендерить
+            for (let pass = 0; pass < 2; pass++) {
+              if (await checkCancel()) break;
+              const numericKeys = Array.from(map.values())
+                .map((e) => e.numericKey)
+                .filter((k): k is number => k !== null)
+                .sort((a, b) => a - b);
 
-            let foundGap = false;
-            for (let i = 1; i < numericKeys.length; i++) {
-              if (numericKeys[i] - numericKeys[i - 1] > 1) {
-                foundGap = true;
-                const nextKey = String(numericKeys[i]);
-                const nextEl = container.querySelector(
-                  `[data-virtual-list-item-key="${nextKey}"]`
-                ) as HTMLElement | null;
-                if (nextEl) {
-                  console.log(
-                    `[bg-scroll] pass ${pass}: gap before ${nextKey} — targeted scroll`
-                  );
-                  // 5.7.16: не scrollIntoView (virtual-list его игнорирует),
-                  // а прямой scrollTop контейнера с центровкой.
-                  const cRect = container.getBoundingClientRect();
-                  const elRect = nextEl.getBoundingClientRect();
-                  const offsetInContainer =
-                    elRect.top - cRect.top + container.scrollTop;
-                  container.scrollTop =
-                    offsetInContainer -
-                    container.clientHeight / 2 +
-                    elRect.height / 2;
-                  try {
-                    container.dispatchEvent(
-                      new Event('scroll', { bubbles: true })
+              let foundGap = false;
+              for (let i = 1; i < numericKeys.length; i++) {
+                if (numericKeys[i] - numericKeys[i - 1] > 1) {
+                  foundGap = true;
+                  const nextKey = String(numericKeys[i]);
+                  const nextEl = container.querySelector(
+                    `[data-virtual-list-item-key="${nextKey}"]`
+                  ) as HTMLElement | null;
+                  if (nextEl) {
+                    console.log(
+                      `[bg-scroll] pass ${pass}: gap before ${nextKey} — targeted scroll`
                     );
-                  } catch {}
-                  await new Promise((r) => setTimeout(r, 2000));
-                  collect();
+                    send(false, {
+                      phase: 'gaps',
+                      direction: 'bidir',
+                      pass,
+                      totalPasses: 2,
+                      currentPwKey: nextKey,
+                    });
+                    // 5.7.16: не scrollIntoView (virtual-list его игнорирует),
+                    // а прямой scrollTop контейнера с центровкой.
+                    const cRect = container.getBoundingClientRect();
+                    const elRect = nextEl.getBoundingClientRect();
+                    const offsetInContainer =
+                      elRect.top - cRect.top + container.scrollTop;
+                    container.scrollTop =
+                      offsetInContainer -
+                      container.clientHeight / 2 +
+                      elRect.height / 2;
+                    try {
+                      container.dispatchEvent(
+                        new Event('scroll', { bubbles: true })
+                      );
+                    } catch {}
+                    await new Promise((r) => setTimeout(r, 1200));
+                    collect();
+                  }
                 }
               }
+              if (!foundGap) break;
             }
-            if (!foundGap) break;
           }
           console.log('[bg-scroll] final collect before send:', map.size);
           collect();
 
           // 5.7.24: обход веток — только если включён флаг collectInactive
-          if (collectInactiveArg) {
+          if (collectInactiveArg && !wasCancelled) {
             // 5.7.51: несколько switcher'ов могут иметь одинаковый total
             // (user-ветки + assistant-ветки). userText НЕнадёжен:
             //  - у assistant его нет (пустая строка)
@@ -1798,11 +2237,23 @@ export class DeepSeekService {
               (a, b) => b.pwKey - a.pwKey
             );
 
+            let traverseDone = 0;
             for (const point of bottomUp) {
+              if (await checkCancel()) break;
               const pwKey = String(point.pwKey);
               console.log(
                 `[bg-scroll]   traverse ${pwKey} [${point.role}#${point.groupIndex}] (currently ${point.branchIndex}/${point.branchTotal})`
               );
+              send(false, {
+                phase: 'traverse',
+                direction: 'bidir',
+                pass: traverseDone,
+                totalPasses: bottomUp.length,
+                currentPwKey: pwKey,
+                branchTotal: bottomUp.length,
+                branchDone: traverseDone,
+              });
+              traverseDone++;
 
               let msgEl0 = container.querySelector(
                 `div[data-virtual-list-item-key="${pwKey}"]`
@@ -1861,7 +2312,7 @@ export class DeepSeekService {
                 traverseInactive = true;
                 (btns1[0] as HTMLElement).click();
                 switched = true;
-                await new Promise((r) => setTimeout(r, 2000));
+                await new Promise((r) => setTimeout(r, 1200));
                 collect(true);
                 const afterPrev = Array.from(map.values()).filter(
                   (e) => e.isActive === 0
@@ -1898,7 +2349,7 @@ export class DeepSeekService {
                     }
                     btn.click();
                     safety++;
-                    await new Promise((r) => setTimeout(r, 2000));
+                    await new Promise((r) => setTimeout(r, 1200));
                     const refreshed = findLiveSwitcher(
                       point.branchTotal,
                       point.role,
@@ -1920,41 +2371,50 @@ export class DeepSeekService {
               }
             }
 
-            console.log(`[bg-scroll] verify active state after traverse...`);
-            for (const snap of activeSnapshot) {
-              let safety = 0;
-              while (safety < 5) {
-                const live = findLiveSwitcher(
-                  snap.branchTotal,
-                  snap.role,
-                  snap.groupIndex
-                );
-                if (!live) {
-                  console.warn(
-                    `[bg-scroll] verify: [${snap.role}#${snap.groupIndex}] NOT FOUND`
+            if (!wasCancelled) {
+              console.log(`[bg-scroll] verify active state after traverse...`);
+              send(false, {
+                phase: 'verify',
+                direction: 'bidir',
+                pass: 1,
+                totalPasses: 1,
+              });
+              for (const snap of activeSnapshot) {
+                if (await checkCancel()) break;
+                let safety = 0;
+                while (safety < 5) {
+                  const live = findLiveSwitcher(
+                    snap.branchTotal,
+                    snap.role,
+                    snap.groupIndex
                   );
-                  break;
-                }
-                if (live.idx === snap.branchIndex) break;
-                const btn = (
-                  live.idx < snap.branchIndex
-                    ? live.btns[1]
-                    : live.btns[0]
-                ) as HTMLElement;
-                if (btn.classList.contains('ds-button--disabled')) {
-                  console.warn(
-                    `[bg-scroll] verify: arrow disabled at ${live.idx}/${live.tot}`
+                  if (!live) {
+                    console.warn(
+                      `[bg-scroll] verify: [${snap.role}#${snap.groupIndex}] NOT FOUND`
+                    );
+                    break;
+                  }
+                  if (live.idx === snap.branchIndex) break;
+                  const btn = (
+                    live.idx < snap.branchIndex
+                      ? live.btns[1]
+                      : live.btns[0]
+                  ) as HTMLElement;
+                  if (btn.classList.contains('ds-button--disabled')) {
+                    console.warn(
+                      `[bg-scroll] verify: arrow disabled at ${live.idx}/${live.tot}`
+                    );
+                    break;
+                  }
+                  console.log(
+                    `[bg-scroll] verify: restoring [${snap.role}#${snap.groupIndex}] ${live.idx}/${live.tot} → ${snap.branchIndex}/${snap.branchTotal}`
                   );
-                  break;
+                  btn.click();
+                  safety++;
+                  await new Promise((r) => setTimeout(r, 2000));
                 }
-                console.log(
-                  `[bg-scroll] verify: restoring [${snap.role}#${snap.groupIndex}] ${live.idx}/${live.tot} → ${snap.branchIndex}/${snap.branchTotal}`
-                );
-                btn.click();
-                safety++;
-                await new Promise((r) => setTimeout(r, 2000));
+                collect(false);
               }
-              collect(false);
             }
           } else {
             console.log(
@@ -1971,7 +2431,7 @@ export class DeepSeekService {
           console.log(
             `[bg-scroll] collected: ${map.size} total (${activeFinal.length} active, ${inactiveFinal.length} inactive), blacklist=[${Array.from(inactivePwKeys).sort((a, b) => a - b).join(',')}]`
           );
-          send(true);
+          send(true, undefined, wasCancelled);
         } finally {
           observer.disconnect();
         }
@@ -1987,6 +2447,8 @@ export class DeepSeekService {
         console.error('[DeepSeek] backgroundScrollAndEmit failed:', e);
       }
     } finally {
+      // 5.8.2: сбрасываем флаг отмены после завершения scroll
+      this.cancelTraverseRequested = false;
       if (this.page && !this.page.isClosed()) {
         try {
           await this.page.evaluate(() => {

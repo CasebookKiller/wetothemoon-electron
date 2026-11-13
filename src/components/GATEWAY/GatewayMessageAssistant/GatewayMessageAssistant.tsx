@@ -12,6 +12,7 @@ import {
   CheckIcon,
 } from '@/components/GATEWAY/GatewayIcons/GatewayIcons';
 import { classNames } from '@/css/classnames';
+import { renderMarkdown } from '@/components/GATEWAY/utils/markdownRenderer';
 
 interface GatewayMessageAssistantProps {
   thinking?: string;
@@ -52,6 +53,36 @@ export const GatewayMessageAssistant: React.FC<GatewayMessageAssistantProps> = (
   const [copied, setCopied] = useState(false);
   const [liked, setLiked] = useState(false);
   const [disliked, setDisliked] = useState(false);
+
+  // 5.8.3: если fullHtml из PW — используем как есть. Но в двух случаях
+  // он «битый», и тогда мы рендерим markdown через Prism:
+  //   1) сломанная таблица: осталась как текст с |---|
+  //   2) неподсвеченный код: есть <code language-X>, но нет token-классов
+  const renderedHtml = React.useMemo(() => {
+    const md = (blocks || [])
+      .filter((b) => b.type === 'text' || b.type === 'code')
+      .map((b) =>
+        b.type === 'code'
+          ? '```' + (b.language || '') + '\n' + b.content + '\n```'
+          : b.content
+      )
+      .join('\n\n');
+
+    if (fullHtml) {
+      const hasBrokenTable =
+        /<br>\|\s*[-:]+\s*\|/.test(fullHtml) ||
+        fullHtml.includes('|---|');
+      const hasUnhighlightedCode =
+        /<pre><code class="language-[^"]+">/.test(fullHtml) &&
+        !fullHtml.includes('class="token');
+      if (!hasBrokenTable && !hasUnhighlightedCode) {
+        return fullHtml;
+      }
+    }
+
+    return md ? renderMarkdown(md) : '';
+  }, [fullHtml, blocks]);
+
 
   const handleCopy = () => {
     if (onCopy) {
@@ -225,41 +256,15 @@ export const GatewayMessageAssistant: React.FC<GatewayMessageAssistantProps> = (
         )}
 
         {/* Основной контент */}
-        {fullHtml ? (
-          <div
-            className={classNames({
-              'ds-markdown': true,
-              'ds-assistant-message-main-content': true,
-              'pointer-events-none': selectMode,
-            })}
-            dangerouslySetInnerHTML={{ __html: fullHtml }}
-          />
-        ) : (
-          <div
-            className={classNames({
-              'ds-markdown': true,
-              'ds-assistant-message-main-content': true,
-              'pointer-events-none': selectMode,
-            })}
-          >
-            {blocks.map((block, idx) => {
-              if (block.type === 'code') {
-                return (
-                  <div className={classNames({ 'md-code-block': true, 'md-code-block-dark': true })} key={idx}>
-                    <pre>
-                      <code className={`language-${block.language || 'text'}`}>{block.content}</code>
-                    </pre>
-                  </div>
-                );
-              }
-              return (
-                <p className={classNames({ 'ds-markdown-paragraph': true })} key={idx}>
-                  {block.content}
-                </p>
-              );
-            })}
-          </div>
-        )}
+        {/* 5.8.3: fullHtml — из PW DOM (идеал), иначе — markdown+Prism */}
+        <div
+          className={classNames({
+            'ds-markdown': true,
+            'ds-assistant-message-main-content': true,
+            'pointer-events-none': selectMode,
+          })}
+          dangerouslySetInnerHTML={{ __html: renderedHtml }}
+        />
       </div>
 
       {/* Панель кнопок */}

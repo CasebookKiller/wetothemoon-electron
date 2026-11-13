@@ -39,6 +39,7 @@ import { BacktestTab } from '@/components/TRADING_ASSISTANT/BacktestTab/Backtest
 import { BatchTab } from '@/components/TRADING_ASSISTANT/BatchTab/BatchTab';
 import { SignalsTab } from '@/components/TRADING_ASSISTANT/SignalsTab/SignalsTab';
 import { ProfileTab } from '@/components/TRADING_ASSISTANT/ProfileTab/ProfileTab';
+import AppIcon from '@/components/COMMON/AppIcon/AppIcon';
 
 interface BatchResult {
   batchId: string;
@@ -642,7 +643,9 @@ export const TradingAssistantPage: React.FC = () => {
         <Dropdown value={stream.displayTimeframe} options={[{ label: '1m', value: 1 }, { label: '5m', value: 5 }, { label: '15m', value: 15 }, { label: '1h', value: 60 }]} onChange={e => updateStream({ displayTimeframe: e.value })} className="p-inputtext-sm" style={{ width: '80px' }} />
         <Button label="Start" onClick={startStream} disabled={stream.active} className="p-button-sm border-round-sm p-1 px-2" />
         <Button label="Stop" onClick={stopStream} disabled={!stream.active} className="p-button-sm p-button-danger border-round-sm p-1 px-2" />
-        <span style={{ color: stream.active ? '#4caf50' : '#d32f2f', minWidth: '60px', fontSize: '0.85rem' }}>{stream.active ? '● Live' : '○ Stopped'}</span>
+        <span style={{ color: stream.active ? '#4caf50' : '#d32f2f', minWidth: '60px', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+          <AppIcon name="circle" set="material" filled size={10} /> {stream.active ? 'Live' : 'Stopped'}
+        </span>
         <Checkbox checked={isWeekendMode} onChange={e => setIsWeekendMode(e.checked as boolean)} />
         <label className="ml-1 mb-0" style={{ fontSize: '0.8rem' }}>Weekend</label>
         <div style={{ borderLeft: '1px solid #555', height: '24px', margin: '0 8px' }} />

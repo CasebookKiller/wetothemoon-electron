@@ -1,3 +1,4 @@
+import AppIcon from '@/components/COMMON/AppIcon/AppIcon';
 import React, { useState, useCallback } from 'react';
 
 interface ChatSearchProps {
@@ -16,7 +17,7 @@ const ChatSearch: React.FC<ChatSearchProps> = ({ onSearch, className }) => {
   return (
     <div className={`p-3 border-bottom-1 surface-border ${className}`}>
       <div className="flex align-items-center gap-2">
-        <i className="pi pi-search text-700" />
+        <AppIcon name="search" className="text-700" />
         <input
           type="text"
           placeholder="Поиск по чатам..."
@@ -29,7 +30,7 @@ const ChatSearch: React.FC<ChatSearchProps> = ({ onSearch, className }) => {
             onClick={() => handleSearch('')}
             className="p-2 border-none bg-transparent cursor-pointer"
           >
-            <i className="pi pi-times" />
+            <AppIcon name="times" />
           </button>
         )}
       </div>

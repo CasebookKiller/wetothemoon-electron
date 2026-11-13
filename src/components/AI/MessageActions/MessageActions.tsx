@@ -1,3 +1,5 @@
+import AppIcon from '@/components/COMMON/AppIcon/AppIcon';
+
 const MessageActions: React.FC<{ messageText: string; messageId: string }> = ({
   messageText,
   messageId
@@ -38,14 +40,14 @@ const MessageActions: React.FC<{ messageText: string; messageId: string }> = ({
         className={`copy-button`}
         title="Копировать весь ответ"
       >
-        📋 Копировать ответ
+        <AppIcon name="content_copy" set="material" /> Копировать ответ
       </button>
       <button
         onClick={handleSave}
         className="save-button"
         title="Сохранить код в файл"
       >
-        💾 Сохранить .md
+        <AppIcon name="save" set="material" /> Сохранить .md
       </button>
     </div>
   );

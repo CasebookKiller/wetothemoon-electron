@@ -3198,7 +3198,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                       flexWrap: 'wrap',
                     }}
                   >
-                    <i className="pi pi-filter" style={{ color: '#6ab2f2' }} />
+                    <AppIcon name="filter" color="#6ab2f2" />
                     <span style={{ color: '#6ab2f2', fontWeight: 600 }}>
                       Фильтр: {referenceTracks.find((r) => r.id === filterByRefId)?.name ?? '...'}
                     </span>
@@ -3318,8 +3318,8 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                   {!loadingFacts && groupedRunsView && (() => {
                     const renderSection = (
                       key: string,
-                      title: string,
-                      items: typeof categorizedGroups.used,
+                      title: React.ReactNode,
+                      items: any[]
                     ) => {
                       if (items.length === 0) return null;
                       const isCollapsed = collapsedSections.has(key);
@@ -3500,7 +3500,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                                                 display: 'inline-block',
                                               }}
                                             >
-                                              ⛓️ {m.name}
+                                              <AppIcon name="link" set="material" /> {m.name}
                                             </span>
                                           ));
                                         })()}
@@ -3528,9 +3528,9 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
 
                     return (
                       <>
-                        {renderSection('used', '🟢 Пройдено', categorizedGroups.used)}
-                        {renderSection('similar', '🟡 Похоже на маршрут', categorizedGroups.similar)}
-                        {renderSection('unused', '⚪ Без маршрута', categorizedGroups.unused)}
+                        {renderSection('used', <><AppIcon name="circle" set="material" color="success" filled /> Пройдено</>, categorizedGroups.used)}
+                        {renderSection('similar', <><AppIcon name="circle" set="material" color="warning" filled /> Похоже на маршрут</>, categorizedGroups.similar)}
+                        {renderSection('unused', <><AppIcon name="circle" set="material" filled /> Без маршрута</>, categorizedGroups.unused)}
                         {categorizedGroups.used.length === 0 &&
                           categorizedGroups.similar.length === 0 &&
                           categorizedGroups.unused.length === 0 && (
@@ -5718,7 +5718,7 @@ export const RouteMapEditor: React.FC<Props> = ({ visible, onHide, initialRunId 
                 pointerEvents: 'none',
               }}
             >
-              🎯 Включите «Разметку» и кликните по карте — поставите точку старта
+              <AppIcon name="my_location" set="material" color="danger" /> Включите «Разметку» и кликните по карте — поставите точку старта
             </div>
           )}
 

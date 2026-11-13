@@ -1840,3 +1840,111 @@
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
+
+/* ============================================================
+   5.8.3: Жесткий фикс код-блоков (Prism)
+   ============================================================ */
+.ds-markdown .md-code-block pre {
+  display: block !important;
+  white-space: pre !important; /* Заставляет браузер уважать \n и пробелы */
+  overflow-x: auto !important;
+  margin: 0 !important;
+  padding: 16px !important;
+  background: transparent !important;
+}
+
+.ds-markdown .md-code-block pre code {
+  display: block !important;
+  white-space: pre !important;
+  font-family: 'Consolas', 'Monaco', 'Andale Mono', 'Ubuntu Mono', monospace !important;
+  font-size: 14px !important;
+  line-height: 22px !important;
+  background: transparent !important;
+  padding: 0 !important;
+  border: none !important;
+}
+
+/* Спаны внутри кода должны быть строчными, чтобы текст не прыгал */
+.ds-markdown .md-code-block pre code span {
+  display: inline !important;
+  white-space: inherit !important;
+}
+
+/* Гарантируем высоту баннера, даже если внутри нет кнопок */
+.ds-markdown .md-code-block-banner-wrap {
+  min-height: 40px !important;
+}
+
+/* ============================================================
+   5.8.3: Финальный фикс KaTeX (размер 1.4em + переносы)
+   ============================================================ */
+
+/* 1. Увеличиваем саму формулу и разрешаем перенос */
+.ds-markdown .katex {
+  font-size: 1.4em !important;
+  font-family: 'KaTeX_Main', 'Cambria Math', 'Times New Roman', serif !important;
+  overflow-wrap: break-word !important;
+  word-break: break-word !important;
+}
+
+/* 2. Принудительно увеличиваем степень (0.8em) */
+.ds-markdown .katex .mtight,
+.ds-markdown .katex .sizing.reset-size6.size3 {
+  font-size: 0.8em !important;
+}
+
+/* 3. Убираем лишние переносы внутри формул, но разрешаем перенос длинных строк */
+.ds-markdown .katex * {
+  line-height: normal !important;
+  letter-spacing: normal !important;
+  white-space: normal !important;
+  word-break: break-word !important;
+}
+
+/* 4. Блочная формула: отступы, выравнивание и перенос */
+.ds-markdown .katex-display {
+  margin: 16px 0 !important;
+  display: block !important;
+  text-align: center !important;
+  white-space: normal !important;
+  word-break: break-word !important;
+  overflow-x: auto !important;
+}
+
+
+/* ============================================================
+   5.8.3: Фикс код-блоков с переносом длинных строк
+   ============================================================ */
+
+.ds-markdown .md-code-block pre {
+  display: block !important;
+  white-space: pre-wrap !important; /* Сохраняет \n, но переносит длинные строки */
+  word-break: break-all !important; /* Ломает длинные слова/URL */
+  overflow-wrap: anywhere !important;
+  overflow-x: auto !important;
+  margin: 0 !important;
+  padding: 16px !important;
+  background: transparent !important;
+}
+
+.ds-markdown .md-code-block pre code,
+.ds-markdown .md-code-block pre > span {
+  display: block !important;
+  white-space: inherit !important;
+  word-break: inherit !important;
+  font-family: 'Consolas', 'Monaco', 'Andale Mono', 'Ubuntu Mono', monospace !important;
+  font-size: 14px !important;
+  line-height: 22px !important;
+  background: transparent !important;
+  padding: 0 !important;
+  border: none !important;
+}
+
+.ds-markdown .md-code-block pre code span {
+  display: inline !important;
+  white-space: inherit !important;
+}
+
+.ds-markdown .md-code-block-banner-wrap {
+  min-height: 40px !important;
+}

@@ -15,6 +15,7 @@ import { TAB_TO_SECTION } from '@/main/services/osint/scrapers/rusprofile/sectio
 import { JudgesCollectionDialog } from '@/components/SIETCH/JudgesCollectionDialog';
 import { JudgesDirectoryDialog } from '@/components/SIETCH/JudgesDirectoryDialog';
 import { KadArbitrDialog } from '@/components/SIETCH/KadArbitrDialog';
+import AppIcon from '@/components/COMMON/AppIcon/AppIcon';
 
 export const OSINTPage: React.FC = () => {
   const [inn, setInn] = useState<string>(() => {
@@ -879,7 +880,7 @@ export const OSINTPage: React.FC = () => {
                   onClick={() => handleSelectDumpItem(item)}
                   style={{ cursor: 'pointer' }}
                 >
-                  <i className="pi pi-database" />
+                  <AppIcon name="database" />
                   <div className="flex-1">
                     <div className="font-bold">
                       {item.entity_name || `ИНН ${item.company_inn}`}
@@ -927,7 +928,7 @@ export const OSINTPage: React.FC = () => {
                     disabled={isDeleting}
                   />
 
-                  <i className="pi pi-arrow-right" />
+                  <AppIcon name="arrow-right" />
                 </div>
               );
             })}

@@ -185,6 +185,20 @@ export function registerGatewayHandlers(): void {
     }
   );
 
+  // 5.8.3-snapshot: чтение всех веток из IndexedDB (fallback на traverse)
+  ipcMain.handle(
+    'gateway:snapshot-history',
+    async (_e, convId?: string) => {
+      try {
+        if (convId) activeConvId = convId;
+        const source = await service.snapshotHistory();
+        return { success: true, data: { source } };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
   ipcMain.handle(
     'gateway:deactivate-by-hashes',
     async (_e, convId: string, hashes: string[]) => {
@@ -210,6 +224,16 @@ export function registerGatewayHandlers(): void {
       }
     }
   );
+
+  // 5.8.2: отмена текущего doBackgroundScroll
+  ipcMain.handle('gateway:cancel-traverse', () => {
+    try {
+      service.cancelTraverse();
+      return { success: true };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
 
   ipcMain.handle(
     'gateway:switch-branch',
@@ -655,9 +679,17 @@ export function registerGatewayHandlers(): void {
         }));
         const cache = GatewayCacheService.getInstance();
         const isFinal = event.type === 'history:complete';
+        const wasCancelled = event.payload?.cancelled === true;
 
         // 5.6: если scroll был запущен с prune: false — сохраняем хеши
         let usePrune = isFinal;
+        // 5.8.2: при отмене не деактивируем то, что не успели собрать
+        if (isFinal && wasCancelled) {
+          usePrune = false;
+          console.log(
+            `[gatewayHandlers] history:complete cancelled → skip prune (${activeConvId})`
+          );
+        }
         if (isFinal && skipPruneOnNextCompleteTs > 0) {
           if (Date.now() - skipPruneOnNextCompleteTs < 60000) {
             usePrune = false;

@@ -6,6 +6,7 @@ import { Task } from '@/shared/types/task';
 import { TaskList } from '@/components/TASKS/TaskList/TaskList';
 import { TaskForm } from '@/components/TASKS/TaskForm/TaskForm';
 import { classNames } from '@/css/classnames';
+import AppIcon from '@/components/COMMON/AppIcon/AppIcon';
 
 export const TasksPage: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -104,7 +105,7 @@ export const TasksPage: React.FC = () => {
 
   const emptyState = (
     <div className="flex flex-column align-items-center justify-content-center py-6 text-color-secondary">
-      <i className="pi pi-calendar text-5xl mb-3" style={{ opacity: 0.3 }}></i>
+      <AppIcon name="calendar" className="text-5xl mb-3" style={{ opacity: 0.3 }} />
       <p className="text-lg mb-3">Нет запланированных задач</p>
       <Button
         icon="pi pi-plus"

@@ -441,7 +441,7 @@ export const FullWeek: React.FC<Props> = ({
         </span>
 
         {loading && (
-          <i className="pi pi-spin pi-spinner pb-full-week__spin" />
+          <AppIcon name="spinner" spin className="pb-full-week__spin" />
         )}
         </div>
 

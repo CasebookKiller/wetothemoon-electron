@@ -5,6 +5,7 @@ import { Card } from 'primereact/card';
 import { Button } from 'primereact/button';
 import { InputText } from 'primereact/inputtext';
 import { Dropdown } from 'primereact/dropdown';
+import AppIcon from '@/components/COMMON/AppIcon/AppIcon';
 
 type Timeframe = 1 | 5 | 15 | 60;
 
@@ -45,7 +46,11 @@ export const StreamTab: React.FC<Props> = ({ stream, updateStream, startStream, 
       </div>
       <div className="p-mt-2">
         <span style={{ color: stream.active ? '#4caf50' : '#d32f2f' }}>
-          {stream.active ? '● Live' : '○ Stopped'}
+          {stream.active ? (
+            <><AppIcon name="circle" set="material" filled color="#4caf50" size={10} /> Live</>
+          ) : (
+            <><AppIcon name="circle" set="material" filled color="#d32f2f" size={10} /> Stopped</>
+          )}
         </span>
       </div>
     </Card>

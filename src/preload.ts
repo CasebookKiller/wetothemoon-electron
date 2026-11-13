@@ -431,6 +431,9 @@ try {
       opts?: { prune?: boolean; collectInactive?: boolean }
     ) => ipcRenderer.invoke('gateway:scroll-history', convId, opts),
 
+    gatewaySnapshotHistory: (convId?: string) =>
+      ipcRenderer.invoke('gateway:snapshot-history', convId),
+
     gatewaySwitchBranch: (
       messageKey: string,
       direction: 'prev' | 'next',
@@ -443,6 +446,9 @@ try {
 
     gatewayDeactivateByHashes: (convId: string, hashes: string[]) =>
       ipcRenderer.invoke('gateway:deactivate-by-hashes', convId, hashes),
+
+    gatewayCancelTraverse: () =>
+      ipcRenderer.invoke('gateway:cancel-traverse'),
 
     gatewaySetDeepThinking: (enabled: boolean) => ipcRenderer.invoke('gateway:set-deep-thinking', enabled),
     gatewaySetSearch: (enabled: boolean) => ipcRenderer.invoke('gateway:set-search', enabled),

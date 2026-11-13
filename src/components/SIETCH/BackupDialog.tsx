@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Dialog } from 'primereact/dialog';
 import { Button } from 'primereact/button';
+import AppIcon from '../COMMON/AppIcon/AppIcon';
 
 export interface BackupDialogProps {
   visible: boolean;
@@ -76,7 +77,7 @@ export const BackupDialog: React.FC<BackupDialogProps> = ({ visible, onHide }) =
       onHide={onHide}
       header={
         <span className="p-panel-title">
-          <i className="pi pi-save mr-2" />
+          <AppIcon name="save" className="mr-2" />
           Создание backup
         </span>
       }
@@ -107,7 +108,7 @@ export const BackupDialog: React.FC<BackupDialogProps> = ({ visible, onHide }) =
             border: '1px solid rgba(59, 130, 246, 0.4)',
           }}
         >
-          <i className="pi pi-info-circle mt-1" style={{ color: '#3b82f6' }} />
+          <AppIcon name="info-circle" color="#3b82f6" className="mt-1" />
           <div className="text-sm">
             Backup сохраняется в выбранную папку в подкаталог с датой.
             Перед восстановлением приложение нужно перезапустить.
@@ -182,7 +183,7 @@ export const BackupDialog: React.FC<BackupDialogProps> = ({ visible, onHide }) =
               border: '1px solid rgba(245, 158, 11, 0.4)',
             }}
           >
-            <i className="pi pi-exclamation-triangle mt-1" style={{ color: '#f59e0b' }} />
+            <AppIcon name="exclamation-triangle" color="#f59e0b" className="mt-1" />
             <div className="text-sm">
               <b>Внимание:</b> backup содержит зашифрованные данные.
               При восстановлении на другом устройстве потребуется

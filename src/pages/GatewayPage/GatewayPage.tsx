@@ -614,20 +614,50 @@ export const GatewayPage: React.FC = () => {
         }
 
         // Прогресс подгрузки истории (приходит во время скролла PW)
+        // Прогресс подгрузки истории (приходит во время скролла PW)
         if (event.type === 'history:progress' || event.type === 'history:complete') {
           const rawParsed = (event.payload?.rawMessages || []) as ChatMessage[];
+          const scrollProgress = event.payload?.scrollProgress as
+            | import('@/main/services/gateway/bridge/BridgeEvents').ScrollProgressMeta
+            | undefined;
+
+          // 5.8.2: обновляем прогресс в тосте (throttle на стороне main)
+          if (scrollProgress && event.type === 'history:progress') {
+            setDialogLoadToast((prev) => {
+              const currentConvId = selectedConversationRef.current;
+              if (!currentConvId) return prev;
+              if (prev && prev.convId !== currentConvId) return prev;
+
+              const messagesNow = scrollProgress.collectedCount || 0;
+              const base: DialogLoadInfo = prev ?? {
+                convId: currentConvId,
+                messagesTotal: messagesRef.current.length || messagesNow,
+                filesTotal: 0,
+                filesLoaded: 0,
+                filesFailed: 0,
+              };
+              const updatedTotal = base.messagesTotal > 0
+                ? base.messagesTotal
+                : Math.max(messagesNow, messagesRef.current.length);
+
+              return {
+                ...base,
+                messagesTotal: updatedTotal,
+                progress: scrollProgress,
+              };
+            });
+
+            // 5.8.2: watchdog — пока идёт progress, таймаут сбрасывается
+            resetHistoryTimeout(180000);
+          }
+
           const prev = latestHistoryRef.current;
 
-          // 5.6.3: на progress — быстрая перезапись видимым окном
-          // (для оптимизма, пока scroll ещё идёт).
-          // На complete — читаем ПОЛНУЮ историю из БД (источник правды).
+          // 5.6.3: на progress — быстрая перезапись видимым окном.
           if (event.type === 'history:progress') {
             const prevAllHashed =
               prev.length > 0 && prev.every((m) => !!m.messageHash);
             if (prevAllHashed) {
-              // 5.6.5: только добавляем новые (если скролл нашёл больше).
-              // НИКОГДА не уменьшаем UI во время progress — ждём history:complete,
-              // где прочитаем полную историю из БД.
               if (rawParsed.length > prev.length) {
                 const merged = mergeWithExisting(rawParsed);
                 latestHistoryRef.current = merged;
@@ -646,7 +676,19 @@ export const GatewayPage: React.FC = () => {
             }
           }
 
+          // 5.6.3: на complete — читаем ПОЛНУЮ историю из БД (источник правды)
           if (event.type === 'history:complete') {
+            // 5.8.2: сохраняем elapsed последнего progress → finalElapsedMs
+            setDialogLoadToast((prev) => {
+              if (!prev) return prev;
+              const finalElapsed = prev.progress?.elapsedMs;
+              return {
+                ...prev,
+                progress: undefined,
+                finalElapsedMs: finalElapsed ?? prev.finalElapsedMs,
+              };
+            });
+
             setIsHistoryLoading(false);
             isLoadingHistoryRef.current = false;
 
@@ -655,10 +697,9 @@ export const GatewayPage: React.FC = () => {
               historyTimeoutRef.current = null;
             }
 
-            // 5.6.1: selectedConversation из замыкания `[]` — stale. Ref.
             const currentConv = selectedConversationRef.current;
             if (currentConv) {
-              // 1. Читаем ПОЛНУЮ историю из БД (5.6.3)
+              // 1. Читаем ПОЛНУЮ историю из БД
               void (async () => {
                 try {
                   const cached = await api.gatewayCacheMessages(currentConv);
@@ -672,12 +713,16 @@ export const GatewayPage: React.FC = () => {
                       mapCachedMessage(m, currentConv)
                     );
 
-                    // 5.6.5: фильтр по messageHash/id, а не по тексту.
-                    // (Текст может повторяться в разных сообщениях легально).
-                    const uniqueMapped = [];
-                    const seenKeys = new Set();
+                    // 5.6.5: фильтр по messageHash/id
+                    const uniqueMapped: ChatMessage[] = [];
+                    const seenKeys = new Set<string>();
                     for (const msg of mapped) {
-                      const key = msg.messageHash || msg.id || `${msg.role}:${msg.blocks?.map((b: any) => b.content).join('\n\n')}`;
+                      const key =
+                        msg.messageHash ||
+                        msg.id ||
+                        `${msg.role}:${msg.blocks
+                          ?.map((b: any) => b.content)
+                          .join('\n\n')}`;
                       if (!seenKeys.has(key)) {
                         seenKeys.add(key);
                         uniqueMapped.push(msg);
@@ -688,7 +733,10 @@ export const GatewayPage: React.FC = () => {
                     setMessagesWithPreserveScroll(uniqueMapped);
                     console.log(
                       '[gateway] history:complete: reloaded from DB',
-                      { rawCount: mapped.length, uniqueCount: uniqueMapped.length }
+                      {
+                        rawCount: mapped.length,
+                        uniqueCount: uniqueMapped.length,
+                      }
                     );
                   }
                 } catch (e) {
@@ -699,7 +747,7 @@ export const GatewayPage: React.FC = () => {
                 }
               })();
 
-              // 2. Финальная сверка статусов файлов из БД (5.6.1)
+              // 2. Финальная сверка статусов файлов из БД
               void (async () => {
                 try {
                   const items: Array<{
@@ -729,11 +777,6 @@ export const GatewayPage: React.FC = () => {
                         next.set(k, v as 'ok' | 'failed');
                       }
                       setFileStatuses(next);
-                      console.log(
-                        '[gateway] fileStatuses refreshed after history:complete:',
-                        next.size,
-                        'items'
-                      );
                     }
                   }
                 } catch (e) {
@@ -1007,6 +1050,17 @@ export const GatewayPage: React.FC = () => {
           return;
         }
 
+        // 5.8.2: telemetry — шум в фоне (DeepSeek сам себе шлёт
+        // POST /api/v0/telemetry, а наш injectedScript его блокирует).
+        // Не показываем, не логируем, не отображаем юзеру.
+        if (event.type === 'fetch:error') {
+          const url = (event.payload?.url as string) || '';
+          if (url.includes('/telemetry')) return;
+          
+          // TODO(5.8.3): реальные fetch:error — показывать юзеру (не телеметрию).
+          // Сейчас падают в общий лог ниже, не в UI.
+        }
+
         // Остальное — пока в лог (этапы 2–4)
         console.log('[bridge]', event.type, event.payload);
       }
@@ -1048,12 +1102,89 @@ export const GatewayPage: React.FC = () => {
     }
   }, [isLoggedIn]);
 
-  // 5.8.1: Ctrl+Shift+R — force-resync текущего диалога.
+
+  // 5.8.2: единый хелпер — ставит/перезапускает таймаут. Вызывается
+  // и при старте, и при каждом history:progress (watchdog на зависание).
+  const resetHistoryTimeout = React.useCallback((ms: number = 180000) => {
+    if (historyTimeoutRef.current) clearTimeout(historyTimeoutRef.current);
+    historyTimeoutRef.current = setTimeout(() => {
+      historyTimeoutRef.current = null;
+      setIsHistoryLoading(false);
+      isLoadingHistoryRef.current = false;
+      console.warn(
+        `[gateway] history:complete timeout (${Math.round(ms / 1000)}s) — forcing isLoading=false`
+      );
+    }, ms);
+  }, []);
+
+  // 5.8.1: Ctrl+Alt+R — force-resync текущего диалога.
   // Полезно после regenerate/edit в середине диалога (когда bridge
   // history:changed не срабатывает — fingerprint хвоста не менялся).
+  // 5.8.2: вынесено из hotkey — теперь используется и в GatewayDialogLoadToast
+  const handleForceResync = React.useCallback(async () => {
+    const convId = selectedConversationRef.current;
+    if (!convId) {
+      console.warn('[force-resync] нет выбранного диалога');
+      return;
+    }
+    if (isLoadingHistoryRef.current) {
+      console.log('[force-resync] уже идёт sync — игнор');
+      return;
+    }
+
+    console.log('[force-resync] запуск', convId);
+    setIsHistoryLoading(true);
+    isLoadingHistoryRef.current = true;
+    if (historyTimeoutRef.current) clearTimeout(historyTimeoutRef.current);
+    
+    // 5.8.2: используем централизованный таймаут
+    resetHistoryTimeout(180000);
+
+    try {
+      const mode = localStorage.getItem('gateway.scrollMode') || 'snapshot';
+      console.log(`[force-resync] mode=${mode}`);
+
+      if (mode === 'snapshot') {
+        const r = await api.gatewaySnapshotHistory(convId);
+        if (r?.success) {
+          console.log(`[force-resync] snapshot OK: source=${r.data?.source}`);
+        } else {
+          console.warn(
+            `[force-resync] snapshot failed: ${r?.error}, falling back to traverse`
+          );
+          // Fallback: traverse — но только если snapshot явно упал.
+          // Внутри service уже есть fallback на traverse, но на всякий случай.
+          const collectInactive =
+            localStorage.getItem('gateway.collectAllBranches') === '1';
+          await api.gatewayScrollHistory(convId, {
+            prune: true,
+            collectInactive,
+            speed: localStorage.getItem('gateway.scrollSpeed') || 'normal',
+          });
+        }
+      } else {
+        const collectInactive = mode !== 'quick' && mode !== 'normal';
+        await api.gatewayScrollHistory(convId, {
+          prune: true,
+          collectInactive,
+          speed: localStorage.getItem('gateway.scrollSpeed') || 'normal',
+        });
+      }
+    } catch (err) {
+      console.error('[force-resync] failed:', (err as Error).message);
+      if (selectedConversationRef.current === convId) {
+        setIsHistoryLoading(false);
+        isLoadingHistoryRef.current = false;
+        if (historyTimeoutRef.current) {
+          clearTimeout(historyTimeoutRef.current);
+          historyTimeoutRef.current = null;
+        }
+      }
+    }
+  }, [api, resetHistoryTimeout]);
+
   useEffect(() => {
     const onKey = async (e: KeyboardEvent) => {
-      // Отладка: увидим, доходят ли нажатия до окна
       if (e.ctrlKey && e.altKey) {
         console.log('[hotkey] Ctrl+Alt pressed, code:', e.code, 'key:', e.key);
       }
@@ -1061,54 +1192,12 @@ export const GatewayPage: React.FC = () => {
       if (!(e.ctrlKey && e.altKey && !e.shiftKey)) return;
       if (e.code !== 'KeyR') return;
 
-      const convId = selectedConversationRef.current;
-      if (!convId) {
-        console.warn('[force-resync] нет выбранного диалога');
-        return;
-      }
-      if (isLoadingHistoryRef.current) {
-        console.log('[force-resync] уже идёт sync — игнор');
-        return;
-      }
-      
       e.preventDefault();
-      console.log('[force-resync] запуск', convId);
-
-      setIsHistoryLoading(true);
-      isLoadingHistoryRef.current = true;
-      if (historyTimeoutRef.current) clearTimeout(historyTimeoutRef.current);
-      historyTimeoutRef.current = setTimeout(() => {
-        historyTimeoutRef.current = null;
-        setIsHistoryLoading(false);
-        isLoadingHistoryRef.current = false;
-        console.warn('[force-resync] timeout (90s) — forcing isLoading=false');
-      }, 90000);
-
-      try {
-        // 5.7.24: передаём флаг сбора веток из localStorage
-        const collectInactive =
-          localStorage.getItem('gateway.collectAllBranches') === '1';
-        await api.gatewayScrollHistory(convId, {
-          prune: true,
-          collectInactive,
-          speed: localStorage.getItem('gateway.scrollSpeed') || 'normal',
-        });
-        console.log('[force-resync] запрошен scrollHistory (prune: true)');
-      } catch (err) {
-        console.error('[force-resync] failed:', (err as Error).message);
-        if (selectedConversationRef.current === convId) {
-          setIsHistoryLoading(false);
-          isLoadingHistoryRef.current = false;
-          if (historyTimeoutRef.current) {
-            clearTimeout(historyTimeoutRef.current);
-            historyTimeoutRef.current = null;
-          }
-        }
-      }
+      await handleForceResync();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [api]);
+  }, [handleForceResync]);
 
   const handleLaunch = async () => {
     setLoading(true);
@@ -1119,11 +1208,7 @@ export const GatewayPage: React.FC = () => {
     if (historyTimeoutRef.current) clearTimeout(historyTimeoutRef.current);
     // Fallback: если history:complete не придёт за 30с —
     // сбрасываем флаг, иначе UI зависнет в «загрузке» навсегда.
-    historyTimeoutRef.current = setTimeout(() => {
-      historyTimeoutRef.current = null;
-      setIsHistoryLoading(false);
-      console.warn('[gateway] history:complete timeout (90s) — forcing isLoading=false');
-    }, 90000);
+    resetHistoryTimeout(180000);
     try {
       const result = await api.gatewayLaunch();
       if (result.success) {
@@ -1396,7 +1481,11 @@ export const GatewayPage: React.FC = () => {
       const sizesMatch = prevLen >= visLen;
 
       // ── Stage 5: решение ──────────────────────────────────
-      if (lastMatches && sizesMatch && pending === 0) {
+      // 5.8.2: pending файлов — не причина для полного sync.
+      // Файлы качаются отдельно через FileBatchService. Полный sync
+      // нужен только если содержимое сообщений реально разъехалось.
+      // Раньше: pending > 0 → forced full scroll (975с на 97 сообщениях!).
+      if (lastMatches && sizesMatch) {
         // SKIP: DB актуальна, файлы все загружены.
         // Перечитываем БД (sync мог заполнить message_hash у legacy-строк).
         try {
@@ -1447,7 +1536,7 @@ export const GatewayPage: React.FC = () => {
         console.warn(
           '[gateway] history:complete timeout (90s) — forcing isLoading=false'
         );
-      }, 90000);
+      }, 180000);
 
       // prune: false когда содержимое совпадает, но есть pending-файлы
       // (сохраняем хеши, чтобы ключи fileStatuses не разъехались).
@@ -1458,19 +1547,43 @@ export const GatewayPage: React.FC = () => {
       // Иначе первичное открытие диалога запускает sync БЕЗ traverse,
       // а Ctrl+Alt+R (нажатый позже) прицепляется к этому же скроллу
       // через backgroundScrollInFlight и traverse тоже не запускает.
-      const collectInactive =
-        localStorage.getItem('gateway.collectAllBranches') === '1';
+            // 5.8.3-snapshot: выбор способа sync по режиму
+      const mode = localStorage.getItem('gateway.scrollMode') || 'snapshot';
+      console.log(`[gateway] sync mode: ${mode}`);
 
       try {
-        await api.gatewayScrollHistory(id, {
-          prune: usePrune,
-          collectInactive,
-          speed: localStorage.getItem('gateway.scrollSpeed') || 'normal',
-        });
-        // history:progress/complete придут через bridge и обновят UI
+        if (mode === 'snapshot') {
+          const r = await api.gatewaySnapshotHistory(id);
+          if (r?.success) {
+            console.log(
+              `[gateway] snapshot OK: source=${r.data?.source}`
+            );
+          } else {
+            console.warn(
+              `[gateway] snapshot failed: ${r?.error}, falling back`
+            );
+            // Fallback на traverse если snapshot явно упал
+            const collectInactive =
+              localStorage.getItem('gateway.collectAllBranches') === '1';
+            await api.gatewayScrollHistory(id, {
+              prune: usePrune,
+              collectInactive,
+              speed: localStorage.getItem('gateway.scrollSpeed') || 'normal',
+            });
+          }
+        } else {
+          const collectInactive =
+            mode === 'deep' ||
+            localStorage.getItem('gateway.collectAllBranches') === '1';
+          await api.gatewayScrollHistory(id, {
+            prune: usePrune,
+            collectInactive,
+            speed: localStorage.getItem('gateway.scrollSpeed') || 'normal',
+          });
+        }
       } catch (e) {
         console.warn(
-          '[gateway] scrollHistory failed:',
+          '[gateway] sync failed:',
           (e as Error).message
         );
         if (selectedConversationRef.current === id) {
@@ -2388,6 +2501,17 @@ export const GatewayPage: React.FC = () => {
                 }
               : null
           }
+          onCancelTraverse={async () => {
+            try {
+              await api.gatewayCancelTraverse();
+            } catch (e) {
+              console.warn(
+                '[dialog-load-toast] cancel error:',
+                (e as Error).message
+              );
+            }
+          }}
+          onForceResync={handleForceResync}
         />
         <GatewayProgressToast
           state={batchToast}

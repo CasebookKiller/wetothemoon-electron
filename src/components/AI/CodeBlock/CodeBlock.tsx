@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import './CodeBlock.css'
+import AppIcon from '@/components/COMMON/AppIcon/AppIcon';
 
 interface CodeBlockProps {
   children: React.ReactNode;
@@ -85,14 +86,14 @@ const CodeBlock: React.FC<CodeBlockProps> = ({
             className={`copy-button ${isCopied ? 'copied' : ''}`}
             title={isCopied ? 'Скопировано!' : 'Копировать код'}
           >
-            {isCopied ? '✓ Скопировано' : '📋 Копировать'}
+            {isCopied ? <><AppIcon name="check" set="material" color="success" /> Скопировано</> : <><AppIcon name="content_copy" set="material" /> Копировать</>}
           </button>
           <button
             onClick={handleSave}
             className="save-button"
             title="Сохранить код в файл"
           >
-            💾 Сохранить
+            <AppIcon name="save" set="material" /> Сохранить
           </button>
         </div>
       </div>

@@ -130,7 +130,12 @@ export function parseStepLine(line: string): WorkoutStep | null {
   const stepMatch = line.match(RE_STEP);
   if (!stepMatch) return null;
 
-  const body = stepMatch[1].trim();
+  // ICU дописывает к шагу аннотацию темпа "(6:43-7:13 for 0.43km)".
+  // Это не часть шага: она ломает матчинг с каталогом и даёт ложный
+  // distanceM из "0.43km". Срезаем до токенайзера.
+  const body = stepMatch[1]
+    .trim()
+    .replace(/(?:\s*\([^)]*\))+\s*$/, '');
   if (!body) return null;
 
   const raw = line;

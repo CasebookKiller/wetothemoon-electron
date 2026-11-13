@@ -13,6 +13,7 @@ import 'primeicons/primeicons.css';
 import 'primeflex/primeflex.css';
 
 import './ChatInterface.css';
+import AppIcon from '@/components/COMMON/AppIcon/AppIcon';
 
 const API_URL = 'http://localhost:11434/api/' ;//generate;
 const MAX_CONTEXT_TOKENS = 40000; // Для Qwen3: 40 960, оставляем запас
@@ -878,8 +879,8 @@ const ChatInterface: React.FC = () => {
       <div className="flex align-items-center justify-content-between p-3 border-bottom-1 surface-border gap-2">
         <h2 className="m-0 font-medium text-900">Нейро</h2>
         <div className="flex gap-2">
-          <i className="pi pi-cog text-700 cursor-pointer" onClick={() => {}} />
-          <i className="pi pi-refresh text-700 cursor-pointer" onClick={() => setMessages([])} />
+          <AppIcon name="cog" className="text-700 cursor-pointer" onClick={() => {}} />
+          <AppIcon name="refresh" className="text-700 cursor-pointer" onClick={() => setMessages([])} />
         </div>
       </div>
 

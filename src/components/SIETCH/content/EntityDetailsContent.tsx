@@ -10,6 +10,7 @@ import { ObservationsTable } from '@/components/SIETCH/DatabaseTables/Observatio
 import { RelationsTable } from '@/components/SIETCH/DatabaseTables/RelationsTable';
 import { SourcesTable } from '@/components/SIETCH/DatabaseTables/SourcesTable';
 import { RepresentativesTable } from './RepresentativesTable';
+import AppIcon from '@/components/COMMON/AppIcon/AppIcon';
 
 export type DialogType = 'entity' | 'relation' | 'observation' | 'source';
 
@@ -138,7 +139,7 @@ export const EntityDetailsContent: React.FC<EntityDetailsContentProps> = ({
       {repRelations.length > 0 && (
         <div className="mt-3">
           <div className="flex align-items-center gap-2 mb-2">
-            <i className="pi pi-users" />
+            <AppIcon name="users" />
             <span className="font-bold">Представители ({repRelations.length})</span>
           </div>
           <RepresentativesTable
