@@ -1377,37 +1377,4 @@ export function registerGatewayHandlers(): void {
     }
   });
 
-  ipcMain.handle('gateway:export-continuation', async (_e, payload: {
-    workspaceKeys: string[];
-    taskTitle?: string;
-  }) => {
-    try {
-      const fsMod = await import('node:fs');
-      const pathMod = await import('node:path');
-      const { app } = await import('electron');
-      const { buildContinuationSystemPrompt } = await import('../services/gateway/contextBuilder');
-
-      const manifestPath = process.env.CONTEXT_MANIFEST;
-      if (!manifestPath) return { success: false, error: 'CONTEXT_MANIFEST не задан в .env.local' };
-      if (!payload?.workspaceKeys?.length) return { success: false, error: 'workspaceKeys обязательны' };
-
-      const r = await buildContinuationSystemPrompt({
-        manifestPath,
-        activeKeys: payload.workspaceKeys,
-        taskTitle: payload.taskTitle ?? 'Продолжение разработки',
-      });
-
-      const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-      const slug = payload.workspaceKeys[payload.workspaceKeys.length - 1].split('/').pop() || 'workspace';
-      const outDir = pathMod.join(app.getPath('userData'), 'continuation');
-      fsMod.mkdirSync(outDir, { recursive: true });
-      const outPath = pathMod.join(outDir, `continuation-${slug}-${ts}.md`);
-      fsMod.writeFileSync(outPath, r.systemPrompt, 'utf8');
-
-      return { success: true, data: { path: outPath, bytes: r.bytes, nodes: r.includedNodes } };
-    } catch (e) {
-      return { success: false, error: (e as Error).message };
-    }
-  });
-
 }
