@@ -279,6 +279,15 @@ declare global {
           lastError?: string;
         } | null>
       >;
+
+      gatewayResourcesList: (opts?: { query?: string; kind?: string; limit?: number }) =>
+        Promise<{ success: boolean; data?: any[]; error?: string }>;
+      gatewayResourcesPickFromDisk: () =>
+        Promise<{ success: boolean; data?: any[]; error?: string }>;
+      gatewayResourcesToggleMemory: (resourceKey: string, state: 'archive' | 'memory' | 'ignored') =>
+        Promise<{ success: boolean; error?: string }>;
+      gatewayResourcesDelete: (resourceKey: string) =>
+        Promise<{ success: boolean; error?: string }>;
       
       gatewayDebugDumpPWState: () => Promise<GatewayIpcResult<Array<{
         pwKey: string;
@@ -287,6 +296,64 @@ declare global {
         branch: string;
       }>>>;
       
+      gatewayCleanupGhosts(
+        convId?: string
+      ): Promise<{ success: boolean; data?: { deleted: number }; error?: string }>;
+
+      gatewaySendMessage: (text: string) => Promise<{ success: boolean; data?: any; error?: string }>;
+      gatewaySendMessageWithFiles: (text: string, fileShas: string[]) => Promise<{ success: boolean; data?: any; error?: string }>;
+      gatewayResourcesList: (opts?: { query?: string; kind?: string; limit?: number }) =>
+        Promise<{ success: boolean; data?: any[]; error?: string }>;
+      gatewayResourcesToggleMemory: (resourceKey: string, state: 'archive' | 'memory' | 'ignored') =>
+        Promise<{ success: boolean; error?: string }>;
+      gatewayResourcesDelete: (resourceKey: string) =>
+        Promise<{ success: boolean; error?: string }>;
+      gatewayResourcesGc: (ttlDays: number) =>
+        Promise<{ success: boolean; data?: any; error?: string }>;
+
+      // ───────── Profiles (multi-account) ─────────
+      gatewayApiUsageSummary: (opts?: { sinceMs?: number; profileId?: string }) =>
+        Promise<{ success: true; data: { summary: unknown; budget: unknown } } | { success: false; error: string }>;
+      gatewaySendMessageApi: (payload: {
+        message: string;
+        model?: string;
+        effort?: 'low' | 'high' | 'max';
+        max_tokens?: number;
+        useFallback?: boolean;
+        continuationMode?: boolean;
+        taskTitle?: string;
+      }) => Promise<{ success: true; data: unknown } | { success: false; error: string }>;
+      gatewayExportContinuation: (payload: { workspaceKeys: string[]; taskTitle?: string }) =>
+        Promise<{ success: true; data: { path: string; bytes: number; nodes: string[] } } | { success: false; error: string }>;
+      gatewayProfilesList: () =>
+        Promise<{
+          success: boolean;
+          data?: {
+            activeId: string;
+            profiles: Array<{
+              id: string;
+              name: string;
+              cdpPort: number;
+              browserKind?: 'yandex' | 'chrome';
+              chromeCdpPort?: number;
+              dirName: string;
+              createdAt: string;
+              lastActiveAt: string | null;
+              notes?: string;
+              hasSession: boolean;
+            }>;
+          };
+          error?: string;
+        }>;
+      gatewayProfilesCreate: (opts: { name: string; notes?: string }) =>
+        Promise<{ success: boolean; data?: any; error?: string }>;
+      gatewayProfilesActivate: (id: string) =>
+        Promise<{ success: boolean; error?: string }>;
+      gatewayProfilesUpdate: (id: string, patch: { name?: string; notes?: string }) =>
+        Promise<{ success: boolean; data?: any; error?: string }>;
+      gatewayProfilesDelete: (id: string, opts: { deleteFiles?: boolean }) =>
+        Promise<{ success: boolean; error?: string }>;
+
     };
   }
 }

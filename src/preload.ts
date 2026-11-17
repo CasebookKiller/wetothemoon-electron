@@ -421,7 +421,65 @@ try {
     gatewayLaunch: () => ipcRenderer.invoke('gateway:launch'),
     gatewayClose: () => ipcRenderer.invoke('gateway:close'),
     gatewayGetStatus: () => ipcRenderer.invoke('gateway:get-status'),
-    gatewaySendMessage: (message: string) => ipcRenderer.invoke('gateway:send-message', message),
+    gatewaySendMessage: (text: string) => ipcRenderer.invoke('gateway:send-message', text),
+    gatewaySendMessageWithFiles: (text: string, files: any[]) =>
+      ipcRenderer.invoke('gateway:send-message-with-files', { text, files }),
+    gatewayResourcesList: (opts?: { query?: string; kind?: string; limit?: number }) =>
+      ipcRenderer.invoke('gateway:resources:list', opts),
+
+    gatewayResourcesPickFromDisk: () =>
+      ipcRenderer.invoke('gateway:resources:pick-from-disk'),
+    gatewayResourcesToggleMemory: (resourceKey: string, state: 'archive' | 'memory' | 'ignored') =>
+      ipcRenderer.invoke('gateway:resources:toggle-memory', { resourceKey, state }),
+    gatewayResourcesDelete: (resourceKey: string) =>
+      ipcRenderer.invoke('gateway:resources:delete', { resourceKey }),
+    gatewayResourcesGc: (ttlDays: number) =>
+      ipcRenderer.invoke('gateway:resources:gc', { ttlDays }),
+
+    // ───────── Profiles (multi-account) ─────────
+    gatewayProfilesList: () =>
+      ipcRenderer.invoke('gateway:profiles-list'),
+    gatewayProfilesCreate: (opts: { name: string; notes?: string }) =>
+      ipcRenderer.invoke('gateway:profiles-create', opts),
+    gatewayProfilesActivate: (id: string) =>
+      ipcRenderer.invoke('gateway:profiles-activate', id),
+    gatewayProfilesImportCookies: (profileId: string, cookiesJson: string) =>
+      ipcRenderer.invoke('gateway:profiles-import-cookies', profileId, cookiesJson),
+    gatewayApiUsageSummary: (opts?: { sinceMs?: number; profileId?: string }) =>
+      ipcRenderer.invoke('gateway:api-usage-summary', opts),
+    gatewaySendMessageApi: (payload: {
+      message: string;
+      model?: string;
+      effort?: 'low' | 'high' | 'max';
+      max_tokens?: number;
+      useFallback?: boolean;
+      continuationMode?: boolean;
+      taskTitle?: string;
+    }) => ipcRenderer.invoke('gateway:send-message-api', payload),
+    gatewayExportContinuation: (payload: { workspaceKeys: string[]; taskTitle?: string }) =>
+      ipcRenderer.invoke('gateway:export-continuation', payload),
+    gatewayProfilesUpdate: (id: string, patch: { name?: string; notes?: string }) =>
+      ipcRenderer.invoke('gateway:profiles-update', id, patch),
+    gatewayProfilesDelete: (id: string, opts: { deleteFiles?: boolean }) =>
+      ipcRenderer.invoke('gateway:profiles-delete', id, opts),
+    gatewayGetUserInfo: () =>
+      ipcRenderer.invoke('gateway:user-info'),
+    gatewayLogout: () =>
+      ipcRenderer.invoke('gateway:logout'),
+    gatewayHardLogout: () =>
+      ipcRenderer.invoke('gateway:hard-logout'),
+    gatewayProfilesBackups: (profileId: string) =>
+      ipcRenderer.invoke('gateway:profiles-backups', profileId),
+    gatewayProfilesBackupCreate: (profileId: string) =>
+      ipcRenderer.invoke('gateway:profiles-backup-create', profileId),
+    gatewayProfilesBackupRestore: (backupPath: string) =>
+      ipcRenderer.invoke('gateway:profiles-backup-restore', backupPath),
+    gatewayProfilesBackupDelete: (backupPath: string) =>
+      ipcRenderer.invoke('gateway:profiles-backup-delete', backupPath),
+    gatewayLogin: () =>
+      ipcRenderer.invoke('gateway:login'),
+    gatewayOpenExternal: (url: string) =>
+      ipcRenderer.invoke('gateway:open-external', url),
     gatewayGetConversations: () => ipcRenderer.invoke('gateway:get-conversations'),
     gatewayOpenConversation: (id: string) => ipcRenderer.invoke('gateway:open-conversation', id),
 
@@ -493,7 +551,7 @@ try {
         chipName,
         chipIndex
       ),
-          gatewayFileSave: (input: {
+    gatewayFileSave: (input: {
       conversationId: string;
       messageHash: string;
       chipIndex: number;
@@ -921,6 +979,15 @@ try {
         ipcRenderer.removeAllListeners('pb:import-progress');
       },
 
+      gatewayResourcesList: (opts?: { query?: string; kind?: string; limit?: number }) =>
+        ipcRenderer.invoke('gateway:resources:list', opts),
+      gatewayResourcesPickFromDisk: () =>
+        ipcRenderer.invoke('gateway:resources:pick-from-disk'),
+      gatewayResourcesToggleMemory: (resourceKey: string, state: 'archive' | 'memory' | 'ignored') =>
+        ipcRenderer.invoke('gateway:resources:toggle-memory', { resourceKey, state }),
+      gatewayResourcesDelete: (resourceKey: string) =>
+        ipcRenderer.invoke('gateway:resources:delete', { resourceKey }),
+
       pickFiles: (opts?: { multiple?: boolean }) =>
         ipcRenderer.invoke('pb:pick-files', opts),
       pickImage: (defaultPath?: string) => ipcRenderer.invoke('pb:pick-image', defaultPath),
@@ -1238,6 +1305,14 @@ try {
     gatewayCacheStats: () => ipcRenderer.invoke('gateway:cache-stats'),
     gatewayCacheDelete: (convId: string) => ipcRenderer.invoke('gateway:cache-delete-conversation', convId),
     gatewayCacheClear: () => ipcRenderer.invoke('gateway:cache-clear'),
+
+    gatewayCleanupGhosts: (convId?: string) =>
+      ipcRenderer.invoke('gateway:cleanup-ghosts', convId),
+
+    gatewayKillAllZombies: () =>
+      ipcRenderer.invoke('gateway:kill-all-zombies'),
+    gatewayKillYandexProfile: (profileId: string) =>
+      ipcRenderer.invoke('gateway:kill-yandex-profile', profileId),   
 
   });
 

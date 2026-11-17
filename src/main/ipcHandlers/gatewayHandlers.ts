@@ -1,14 +1,17 @@
 // src/main/ipcHandlers/gatewayHandlers.ts
 
-import { app, ipcMain } from 'electron';
+import { app, dialog, ipcMain } from 'electron';
 import path from 'path';
 import { DeepSeekService } from '../services/gateway/deepseekService';
 import { getGatewayWindow } from '../windows/gatewayWindow';
 import type { GatewayBridgeEvent } from '../services/gateway/bridge/BridgeEvents';
-import { GatewayCacheService } from '../services/gateway/cache/GatewayCacheService';
 import { GatewayFileService } from '../services/gateway/cache/GatewayFileService';
+import { ResourceService } from '../services/gateway/cache/ResourceService';
+// (если ниже нет других импортов — просто добавь рядом)
+import { GatewayCacheService } from '../services/gateway/cache/GatewayCacheService';
 import { FileBatchService } from '../services/gateway/cache/FileBatchService';
 import type { IncomingMessage } from '../services/gateway/cache/types';
+import { ProfileService } from '../services/gateway/ProfileService';
 
 let activeConvId: string | undefined;
 let activeConvTitle: string | undefined;
@@ -50,6 +53,161 @@ export function registerGatewayHandlers(): void {
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('gateway:send-message-with-files', async (_e, { text, files }: { text: string; files: any[] }) => {
+    try {
+      const deepseek = DeepSeekService.getInstance();
+      const resourceSvc = ResourceService.getInstance();
+
+      // 1. Получаем accepted extensions из PW (кэшируем на время вызова)
+      const acceptedExts = await deepseek.getAcceptedFileExtensions();
+
+      // 2. Резолвим Buffer для каждого файла
+      const resolved = await Promise.all(files.map(async (f) => {
+        if (f.kind === 'disk') {
+          const ext = ('.' + f.name.split('.').pop() || '').toLowerCase();
+          if (acceptedExts.length > 0 && !acceptedExts.includes(ext)) {
+            throw new Error(
+              `Файл "${f.name}" имеет расширение "${ext}", которое DeepSeek не принимает.`
+            );
+          }
+          // Сохраняем в ресурсы (upsert), затем читаем
+          const saved = await resourceSvc.saveDiskFile(f.path);
+          const got = await resourceSvc.getContentByKey(saved.resourceKey);
+          return { name: got.name, mimeType: got.mime || 'application/octet-stream', buffer: got.buffer };
+        }
+        if (f.kind === 'archive') {
+          // f.resourceKey — ключ вида 'file:/abs'
+          const got = await resourceSvc.getContentByKey(f.resourceKey);
+          return { name: got.name, mimeType: got.mime || 'application/octet-stream', buffer: got.buffer };
+        }
+        throw new Error(`Неизвестный тип файла: ${JSON.stringify(f)}`);
+      }));
+
+      const result = await deepseek.sendMessageWithFiles(resolved, text);
+      console.log('[gateway:send-message-with-files] OK, chars=', result?.fullHtml?.length || 0);
+
+      // 3. Явный sync в БД через SNAPSHOT с retry.
+      //    PW пишет в IndexedDB с задержкой 1-3с после DOM-stabilize.
+      //    Первый snapshot может вернуть устаревшее дерево (без новой пары).
+      //    Ретраим до появления новых сообщений.
+      try {
+        const page = deepseek.getPage();
+        const url = page?.url() || '';
+        const m = url.match(/\/a\/chat\/s\/([a-f0-9-]+)/i);
+        if (m) {
+          const convId = m[1];
+          const cache = GatewayCacheService.getInstance();
+
+          // Считаем СКОЛЬКО БЫЛО до snapshot
+          const prevCount = cache.getMessages(convId).length;
+          console.log(
+            `[gateway:send-message-with-files] snapshot sync for ${convId.slice(0, 8)} (before=${prevCount})…`
+          );
+
+          // Один вызов snapshot — быстрый, без retry. Если IndexedDB
+          // отстаёт — UI использует result.data (мгновенный ответ).
+          try {
+            await deepseek.snapshotHistory({ fallbackOnError: true });
+            const nowCount = cache.getMessages(convId).length;
+            console.log(
+              `[gateway:send-message-with-files] snapshot: ${prevCount}→${nowCount} ` +
+              `(${nowCount > prevCount ? 'CAUGHT' : 'stale, UI использует result.data'})`
+            );
+          } catch (snapErr) {
+            console.warn(
+              '[gateway:send-message-with-files] snapshot failed:',
+              (snapErr as Error).message
+            );
+          }
+        }
+      } catch (syncErr) {
+        console.warn(
+          '[gateway:send-message-with-files] snapshot sync failed:',
+          (syncErr as Error).message
+        );
+      }
+
+      return { success: true, data: result };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('gateway:resources:list', async (_e, { query, kind, limit } = {}) => {
+    try {
+      const svc = ResourceService.getInstance();
+      const items = svc.listResources({
+        kind: kind || 'file',
+        query: query || '',
+        limit: limit || 200,
+        checkExists: true,
+      });
+      return { success: true, data: items };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('gateway:resources:pick-from-disk', async () => {
+    try {
+      const result = await dialog.showOpenDialog({
+        title: 'Выберите файлы',
+        properties: ['openFile', 'multiSelections'],
+      });
+      if (result.canceled || !result.filePaths.length) {
+        return { success: true, data: [] };
+      }
+
+      // Проверяем accept-лист PW один раз на все файлы
+      const deepseek = DeepSeekService.getInstance();
+      const acceptedExts = await deepseek.getAcceptedFileExtensions();
+
+      const pathMod = await import('path');
+      const svc = ResourceService.getInstance();
+      const saved: Array<{ resourceKey: string; name: string; size: number; existsOnDisk: true }> = [];
+
+      for (const p of result.filePaths) {
+        const name = pathMod.basename(p);
+        const ext = ('.' + name.split('.').pop()).toLowerCase();
+        if (acceptedExts.length > 0 && !acceptedExts.includes(ext)) {
+          throw new Error(
+            `Файл "${name}" имеет расширение "${ext}", которое DeepSeek не принимает.`
+          );
+        }
+        const s = await svc.saveDiskFile(p);
+        saved.push({
+          resourceKey: s.resourceKey,
+          name,
+          size: s.sizeBytes,
+          existsOnDisk: true,
+        });
+      }
+      return { success: true, data: saved };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('gateway:resources:toggle-memory', async (_e, { resourceKey, state }) => {
+    try {
+      const svc = ResourceService.getInstance();
+      svc.setMemoryState(resourceKey, state);
+      return { success: true };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('gateway:resources:delete', async (_e, { resourceKey }) => {
+    try {
+      const svc = ResourceService.getInstance();
+      svc.deleteResource(resourceKey);
+      return { success: true };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
     }
   });
 
@@ -655,6 +813,11 @@ export function registerGatewayHandlers(): void {
   let activeConvId: string | undefined;
   let activeConvTitle: string | undefined;
 
+  // P0.5 Phase 2: авто-failover по rate-limit
+  let autoSwitchCount = 0;
+  let autoSwitching = false;
+  const MAX_AUTO_SWITCH = 3;
+
   service.getBridgeEmitter().on('event', (event: GatewayBridgeEvent) => {
     if (event.type !== 'assistant:content-update' && event.type !== 'reasoning:update') {
       console.log('[bridge-handler]', event.type);
@@ -708,6 +871,83 @@ export function registerGatewayHandlers(): void {
             )
           )
           .catch((e) => console.error('[GatewayCache] sync error:', e));
+      }
+    }
+
+    // P0.5: rate-limit / ban — пометить профиль и форвардить в renderer
+    let rateLimitInfo: { kind: string; untilMs: number | null; nextId: string | null; activeId: string } | null = null;
+    if (event.type === 'profile:rate-limited' || event.type === 'profile:banned') {
+      try {
+        const ps = ProfileService.getInstance();
+        const activeId = ps.getActiveId();
+        const kind = event.payload?.kind ?? 'RATE_LIMIT';
+        const untilMs: number | null = event.payload?.untilMs ?? null;
+        if (kind === 'ACCOUNT_BANNED' || event.type === 'profile:banned') {
+          ps.markBanned(activeId);
+        } else {
+          ps.markRateLimited(activeId, untilMs);
+        }
+        const next = ps.getNextAvailableProfile(activeId);
+        rateLimitInfo = { kind, untilMs, nextId: next?.id ?? null, activeId };
+        console.log('[gatewayHandlers] profile-limit', rateLimitInfo);
+
+        // Phase 2: auto-failover — только для RATE_LIMIT (бан = стоп)
+        if (kind === 'RATE_LIMIT' && !autoSwitching) {
+          const gwNow = getGatewayWindow();
+          if (autoSwitchCount >= MAX_AUTO_SWITCH) {
+            if (gwNow && !gwNow.isDestroyed()) {
+              gwNow.webContents.send('gateway:bridge-event', {
+                type: 'all-profiles-limited',
+                payload: { reason: 'max-attempts', activeId, untilMs },
+                ts: Date.now(),
+              });
+            }
+            autoSwitchCount = 0;
+          } else if (next) {
+            autoSwitching = true;
+            autoSwitchCount++;
+            (async () => {
+              try {
+                console.log(`[gatewayHandlers] auto-switch ${activeId} → ${next.id}`);
+                const r = await service.switchProfile(next.id);
+                const gw1 = getGatewayWindow();
+                if (!gw1 || gw1.isDestroyed()) return;
+                if (r.ok) {
+                  gw1.webContents.send('gateway:bridge-event', {
+                    type: 'profile:switched',
+                    payload: {
+                      reason: 'rate-limited',
+                      from: activeId,
+                      to: next.id,
+                      needLogin: r.status === 'login_required',
+                    },
+                    ts: Date.now(),
+                  });
+                } else {
+                  gw1.webContents.send('gateway:bridge-event', {
+                    type: 'all-profiles-limited',
+                    payload: { reason: r.reason || 'switch-failed', activeId, untilMs },
+                    ts: Date.now(),
+                  });
+                }
+              } catch (e) {
+                console.error('[gatewayHandlers] auto-switch error:', e);
+              } finally {
+                autoSwitching = false;
+              }
+            })();
+          } else {
+            if (gwNow && !gwNow.isDestroyed()) {
+              gwNow.webContents.send('gateway:bridge-event', {
+                type: 'all-profiles-limited',
+                payload: { reason: 'no-next', activeId, untilMs },
+                ts: Date.now(),
+              });
+            }
+          }
+        }
+      } catch (e) {
+        console.error('[gatewayHandlers] profile-limit error:', e);
       }
     }
 
@@ -883,4 +1123,291 @@ export function registerGatewayHandlers(): void {
       return { success: false, error: (e as Error).message };
     }
   });
+
+  ipcMain.handle(
+    'gateway:cleanup-ghosts',
+    async (_e, convId?: string) => {
+      try {
+        const deleted = cache.cleanupGhosts(convId);
+        return { success: true, data: { deleted } };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+  ipcMain.handle('gateway:resources:gc', async (_e, { ttlDays }) => {
+    try {
+      const svc = ResourceService.getInstance();
+      const result = await svc.gc(ttlDays || 7, 90);
+      return { success: true, data: result };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  // ───────── Profiles (multi-account, см. ProfileService.ts) ─────────
+  ipcMain.handle('gateway:profiles-list', () => {
+    try {
+      const ps = ProfileService.getInstance();
+      return {
+        success: true,
+        data: {
+          activeId: ps.getActiveId(),
+          profiles: ps.list().map((p) => ({ ...p, hasSession: ps.hasSession(p) })),
+        },
+      };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('gateway:profiles-create', (_e, opts: { name: string; notes?: string }) => {
+    try {
+      return { success: true, data: ProfileService.getInstance().create(opts) };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('gateway:profiles-activate', async (_e, id: string) => {
+    try {
+      // Ручной switch = сброс авто-счётчика (новый цикл failover)
+      autoSwitchCount = 0;
+      const r = await service.switchProfile(id);
+      return r.ok ? { success: true } : { success: false, error: r.reason };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('gateway:profiles-update', (_e, id: string, patch: { name?: string; notes?: string }) => {
+    try {
+      return { success: true, data: ProfileService.getInstance().update(id, patch) };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('gateway:profiles-delete', (_e, id: string, opts: { deleteFiles?: boolean }) => {
+    try {
+      ProfileService.getInstance().delete(id, opts);
+      return { success: true };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+    ipcMain.handle('gateway:user-info', async () => {
+    try {
+      const data = await service.getUserInfo();
+      return { success: true, data };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('gateway:logout', async () => {
+    try {
+      await service.logout();
+      return { success: true };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('gateway:hard-logout', async () => {
+    try {
+      await service.hardLogout();
+      return { success: true };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+    ipcMain.handle('gateway:profiles-backups', (_e, profileId: string) => {
+    try {
+      const ps = ProfileService.getInstance();
+      const p = ps.get(profileId);
+      if (!p) return { success: false, error: 'Профиль не найден' };
+      return { success: true, data: ps.listBackups(p) };
+    } catch (e) { return { success: false, error: (e as Error).message }; }
+  });
+
+  ipcMain.handle('gateway:profiles-backup-create', (_e, profileId: string) => {
+    try {
+      const ps = ProfileService.getInstance();
+      const p = ps.get(profileId);
+      if (!p) return { success: false, error: 'Профиль не найден' };
+      return { success: true, data: ps.createSessionBackup(p) };
+    } catch (e) { return { success: false, error: (e as Error).message }; }
+  });
+
+  ipcMain.handle('gateway:profiles-backup-restore', async (_e, backupPath: string) => {
+    try {
+      return await service.restoreSession(backupPath);
+    } catch (e) { return { ok: false, reason: (e as Error).message }; }
+  });
+
+  ipcMain.handle('gateway:profiles-backup-delete', (_e, backupPath: string) => {
+    try {
+      ProfileService.getInstance().deleteSessionBackup(backupPath);
+      return { success: true };
+    } catch (e) { return { success: false, error: (e as Error).message }; }
+  });
+
+  ipcMain.handle('gateway:login', async () => {
+    try {
+      const ok = await service.requestLogin();
+      return { success: ok };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('gateway:open-external', async (_e, url: string) => {
+    try {
+      const { shell } = await import('electron');
+      await shell.openExternal(url);
+      return { success: true };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle(
+    'gateway:profiles-import-cookies',
+    async (_e, profileId: string, cookiesJson: string) => {
+      try {
+        const r = await service.importCookiesForProfile(profileId, cookiesJson);
+        return r.ok ? { success: true } : { success: false, error: r.reason };
+      } catch (e) {
+        return { success: false, error: (e as Error).message };
+      }
+    }
+  );
+
+    ipcMain.handle('gateway:kill-all-zombies', async () => {
+    try {
+      const r = await service.killAllYandexZombies();
+      return { success: true, data: { killed: r.killed } };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('gateway:kill-yandex-profile', async (_e, profileId: string) => {
+    try {
+      const r = await service.killYandexForProfile(profileId);
+      return r.ok
+        ? { success: true, data: { killed: r.killed } }
+        : { success: false, error: r.reason };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('gateway:export-continuation', async (_e, payload: {
+    workspaceKeys: string[];
+    taskTitle?: string;
+  }) => {
+    try {
+      const fsMod = await import('node:fs');
+      const pathMod = await import('node:path');
+      const { app } = await import('electron');
+      const { buildContinuationSystemPrompt } = await import('../services/gateway/contextBuilder');
+
+      const manifestPath = process.env.CONTEXT_MANIFEST;
+      if (!manifestPath) return { success: false, error: 'CONTEXT_MANIFEST не задан в .env.local' };
+      if (!payload?.workspaceKeys?.length) return { success: false, error: 'workspaceKeys обязательны' };
+
+      const r = await buildContinuationSystemPrompt({
+        manifestPath,
+        activeKeys: payload.workspaceKeys,
+        taskTitle: payload.taskTitle ?? 'Продолжение разработки',
+      });
+
+      const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      const slug = payload.workspaceKeys[payload.workspaceKeys.length - 1].split('/').pop() || 'workspace';
+      const outDir = pathMod.join(app.getPath('userData'), 'continuation');
+      fsMod.mkdirSync(outDir, { recursive: true });
+      const outPath = pathMod.join(outDir, `continuation-${slug}-${ts}.md`);
+      fsMod.writeFileSync(outPath, r.systemPrompt, 'utf8');
+
+      return { success: true, data: { path: outPath, bytes: r.bytes, nodes: r.includedNodes } };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  // ── DeepSeek API: учёт расхода ──
+  ipcMain.handle('gateway:api-usage-summary', async (_e, opts?: { sinceMs?: number; profileId?: string }) => {
+    try {
+      const { summary, budget } = await import('../services/gateway/apiUsageDb');
+      return { success: true, data: { summary: summary(opts ?? {}), budget: budget() } };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  // ── DeepSeek API: прямой вызов API-канала (ручная проверка / fallback) ──
+  ipcMain.handle('gateway:send-message-api', async (_e, payload: {
+    message: string;
+    model?: string;
+    effort?: 'low' | 'high' | 'max';
+    max_tokens?: number;
+    useFallback?: boolean;
+    continuationMode?: boolean;
+    taskTitle?: string;
+  }) => {
+    try {
+      if (!payload?.message) return { success: false, error: 'message обязателен' };
+      const result = payload.useFallback
+        ? await service.sendMessageWithFallback(payload.message)
+        : await service.sendMessageViaApi(payload.message, {
+            model: payload.model,
+            effort: payload.effort,
+            max_tokens: payload.max_tokens,
+            continuationMode: payload.continuationMode,
+            taskTitle: payload.taskTitle,
+          });
+      return { success: true, data: result };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('gateway:export-continuation', async (_e, payload: {
+    workspaceKeys: string[];
+    taskTitle?: string;
+  }) => {
+    try {
+      const fsMod = await import('node:fs');
+      const pathMod = await import('node:path');
+      const { app } = await import('electron');
+      const { buildContinuationSystemPrompt } = await import('../services/gateway/contextBuilder');
+
+      const manifestPath = process.env.CONTEXT_MANIFEST;
+      if (!manifestPath) return { success: false, error: 'CONTEXT_MANIFEST не задан в .env.local' };
+      if (!payload?.workspaceKeys?.length) return { success: false, error: 'workspaceKeys обязательны' };
+
+      const r = await buildContinuationSystemPrompt({
+        manifestPath,
+        activeKeys: payload.workspaceKeys,
+        taskTitle: payload.taskTitle ?? 'Продолжение разработки',
+      });
+
+      const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      const slug = payload.workspaceKeys[payload.workspaceKeys.length - 1].split('/').pop() || 'workspace';
+      const outDir = pathMod.join(app.getPath('userData'), 'continuation');
+      fsMod.mkdirSync(outDir, { recursive: true });
+      const outPath = pathMod.join(outDir, `continuation-${slug}-${ts}.md`);
+      fsMod.writeFileSync(outPath, r.systemPrompt, 'utf8');
+
+      return { success: true, data: { path: outPath, bytes: r.bytes, nodes: r.includedNodes } };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
 }
