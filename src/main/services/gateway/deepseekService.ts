@@ -1,7 +1,20 @@
 // src/main/services/gateway/deepseekService.ts
 
+import { spawn } from 'child_process';
+import http from 'http';
 import { app, safeStorage } from 'electron';
-import { chromium, Browser, BrowserContext, Page } from 'playwright';
+import { chromium as playwrightChromium } from 'playwright-extra';
+import { chromium as patchrightChromium } from 'patchright';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+import {
+  chromium as playwrightCoreChromium,
+  Browser,
+  BrowserContext,
+  Page,
+} from 'playwright-core';
+
+// Подключаем плагин невидимости
+playwrightChromium.use(StealthPlugin());
 import fs from 'fs';
 import fsPromises from 'fs/promises';
 import path from 'path';
@@ -11,12 +24,15 @@ import { SelectorProfileService } from './selectorProfiles/SelectorProfileServic
 import { EventEmitter } from 'events';
 import { INJECTED_SCRIPT } from './bridge/injectedScript';
 import type { GatewayBridgeEvent } from './bridge/BridgeEvents';
+import { WebSource } from './cache/types';
+import { ProfileService } from './ProfileService';
 
 dotenv.config();
 
 const DEEPSEEK_URL = 'https://chat.deepseek.com';
 const LOGIN_URL = 'https://chat.deepseek.com/sign_in';
-const STORAGE_FILE = 'deepseek_storage.json';
+const YANDEX_CDP_WAIT_MS = 25_000;
+const YANDEX_CDP_POLL_MS = 500;
 
 interface DeepSeekCredentials {
   login: string;
@@ -38,6 +54,14 @@ export interface GatewayChatMessage {
   id?: string;         // стабильный id сообщения (data-virtual-list-item-key)
   role: 'user' | 'assistant';
   thinking?: string;
+  // 5.8.4: источники из Web Search (для badge «N источников»)
+  sources?: Array<{
+    url: string;
+    title: string;
+    snippet?: string;
+    siteIcon?: string;
+    siteName?: string;
+  }>;
   blocks: GatewayChatBlock[];
   fullHtml?: string;   // точный HTML ассистентского ответа для рендера 1:1
   // 5.7: branching
@@ -53,6 +77,7 @@ export class DeepSeekService {
   private browser: Browser | null = null;
   private context: BrowserContext | null = null;
   private page: Page | null = null;
+  private yandexPid: number | null = null;
   private isLoggedIn = false;
   private bridgeEmitter = new EventEmitter();
   private lastContentTs = 0;
@@ -65,6 +90,762 @@ export class DeepSeekService {
 
   private constructor() {
     this.profileService = new SelectorProfileService('deepseek');
+  }
+
+  private get cfg() {
+    const ps = ProfileService.getInstance();
+    const p = ps.getActive();
+    return {
+      profileId: p.id,
+      profileName: p.name,
+      browserKind: ps.browserKindOf(p),
+      cdpPort: ps.reconCdpPort(p),
+      cdpUrl: `http://127.0.0.1:${ps.reconCdpPort(p)}`,
+      storagePath: ps.storagePath(p),
+      cookiesPath: ps.cookiesPath(p),
+      yandexProfileDir: ps.yandexProfileDir(p),
+      chromeProfileDir: ps.chromeProfileDir(p),
+      chromeCdpPort: p.chromeCdpPort ?? p.cdpPort + 100,
+    };
+  }
+
+  async disconnect(): Promise<void> {
+    try { await this.browser?.close(); } catch { /* уже мёртв */ }
+    this.browser = null;
+    this.context = null;
+    this.page = null;
+  }
+
+  async getUserInfo(): Promise<{ name: string; avatarUrl: string } | null> {
+    if (!this.page || this.page.isClosed()) return null;
+    try {
+      return await this.page.evaluate(() => {
+        const img = document.querySelector('div._7b40dad img.fdf01f38') as HTMLImageElement;
+        const nameEl = document.querySelector('div._7b40dad div._9d8da05');
+        if (!img && !nameEl) return null;
+        return {
+          name: nameEl ? (nameEl.textContent || '').trim() : 'Профиль',
+          avatarUrl: img ? img.src : '',
+        };
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  async logout(): Promise<void> {
+    if (!this.page) throw new Error('Браузер не запущен');
+    // 1. Открываем меню профиля
+    await this.page.click('div._7b40dad div._2afd28d', { timeout: 5000 }).catch(() => {});
+    await this.page.waitForTimeout(500);
+    // 2. Кликаем "Выйти"
+    const logoutOption = this.page.locator('.ds-dropdown-menu-option').filter({ hasText: 'Выйти' }).first();
+    await logoutOption.click({ timeout: 3000 }).catch(() => {});
+    await this.page.waitForTimeout(1000);
+    // 3. Подтверждение в модалке (если есть)
+    try {
+      const confirmBtn = this.page.locator('.ds-modal button:has-text("Выйти"), .ds-modal .ds-button--primary:has-text("Выйти")').first();
+      if (await confirmBtn.isVisible({ timeout: 1500 })) {
+        await confirmBtn.click();
+      }
+    } catch { /* модалки нет */ }
+    
+    // 4. Ждём редиректа на страницу логина
+    await this.page.waitForURL(/sign_in/, { timeout: 10000 }).catch(() => {});
+    await this.page.waitForTimeout(1000);
+
+    // 5. Удаляем сохранённую сессию
+    try {
+      const fs = await import('node:fs');
+      if (fs.existsSync(this.cfg.storagePath)) fs.unlinkSync(this.cfg.storagePath);
+      console.log('[DeepSeek] storage.json удалён при выходе');
+    } catch (e) {
+      console.warn('[DeepSeek] не удалось удалить storage.json:', e);
+    }
+
+    // 6. Уведомляем bridge
+    this.bridgeEmitter.emit('event', { type: 'auth:logged-out', payload: {}, ts: Date.now() });
+  }
+
+  /**
+   * Полный логаут: реальный выход из аккаунта DeepSeek.
+   * - Кликает «Выйти» в меню PW + подтверждает в модалке.
+   * - Ждёт редиректа на /sign_in.
+   * - Архивирует storage.json (rename → storage.json.bak-<ts>).
+   * - Отключает ссылки, эмитит auth:logged-out.
+   *
+   * Сессия на сервере DeepSeek будет инвалидирована.
+   * Для восстановления старой сессии — см. restoreArchivedSession().
+   */
+  async hardLogout(): Promise<void> {
+    // 1. Если PW не запущен — уже «вышли», архивируем storage.json
+    if (!this.page || this.page.isClosed()) {
+      console.log('[DeepSeek] hardLogout: PW не запущен, архивируем storage.json');
+      await this.archiveStorageState();
+      this.isLoggedIn = false;
+      this.bridgeEmitter.emit('event', { type: 'auth:logged-out', payload: {}, ts: Date.now() });
+      return;
+    }
+
+    try {
+      // 2. Открываем меню профиля в PW
+      await this.page.click('div._7b40dad div._2afd28d', { timeout: 5000 }).catch(() => {});
+      await this.page.waitForTimeout(500);
+
+      // 3. Кликаем "Выйти" в меню
+      const logoutOption = this.page
+        .locator('.ds-dropdown-menu-option')
+        .filter({ hasText: 'Выйти' })
+        .first();
+      await logoutOption.click({ timeout: 3000 }).catch(() => {});
+      await this.page.waitForTimeout(1000);
+
+      // 4. Подтверждение в модалке (если есть)
+      try {
+        const confirmBtn = this.page
+          .locator('.ds-modal button:has-text("Выйти"), .ds-modal .ds-button--primary:has-text("Выйти")')
+          .first();
+        if (await confirmBtn.isVisible({ timeout: 1500 })) {
+          await confirmBtn.click();
+        }
+      } catch { /* модалки нет */ }
+
+      // 5. Ждём редиректа на /sign_in (максимум 15с)
+      await this.page.waitForURL(/sign_in/, { timeout: 15000 }).catch(() => {
+        console.warn('[DeepSeek] hardLogout: не дождались /sign_in, продолжаем');
+      });
+    } catch (e) {
+      console.error('[DeepSeek] hardLogout: ошибка PW-логаута:', (e as Error).message);
+    }
+
+    // 6. Архивируем storage.json через ProfileService (с автоочисткой)
+    try {
+      const ps = ProfileService.getInstance();
+      const backup = ps.createSessionBackup(ps.getActive());
+      if (backup) console.log(`[DeepSeek] hardLogout: архив → ${backup.filename}`);
+    } catch (e) {
+      console.warn('[DeepSeek] hardLogout: ошибка архивации:', e);
+    }
+    // Удаляем активный storage.json — сессия мертва
+    try {
+      const fs = await import('node:fs');
+      if (fs.existsSync(this.cfg.storagePath)) fs.unlinkSync(this.cfg.storagePath);
+    } catch { /* ignore */ }
+
+    // 7. Отключаем ссылки
+    this.browser = null;
+    this.context = null;
+    this.page = null;
+    this.isLoggedIn = false;
+
+    console.log('[DeepSeek] hardLogout: выполнен, storage.json заархивирован');
+    this.bridgeEmitter.emit('event', { type: 'auth:logged-out', payload: {}, ts: Date.now() });
+  }
+
+  /** Архивирует storage.json → storage.json.bak-<timestamp> */
+  private async archiveStorageState(): Promise<void> {
+    try {
+      const fs = await import('node:fs');
+      const path = await import('node:path');
+      if (!fs.existsSync(this.cfg.storagePath)) return;
+
+      const ts = new Date().toISOString().replace(/[:.]/g, '-');
+      const dir = path.dirname(this.cfg.storagePath);
+      const backupPath = path.join(dir, `storage.json.bak-${ts}`);
+      fs.renameSync(this.cfg.storagePath, backupPath);
+      console.log(`[DeepSeek] storage.json → ${backupPath}`);
+
+      // Оставляем не больше 5 архивов
+      const backups = fs.readdirSync(dir)
+        .filter((f) => f.startsWith('storage.json.bak-'))
+        .sort()
+        .reverse();
+      for (const old of backups.slice(5)) {
+        try { fs.unlinkSync(path.join(dir, old)); } catch { /* ignore */ }
+      }
+    } catch (e) {
+      console.warn('[DeepSeek] archiveStorageState:', (e as Error).message);
+    }
+  }
+
+  /**
+   * Восстанавливает сессию из архива storage.json.bak-*.
+   * - Копирует архив → storage.json
+   * - Запускает launch() (который попробует Yandex CDP)
+   * - Возвращает ok: true если сессия жива, ok: false если сервер отверг
+   *
+   * Использовать только если пользователь передумал после hardLogout,
+   * и есть надежда, что сервер ещё не инвалидировал cookies.
+   */
+  async restoreSession(backupPath: string): Promise<{ ok: boolean; reason?: string }> {
+    const ps = ProfileService.getInstance();
+    const p = ps.getActive();
+
+    // 1. Отключаемся от текущего PW (если жив)
+    try {
+      await this.disconnect();
+    } catch { /* ignore */ }
+
+    // 2. Восстанавливаем файл
+    try {
+      ps.restoreSessionBackup(p, backupPath);
+    } catch (e) {
+      return { ok: false, reason: (e as Error).message };
+    }
+
+    // 3. Пробуем launch() — он проверит isAuthenticated()
+    try {
+      this.browser = null;
+      this.context = null;
+      this.page = null;
+      this.isLoggedIn = false;
+
+      const r = await this.launch();
+      if (r.status === 'logged_in') {
+        this.isLoggedIn = true;
+        this.bridgeEmitter.emit('event', { type: 'auth:logged-in', payload: {}, ts: Date.now() });
+        return { ok: true };
+      }
+      return {
+        ok: false,
+        reason: 'Сервер отклонил сессию — требуется повторный вход',
+      };
+    } catch (e) {
+      return { ok: false, reason: (e as Error).message };
+    }
+  }
+
+  /**
+   * Импорт cookies из JSON (формат Cookie-Editor) в указанный профиль.
+   * Запускает Yandex с CDP → addCookies → проверка → storage.json.
+   * Оставляет Yandex живым — следующий launch() подхватит его.
+   */
+  async importCookiesForProfile(
+    profileId: string,
+    cookiesJson: string
+  ): Promise<{ ok: boolean; reason?: string }> {
+    const ps = ProfileService.getInstance();
+    const target = ps.get(profileId);
+    if (!target) return { ok: false, reason: 'профиль не найден' };
+
+    // 1. Парсим JSON
+    let raw: any;
+    try {
+      raw = JSON.parse(cookiesJson);
+    } catch (e) {
+      return { ok: false, reason: 'JSON невалидный: ' + (e as Error).message };
+    }
+    if (!Array.isArray(raw) || raw.length === 0) {
+      return { ok: false, reason: 'JSON должен быть непустым массивом cookies' };
+    }
+
+    const cookies = raw
+      .filter((c: any) => c && c.name && c.value !== undefined && c.domain)
+      .map((c: any) => {
+        const out: any = {
+          name: String(c.name),
+          value: String(c.value),
+          domain: String(c.domain),
+          path: String(c.path || '/'),
+          httpOnly: !!c.httpOnly,
+          secure: !!c.secure,
+        };
+        if (typeof c.expirationDate === 'number' && c.expirationDate > 0) {
+          out.expires = Math.floor(c.expirationDate);
+        }
+        if (c.sameSite === 'lax') out.sameSite = 'Lax';
+        else if (c.sameSite === 'strict') out.sameSite = 'Strict';
+        else if (c.sameSite === 'none') out.sameSite = 'None';
+        else out.sameSite = 'Lax';
+        return out;
+      });
+
+    if (cookies.length === 0) {
+      return { ok: false, reason: 'после фильтрации cookies пусты' };
+    }
+    console.log(
+      `[importCookies] ${target.name}: импорт ${cookies.length} cookies`
+    );
+
+    // 2. Убиваем браузер ИМЕННО этого профиля (не трогаем другие)
+    const isChrome = ps.browserKindOf(target) === 'chrome';
+    const profileDir = ps.browserProfileDir(target);
+    try {
+      const { execSync } = await import('node:child_process');
+      execSync(`pkill -f "user-data-dir=${profileDir}"`, { stdio: 'ignore' });
+    } catch { /* ignore */ }
+    await new Promise((r) => setTimeout(r, 2000));
+
+    await fsPromises.mkdir(profileDir, { recursive: true });
+
+    // 3a. Chrome-ветка: patchright + системный Chrome
+    if (isChrome) {
+      console.log(`[importCookies] Chrome (patchright) для профиля ${target.name}`);
+      let browser: Browser | null = null;
+      let authed = false;
+      try {
+        const patchrightCtx = await patchrightChromium.launchPersistentContext(profileDir, {
+          channel: 'chrome',
+          headless: false,
+          viewport: null,
+          locale: 'ru-RU',
+          timezoneId: 'Europe/Moscow',
+          args: ['--no-first-run', '--no-default-browser-check'],
+        });
+        // См. launchChromeViaPatchright: patchright-core ≠ playwright-core как типы.
+        const ctx = patchrightCtx as unknown as BrowserContext;
+        browser = (patchrightCtx.browser() ?? null) as unknown as Browser | null;
+        await ctx.addCookies(cookies);
+        console.log('[importCookies] cookies добавлены (chrome)');
+
+        const page = ctx.pages()[0] ?? await ctx.newPage();
+        await page.goto('https://chat.deepseek.com', { waitUntil: 'domcontentloaded', timeout: 20000 });
+        await page.waitForTimeout(3000);
+
+        if (page.url().includes('/sign_in')) {
+          console.warn('[importCookies] редирект на /sign_in (chrome)');
+        } else {
+          authed = await page.evaluate(() => !!(document.querySelector('textarea[placeholder*="Сообщение"]') || document.querySelector('textarea[placeholder*="Message"]') || document.querySelector('div._7b40dad div._2afd28d')));
+          console.log('[importCookies] isAuthenticated (chrome):', authed);
+        }
+
+        try {
+          const state = await ctx.storageState();
+          fs.writeFileSync(this.cfg.storagePath, JSON.stringify(state, null, 2));
+        } catch (e) { console.warn('[importCookies] storage.json:', (e as Error).message); }
+      } catch (e) {
+        return { ok: false, reason: (e as Error).message };
+      } finally {
+        try { await browser?.close(); } catch { /* ignore */ }
+      }
+      if (!authed) return { ok: false, reason: 'сервер не подтвердил cookies (chrome)' };
+      return { ok: true, reason: 'cookies импортированы (chrome); launch() подхватит' } as any;
+    }
+
+    // 3b. Yandex-ветка — как было
+    const bin = this.findYandexBinary();
+    if (!bin) return { ok: false, reason: 'Yandex не найден' };
+
+    const args = [
+      `--remote-debugging-port=${target.cdpPort}`,
+      `--user-data-dir=${profileDir}`,
+      '--no-first-run',
+      '--no-default-browser-check',
+      '--class=gatewayyandex',
+      'about:blank',
+    ];
+    console.log(`[importCookies] spawn: ${bin} ${args.join(' ')}`);
+    const child = spawn(bin, args, { detached: true, stdio: 'ignore' });
+    child.unref();
+
+    // 4. Ждём CDP
+    const waitStart = Date.now();
+    let cdpReady = false;
+    while (Date.now() - waitStart < YANDEX_CDP_WAIT_MS) {
+      try {
+        const res = await fetch(
+          `http://127.0.0.1:${target.cdpPort}/json/version`,
+          { signal: AbortSignal.timeout(1000) }
+        );
+        if (res.ok) { cdpReady = true; break; }
+      } catch { /* ignore */ }
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    if (!cdpReady) {
+      return { ok: false, reason: 'CDP-порт не поднялся за 25с' };
+    }
+    console.log(`[importCookies] CDP готов за ${Date.now() - waitStart}мс`);
+
+    // 5. Подключаемся, добавляем cookies
+    let browser: Browser | null = null;
+    let authed = false;
+    try {
+      browser = await playwrightCoreChromium.connectOverCDP(
+        `http://127.0.0.1:${target.cdpPort}`
+      );
+      const ctx = browser.contexts()[0];
+      await ctx.addCookies(cookies);
+      console.log('[importCookies] cookies добавлены');
+
+      // 6. Проверка авторизации
+      const page = await ctx.newPage();
+      await page.goto('https://chat.deepseek.com', {
+        waitUntil: 'domcontentloaded',
+        timeout: 20000,
+      });
+      await page.waitForTimeout(3000);
+
+      const url = page.url();
+      if (url.includes('/sign_in')) {
+        console.warn('[importCookies] редирект на /sign_in');
+      } else {
+        authed = await page.evaluate(() => {
+          return !!(
+            document.querySelector('textarea[placeholder*="Сообщение"]') ||
+            document.querySelector('textarea[placeholder*="Message"]') ||
+            document.querySelector('div._7b40dad div._2afd28d')
+          );
+        });
+        console.log('[importCookies] isAuthenticated:', authed);
+      }
+
+      // 7. Сохраняем storage.json (fallback для bundled Chromium)
+      try {
+        const state = await ctx.storageState();
+        fs.writeFileSync(
+          this.cfg.storagePath,
+          JSON.stringify(state, null, 2)
+        );
+        console.log(
+          `[importCookies] storage.json: ${state.cookies?.length || 0} cookies`
+        );
+      } catch (e) {
+        console.warn('[importCookies] storage.json:', (e as Error).message);
+      }
+    } catch (e) {
+      return { ok: false, reason: (e as Error).message };
+    } finally {
+      // 8. disconnect, НО НЕ убиваем Yandex — он живой, launch() подхватит
+      try { await browser?.close(); } catch { /* ignore */ }
+    }
+
+    if (!authed) {
+      return {
+        ok: false,
+        reason: 'сервер не подтвердил cookies (редирект на /sign_in)',
+      };
+    }
+
+    // 9. Убиваем «временный» Yandex и запускаем свежий через launch()
+    // (это нужно, чтобы весь pipeline launch() прошёл чисто)
+    try {
+      const { execSync } = await import('node:child_process');
+      execSync(`pkill -f "user-data-dir=${profileDir}"`, { stdio: 'ignore' });
+    } catch { /* ignore */ }
+    await new Promise((r) => setTimeout(r, 2000));
+
+    return { ok: true };
+  }
+
+  /**
+   * Публичный метод для кнопки "Войти" в UI.
+   * Открывает страницу входа в PW и ждёт, пока пользователь
+   * вручную авторизуется в окне Yandex (до 5 минут).
+   * По завершении сохраняет storageState.
+   *
+   * НЕ путать с private login() — тот использует credentials из .env
+   * и вызывается только из launch() в не-Yandex ветке.
+   */
+  async requestLogin(): Promise<boolean> {
+    // 1. Если браузер не запущен — запускаем (launch уже знает как)
+    if (!this.browser || !this.browser.isConnected() || !this.page || this.page.isClosed()) {
+      console.log('[DeepSeek] requestLogin: браузер не запущен, вызываю launch()');
+      const r = await this.launch();
+      if (r.status === 'logged_in') {
+        this.bridgeEmitter.emit('event', { type: 'auth:logged-in', payload: {}, ts: Date.now() });
+        return true;
+      }
+      // launch вернул running → продолжаем ждать ручной вход
+    }
+
+    // 2. Уже авторизованы?
+    if (await this.isAuthenticated()) {
+      this.isLoggedIn = true;
+      this.bridgeEmitter.emit('event', { type: 'auth:logged-in', payload: {}, ts: Date.now() });
+      return true;
+    }
+
+    // 3. Переходим на страницу входа, если ещё не там
+    if (!this.page!.url().includes('/sign_in')) {
+      await this.gotoWithTimeout(LOGIN_URL, 20000);
+    }
+
+    // 4. Ждём авторизации (макс. 5 минут)
+    console.log('[DeepSeek] requestLogin: ожидание ручного входа (до 5 минут)...');
+    const start = Date.now();
+    while (Date.now() - start < 5 * 60 * 1000) {
+      if (this.page!.isClosed()) {
+        throw new Error('Браузер закрыт во время ожидания входа');
+      }
+      if (await this.isAuthenticated()) {
+        this.isLoggedIn = true;
+        await this.stopLoadingSpinner().catch(() => {});
+        await this.saveStorageState();
+        console.log('[DeepSeek] ✅ requestLogin: вход выполнен, сессия сохранена');
+        this.bridgeEmitter.emit('event', { type: 'auth:logged-in', payload: {}, ts: Date.now() });
+        return true;
+      }
+      await this.page!.waitForTimeout(1000);
+    }
+    throw new Error('Время ожидания входа истекло (5 минут). Попробуйте ещё раз.');
+  }
+
+  /**
+   * Первый логин в новом (пустом) профиле БЕЗ CDP.
+   * AWS WAF видит обычный браузер → капча проходит как на телефоне.
+   */
+  async loginInNewProfile(): Promise<boolean> {
+    const fsMod = await import('node:fs');
+    const ps = ProfileService.getInstance();
+    const active = ps.getActive();
+
+    console.log(`[DeepSeek] loginInNewProfile: "${active.name}", БЕЗ CDP`);
+
+    if (this.yandexPid) {
+      try { process.kill(this.yandexPid, 'SIGTERM'); } catch { /* ignore */ }
+      this.yandexPid = null;
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+
+    await this.launchYandexWithCdp({ withCdp: false });
+
+    const candidates = [
+      `${this.cfg.yandexProfileDir}/Default/Network/Cookies`,
+      `${this.cfg.yandexProfileDir}/Default/Cookies`,
+    ];
+    let cookiePath: string | null = null;
+    for (const c of candidates) {
+      if (fsMod.existsSync(c)) { cookiePath = c; break; }
+    }
+    if (!cookiePath) {
+      throw new Error(`Cookies-база не найдена: ${candidates.join(', ')}`);
+    }
+    console.log(`[DeepSeek] loginInNewProfile: cookiePath=${cookiePath}`);
+
+    const TIMEOUT_MS = 10 * 60 * 1000;
+    const started = Date.now();
+    let lastCount = 0;
+    while (Date.now() - started < TIMEOUT_MS) {
+      const count = await this.countDeepSeekCookies(cookiePath).catch(() => 0);
+      if (count !== lastCount) {
+        console.log(`[DeepSeek] loginInNewProfile: cookies=${count} (${Math.round((Date.now()-started)/1000)}с)`);
+        lastCount = count;
+      }
+      if (count >= 3) {
+        console.log('[DeepSeek] ✅ loginInNewProfile: cookies появились, flush 3с');
+        await new Promise((r) => setTimeout(r, 3000));
+        if (this.yandexPid) {
+          try { process.kill(this.yandexPid, 'SIGTERM'); } catch { /* ignore */ }
+          this.yandexPid = null;
+          await new Promise((r) => setTimeout(r, 1500));
+        }
+        return true;
+      }
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+    throw new Error('Логин не выполнен за 10 минут');
+  }
+
+  private async countDeepSeekCookies(cookiePath: string): Promise<number> {
+    const fsMod = await import('node:fs');
+    if (!fsMod.existsSync(cookiePath)) return 0;
+    const os = await import('node:os');
+    const pathMod = await import('node:path');
+    const tmp = pathMod.join(os.tmpdir(), `gw-cookies-${Date.now()}.db`);
+    try {
+      fsMod.copyFileSync(cookiePath, tmp);
+      for (const ext of ['-wal', '-shm']) {
+        if (fsMod.existsSync(cookiePath + ext)) fsMod.copyFileSync(cookiePath + ext, tmp + ext);
+      }
+      const { DatabaseSync } = await import('node:sqlite');
+      const db = new DatabaseSync(tmp);
+      try {
+        const r = db.prepare(
+          `SELECT count(*) AS c FROM cookies WHERE host_key LIKE '%deepseek%'`
+        ).get() as { c: number };
+        return r?.c ?? 0;
+      } finally { db.close(); }
+    } catch { return 0; }
+    finally {
+      try { fsMod.unlinkSync(tmp); } catch {}
+      for (const ext of ['-wal', '-shm']) {
+        try { fsMod.unlinkSync(tmp + ext); } catch {}
+      }
+    }
+  }
+
+  /**
+   * Убивает все Yandex-процессы GW (все профили).
+   * Освобождает порты 9322/9323, чистит состояние.
+   * После — launch() запустит свежие.
+   */
+  async killAllYandexZombies(): Promise<{ ok: boolean; killed: number }> {
+    // 1. Отключаемся от текущего CDP
+    try { await this.disconnect(); } catch { /* ignore */ }
+    this.browser = null;
+    this.context = null;
+    this.page = null;
+    this.isLoggedIn = false;
+    this.yandexPid = null;
+
+    // 2. Ищем все GW-Yandex процессы
+    const { execSync } = await import('node:child_process');
+    const findPids = (): number[] => {
+      try {
+        const raw = execSync(
+          `pgrep -f "wetothemoon-electron/profiles"`,
+          { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
+        ).trim();
+        return raw ? raw.split('\n').filter(Boolean).map(Number) : [];
+      } catch (e: any) {
+        if (e.status === 1) return [];  // pgrep: нет совпадений — норм
+        throw e;
+      }
+    };
+
+    const pids = findPids();
+    if (pids.length === 0) {
+      console.log('[kill-zombies] нечего убивать');
+      return { ok: true, killed: 0 };
+    }
+    console.log(`[kill-zombies] найдено ${pids.length} процессов GW-Yandex`);
+
+    // 3. SIGTERM
+    for (const pid of pids) {
+      try { process.kill(pid, 'SIGTERM'); } catch { /* ignore */ }
+    }
+    await new Promise((r) => setTimeout(r, 1500));
+
+    // 4. SIGKILL для выживших
+    const remaining = findPids();
+    for (const pid of remaining) {
+      try { process.kill(pid, 'SIGKILL'); } catch { /* ignore */ }
+    }
+    await new Promise((r) => setTimeout(r, 500));
+
+    const after = findPids();
+    console.log(
+      `[kill-zombies] убито ${pids.length}, осталось ${after.length}`
+    );
+
+    this.bridgeEmitter.emit('event', {
+      type: 'zombies:killed',
+      payload: { killed: pids.length, remaining: after.length },
+      ts: Date.now(),
+    });
+
+    return { ok: true, killed: pids.length };
+  }
+
+  /**
+   * Убивает Yandex только для указанного профиля.
+   * Полезно когда один профиль «залип», а другие работают.
+   */
+  async killYandexForProfile(
+    profileId: string
+  ): Promise<{ ok: boolean; killed: number; reason?: string }> {
+    const ps = ProfileService.getInstance();
+    const target = ps.get(profileId);
+    if (!target) return { ok: false, killed: 0, reason: 'профиль не найден' };
+
+    const profileDir = ps.browserProfileDir(target);
+
+    // Если это активный — отключаемся
+    if (this.cfg.profileId === profileId) {
+      try { await this.disconnect(); } catch { /* ignore */ }
+      this.browser = null;
+      this.context = null;
+      this.page = null;
+      this.isLoggedIn = false;
+      this.yandexPid = null;
+    }
+
+    const { execSync } = await import('node:child_process');
+    const findPids = (): number[] => {
+      try {
+        const raw = execSync(
+          `pgrep -f "user-data-dir=${profileDir}"`,
+          { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
+        ).trim();
+        return raw ? raw.split('\n').filter(Boolean).map(Number) : [];
+      } catch (e: any) {
+        if (e.status === 1) return [];
+        throw e;
+      }
+    };
+
+    const pids = findPids();
+    if (pids.length === 0) {
+      return { ok: true, killed: 0 };
+    }
+
+    for (const pid of pids) {
+      try { process.kill(pid, 'SIGTERM'); } catch { /* ignore */ }
+    }
+    await new Promise((r) => setTimeout(r, 1500));
+    for (const pid of findPids()) {
+      try { process.kill(pid, 'SIGKILL'); } catch { /* ignore */ }
+    }
+
+    console.log(
+      `[kill-zombies] ${target.name}: убито ${pids.length}`
+    );
+    return { ok: true, killed: pids.length };
+  }
+
+  async switchProfile(profileId: string): Promise<{
+    ok: boolean;
+    status?: 'logged_in' | 'login_required';
+    reason?: string;
+  }> {
+    const ps = ProfileService.getInstance();
+    const target = ps.get(profileId);
+    if (!target) return { ok: false, reason: 'профиль не найден' };
+
+    const prevActiveId = ps.getActiveId();
+    const hadSession = ps.hasSession(target);
+
+    // Отключаемся от текущего браузера, но НЕ убиваем процесс Yandex —
+    // он остаётся жить со своим профилем.
+    try { await this.disconnect(); } catch { /* best effort */ }
+    this.browser = null;
+    this.context = null;
+    this.page = null;
+    this.isLoggedIn = false;
+
+    ps.activate(profileId);
+    this.bridgeEmitter.emit('profile:switched', {
+      profileId,
+      cdpPort: target.cdpPort,
+    });
+
+    // Если у профиля НЕТ сессии — запускаем Yandex БЕЗ CDP для ручного входа.
+    // Капча проходится как на телефоне (без --remote-debugging-port).
+    if (!hadSession) {
+      console.log(
+        `[switchProfile] ${target.name}: нет сессии → loginInNewProfile`
+      );
+      try {
+        await this.loginInNewProfile();
+      } catch (e) {
+        return {
+          ok: true,
+          status: 'login_required',
+          reason: (e as Error).message,
+        };
+      }
+    }
+
+    // Теперь launch() с CDP — подхватываем cookies
+    try {
+      const r = await this.launch();
+      if (r.status === 'logged_in') {
+        return { ok: true, status: 'logged_in' };
+      }
+      return {
+        ok: true,
+        status: 'login_required',
+        reason: 'Требуется вход в DeepSeek',
+      };
+    } catch (e: any) {
+      console.warn(
+        `[switchProfile] launch() failed, rollback to ${prevActiveId}:`,
+        (e as Error).message
+      );
+      try { ps.activate(prevActiveId); } catch { /* best effort */ }
+      try { await this.launch(); } catch { /* ignore */ }
+      return { ok: false, reason: e?.message || String(e) };
+    }
   }
 
   static getInstance(): DeepSeekService {
@@ -206,7 +987,7 @@ export class DeepSeekService {
   }
 
   private getStoragePath(): string {
-    return path.join(app.getPath('userData'), STORAGE_FILE);
+    return this.cfg.storagePath;
   }
 
   private getCredentialsFromEnv(): DeepSeekCredentials | null {
@@ -264,6 +1045,98 @@ export class DeepSeekService {
   }
 
   /**
+   * 2.2.7: импорт cookies из Yandex/Chrome через Cookie-Editor.
+   * Вызывается ТОЛЬКО если storage_state нет. Формат:
+   *  - Cookie-Editor: [{domain, name, value, ...}]
+   *  - Playwright storage_state: {cookies: [...]}
+   * Ищет в: ./deepseek_cookies.json или userData/deepseek_cookies.json
+   */
+  private async importYandexCookies(): Promise<boolean> {
+    if (!this.context) return false;
+
+    const candidates = [
+      path.join(process.cwd(), 'deepseek_cookies.json'),
+      path.join(app.getPath('userData'), 'deepseek_cookies.json'),
+    ];
+
+    let raw: any = null;
+    let filePath = '';
+    for (const p of candidates) {
+      if (fs.existsSync(p)) {
+        try {
+          raw = JSON.parse(fs.readFileSync(p, 'utf-8'));
+          filePath = p;
+          break;
+        } catch (e) {
+          console.warn(
+            `[DeepSeek] не удалось парсить ${p}:`,
+            (e as Error).message
+          );
+        }
+      }
+    }
+
+    if (!raw) {
+      console.log(
+        '[DeepSeek] deepseek_cookies.json не найден — стартуем с чистого контекста'
+      );
+      return false;
+    }
+
+    const arr = Array.isArray(raw)
+      ? raw
+      : Array.isArray(raw.cookies)
+        ? raw.cookies
+        : [];
+    if (arr.length === 0) {
+      console.warn('[DeepSeek] cookies.json пустой или невалидный формат');
+      return false;
+    }
+
+    const normalized = arr
+      .filter((c: any) => c && c.name && c.value && c.domain)
+      .map((c: any) => {
+        const out: any = {
+          name: String(c.name),
+          value: String(c.value),
+          domain: String(c.domain),
+          path: String(c.path || '/'),
+        };
+        if (typeof c.expires === 'number' && c.expires > 0) {
+          out.expires = c.expires;
+        } else if (typeof c.expirationDate === 'number') {
+          out.expires = c.expirationDate;
+        }
+        if (typeof c.httpOnly === 'boolean') out.httpOnly = c.httpOnly;
+        if (typeof c.secure === 'boolean') out.secure = c.secure;
+        if (c.sameSite) {
+          const s = String(c.sameSite).toLowerCase();
+          if (s === 'strict') out.sameSite = 'Strict';
+          else if (s === 'lax') out.sameSite = 'Lax';
+          else if (s === 'none' || s === 'no_restriction')
+            out.sameSite = 'None';
+        }
+        return out;
+      });
+
+    if (normalized.length === 0) {
+      console.warn('[DeepSeek] после нормализации cookies пусто');
+      return false;
+    }
+
+    try {
+      await this.context.addCookies(normalized);
+      console.log(
+        `[DeepSeek] ✅ Импортировано ${normalized.length} cookies из ${filePath}`
+      );
+      return true;
+    } catch (e) {
+      console.warn('[DeepSeek] addCookies ошибка:', (e as Error).message);
+      return false;
+    }
+  }
+
+  /**
    * Проверяет, авторизован ли пользователь.
    * Ориентируемся на наличие поля ввода сообщения (характерно для авторизованного чата).
    * Селектор можно уточнить при необходимости.
@@ -312,6 +1185,41 @@ export class DeepSeekService {
       await this.page!.waitForTimeout(2000);
     }
     throw new Error('Время ожидания ручного прохождения капчи истекло');
+  }
+
+  /**
+   * Мягкая версия waitForCaptchaToDisappear:
+   * - если капчи нет — сразу возвращаемся;
+   * - если есть — ждём исчезновения, НЕ бросаем при таймауте.
+   * Нужна для CDP-режима, где пользователь проходит капчу руками.
+   */
+  private async waitForCaptchaIfPresent(timeoutMs: number = 120000): Promise<void> {
+    if (!this.page || this.page.isClosed()) return;
+    const captchaSelector =
+      '#ds_aws_captcha, #cf-overlay, iframe[src*="hcaptcha"], iframe[src*="captcha"], [class*="captcha-modal"]';
+    const isVisible = () =>
+      this.page!.locator(captchaSelector).first().isVisible().catch(() => false);
+
+    if (!(await isVisible())) return;
+
+    console.log(
+      `[DeepSeek] ⚠️ Обнаружена капча. Пройдите её в окне Yandex (ждём до ${Math.round(
+        timeoutMs / 1000
+      )}с)...`
+    );
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      if (!(await isVisible())) {
+        console.log('[DeepSeek] ✅ Капча пройдена');
+        return;
+      }
+      await this.page!.waitForTimeout(2000);
+    }
+    console.warn(
+      `[DeepSeek] ⏱ Капча не исчезла за ${Math.round(
+        timeoutMs / 1000
+      )}с — продолжаем как есть`
+    );
   }
 
   /**
@@ -459,11 +1367,78 @@ export class DeepSeekService {
       this.isLoggedIn = false;
     }
 
+    // 2.2.8: если задан VITE_GATEWAY_USE_YANDEX=1 — подключаемся
+    // к уже запущенному Yandex через CDP (без капчи, без своего Chromium).
+    const useYandex = process.env.VITE_GATEWAY_USE_YANDEX === '1';
+    if (useYandex) {
+      console.log('[DeepSeek] VITE_GATEWAY_USE_YANDEX=1 — пробуем Yandex CDP');
+      try {
+        await this.connectToYandex();
+
+        // Перейти на DeepSeek, если ещё не там
+        const url = this.page!.url();
+        if (!url.includes('chat.deepseek.com')) {
+          await this.gotoWithTimeout(DEEPSEEK_URL, 20000);
+          await this.page!.waitForTimeout(3000);
+        }
+
+        // Ждём капчу, если она появилась после навигации
+        await this.waitForCaptchaIfPresent(120000);
+
+        const authed = await this.isAuthenticated();
+        if (authed) {
+          this.isLoggedIn = true;
+          await this.stopLoadingSpinner();
+          await this.saveStorageState();
+          console.log('[DeepSeek] ✅ Yandex подключён и авторизован');
+          return { status: 'logged_in' };
+        }
+        console.log(
+          '[DeepSeek] Yandex подключён, но DeepSeek не авторизован'
+        );
+        return { status: 'running', loginRequired: true };
+      } catch (e) {
+        console.error(
+          '[DeepSeek] ❌ Yandex CDP недоступен:',
+          (e as Error).message
+        );
+        console.warn(
+          '[DeepSeek] Fallback — запускаем свой Chromium (может быть капча)'
+        );
+        // Не throw — идём обычным путём ниже
+      }
+    }
+
     console.log('Запуск браузера для DeepSeek...');
-    this.browser = await chromium.launch({
-      headless: false,
-      args: ['--no-sandbox', '--disable-gpu', '--ozone-platform=x11'],
-    });
+
+    // 2.2.7: пытаемся запустить СИСТЕМНЫЙ Chrome (меньше automation-маркеров),
+    // fallback на bundled Chromium, если Chrome не установлен.
+    const launchArgs = [
+      '--no-sandbox',
+      '--disable-gpu',
+      '--ozone-platform=x11',
+      '--disable-blink-features=AutomationControlled',
+    ];
+
+    try {
+      // 2.2.8: используем playwrightChromium (Stealth-плагин), а не chromium
+      this.browser = await playwrightChromium.launch({
+        headless: false,
+        channel: 'chrome',
+        args: launchArgs,
+      });
+      console.log('[DeepSeek] ✅ Запущен системный Chrome + Stealth');
+    } catch (e) {
+      console.warn(
+        '[DeepSeek] system Chrome недоступен, fallback на bundled Chromium:',
+        (e as Error).message
+      );
+      this.browser = await playwrightChromium.launch({
+        headless: false,
+        args: launchArgs,
+      });
+      console.log('[DeepSeek] ⚠️ Запущен bundled Chromium + Stealth');
+    }
 
     // Слушаем событие, если пользователь закроет окно PW руками
     this.browser.on('disconnected', () => {
@@ -472,7 +1447,6 @@ export class DeepSeekService {
       this.context = null;
       this.page = null;
       this.isLoggedIn = false;
-      // Дать знать FileBatchService и другим подписчикам
       try {
         this.bridgeEmitter.emit('disconnected');
       } catch {
@@ -480,12 +1454,30 @@ export class DeepSeekService {
       }
     });
 
+    // 2.2.7: СНАЧАЛА пробуем storage_state (как раньше).
+    // Если нет — создаём пустой контекст, потом импортируем cookies.json.
     const storageLoaded = await this.loadStorageState();
     if (!storageLoaded) {
-      this.context = await this.browser.newContext();
+      this.context = await this.browser.newContext({
+        viewport: { width: 1280, height: 800 },
+        locale: 'ru-RU',
+      });
+      await this.importYandexCookies();
     }
 
     this.page = await this.context!.newPage();
+
+    // 2.2.7: stealth — маскируем автоматизацию (ДО первой навигации)
+    await this.context!.addInitScript(() => {
+      Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+      Object.defineProperty(navigator, 'plugins', {
+        get: () => [1, 2, 3, 4, 5],
+      });
+      Object.defineProperty(navigator, 'languages', {
+        get: () => ['ru-RU', 'ru', 'en-US', 'en'],
+      });
+      (window as any).chrome = (window as any).chrome || { runtime: {} };
+    });
 
     // Мост событий — ДО первой навигации
     await this.setupBridge();
@@ -498,8 +1490,29 @@ export class DeepSeekService {
     const authed = await this.isAuthenticated();
     if (!authed) {
       console.log('[DeepSeek] Требуется вход');
-      await this.login(); // login уже устанавливает isLoggedIn = true и сохраняет сессию
-      return { status: 'logged_in' };
+      try {
+        await this.login(); // как было
+        return { status: 'logged_in' };
+      } catch (e) {
+        // 2.2.7: автологин упал (вероятно, капча) — ждём ручной вход 5 минут
+        console.warn(
+          '[DeepSeek] Автологин не удался, ждём ручной вход в окне PW (5 мин):',
+          (e as Error).message
+        );
+        const start = Date.now();
+        while (Date.now() - start < 5 * 60 * 1000) {
+          await this.page!.waitForTimeout(2000);
+          if (await this.isAuthenticated()) {
+            this.isLoggedIn = true;
+            await this.saveStorageState();
+            console.log('[DeepSeek] ✅ Ручной вход выполнен, сессия сохранена');
+            return { status: 'logged_in' };
+          }
+        }
+        throw new Error(
+          'Вход не выполнен за 5 минут. Войдите вручную в окне Chromium и перезапустите Launch.'
+        );
+      }
     }
 
     // Уже авторизованы
@@ -572,6 +1585,162 @@ export class DeepSeekService {
   }
 
   /**
+   * API-канал: ответ через официальный DeepSeek API.
+   * Эмитит те же bridge-события, что web-канал (с profileId), возвращает
+   * тот же GatewayChatMessage — UI не замечает разницы.
+   */
+  async sendMessageViaApi(message: string, opts?: {
+    model?: string;
+    effort?: 'low' | 'high' | 'max';
+    max_tokens?: number;
+    history?: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
+    signal?: AbortSignal;
+    /** Если true — собирает структурированный continuation prompt (экономнее). */
+    continuationMode?: boolean;
+    /** Название текущей задачи (для continuationMode). */
+    taskTitle?: string;
+  }): Promise<GatewayChatMessage> {
+    const ps = ProfileService.getInstance();
+    const p = ps.getActive();
+    const apiKey = ps.apiKeyOf(p);
+    if (!apiKey) {
+      throw new Error('API-ключ не задан (DEEPSEEK_API_KEY / VITE_DEEPSEEK_API_KEY)');
+    }
+
+    const deepseekApi = await import('./deepseekApiService');
+    const profileId = p.id;
+
+    // ── Контекст (workspace: global→project→submodule→module→direction) ──
+    let contextSystemPrompt: string | null = null;
+    try {
+      const manifestPath = process.env.CONTEXT_MANIFEST;
+      const activeKeysRaw =
+        process.env.ACTIVE_WORKSPACE_KEYS ||
+        process.env.ACTIVE_CONTEXT_KEY ||
+        '';
+      const activeKeys = activeKeysRaw.split(',').map(s => s.trim()).filter(Boolean);
+      if (manifestPath && activeKeys.length > 0 && fs.existsSync(manifestPath)) {
+        if (opts?.continuationMode) {
+          const { buildContinuationSystemPrompt } = await import('./contextBuilder');
+          const built = await buildContinuationSystemPrompt({
+            manifestPath, activeKeys, taskTitle: opts.taskTitle ?? 'Продолжение разработки',
+          });
+          contextSystemPrompt = built.systemPrompt;
+          console.log(
+            `[DeepSeek] continuation prompt: ${built.bytes} байт  [${activeKeys.join(' + ')}]`
+          );
+        } else {
+          const { buildContext } = await import('./contextBuilder');
+          const built = buildContext({ manifestPath, activeKeys });
+          contextSystemPrompt = built.systemPrompt;
+          console.log(
+            `[DeepSeek] context: ${built.includedNodes.length} узлов, ${built.totalBytes} байт, ` +
+            `пропущено ${built.skippedNodes.length}  [${activeKeys.join(' + ')}]`
+          );
+        }
+      }
+    } catch (e) {
+      console.warn('[DeepSeek] contextBuilder failed:', (e as Error).message);
+    }
+
+    const baseMessages = opts?.history ?? [];
+    const messages = [
+      ...(contextSystemPrompt
+        ? [{ role: 'system' as const, content: contextSystemPrompt }]
+        : []),
+      ...baseMessages,
+      { role: 'user' as const, content: message },
+    ];
+
+    const ts = Date.now();
+    const r = await deepseekApi.chat(apiKey, messages, {
+      model: opts?.model ?? 'deepseek-flash',
+      effort: opts?.effort ?? 'high',
+      max_tokens: opts?.max_tokens ?? 8192,
+      profileId,
+      signal: opts?.signal,
+      onDelta: (d) => {
+        if (d.reasoning) {
+          this.bridgeEmitter.emit('event', {
+            type: 'reasoning:update',
+            payload: { profileId, delta: d.reasoning, channel: 'api' },
+            ts: Date.now(),
+          });
+        }
+        if (d.content) {
+          this.bridgeEmitter.emit('event', {
+            type: 'assistant:content-update',
+            payload: { profileId, delta: d.content, channel: 'api' },
+            ts: Date.now(),
+          });
+        }
+      },
+    });
+
+    const finalText = r.content || '';
+    const finalReasoning = r.reasoning || '';
+    const fullHtml = this.markdownToHtml(finalText);
+
+    this.bridgeEmitter.emit('event', {
+      type: 'assistant:done',
+      payload: {
+        profileId,
+        channel: 'api',
+        content: finalText,
+        thinking: finalReasoning,
+        fullHtml,
+        usage: r.usage,
+      },
+      ts,
+    });
+
+    const blocks: GatewayChatBlock[] = [];
+    if (finalText) blocks.push({ type: 'text', content: finalText });
+
+    return {
+      id: `api-${profileId}-${ts}`,
+      role: 'assistant',
+      thinking: finalReasoning || undefined,
+      blocks,
+      fullHtml,
+      isActive: 1,
+    };
+  }
+
+  /**
+   * Обёртка над sendMessage: при detect-ошибке web-канала
+   * (sign_in / captcha / disconnected / не авторизован) и наличии API-ключа
+   * делает один retry через sendMessageViaApi и эмитит channel:switched.
+   */
+  async sendMessageWithFallback(message: string): Promise<GatewayChatMessage> {
+    try {
+      return await this.sendMessage(message);
+    } catch (e) {
+      const msg = (e as Error).message || '';
+      const isDetect =
+        /Не авторизован/i.test(msg) ||
+        /sign_in/i.test(msg) ||
+        /captcha/i.test(msg) ||
+        /капч/i.test(msg) ||
+        /disconnected/i.test(msg) ||
+        /Браузер не запущен/i.test(msg);
+
+      const ps = ProfileService.getInstance();
+      const apiKey = ps.apiKeyOf(ps.getActive());
+
+      if (!isDetect || !apiKey) throw e;
+
+      console.warn(`[DeepSeek] web-канал упал (${msg.slice(0, 80)}), fallback → API`);
+      this.bridgeEmitter.emit('event', {
+        type: 'channel:switched',
+        payload: { profileId: ps.getActive().id, from: 'web', to: 'api', reason: msg.slice(0, 200) },
+        ts: Date.now(),
+      });
+      return await this.sendMessageViaApi(message);
+    }
+  }
+
+  /**
    * Отправляет сообщение в DeepSeek и возвращает структурированный ответ.
    */
   async sendMessage(message: string): Promise<GatewayChatMessage> {
@@ -596,24 +1765,108 @@ export class DeepSeekService {
     const textarea = this.page.locator(textareaSelector).first();
     await textarea.waitFor({ state: 'visible', timeout: 10000 });
     await textarea.fill(finalMessage);
-    await textarea.press('Enter');
+    await this.page.waitForTimeout(300); // Даём React обновить стейт кнопки
+
+    // 1. Ждём, пока кнопка Send станет активной (после upload файлов
+    // и заполнения textarea). Может занять до 60с для больших файлов.
+    try {
+      await this.page.waitForFunction(
+        () => {
+          const btns = Array.from(document.querySelectorAll('div._52c986b'));
+          if (btns.length === 0) return false;
+          const btn = btns[btns.length - 1] as HTMLElement;
+          return !btn.classList.contains('ds-button--disabled');
+        },
+        { timeout: 60000, polling: 300 }
+      );
+      console.log('[DeepSeek] ✅ Кнопка Send активна');
+    } catch (e) {
+      console.warn('[DeepSeek] ⏱ Кнопка Send не стала активной за 60с');
+    }
+
+    // 2. Клик через DOM
+    const clickedState = await this.page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll('div._52c986b, div.ds-button--primary.ds-button--filled'));
+      const btn = btns[btns.length - 1] as HTMLElement;
+      if (!btn) return 'not-found';
+      if (btn.classList.contains('ds-button--disabled')) return 'disabled';
+      btn.click();
+      return 'clicked';
+    });
+    console.log('[DeepSeek] send click:', clickedState);
+
+    // 3. Верификация: textarea должна очиститься (или исчезнуть) — это
+    // значит, React принял отправку и отрисовал сообщение в списке.
+    await this.page.waitForTimeout(800);
+    let sent = await this.page.evaluate(() => {
+      const ta = document.querySelector(
+        'textarea[placeholder*="Сообщение"], textarea[placeholder*="Message"]'
+      ) as HTMLTextAreaElement | null;
+      return !ta || ta.value.length === 0;
+    });
+
+    // 4. Fallback: если DOM-клик не сработал — жмём Enter
+    if (!sent) {
+      console.log('[DeepSeek] DOM-клик не сработал, пробуем Enter');
+      await textarea.focus();
+      await textarea.press('Enter');
+      await this.page.waitForTimeout(800);
+      sent = await this.page.evaluate(() => {
+        const ta = document.querySelector(
+          'textarea[placeholder*="Сообщение"], textarea[placeholder*="Message"]'
+        ) as HTMLTextAreaElement | null;
+        return !ta || ta.value.length === 0;
+      });
+    }
+
+    // 5. Если и Enter не помог — явная ошибка (лучше упасть, чем молча ждать 120с)
+    if (!sent) {
+      throw new Error(
+        'Не удалось отправить сообщение: кнопка Send не реагирует. ' +
+        'Возможно, файл ещё загружается или DeepSeek временно недоступен.'
+      );
+    }
+    console.log('[DeepSeek] ✅ Сообщение отправлено');
 
     // Считаем существующие error-кнопки ДО (могут быть старые ошибки в чате)
     const errorsBefore = await this.page
       .locator('div.ds-message .ds-button--warning')
       .count();
 
-    // Ждём ЛИБО нового сообщения ассистента, ЛИБО появления новой ошибки
+    // Сразу после отправки — прокручиваем список вниз, чтобы новое сообщение
+    // точно отрендерилось (виртуалка PW держит только видимые).
+    try {
+      await this.page.evaluate(() => {
+        const c = document.querySelector(
+          'div.ds-virtual-list.ds-virtual-list--printable'
+        ) as HTMLElement | null;
+        if (c) c.scrollTop = c.scrollHeight;
+      });
+    } catch { /* ignore */ }
+
+    // Ждём ЛИБО нового сообщения ассистента, ЛИБО ошибки.
+    // ВАЖНО: сравниваем не count (виртуалка переиспользует контейнеры),
+    // а ДЛИНУ текста последнего assistant-сообщения.
+    const prevLastAssistantText = await this.page
+      .evaluate((sel) => {
+        const els = document.querySelectorAll(sel);
+        const last = els[els.length - 1] as HTMLElement | null;
+        return last?.textContent?.trim() || '';
+      }, assistantMessageSelector)
+      .catch(() => '');
+
     const outcome = (await this.page
       .waitForFunction(
-        ({ selector, prevCount, errPrevCount }) => {
-          // 1. Успех: новое сообщение ассистента появилось
-          const elements = document.querySelectorAll(selector);
-          if (elements.length > prevCount) {
+        ({ selector, errPrevCount, prevText }) => {
+          // 1. Успех: последнее assistant-сообщение непустое и текст изменился
+          const els = document.querySelectorAll(selector);
+          const last = els[els.length - 1] as HTMLElement | null;
+          const currentText = last?.textContent?.trim() || '';
+          if (currentText.length > 0 && currentText !== prevText) {
             return { type: 'success' as const };
           }
 
-          // 2. Ошибка: появилась новая retry-warning кнопка
+          // 2. Ошибка: retry-warning кнопка появилась
           const errBtns = document.querySelectorAll(
             'div.ds-message .ds-button--warning'
           );
@@ -637,10 +1890,10 @@ export class DeepSeekService {
         },
         {
           selector: assistantMessageSelector,
-          prevCount: messagesBefore,
           errPrevCount: errorsBefore,
+          prevText: prevLastAssistantText,
         },
-        { timeout: 120000, polling: 500 }
+        { timeout: 90000, polling: 500 }
       )
       .then((h) => h.jsonValue())) as
       | { type: 'success' }
@@ -648,17 +1901,29 @@ export class DeepSeekService {
       | null;
 
     if (outcome?.type === 'error') {
-      // Дамп для диагностики + осмысленная ошибка для GW
       let dumpPath = '';
       try {
         dumpPath = await this.dumpCurrentPage('send_network_error');
-      } catch {
-        /* не критично */
-      }
+      } catch { /* не критично */ }
       throw new Error(
         `DeepSeek не смог обработать запрос: "${outcome.text}".` +
           (dumpPath ? ` Дамп: ${dumpPath}` : '')
       );
+    }
+
+    // Если waitForFunction упал по таймауту (outcome = null) — не блокируем
+    // вызывающий код. UI всё равно получит сообщение через bridge-события
+    // (history:changed / message:count-changed). Возвращаем пустое сообщение.
+    if (!outcome) {
+      console.warn(
+        '[DeepSeek] ⏱ Таймаут ожидания assistant-сообщения — возвращаем пустое, ' +
+        'UI обновится через bridge'
+      );
+      return {
+        role: 'assistant',
+        blocks: [],
+        fullHtml: '',
+      } as GatewayChatMessage;
     }
 
     // Ждём стабилизации содержимого — стрим завершён, когда HTML
@@ -705,8 +1970,12 @@ export class DeepSeekService {
         }
       }
 
-      // Сохраняем HTML как есть — для точного рендера в нашем окне
-      const fullHtml = el.innerHTML;
+      // Получаем HTML, но убираем переносы строк между тегами (>\n<),
+      // которые ломают white-space: pre-wrap и создают двойные пустые строки.
+      let fullHtml = el.innerHTML;
+      if (fullHtml) {
+        fullHtml = fullHtml.replace(/>\s+</g, '><');
+      }
 
       const blocks: any[] = [];
 
@@ -720,7 +1989,14 @@ export class DeepSeekService {
             const langEl = element.querySelector('span.d813de27');
             const codeEl = element.querySelector('pre');
             const language = langEl?.textContent?.trim() || 'text';
-            const code = codeEl?.textContent || '';
+            // PW рендерит код как <pre><span>line1</span>\n<span>line2</span></pre>,
+            // где \n между spans = line separator. Но textContent содержит
+            // ТАКЖЕ эти \n + может быть двойной из-за <span></span> (пустая
+            // строка) → \n\n\n. Нормализуем: убираем `\n` в конце, схлопываем
+            // тройные+ \n в двойной (1 пустая строка = норм), и убираем \r.
+            let code = (codeEl?.textContent || '').replace(/\r\n?/g, '\n');
+            code = code.replace(/\n{3,}/g, '\n\n');
+            code = code.replace(/\n+$/, '');
             if (code.trim()) {
               blocks.push({
                 type: 'code',
@@ -729,12 +2005,15 @@ export class DeepSeekService {
               });
             }
           } else {
-            // Любой другой элемент (p, h3, ul, blockquote и т.п.) — текстовый блок
-            const text = element.textContent?.trim() || '';
-            if (text) {
+            // ВАЖНО: берём innerHTML, а не textContent. PW иногда рендерит
+            // `<K extends...>` или `<li>...</li>` из текста как РЕАЛЬНЫЕ
+            // HTML-теги. textContent их съедает безвозвратно; innerHTML
+            // сохраняет всё как строку — а экранирование сделаем в UI.
+            const innerHtml = element.innerHTML?.trim() || '';
+            if (innerHtml) {
               blocks.push({
                 type: 'text',
-                content: text,
+                content: innerHtml,
               });
             }
           }
@@ -768,6 +2047,133 @@ export class DeepSeekService {
     });
 
     return messageData;
+  }
+
+  /**
+   * 5.5: отправка сообщения с прикреплёнными файлами.
+   * Использует скрытый `<input type="file">` DeepSeek (найден в Recon 5.5.1).
+   * После attach — делегирует отправку в sendMessage() (fill + Enter + ожидание ответа).
+   */
+  /**
+   * Возвращает список расширений ('.txt', '.md', ...), которые принимает
+   * скрытый input[type=file] в PW. Пустой массив = PW не найден или input без accept.
+   * Кэшируется в памяти инстанса на 60с — accept-лист меняется редко.
+   */
+  private acceptedExtsCache: { exts: string[]; ts: number } | null = null;
+
+  async getAcceptedFileExtensions(): Promise<string[]> {
+    if (!this.page) return [];
+    if (
+      this.acceptedExtsCache &&
+      Date.now() - this.acceptedExtsCache.ts < 60_000
+    ) {
+      return this.acceptedExtsCache.exts;
+    }
+    try {
+      const accept = await this.page
+        .locator('input[type="file"]')
+        .first()
+        .getAttribute('accept');
+      const exts = (accept || '')
+        .split(',')
+        .map((s) => s.trim().toLowerCase())
+        .filter((s) => s.startsWith('.'));
+      this.acceptedExtsCache = { exts, ts: Date.now() };
+      return exts;
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * 5.5: Отправка сообщения с прикрепленными файлами.
+   */
+  async sendMessageWithFiles(
+    files: Array<{ name: string; mimeType: string; buffer: Buffer }>,
+    message: string
+  ): Promise<GatewayChatMessage> {
+    if (!this.page) throw new Error('Браузер не запущен');
+    if (!this.isLoggedIn && !(await this.isAuthenticated())) {
+      throw new Error('Не авторизован в DeepSeek');
+    }
+    await this.ensureReadyForChat();
+
+    const fileInput = this.page.locator('input[type="file"]').first();
+    if ((await fileInput.count()) === 0) {
+      throw new Error('Скрытый input[type=file] не найден.');
+    }
+
+    const chipsBefore = await this.page.locator('._25c7358').count();
+    console.log(`[DeepSeek] sendMessageWithFiles: ${files.length} файлов, чипов было: ${chipsBefore}`);
+
+    // Загружаем файлы через Buffer
+    await fileInput.setInputFiles(
+      files.map((f) => ({
+        name: f.name,
+        mimeType: f.mimeType,
+        buffer: f.buffer,
+      }))
+    );
+
+    // Ждем отрисовки чипов
+    try {
+      await this.page.waitForFunction(
+        ({ target }) => document.querySelectorAll('._25c7358').length >= target,
+        { target: chipsBefore + files.length },
+        { timeout: 30000, polling: 300 }
+      );
+      console.log('[DeepSeek] ✅ Чипы файлов отрисованы в PW');
+    } catch (e) {
+      throw new Error(`DeepSeek не отрисовал чипы файлов за 30с: ${(e as Error).message}`);
+    }
+
+    // Ждём завершения загрузки на сервер DeepSeek: пока чип показывает
+    // "Загрузка..." или процент — кнопка Send заблокирована.
+    console.log('[DeepSeek] Ждём завершения загрузки файлов…');
+    try {
+      await this.page.waitForFunction(
+        () => {
+          const chips = Array.from(document.querySelectorAll('._25c7358'));
+          if (chips.length === 0) return true;
+          for (const chip of chips) {
+            const meta = chip.querySelector('._7103a25')?.textContent?.trim() || '';
+            // Признаки незавершённой загрузки: слово "Загрузка" / "Loading" / "%"
+            if (/агрузк|oading|%/.test(meta)) return false;
+          }
+          return true;
+        },
+        { timeout: 60000, polling: 400 }
+      );
+      console.log('[DeepSeek] ✅ Файлы загружены в PW');
+    } catch (e) {
+      console.warn(
+        '[DeepSeek] ⏱ Не дождались завершения загрузки за 60с, продолжаем как есть:',
+        (e as Error).message
+      );
+    }
+
+    // Вызываем стандартную отправку (fill + Enter/Button + ожидание ответа)
+    return await this.sendMessage(message);
+  }
+
+  /**
+   * Очистка input area от чипов.
+   */
+  async clearInputAreaChips(): Promise<number> {
+    if (!this.page) return 0;
+    const removed = await this.page.evaluate(() => {
+      const chips = Array.from(document.querySelectorAll('._25c7358 > ._8402d8c')) as HTMLElement[];
+      let n = 0;
+      for (const btn of chips) {
+        try { btn.click(); n++; } catch {}
+      }
+      return n;
+    });
+    if (removed > 0) {
+      console.log('[DeepSeek] Очищено чипов:', removed);
+      await this.page.waitForTimeout(300);
+    }
+    return removed;
   }
 
   /**
@@ -1022,7 +2428,7 @@ export class DeepSeekService {
             const el = n as HTMLElement;
             if (el.classList.contains('md-code-block')) {
               const lang = el.querySelector('span.d813de27')?.textContent?.trim() || 'text';
-              const code = el.querySelector('pre')?.textContent || '';
+              const code = (el.querySelector('pre')?.textContent || '').replace(/\n+$/, '');
               if (code.trim()) blocks.push({ type: 'code', content: code, language: lang });
             } else {
               const text = el.textContent?.trim() || '';
@@ -1039,12 +2445,16 @@ export class DeepSeekService {
           if (text) blocks.push({ type: 'text', content: text });
         }
 
+        let fullHtml = (main as HTMLElement).innerHTML;
+        if (fullHtml) {
+          fullHtml = fullHtml.replace(/>\s+</g, '><');
+        }
         return {
           id,
           role: 'assistant',
           thinking,
           blocks,
-          fullHtml: (main as HTMLElement).innerHTML,
+          fullHtml,
           branchTotal,
           branchIndex,
         };
@@ -1442,6 +2852,8 @@ export class DeepSeekService {
       let userText = '';
       let assistantText = '';
       const files: any[] = [];
+      const sources: WebSource[] = [];
+      const seenUrls = new Set<string>();
 
       for (const f of fragments) {
         const type = String(f?.type || '').toUpperCase();
@@ -1459,6 +2871,31 @@ export class DeepSeekService {
             mime: f?.mime,
             size: f?.size,
           });
+        } else if (type === 'TOOL_SEARCH' && Array.isArray(f?.results)) {
+          for (const r of f.results) {
+            if (r?.url && !seenUrls.has(r.url)) {
+              seenUrls.add(r.url);
+              sources.push({
+                url: r.url,
+                title: r.title || '',
+                snippet: r.snippet,
+                siteIcon: r.site_icon,
+                siteName: r.site_name
+              });
+            }
+          }
+        } else if (type === 'TOOL_OPEN' && f?.result?.url) {
+          const r = f.result;
+          if (!seenUrls.has(r.url)) {
+            seenUrls.add(r.url);
+            sources.push({
+              url: r.url,
+              title: r.title || '',
+              snippet: r.snippet,
+              siteIcon: r.site_icon,
+              siteName: r.site_name
+            });
+          }
         }
       }
 
@@ -1489,6 +2926,7 @@ export class DeepSeekService {
         id: String(messageId),
         role,
         thinking,
+        sources: sources.length > 0 ? sources : undefined,
         blocks,
         fullHtml,
         branchTotal,
@@ -1685,7 +3123,7 @@ export class DeepSeekService {
               if (el.classList.contains('md-code-block')) {
                 const lang =
                   el.querySelector('span.d813de27')?.textContent?.trim() || 'text';
-                const code = el.querySelector('pre')?.textContent || '';
+                const code = (el.querySelector('pre')?.textContent || '').replace(/\n+$/, '');
                 if (code.trim())
                   blocks.push({ type: 'code', content: code, language: lang });
               } else {
@@ -1701,12 +3139,16 @@ export class DeepSeekService {
             const text = main.textContent?.trim() || '';
             if (text) blocks.push({ type: 'text', content: text });
           }
+          let fullHtml = (main as HTMLElement).innerHTML;
+          if (fullHtml) {
+            fullHtml = fullHtml.replace(/>\s+</g, '><');
+          }
           return {
             id,
             role: 'assistant',
             thinking,
             blocks,
-            fullHtml: (main as HTMLElement).innerHTML,
+            fullHtml,
             branchTotal,
             branchIndex,
             isActive: entry.isActive,
@@ -5618,6 +7060,290 @@ export class DeepSeekService {
       this.page.off('response', onResponse);
     }
   }
+
+  /**
+   * 2.2.8: Подключение к уже запущенному Yandex через CDP.
+   * Yandex должен быть запущен с --remote-debugging-port=<cfg.cdpPort>.
+   */
+  async connectToYandex(): Promise<void> {
+    if (this.cfg.browserKind === 'chrome') {
+      return this.connectToChromeViaPatchright();
+    }
+    console.log(`[DeepSeek] Подключение к Yandex через CDP (порт ${this.cfg.cdpPort})...`);
+
+    if (this.browser) {
+      try { await this.browser.close(); } catch {}
+      this.browser = null;
+      this.context = null;
+      this.page = null;
+    }
+
+    // 1. Проверяем, слушается ли порт. Если нет — поднимаем Yandex.
+    const alive = await this.isYandexCdpAlive();
+    let justLaunched = false;
+    if (!alive) {
+      console.log(`[DeepSeek] CDP-порт ${this.cfg.cdpPort} не отвечает — запускаем Yandex`);
+      await this.launchYandexWithCdp();
+      justLaunched = true;
+    } else {
+      console.log(`[DeepSeek] CDP-порт ${this.cfg.cdpPort} уже слушается — переиспользуем`);
+    }
+
+    try {
+      this.browser = await playwrightCoreChromium.connectOverCDP(this.cfg.cdpUrl);
+
+      console.log('[DeepSeek] CDP version:', this.browser.version());
+
+      const contexts = this.browser.contexts();
+      if (contexts.length === 0) {
+        throw new Error(
+          'В Yandex нет открытых контекстов (вкладок). Открой хотя бы одну.'
+        );
+      }
+      this.context = contexts[0];
+
+      const pages = this.context.pages();
+      this.page =
+        pages.find((p) => p.url().includes('chat.deepseek.com')) ??
+        (await this.context.newPage());
+
+      console.log('[DeepSeek] ✅ Подключено к Yandex. URL:', this.page.url());
+
+      await this.setupBridge();
+
+      // Ждём, пока пользователь пройдёт капчу (если она появилась)
+      await this.waitForCaptchaIfPresent(120000);
+
+      if (justLaunched) {
+        console.log(
+          '[DeepSeek] ⚠ Yandex запущен на выделенном профиле. ' +
+            'Если DeepSeek ещё не авторизован — войдите в открывшемся окне.'
+        );
+      }
+    } catch (e) {
+      throw new Error(
+        `Не удалось подключиться к Yandex: ${(e as Error).message}. ` +
+          `Убедитесь, что ${this.cfg.cdpUrl}/json/version отвечает.`
+      );
+    }
+  }
+
+  /**
+   * Chrome-ветка: запускает системный Chrome через patchright (channel: 'chrome')
+   * с stealth-патчами на уровне CDP. CDP-порт для внешних recon-скриптов
+   * передаётся опционально (ухудшает stealth, поэтому только при отладке).
+   */
+  private async connectToChromeViaPatchright(): Promise<void> {
+    const cfg = this.cfg;
+    console.log(`[DeepSeek] Подключение через Chrome (patchright), профиль ${cfg.profileName}`);
+
+    if (this.browser) {
+      try { await this.browser.close(); } catch {}
+      this.browser = null;
+      this.context = null;
+      this.page = null;
+    }
+
+    await this.launchChromeViaPatchright();
+
+    console.log('[DeepSeek] ✅ Chrome (patchright) готов, URL:', this.page?.url());
+    await this.setupBridge();
+    await this.waitForCaptchaIfPresent(120000);
+  }
+
+  private async launchChromeViaPatchright(): Promise<void> {
+    const cfg = this.cfg;
+    const profileDir = cfg.chromeProfileDir;
+    await fsPromises.mkdir(profileDir, { recursive: true });
+
+    const args: string[] = [
+      '--no-first-run',
+      '--no-default-browser-check',
+      '--start-maximized',
+      // Раскомментировать только при отладке через recon-скрипты (ухудшает stealth):
+      // `--remote-debugging-port=${cfg.chromeCdpPort}`,
+    ];
+
+    console.log('[DeepSeek] launchPersistentContext(channel=chrome):');
+    console.log('[DeepSeek]   profile:', profileDir);
+    console.log('[DeepSeek]   args:', args.join(' '));
+
+    const patchrightCtx = await patchrightChromium.launchPersistentContext(profileDir, {
+      channel: 'chrome',
+      headless: false,
+      viewport: null,          // patchright: используем реальный размер окна
+      locale: 'ru-RU',
+      timezoneId: 'Europe/Moscow',
+      args,
+    });
+
+    // patchright — форк playwright; runtime-типы совместимы, но TS видит два разных
+    // номинальных типа (patchright-core vs playwright-core). Приводим на границе.
+    this.context = patchrightCtx as unknown as BrowserContext;
+    this.browser = (patchrightCtx.browser() ?? null) as unknown as Browser | null;
+    console.log('[DeepSeek] CDP version (patchright):', this.browser?.version?.() ?? 'n/a');
+
+    const pages = this.context.pages();
+    this.page =
+      pages.find((p) => p.url().includes('chat.deepseek.com')) ??
+      (await this.context.newPage());
+  }
+
+  /**
+   * Проверяет, слушается ли CDP-порт (уже запущенный Yandex или другой Chromium).
+   * Не различает «наш» и «чужой» инстанс — по CDP это не важно.
+   */
+  private async isYandexCdpAlive(): Promise<boolean> {
+    return new Promise((resolve) => {
+      const req = http.get(
+        `${this.cfg.cdpUrl}/json/version`,
+        { timeout: 1500 },
+        (res) => {
+          let data = '';
+          res.on('data', (c) => (data += c));
+          res.on('end', () => {
+            try {
+              const j = JSON.parse(data);
+              resolve(!!j.webSocketDebuggerUrl);
+            } catch {
+              resolve(false);
+            }
+          });
+        }
+      );
+      req.on('error', () => resolve(false));
+      req.on('timeout', () => {
+        req.destroy();
+        resolve(false);
+      });
+    });
+  }
+
+  /**
+   * Ищет бинарник Yandex для текущей ОС.
+   * Возвращает путь или null, если не нашли.
+   */
+  private findYandexBinary(): string | null {
+    const candidates: string[] = [];
+
+    if (process.platform === 'linux') {
+      candidates.push(
+        '/usr/bin/yandex-browser-stable',
+        '/usr/bin/yandex-browser',
+        '/opt/yandex/browser/yandex_browser',
+        '/opt/yandex/browser/yandex-browser'
+      );
+    } else if (process.platform === 'darwin') {
+      const home = process.env.HOME || '';
+      candidates.push(
+        '/Applications/Yandex.app/Contents/MacOS/Yandex',
+        '/Applications/Yandex Browser.app/Contents/MacOS/Yandex',
+        path.join(home, 'Applications/Yandex.app/Contents/MacOS/Yandex')
+      );
+    } else if (process.platform === 'win32') {
+      const local = process.env.LOCALAPPDATA || '';
+      const prog = process.env.PROGRAMFILES || '';
+      const prog86 = process.env['PROGRAMFILES(X86)'] || '';
+      candidates.push(
+        path.join(local, 'Yandex', 'YandexBrowser', 'Application', 'browser.exe'),
+        path.join(prog, 'Yandex', 'YandexBrowser', 'Application', 'browser.exe'),
+        path.join(prog86, 'Yandex', 'YandexBrowser', 'Application', 'browser.exe')
+      );
+    }
+
+    for (const p of candidates) {
+      try {
+        if (fs.existsSync(p)) return p;
+      } catch {
+        /* ignore */
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Запускает Yandex с CDP-портом на выделенном профиле (userData/yandex-cdp-profile).
+   * Процесс detached: при закрытии GW Yandex продолжает работать,
+   * и следующий Launch переиспользует его.
+   */
+  private async launchYandexWithCdp(opts: { withCdp?: boolean } = {}): Promise<void> {
+    const withCdp = opts.withCdp !== false;  // по умолчанию true
+    const bin = this.findYandexBinary();
+    if (!bin) {
+      throw new Error(
+        `Yandex Browser не найден. Установите его, либо запустите Yandex вручную с --remote-debugging-port=${this.cfg.cdpPort}.`
+      );
+    }
+
+    const profileDir = this.cfg.yandexProfileDir;
+    await fsPromises.mkdir(profileDir, { recursive: true });
+
+/*
+убийство
+
+kill $(lsof -ti :9222)
+
+ручной
+
+/usr/bin/yandex-browser-stable \
+  --remote-debugging-port=9222 \
+  --user-data-dir="${this.cfg.yandexProfileDir}" \
+  --no-first-run \
+  --no-default-browser-check
+*/
+
+    const args = [
+    ...(withCdp ? [`--remote-debugging-port=${this.cfg.cdpPort}`] : []),
+    `--user-data-dir=${profileDir}`,
+    '--no-first-run',
+    '--no-default-browser-check',
+    '--class=gatewayyandex',
+  ];
+    /*const args = [
+      `--remote-debugging-port=${this.cfg.cdpPort}`,
+      `--user-data-dir=${profileDir}`,
+      '--no-first-run',
+      '--no-default-browser-check',
+    ];*/
+
+    console.log('[DeepSeek] Запускаю Yandex CDP:', bin);
+    console.log('[DeepSeek]   args:', args.join(' '));
+    console.log('[DeepSeek]   profile:', profileDir);
+
+    const child = spawn(bin, args, { 
+      detached: true, 
+      stdio: 'ignore',
+      env: { ...process.env } 
+    });
+    child.unref();
+    this.yandexPid = child.pid ?? null;
+    console.log(`[DeepSeek] Yandex PID: ${this.yandexPid}, withCdp=${withCdp}`);
+
+    // Без CDP — просто запустили и возвращаемся. Ждать нечего.
+    if (!withCdp) {
+      console.log('[DeepSeek] launchYandexWithCdp: без CDP, возвращаюсь сразу');
+      return;
+    }
+
+    const start = Date.now();
+    while (Date.now() - start < YANDEX_CDP_WAIT_MS) {
+      if (await this.isYandexCdpAlive()) {
+        console.log(
+          `[DeepSeek] Yandex CDP поднялся за ${Date.now() - start}мс`
+        );
+        return;
+      }
+      await new Promise((r) => setTimeout(r, YANDEX_CDP_POLL_MS));
+    }
+
+    throw new Error(
+      `Yandex запущен, но CDP-порт ${this.cfg.cdpPort} не открылся за ${YANDEX_CDP_WAIT_MS}мс. ` +
+        `Проверьте, что версия Yandex поддерживает --remote-debugging-port ` +
+        `(минимум 24.x), и что профиль ${profileDir} не заблокирован другим процессом.`
+    );
+  }
+
+
 }
 
 
