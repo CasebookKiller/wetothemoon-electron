@@ -1,5 +1,181 @@
 # GATEWAY ROADMAP
 
+_Обновлено: 2026-11-13 (Yandex CDP autolaunch + Input Area Recon closed)_
+
+## ✅ Выполнено
+
+### Ядро и управление Playwright
+- [x] Окно «Шлюз», управление браузером через Playwright
+- [x] Авторизация и восстановление сессии DeepSeek (storageState)
+- [x] Обработка закрытия PW руками (`disconnected` listener)
+- [x] Отправка сообщений (thinking + blocks + fullHtml)
+- [x] Загрузка списка диалогов и истории
+- [x] Тумблеры «Глубокое мышление» / «Умный поиск»
+- [x] Стриминг (`assistant:content-update`, `reasoning:update`)
+- [x] Отлов ошибок (`message:error` → `TopControlPanel`)
+- [x] Прогресс истории (`history:progress`, `history:complete`)
+- [x] Удаление / переименование / закрепление диалогов
+- [x] Multi-select (bulk-pin, bulk-delete)
+- [x] `sendMessage()` — отправка + ожидание + stabilize + extract
+
+### Yandex CDP (закрыто 2026-11-13)
+- [x] `connectToYandex()` через `playwright-core.connectOverCDP` (НЕ `playwright-extra`)
+- [x] `isYandexCdpAlive()` — HTTP-probe `/json/version`
+- [x] `launchYandexWithCdp()` — автозапуск при `ECONNREFUSED`
+- [x] Переиспользование уже запущенного Yandex (`CDP-порт 9222 уже слушается`)
+- [x] Cross-platform поиск бинарника (Linux/macOS/Windows)
+- [x] Persistent profile: `<userData>/yandex-cdp-profile` (НЕ /tmp)
+- [x] Autosave `deepseek_storage.json` после авторизации
+- [x] Проверено: сессия переживает перезапуск GW
+
+### Markdown Renderer (5.8.3 — закрыто)
+- [x] `markdownRenderer.ts` (marked + prismjs + katex)
+- [x] Классы DeepSeek: `ds-markdown-paragraph`, `md-code-block`, `token`, `katex`
+- [x] KaTeX: размеры `1.4em`, степени `0.8em`
+- [x] Fallback в `GatewayMessageAssistant` при битом `fullHtml`
+
+### Snapshot API (5.8.3 — закрыто)
+- [x] `snapshotHistory()` через IndexedDB `deepseek-chat` (~0.2с вместо 975с)
+- [x] `parseIndexedDbSnapshot()` — дерево через `parent_id` + `current_message_id`
+- [x] `markdownToHtml()` — минимальный fallback для IndexedDB
+- [x] Fallback на traverse при ошибке
+
+### Branching (5.7 — закрыто)
+- [x] `switchBranch(messageKey, direction, opts)` с sibling-fallback
+- [x] UI switcher `< 2/2 >`
+- [x] `branchTotal`/`branchIndex` (user через `.dd7e4fda`, assistant наследует)
+- [x] `isActive` через `activePath` из `current_message_id`
+
+### Skip Scroll (5.6 — закрыто)
+- [x] `getConversationMessages({skipBackgroundScroll})`
+- [x] `scrollHistory()`
+- [x] `history:complete` → sync
+- [x] fingerprint last-message сравнение
+
+### Ghost Records (2.2.6 — закрыто)
+- [x] `cleanupGhosts()` в `GatewayCacheService`
+- [x] Кнопка «Очистить призраков» в `GatewayCacheManager`
+
+### Input Area Recon (5.5.1 — закрыто 2026-11-13)
+- [x] `scripts/recon-input-area.mjs` через CDP (без DevTools, без `allow pasting`)
+- [x] **Найдено:** `<input type="file" multiple>` скрытый, `style="display:none"`
+- [x] **Найдено:** React `onChange`-хендлер на input → DeepSeek сам обработает
+- [x] **Найдено:** `textareaReactHandlers: onPaste, onChange, onKeyDown` → Paste-to-File есть
+- [x] **Найдено:** drop-зоны нет (D&D не поддерживается через React)
+- [x] **Найдено:** кнопка-скрепка `div.f02f0e25` с SVG `M5.5498 9.75V5...`
+- [x] **Найдено:** parentChain инпута: `INPUT → .bf38813a → .ec4f5d61 → ._020ab5b`
+- [ ] **Recon 2 (attach-test):** `setInputFiles` на живом инпуте + проверка появления чипа
+
+---
+
+
+
+## ✅ Выполнено 2026-11-17: Patchright + API-канал + контекст
+
+### Patchright (Chrome stealth)
+- [x] `browserKind: "yandex" | "chrome"` в `ProfileService`
+- [x] `launchChromeViaPatchright` — системный Chrome через patchright (`channel: "chrome"`)
+- [x] `connectToChromeViaPatchright` — точка входа в `connectToYandex`
+- [x] Смоук: `webdriver=false`, `cdcKeys=[]`, Chrome 157, реалистичные плагины
+- [x] `inject-cookies-patchright.mjs` — импорт cookies в chrome-профиль
+
+### API-канал (DeepSeek)
+- [x] `deepseekApiService.ts` — стриминг, reasoning, usage
+- [x] Модели: `deepseek-flash` (1M контекст, image input), `deepseek-v4-pro`
+- [x] Aliases `deepseek-chat` / `deepseek-reasoner` работают
+- [x] `sendMessageViaApi` — эмитит те же bridge-события, что web-канал
+- [x] IPC `gateway:send-message-api`
+
+### Учёт бюджета
+- [x] `apiUsageDb.ts` — JSONL + pricing + budget
+- [x] `usage` из каждого ответа пишется в файл
+- [x] IPC `gateway:api-usage-summary` (summary + budget)
+- [x] Оценка: \$0.00168 за типичный запрос на Flash
+
+### Контекст и память (фундамент)
+- [x] `context.manifest.json` — иерархия: global → project → submodule → module → direction
+- [x] `contextBuilder.ts` — `buildContext` (full, 60K) + `buildContinuationSystemPrompt` (compact, 20K)
+- [x] `sendMessageViaApi(continuationMode: true)` — компактный контекст
+- [x] IPC `gateway:export-continuation` — файл в `userData/continuation/`
+- [x] E2E-доказательство: модель отвечает в контексте (7/9 ключевых слов)
+- [x] `docs/GATEWAY_SUMMARY.md`, `docs/SUBMODULE_SUMMARY.md`
+- [x] Чистка `01_COMMON_CONTEXT.md` (убрана старая версия, бэкап `.bak-*`)
+
+### Инфраструктура
+- [x] `.gitignore`: `*.bak-*`, `deepseek_cookies.json`, `.env.local.bak-*`, recon-папки
+- [x] Recon-скрипты: `test-deepseek-*.mjs`, `test-context-*.mjs`, `export-continuation-prompt.mjs`, `gen-context-manifest.mjs`
+
+---
+
+## 🛡️ Сквозная фаза: Anti-Bot Defense (обязательно)
+
+**Правило:** Yandex CDP — приоритет, всё остальное — fallback.
+
+- [x] **Yandex CDP (основной):** реальный браузер, капча проходит 100%
+- [x] **Persistent profile:** cookies/сессия в `<userData>/yandex-cdp-profile`
+- [x] **Автозапуск Yandex:** `isYandexCdpAlive()` + `launchYandexWithCdp()`
+- [x] **Переиспользование живого Yandex:** не убиваем, подключаемся
+- [ ] **Cookie-injection при пустом профиле:** если нет cookies — влить `deepseek_cookies.json` / `deepseek_storage.json` до навигации
+- [ ] **Детект капчи в injectedScript:** `#ds_aws_captcha` / `#cf-overlay` → bridge `captcha:appeared` → UI-баннер
+- [ ] **Safe-flags для Yandex:** `--no-sandbox --disable-gpu --disable-gpu-compositing --disable-features=VaapiVideoDecoder` в `launchYandexWithCdp()` (если segfault вернётся)
+- [ ] **Stealth fallback (Patchright):** если Yandex недоступен — `patchright` вместо `playwright-extra`
+- [ ] **Поведенческий слой:** human-like задержки (1–8с), mouse-jitter, scroll перед вводом
+- [ ] **Прокси-ротация (reserved):** SOCKS/HTTP sticky-session
+- [ ] **Капча-сервисы (reserved):** CapSolver / 2Captcha
+
+---
+
+## 📋 В работе / Ближайшие задачи
+
+### 🎯 5.5 — Input Area + File Picker (СЛЕДУЮЩЕЕ)
+
+**Цель:** умное поле ввода — выбор файлов из архива, чипы 1:1 с PW.
+
+- [x] Recon Input Area (см. выше)
+- [ ] **Recon 2 (attach-test):** `setInputFiles` на живом инпуте → появление чипа
+- [ ] **`sendMessageWithFiles()`** в `deepseekService.ts` — `setInputFiles` + waitFor chips + send
+- [ ] **Refactor `sendMessage`:** вынести общий `waitForAssistantResponse()` helper
+- [ ] **File Picker из БД:** кнопка «Скрепка» → модалка выбора из `file_blobs` (dedup по sha256)
+- [ ] **Чипы в GW:** 1:1 с PW (использовать `chipFullHTML` из recon)
+- [ ] **Paste-to-File:** текст > N KB → виртуальный файл
+- [ ] **Batch-загрузка:** прогресс, отмена, обработка ошибок
+- [ ] **`@file` автодополнение:** по списку файлов проекта
+
+### 🎯 5.5b — SVG-скрепка
+- [ ] Перенести SVG `M5.5498 9.75V5...` в `GatewayIcons.tsx`
+
+### 🎯 5.8 — Полировка
+- [ ] Подсветка кода в старых сообщениях
+- [ ] AppIcon вместо своих SVG
+- [ ] Auto-hide скроллбар в FilePanel
+- [ ] Меню профиля внизу сайдбара
+- [ ] `cleanupOrphans` для `message_files`
+- [ ] `handleEditMessage` — синхронизация edit с PW
+
+### 🎯 Приоритет 2 — Синхронизация GW ↔ PW
+- [ ] `conversation:active-changed` bridge-событие
+- [ ] `activeConvId` в main — sync при переключении
+- [ ] «PW закрыт руками» → fallback из БД
+
+### 🧩 Плагин селекторов
+- [ ] `dumpCurrentPage` при сбое селектора
+- [ ] `deepseek.v1.json` — цепочки с фолбэками
+- [ ] Окно «Редактор селекторов»
+
+---
+
+## 🚀 Схема БД (v3 — актуальная)
+
+```sql
+-- v1: conversations, messages, messages_fts (FTS5)
+-- v2: + messages.message_hash, messages.pw_key, conversations.last_synced_at, pending_edits
+-- v3: + file_blobs, message_files, триггеры ref_count
+
+
+=================
+
+# GATEWAY ROADMAP
+
 _Обновлено: 2026-11-04 (после v3 + files feature)_
 
 ## ✅ Выполнено
@@ -59,107 +235,80 @@ _Обновлено: 2026-11-04 (после v3 + files feature)_
 - [x] Autofetch при открытии (опционально, `localStorage['gateway.autoFetchFileCount']` 0/3/5/10, дефолт 0)
 - [x] `GatewayCacheManager`: бейдж «файлы: N/M», кнопки «⬇ Загрузить» / «✓ все файлы», radio автозагрузки
 
+### Yandex CDP (2.2.8 — закрыто 2026-11-13)
+- [x] `connectToYandex()` — через `playwright-core.connectOverCDP` (НЕ `playwright-extra`)
+- [x] `isYandexCdpAlive()` — HTTP-probe `/json/version`
+- [x] `launchYandexWithCdp()` — автозапуск при ECONNREFUSED
+- [x] Переиспользование уже запущенного Yandex (`CDP-порт 9222 уже слушается`)
+- [x] Cross-platform поиск бинарника (Linux/macOS/Windows)
+- [x] Persistent profile: `<userData>/yandex-cdp-profile` (не /tmp)
+- [x] Autosave `deepseek_storage.json` после успешной авторизации
+- [x] ⚠️ Fallback на bundled Chromium СЛОМАН: `Playwright is missing. :-)` (см. техдолг #10)
+
+### Markdown renderer (5.8.3 — закрыто)
+- [x] `markdownRenderer.ts` (marked + prismjs + katex)
+- [x] Классы DeepSeek: `ds-markdown-paragraph`, `md-code-block`, `token`, `katex`
+- [x] KaTeX: размеры `1.4em`, степени `0.8em`
+- [x] Fallback в `GatewayMessageAssistant`, если `fullHtml` битый
+
+### Snapshot API (5.8.3 — закрыто)
+- [x] `snapshotHistory()` через IndexedDB `deepseek-chat` (~0.2с вместо 975с)
+- [x] `parseIndexedDbSnapshot()` — дерево через `parent_id` + `current_message_id`
+- [x] `markdownToHtml()` — минимальный fallback для IndexedDB-снимков
+- [x] Fallback на traverse при ошибке
+
+### Branching (5.7 — закрыто)
+- [x] `switchBranch(messageKey, direction, opts)` с sibling-fallback
+- [x] UI switcher `< 2/2 >`
+- [x] `branchTotal`/`branchIndex` в parse (для user через `.dd7e4fda`, для assistant — наследование от предыдущего user)
+- [x] `isActive` через `activePath` из `current_message_id`
+
+### Ghost Records (2.2.6 — закрыто)
+- [x] `cleanupGhosts()` в `GatewayCacheService`
+- [x] Кнопка «Очистить призраков» в `GatewayCacheManager`
+
+---
+
+## 🛡️ Сквозная фаза: Anti-Bot Defense (обязательно)
+
+Цель: минимизировать риск блокировки DeepSeek из-за AWS WAF/hCaptcha.
+Многослойная стратегия, от «идеального» к «последнему рубежу».
+
+**Правило:** Yandex CDP — приоритет, всё остальное — fallback.
+
+- [x] **Yandex CDP (основной):** подключение к реальному браузеру. Капча проходит 100%.
+- [x] **Persistent profile:** cookies/сессия в `<userData>/yandex-cdp-profile` (переживает перезагрузку).
+- [x] **Автозапуск Yandex:** `isYandexCdpAlive()` + `launchYandexWithCdp()` при `ECONNREFUSED`.
+- [x] **Переиспользование живого Yandex:** не убиваем, подключаемся к существующему.
+- [ ] **Cookie-injection при пустом профиле:** если нет cookies — влить `deepseek_cookies.json` / `deepseek_storage.json` до первой навигации (чтобы не логиниться вручную).
+- [ ] **Детект капчи в injectedScript:** ловить `#ds_aws_captcha` / `#cf-overlay` → bridge `captcha:appeared` → UI-баннер «Требуется ручное прохождение».
+- [ ] **Safe-flags для Yandex:** `--no-sandbox --disable-gpu --disable-gpu-compositing --disable-features=VaapiVideoDecoder` в `launchYandexWithCdp()`.
+- [ ] **Stealth fallback (Patchright):** если Yandex недоступен — `patchright` вместо `playwright-extra` (патчит бинарник, а не только JS). Капчу скорее всего не пройдёт, но лучше, чем ничего.
+- [ ] **Поведенческий слой:** human-like задержки (1–8с), mouse-jitter перед send, scroll перед вводом. Снижает bot-score, капчу не решает.
+- [ ] **Прокси-ротация (reserved):** SOCKS/HTTP sticky-session. Только при бане IP.
+- [ ] **Капча-сервисы (reserved):** CapSolver / 2Captcha. Платно, 100%.
+
 ---
 
 ## 📋 В работе / Ближайшие задачи
 
-### 🎯 5.6 — Skip scroll + history:changed (СЛЕДУЮЩЕЕ)
+### 🎯 5.5 — Input Area + File Picker (СЛЕДУЮЩЕЕ)
 
-**Цель:** открытие свежего диалога за ~2с вместо 12-13с, если БД актуальна и файлы загружены.
+**Цель:** умное поле ввода — выбор файлов из архива, paste-to-file, чипы 1:1 с PW.
 
-**Логика `handleOpenConversation`:**
+- [ ] **Recon Input Area** (`scripts/recon-input-area.mjs` через CDP): найти `input[type=file]`, paste-handler на textarea, drop-зону.
+- [ ] **File Picker из БД:** кнопка «Скрепка» → модалка выбора из `file_blobs` (dedup по sha256).
+- [ ] **Отправка в PW:** `setInputFiles()` / `ClipboardEvent` paste / `DataTransfer` drop — по результатам Recon.
+- [ ] **Чипы в GW:** 1:1 с PW (использовать `existingChips[].chipFullHTML` из Recon).
+- [ ] **Paste-to-File:** текст > N KB → виртуальный файл (как PW).
+- [ ] **Batch-загрузка:** прогресс, отмена, обработка ошибок.
+- [ ] **`@file` автодополнение** — по списку файлов проекта.
 
-```
-1. БД → UI (мгновенно)
-2. Параллельно:
-   - api.gatewayGetConversationMessages(id, title, { skipBackgroundScroll: true })
-   - api.gatewayFileStatsBulk()
-3. Сравнение fingerprint(last):
-   - dbLast vs pwLast + prev.length === pwVisible.length
-4. Решение:
-   - lastMatches && pending===0 → skip всё (~2с)
-   - lastMatches && pending>0  → scrollHistory + sync({prune:false})
-   - !lastMatches                → scrollHistory + sync({prune:true})
-```
-
-**Что добавить:**
-
-- [ ] `deepseekService.getConversationMessages(opts?: {skipBackgroundScroll})`
-- [ ] `deepseekService.scrollHistory()` — публичная обёртка над `backgroundScrollAndEmit`
-- [ ] IPC `gateway:scroll-history(convId)`
-- [ ] preload `gatewayScrollHistory`
-- [ ] типы в `types/gateway.d.ts`
-- [ ] `GatewayPage.handleOpenConversation` — новая логика
-- [ ] Auto-fetch: проверка `gatewayGetStatus().status === 'running'` перед batch
-- [ ] InjectedScript polling last fingerprint 1с → `history:changed`
-- [ ] `BridgeEvents.ts` — `history:changed`
-- [ ] `GatewayPage` — обработчик `history:changed` с дебаунсом 1.5с
-- [ ] `__gatewayIsScrolling` флаг (выставляется из `backgroundScrollAndEmit`)
-- [ ] `batchRunningRef` — игнорировать `message:count-changed` во время batch
-
-**Fingerprint для сравнения last (без thumbUrl/mime/size/fileId):**
-
-```typescript
-const messageFingerprint = (msg: ChatMessage): string => {
-  const parts = msg.blocks
-    .filter(b => b.type === 'text' || b.type === 'file')
-    .map(b => `${b.type}:${b.content}`)
-    .join('\u0001');
-  return `${msg.role}\u0002${parts}`;
-};
-```
-
-### 🎯 5.7 — Branching (отложено)
-
-**Проблема:** regenerate/edit в PW создают ветки (`1/2 ← →`), БД flat — старые ветки теряются при `prune`.
-
-**Миграция v4:**
-
-```sql
-ALTER TABLE messages ADD COLUMN parent_hash TEXT;
-ALTER TABLE messages ADD COLUMN branch_index INTEGER DEFAULT 0;
-ALTER TABLE messages ADD COLUMN branch_total INTEGER DEFAULT 1;
-ALTER TABLE messages ADD COLUMN is_active INTEGER DEFAULT 1;
-```
-
-**Sync при `prune:true`:** вместо DELETE → `UPDATE messages SET is_active=0`, потом INSERT/UPDATE активной ветки с `is_active=1`.
-
-**UI:** `1/2 ← →` под ответом, клик → `switchBranchInPW(branchIndex)` → sync.
-
-**Recon:** как PW переключает ветки (endpoint, branch index в payload).
-
-### 🎯 5.5 — File picker из архива в InputArea (отложено)
-
-Из требования: «выбирать из файлов, которые уже отправляли, чтобы исключить дубли».
-
-- [ ] `GatewayFilePickerModal` — поиск по имени, фильтр по типу/mime, превью, чекбоксы
-- [ ] IPC `gateway:file-picker-list(query, limit)` → distinct по sha256
-- [ ] Отправка в PW: `page.setInputFiles()` или drag&drop (нужен recon attach-механизма)
-
-### 🎯 5.8 — Полировка
-
-- [ ] Подсветка кода в **старых** сообщениях (фикс: переоткрыть → sync перезапишет content_html)
-- [ ] AppIcon вместо своих SVG
-- [ ] Auto-hide скроллбар в FilePanel (hover → показать, 1с простоя → скрыть)
-- [ ] Меню профиля внизу сайдбара (Настройки / Выйти)
-- [ ] `cleanupOrphans` для orphaned `message_files` (кнопка в CacheManager)
-- [ ] `handleEditMessage` — синхронизация edit с PW
-
-### 🎯 Приоритет 2 — Синхронизация GW ↔ PW (частично покрыто 5.6)
-
-- [ ] `conversation:active-changed` bridge-событие (если юзер переключил чат в PW)
-- [ ] `activeConvId` в main — sync при переключении
-- [ ] «PW закрыт руками» → fallback из БД (проверить `isHistoryLoading=false` корректно)
-
-### 🧩 Плагин селекторов (адаптация под изменения DeepSeek)
-
-- [ ] `dumpCurrentPage` — вызывать при сбое селектора (есть в deepseekService)
-- [ ] `deepseek.v1.json` — цепочки с фолбэками для всех критичных селекторов
-- [ ] Автосохранение HTML-дампа при сбое
-- [ ] Окно «Редактор селекторов» (Проверить / Сохранить / Импорт / Экспорт)
-- [ ] Обновление профиля без пересборки
-
----
+### 🎯 5.6 — Skip scroll (закрыто в этой сессии)
+- [x] `getConversationMessages({skipBackgroundScroll})`
+- [x] `scrollHistory()`
+- [x] `history:complete` → sync
+- [x] fingerprint last-message сравнение
 
 ## 🚀 Схема БД (v3 — актуальная)
 
@@ -230,6 +379,9 @@ CREATE TABLE message_files (
 7. **`selectMessages`/`regenerate`/`sendFeedback`** — `nth(index)`, не работают на виртуалке.
 8. **`setRussianLanguage`** — отключён (нет селекторов Settings).
 9. **FTS5** — проверено, работает (ENABLE_FTS3, ENABLE_FTS3_PARENTHESIS, ENABLE_FTS5).
+
+10. **`Playwright is missing` в fallback** — `vite.main.config.ts` не externalize'ит `playwright-extra`. `/node_modules/` не матчится по спецификатору импорта. Нужен явный список: `'playwright', 'playwright-core', 'playwright-extra', 'puppeteer-extra', 'puppeteer-extra-plugin', 'puppeteer-extra-plugin-stealth'`. После правки `grep -c "Playwright is missing" dist/main/main.js` должно быть `0`.
+11. **Yandex segfault на T480s** — при ручном `--remote-debugging-port` падает с SIGSEGV из-за GPU/sandbox. В `launchYandexWithCdp()` пока НЕ добавлены `--no-sandbox --disable-gpu --disable-gpu-compositing --disable-features=VaapiVideoDecoder`. Добавить, если segfault вернётся.
 
 ---
 
