@@ -1,0 +1,74 @@
+{
+  "version": 1,
+  "root": "/home/ll/Документы/GitHub/wetothemoon-project/wetothemoon-electron",
+  "hint": "summaryFile — короткая версия для system prompt, file — полная для read_context_node tool.",
+  "workspaces": {
+    "gateway-sprint": {
+      "title": "Gateway: patchright + API fallback",
+      "keys": [
+        "wetothemoon-electron/gateway",
+        "wetothemoon-electron/gateway/patchright",
+        "wetothemoon-electron/gateway/api-channel"
+      ]
+    },
+    "prana-bindu-ai": {
+      "title": "Prana-Bindu: AI-тренер + Ollama",
+      "keys": [
+        "wetothemoon-electron/prana-bindu",
+        "wetothemoon-electron/prana-bindu/11-ai-coach",
+        "wetothemoon-electron/training/finetune-ollama"
+      ]
+    },
+    "osint-sietch": {
+      "title": "OSINT → SIETCH pipeline",
+      "keys": [
+        "wetothemoon-electron/osint",
+        "wetothemoon-electron/sietch"
+      ]
+    }
+  },
+  "nodes": [
+    { "key": "global", "kind": "global", "title": "Global Context",
+      "parent": null, "file": "docs/prompts/01_COMMON_CONTEXT.md" },
+
+    { "key": "wetothemoon-project", "kind": "project", "title": "WeToTheMoon Project",
+      "parent": "global", "file": null },
+
+    { "key": "wetothemoon-electron", "kind": "submodule", "title": "Electron Submodule",
+      "parent": "wetothemoon-project", "file": "docs/SUBMODULE_SUMMARY.md" },
+
+    { "key": "wetothemoon-electron/gateway", "kind": "module", "title": "Gateway (DeepSeek brain)",
+      "parent": "wetothemoon-electron", "file": "GATEWAY_ROADMAP.md",
+      "summaryFile": "docs/GATEWAY_SUMMARY.md" },
+
+    { "key": "wetothemoon-electron/gateway/patchright", "kind": "direction", "title": "Patchright + Chrome channel",
+      "parent": "wetothemoon-electron/gateway", "file": "GATEWAY_ROADMAP.md" },
+
+    { "key": "wetothemoon-electron/gateway/api-channel", "kind": "direction", "title": "API channel + context builder",
+      "parent": "wetothemoon-electron/gateway", "file": "GATEWAY_MULTI_ACCOUNT_ROADMAP.md" },
+
+    { "key": "wetothemoon-electron/prana-bindu", "kind": "module", "title": "Prana-Bindu (fitness)",
+      "parent": "wetothemoon-electron", "file": "docs/prompts/PROJECT_STATE.md" },
+
+    { "key": "wetothemoon-electron/prana-bindu/11-ai-coach", "kind": "direction", "title": "AI-тренер",
+      "parent": "wetothemoon-electron/prana-bindu", "file": null },
+
+    { "key": "wetothemoon-electron/training", "kind": "module", "title": "Ollama training (fine-tune)",
+      "parent": "wetothemoon-electron", "file": "docs/training.md" },
+
+    { "key": "wetothemoon-electron/training/finetune-ollama", "kind": "direction", "title": "Fine-tune small models",
+      "parent": "wetothemoon-electron/training", "file": null },
+
+    { "key": "wetothemoon-electron/osint", "kind": "module", "title": "OSINT (rusprofile/kad.arbitr)",
+      "parent": "wetothemoon-electron", "file": "OSINT_ROADMAP.md" },
+
+    { "key": "wetothemoon-electron/sietch", "kind": "module", "title": "SIETCH (data warehouse)",
+      "parent": "wetothemoon-electron", "file": null },
+
+    { "key": "wetothemoon-electron/trading", "kind": "module", "title": "Trading (T-Bank)",
+      "parent": "wetothemoon-electron", "file": null },
+
+    { "key": "wetothemoon-electron/tasks", "kind": "module", "title": "Tasks (scheduler)",
+      "parent": "wetothemoon-electron", "file": null }
+  ]
+}
