@@ -127,3 +127,13 @@ md-recon/
 captures/
 deepseek_cookies.json
 .env.local.bak-*
+scripts/recon-*.mjs
+scripts/md-*.mjs
+scripts/inject-cookies.mjs
+scripts/compare-stream-formatting.mjs
+scripts/check-injected.js
+scripts/check-icon.sh
+scripts/svg-to-gateway-icon.sh
+scripts/test-prompt.txt
+scripts/recon-symbols.sh
+scripts/recon.sh
