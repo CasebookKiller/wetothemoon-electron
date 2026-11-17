@@ -119,4 +119,9 @@ src/renderer/dist/
 # Отладочные скрипты для kad.arbitr — не коммитим
 scripts/kad-test/
 
-docs/strava/
+docs/strava/*.bak-*
+continuation/
+recon-output/
+recon-out/
+md-recon/
+captures/
