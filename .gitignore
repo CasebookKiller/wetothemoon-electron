@@ -125,3 +125,5 @@ recon-output/
 recon-out/
 md-recon/
 captures/
+deepseek_cookies.json
+.env.local.bak-*
