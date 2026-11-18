@@ -1,6 +1,6 @@
 // src/main/services/gateway/cache/schema.ts
 
-export const SCHEMA_VERSION = 8;
+export const SCHEMA_VERSION = 9;
 
 export const CREATE_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS conversations (
