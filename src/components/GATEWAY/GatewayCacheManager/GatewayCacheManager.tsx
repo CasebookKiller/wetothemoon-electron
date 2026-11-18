@@ -68,7 +68,8 @@ export const GatewayCacheManager: React.FC<GatewayCacheManagerProps> = ({
     Record<string, { total: number; loaded: number; pending: number; failed: number }>
   >({});
   const [batchingConvId, setBatchingConvId] = useState<string | null>(null);
-    // 5.8.x: диагностика веток (read-only)
+  
+  // 5.8.x: диагностика веток (read-only)
   const [diagOpen, setDiagOpen] = useState(false);
   const [diagLoading, setDiagLoading] = useState(false);
   const [diagReport, setDiagReport] = useState<any | null>(null);
@@ -89,6 +90,7 @@ export const GatewayCacheManager: React.FC<GatewayCacheManagerProps> = ({
       setDiagLoading(false);
     }
   };
+  
   // 5.7.24: сбор всех веток (true = медленно, false = только активная)
   const [collectAllBranches, setCollectAllBranches] = useState<boolean>(() => {
     try {
@@ -97,6 +99,7 @@ export const GatewayCacheManager: React.FC<GatewayCacheManagerProps> = ({
       return false;
     }
   });
+  
   // 5.8.3: скорость скроллинга
   const [scrollSpeed, setScrollSpeed] = useState<'fast' | 'normal' | 'slow'>(() => {
     try {
@@ -105,6 +108,7 @@ export const GatewayCacheManager: React.FC<GatewayCacheManagerProps> = ({
     } catch {}
     return 'normal';
   });
+  
   const [scrollMode, setScrollMode] = useState<'snapshot' | 'normal' | 'deep'>(() => {
     try {
       const v = localStorage.getItem('gateway.scrollMode');
@@ -112,6 +116,7 @@ export const GatewayCacheManager: React.FC<GatewayCacheManagerProps> = ({
     } catch {}
     return 'snapshot';
   });
+  
   const handleScrollSpeedChange = (v: 'fast' | 'normal' | 'slow') => {
     setScrollSpeed(v);
     try { localStorage.setItem('gateway.scrollSpeed', v); } catch {}
@@ -135,6 +140,18 @@ export const GatewayCacheManager: React.FC<GatewayCacheManagerProps> = ({
       /* ignore */
     }
     return 0;
+  });
+
+  // TTL для старых версий файлов (7/14/30/90)
+  const [ttlDays, setTtlDays] = useState<number>(() => {
+    try {
+      const v = localStorage.getItem('gateway.fileTTLDays');
+      if (v) {
+        const n = parseInt(v, 10);
+        if ([7, 14, 30, 90].includes(n)) return n;
+      }
+    } catch {}
+    return 7;
   });
 
   const handleAutoFetchChange = (v: number) => {
@@ -549,6 +566,34 @@ export const GatewayCacheManager: React.FC<GatewayCacheManagerProps> = ({
                     </div>
                   </div>
 
+                  {/* cleanup ghost записей */}
+                  <div className="gateway-cache-actions__card">
+                    <div className="gateway-cache-actions__title">Удалить ghost-записи</div>
+                    <div className="gateway-cache-actions__desc">
+                      Удаляет «призраков» — неактивные сообщения, у которых нет активной версии.
+                      Это очищает БД от мусора после сбоев синхронизации веток.
+                    </div>
+                    <div
+                      role="button"
+                      className="ds-button ds-button--outlinedNeutral ds-button--outlined ds-button--capsule ds-button--m"
+                      onClick={async () => {
+                        try {
+                          const r = await api.gatewayCleanupGhosts();
+                          if (r.success) {
+                            setInfo(`Удалено ghost-записей: ${r.data?.deleted || 0}`);
+                            await Promise.all([refreshStats(), refreshConversations()]);
+                          } else {
+                            setError(r.error || 'Ошибка очистки');
+                          }
+                        } catch (e) {
+                          setError((e as Error).message);
+                        }
+                      }}
+                    >
+                      <span className="ds-button__content">Очистить призраков</span>
+                    </div>
+                  </div>
+
                   {/* 5.7.24: Сбор веток */}
                   <div className="gateway-cache-actions__card">
                     <div className="gateway-cache-actions__title">Режим синхронизации</div>
@@ -644,6 +689,52 @@ export const GatewayCacheManager: React.FC<GatewayCacheManagerProps> = ({
                         : `${autoFetchCount} файлов при открытии диалога`}
                     </div>
                   </div>
+
+                  {/* ── TTL для версий файлов ── */}
+                  <div className="gateway-cache-actions__card">
+                    <div className="gateway-cache-actions__title">Срок хранения версий файлов</div>
+                    <div className="gateway-cache-actions__desc">
+                      Старые версии файлов из архива, которые не отправлялись дольше указанного срока, будут удалены. Последняя (актуальная) версия каждого файла сохраняется навсегда.
+                    </div>
+                    <div className="gateway-cache-actions__radio-group">
+                      {[7, 14, 30, 90].map((n) => (
+                        <div
+                          key={n}
+                          role="button"
+                          tabIndex={0}
+                          className={`gateway-cache-actions__radio${ttlDays === n ? ' gateway-cache-actions__radio--active' : ''}`}
+                          onClick={() => {
+                            setTtlDays(n);
+                            try { localStorage.setItem('gateway.fileTTLDays', String(n)); } catch {}
+                          }}
+                        >
+                          {n} дней
+                        </div>
+                      ))}
+                    </div>
+                    <div className="gateway-cache-actions__hint" style={{ marginTop: 12 }}>
+                      <div
+                        role="button"
+                        className="ds-button ds-button--outlinedNeutral ds-button--outlined ds-button--capsule ds-button--m"
+                        onClick={async () => {
+                          try {
+                            const r = await api.gatewayResourcesGc(ttlDays);
+                            if (r.success) {
+                              setInfo(`Очистка завершена. Удалено версий: ${r.data.deletedVersions}, источников: ${r.data.deletedSources}`);
+                              await Promise.all([refreshStats(), refreshConversations()]);
+                            } else {
+                              setError(r.error || 'Ошибка очистки');
+                            }
+                          } catch (e) {
+                            setError((e as Error).message);
+                          }
+                        }}
+                      >
+                        <span className="ds-button__content">Очистить сейчас</span>
+                      </div>
+                    </div>
+                  </div>
+
                 </div>
               )}
             </div>

@@ -20,3 +20,10 @@ export {
 } from './FileBatchService';
 export { getGatewayFilesDir } from './db';
 export { CREATE_FILES_SQL } from './schema';
+export {
+  ResourceService,
+  type ResourceKind,
+  type MemoryState,
+  type ResourceListItem,
+  type SaveDiskFileResult,
+} from './ResourceService';

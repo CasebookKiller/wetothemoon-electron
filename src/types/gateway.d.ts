@@ -345,11 +345,11 @@ declare global {
           };
           error?: string;
         }>;
-      gatewayProfilesCreate: (opts: { name: string; notes?: string }) =>
+      gatewayProfilesCreate: (opts: { name: string; notes?: string; browserKind?: 'yandex' | 'chrome' }) =>
         Promise<{ success: boolean; data?: any; error?: string }>;
       gatewayProfilesActivate: (id: string) =>
         Promise<{ success: boolean; error?: string }>;
-      gatewayProfilesUpdate: (id: string, patch: { name?: string; notes?: string }) =>
+      gatewayProfilesUpdate: (id: string, patch: { name?: string; notes?: string; browserKind?: 'yandex' | 'chrome' }) =>
         Promise<{ success: boolean; data?: any; error?: string }>;
       gatewayProfilesDelete: (id: string, opts: { deleteFiles?: boolean }) =>
         Promise<{ success: boolean; error?: string }>;

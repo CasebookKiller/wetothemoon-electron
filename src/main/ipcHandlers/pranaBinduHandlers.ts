@@ -4250,7 +4250,7 @@ export function registerPranaBinduHandlers(): void {
           if (enabledProviders.has('intervals-icu')) {
             try {
               const provider = getProvider('intervals-icu') as any;
-              if (!provider || typeof provider.fetchPlanEvents !== 'function') {
+                            if (!provider || typeof provider.fetchPlanEvents !== 'function') {
                 icuPlanResult = {
                   added: 0,
                   updated: 0,
@@ -4258,7 +4258,15 @@ export function registerPranaBinduHandlers(): void {
                   error: 'провайдер ICU не поддерживает план',
                 };
               } else {
-                const events = await provider.fetchPlanEvents(fromIso, toIso);
+                // План тянем и на будущее (+30 дней от сегодня): иначе
+                // в FullWeek будущие карточки пустые — ICU-план просто
+                // не попадает в БД. fromIso (прошлое окно) оставляем
+                // как было — он нужен, чтобы подхватить правки прошлого.
+                const planFuture = new Date();
+                planFuture.setDate(planFuture.getDate() + 30);
+                const planToIso = `${planFuture.getFullYear()}-${pad(planFuture.getMonth() + 1)}-${pad(planFuture.getDate())}`;
+
+                const events = await provider.fetchPlanEvents(fromIso, planToIso);
                 let added = 0;
                 let updated = 0;
                 let failed = 0;
@@ -4273,7 +4281,8 @@ export function registerPranaBinduHandlers(): void {
                 }
                 icuPlanResult = { added, updated, failed };
                 console.log(
-                  `[Prana-Bindu] auto-sync: icu-plan +${added} ~${updated} ✗${failed} (всего ${events.length})`,
+                  `[Prana-Bindu] auto-sync: icu-plan ${fromIso}..${planToIso} ` +
+                  `+${added} ~${updated} ✗${failed} (всего ${events.length})`,
                 );
               }
             } catch (e) {

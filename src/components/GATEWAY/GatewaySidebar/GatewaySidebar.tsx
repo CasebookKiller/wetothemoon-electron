@@ -18,6 +18,8 @@ import {
   PanelCollapseIcon
 } from '../GatewayIcons/GatewayIcons';
 
+import { GatewayProfileMenu } from '../GatewayProfileMenu/GatewayProfileMenu';
+
 interface Conversation {
   id: string;
   title: string;
@@ -461,23 +463,7 @@ export const GatewaySidebar: React.FC<GatewaySidebarProps> = ({
             </div>
           </div>
         ) : (
-          <div className="_7b40dad f14f3a6d">
-            <div className="dc1f7bee _4bcc731">
-              <div className="_2afd28d" tabIndex={0}>
-                <div className="ede5bc47">
-                  <img
-                    className="fdf01f38"
-                    src="/src/themes/deepseek-theme/Og5Vsi-3JyYNSKTMzUM4MOYp"
-                    alt="avatar"
-                  />
-                </div>
-                <div className="_9d8da05">Алексей Кузнецов</div>
-                <div className="ds-icon _39cc453" style={{ fontSize: 16, width: 16, height: 16 }}>
-                  <MoreIcon size={16} />
-                </div>
-              </div>
-            </div>
-          </div>
+          <GatewayProfileMenu />
         )}
       </div>
     </>

@@ -107,6 +107,63 @@ export class GatewayFileService {
   }
 
   /**
+   * Универсальный upsert blob'а в file_blobs (без message_files).
+   * Используется ResourceService.saveDiskFile.
+   */
+  async ensureBlob(input: {
+    content: string;
+    name: string;
+    mime?: string;
+    fileKind: 'text' | 'image' | 'binary';
+    isBase64: boolean;
+  }): Promise<{ sha256: string; contentSaved: 'db' | 'disk'; wasExisting: boolean }> {
+    const db = this.db;
+    const now = Date.now();
+
+    const buffer = input.isBase64
+      ? Buffer.from(input.content, 'base64')
+      : Buffer.from(input.content, 'utf-8');
+    const sizeBytes = buffer.byteLength;
+    const sha256 = createHash('sha256').update(buffer).digest('hex');
+
+    const existing = db
+      .prepare('SELECT * FROM file_blobs WHERE sha256 = ?')
+      .get(sha256) as unknown as BlobRow | undefined;
+    if (existing) {
+      return {
+        sha256,
+        contentSaved: existing.content_path ? 'disk' : 'db',
+        wasExisting: true,
+      };
+    }
+
+    let contentSaved: 'db' | 'disk' = 'db';
+    if (input.fileKind === 'text' && sizeBytes < TEXT_DB_THRESHOLD) {
+      db.prepare(`
+        INSERT INTO file_blobs
+          (sha256, content_text, content_path, content_size_bytes,
+           file_kind, mime, created_at, ref_count)
+        VALUES (?, ?, NULL, ?, ?, ?, ?, 0)
+      `).run(sha256, input.content, sizeBytes, input.fileKind, input.mime || null, now);
+      contentSaved = 'db';
+    } else {
+      const ext = this.guessExt(input.mime, input.name);
+      const filePath = this.blobPath(sha256, ext);
+      await this.ensureBlobDir(sha256);
+      await fsPromises.writeFile(filePath, buffer);
+      db.prepare(`
+        INSERT INTO file_blobs
+          (sha256, content_text, content_path, content_size_bytes,
+           file_kind, mime, created_at, ref_count)
+        VALUES (?, NULL, ?, ?, ?, ?, ?, 0)
+      `).run(sha256, filePath, sizeBytes, input.fileKind, input.mime || null, now);
+      contentSaved = 'disk';
+    }
+
+    return { sha256, contentSaved, wasExisting: false };
+  }
+
+  /**
    * Сохранить файл: sha256 → file_blobs (dedup) + message_files.
    * Триггер message_files_ai инкрементирует ref_count.
    */
@@ -620,7 +677,16 @@ export class GatewayFileService {
     const cutoff = Date.now() - olderThanHours * 3600 * 1000;
 
     const blobs = db
-      .prepare('SELECT * FROM file_blobs WHERE ref_count <= 0 AND created_at < ?')
+      .prepare(`
+        SELECT * FROM file_blobs
+        WHERE ref_count <= 0
+          AND created_at < ?
+          AND sha256 NOT IN (
+            SELECT latest_sha256 FROM resources WHERE latest_sha256 IS NOT NULL
+            UNION
+            SELECT sha256 FROM resource_versions
+          )
+      `)
       .all(cutoff) as unknown as BlobRow[];
 
     let deletedFiles = 0;

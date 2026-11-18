@@ -91,3 +91,116 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ────────────────────────────────────────────────────────────
+   GatewayProfileSwitcher: выравнивание по высоте + z-index тултипа
+   ──────────────────────────────────────────────────────────── */
+
+/* Обёртка — строгий flex, всё по центру */
+.gateway-profile-switcher {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.gateway-profile-switcher__label {
+  color: var(--tg-theme-hint-color, #888);
+}
+
+/* Dropdown — фиксированная высота 2.5rem (=40px), без лишних отступов */
+.gateway-profile-switcher__dropdown.p-dropdown {
+  height: 2.5rem !important;
+  min-height: 2.5rem !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  padding: 0 0.5rem !important;
+  font-size: 0.75rem !important;
+  margin: 0 !important;
+}
+
+.gateway-profile-switcher__dropdown.p-dropdown .p-dropdown-label {
+  font-size: 0.75rem !important;
+  padding: 0 0.25rem !important;
+  line-height: 1 !important;
+}
+
+.gateway-profile-switcher__dropdown.p-dropdown .p-dropdown-trigger {
+  width: 1.75rem !important;
+}
+
+/* Кнопка «+» — квадрат 2.5×2.5rem, без padding/margin, иконка по центру */
+.gateway-profile-switcher__plus.p-button {
+  height: 2.5rem !important;
+  min-height: 2.5rem !important;
+  width: 2.5rem !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  line-height: 1 !important;
+}
+
+/* На всякий случай — иконка внутри тоже по центру */
+.gateway-profile-switcher__plus.p-button .p-button-icon {
+  margin: 0 !important;
+  line-height: 1 !important;
+}
+
+.gateway-profile-switcher__hint {
+  color: var(--tg-theme-destructive-text-color, #c97);
+  font-size: 0.7rem;
+}
+
+.gateway-profile-switcher__error {
+  color: var(--tg-theme-destructive-text-color, #c33);
+  font-size: 0.7rem;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Тултип PrimeReact — выше панели (панель обычно z-index ≤ 9999) */
+.p-tooltip {
+  z-index: 10000 !important;
+}
+
+/* Серая `+` кнопка (вместо accent-синей) */
+.gateway-profile-switcher__plus.p-button {
+  height: 2.5rem !important;
+  min-height: 2.5rem !important;
+  width: 2.5rem !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: transparent !important;
+  color: var(--tg-theme-hint-color, #888) !important;
+  border: 1px solid var(--tg-theme-hint-color, #888) !important;
+  box-shadow: none !important;
+}
+
+.gateway-profile-switcher__plus.p-button:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: var(--tg-theme-text-color, #f5f5f5) !important;
+  border-color: var(--tg-theme-text-color, #f5f5f5) !important;
+}
+
+.gateway-profile-switcher__plus.p-button:focus {
+  box-shadow: 0 0 0 2px rgba(136, 136, 136, 0.3) !important;
+}
+
+/* Опасная кнопка «убить Yandex» — красная */
+.gateway-profile-switcher__plus--danger.p-button {
+  border-color: rgba(236, 57, 66, 0.6) !important;
+  color: #ec3942 !important;
+}
+
+.gateway-profile-switcher__plus--danger.p-button:hover {
+  background: rgba(236, 57, 66, 0.15) !important;
+  border-color: #ec3942 !important;
+  color: #ec3942 !important;
+}

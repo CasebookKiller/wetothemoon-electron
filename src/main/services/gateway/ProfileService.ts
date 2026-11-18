@@ -222,16 +222,19 @@ export class ProfileService {
     }
   }
 
-  create(opts: { name: string; notes?: string }): GatewayProfile {
+  create(opts: { name: string; notes?: string; browserKind?: 'yandex' | 'chrome' }): GatewayProfile {
     const id = 'p_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
     const dir = path.join(this.profilesRoot, id);
     fs.mkdirSync(dir, { recursive: true });
 
+    const cdpPort = this.nextPort();
+    const browserKind = opts.browserKind ?? 'yandex';
     const profile: GatewayProfile = {
       id,
       name: opts.name,
-      cdpPort: this.nextPort(),
-      browserKind: 'yandex',
+      cdpPort,
+      browserKind,
+      ...(browserKind === 'chrome' ? { chromeCdpPort: cdpPort + 100 } : {}),
       dirName: id,
       createdAt: new Date().toISOString(),
       lastActiveAt: null,
@@ -242,10 +245,17 @@ export class ProfileService {
     return profile;
   }
 
-  update(id: string, patch: Partial<Pick<GatewayProfile, 'name' | 'notes'>>): GatewayProfile {
+  update(id: string, patch: Partial<Pick<GatewayProfile, 'name' | 'notes' | 'browserKind'>>): GatewayProfile {
     const p = this.get(id);
     if (!p) throw new Error('Профиль не найден: ' + id);
     Object.assign(p, patch);
+    // Авто-настройка chromeCdpPort при смене browserKind
+    if (patch.browserKind === 'chrome' && !p.chromeCdpPort) {
+      p.chromeCdpPort = p.cdpPort + 100;
+    }
+    if (patch.browserKind === 'yandex') {
+      delete p.chromeCdpPort;
+    }
     this.save();
     return p;
   }

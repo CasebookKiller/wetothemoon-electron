@@ -13,11 +13,15 @@ import {
 } from '@/components/GATEWAY/GatewayIcons/GatewayIcons';
 import { classNames } from '@/css/classnames';
 import { renderMarkdown } from '@/components/GATEWAY/utils/markdownRenderer';
+import AppIcon from '@/components/COMMON/AppIcon/AppIcon';
+import type { WebSource } from '@/components/GATEWAY/GatewaySourcesPanel/GatewaySourcesPanel';
 
 interface GatewayMessageAssistantProps {
   thinking?: string;
   blocks: Array<{ type: 'text' | 'code' | 'file'; content: string; language?: string }>;
   fullHtml?: string;
+  sources?: WebSource[];
+  onSourceClick?: (sources: WebSource[]) => void;
   selectMode?: boolean;
   isSelected?: boolean;
   onToggleSelect?: () => void;
@@ -36,6 +40,8 @@ export const GatewayMessageAssistant: React.FC<GatewayMessageAssistantProps> = (
   thinking,
   blocks,
   fullHtml,
+  sources,
+  onSourceClick,
   selectMode = false,
   isSelected = false,
   onToggleSelect,
@@ -59,12 +65,23 @@ export const GatewayMessageAssistant: React.FC<GatewayMessageAssistantProps> = (
   //   1) сломанная таблица: осталась как текст с |---|
   //   2) неподсвеченный код: есть <code language-X>, но нет token-классов
   const renderedHtml = React.useMemo(() => {
+    // Хелпер: экранировать «чужие» HTML-теги в тексте (PW иногда вставляет
+    // <k>, <li>, <suspense>, <div> из JSX-примеров как реальные теги).
+    // Оставляем только безопасный inline-набор — marked отрендерит его.
+    const escapeUnknownTags = (html: string): string => {
+      const SAFE = /^(?:strong|b|em|i|u|code|a|br|span|sub|sup|del|s|mark|p|ul|ol|li|blockquote|h[1-6]|table|thead|tbody|tr|td|th|hr|img|pre)$/i;
+      return html.replace(/<\/?([a-zA-Z][a-zA-Z0-9]*)\b[^>]*>/g, (match, tag) => {
+        if (SAFE.test(tag)) return match;
+        return match.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      });
+    };
+
     const md = (blocks || [])
       .filter((b) => b.type === 'text' || b.type === 'code')
       .map((b) =>
         b.type === 'code'
-          ? '```' + (b.language || '') + '\n' + b.content + '\n```'
-          : b.content
+          ? '```' + (b.language || '') + '\n' + b.content.replace(/\n+$/, '') + '\n```'
+          : escapeUnknownTags(b.content)
       )
       .join('\n\n');
 
@@ -72,11 +89,32 @@ export const GatewayMessageAssistant: React.FC<GatewayMessageAssistantProps> = (
       const hasBrokenTable =
         /<br>\|\s*[-:]+\s*\|/.test(fullHtml) ||
         fullHtml.includes('|---|');
+      
       const hasUnhighlightedCode =
         /<pre><code class="language-[^"]+">/.test(fullHtml) &&
         !fullHtml.includes('class="token');
-      if (!hasBrokenTable && !hasUnhighlightedCode) {
+
+      // Ловим и `<pre><span>`, и `<pre>\n<span>` (если strip не сработал)
+      const hasSpanPre = /<pre[^>]*>\s*<span/.test(fullHtml);
+      
+      // PW иногда рендерит `<X>` в тексте как HTML-тег. Признаки:
+      // `<k extends...>` (JSX в тексте), `<tag>`, `<suspense>`,
+      // `<fragment>`, `<form>` внутри `<p>`. В этих случаях `fullHtml`
+      // искажён браузером — используем renderMarkdown(md) как fallback.
+      const hasWeirdTags =
+        /<k\s+extends\b/i.test(fullHtml) ||
+        /<(tag|suspense|fragment)\b[^>]*>/i.test(fullHtml) ||
+        /<\/?(suspense|fragment)\b/i.test(fullHtml) ||
+        /<p[^>]*>[\s\S]{0,200}<form[\s>]/i.test(fullHtml);
+      
+      if (!hasBrokenTable && !hasUnhighlightedCode && !hasSpanPre && !hasWeirdTags) {
         return fullHtml;
+      }
+      
+      if (hasWeirdTags) {
+        console.warn(
+          '[GatewayMessageAssistant] fullHtml искажён (PW не экранировал <X>). Fallback на renderMarkdown.'
+        );
       }
     }
 
@@ -162,6 +200,79 @@ export const GatewayMessageAssistant: React.FC<GatewayMessageAssistantProps> = (
         })}
         style={isSelected ? { backgroundColor: 'transparent', background: 'transparent' } : undefined}
       >
+        {/* Sources badge (Умный поиск) */}
+        {sources && sources.length > 0 && (
+          <div
+            className="f93f59e4"
+            onClick={() => onSourceClick?.(sources)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              marginBottom: 12,
+              padding: '6px 10px',
+              background: 'rgba(77, 107, 254, 0.08)',
+              border: '1px solid rgba(77, 107, 254, 0.25)',
+              borderRadius: 8,
+              cursor: 'pointer',
+              userSelect: 'none',
+            }}
+            title="Показать изученные источники"
+          >
+            <AppIcon name="travel_explore" set="material" size="md" color="accent" />
+            <span style={{ fontSize: 13, color: '#a5b4fc' }}>
+              {sources.length} {sources.length === 1 ? 'источник' : sources.length < 5 ? 'источника' : 'источников'}
+            </span>
+            <div style={{ display: 'flex', marginLeft: 4 }}>
+              {sources.slice(0, 4).map((s, i) => (
+                <div
+                  key={i}
+                  style={{
+                    width: 16,
+                    height: 16,
+                    borderRadius: 3,
+                    marginLeft: i > 0 ? -6 : 0,
+                    background: '#333',
+                    border: '1px solid #1a1a1a',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {s.siteIcon ? (
+                    <img
+                      src={s.siteIcon}
+                      alt=""
+                      style={{ width: 14, height: 14, objectFit: 'cover' }}
+                    />
+                  ) : (
+                    <AppIcon name="language" set="material" size="xs" color="muted" />
+                  )}
+                </div>
+              ))}
+              {sources.length > 4 && (
+                <div
+                  style={{
+                    width: 16,
+                    height: 16,
+                    borderRadius: 3,
+                    marginLeft: -6,
+                    background: '#252525',
+                    border: '1px solid #1a1a1a',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 9,
+                    color: '#888',
+                  }}
+                >
+                  +{sources.length - 4}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         {/* Размышление */}
         {thinking && (
           <div

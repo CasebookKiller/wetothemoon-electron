@@ -2,6 +2,14 @@
 
 export type ChatMessageFileKind = 'text' | 'image' | 'binary';
 
+export interface WebSource {
+  url: string;
+  title: string;
+  snippet?: string;
+  siteIcon?: string;
+  siteName?: string;
+}
+
 export interface ChatMessageBlock {
   type: 'text' | 'code' | 'file';
   content: string;
@@ -17,11 +25,11 @@ export interface ChatMessage {
   id?: string;
   role: 'user' | 'assistant';
   thinking?: string;
+  sources?: WebSource[];
   blocks: ChatMessageBlock[];
   fullHtml?: string;
   messageHash?: string | null;
   pwKey?: string | null;
-  // 5.7: branching
   branchTotal?: number;
   branchIndex?: number;
 }
@@ -33,7 +41,6 @@ export function parseMessageHtml(entry: { role: string; html: string; key?: stri
   if (entry.role === 'user') {
     const blocks: ChatMessageBlock[] = [];
 
-    // 1) File-чипы: контейнер .eafda4ae > чип ._25c7358
     const chipContainer = div.querySelector('.eafda4ae');
     if (chipContainer) {
       chipContainer.querySelectorAll('._25c7358').forEach((chip) => {
@@ -57,36 +64,41 @@ export function parseMessageHtml(entry: { role: string; html: string; key?: stri
         const thumbUrl =
           imgEl?.getAttribute('src') || imgEl?.getAttribute('data-src') || undefined;
 
-        blocks.push({
-          type: 'file',
-          content: name,
-          mime,
-          size,
-          fileKind,
-          thumbUrl,
-        });
+        blocks.push({ type: 'file', content: name, mime, size, fileKind, thumbUrl });
       });
     }
 
-    // 2) Текст (если есть)
     const fbb = div.querySelector('.fbb737a4');
     const text = fbb?.textContent?.trim() || '';
-    if (text) {
-      blocks.push({ type: 'text', content: text });
-    }
+    if (text) blocks.push({ type: 'text', content: text });
 
     if (blocks.length === 0) return null;
-    return {
-      id: entry.key ? String(entry.key) : undefined,
-      role: 'user',
-      blocks,
-    };
+    return { id: entry.key ? String(entry.key) : undefined, role: 'user', blocks };
   }
 
   let thinking: string | undefined;
   const thinkingEl = div.querySelector('div.e1675d8b.ds-think-content');
-  if (thinkingEl) {
-    thinking = thinkingEl.textContent?.trim() || '';
+  if (thinkingEl) thinking = thinkingEl.textContent?.trim() || '';
+
+  // Источники из DOM (только favicon+count). Полный список — из IndexedDB.
+  const sources: WebSource[] = [];
+  const sourcesEl = div.querySelector('div.f93f59e4');
+  if (sourcesEl) {
+    const iconEls = sourcesEl.querySelectorAll('div._8e95474 img.site_logo_img');
+    iconEls.forEach((img) => {
+      const iconUrl = img.getAttribute('src') || '';
+      let host = '';
+      const m = iconUrl.match(/site-icons\/([^\/]+)/);
+      if (m) host = m[1];
+      if (host) {
+        sources.push({
+          url: `https://${host}`,
+          title: host,
+          siteIcon: iconUrl,
+          siteName: host,
+        });
+      }
+    });
   }
 
   const assistantMain = div.querySelector('div.ds-markdown.ds-assistant-message-main-content');
@@ -100,36 +112,35 @@ export function parseMessageHtml(entry: { role: string; html: string; key?: stri
         const langEl = element.querySelector('span.d813de27');
         const codeEl = element.querySelector('pre');
         const language = langEl?.textContent?.trim() || 'text';
-        const code = codeEl?.textContent || '';
+        const code = (codeEl?.textContent || '').replace(/\n+$/, '');
         if (code.trim()) {
           blocks.push({ type: 'code', content: code, language });
         }
       } else {
         const text = element.textContent?.trim() || '';
-        if (text) {
-          blocks.push({ type: 'text', content: text });
-        }
+        if (text) blocks.push({ type: 'text', content: text });
       }
     } else if (node.nodeType === Node.TEXT_NODE) {
       const text = node.textContent?.trim() || '';
-      if (text) {
-        blocks.push({ type: 'text', content: text });
-      }
+      if (text) blocks.push({ type: 'text', content: text });
     }
   });
 
   if (blocks.length === 0) {
     const text = assistantMain.textContent?.trim() || '';
-    if (text) {
-      blocks.push({ type: 'text', content: text });
-    }
+    if (text) blocks.push({ type: 'text', content: text });
   }
 
+  let fullHtml = (assistantMain as HTMLElement).innerHTML;
+  if (fullHtml) {
+    fullHtml = fullHtml.replace(/>\s+</g, '><');
+  }
   return {
     id: entry.key ? String(entry.key) : undefined,
     role: 'assistant',
     thinking,
+    sources: sources.length > 0 ? sources : undefined,
     blocks,
-    fullHtml: (assistantMain as HTMLElement).innerHTML,
+    fullHtml,
   };
 }

@@ -19,6 +19,14 @@ export interface MessageBlock {
   branchIndex?: number;
 }
 
+export interface WebSource {
+  url: string;
+  title: string;
+  snippet?: string;
+  siteIcon?: string;
+  siteName?: string;
+}
+
 export interface CachedMessage {
   id: string;
   conversationId: string;
@@ -27,6 +35,7 @@ export interface CachedMessage {
   contentPlain: string;
   contentHtml?: string;
   thinking?: string;
+  sources?: WebSource[];
   blocks: MessageBlock[];
   savedAt: number;
   // NEW (v2):
@@ -65,6 +74,8 @@ export interface IncomingMessage {
   contentPlain: string;
   contentHtml?: string;
   thinking?: string;
+  // NEW (v7): источники из Web Search
+  sources?: WebSource[];
   blocks?: MessageBlock[];
   // NEW (v4): branching
   branchTotal?: number;

@@ -221,6 +221,31 @@ export const FullWeek: React.FC<Props> = ({
     };
   }, [range.from, range.to, api]);
 
+  // On-demand синк плана из ICU при навигации по неделям.
+  // Дебаунс 1с, чтобы не дёргать ICU при быстрых ←/→. После синка
+  // перечитываем план, чтобы новые события сразу попали в UI.
+  const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!api?.pb?.syncPlan) return;
+    if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+    syncTimerRef.current = setTimeout(async () => {
+      try {
+        // Запас вперёд: текущая неделя + 30 дней.
+        const toExtra = addDays(range.to, 30);
+        const res = await api.pb.syncPlan(range.from, toExtra);
+        if (res?.success && (res.added ?? 0) + (res.updated ?? 0) > 0) {
+          const fresh = await api.pb.listPlanEvents(range.from, range.to);
+          if (fresh?.success) setPlans(fresh.items ?? []);
+        }
+      } catch {
+        /* тихо игнорируем — auto-sync всё равно отработает */
+      }
+    }, 1000);
+    return () => {
+      if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+    };
+  }, [range.from, range.to, api]);
+
   // Сдвиг
   const shift = useCallback((dir: -1 | 1) => {
     setCenterIso((iso) => addDays(iso, dir));
@@ -323,24 +348,32 @@ export const FullWeek: React.FC<Props> = ({
 
   // Ячейки
   const cells: DayCellData[] = useMemo(() => {
+    // Ключ — только YYYY-MM-DD. Если БД хранит дату с временем
+    // (напр. "2024-11-15T09:00:00" из ICU), без нормализации
+    // planByDate.get(iso) промахивается и план «исчезает».
+    const dayKey = (v: string | null | undefined): string =>
+      String(v ?? '').slice(0, 10);
+
     const planByDate = new Map<string, PlanEventLite[]>();
     for (const p of plans) {
-      const list = planByDate.get(p.date) ?? [];
+      const k = dayKey(p.date);
+      const list = planByDate.get(k) ?? [];
       list.push(p);
-      planByDate.set(p.date, list);
+      planByDate.set(k, list);
     }
 
     const allGroups = groupRunFacts(facts, {});
     const factByDate = new Map<string, GroupedRunFact[]>();
     for (const g of allGroups) {
-      const list = factByDate.get(g.date) ?? [];
+      const k = dayKey(g.date);
+      const list = factByDate.get(k) ?? [];
       list.push(g);
-      factByDate.set(g.date, list);
+      factByDate.set(k, list);
     }
 
     const wellnessByDate = new Map<string, RecoveryLogLite>();
     for (const w of wellness) {
-      wellnessByDate.set(w.date, w);
+      wellnessByDate.set(dayKey(w.date), w);
     }
 
     return Array.from({ length: 7 }, (_, i) => {

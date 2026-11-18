@@ -25,6 +25,10 @@ import { GatewayInputModal } from '@/components/GATEWAY/GatewayInputModal/Gatewa
 import { GatewayFilePanel, FilePanelState, getStoredPanelWidth } from '@/components/GATEWAY/GatewayFilePanel/GatewayFilePanel';
 import { GatewayProgressToast, BatchUIState } from '@/components/GATEWAY/GatewayProgressToast/GatewayProgressToast';
 import { GatewayDialogLoadToast, DialogLoadInfo } from '@/components/GATEWAY/GatewayDialogLoadToast/GatewayDialogLoadToast';
+import { estimateConversationTokens, CONTEXT_WINDOW_TOKENS } from '@/components/GATEWAY/utils/tokenEstimator';
+import { GatewayAttachedFile } from '@/components/GATEWAY/GatewayFilePickerModal/GatewayFilePickerModal';
+import { GatewaySourcesPanel } from '@/components/GATEWAY/GatewaySourcesPanel/GatewaySourcesPanel';
+import type { WebSource } from '@/components/GATEWAY/GatewaySourcesPanel/GatewaySourcesPanel';
 
 
 export const GatewayPage: React.FC = () => {
@@ -74,6 +78,8 @@ export const GatewayPage: React.FC = () => {
   // Прогресс batch-загрузки файлов
   const [batchToast, setBatchToast] = useState<BatchUIState | null>(null);
 
+  const [sourcesPanel, setSourcesPanel] = useState<{ isOpen: boolean, sources: WebSource[] }>({ isOpen: false, sources: [] });
+
   // API — объявлено до useEffect'ов, которые его используют
   const api = (window as any).electronAPI;
 
@@ -100,6 +106,7 @@ export const GatewayPage: React.FC = () => {
       id: originalKey,
       role: m.role,
       thinking: m.thinking,
+      sources: m.sources,
       blocks: m.blocks,
       fullHtml: m.contentHtml,
       messageHash: m.messageHash,
@@ -263,6 +270,10 @@ export const GatewayPage: React.FC = () => {
   // 5.6: history:changed — debounce
   const historyChangedTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // После handleSend игнорируем bridge-события 3с: фоновые snapshot'ы
+  // и visible-sync возвращают устаревшую БД и перезаписывают optimistic-result.
+  const postSendIgnoreUntilRef = React.useRef<number>(0);
+
   // ============================================================
   // Автоскролл вниз во время стрима.
   // ============================================================
@@ -281,6 +292,19 @@ export const GatewayPage: React.FC = () => {
 
   React.useEffect(() => {
     messagesRef.current = messages;
+    // ── TEMP DIAG: отслеживаем каждое изменение messages ──
+    const snap = messages.slice(-4).map((m, idx) => ({
+      i: messages.length - 4 + idx,
+      key: String(m.id ?? m.messageHash ?? 'n/a'),
+      role: m.role,
+      text: (m.blocks?.[0]?.content || '').slice(0, 25),
+      hash: m.messageHash ?? null,
+      pwKey: m.pwKey ?? null,
+    }));
+    console.log(
+      `[MSG-CHANGE] len=${messages.length}`,
+      snap
+    );
   }, [messages]);
 
   // Cleanup при размонтировании
@@ -535,6 +559,10 @@ export const GatewayPage: React.FC = () => {
         if (event.type === 'assistant:content-update') {
           if (!sendingRef.current && !selectedConversation) return;
           const html = (event.payload?.html as string) || '';
+          console.log(
+            `[bridge] assistant:content-update len=${html.length} ` +
+            `sendingRef=${sendingRef.current} messagesLast=${messagesRef.current[messagesRef.current.length - 1]?.role}`
+          );
           if (html) setLiveAssistantHtml(html);
           return;
         }
@@ -544,9 +572,18 @@ export const GatewayPage: React.FC = () => {
           if (isLoadingHistoryRef.current) return;
           if (batchRunningRef.current) return;
           if (branchSwitchingRef.current) return;
+          if (sendingRef.current) return;
+          if (Date.now() < postSendIgnoreUntilRef.current) {
+            console.log('[bridge] message:count-changed пропущен (post-send)');
+            return;
+          }
+          if (Date.now() < postSendIgnoreUntilRef.current) {
+            console.log('[bridge] message:count-changed пропущен (post-send)');
+            return;
+          }
 
           const currentConv = selectedConversationRef.current;
-          if (!sendingRef.current && currentConv) {
+          if (currentConv) {
             const title =
               conversationsRef.current.find((c) => c.id === currentConv)
                 ?.title || 'Диалог';
@@ -614,8 +651,15 @@ export const GatewayPage: React.FC = () => {
         }
 
         // Прогресс подгрузки истории (приходит во время скролла PW)
-        // Прогресс подгрузки истории (приходит во время скролла PW)
         if (event.type === 'history:progress' || event.type === 'history:complete') {
+          if (sendingRef.current) {
+            console.log(`[bridge] ${event.type} пропущен (sending=true)`);
+            return;
+          }
+          if (Date.now() < postSendIgnoreUntilRef.current) {
+            console.log(`[bridge] ${event.type} пропущен (post-send)`);
+            return;
+          }
           const rawParsed = (event.payload?.rawMessages || []) as ChatMessage[];
           const scrollProgress = event.payload?.scrollProgress as
             | import('@/main/services/gateway/bridge/BridgeEvents').ScrollProgressMeta
@@ -678,6 +722,10 @@ export const GatewayPage: React.FC = () => {
 
           // 5.6.3: на complete — читаем ПОЛНУЮ историю из БД (источник правды)
           if (event.type === 'history:complete') {
+            if (Date.now() < postSendIgnoreUntilRef.current) {
+              console.log('[bridge] history:complete пропущен (post-send)');
+              return;
+            }
             // 5.8.2: сохраняем elapsed последнего progress → finalElapsedMs
             setDialogLoadToast((prev) => {
               if (!prev) return prev;
@@ -698,6 +746,7 @@ export const GatewayPage: React.FC = () => {
             }
 
             const currentConv = selectedConversationRef.current;
+            const isSending = sendingRef.current;   // фиксируем в моменте
             if (currentConv) {
               // 1. Читаем ПОЛНУЮ историю из БД
               void (async () => {
@@ -709,6 +758,18 @@ export const GatewayPage: React.FC = () => {
                     cached.data.length > 0 &&
                     selectedConversationRef.current === currentConv
                   ) {
+                    // ⚠️ ЗАЩИТА ОТ RACE: если идёт отправка и в БД меньше
+                    // сообщений чем уже в UI (оптимистичный user + старые),
+                    // НЕ перезаписываем — иначе user-message исчезнет
+                    // (это и был баг «ни запроса, ни ответа»).
+                    if (isSending && cached.data.length <= messagesRef.current.length) {
+                      console.log(
+                        '[gateway] history:complete: skip (sending, DB smaller)',
+                        { dbLen: cached.data.length, uiLen: messagesRef.current.length }
+                      );
+                      return;
+                    }
+
                     const mapped = cached.data.map((m: any) =>
                       mapCachedMessage(m, currentConv)
                     );
@@ -730,6 +791,7 @@ export const GatewayPage: React.FC = () => {
                     }
 
                     latestHistoryRef.current = uniqueMapped;
+                    console.trace('[SET-MSG] history:complete → reloaded from DB', uniqueMapped.length);
                     setMessagesWithPreserveScroll(uniqueMapped);
                     console.log(
                       '[gateway] history:complete: reloaded from DB',
@@ -959,6 +1021,14 @@ export const GatewayPage: React.FC = () => {
           if (isLoadingHistoryRef.current) return;
           if (batchRunningRef.current) return;
           if (branchSwitchingRef.current) return;
+          if (sendingRef.current) {
+            console.log('[bridge] history:changed пропущен (sending=true)');
+            return;
+          }
+          if (Date.now() < postSendIgnoreUntilRef.current) {
+            console.log('[bridge] history:changed пропущен (post-send)');
+            return;
+          }
 
           const currentConvId = selectedConversationRef.current;
           if (!currentConvId) return;
@@ -1028,8 +1098,12 @@ export const GatewayPage: React.FC = () => {
                       uniqueMapped.push(msg);
                     }
                   }
+                  console.trace('[SET-MSG] message:count-changed → sync', uniqueMapped.length);
                   setMessages(uniqueMapped);
                   latestHistoryRef.current = uniqueMapped;
+                  // Чистим live: финальный ответ уже в messages
+                  setLiveAssistantHtml('');
+                  setLiveReasoning('');
                 }
               }
             } catch (e) {
@@ -1061,6 +1135,24 @@ export const GatewayPage: React.FC = () => {
           // Сейчас падают в общий лог ниже, не в UI.
         }
 
+        // P0.5 Phase 2: rate-limit / auto-switch → DOM-события
+        // (preload пробрасывает только gateway:bridge-event, остальное — renderer сам)
+        if (event.type === 'profile:rate-limited') {
+          window.dispatchEvent(new CustomEvent('gateway:profile-rate-limited', { detail: event.payload }));
+          return;
+        }
+        if (event.type === 'profile:switched') {
+          if (event.payload?.needLogin) {
+            window.dispatchEvent(new CustomEvent('gateway:need-login', { detail: { id: event.payload?.to } }));
+          }
+          window.dispatchEvent(new CustomEvent('gateway:profile-switched', { detail: { id: event.payload?.to } }));
+          return;
+        }
+        if (event.type === 'all-profiles-limited') {
+          window.dispatchEvent(new CustomEvent('gateway:all-profiles-limited', { detail: event.payload }));
+          return;
+        }
+
         // Остальное — пока в лог (этапы 2–4)
         console.log('[bridge]', event.type, event.payload);
       }
@@ -1083,6 +1175,125 @@ export const GatewayPage: React.FC = () => {
     window.addEventListener('mousemove', handleMouseMove);
     return () => window.removeEventListener('mousemove', handleMouseMove);
   }, [panelHovered]);
+
+  // Multi-profile: при переключении аккаунта — полный сброс + перезагрузка
+  useEffect(() => {
+    const onSwitch = async () => {
+      try {
+        console.log('[GatewayPage] profile-switched → reset + reload');
+        const api2 = (window as any)?.electronAPI;
+
+        // 1. Сбрасываем состояние чата (чужой профиль — чужие диалоги)
+        setSelectedConversation(null);
+        selectedConversationRef.current = null;
+        setMessages([]);
+        messagesRef.current = [];
+        latestHistoryRef.current = [];
+        initialScrollDoneRef.current = false;
+        setMessage('');
+        setLiveAssistantHtml('');
+        setLiveReasoning('');
+        setFileStatuses(new Map());
+        setDialogLoadToast(null);
+        setSourcesPanel({ isOpen: false, sources: [] });
+
+        // 2. Обновляем статус (мог измениться isLoggedIn)
+        if (api2?.gatewayGetStatus) {
+          const s = await api2.gatewayGetStatus();
+          if (s) {
+            setStatus(s.status);
+            setIsLoggedIn(!!s.isLoggedIn);
+          }
+        }
+
+        // 3. Перезагружаем список диалогов
+        if (api2?.gatewayGetConversations) {
+          const r = await api2.gatewayGetConversations();
+          if (r?.success && Array.isArray(r.data)) setConversations(r.data);
+          else setConversations([]);
+        }
+      } catch (err) {
+        console.warn('[GatewayPage] profile-switched failed:', err);
+      }
+    };
+    window.addEventListener('gateway:profile-switched', onSwitch);
+    return () => window.removeEventListener('gateway:profile-switched', onSwitch);
+  }, []);
+
+  // Реакция на убийство зомби: обновить статус (Yandex закрыт → stopped)
+  useEffect(() => {
+    const onKilled = async () => {
+      console.log('[GatewayPage] zombies-killed → обновляю статус');
+      try {
+        const api = (window as any)?.electronAPI;
+        const s = await api?.gatewayGetStatus();
+        if (s) {
+          setStatus(s.status || 'stopped');
+          setIsLoggedIn(!!s.isLoggedIn);
+        }
+        // Сбрасываем чат — PW мог быть закрыт
+        setSelectedConversation(null);
+        selectedConversationRef.current = null;
+        setMessages([]);
+        messagesRef.current = [];
+        latestHistoryRef.current = [];
+        setLiveAssistantHtml('');
+        setLiveReasoning('');
+      } catch (e) {
+        console.warn('[GatewayPage] zombies-killed handler:', e);
+      }
+    };
+    window.addEventListener('gateway:zombies-killed', onKilled);
+    return () => window.removeEventListener('gateway:zombies-killed', onKilled);
+  }, []);
+
+  // Переключились на профиль без сессии — обновляем статус и подсвечиваем "Войти"
+  useEffect(() => {
+    const onNeedLogin = () => {
+      console.log('[GatewayPage] need-login → updating status');
+      updateStatus(); // isLoggedIn = false → покажет TopPanel "Login required"
+    };
+    window.addEventListener('gateway:need-login', onNeedLogin);
+    return () => window.removeEventListener('gateway:need-login', onNeedLogin);
+  }, []);
+
+  // P0.5 Phase 2: все профили в лимите — alert (DOM-событие приходит из bridge-handler выше)
+  useEffect(() => {
+    const onAll = (e: any) => {
+      const d = e?.detail || {};
+      const until = d.untilMs ? new Date(d.untilMs).toLocaleString('ru-RU') : '?';
+      console.warn('[GatewayPage] all-profiles-limited', d);
+      alert(`Все профили в лимите DeepSeek.\nБлижайший сброс: ${until}.\nПричина: ${d.reason || 'no-next'}`);
+    };
+    window.addEventListener('gateway:all-profiles-limited', onAll);
+    return () => window.removeEventListener('gateway:all-profiles-limited', onAll);
+  }, []);
+
+  // Multi-profile: при выходе из аккаунта — сбрасываем UI
+  useEffect(() => {
+    const onLogout = () => {
+      console.log('[GatewayPage] logged-out → reset UI');
+      // (мягкий и полный выход обрабатываются одинаково — просто сброс)
+      setSelectedConversation(null);
+      selectedConversationRef.current = null;
+      setMessages([]);
+      messagesRef.current = [];
+      latestHistoryRef.current = [];
+      initialScrollDoneRef.current = false;
+      setMessage('');
+      setLiveAssistantHtml('');
+      setLiveReasoning('');
+      setFileStatuses(new Map());
+      setDialogLoadToast(null);
+      setConversations([]);
+      setSourcesPanel({ isOpen: false, sources: [] });
+      
+      // Обновляем статус (PW всё ещё работает, но isLoggedIn=false)
+      updateStatus();
+    };
+    window.addEventListener('gateway:logged-out', onLogout);
+    return () => window.removeEventListener('gateway:logged-out', onLogout);
+  }, []);
 
   const syncToggleState = async () => {
     try {
@@ -1199,6 +1410,16 @@ export const GatewayPage: React.FC = () => {
     return () => window.removeEventListener('keydown', onKey);
   }, [handleForceResync]);
 
+  const contextUsage = React.useMemo(() => {
+    const used = estimateConversationTokens(
+      messages.map((m) => ({
+        contentPlain: m.blocks.map((b) => b.content).join('\n\n'),
+        thinking: m.thinking,
+      }))
+    );
+    return { used, total: CONTEXT_WINDOW_TOKENS, percent: (used / CONTEXT_WINDOW_TOKENS) * 100 };
+  }, [messages]);
+
   const handleLaunch = async () => {
     setLoading(true);
     setError('');
@@ -1244,66 +1465,197 @@ export const GatewayPage: React.FC = () => {
     }
   };
 
-  const handleSend = async () => {
+  const handleSend = async (files: GatewayAttachedFile[]) => {
     if (!message.trim() || sending) return;
-    sendingRef.current = true;   // ← синхронно, до любых setState
+
+    // Отменяем ЛЮБОЙ висящий history:changed debounce — он мог сработать
+    // во время await и вернуть старые данные.
+    if (historyChangedTimerRef.current) {
+      clearTimeout(historyChangedTimerRef.current);
+      historyChangedTimerRef.current = null;
+    }
+
+    const userText = message;
+    const prevMessages = messages;
+    const convIdAtStart = selectedConversationRef.current;
+
+    // ⚠️ СИНХРОННО ставим флаг ДО setSending (React setState асинхронный,
+    // useEffect обновит sendingRef.current только через рендер + микротаск,
+    // а bridge-события успевают прийти между ними → race).
+    sendingRef.current = true;
     setSending(true);
-    setError('');
-    setLiveReasoning('');
-    setLiveAssistantHtml('');
-
-    const currentMessage = message;
-    const userMsg: ChatMessage = {
-      role: 'user',
-      blocks: [{ type: 'text', content: currentMessage }],
-    };
-
-    // Сразу показываем сообщение пользователя и очищаем input.
-    // Стрим ответа придёт через bridge → liveAssistantHtml.
-    setMessages((prev) => [...prev, userMsg]);
     setMessage('');
 
-    try {
-      const result = await api.gatewaySendMessage(currentMessage);
-      if (result.success) {
-        const assistantMsg = result.data as ChatMessage;
-        // Добавляем финальное сообщение и одновременно
-        // очищаем live-контент — атомарно в одном батче React
-        setMessages((prev) => [...prev, assistantMsg]);
-        setLiveAssistantHtml('');
-        setLiveReasoning('');
+    // ── ОПТИМИСТИЧНАЯ ВСТАВКА user-message ──
+    // Пока main работает (setInputFiles + upload 88KB + ожидание ответа = до 60с),
+    // UI должен показывать user-сообщение + стримящийся ответ. Без этого
+    // пользователь видит «голый ответ в воздухе».
+    const optimisticUserMsg: ChatMessage = {
+      id: `optimistic-user-${Date.now()}`,
+      role: 'user',
+      blocks: [
+        ...files.map(f => ({
+          type: 'file' as const,
+          content: f.name,
+          mime: f.mime,
+          size: '',
+        })),
+        ...(userText.trim()
+          ? [{ type: 'text' as const, content: userText }]
+          : []),
+      ],
+      fullHtml: undefined,
+    } as ChatMessage;
 
-        // 5.6.1: sync cache с ФИНАЛЬНЫМ содержимым.
-        // message:count-changed ранее синкнул ЧАСТИЧНЫЙ ответ (первый токен),
-        // из-за чего при следующем open tail-fingerprint не совпадал и
-        // запускался 12-секундный scroll. Fire-and-forget — не блокируем UX.
-        const convId = selectedConversationRef.current;
-        if (convId) {
-          const title =
-            conversationsRef.current.find((c) => c.id === convId)?.title ||
-            'Диалог';
-          void api
-            .gatewayGetConversationMessages(convId, title, {
-              skipBackgroundScroll: true,
-            })
-            .catch((e: Error) =>
-              console.warn('[handleSend] post-send sync failed:', e.message)
-            );
-        }
-      } else {
-        setError(result.error || 'Ошибка отправки');
+    const optimisticMessages = [...prevMessages, optimisticUserMsg];
+    console.trace('[SET-MSG] handleSend → optimistic user');
+    setMessages(optimisticMessages);
+    latestHistoryRef.current = optimisticMessages;
+    requestAnimationFrame(() => scrollToBottom(true));
+
+    // Блокируем bridge ДО await: main эмитит history:complete ещё
+    // внутри send-message-with-files (snapshot → эмит → return IPC),
+    // поэтому 5с от старта = 5с покрывают всё окно ожидания + возврат.
+    postSendIgnoreUntilRef.current = Date.now() + 5000;
+
+    try {
+      const result = files.length > 0
+        ? await api.gatewaySendMessageWithFiles(userText, files)
+        : await api.gatewaySendMessage(userText);
+
+      if (!result?.success) {
+        throw new Error(result?.error || 'Отправка не удалась (нет details от main)');
+      }
+
+      // ═══ ГЛАВНЫЙ ФИКС: используем готовый ответ из result.data ═══
+      // sendMessage/sendMessageWithFiles возвращает GatewayChatMessage
+      // с полным HTML ответа. Не ждём IndexedDB (она может отставать на
+      // десятки секунд) — сразу вставляем в messages с кнопками.
+      if (result.data?.fullHtml) {
+        const assistantMsg: ChatMessage = {
+          id: result.data.id || `optimistic-assistant-${Date.now()}`,
+          role: 'assistant',
+          thinking: result.data.thinking,
+          blocks: (result.data.blocks || []).filter(
+            (b: any) => b.type !== 'file'
+          ),
+          fullHtml: result.data.fullHtml,
+        };
+        // Берём текущий стейт messages (мог обновиться от bridge-событий)
+        // и удаляем наши оптимистичные дубликаты перед вставкой финальных.
+        const currentMessages = messagesRef.current;
+        const baseMessages = currentMessages.filter(m => {
+          // Оставляем всё, кроме оптимистичных user с нашим текстом
+          // и оптимистичных assistant (id начинается с optimistic-)
+          if (m.id && String(m.id).startsWith('optimistic-')) return false;
+          return true;
+        });
+        const finalMessages = [...baseMessages, optimisticUserMsg, assistantMsg];
+        console.trace('[SET-MSG] handleSend → result.data');
+        setMessages(finalMessages);
+        latestHistoryRef.current = finalMessages;
         setLiveAssistantHtml('');
         setLiveReasoning('');
+        requestAnimationFrame(() => scrollToBottom(true));
+        // Блокируем bridge-события на 3с, чтобы фоновые snapshot'ы
+        // не затирали только что вставленный result.data.
+        postSendIgnoreUntilRef.current = Date.now() + 3000;
+        console.log(
+          '[handleSend] мгновенный ответ из result.data (chars=',
+          result.data.fullHtml.length,
+          ')'
+        );
+      } else {
+        // Если result.data пустой (timeout в PW) — блокируем bridge,
+        // чтобы не перезаписать live-стрим устаревшей БД.
+        postSendIgnoreUntilRef.current = Date.now() + 3000;
+      }
+
+      // ── Фоновый polling БД (не блокирует UI) ──
+      // Когда БД догонит — заменим optimistic-данные на настоящие
+      // с правильными id/messageHash/pwKey.
+      const isNewPairInDb = (fresh: any[]): boolean => {
+        if (fresh.length < 2) return false;
+        const last = fresh[fresh.length - 1];
+        const penult = fresh[fresh.length - 2];
+        if (last.role !== 'assistant' || penult.role !== 'user') return false;
+        // Проверяем, что предпоследний user содержит наш текст.
+        // Файлы проверять не нужно — они в blocks[], а текст — самое
+        // надёжное, что мы контролируем.
+        if (userText.trim().length === 0) {
+          // Только файлы — проверяем имена
+          const fileNamesInDb = (penult.blocks || [])
+            .filter((b: any) => b.type === 'file')
+            .map((b: any) => b.content)
+            .sort()
+            .join(',');
+          const fileNamesExpected = files.map(f => f.name).sort().join(',');
+          return fileNamesExpected.length > 0 && fileNamesInDb.includes(fileNamesExpected.slice(0, 20));
+        }
+        const userInDb = (penult.blocks || [])
+          .filter((b: any) => b.type === 'text')
+          .map((b: any) => (b.content || '').trim())
+          .join('\n');
+        return userInDb.includes(userText.trim().slice(0, 30));
+      };
+
+      if (selectedConversationRef.current === convIdAtStart && convIdAtStart) {
+        // Фоновый polling — не блокирует UI (он уже показал ответ из result.data)
+        void (async () => {
+          let caught = false;
+          const deadline = Date.now() + 60000;   // 60с, а не 30с
+          while (Date.now() < deadline) {
+            try {
+              const reloaded = await api.gatewayCacheMessages(convIdAtStart);
+              if (
+                reloaded.success &&
+                Array.isArray(reloaded.data) &&
+                isNewPairInDb(reloaded.data)
+              ) {
+                if (selectedConversationRef.current !== convIdAtStart) return;
+                const freshMapped = reloaded.data.map((m: any) =>
+                  mapCachedMessage(m, convIdAtStart)
+                );
+                console.trace('[SET-MSG] handleSend → polling reload', reloaded.data.length);
+                setMessages(freshMapped);
+                latestHistoryRef.current = freshMapped;
+                setLiveAssistantHtml('');
+                setLiveReasoning('');
+                console.log(
+                  '[handleSend] фоновый reload OK:',
+                  reloaded.data.length,
+                  'msgs'
+                );
+                caught = true;
+                break;
+              }
+            } catch (e) {
+              console.warn(
+                '[handleSend] фоновый poll error:',
+                (e as Error).message
+              );
+            }
+            await new Promise(r => setTimeout(r, 2000));
+          }
+          if (!caught) {
+            console.warn(
+              '[handleSend] фоновый polling: DB did not catch up in 60s. ' +
+              'UI остаётся на optimistic + result.data.'
+            );
+          }
+        })();
       }
     } catch (e) {
+      console.error('[handleSend]', e);
       setError((e as Error).message);
-      setLiveAssistantHtml('');
-      setLiveReasoning('');
+      // ROLLBACK optimistic — возвращаем UI к prevMessages + восстанавливаем текст
+      setMessages(prevMessages);
+      latestHistoryRef.current = prevMessages;
+      setMessage(userText);
     } finally {
+      // ⚠️ Синхронно снимаем флаг
       sendingRef.current = false;
       setSending(false);
-      setLiveReasoning('');
-      setLiveAssistantHtml('');
     }
   };
 
@@ -2108,13 +2460,14 @@ export const GatewayPage: React.FC = () => {
                       <GatewayInputArea
                         value={message}
                         onChange={setMessage}
-                        onSend={handleSend}
+                        onSend={handleSend} 
                         disabled={!isLoggedIn}
                         sending={sending}
                         deepThinking={deepThinking}
                         search={search}
                         onToggleDeepThinking={() => handleDeepThinkingChange(!deepThinking)}
                         onToggleSearch={() => handleSearchChange(!search)}
+                        contextUsedTokens={contextUsage.used}
                       />
                     </div>
                   </div>
@@ -2162,7 +2515,20 @@ export const GatewayPage: React.FC = () => {
                         <div className="ds-virtual-list-visible-items">
                           {messages.map((msg, idx) => {
                             const isLast = idx === messages.length - 1;
-                            const key = msg.id || idx;
+                            // Защита от коллизий: оптимистичные сообщения (id=undefined)
+                            // получают idx, реальные из БД — числовой id (pwKey).
+                            // Префикс гарантирует уникальность между ними.
+                            const key = msg.id
+                              ? `id-${msg.id}`
+                              : msg.messageHash
+                                ? `hash-${msg.messageHash}`
+                                : `idx-${idx}`;
+                            if (idx >= messages.length - 2) {
+                              console.log(
+                                `[RENDER] idx=${idx} role=${msg.role} key=${String(key).slice(0, 20)} ` +
+                                `text="${(msg.blocks?.[0]?.content || '').slice(0, 20)}"`
+                              );
+                            }
                             return msg.role === 'user' ? (
                               <GatewayMessageUser
                                 key={key}
@@ -2221,12 +2587,20 @@ export const GatewayPage: React.FC = () => {
                                 onBranchSwitch={(dir) =>
                                   handleBranchSwitch(idx, dir)
                                 }
+                                sources={msg.sources}
+                                onSourceClick={(sources) => setSourcesPanel({ isOpen: true, sources })}
                               />
                             );
                           })}
-                          {liveReasoning && <GatewayLiveReasoning text={liveReasoning} />}
-                          {liveAssistantHtml && (
-                            <GatewayLiveAssistant html={liveAssistantHtml} />
+                          {(liveReasoning || liveAssistantHtml) &&
+                            !(
+                              messages.length > 0 &&
+                              messages[messages.length - 1].role === 'assistant'
+                            ) && (
+                            <>
+                              {liveReasoning && <GatewayLiveReasoning text={liveReasoning} />}
+                              {liveAssistantHtml && <GatewayLiveAssistant html={liveAssistantHtml} />}
+                            </>
                           )}
                         </div>
                       </div>
@@ -2252,6 +2626,7 @@ export const GatewayPage: React.FC = () => {
                             search={search}
                             onToggleDeepThinking={() => handleDeepThinkingChange(!deepThinking)}
                             onToggleSearch={() => handleSearchChange(!search)}
+                            contextUsedTokens={contextUsage.used}
                           />
                         </div>
                         <div className="_0fcaa63" style={{ width: '100%', flexShrink: 0, marginTop: 4 }}>
@@ -2350,6 +2725,12 @@ export const GatewayPage: React.FC = () => {
                   onWidthChange={setFilePanelWidth}
                 />
               )}
+
+              <GatewaySourcesPanel 
+                isOpen={sourcesPanel.isOpen} 
+                onClose={() => setSourcesPanel({ isOpen: false, sources: [] })} 
+                sources={sourcesPanel.sources} 
+              />
             </div>
           </div>
         </div>

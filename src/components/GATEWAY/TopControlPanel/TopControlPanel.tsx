@@ -2,6 +2,7 @@
 
 import React, { useEffect } from 'react';
 import { Button } from 'primereact/button';
+import { GatewayAccountsButton } from '../GatewayAccountsButton/GatewayAccountsButton';
 import './TopControlPanel.css';
 
 interface TopControlPanelProps {
@@ -36,11 +37,12 @@ export const TopControlPanel: React.FC<TopControlPanelProps> = (props) => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [props.isOpen, props.onClose, props.onOpen]);
 
-  if (!props.isOpen) return null;
-
+  // Не размонтируем при закрытии — иначе теряется state дочерних компонентов
+  // (например, модалка создания профиля в GatewayProfileSwitcher).
   return (
     <div
       className="gateway-top-panel-wrapper"
+      style={{ display: props.isOpen ? undefined : 'none' }}
       onMouseEnter={props.onPanelMouseEnter}
       onMouseLeave={props.onPanelMouseLeave}
     >
@@ -59,6 +61,8 @@ export const TopControlPanel: React.FC<TopControlPanelProps> = (props) => {
             <span className="gateway-top-panel__status-ok">(авторизован)</span>
           )}
         </span>
+
+        <GatewayAccountsButton />
 
         <Button
           label="Обновить диалоги"

@@ -14,7 +14,11 @@ export type GatewayBridgeEventType =
   | 'file:batch-started'
   | 'file:batch-progress'
   | 'file:batch-complete'
-  | 'history:changed';
+  | 'history:changed'
+  | 'profile:rate-limited'
+  | 'profile:banned'
+  | 'profile:switched'
+  | 'all-profiles-limited';
 
 // 5.8.2: индикатор скроллинга
 export interface ScrollProgressMeta {
@@ -39,4 +43,11 @@ export interface GatewayBridgeEvent {
 export interface HistoryProgressPayload {
   rawMessages: any[];
   scrollProgress?: ScrollProgressMeta;
+}
+
+// P0.5: события rate-limit / бана из injected-скрипта
+export interface RateLimitedPayload {
+  kind: 'RATE_LIMIT' | 'ACCOUNT_BANNED';
+  untilMs: number | null;
+  rawText: string;
 }

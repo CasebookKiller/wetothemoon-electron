@@ -439,7 +439,7 @@ try {
     // ───────── Profiles (multi-account) ─────────
     gatewayProfilesList: () =>
       ipcRenderer.invoke('gateway:profiles-list'),
-    gatewayProfilesCreate: (opts: { name: string; notes?: string }) =>
+    gatewayProfilesCreate: (opts: { name: string; notes?: string; browserKind?: 'yandex' | 'chrome' }) =>
       ipcRenderer.invoke('gateway:profiles-create', opts),
     gatewayProfilesActivate: (id: string) =>
       ipcRenderer.invoke('gateway:profiles-activate', id),
@@ -458,7 +458,7 @@ try {
     }) => ipcRenderer.invoke('gateway:send-message-api', payload),
     gatewayExportContinuation: (payload: { workspaceKeys: string[]; taskTitle?: string }) =>
       ipcRenderer.invoke('gateway:export-continuation', payload),
-    gatewayProfilesUpdate: (id: string, patch: { name?: string; notes?: string }) =>
+    gatewayProfilesUpdate: (id: string, patch: { name?: string; notes?: string; browserKind?: 'yandex' | 'chrome' }) =>
       ipcRenderer.invoke('gateway:profiles-update', id, patch),
     gatewayProfilesDelete: (id: string, opts: { deleteFiles?: boolean }) =>
       ipcRenderer.invoke('gateway:profiles-delete', id, opts),

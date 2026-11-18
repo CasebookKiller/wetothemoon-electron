@@ -10,6 +10,24 @@
   --tg-success: #6fbf73;
   --tg-border: rgba(255, 255, 255, 0.08);
 
+  /* ═══════════════════════════════════════════════════════════
+     АЛИАСЫ tg-theme-* для common-компонентов.
+     Добавлены для исправления отсутствующей --surface-border
+     в PB/OSINT. Модули, которые переопределяют эти переменные
+     в своих [data-module="..."] блоках, всё равно выигрывают
+     (селектор атрибута > :root по специфичности).
+     ═══════════════════════════════════════════════════════════ */
+  --tg-theme-bg-color: var(--tg-bg);
+  --tg-theme-text-color: var(--tg-text);
+  --tg-theme-hint-color: var(--tg-hint);
+  --tg-theme-destructive-text-color: var(--tg-destructive);
+  --tg-theme-secondary-bg-color: var(--tg-surface);
+  --tg-theme-section-bg-color: var(--tg-surface);
+  --tg-theme-accent-text-color: var(--tg-text);
+
+  /* Универсальный бордер (используется в common/inputs.css) */
+  --surface-border: var(--tg-border);
+
   /* Цвета по умолчанию (для COMMON-компонентов) */
   --module-accent: #6ab2f2; /* Синий, как в OSINT */
   --module-accent-rgb: 106, 178, 242;

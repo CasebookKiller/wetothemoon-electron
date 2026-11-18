@@ -14,6 +14,7 @@ import type {
   MessageRole,
   SearchResult,
   CacheStats,
+  WebSource,
 } from './types';
 
 interface ExistingMessageRow {
@@ -25,6 +26,7 @@ interface ExistingMessageRow {
   content_html: string | null;
   thinking: string | null;
   blocks_json: string | null;
+  sources_json: string | null;
   branch_total: number | null;
   branch_index: number | null;
   is_active: number | null;
@@ -86,16 +88,16 @@ export class GatewayCacheService {
     // Подготовленные statements (один раз на вызов)
     const selectByHash = db.prepare(`
       SELECT id, message_hash, pw_key, sequence, content_plain,
-             content_html, thinking, blocks_json, branch_total, branch_index,
-             is_active
+             content_html, thinking, blocks_json, sources_json,
+             branch_total, branch_index, is_active
       FROM messages
       WHERE conversation_id = ? AND message_hash = ?
     `);
     // Для сообщений с ветками: ищем по (pw_key, branch_index).
     const selectByPwKeyAndBranch = db.prepare(`
       SELECT id, message_hash, pw_key, sequence, content_plain,
-             content_html, thinking, blocks_json, branch_total, branch_index,
-             is_active
+             content_html, thinking, blocks_json, sources_json,
+             branch_total, branch_index, is_active
       FROM messages
       WHERE conversation_id = ? AND pw_key = ?
         AND COALESCE(branch_index, 1) = ?
@@ -105,23 +107,31 @@ export class GatewayCacheService {
     // активной версии или последний обновлённый.
     const selectByPwKeyFallback = db.prepare(`
       SELECT id, message_hash, pw_key, sequence, content_plain,
-             content_html, thinking, blocks_json, branch_total, branch_index,
-             is_active
+             content_html, thinking, blocks_json, sources_json,
+             branch_total, branch_index, is_active
       FROM messages
       WHERE conversation_id = ? AND pw_key = ?
       ORDER BY is_active DESC, saved_at DESC
       LIMIT 1
     `);
+    // Content-match ограничен свежими сообщениями (< 5 минут).
+    // Иначе regenerate короткого ответа ("OK") перезаписывает СТАРОЕ
+    // сообщение с тем же текстом и оставляет ему низкий sequence
+    // → в UI ответ оказывается "до" вопроса.
+    const contentMatchCutoff = Date.now() - 5 * 60 * 1000;
     const selectByContent = db.prepare(`
       SELECT id, message_hash, pw_key, sequence, content_plain,
-             content_html, thinking, blocks_json, branch_total, branch_index
+             content_html, thinking, blocks_json, sources_json,
+             branch_total, branch_index
       FROM messages
       WHERE conversation_id = ? AND role = ? AND content_plain = ?
+        AND saved_at > ?
       LIMIT 1
     `);
     const selectLastByRole = db.prepare(`
       SELECT id, message_hash, pw_key, sequence, content_plain,
-             content_html, thinking, blocks_json, branch_total, branch_index
+             content_html, thinking, blocks_json, sources_json,
+             branch_total, branch_index
       FROM messages
       WHERE conversation_id = ? AND role = ?
       ORDER BY sequence DESC
@@ -130,9 +140,9 @@ export class GatewayCacheService {
     const insertStmt = db.prepare(`
       INSERT INTO messages
         (id, conversation_id, sequence, role, content_plain, content_html,
-         thinking, blocks_json, saved_at, message_hash, pw_key,
+         thinking, blocks_json, sources_json, saved_at, message_hash, pw_key,
          branch_total, branch_index, is_active)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         message_hash = excluded.message_hash,
         pw_key = excluded.pw_key,
@@ -141,6 +151,7 @@ export class GatewayCacheService {
         content_html = COALESCE(excluded.content_html, messages.content_html),
         thinking = excluded.thinking,
         blocks_json = excluded.blocks_json,
+        sources_json = COALESCE(excluded.sources_json, messages.sources_json),
         saved_at = excluded.saved_at,
         branch_total = excluded.branch_total,
         branch_index = excluded.branch_index,
@@ -150,6 +161,7 @@ export class GatewayCacheService {
       UPDATE messages
       SET message_hash = ?, pw_key = ?, sequence = ?, content_plain = ?,
           content_html = COALESCE(?, content_html), thinking = ?, blocks_json = ?,
+          sources_json = COALESCE(?, sources_json),
           branch_total = ?, branch_index = ?, is_active = ?
       WHERE id = ?
     `);
@@ -226,6 +238,9 @@ export class GatewayCacheService {
         const blocksJson = JSON.stringify(
           m.blocks ?? [{ type: 'text', content: contentPlain }]
         );
+        const sourcesJson = m.sources && m.sources.length > 0
+          ? JSON.stringify(m.sources)
+          : null;
 
         // v5: активная ли ветка (1) или сохранена для истории (0).
         // Пока deepseekService это не передаёт — будет 1.
@@ -253,9 +268,12 @@ export class GatewayCacheService {
         // Fallback по тексту — только для не-веток (для веток текст
         // может совпадать, но это разные версии)
         if (!existing && !numericKey && !hasBranch) {
-          existing = selectByContent.get(convId, m.role, contentPlain) as
-            | ExistingMessageRow
-            | undefined;
+          existing = selectByContent.get(
+            convId,
+            m.role,
+            contentPlain,
+            contentMatchCutoff
+          ) as ExistingMessageRow | undefined;
         }
         // Fallback для стримящегося ответа — только при не-prune
         if (!existing && !opts?.prune && idx === incoming.length - 1) {
@@ -304,6 +322,7 @@ export class GatewayCacheService {
             contentHtmlChanged ||
             (existing.thinking ?? null) !== thinking ||
             (existing.blocks_json ?? null) !== blocksJson ||
+            (existing.sources_json ?? null) !== sourcesJson ||
             (existing.branch_total ?? 1) !== branchTotal ||
             (existing.branch_index ?? 1) !== branchIndex ||
             (existing.is_active ?? 1) !== isActive;
@@ -332,6 +351,7 @@ export class GatewayCacheService {
                 contentHtml,
                 thinking,
                 blocksJson,
+                sourcesJson,
                 now,
                 messageHash,
                 numericKey,
@@ -350,6 +370,7 @@ export class GatewayCacheService {
                 contentHtml,
                 thinking,
                 blocksJson,
+                sourcesJson,
                 branchTotal,
                 branchIndex,
                 isActive,
@@ -376,6 +397,7 @@ export class GatewayCacheService {
             contentHtml,
             thinking,
             blocksJson,
+            sourcesJson,
             now,
             messageHash,
             numericKey,
@@ -467,7 +489,7 @@ export class GatewayCacheService {
     const rows = this.db
       .prepare(`
         SELECT id, conversation_id, sequence, role, content_plain,
-               content_html, thinking, blocks_json, saved_at,
+               content_html, thinking, blocks_json, sources_json, saved_at,
                message_hash, pw_key, branch_total, branch_index, is_active
         FROM messages
         WHERE conversation_id = ? AND is_active = 1
@@ -482,6 +504,7 @@ export class GatewayCacheService {
         content_html: string | null;
         thinking: string | null;
         blocks_json: string | null;
+        sources_json: string | null;
         saved_at: number;
         message_hash: string | null;
         pw_key: string | null;
@@ -498,6 +521,7 @@ export class GatewayCacheService {
       contentPlain: r.content_plain,
       contentHtml: r.content_html ?? undefined,
       thinking: r.thinking ?? undefined,
+      sources: r.sources_json ? (JSON.parse(r.sources_json) as WebSource[]) : undefined,
       blocks: r.blocks_json ? (JSON.parse(r.blocks_json) as MessageBlock[]) : [],
       savedAt: r.saved_at,
       messageHash: r.message_hash ?? undefined,
@@ -519,7 +543,7 @@ export class GatewayCacheService {
     const r = this.db
       .prepare(`
         SELECT id, conversation_id, sequence, role, content_plain,
-               content_html, thinking, blocks_json, saved_at,
+               content_html, thinking, blocks_json, sources_json, saved_at,
                message_hash, pw_key
         FROM messages
         WHERE message_hash = ?
@@ -534,6 +558,7 @@ export class GatewayCacheService {
           content_html: string | null;
           thinking: string | null;
           blocks_json: string | null;
+          sources_json: string | null;
           saved_at: number;
           message_hash: string | null;
           pw_key: string | null;
@@ -549,6 +574,7 @@ export class GatewayCacheService {
       contentPlain: r.content_plain,
       contentHtml: r.content_html ?? undefined,
       thinking: r.thinking ?? undefined,
+      sources: r.sources_json ? (JSON.parse(r.sources_json) as WebSource[]) : undefined,
       blocks: r.blocks_json ? (JSON.parse(r.blocks_json) as MessageBlock[]) : [],
       savedAt: r.saved_at,
       messageHash: r.message_hash ?? undefined,
@@ -765,5 +791,44 @@ export class GatewayCacheService {
     await fs.writeFile(fullPath, lines.join('\n'), 'utf-8');
     console.log(`[GatewayCache] Markdown экспортирован: ${fullPath}`);
     return fullPath;
+  }
+
+    /**
+   * 2.2.6: Удаляет "ghost"-записи (is_active=0), у которых нет активной пары
+   * (того же conversation_id и pw_key с is_active=1).
+   * Возвращает количество удаленных записей.
+   */
+  cleanupGhosts(convId?: string): number {
+    const db = this.db;
+    
+    // Находим ID всех "сирот"
+    const findGhostsQuery = `
+      SELECT m1.id
+      FROM messages m1
+      WHERE m1.is_active = 0
+        ${convId ? 'AND m1.conversation_id = ?' : ''}
+        AND NOT EXISTS (
+          SELECT 1 FROM messages m2
+          WHERE m2.conversation_id = m1.conversation_id
+            AND m2.pw_key = m1.pw_key
+            AND m2.is_active = 1
+        )
+    `;
+    
+    const ghosts = convId 
+      ? db.prepare(findGhostsQuery).all(convId) as { id: string }[]
+      : db.prepare(findGhostsQuery).all() as { id: string }[];
+
+    if (ghosts.length === 0) return 0;
+
+    const ids = ghosts.map(g => g.id);
+    const placeholders = ids.map(() => '?').join(',');
+    
+    const result = db.prepare(
+      `DELETE FROM messages WHERE id IN (${placeholders})`
+    ).run(...ids);
+
+    console.log(`[GatewayCache] cleanupGhosts: удалено ${result.changes} записей`);
+    return Number(result.changes);
   }
 }

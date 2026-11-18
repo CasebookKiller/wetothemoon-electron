@@ -1,6 +1,6 @@
 // src/main/services/gateway/cache/schema.ts
 
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 8;
 
 export const CREATE_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS conversations (
@@ -11,7 +11,8 @@ CREATE TABLE IF NOT EXISTS conversations (
   last_message_at INTEGER,
   message_count INTEGER NOT NULL DEFAULT 0,
   pinned INTEGER NOT NULL DEFAULT 0,
-  archived INTEGER NOT NULL DEFAULT 0
+  archived INTEGER NOT NULL DEFAULT 0,
+  profile_id TEXT NOT NULL DEFAULT 'default'
 );
 
 CREATE INDEX IF NOT EXISTS idx_conversations_updated
@@ -19,6 +20,9 @@ CREATE INDEX IF NOT EXISTS idx_conversations_updated
 
 CREATE INDEX IF NOT EXISTS idx_conversations_pinned
   ON conversations(pinned DESC, updated_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_conversations_profile
+  ON conversations(profile_id);
 
 CREATE TABLE IF NOT EXISTS messages (
   id TEXT PRIMARY KEY,
@@ -30,6 +34,7 @@ CREATE TABLE IF NOT EXISTS messages (
   thinking TEXT,
   blocks_json TEXT,
   saved_at INTEGER NOT NULL,
+  profile_id TEXT NOT NULL DEFAULT 'default',
   FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
 );
 
@@ -38,6 +43,9 @@ CREATE INDEX IF NOT EXISTS idx_messages_conv_seq
 
 CREATE INDEX IF NOT EXISTS idx_messages_saved_at
   ON messages(saved_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_messages_profile
+  ON messages(profile_id);
 `;
 
 export const CREATE_FTS_SQL = `

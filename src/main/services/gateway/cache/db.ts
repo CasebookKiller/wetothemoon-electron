@@ -14,6 +14,9 @@ import {
 } from './schema';
 import { computeMessageHash } from './hash';
 import type { MessageRole } from './types';
+import { migrateToV6 } from './migrations/v6';
+import { migrateToV7 } from './migrations/v7';
+import { migrateToV8 } from './migrations/v8';
 
 let db: DatabaseSync | null = null;
 let gatewayFilesDir: string | null = null;
@@ -147,6 +150,9 @@ const migrations: readonly Migration[] = [
         }
       }
 
+      // v8 заменит это на UNIQUE(profile_id, message_hash).
+      // На свежих БД индекс всё равно создаётся в v2, чтобы v7→v8 миграция
+      // работала одинаково на любых БД (legacy и fresh).
       database.exec(
         'CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_hash ON messages(message_hash)'
       );
@@ -180,6 +186,32 @@ const migrations: readonly Migration[] = [
           ON messages(conversation_id, is_active);
       `);
       console.log('[GatewayCache] Миграция v5 завершена');
+    },
+  },
+  {
+    version: 6,
+    apply: (database) => {
+      console.log(
+        '[GatewayCache] Миграция v6: resources, tool-registry, async-tasks, ' +
+        'sandboxes, agents, pipelines'
+      );
+      migrateToV6(database);
+      console.log('[GatewayCache] Миграция v6 завершена');
+    },
+  },
+  {
+    version: 7,
+    apply: (database) => {
+      console.log('[GatewayCache] Миграция v7: sources_json для web-источников');
+      migrateToV7(database);
+    },
+  },
+  {
+    version: 8,
+    apply: (database) => {
+      console.log('[GatewayCache] Миграция v8: profile_id (multi-profile)');
+      migrateToV8(database);
+      console.log('[GatewayCache] Миграция v8 завершена');
     },
   },
 ];

@@ -7,13 +7,14 @@
 
 export const INJECTED_SCRIPT = `
 (() => {
+  try {   // ← обёртка для диагностики
   // Cleanup предыдущей версии, если была
   if (window.__gatewayBridgeCleanup) {
     try { window.__gatewayBridgeCleanup(); } catch (_) {}
   }
 
-  window.__scriptVersion = 'v6-history-changed';
-  console.log('[injected] script v6-history-changed starting');
+  window.__scriptVersion = 'v7-rate-limit';
+  console.log('[injected] script v7-rate-limit starting');
 
   if (window.__gatewayBridgeReady) {
     console.log('[injected] already running, skip');
@@ -149,7 +150,7 @@ export const INJECTED_SCRIPT = `
     send('assistant:content-update', { html });
   }, 150);
 
-  const streamCallback = () => {
+    const streamCallback = () => {
     const mains = document.querySelectorAll(
       'div.ds-markdown.ds-assistant-message-main-content'
     );
@@ -160,7 +161,10 @@ export const INJECTED_SCRIPT = `
       lastStreamingEl = last;
       lastStreamingHtml = '';
     }
-    const html = last.innerHTML;
+    let html = last.innerHTML;
+    if (html) {
+      html = html.replace(/>\\s+</g, '><');
+    }
     if (html && html !== lastStreamingHtml) {
       lastStreamingHtml = html;
       contentThrottled(html);
@@ -369,6 +373,64 @@ export const INJECTED_SCRIPT = `
   // регистрируем в cleanup-массиве
   observers.push({ disconnect: () => clearInterval(historyPoller) });
 
+  // ---- 7d. Детекция rate-limit и бана ----
+  // Срабатывает на [role="dialog"] .ds-modal-content--dialog (модалка)
+  // или .ds-banner--info (баннер над инпутом). Шлёт profile:rate-limited /
+  // profile:banned в main. Дедуп по сигнатуре текста — чтобы не спамить.
+  // НЕ переключается само: решение принимает main-сторона (RATE_LIMIT →
+  // failover; ACCOUNT_BANNED → стоп и алерт, чтобы не связывать по device_id).
+  // ВАЖНО: внутри template literal бэкслеши удваиваются (\\d, \\s, \\.),
+  // иначе JS съедает их и regex ищет буквы d/s/literal-dot.
+  const RATE_RE = /Лимит будет (?:восстановлен|сброшен):?\\s*(\\d{2})\\.(\\d{2})\\.(\\d{4})[, ]+(?:в\\s+)?(\\d{2}):(\\d{2})/i;
+  const BAN_MARKS  = ['заблокирован', 'banned', 'account_banned', '11140'];
+  const RATE_MARKS = ['сервер занят', 'лимит использования', 'quota exceeded', 'rate limit'];
+  let lastLimitSig = '';
+
+  const parseUntil = (t) => {
+    const m = t.match(RATE_RE);
+    if (!m) return null;
+    const d = new Date(+m[3], +m[2] - 1, +m[1], +m[4], +m[5]);
+    return isNaN(d.getTime()) ? null : d.getTime();
+  };
+
+  const classifyLimit = (t) => {
+    const low = t.toLowerCase();
+    if (BAN_MARKS.some((x) => low.includes(x))) return 'ACCOUNT_BANNED';
+    if (RATE_MARKS.some((x) => low.includes(x))) return 'RATE_LIMIT';
+    return null;
+  };
+
+  const checkLimit = () => {
+    const els = [
+      document.querySelector('[role="dialog"] .ds-modal-content--dialog'),
+      document.querySelector('.ds-banner--info'),
+    ].filter(Boolean);
+    for (const el of els) {
+      const text = (el.textContent || '').trim().slice(0, 500);
+      const kind = classifyLimit(text);
+      if (!kind) continue;
+      const untilMs = parseUntil(text);
+      const sig = kind + '|' + (untilMs || 0) + '|' + text.slice(0, 100);
+      if (sig === lastLimitSig) continue;
+      lastLimitSig = sig;
+      console.warn('[injected] ' + kind + ':', text);
+      send('profile:' + (kind === 'ACCOUNT_BANNED' ? 'banned' : 'rate-limited'), {
+        kind, untilMs, rawText: text,
+      });
+      return;
+    }
+  };
+
+  // document.documentElement существует уже на document-start,
+  // document.body — ещё нет (addInitScript инжектит раньше). subtree:true
+  // покрывает всё внутри body.
+  // document существует всегда (раньше documentElement и body).
+  // subtree:true покрывает всё дерево. observe(document, …) легален.
+  const limitObserver = new MutationObserver(throttleTrailing(checkLimit, 500));
+  limitObserver.observe(document, { childList: true, subtree: true, characterData: true });
+  observers.push(limitObserver);
+  checkLimit(); // первичная проверка — если уже открыт на баннере
+
   // ---- 8. Cleanup API ----
   window.__gatewayBridgeCleanup = () => {
     for (const o of observers) {
@@ -380,6 +442,9 @@ export const INJECTED_SCRIPT = `
     console.log('[injected] cleanup done');
   };
 
-  console.log('[injected] script v6-history-changed fully loaded');
+  console.log('[injected] script v7-rate-limit fully loaded');
+  } catch (err) {   // ← диагностика: сюда попадают любые падения IIFE
+    console.error('[injected] CRASH:', err && err.stack || String(err));
+  }
 })();
 `;
