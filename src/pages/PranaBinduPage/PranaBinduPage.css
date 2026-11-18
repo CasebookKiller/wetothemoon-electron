@@ -1,11 +1,5 @@
 /* src/pages/PranaBinduPage/PranaBinduPage.css */
 
-@import '@/styles/common/theme.css';
-@import '@/styles/common/buttons.css';
-@import '@/styles/common/inputs.css';
-@import '@/styles/common/dialogs.css';
-@import '@/styles/common/tables.css';
-@import '@/styles/common/scrollbars.css';
 @import './styles/pb-layout.css';
 @import './styles/pb-components.css';
 

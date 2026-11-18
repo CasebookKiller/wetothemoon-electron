@@ -18,6 +18,12 @@ import 'primeflex/themes/primeone-dark.css';
 import 'primeicons/primeicons.css';
 
 // Включаем стили пользовательского интерфейса, чтобы наш код мог переопределять CSS пакета.
+import '@/styles/common/theme.css';
+import '@/styles/common/buttons.css';
+import '@/styles/common/inputs.css';
+import '@/styles/common/dialogs.css';
+import '@/styles/common/tables.css';
+import '@/styles/common/scrollbars.css';
 import '@/index.css';
 import React, { StrictMode } from 'react';
 import { PrimeReactProvider } from 'primereact/api';

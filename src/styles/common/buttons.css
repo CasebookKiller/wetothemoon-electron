@@ -125,3 +125,53 @@ span.pb-destructive {
 .pb-soft.p-button.p-disabled .p-button-icon {
   color: rgba(var(--module-accent-rgb), 0.4) !important;
 }
+
+/* --- нативные <button> вне PrimeReact (диалоги, порталы) --- */
+button.pb, button.pb-soft, button.pb-destructive, button.pb-icon {
+  padding: 0.75rem 1.25rem;
+  font-size: 0.75rem;
+  border-radius: 6px;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: inherit;
+}
+button.pb {
+  color: var(--module-accent, #4d6bfe);
+  background: var(--tg-theme-bg-color, #17212b);
+  border: 1px solid var(--module-accent, #4d6bfe);
+}
+button.pb:hover { background: var(--module-accent, #4d6bfe); color: var(--tg-theme-bg-color, #17212b); }
+button.pb-soft {
+  color: var(--module-accent, #4d6bfe);
+  background: transparent;
+  border: 1px solid var(--module-accent, #4d6bfe);
+}
+button.pb-soft:hover { background: rgba(var(--module-accent-rgb, 77, 107, 254), 0.12); }
+button.pb-destructive {
+  color: #ec3942;
+  background: transparent;
+  border: 1px solid #ec3942;
+}
+button.pb-destructive:hover { background: rgba(236, 57, 66, 0.12); }
+button.pb-icon {
+  width: 2rem; height: 2rem; min-width: 2rem;
+  padding: 0; border-radius: 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--tg-theme-hint-color, #888);
+  justify-content: center;
+}
+button.pb-icon:hover {
+  background: rgba(var(--module-accent-rgb, 77, 107, 254), 0.12);
+  color: var(--module-accent, #4d6bfe);
+  border-color: var(--module-accent, #4d6bfe);
+}
+button.pb-icon--danger { color: #ec3942; }
+button.pb-icon--danger:hover { background: rgba(236, 57, 66, 0.15); border-color: #ec3942; color: #ec3942; }
+button.pb:disabled, button.pb-soft:disabled,
+button.pb-destructive:disabled, button.pb-icon:disabled {
+  opacity: 0.4; cursor: not-allowed;
+}

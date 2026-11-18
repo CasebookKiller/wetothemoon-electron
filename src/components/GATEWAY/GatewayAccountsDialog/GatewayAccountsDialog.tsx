@@ -49,24 +49,6 @@ const modalStyle: React.CSSProperties = {
   boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
 };
 
-const btnPrimary: React.CSSProperties = {
-  background: '#4d6bfe', color: '#fff', border: 'none',
-  padding: '6px 14px', borderRadius: 6, fontSize: 13, cursor: 'pointer',
-  display: 'flex', alignItems: 'center', gap: 6,
-};
-
-const btnGhost: React.CSSProperties = {
-  background: 'transparent', color: '#ccc', border: '1px solid rgba(255,255,255,0.2)',
-  padding: '6px 14px', borderRadius: 6, fontSize: 13, cursor: 'pointer',
-  display: 'flex', alignItems: 'center', gap: 6,
-};
-
-const btnIcon: React.CSSProperties = {
-  background: 'transparent', border: 'none', color: '#adb2b8',
-  width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
-  borderRadius: 6, cursor: 'pointer', transition: 'background 0.15s',
-};
-
 export const GatewayAccountsDialog: React.FC<GatewayAccountsDialogProps> = ({
   visible, onClose, onChanged,
 }) => {
@@ -182,7 +164,7 @@ export const GatewayAccountsDialog: React.FC<GatewayAccountsDialogProps> = ({
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <div style={{ fontSize: 16, fontWeight: 600 }}>Аккаунты Gateway</div>
-          <button onClick={onClose} disabled={!!busy} style={btnIcon} title="Закрыть">
+          <button onClick={onClose} disabled={!!busy} className="pb-icon" title="Закрыть">
             <AppIcon name="close" set="material" size="md" />
           </button>
         </div>
@@ -192,19 +174,19 @@ export const GatewayAccountsDialog: React.FC<GatewayAccountsDialogProps> = ({
           <button
             onClick={() => { setNewName(''); setCreating({ browserKind: 'yandex' }); }}
             disabled={!!busy}
-            style={btnPrimary}
+            className="pb"
           >
             <AppIcon name="add" set="material" size="sm" /> Yandex
           </button>
           <button
             onClick={() => { setNewName(''); setCreating({ browserKind: 'chrome' }); }}
             disabled={!!busy}
-            style={btnPrimary}
+            className="pb"
           >
             <AppIcon name="add" set="material" size="sm" /> Chrome
           </button>
           <span style={{ flex: 1 }} />
-          <button onClick={refresh} disabled={!!busy} style={btnIcon} title="Обновить">
+          <button onClick={refresh} disabled={!!busy} className="pb-icon" title="Обновить">
             <AppIcon name="refresh" set="material" size="sm" />
           </button>
         </div>
@@ -265,7 +247,7 @@ export const GatewayAccountsDialog: React.FC<GatewayAccountsDialogProps> = ({
                 <button
                   onClick={(e) => { e.stopPropagation(); onToggleKind(p); }}
                   disabled={!!busy}
-                  style={btnIcon}
+                  className="pb-icon"
                   title={kind === 'chrome' ? 'Переключить на Yandex' : 'Переключить на Chrome'}
                 >
                   <AppIcon name="sync" set="material" size="sm" />
@@ -279,7 +261,7 @@ export const GatewayAccountsDialog: React.FC<GatewayAccountsDialogProps> = ({
                       setImporting({ id: p.id, name: p.name });
                     }}
                     disabled={!!busy}
-                    style={btnIcon}
+                    className="pb-icon"
                     title="Импорт cookies"
                   >
                     <AppIcon name="upload" set="material" size="sm" />
@@ -291,7 +273,7 @@ export const GatewayAccountsDialog: React.FC<GatewayAccountsDialogProps> = ({
                       setDeleting({ id: p.id, name: p.name });
                     }}
                     disabled={!!busy || isActive}
-                    style={{ ...btnIcon, color: isActive ? '#555' : '#ec3942' }}
+                    className="pb-icon pb-icon--danger"
                     title="Удалить"
                   >
                     <AppIcon name="delete" set="material" size="sm" />
@@ -315,7 +297,7 @@ export const GatewayAccountsDialog: React.FC<GatewayAccountsDialogProps> = ({
           <div style={{ fontSize: 12, color: '#888' }}>
             {state && `Всего: ${state.profiles.length}  ·  активный: ${active?.name ?? '—'}`}
           </div>
-          <button onClick={onClose} disabled={!!busy} style={btnGhost}>
+          <button onClick={onClose} disabled={!!busy} className="pb-soft">
             Закрыть
           </button>
         </div>
@@ -347,8 +329,8 @@ export const GatewayAccountsDialog: React.FC<GatewayAccountsDialogProps> = ({
               }}
             />
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-              <button onClick={() => setCreating(null)} disabled={!!busy} style={btnGhost}>Отмена</button>
-              <button onClick={submitCreate} disabled={!!busy || !newName.trim()} style={btnPrimary}>
+              <button onClick={() => setCreating(null)} disabled={!!busy} className="pb-soft">Отмена</button>
+              <button onClick={submitCreate} disabled={!!busy || !newName.trim()} className="pb">
                 {busy ? 'Создаю…' : 'Создать'}
               </button>
             </div>
@@ -379,8 +361,8 @@ export const GatewayAccountsDialog: React.FC<GatewayAccountsDialogProps> = ({
               }}
             />
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-              <button onClick={() => setImporting(null)} disabled={!!busy} style={btnGhost}>Отмена</button>
-              <button onClick={submitImport} disabled={!!busy || !importJson.trim()} style={btnPrimary}>
+              <button onClick={() => setImporting(null)} disabled={!!busy} className="pb-soft">Отмена</button>
+              <button onClick={submitImport} disabled={!!busy || !importJson.trim()} className="pb">
                 {busy ? 'Импортирую…' : 'Импортировать'}
               </button>
             </div>
@@ -398,11 +380,11 @@ export const GatewayAccountsDialog: React.FC<GatewayAccountsDialogProps> = ({
               Профиль исчезнет из списка. Файлы сессии на диске останутся.
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-              <button onClick={() => setDeleting(null)} disabled={!!busy} style={btnGhost}>Отмена</button>
+              <button onClick={() => setDeleting(null)} disabled={!!busy} className="pb-soft">Отмена</button>
               <button
                 onClick={submitDelete}
                 disabled={!!busy}
-                style={{ ...btnPrimary, background: '#ec3942' }}
+                className="pb-destructive"
               >
                 {busy ? 'Удаляю…' : 'Удалить'}
               </button>
