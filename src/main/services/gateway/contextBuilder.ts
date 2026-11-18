@@ -207,6 +207,8 @@ export interface BuiltContinuation {
   bytes: number;
   includedNodes: string[];
   skippedNodes: string[];
+  /** Откуда взята цепочка: БД (contextService) или FS (манифест). */
+  source: 'db' | 'fs';
 }
 
 /**
@@ -221,33 +223,71 @@ export interface BuiltContinuation {
 export async function buildContinuationSystemPrompt(
   opts: BuildContinuationOpts,
 ): Promise<BuiltContinuation> {
-  const manifest = loadManifest(opts.manifestPath);
   const maxBytes = opts.maxBytes ?? 20_000;
   if (!opts.activeKeys || opts.activeKeys.length === 0) {
     throw new Error('activeKeys пуст');
   }
 
-  const seen = new Set<string>();
-  const chain: ContextNode[] = [];
-  for (const k of opts.activeKeys) {
-    for (const n of chainOf(manifest, k)) {
-      if (seen.has(n.key)) continue;
-      seen.add(n.key);
-      chain.push(n);
-    }
-  }
-  chain.sort((a, b) => a.key.split('/').length - b.key.split('/').length);
+  // ─── Источник: сначала БД, fallback на FS ─────────────────────────
+  // Формат chainNode: { key, kind, title, contentMd } — общий для обоих источников.
+  type ChainNode = { key: string; kind: string; title: string; contentMd: string | null };
 
-  const readNode = (n: ContextNode): string | null => {
-    const eff = (n as any).summaryFile || n.file;
-    if (!eff) return null;
-    const abs = path.isAbsolute(eff) ? eff : path.join(manifest.root, eff);
-    return readFileSafe(abs);
-  };
+  let chain: ChainNode[] = [];
+  let source: 'db' | 'fs' = 'fs';
+  let skippedFromSource: string[] = [];
+
+  try {
+    const dbMod = await import('./contextService');
+    // Проверим, что все activeKeys есть в БД. Если хоть один отсутствует —
+    // считаем БД неполной и уходим на FS (лучше полный промпт, чем дырявой).
+    const checkAll = opts.activeKeys.every((k) => !!dbMod.getNode(k));
+    if (checkAll) {
+      const dbChain = dbMod.getChain(opts.activeKeys);
+      if (dbChain.length > 0) {
+        chain = dbChain.map((n) => ({
+          key: n.key,
+          kind: n.kind,
+          title: n.title,
+          contentMd: n.contentMd || null,
+        }));
+        source = 'db';
+      }
+    } else {
+      skippedFromSource.push('db: не все activeKeys найдены в context_nodes');
+    }
+  } catch (e) {
+    skippedFromSource.push('db: ' + (e as Error).message);
+  }
+
+  // ─── Fallback: FS (манифест) ──────────────────────────────────────
+  if (source === 'fs') {
+    const manifest = loadManifest(opts.manifestPath);
+    const seen = new Set<string>();
+    const chainFromFs: ChainNode[] = [];
+    for (const k of opts.activeKeys) {
+      for (const n of chainOf(manifest, k)) {
+        if (seen.has(n.key)) continue;
+        seen.add(n.key);
+        const eff = (n as any).summaryFile || n.file;
+        let contentMd: string | null = null;
+        if (eff) {
+          const abs = path.isAbsolute(eff) ? eff : path.join(manifest.root, eff);
+          contentMd = readFileSafe(abs);
+        }
+        chainFromFs.push({ key: n.key, kind: n.kind, title: n.title, contentMd });
+      }
+    }
+    chain = chainFromFs;
+  }
+
+  // Стабильная сортировка по глубине: global → project → submodule → module → direction.
+  // Внутри одной группы — порядок вставки (после unshift в getChain он корректен;
+  // для FS-пути chainOf тоже через unshift).
+  chain.sort((a, b) => a.key.split('/').length - b.key.split('/').length);
 
   const parts: string[] = [];
   const includedNodes: string[] = [];
-  const skippedNodes: string[] = [];
+  const skippedNodes: string[] = [...skippedFromSource];
 
   parts.push(
     `# Продолжение разработки\n\n` +
@@ -257,22 +297,20 @@ export async function buildContinuationSystemPrompt(
 
   // 1. global / project / submodule — по бюджету kind
   for (const n of chain.filter(x => ['global', 'project', 'submodule'].includes(x.kind))) {
-    const text = readNode(n);
-    if (!text) { skippedNodes.push(n.key + ' (missing)'); continue; }
+    if (!n.contentMd) { skippedNodes.push(n.key + ' (no content)'); continue; }
     const budget = CONT_BUDGET_BY_KIND[n.kind] ?? 3000;
-    parts.push(`## ${n.title}\n\n${clampMdContinuation(text, budget).trim()}\n`);
+    parts.push(`## ${n.title}\n\n${clampMdContinuation(n.contentMd, budget).trim()}\n`);
     includedNodes.push(n.key);
   }
 
   // 2. module / direction — секциями
   for (const n of chain.filter(x => ['module', 'direction'].includes(x.kind))) {
-    const text = readNode(n);
-    if (!text) {
+    if (!n.contentMd) {
       parts.push(`## ${n.title}\n\n_(${n.key}; файл не задан, направление активно)_\n`);
       includedNodes.push(n.key);
       continue;
     }
-    const sec = extractContinuationSections(text);
+    const sec = extractContinuationSections(n.contentMd);
     const summary: string[] = [];
     if (sec.done.length)       summary.push(`### ✅ Выполнено\n` + sec.done.slice(0, 10).map(x => `- ${x}`).join('\n'));
     if (sec.inProgress.length) summary.push(`### 🎯 В работе\n` + sec.inProgress.slice(0, 10).map(x => `- ${x}`).join('\n'));
@@ -280,7 +318,7 @@ export async function buildContinuationSystemPrompt(
 
     const budget = CONT_BUDGET_BY_KIND[n.kind] ?? 3000;
     if (summary.length === 0) {
-      parts.push(`## ${n.title}\n\n${clampMdContinuation(text, budget).trim()}\n`);
+      parts.push(`## ${n.title}\n\n${clampMdContinuation(n.contentMd, budget).trim()}\n`);
     } else {
       parts.push(`## ${n.title}\n\n${clampMdContinuation(summary.join('\n\n'), budget).trim()}\n`);
     }
@@ -314,5 +352,5 @@ export async function buildContinuationSystemPrompt(
     bytes = Buffer.byteLength(systemPrompt, 'utf8');
   }
 
-  return { systemPrompt, bytes, includedNodes, skippedNodes };
+  return { systemPrompt, bytes, includedNodes, skippedNodes, source };
 }
