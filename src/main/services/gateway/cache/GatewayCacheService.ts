@@ -75,7 +75,7 @@ export class GatewayCacheService {
     convId: string,
     title: string,
     incoming: IncomingMessage[],
-    opts?: { prune?: boolean }
+    opts?: { prune?: boolean; profileId?: string }
   ): Promise<{
     inserted: number;
     updated: number;
@@ -84,6 +84,7 @@ export class GatewayCacheService {
   }> {
     const db = this.db;
     const now = Date.now();
+    const profileId = opts?.profileId ?? 'default';
 
     // Подготовленные statements (один раз на вызов)
     const selectByHash = db.prepare(`
@@ -141,8 +142,8 @@ export class GatewayCacheService {
       INSERT INTO messages
         (id, conversation_id, sequence, role, content_plain, content_html,
          thinking, blocks_json, sources_json, saved_at, message_hash, pw_key,
-         branch_total, branch_index, is_active)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         branch_total, branch_index, is_active, profile_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         message_hash = excluded.message_hash,
         pw_key = excluded.pw_key,
@@ -176,8 +177,8 @@ export class GatewayCacheService {
       // 1. Upsert диалога ДО сообщений (иначе FOREIGN KEY)
       db.prepare(`
         INSERT INTO conversations
-          (id, title, created_at, updated_at, last_message_at, message_count, pinned, archived)
-        VALUES (?, ?, ?, ?, ?, ?, 0, 0)
+          (id, title, created_at, updated_at, last_message_at, message_count, pinned, archived, profile_id)
+        VALUES (?, ?, ?, ?, ?, ?, 0, 0, ?)
         ON CONFLICT(id) DO UPDATE SET
           title = excluded.title,
           updated_at = excluded.updated_at,
@@ -188,7 +189,8 @@ export class GatewayCacheService {
         now,
         now,
         incoming.length > 0 ? now : null,
-        incoming.length
+        incoming.length,
+        profileId
       );
 
       // 1.5. PRUNE — удаляем все старые сообщения диалога перед полной
@@ -357,7 +359,8 @@ export class GatewayCacheService {
                 numericKey,
                 branchTotal,
                 branchIndex,
-                isActive
+                isActive,
+                profileId
               );
               if (wasLegacy) hashedLegacy++;
               inserted++;
@@ -403,7 +406,8 @@ export class GatewayCacheService {
             numericKey,
             branchTotal,
             branchIndex,
-            isActive
+            isActive,
+            profileId
           );
           inserted++;
           if (opts?.prune) {
@@ -441,15 +445,15 @@ export class GatewayCacheService {
     return { inserted, updated, total: incoming.length, hashedLegacy };
   }
 
-  listConversations(): ConversationListItem[] {
+  listConversations(profileId = 'default'): ConversationListItem[] {
     const rows = this.db
       .prepare(`
         SELECT id, title, message_count, updated_at, last_message_at, pinned
         FROM conversations
-        WHERE archived = 0
+        WHERE archived = 0 AND profile_id = ?
         ORDER BY pinned DESC, COALESCE(last_message_at, updated_at) DESC
       `)
-      .all() as Array<{
+      .all(profileId) as Array<{
         id: string;
         title: string;
         message_count: number;
@@ -539,16 +543,16 @@ export class GatewayCacheService {
 
   // ========== Поиск по hash (для IPC 5.5) ==========
 
-  getMessageByHash(hash: string): CachedMessage | null {
+  getMessageByHash(hash: string, profileId = 'default'): CachedMessage | null {
     const r = this.db
       .prepare(`
         SELECT id, conversation_id, sequence, role, content_plain,
                content_html, thinking, blocks_json, sources_json, saved_at,
                message_hash, pw_key
         FROM messages
-        WHERE message_hash = ?
+        WHERE profile_id = ? AND message_hash = ?
       `)
-      .get(hash) as
+      .get(profileId, hash) as
       | {
           id: string;
           conversation_id: string;
@@ -599,7 +603,7 @@ export class GatewayCacheService {
     return !!row;
   }
 
-  searchMessages(query: string, limit = 50): SearchResult[] {
+  searchMessages(query: string, limit = 50, profileId = 'default'): SearchResult[] {
     if (!query.trim()) return [];
 
     if (this.hasFts()) {
@@ -616,11 +620,11 @@ export class GatewayCacheService {
             FROM messages_fts
             JOIN messages m ON m.id = messages_fts.message_id
             JOIN conversations c ON c.id = m.conversation_id
-            WHERE messages_fts MATCH ?
+            WHERE c.profile_id = ? AND messages_fts MATCH ?
             ORDER BY m.saved_at DESC
             LIMIT ?
           `)
-          .all(query, limit) as Array<{
+          .all(profileId, query, limit) as Array<{
             conversation_id: string;
             conversation_title: string;
             message_id: string;
@@ -658,11 +662,11 @@ export class GatewayCacheService {
           m.saved_at
         FROM messages m
         JOIN conversations c ON c.id = m.conversation_id
-        WHERE m.content_plain LIKE ?
+        WHERE c.profile_id = ? AND m.content_plain LIKE ?
         ORDER BY m.saved_at DESC
         LIMIT ?
       `)
-      .all(like, limit) as Array<{
+      .all(profileId, like, limit) as Array<{
         conversation_id: string;
         conversation_title: string;
         message_id: string;
