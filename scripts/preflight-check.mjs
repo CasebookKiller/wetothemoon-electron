@@ -4,9 +4,12 @@
 // Возвращает exit code 0 если всё ок, 1 если есть расхождения.
 
 import { execSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+
+const require = createRequire(import.meta.url);
 
 const ROOT = path.resolve(process.cwd());
 const DB_PATH = path.join(os.homedir(), '.config/wetothemoon-electron/gateway.db');
@@ -68,7 +71,7 @@ if (!fs.existsSync(DB_PATH)) {
   warn('БД ещё не создана (первый запуск): ' + DB_PATH);
 } else {
   try {
-    const { DatabaseSync } = await import('node:sqlite');
+    const { DatabaseSync } = require('node:sqlite');
     const db = new DatabaseSync(DB_PATH);
     const ver = db.prepare('PRAGMA user_version').get().user_version;
     if (ver === 9) ok('user_version = 9'); else err('user_version = ' + ver);

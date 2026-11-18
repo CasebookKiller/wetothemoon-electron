@@ -29,7 +29,7 @@
   },
   "nodes": [
     { "key": "global", "kind": "global", "title": "Global Context",
-      "parent": null, "file": "docs/prompts/01_COMMON_CONTEXT.md" },
+      "parent": null, "file": "docs/prompts/_common/COMMON.md" },
 
     { "key": "wetothemoon-project", "kind": "project", "title": "WeToTheMoon Project",
       "parent": "global", "file": null },
