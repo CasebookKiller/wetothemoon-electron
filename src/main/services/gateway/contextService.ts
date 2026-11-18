@@ -140,18 +140,23 @@ export function syncManifestToDb(manifestPath: string): SyncResult {
   db.exec('BEGIN');
   try {
     for (const node of nodes) {
-      // 1. Прочитать содержимое файла (если задан)
+      // 1. Прочитать содержимое файла: summaryFile имеет приоритет для content_md
+      //    (именно summary попадает в промпт). Полный file — в source_file, для
+      //    read_context_node tool (будущий). Если summaryFile нет — читаем file.
       let contentMd = '';
       let sourceFile: string | null = null;
-      if (node.file) {
-        const abs = path.isAbsolute(node.file) ? node.file : path.join(manifest.root, node.file);
+      const effectiveFile = (node as any).summaryFile || node.file;
+      if (effectiveFile) {
+        const abs = path.isAbsolute(effectiveFile)
+          ? effectiveFile
+          : path.join(manifest.root, effectiveFile);
         const txt = readFileSafe(abs);
         if (txt !== null) {
           contentMd = txt;
-          sourceFile = node.file;
+          sourceFile = node.file; // в source_file — полный путь (для tool)
         } else {
-          result.skipped.push({ key: node.key, reason: `file missing: ${node.file}` });
-          sourceFile = node.file; // всё равно запомним путь — для отладки
+          result.skipped.push({ key: node.key, reason: `file missing: ${effectiveFile}` });
+          sourceFile = node.file;
         }
       }
       const contentHash = contentMd ? hashContent(contentMd) : '';
@@ -286,26 +291,32 @@ export function getChain(activeKeys: string[]): ContextNode[] {
   const stmt = db.prepare(`SELECT * FROM context_nodes WHERE key = ?`);
 
   const seen = new Set<string>();
-  const chain: ContextNode[] = [];
+  const merged: ContextNode[] = [];
 
   for (const activeKey of activeKeys) {
-    let cur: ContextNode | null = null;
+    // Собираем цепочку ОТ КОРНЯ: unshift → [global, project, ..., activeKey]
+    const oneChain: ContextNode[] = [];
     let key: string | null = activeKey;
     while (key) {
-      if (seen.has(key)) break; // уже поднялись через этот узел
       const row: any = stmt.get(key);
       if (!row) break;
       const node = rowToNode(row);
+      oneChain.unshift(node);
+      key = node.parentId;
+    }
+
+    // Мержим, дедуп по key. Сохраняем порядок из oneChain (global первый).
+    for (const node of oneChain) {
+      if (seen.has(node.key)) continue;
       seen.add(node.key);
-      chain.push(node);
-      cur = node;
-      key = cur.parentId;
+      merged.push(node);
     }
   }
 
-  // Сортировка по глубине key (родители раньше) — тот же порядок, что в manifest
-  chain.sort((a, b) => a.key.split('/').length - b.key.split('/').length);
-  return chain;
+  // Стабильная сортировка по глубине: сохраняет порядок вставки внутри группы.
+  // После unshift global/project/submodule всегда идут в правильном порядке.
+  merged.sort((a, b) => a.key.split('/').length - b.key.split('/').length);
+  return merged;
 }
 
 // ─── Версии ───────────────────────────────────────────────────────────
