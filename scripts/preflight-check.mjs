@@ -68,7 +68,7 @@ if (!fs.existsSync(DB_PATH)) {
   warn('БД ещё не создана (первый запуск): ' + DB_PATH);
 } else {
   try {
-    const { DatabaseSync } = require('node:sqlite');
+    const { DatabaseSync } = await import('node:sqlite');
     const db = new DatabaseSync(DB_PATH);
     const ver = db.prepare('PRAGMA user_version').get().user_version;
     if (ver === 9) ok('user_version = 9'); else err('user_version = ' + ver);
