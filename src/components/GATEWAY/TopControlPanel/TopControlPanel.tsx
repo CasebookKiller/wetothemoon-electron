@@ -38,7 +38,7 @@ export const TopControlPanel: React.FC<TopControlPanelProps> = (props) => {
   }, [props.isOpen, props.onClose, props.onOpen]);
 
   // Не размонтируем при закрытии — иначе теряется state дочерних компонентов
-  // (например, модалка создания профиля в GatewayProfileSwitcher).
+  // (например, модалка создания профиля в GatewayAccountsDialog).
   return (
     <div
       className="gateway-top-panel-wrapper"
