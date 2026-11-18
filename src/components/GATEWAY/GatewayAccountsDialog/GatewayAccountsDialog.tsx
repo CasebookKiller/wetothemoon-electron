@@ -167,16 +167,17 @@ export const GatewayAccountsDialog: React.FC<GatewayAccountsDialogProps> = ({
       >
         
         {/* Header */}
-        <div className="ds-modal-content__header-wrapper">
-          <div className="ds-modal-content__title">Аккаунты Gateway</div>
-          <div
-            role="button"
-            className="ds-modal-content__close"
-            onClick={() => !busy && onClose()}
-            tabIndex={0}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <div style={{ fontSize: 16, fontWeight: 600 }}>Аккаунты Gateway</div>
+          <button
+            onClick={onClose}
+            disabled={!!busy}
+            className="pb-icon"
+            title="Закрыть"
+            style={{ width: 28, height: 28, minWidth: 28, padding: 0, background: 'transparent', border: 'none', color: '#888', cursor: busy ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
           >
             <CloseIcon size={14} />
-          </div>
+          </button>
         </div>
 
         {/* Toolbar */}
