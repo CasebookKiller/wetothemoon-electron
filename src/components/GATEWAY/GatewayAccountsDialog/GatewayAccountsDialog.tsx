@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AppIcon } from '@/components/COMMON/AppIcon/AppIcon';
+import { CloseIcon } from '../GatewayIcons/GatewayIcons';
 
 const getApi = () =>
   (window as Window & typeof globalThis & { electronAPI?: any })?.electronAPI;
@@ -159,14 +160,23 @@ export const GatewayAccountsDialog: React.FC<GatewayAccountsDialogProps> = ({
 
   return createPortal(
     <div onClick={() => !busy && onClose()} style={overlayStyle}>
-      <div onClick={(e) => e.stopPropagation()} style={modalStyle}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="ds-modal-content ds-elevated ds-modal-content--dialog"
+        style={{ width: 720, maxWidth: '92vw', maxHeight: '85vh' }}
+      >
         
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <div style={{ fontSize: 16, fontWeight: 600 }}>Аккаунты Gateway</div>
-          <button onClick={onClose} disabled={!!busy} className="pb-icon" title="Закрыть">
-            <AppIcon name="close" set="material" size="md" />
-          </button>
+        <div className="ds-modal-content__header-wrapper">
+          <div className="ds-modal-content__title">Аккаунты Gateway</div>
+          <div
+            role="button"
+            className="ds-modal-content__close"
+            onClick={() => !busy && onClose()}
+            tabIndex={0}
+          >
+            <CloseIcon size={14} />
+          </div>
         </div>
 
         {/* Toolbar */}
