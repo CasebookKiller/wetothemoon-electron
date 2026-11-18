@@ -297,6 +297,7 @@ export function registerGatewayHandlers(): void {
             }));
             await cache.syncConversation(convId, title, incoming, {
               prune: opts?.prune === true,
+              profileId: ProfileService.getInstance().getActiveId(),
             });
             console.log(
               `[GatewayCache] Синхронизировано ${data.length} сообщений для ${convId}` +
@@ -864,6 +865,7 @@ export function registerGatewayHandlers(): void {
         cache
           .syncConversation(activeConvId, activeConvTitle, incoming, {
             prune: usePrune,
+            profileId: ProfileService.getInstance().getActiveId(),
           })
           .then((r) =>
             console.log(
@@ -1051,7 +1053,7 @@ export function registerGatewayHandlers(): void {
 
   ipcMain.handle('gateway:cache-list', async () => {
     try {
-      const data = cache.listConversations();
+      const data = cache.listConversations(ProfileService.getInstance().getActiveId());
       return { success: true, data };
     } catch (e) {
       return { success: false, error: (e as Error).message };
@@ -1069,7 +1071,11 @@ export function registerGatewayHandlers(): void {
 
   ipcMain.handle('gateway:cache-search', async (_e, query: string, limit?: number) => {
     try {
-      const data = cache.searchMessages(query, limit ?? 50);
+      const data = cache.searchMessages(
+        query,
+        limit ?? 50,
+        ProfileService.getInstance().getActiveId()
+      );
       return { success: true, data };
     } catch (e) {
       return { success: false, error: (e as Error).message };
@@ -1080,7 +1086,9 @@ export function registerGatewayHandlers(): void {
     'gateway:cache-save',
     async (_e, convId: string, title: string, messages: IncomingMessage[]) => {
       try {
-        const data = await cache.syncConversation(convId, title, messages);
+        const data = await cache.syncConversation(convId, title, messages, {
+          profileId: ProfileService.getInstance().getActiveId(),
+        });
         return { success: true, data };
       } catch (e) {
         return { success: false, error: (e as Error).message };
