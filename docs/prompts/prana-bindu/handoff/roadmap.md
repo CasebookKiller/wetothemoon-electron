@@ -57,6 +57,34 @@
 - `dofekProvider.ts`, `mcpProvider.ts`, `bridgeProvider.ts` — заглушки.
 - **Реальные запросы к Zepp** (тренировки, VO2max, SpO2, HRV) — TODO.
 
+## 07 ICU — синтаксис конструктора (детали в `chats/07_SPICE_PLAN.md`)
+
+**Единицы:** `m`=минуты, `s`=секунды, `h`=часы, `mtr`=метры, `km`, `mi`.
+
+**Секции:** `Warmup`, `Main Set`, `Cooldown` (на отдельной строке).
+
+**Повторы:** `Nx` на отдельной строке, пустые строки до и после. **Вложенные повторы — НЕ поддерживаются.**
+
+**Цели:** `% HR`, `%`, `Z1..Z7`, `Pace`, `freeride`.
+
+**Cue:** текст **ПЕРЕД** длительностью → подсказка на часах.
+
+**НЕ поддерживается:** RPE, вложенные повторы, русские единицы (`сек/мин/км`).
+
+**Пример:**
+```
+VO2max Intervals (10x 400m)
+Warmup
+- 2km Z2 Pace
+Main set 10x
+- 400m Z5 Pace
+- 400m recovery Z1 Pace
+Cooldown
+- 2km Z1 Pace
+```
+
+**Формат событий ICU:** `category` (WORKOUT/PLAN/TARGET/NOTE/RACE), `type` (Run), `name`, `start_date_local`, `icu_workout.steps` (type + duration + target). Push: `POST /events`, `PUT /events/{id}`, `DELETE /events/{id}`.
+
 ## Что НЕ делаем сейчас
 
 - Google Fit (отложено навсегда).

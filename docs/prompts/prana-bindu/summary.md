@@ -27,5 +27,21 @@ Electron 44 + React 19 + PrimeReact 10 + SQLite (`node:sqlite`). Парсеры:
 - **Zepp FIT-папка** — ручные выгрузки.
 - **Zepp-direct** — TODO (VO2max, SpO2, HRV).
 
+## Карта файлов
+
+| Что | Где |
+|---|---|
+| Окно | `src/main/windows/pranaBinduWindow.ts` |
+| Страница | `src/pages/PranaBinduPage/PranaBinduPage.tsx` |
+| IPC-префикс | `pb:*` |
+| IPC-хендлеры | `src/main/ipcHandlers/pranaBinduHandlers.ts` |
+| Сервисы | `src/main/services/pranaBindu/{core,stillsuit,crysknife,mentat,waterDiscipline,spice,melange}/` |
+| Компоненты | `src/components/PRANA_BINDU/` |
+| Панели | `src/components/PRANA_BINDU/PANELS/` (по подпапке на панель) |
+| Preload | `electronAPI.pb.*` |
+| Меланж (БД) | `src/main/services/pranaBindu/melange/{db,schema,migrations,repositories}/` |
+| Провайдеры | `src/main/services/pranaBindu/spice/providers/{dodofoProvider,intervalsIcuProvider,dofekProvider,mcpProvider,bridgeProvider,regionDetector}.ts` |
+| Парсеры | `src/main/services/pranaBindu/spice/parsers/{fitParser,tcxParser,stravaCsvParser,gpsClassifier}.ts` |
+
 ## Что НЕ входит
 Fine-tuning Ollama (`training:*`), мобильная версия Prana-Bindu, Live-журнал (отдельный PWA), публичный релиз с именами из «Дюны».

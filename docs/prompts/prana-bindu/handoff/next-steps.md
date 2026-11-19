@@ -27,11 +27,29 @@ ls -la ~/.config/wetothemoon-electron/prana_bindu.db
 
 ## Приоритет на сессию (2 часа)
 
-1. **Если 02 Core не начат** — реализовать. Спека готова, файлы `src/main/services/pranaBindu/core/{types,zones,eightyTwenty,phases,progressionGate,recommendationValidator,scenarios,index}.ts`. Разблокирует Crysknife, Water Discipline, AI-Validator.
-2. **Если 07 Spice** — Push в ICU (`POST/PUT/DELETE events`, UI в `PlanEventDrawer`, preview таймлайна).
-3. **Если 11 AI-Тренер** — `contextBuilder.ts` + `AiCoachDialog`. Зависит от 02 Core.
-4. **Если 16 Exercise Graph** — миграция каталогов в JSON (этап B).
-5. **Если 18 Map Editor** — C.7 «Территория» (полигоны на 3 КП, фундамент — C.12 chains).
+> **Browser-канал приоритетнее API.** Не ждём API. См. `architecture.md` §«Browser-канал > API».
+
+1. **`ProviderAdapter` + `BrowserPool`** — фундамент для параллельных браузеров и N провайдеров (1 час).
+2. **Recon провайдеров** — Duck.ai → g4f.dev → GigaChat → Алиса → HuggingChat (1 час).
+3. **Cookie/fingerprint** — расширить `cookieTracker.ts` (canvas, WebGL, timezone, fonts). Ответить на П5: как нас палят.
+
+## 02 Core — сигнатуры (детали в `docs/prompts/prana-bindu/chats/02_CORE.md`)
+
+Файлы: `src/main/services/pranaBindu/core/{types,zones,eightyTwenty,phases,progressionGate,recommendationValidator,scenarios,index}.ts`. **Zero импортов Electron/React/БД. Детерминированы.**
+
+- **`zones.ts`** — `getZone(hr)`, `getZoneBoundaries(profile)`, `zoneToIntensity(zone)`. Два режима: по возрасту (`220 - age`) или по ПАНО (точнее).
+- **`eightyTwenty.ts`** — `checkEightyTwenty(weekId)` → `{ ratio, verdict, advice }`. Считает объём в зонах 1–2 vs 4–5.
+- **`phases.ts`** — `getPhase(date)`, `phaseAllows(type)`, `phaseVolumeMultiplier(phase)`. Фазы: база → порог → специфика → подводка.
+- **`progressionGate.ts`** — `checkProgressionGate(movementId)` → `{ open, reasons }`. Benchmark + стабильность пульса + HRV.
+- **`recommendationValidator.ts`** — `validateRecommendation(rec)` → `{ ok, violations }`. Проверяет AI-совет против 80/20, восстановления, taper.
+
+**6 сценариев в `scenarios.ts`** (запускаются вручную, вывод в консоль):
+1. **Зоны.** Age 40, max HR 180 → З1=90-108, З2=108-126, З3=126-144, З4=144-162, З5=162-180. `getZone(120) === 2`.
+2. **80/20 OK.** 100 км: 85 З1-2, 15 З4-5 → `verdict: ok`.
+3. **80/20 нарушено.** 60 км: 30 З1-2, 30 З4-5 → `verdict: warn`, «снизить интенсивность».
+4. **Фаза.** Май (порог) → `phaseAllows('threshold') = true`. За 2 недели до 27.09.2026 → `false`.
+5. **Ворота.** Benchmark + пульс + HRV → `{ open: true }`. Benchmark + HRV низкий → `{ open: false, reasons: ['low_hrv'] }`.
+6. **Валидатор.** AI: «+2 пороговых в неделю» во время taper → `{ ok: false, violations: ['taper_violation'] }`.
 
 ## Правила работы
 
