@@ -139,3 +139,5 @@ scripts/recon-symbols.sh
 scripts/recon.sh
 scripts/recon-free-llms.discovered.json
 scripts/recon-free-llms.filtered.json
+deepseek_cookies.json
+.env.local.bak-*
