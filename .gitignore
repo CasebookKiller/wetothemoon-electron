@@ -96,13 +96,11 @@ out/
 
 *.old
 
-# docs/ — локальные (OSINT, 594M). В git только правила игры (docs/prompts/*.md + SUBMODULE_SUMMARY.md)
+# docs/ — локальные (OSINT, 594M). В git только правила игры (docs/prompts/**/*.md + SUBMODULE_SUMMARY.md)
 docs/*
-!docs/prompts
-docs/prompts/*
-!docs/prompts/**/*.md
-docs/prompts/01_COMMON_CONTEXT.md
+!docs/prompts/
 !docs/SUBMODULE_SUMMARY.md
+docs/prompts/01_COMMON_CONTEXT.md
 
 # Training
 training/
