@@ -1,6 +1,6 @@
 // src/components/GATEWAY/TopControlPanel/TopControlPanel.tsx
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from 'primereact/button';
 import { GatewayAccountsButton } from '../GatewayAccountsButton/GatewayAccountsButton';
 import './TopControlPanel.css';
@@ -26,6 +26,7 @@ interface TopControlPanelProps {
 }
 
 export const TopControlPanel: React.FC<TopControlPanelProps> = (props) => {
+  const [handoffLoading, setHandoffLoading] = useState(false);
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.code === 'Backquote') {
@@ -63,6 +64,45 @@ export const TopControlPanel: React.FC<TopControlPanelProps> = (props) => {
         </span>
 
         <GatewayAccountsButton />
+
+        <Button
+          label={handoffLoading ? 'Собираю…' : 'Handoff'}
+          icon={handoffLoading ? 'pi pi-spin pi-spinner' : 'pi pi-download'}
+          className="pb-soft"
+          disabled={handoffLoading}
+          loading={handoffLoading}
+          tooltip="Собрать состояние проекта в .md (для нового чата)"
+          tooltipOptions={{ position: 'bottom' }}
+          onClick={async () => {
+            if (handoffLoading) return;
+            setHandoffLoading(true);
+            try {
+              const r = await (window as any).electronAPI.gatewayExportHandoff({
+                taskTitle: 'Продолжение работы',
+              });
+              if (r.success && r.data) {
+                try {
+                  await navigator.clipboard.writeText(r.data.markdown);
+                  alert(
+                    `✅ Handoff сохранён и скопирован в буфер\n\n` +
+                    `${r.data.path}\n(${r.data.bytes} байт)\n\n` +
+                    `Секции: ${r.data.sections.join(', ')}`
+                  );
+                } catch {
+                  alert(
+                    `✅ Handoff сохранён (буфер недоступен)\n\n${r.data.path}\n(${r.data.bytes} байт)`
+                  );
+                }
+              } else {
+                alert('❌ ' + (r.error || 'Не удалось собрать handoff'));
+              }
+            } catch (e: any) {
+              alert('❌ ' + e.message);
+            } finally {
+              setHandoffLoading(false);
+            }
+          }}
+        />
 
         <Button
           label="Обновить диалоги"

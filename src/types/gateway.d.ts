@@ -354,6 +354,14 @@ declare global {
       gatewayProfilesDelete: (id: string, opts: { deleteFiles?: boolean }) =>
         Promise<{ success: boolean; error?: string }>;
 
+      gatewayExportHandoff(opts?: {
+        workspaceKeys?: string[];
+        taskTitle?: string;
+      }): Promise<{
+        success: boolean;
+        data?: { path: string; bytes: number; sections: string[]; markdown: string };
+        error?: string;
+      }>;
     };
   }
 }

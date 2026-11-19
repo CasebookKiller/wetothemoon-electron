@@ -1314,6 +1314,8 @@ try {
     gatewayKillYandexProfile: (profileId: string) =>
       ipcRenderer.invoke('gateway:kill-yandex-profile', profileId),   
 
+    gatewayExportHandoff: (opts?: any) => ipcRenderer.invoke('gateway:export-handoff', opts),
+
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

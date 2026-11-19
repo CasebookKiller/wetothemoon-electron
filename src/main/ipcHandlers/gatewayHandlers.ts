@@ -1,6 +1,7 @@
 // src/main/ipcHandlers/gatewayHandlers.ts
 
 import { app, dialog, ipcMain } from 'electron';
+import fs from 'node:fs';
 import path from 'path';
 import { DeepSeekService } from '../services/gateway/deepseekService';
 import { getGatewayWindow } from '../windows/gatewayWindow';
@@ -21,6 +22,40 @@ let activeConvTitle: string | undefined;
 // fileStatuses-ключи не разъехались). Живёт максимум 60с — защита
 // от утечки при ошибке/навигации.
 let skipPruneOnNextCompleteTs = 0;
+
+function resolveActiveKeys(explicit?: string[]): string[] {
+  if (explicit && explicit.length > 0) return explicit;
+
+  // 1. process.env (заполнится, если ключ есть в .env)
+  const fromEnv = process.env.ACTIVE_WORKSPACE_KEYS
+    ?.split(',').map(s => s.trim()).filter(Boolean);
+  if (fromEnv && fromEnv.length > 0) return fromEnv;
+
+  // 2. читаем .env.local / .env руками — main грузит только .env
+  for (const fname of ['.env.local', '.env']) {
+    try {
+      const p = path.join(app.getAppPath(), fname);
+      if (!fs.existsSync(p)) continue;
+      const text = fs.readFileSync(p, 'utf8');
+      for (const line of text.split('\n')) {
+        const m = line.match(/^\s*ACTIVE_WORKSPACE_KEYS\s*=\s*(.+?)\s*$/);
+        if (m) {
+          const raw = m[1].replace(/^["']|["']$/g, '');
+          const keys = raw.split(',').map(s => s.trim()).filter(Boolean);
+          if (keys.length > 0) return keys;
+        }
+      }
+    } catch { /* ignore */ }
+  }
+
+  // 3. context_workspaces — если .env.local нет
+  try {
+    // dynamic import — работает и в ESM, и в CJS bundling
+    // (нужен await → хелпер сделать async, либо вынести вызов в сам handler)
+  } catch { /* ignore */ }
+
+  return [];
+}
 
 export function registerGatewayHandlers(): void {
   const service = DeepSeekService.getInstance();
@@ -1385,4 +1420,57 @@ export function registerGatewayHandlers(): void {
     }
   });
 
+  ipcMain.handle('gateway:export-handoff', async (_e, opts?: {
+    workspaceKeys?: string[];
+    taskTitle?: string;
+  }) => {
+    try {
+      const api = await import('../services/gateway/handoffBuilder');
+
+      let activeKeys = resolveActiveKeys(opts?.workspaceKeys);
+
+      // last-resort: context_workspaces
+      if (activeKeys.length === 0) {
+        try {
+          const { getGatewayCache } = await import('../services/gateway/cache/db');
+          const db = getGatewayCache();
+          const row = db.prepare(
+            'SELECT active_keys_json FROM context_workspaces ORDER BY id LIMIT 1'
+          ).get() as any;
+          if (row?.active_keys_json) {
+            const parsed = JSON.parse(row.active_keys_json);
+            if (Array.isArray(parsed) && parsed.length > 0) activeKeys = parsed;
+          }
+        } catch { /* ignore */ }
+      }
+
+      if (activeKeys.length === 0) {
+        return {
+          success: false,
+          error:
+            'ACTIVE_WORKSPACE_KEYS не найден (env → .env.local → .env → context_workspaces). ' +
+            'Проверь .env.local и наличие активного workspace в БД.',
+        };
+      }
+
+      const r = await api.buildHandoff({
+        workspaceKeys: activeKeys,
+        taskTitle: opts?.taskTitle ?? 'Продолжение работы',
+        rootPath: app.getAppPath(),
+      });
+
+      const dir = path.join(app.getPath('userData'), 'handoff');
+      fs.mkdirSync(dir, { recursive: true });
+      const fname = `handoff-${new Date().toISOString().replace(/[:.]/g, '-')}.md`;
+      const fpath = path.join(dir, fname);
+      fs.writeFileSync(fpath, r.markdown, 'utf8');
+
+      return {
+        success: true,
+        data: { path: fpath, bytes: r.bytes, sections: r.sections, markdown: r.markdown },
+      };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
 }
