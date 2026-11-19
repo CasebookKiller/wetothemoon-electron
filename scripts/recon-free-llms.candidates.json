@@ -3,17 +3,22 @@
   "updatedAt": "2026-11-19",
   "note": "Кандидаты — бесплатные аналоги chat.deepseek.com. discoverySources — откуда брать новых.",
   "candidates": [
-    { "name": "DeepSeek",     "url": "https://chat.deepseek.com",              "kind": "web", "auth": "session", "note": "текущий" },
-    { "name": "HuggingChat",  "url": "https://huggingface.co/chat",            "kind": "web", "auth": "session", "note": "HF-аккаунт" },
-    { "name": "Duck.ai",      "url": "https://duck.ai",                        "kind": "web", "auth": "none",    "note": "без логина" },
-    { "name": "t3.chat",      "url": "https://t3.chat",                        "kind": "web", "auth": "session", "note": "нужен аккаунт" },
-    { "name": "LMArena",      "url": "https://lmarena.ai",                     "kind": "web", "auth": "none",    "note": "анонимно" },
-    { "name": "g4f.dev",      "url": "https://g4f.dev",                        "kind": "web", "auth": "none",    "note": "агрегатор" },
-    { "name": "sharedchat.cn","url": "https://sharedchat.cn",                  "kind": "web", "auth": "session", "note": "китайский" },
-    { "name": "IdleClaw",     "url": "https://idleclaw.com",                   "kind": "web", "auth": "none",    "note": "анонимно" },
-    { "name": "LLM7.io",      "url": "https://api.llm7.io/v1/models",          "kind": "api", "auth": "none",    "note": "OpenAI-совместимый" },
-    { "name": "OpenCode Free","url": "https://opencode.ai/api/v1/models",      "kind": "api", "auth": "none",    "note": "" },
-    { "name": "Pollinations", "url": "https://text.pollinations.ai/models",    "kind": "api", "auth": "none",    "note": "" }
+    { "name": "DeepSeek",       "url": "https://chat.deepseek.com",              "kind": "web", "auth": "session", "note": "текущий" },
+    { "name": "HuggingChat",    "url": "https://huggingface.co/chat",            "kind": "web", "auth": "session", "note": "HF-аккаунт" },
+    { "name": "Duck.ai",        "url": "https://duck.ai",                        "kind": "web", "auth": "none",    "note": "без логина" },
+    { "name": "t3.chat",        "url": "https://t3.chat",                        "kind": "web", "auth": "session", "note": "нужен аккаунт" },
+    { "name": "LMArena",        "url": "https://lmarena.ai",                     "kind": "web", "auth": "none",    "note": "анонимно" },
+    { "name": "g4f.dev",        "url": "https://g4f.dev",                        "kind": "web", "auth": "none",    "note": "агрегатор" },
+    { "name": "sharedchat.cn",  "url": "https://sharedchat.cn",                  "kind": "web", "auth": "session", "note": "китайский" },
+    { "name": "IdleClaw",       "url": "https://idleclaw.com",                   "kind": "web", "auth": "none",    "note": "анонимно" },
+    { "name": "LLM7.io",        "url": "https://api.llm7.io/v1/models",          "kind": "api", "auth": "none",    "note": "OpenAI-совместимый" },
+    { "name": "OpenCode Free",  "url": "https://opencode.ai/api/v1/models",      "kind": "api", "auth": "none",    "note": "" },
+    { "name": "Pollinations",   "url": "https://text.pollinations.ai/models",    "kind": "api", "auth": "none",    "note": "" },
+
+    { "name": "GigaChat",       "url": "https://giga.chat",                      "kind": "web", "auth": "session", "note": "Сбер, вход по SberID/телефону" },
+    { "name": "GigaChat API",   "url": "https://api.giga.chat/v1",               "kind": "api", "auth": "key",     "note": "OpenAI-совместимый, OAuth-токен" },
+    { "name": "Алиса AI",       "url": "https://alice.yandex.ru",                "kind": "web", "auth": "session", "note": "Яндекс, вход по Yandex ID" },
+    { "name": "Алиса AI API",   "url": "https://llm.api.cloud.yandex.net/v1",    "kind": "api", "auth": "key",     "note": "YandexGPT/Alice AI, OpenAI-совместимый" }
   ],
   "discoverySources": [
     {
