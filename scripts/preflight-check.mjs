@@ -11,6 +11,8 @@ import os from 'node:os';
 
 const require = createRequire(import.meta.url);
 
+const FAST = process.argv.includes('--fast');
+
 const ROOT = path.resolve(process.cwd());
 const DB_PATH = path.join(os.homedir(), '.config/wetothemoon-electron/gateway.db');
 const PARENT = path.resolve(ROOT, '..');
@@ -97,6 +99,10 @@ if (!fs.existsSync(DB_PATH)) {
 
 // ─── 6. tsc ─────────────────────────────────────────────────────────
 section('6. tsc по нашим файлам');
+if (FAST) {
+  console.log('\n=== 6. tsc по нашим файлам ===');
+  console.log('  ⏭ пропущено (--fast)');
+}
 try {
   const out = execSync('npx tsc --noEmit 2>&1', { cwd: ROOT, encoding: 'utf8', timeout: 60000 });
   const lines = out.split('\n').filter(l =>

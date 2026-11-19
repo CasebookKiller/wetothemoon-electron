@@ -74,16 +74,28 @@ export async function buildHandoff(opts: HandoffOpts): Promise<BuiltHandoff> {
   parts.push(`**Task:** ${opts.taskTitle}\n`);
   sections.push('title', 'task');
 
+  // 0c. Недавно сделано — из git log (авто, не требует ручной поддержки)
+  parts.push(`## ✅ Недавно сделано (git log -10)
+
+\`\`\`
+${await sh('git log --oneline -10 --no-decorate', ROOT)}
+\`\`\`
+
+> Полный список «Сделано / НЕ откатывать» — в \`docs/prompts/${opts.moduleId}/handoff/done.md\` (если есть).
+`);
+  sections.push('done-recent');
+
   // 0. Intent — намерения, не код
   if (opts.includeIntent !== false) {
     const intentFiles: Array<[string, string, 'module' | 'common']> = [
-      ['ban-pattern.md',  '## ⏱ Паттерн бана',           'common'],
-      ['next-steps.md',   '## 🚀 С чего начать',          'module'],
-      ['roadmap.md',      '## 📋 Roadmap',                'module'],
-      ['problems.md',     '## 🐞 Известные проблемы',     'module'],
-      ['architecture.md', '## 🏛 Архитектурные принципы', 'module'],
-      ['techdebt.md',     '## 🧹 Техдолг',                'module'],
-      ['checklist.md',    '## ✅ Финальный чек-лист',      'common'],
+      ['ban-pattern.md',  '## ⏱ Паттерн бана',              'common'],
+      ['next-steps.md',   '## 🚀 С чего начать',             'module'],
+      ['done.md',         '## ✅ Сделано / НЕ откатывать',    'module'],
+      ['roadmap.md',      '## 📋 Roadmap',                   'module'],
+      ['problems.md',     '## 🐞 Известные проблемы',        'module'],
+      ['architecture.md', '## 🏛 Архитектурные принципы',    'module'],
+      ['techdebt.md',     '## 🧹 Техдолг',                   'module'],
+      ['checklist.md',    '## ✅ Финальный чек-лист',         'common'],
     ];
     let intentAdded = false;
     for (const [fname, header, scope] of intentFiles) {
@@ -97,6 +109,31 @@ export async function buildHandoff(opts: HandoffOpts): Promise<BuiltHandoff> {
     }
     if (intentAdded) sections.push('intent');
   }
+
+  // 0b. Мета-инструкция: как поддерживать handoff в актуальном виде
+  parts.push(`## 🔄 Как поддерживать handoff в актуальном виде
+
+После завершения этапа разработки (в конце сессии, перед \`wm-backup\`) — **обнови intent-файлы**:
+
+| Файл | Когда обновлять | Что менять |
+|---|---|---|
+| \`docs/prompts/${opts.moduleId}/handoff/roadmap.md\` | Задача закрыта / появилась новая | Убрать из «Ближайшие» → перенести в «Закрытые» или удалить. Добавить новое в «Следующие сессии» |
+| \`docs/prompts/${opts.moduleId}/handoff/problems.md\` | Проблема решена / найдена новая | Решённое → в «Закрытые» (или удалить). Новое — с симптомом, причиной, фиксом |
+| \`docs/prompts/${opts.moduleId}/handoff/techdebt.md\` | Долг закрыт / обнаружен | То же: закрытое → в «Закрытые», новое — с приоритетом |
+| \`docs/prompts/${opts.moduleId}/handoff/architecture.md\` | Появился новый принцип | Добавить в конец, **старое не удалять** (архитектура — накопительная) |
+| \`docs/prompts/${opts.moduleId}/summary.md\` | Изменилась архитектура модуля | Обновить цифры, роли, координаторов, стек |
+| \`docs/prompts/${opts.moduleId}/handoff/next-steps.md\` | Изменился приоритет | Обновить «Приоритет на сессию» |
+
+**Формат правок:** «найти → заменить» (два блока: что найти, на что заменить). Не diff, не «весь файл заново», не «вставь после строки N». Не можешь найти — попроси \`grep -n\` и работай по выводу.
+
+**Когда обновлять:**
+- В конце сессии, **перед** \`wm-backup\` (иначе бэкап снимет старое)
+- После завершения крупного этапа
+- **Не автоматически** — только осознанно, чтобы не замусорить intent-файлы
+
+**Проверка:** после обновления — \`git diff docs/prompts/${opts.moduleId}/handoff/\` должен быть осмысленным, не пустым (если этап был).
+`);
+  sections.push('meta-instructions');
 
   // 1. Git state
   if (opts.includeGit !== false) {
