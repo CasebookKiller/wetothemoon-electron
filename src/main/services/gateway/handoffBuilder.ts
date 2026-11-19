@@ -238,11 +238,22 @@ ${nodes.map(n => `| ${n.key} | ${n.kind} | ${n.version} |`).join('\n')}
   // 4. Context chain
   try {
     const chain = getChain(workspaceKeys);
-    const MAX = 500;
+    // Для submodule/module — 2000 символов (summary.md обычно длиннее 500).
+    // Для direction — 800 (там короткие roadmap-выжимки).
+    const MAX_BY_KIND: Record<string, number> = {
+      global: 1000, project: 1500, submodule: 2000, module: 2500, direction: 800,
+    };
     const md = chain.map((n: any) => {
+      const MAX = MAX_BY_KIND[n.kind] ?? 800;
       const c = n.contentMd || '';
-      const preview = c.slice(0, MAX);
-      const trunc = c.length > MAX ? '\n\n_(обрезано)_' : '';
+      // Разные лимиты по kind: direction короткие, module/summary длиннее
+      const kindLimit = n.kind === 'module' ? 2500
+                       : n.kind === 'submodule' ? 2000
+                       : n.kind === 'project' ? 1500
+                       : n.kind === 'global' ? 1000
+                       : 800;
+      const preview = c.slice(0, kindLimit);
+      const trunc = c.length > kindLimit ? '\n\n_(обрезано)_' : '';
       return `### ${n.key} [${n.kind}] v${n.version ?? '?'}\n\n${preview}${trunc}`;
     }).join('\n\n---\n\n');
     parts.push(`## Context chain (${chain.length} узлов)\n\n${md}\n`);
