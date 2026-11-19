@@ -1,7 +1,7 @@
 {
-  "version": 1,
+  "version": 2,
   "updatedAt": "2026-11-19",
-  "note": "Кандидаты — бесплатные аналоги chat.deepseek.com. Добавляй новые сюда, скрипт подхватит автоматически.",
+  "note": "Кандидаты — бесплатные аналоги chat.deepseek.com. discoverySources — откуда брать новых.",
   "candidates": [
     { "name": "DeepSeek",     "url": "https://chat.deepseek.com",              "kind": "web", "auth": "session", "note": "текущий" },
     { "name": "HuggingChat",  "url": "https://huggingface.co/chat",            "kind": "web", "auth": "session", "note": "HF-аккаунт" },
@@ -11,9 +11,28 @@
     { "name": "g4f.dev",      "url": "https://g4f.dev",                        "kind": "web", "auth": "none",    "note": "агрегатор" },
     { "name": "sharedchat.cn","url": "https://sharedchat.cn",                  "kind": "web", "auth": "session", "note": "китайский" },
     { "name": "IdleClaw",     "url": "https://idleclaw.com",                   "kind": "web", "auth": "none",    "note": "анонимно" },
-
     { "name": "LLM7.io",      "url": "https://api.llm7.io/v1/models",          "kind": "api", "auth": "none",    "note": "OpenAI-совместимый" },
     { "name": "OpenCode Free","url": "https://opencode.ai/api/v1/models",      "kind": "api", "auth": "none",    "note": "" },
     { "name": "Pollinations", "url": "https://text.pollinations.ai/models",    "kind": "api", "auth": "none",    "note": "" }
+  ],
+  "discoverySources": [
+    {
+      "id": "free-llm-api-hub",
+      "kind": "json-api",
+      "url": "https://raw.githubusercontent.com/pacocartones/free-llm-api-hub/main/data/providers.json",
+      "note": "JSON-датасет бесплатных LLM API"
+    },
+    {
+      "id": "no-cost-ai-readme",
+      "kind": "markdown-raw",
+      "url": "https://raw.githubusercontent.com/zebbern/no-cost-ai/main/README.md",
+      "note": "README с 80+ бесплатными AI-сервисами"
+    },
+    {
+      "id": "awesome-free-models",
+      "kind": "markdown-raw",
+      "url": "https://raw.githubusercontent.com/12britz/awesome-free-models/main/README.md",
+      "note": "Курируемый список бесплатных моделей"
+    }
   ]
 }
