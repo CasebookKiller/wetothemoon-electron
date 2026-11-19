@@ -137,3 +137,5 @@ scripts/svg-to-gateway-icon.sh
 scripts/test-prompt.txt
 scripts/recon-symbols.sh
 scripts/recon.sh
+scripts/recon-free-llms.discovered.json
+scripts/recon-free-llms.filtered.json
