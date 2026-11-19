@@ -31,8 +31,8 @@
     { "key": "global", "kind": "global", "title": "Global Context",
       "parent": null, "file": "docs/prompts/_common/COMMON.md" },
 
-    { "key": "wetothemoon-project", "kind": "project", "title": "WeToTheMoon Project",
-      "parent": "global", "file": null },
+    { "key": "wetothemoon-project", "kind": "project", "title": "wetothemoon-project",
+      "parent": null, "file": "docs/prompts/_common/project.md" },
 
     { "key": "wetothemoon-electron", "kind": "submodule", "title": "Electron Submodule",
       "parent": "wetothemoon-project", "file": "docs/SUBMODULE_SUMMARY.md" },
@@ -47,8 +47,13 @@
     { "key": "wetothemoon-electron/gateway/api-channel", "kind": "direction", "title": "API channel + context builder",
       "parent": "wetothemoon-electron/gateway", "file": "GATEWAY_MULTI_ACCOUNT_ROADMAP.md" },
 
-    { "key": "wetothemoon-electron/prana-bindu", "kind": "module", "title": "Prana-Bindu (fitness)",
-      "parent": "wetothemoon-electron", "file": "docs/prompts/PROJECT_STATE.md" },
+    {
+      "key": "wetothemoon-electron/prana-bindu",
+      "kind": "module",
+      "title": "Prana-Bindu",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/prana-bindu/summary.md"
+    },
 
     { "key": "wetothemoon-electron/prana-bindu/11-ai-coach", "kind": "direction", "title": "AI-тренер",
       "parent": "wetothemoon-electron/prana-bindu", "file": null },

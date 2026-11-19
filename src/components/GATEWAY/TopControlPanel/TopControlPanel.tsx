@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Button } from 'primereact/button';
+import { Dropdown } from 'primereact/dropdown';
 import { GatewayAccountsButton } from '../GatewayAccountsButton/GatewayAccountsButton';
 import './TopControlPanel.css';
 
@@ -27,6 +28,17 @@ interface TopControlPanelProps {
 
 export const TopControlPanel: React.FC<TopControlPanelProps> = (props) => {
   const [handoffLoading, setHandoffLoading] = useState(false);
+  const [handoffModule, setHandoffModule] = useState<string>(() => {
+    const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('handoff-module') : null;
+    return saved || 'gateway';
+  });
+
+  const handoffModules = [
+    { label: 'Gateway', value: 'gateway' },
+    { label: 'Prana-Bindu', value: 'prana-bindu' },
+    { label: 'OSINT', value: 'osint' },
+    { label: 'Sietch', value: 'sietch' },
+  ];
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.code === 'Backquote') {
@@ -65,6 +77,18 @@ export const TopControlPanel: React.FC<TopControlPanelProps> = (props) => {
 
         <GatewayAccountsButton />
 
+        <Dropdown
+          value={handoffModule}
+          options={handoffModules}
+          onChange={(e) => {
+            setHandoffModule(e.value);
+            try { localStorage.setItem('handoff-module', e.value); } catch { /* ignore */ }
+          }}
+          disabled={handoffLoading}
+          className="pb-soft"
+          tooltip="Модуль для handoff"
+          tooltipOptions={{ position: 'bottom' }}
+        />
         <Button
           label={handoffLoading ? 'Собираю…' : 'Handoff'}
           icon={handoffLoading ? 'pi pi-spin pi-spinner' : 'pi pi-download'}
@@ -78,19 +102,20 @@ export const TopControlPanel: React.FC<TopControlPanelProps> = (props) => {
             setHandoffLoading(true);
             try {
               const r = await (window as any).electronAPI.gatewayExportHandoff({
+                moduleId: handoffModule,
                 taskTitle: 'Продолжение работы',
               });
               if (r.success && r.data) {
                 try {
                   await navigator.clipboard.writeText(r.data.markdown);
                   alert(
-                    `✅ Handoff сохранён и скопирован в буфер\n\n` +
+                    `✅ Handoff [${handoffModule}] сохранён и скопирован в буфер\n\n` +
                     `${r.data.path}\n(${r.data.bytes} байт)\n\n` +
                     `Секции: ${r.data.sections.join(', ')}`
                   );
                 } catch {
                   alert(
-                    `✅ Handoff сохранён (буфер недоступен)\n\n${r.data.path}\n(${r.data.bytes} байт)`
+                    `✅ Handoff [${handoffModule}] сохранён (буфер недоступен)\n\n${r.data.path}\n(${r.data.bytes} байт)`
                   );
                 }
               } else {

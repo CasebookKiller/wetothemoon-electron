@@ -1,17 +1,23 @@
+// src/main/services/gateway/handoffBuilder.ts
+
 import { exec } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
 import { promisify } from 'node:util';
 
 import { getGatewayCache } from './cache/db';
 import { getChain } from './contextService';
 
 export interface HandoffOpts {
-  workspaceKeys: string[];
+  moduleId: string;
+  workspaceKeys?: string[];
   taskTitle: string;
   rootPath?: string;               // default: process.cwd()
   includeGit?: boolean;            // default true
   includePreflight?: boolean;      // default true
   includeSchema?: boolean;         // default true
   includeRoadmap?: boolean;        // default true
+  includeIntent?: boolean;         // default true — architecture/roadmap/problems/next-steps
   maxContextBytes?: number;        // default 60_000
 }
 
@@ -40,8 +46,27 @@ async function sh(cmd: string, cwd: string, timeoutMs = 10_000): Promise<string>
   }
 }
 
+
+function readCommon(rootPath: string, fname: string): string {
+  const candidates = [
+    path.join(rootPath, 'prompts', '_common', fname),
+    path.join(rootPath, 'docs', 'prompts', '_common', fname),
+  ];
+  for (const p of candidates) {
+    try {
+      if (fs.existsSync(p)) return fs.readFileSync(p, 'utf8').trim();
+    } catch { /* ignore */ }
+  }
+  return '';
+}
+
 export async function buildHandoff(opts: HandoffOpts): Promise<BuiltHandoff> {
   const ROOT = opts.rootPath ?? process.cwd();
+  const cfg = MODULE_MAP[opts.moduleId];
+  if (!cfg) {
+    throw new Error(`Неизвестный moduleId: ${opts.moduleId}. Доступные: ${Object.keys(MODULE_MAP).join(', ')}`);
+  }
+  const workspaceKeys = opts.workspaceKeys ?? cfg.workspaceKeys;
   const sections: string[] = [];
   const parts: string[] = [];
 
@@ -49,12 +74,36 @@ export async function buildHandoff(opts: HandoffOpts): Promise<BuiltHandoff> {
   parts.push(`**Task:** ${opts.taskTitle}\n`);
   sections.push('title', 'task');
 
+  // 0. Intent — намерения, не код
+  if (opts.includeIntent !== false) {
+    const intentFiles: Array<[string, string, 'module' | 'common']> = [
+      ['ban-pattern.md',  '## ⏱ Паттерн бана',           'common'],
+      ['next-steps.md',   '## 🚀 С чего начать',          'module'],
+      ['roadmap.md',      '## 📋 Roadmap',                'module'],
+      ['problems.md',     '## 🐞 Известные проблемы',     'module'],
+      ['architecture.md', '## 🏛 Архитектурные принципы', 'module'],
+      ['techdebt.md',     '## 🧹 Техдолг',                'module'],
+      ['checklist.md',    '## ✅ Финальный чек-лист',      'common'],
+    ];
+    let intentAdded = false;
+    for (const [fname, header, scope] of intentFiles) {
+      const content = scope === 'common'
+        ? readPrompt(ROOT, '_common', fname)
+        : readPrompt(ROOT, opts.moduleId, fname);
+      if (content) {
+        parts.push(`${header}\n\n${content}\n`);
+        intentAdded = true;
+      }
+    }
+    if (intentAdded) sections.push('intent');
+  }
+
   // 1. Git state
   if (opts.includeGit !== false) {
     const head     = await sh('git rev-parse --short HEAD', ROOT);
     const branch   = await sh('git rev-parse --abbrev-ref HEAD', ROOT);
     const status   = (await sh('git status --short', ROOT)) || '(clean)';
-    const log      = await sh('git log --oneline -5', ROOT);
+    const log      = await sh('git log --oneline -15', ROOT);
     const diffstat = (await sh('git diff --stat HEAD~5 HEAD 2>/dev/null', ROOT)) || '(n/a)';
     const submod   = (await sh("git -C .. submodule status 2>/dev/null | grep wetothemoon-electron", ROOT)) || '(n/a)';
     parts.push(`## Git state
@@ -90,21 +139,45 @@ ${diffstat}
   // 3. Schema
   if (opts.includeSchema !== false) {
     try {
-      const db = getGatewayCache();
-      const uv = (db.prepare('PRAGMA user_version').get() as any)?.user_version;
-      const tables = (db.prepare(
-        "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
-      ).all() as any[]).map(r => r.name);
-      const counts: Record<string, number> = {};
-      for (const t of ['context_nodes', 'context_versions', 'conversations', 'messages']) {
-        if (tables.includes(t)) {
-          counts[t] = (db.prepare(`SELECT COUNT(*) AS c FROM ${t}`).get() as any)?.c ?? 0;
+      if (cfg.db === 'prana_bindu') {
+        // prana_bindu.db — Melange
+        const { DatabaseSync } = await import('node:sqlite');
+        const dbPath = path.join(process.env.HOME || '', '.config', 'wetothemoon-electron', 'prana_bindu.db');
+        const db = new DatabaseSync(dbPath, { readOnly: true });
+        const schemaVer = (db.prepare("SELECT value FROM meta WHERE key = 'schema_version'").get() as any)?.value;
+        const tables = (db.prepare(
+          "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
+        ).all() as any[]).map(r => r.name);
+        const counts: Record<string, number> = {};
+        for (const t of ['run_facts','run_streams','recovery_logs','plan_events','chains','workout_sessions','water_logs','weight_logs','nutrition_logs','exercise_progress','equivalences']) {
+          if (tables.includes(t)) {
+            try { counts[t] = (db.prepare(`SELECT COUNT(*) AS c FROM ${t}`).get() as any)?.c ?? 0; } catch { counts[t] = -1; }
+          }
         }
-      }
-      const nodes = (db.prepare(
-        'SELECT key, kind, version FROM context_nodes ORDER BY key'
-      ).all() as any[]);
-      parts.push(`## Schema
+        db.close();
+        parts.push(`## Schema — prana_bindu.db (Melange)
+
+- **schema_version:** ${schemaVer}
+- **Tables (${tables.length}):** ${tables.join(', ')}
+- **Counts:** ${Object.entries(counts).map(([k, v]) => `${k}=${v}`).join(', ')}
+`);
+      } else {
+        // gateway.db
+        const db = getGatewayCache();
+        const uv = (db.prepare('PRAGMA user_version').get() as any)?.user_version;
+        const tables = (db.prepare(
+          "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
+        ).all() as any[]).map(r => r.name);
+        const counts: Record<string, number> = {};
+        for (const t of ['context_nodes', 'context_versions', 'conversations', 'messages']) {
+          if (tables.includes(t)) {
+            counts[t] = (db.prepare(`SELECT COUNT(*) AS c FROM ${t}`).get() as any)?.c ?? 0;
+          }
+        }
+        const nodes = (db.prepare(
+          'SELECT key, kind, version FROM context_nodes ORDER BY key'
+        ).all() as any[]);
+        parts.push(`## Schema — gateway.db
 
 - **user_version:** ${uv}
 - **Tables (${tables.length}):** ${tables.join(', ')}
@@ -116,6 +189,7 @@ ${diffstat}
 |---|---|---|
 ${nodes.map(n => `| ${n.key} | ${n.kind} | ${n.version} |`).join('\n')}
 `);
+      }
       sections.push('schema');
     } catch (e: any) {
       parts.push(`## Schema\n\n[error] ${e.message}\n`);
@@ -125,7 +199,7 @@ ${nodes.map(n => `| ${n.key} | ${n.kind} | ${n.version} |`).join('\n')}
 
   // 4. Context chain
   try {
-    const chain = getChain(opts.workspaceKeys);
+    const chain = getChain(workspaceKeys);
     const MAX = 500;
     const md = chain.map((n: any) => {
       const c = n.contentMd || '';
@@ -143,7 +217,7 @@ ${nodes.map(n => `| ${n.key} | ${n.kind} | ${n.version} |`).join('\n')}
   // 5. Roadmap / TODOs
   if (opts.includeRoadmap !== false) {
     const todos = (await sh(
-      "grep -rn 'TODO\\|FIXME' src/main/services/gateway/ src/main/ipcHandlers/gatewayHandlers.ts 2>/dev/null | head -20",
+      `grep -rn 'TODO\\|FIXME' ${cfg.grepPath} 2>/dev/null | head -20`,
       ROOT
     )) || '(нет)';
     parts.push(`## Roadmap / TODOs\n\n\`\`\`\n${todos}\n\`\`\`\n`);
@@ -162,4 +236,59 @@ ${nodes.map(n => `| ${n.key} | ${n.kind} | ${n.version} |`).join('\n')}
     bytes: Buffer.byteLength(markdown, 'utf8'),
     generatedAt: Date.now(),
   };
+}
+
+// ============================================================
+// MODULE_MAP — маппинг moduleId → параметры сборки handoff
+// ============================================================
+
+export const MODULE_MAP: Record<string, {
+  title: string;
+  workspaceKeys: string[];
+  db: 'gateway' | 'prana_bindu';
+  grepPath: string;
+}> = {
+  gateway: {
+    title: 'Gateway (DeepSeek)',
+    workspaceKeys: [
+      'wetothemoon-electron/gateway',
+      'wetothemoon-electron/gateway/api-channel',
+    ],
+    db: 'gateway',
+    grepPath: 'src/main/services/gateway/ src/main/ipcHandlers/gatewayHandlers.ts',
+  },
+  'prana-bindu': {
+    title: 'Prana-Bindu (тренировки тела)',
+    workspaceKeys: [
+      'wetothemoon-electron/prana-bindu',
+    ],
+    db: 'prana_bindu',
+    grepPath: 'src/main/services/pranaBindu/ src/main/ipcHandlers/pranaBinduHandlers.ts',
+  },
+  osint: {
+    title: 'OSINT (Fremen Eye)',
+    workspaceKeys: ['wetothemoon-electron/osint'],
+    db: 'gateway',
+    grepPath: 'src/main/services/osint/ src/main/ipcHandlers/osintHandlers.ts',
+  },
+  sietch: {
+    title: 'Sietch',
+    workspaceKeys: ['wetothemoon-electron/sietch'],
+    db: 'gateway',
+    grepPath: 'src/main/services/sietch/ src/main/ipcHandlers/sietchHandlers.ts',
+  },
+};
+
+function readPrompt(rootPath: string, moduleId: string, fname: string): string {
+  // Порядок: <module>/handoff/ → _common/
+  const candidates = [
+    path.join(rootPath, 'docs', 'prompts', moduleId, 'handoff', fname),
+    path.join(rootPath, 'docs', 'prompts', '_common', fname),
+  ];
+  for (const p of candidates) {
+    try {
+      if (fs.existsSync(p)) return fs.readFileSync(p, 'utf8').trim();
+    } catch { /* ignore */ }
+  }
+  return '';
 }

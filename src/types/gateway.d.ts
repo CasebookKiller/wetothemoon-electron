@@ -355,6 +355,7 @@ declare global {
         Promise<{ success: boolean; error?: string }>;
 
       gatewayExportHandoff(opts?: {
+        moduleId?: string;
         workspaceKeys?: string[];
         taskTitle?: string;
       }): Promise<{

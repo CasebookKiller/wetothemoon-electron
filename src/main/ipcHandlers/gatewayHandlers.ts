@@ -1421,40 +1421,49 @@ export function registerGatewayHandlers(): void {
   });
 
   ipcMain.handle('gateway:export-handoff', async (_e, opts?: {
+    moduleId?: string;
     workspaceKeys?: string[];
     taskTitle?: string;
   }) => {
     try {
       const api = await import('../services/gateway/handoffBuilder');
 
-      let activeKeys = resolveActiveKeys(opts?.workspaceKeys);
+      const moduleId = opts?.moduleId ?? 'gateway';
 
-      // last-resort: context_workspaces
-      if (activeKeys.length === 0) {
-        try {
-          const { getGatewayCache } = await import('../services/gateway/cache/db');
-          const db = getGatewayCache();
-          const row = db.prepare(
-            'SELECT active_keys_json FROM context_workspaces ORDER BY id LIMIT 1'
-          ).get() as any;
-          if (row?.active_keys_json) {
-            const parsed = JSON.parse(row.active_keys_json);
-            if (Array.isArray(parsed) && parsed.length > 0) activeKeys = parsed;
-          }
-        } catch { /* ignore */ }
-      }
+      // Для gateway — старое поведение (env → .env.local → .env → context_workspaces).
+      // Для остальных — activeKeys пустой, buildHandoff возьмёт MODULE_MAP[moduleId].workspaceKeys.
+      let activeKeys: string[] = [];
+      if (moduleId === 'gateway') {
+        activeKeys = resolveActiveKeys(opts?.workspaceKeys);
 
-      if (activeKeys.length === 0) {
-        return {
-          success: false,
-          error:
-            'ACTIVE_WORKSPACE_KEYS не найден (env → .env.local → .env → context_workspaces). ' +
-            'Проверь .env.local и наличие активного workspace в БД.',
-        };
+        // last-resort: context_workspaces
+        if (activeKeys.length === 0) {
+          try {
+            const { getGatewayCache } = await import('../services/gateway/cache/db');
+            const db = getGatewayCache();
+            const row = db.prepare(
+              'SELECT active_keys_json FROM context_workspaces ORDER BY id LIMIT 1'
+            ).get() as any;
+            if (row?.active_keys_json) {
+              const parsed = JSON.parse(row.active_keys_json);
+              if (Array.isArray(parsed) && parsed.length > 0) activeKeys = parsed;
+            }
+          } catch { /* ignore */ }
+        }
+
+        if (activeKeys.length === 0) {
+          return {
+            success: false,
+            error:
+              'ACTIVE_WORKSPACE_KEYS не найден (env → .env.local → .env → context_workspaces). ' +
+              'Проверь .env.local и наличие активного workspace в БД.',
+          };
+        }
       }
 
       const r = await api.buildHandoff({
-        workspaceKeys: activeKeys,
+        moduleId: opts?.moduleId ?? 'gateway',
+        workspaceKeys: activeKeys.length > 0 ? activeKeys : undefined,
         taskTitle: opts?.taskTitle ?? 'Продолжение работы',
         rootPath: app.getAppPath(),
       });
