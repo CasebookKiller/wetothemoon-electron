@@ -96,11 +96,15 @@ out/
 
 *.old
 
-# docs/ — локальные (OSINT, 594M). В git только правила игры (docs/prompts/**/*.md + SUBMODULE_SUMMARY.md)
+# docs/ — локальный скретчпад (стек версий, 594M). В git только intent-файлы
 docs/*
-!docs/prompts/
 !docs/SUBMODULE_SUMMARY.md
-docs/prompts/01_COMMON_CONTEXT.md
+!docs/prompts/
+docs/prompts/*
+!docs/prompts/_common/
+!docs/prompts/gateway/handoff/
+!docs/prompts/prana-bindu/handoff/
+!docs/prompts/prana-bindu/summary.md
 
 # Training
 training/
