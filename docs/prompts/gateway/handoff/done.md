@@ -20,6 +20,8 @@
 | **Стандарт 13 секций** для всех модулей | ✅ | (эта сессия) |
 | **cookieTracker.ts** + **probe-deepseek-cookies.mjs** — мониторинг куки, которыми DeepSeek/провайдеры идентифицируют и трекают пользователя. Anti-detection, тот же трек, что patchright stealth | ✅ | `e089c5e` |
 | **done.md / git log -10 / meta-instructions** в handoffBuilder | ✅ | (эта сессия) |
+| **recon-free-llms.mjs** + `candidates.json` + `filter-discovered.mjs` — разведка 15 провайдеров (9 живых) | ✅ | `92adb33` |
+| **gitignore**: `docs/*` + `!docs/prompts/` (18 intent-файлов в git), `deepseek_cookies.json` + `.env.local.bak-*` вне git | ✅ | `72969d6`, `2c269d1`, `c709b83` |
 | **cookieTracker.ts** + **probe-deepseek-cookies.mjs** — снимок куки по профилю (CDP) | ✅ | `e089c5e` |
 | **done.md / git log -10 / meta-instructions** в handoffBuilder | ✅ | (эта сессия) |
 

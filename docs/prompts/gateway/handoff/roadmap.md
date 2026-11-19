@@ -1,9 +1,12 @@
 # Roadmap
 
-## Ближайшие (2 часа)
-1. **tokenCounter.ts** — pre-check бюджета перед chat() (30 мин). См. «tokenCounter — открытые вопросы» ниже.
-2. **Tool calling** (prompt-based): read_context_node, create_task, list_tasks (1 час)
-3. **Recon free LLMs** (Handoff v7, параллельная тема) — 9/15 живых: Duck.ai (без логина), GigaChat API (нужен Russian Trusted CA в `NODE_EXTRA_CA_CERTS`), Алиса AI API (IAM-токен), token-free-gateway. Скрипты `scripts/recon-free-llms.*` в git (1–2 часа)
+## Ближайшие (2 часа) — приоритет browser-канал, не API
+
+> **Не ждём API.** API-канал (`tokenCounter.ts`) — **отложен** (fallback, не развиваем). Приоритет — **браузерный** канал: параллельность, recon, cookie.
+
+1. **`ProviderAdapter` + `BrowserPool`** — фундамент под N провайдеров и N профилей (1 час). Файлы: `src/main/services/gateway/providers/{types,registry}.ts`, `src/main/services/gateway/pool/{BrowserPool,TaskQueue,ProfileRouter}.ts`. Выжимка интерфейсов — см. `architecture.md` §«Browser-канал».
+2. **Recon провайдеров** (1 час) — по порядку: Duck.ai (без логина) → g4f.dev (агрегатор, без логина) → GigaChat (SberID) → Алиса (Yandex ID) → HuggingChat (HF). Для каждого: selectors, cookiePatterns, adapter. Скрипты `scripts/recon-free-llms.*` уже в git.
+3. **Cookie tracker** — расширить `cookieTracker.ts` (197 строк): добавить `fingerprint` (canvas, WebGL, timezone, fonts). Цель — **понять, как нас палят** (DeepSeek спросил возраст). 
 
 ## Следующие сессии
 3. Event bus между окнами (1 час)
@@ -13,7 +16,9 @@
 7. П1 (вариант B): сайдбар из cache.listConversations() без фильтра (30 мин)
 8. preflight-check.mjs --json (10 мин)
 
-## tokenCounter — открытые вопросы (на следующую сессию)
+## tokenCounter — ОТЛОЖЕНО (приоритет browser-канал, не API)
+
+> Не начинать, пока не закрыты BrowserPool + recon + cookie. Ответы на 4 вопроса — на будущее.
 
 1. **Блокировать или предупреждать?** → предупреждать (console + UI badge `⚠️ 90% бюджета`), не блокировать. Решает пользователь.
 2. **Input или резерв output?** → input + `max_tokens` (эвристика `input × 1.2`). `usage.prompt_tokens` из SSE — для калибровки.
