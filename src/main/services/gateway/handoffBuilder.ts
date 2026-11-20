@@ -81,6 +81,32 @@ function readModuleRoot(rootPath: string, moduleId: string, fname: string): stri
   return '';
 }
 
+/**
+ * Читает все topics/*.md из docs/prompts/<module>/topics/.
+ * Сортирует по имени (NN_ — порядок). Возвращает [] если папки нет.
+ * По стандарту _common/HANDOFF_STRUCTURE.md — 1 файл = 1 направление.
+ */
+function readTopics(rootPath: string, moduleId: string): Array<{ name: string; content: string }> {
+  const candidates = [
+    path.join(rootPath, 'docs', 'prompts', moduleId, 'topics'),
+    path.join(rootPath, 'prompts', moduleId, 'topics'),
+  ];
+  for (const dir of candidates) {
+    try {
+      if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) continue;
+      return fs.readdirSync(dir)
+        .filter(f => f.endsWith('.md'))
+        .sort()
+        .map(f => ({
+          name: f.replace(/\.md$/, ''),
+          content: fs.readFileSync(path.join(dir, f), 'utf8').trim(),
+        }))
+        .filter(t => t.content.length > 0);
+    } catch { /* ignore */ }
+  }
+  return [];
+}
+
 export async function buildHandoff(opts: HandoffOpts): Promise<BuiltHandoff> {
   const ROOT = opts.rootPath ?? process.cwd();
   const cfg = MODULE_MAP[opts.moduleId];
@@ -108,7 +134,19 @@ ${await sh('git log --oneline -10 --no-decorate', ROOT)}
 
   // 0. Intent — намерения, не код
   if (opts.includeIntent !== false) {
-    const intentFiles: Array<[string, string, 'module' | 'module-root' | 'common']> = [
+    // structure: 'topics' → topics/*.md; 'legacy' (default) → handoff/{roadmap,problems,techdebt}.md.
+    // Fallback: если 'topics', но topics/ пуст — переключаемся на legacy для этого вызова.
+    let effectiveStructure: 'topics' | 'legacy' = cfg.structure ?? 'legacy';
+    let topicsContent: Array<{ name: string; content: string }> = [];
+    if (effectiveStructure === 'topics') {
+      topicsContent = readTopics(ROOT, opts.moduleId);
+      if (topicsContent.length === 0) {
+        console.warn(`[handoffBuilder] ${opts.moduleId}: structure='topics', но topics/ пуст → fallback на legacy`);
+        effectiveStructure = 'legacy';
+      }
+    }
+
+    const intentFiles: Array<[string, string, 'module' | 'module-root' | 'legacy' | 'common']> = [
       ['ban-pattern.md',     '## ⏱ Паттерн бана',              'common'],
       // module-root — новые файлы стандарта HANDOFF_STRUCTURE (2026-11-20).
       // Если файла нет — пропускается, legacy продолжает работать.
@@ -117,11 +155,12 @@ ${await sh('git log --oneline -10 --no-decorate', ROOT)}
       ['PROJECT_STATE.md',   '## 📊 Состояние проекта',        'module-root'],
       ['next-steps.md',      '## 🚀 С чего начать',             'module'],
       ['done.md',            '## ✅ Сделано / НЕ откатывать',    'module'],
-      ['roadmap.md',         '## 📋 Roadmap',                   'module'],
-      ['problems.md',        '## 🐞 Известные проблемы',        'module'],
       ['architecture.md',    '## 🏛 Архитектурные принципы',    'module'],
-      ['techdebt.md',        '## 🧹 Техдолг',                   'module'],
       ['checklist.md',       '## ✅ Финальный чек-лист',         'common'],
+      // legacy — читаем только если structure='legacy' (или fallback)
+      ['roadmap.md',         '## 📋 Roadmap',                   'legacy'],
+      ['problems.md',        '## 🐞 Известные проблемы',        'legacy'],
+      ['techdebt.md',        '## 🧹 Техдолг',                   'legacy'],
     ];
     let intentAdded = false;
     for (const [fname, header, scope] of intentFiles) {
@@ -130,6 +169,10 @@ ${await sh('git log --oneline -10 --no-decorate', ROOT)}
         content = readPrompt(ROOT, '_common', fname);
       } else if (scope === 'module-root') {
         content = readModuleRoot(ROOT, opts.moduleId, fname);
+      } else if (scope === 'legacy') {
+        if (effectiveStructure === 'legacy') {
+          content = readPrompt(ROOT, opts.moduleId, fname);
+        }
       } else {
         content = readPrompt(ROOT, opts.moduleId, fname);
       }
@@ -138,6 +181,17 @@ ${await sh('git log --oneline -10 --no-decorate', ROOT)}
         intentAdded = true;
       }
     }
+
+    // Topics (structure='topics') — после intent-файлов
+    if (effectiveStructure === 'topics' && topicsContent.length > 0) {
+      parts.push(`## 🗂 Topics (${topicsContent.length})\n`);
+      for (const t of topicsContent) {
+        parts.push(`### ${t.name}\n\n${t.content}\n`);
+      }
+      sections.push('topics');
+      intentAdded = true;
+    }
+
     if (intentAdded) sections.push('intent');
   }
 
@@ -327,6 +381,9 @@ export const MODULE_MAP: Record<string, {
   workspaceKeys: string[];
   db: 'gateway' | 'prana_bindu';
   grepPath: string;
+  /** 'topics' — читать topics/*.md; 'legacy' (default) — handoff/{roadmap,problems,techdebt}.md.
+   *  При 'topics' и пустом topics/ — fallback на legacy (warning в консоль). */
+  structure?: 'topics' | 'legacy';
 }> = {
   gateway: {
     title: 'Gateway (DeepSeek)',
@@ -336,6 +393,7 @@ export const MODULE_MAP: Record<string, {
     ],
     db: 'gateway',
     grepPath: 'src/main/services/gateway/ src/main/ipcHandlers/gatewayHandlers.ts',
+    structure: 'topics',
   },
   'prana-bindu': {
     title: 'Prana-Bindu (тренировки тела)',

@@ -1,3 +1,5 @@
+> ⚠️ **DEPRECATED (2026-11-20).** См. `topics/*.md` и `handoff/handoff-system.md`. Файл оставлен для отката на 1–2 сессии.
+
 # Roadmap
 
 ## Ближайшие (2 часа) — приоритет browser-канал, не API
