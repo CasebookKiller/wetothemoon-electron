@@ -27,7 +27,9 @@
 
 1. **02 Core** — реализовать 5 модулей из спеки (`zones`, `eightyTwenty`, `phases`, `progressionGate`, `recommendationValidator`) + `scenarios.ts` для ручной проверки. **Нулевой риск:** новые файлы, zero импортов, zero Electron/DB. Разблокирует 04, 05, 06, 11.
 2. **07 Push в ICU** — `POST /events`, `PUT /events/{id}`, `DELETE /events/{id}`, UI textarea в `PlanEventDrawer`, preview таймлайна.
+   ⚠️ **Перед работой** восстановить детали 07 Spice: `git show d37d02f:docs/prompts/prana-bindu/chats/07_SPICE.md > /tmp/07_SPICE.md` (handoff-by-button содержит только ICU-синтаксис, см. TD12).
 3. **08 Melange v37** — `run_facts.training_load` вынести из `raw_json`.
+   ⚠️ **Перед работой** восстановить DDL: `git show d37d02f:docs/prompts/prana-bindu/chats/08_MELANGE.md > /tmp/08_MELANGE.md` (TD11).
 
 ## Следующие сессии
 
