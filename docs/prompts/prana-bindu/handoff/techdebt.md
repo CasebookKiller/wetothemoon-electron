@@ -65,10 +65,23 @@
 **Фикс:** восстанавливать по необходимости из `d37d02f`. В handoff **не дублировать** (объём), но помнить, где лежит.
 **Приоритет:** низкий (по факту).
 
-### TD10. Duck.ai не работает в РФ
-**Проблема:** `recon-free-llms.mjs` показал 200, но `recon-duck-smoke.mjs` (patchright + Chrome) — страница не грузится из РФ (geoblock / региональные ограничения). Ложный 200 в probe — редирект на страницу «недоступно».
-**Фикс:** не тратить время. Альтернативы без логина: g4f.dev (200), LLM7.io (API), Pollinations (API).
-**Приоритет:** закрыто (не делаем).
+### TD9. DDL 23 таблиц Melange не в handoff-by-button
+**Проблема:** handoff-by-button (2026-11-20) включает DDL только 6 из 29 таблиц (`profile`, `chains`, `chain_slots`, `water_logs`, `weight_logs`, `nutrition_logs`). Отсутствуют: `run_facts`, `run_streams`, `recovery_logs`, `plan_events`, `movements`, `progressions`, `progress_checks`, `equivalences`, `strength_plans`, `strength_sessions`, `sync_settings`, `threshold_history`, `user_movement_state`, `week_template_days`, `week_templates`, `workout_sessions`, `meta`, `reference_tracks`, `test_segments`, `exercise_progress`, `recommendations`, `run_plans`.
+**Источник истины:** `git show d37d02f:docs/prompts/prana-bindu/chats/08_MELANGE.md` (2776 строк, коммит до `b4800a3`).
+**Фикс:** при работе над v37 — восстанавливать DDL из этого коммита.
+**Приоритет:** средний (блокирует v37 и аналитику).
+
+### TD10. 07 Spice — провайдеры/парсеры/sync не в handoff-by-button
+**Проблема:** в handoff только синтаксис ICU-конструктора. Потеряны: `dodofoProvider`, `intervalsIcuProvider`, `stravaProvider`, `dofekProvider` (поля, auth, формат ответа), парсеры (`fitParser`, `tcxParser`, `stravaCsvParser`, `gpsClassifier`), логика sync, дедупликация `(source, external_id)`, `sources_json`.
+**Источник истины:** `git show d37d02f:docs/prompts/prana-bindu/chats/07_SPICE.md` (2201 строка).
+**Фикс:** при Push в ICU и доработке Zepp-direct — восстанавливать.
+**Приоритет:** высокий (07 Spice — 99%, но push в ICU = ближайшая задача).
+
+### TD11. Детали 09/16/17/18 и конвенций — не в handoff-by-button
+**Проблема:** handoff-by-button содержит только выжимки. Потеряны детали: `09_ELECTRON_SHELL.md` (IPC `pb:*`), `16_GRAPH.md` (граф сверх kinds), `17_SMITHRUN.md` (212 строк), `18_MAP_EDITOR.md` (C.1–C.13), `COMPONENTS_CONVENTION.md`, `STYLES_CONVENTION.md`, `PRODUCT_NAME.md`, `plans/*.csv|.md`, `letter_dodofo_hr_bug.txt`.
+**Источник истины:** коммит `d37d02f` (все файлы были в git до `b4800a3`).
+**Фикс:** восстанавливать по необходимости из `d37d02f`. В handoff **не дублировать** (объём), но помнить, где лежит.
+**Приоритет:** низкий (по факту).
 
 ## Закрытый (для контекста)
 
