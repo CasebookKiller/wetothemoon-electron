@@ -102,8 +102,11 @@ docs/*
 !docs/prompts/
 docs/prompts/*
 !docs/prompts/_common/
-!docs/prompts/gateway/handoff/
+!docs/prompts/_common/**
+!docs/prompts/gateway/
+!docs/prompts/gateway/**
 !docs/prompts/prana-bindu/handoff/
+!docs/prompts/prana-bindu/handoff/**
 !docs/prompts/prana-bindu/summary.md
 
 # Training
