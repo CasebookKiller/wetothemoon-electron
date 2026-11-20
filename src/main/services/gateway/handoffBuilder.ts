@@ -60,6 +60,27 @@ function readCommon(rootPath: string, fname: string): string {
   return '';
 }
 
+/**
+ * Читает файл из корня модуля: docs/prompts/<module>/<fname>.
+ * Для COMMON_CONTEXT.md, PROJECT_STATE.md, 00_MASTER_INDEX.md (по стандарту
+ * docs/prompts/_common/HANDOFF_STRUCTURE.md от 2026-11-20).
+ *
+ * Возвращает '' если файла нет — это нормально в переходный период:
+ * legacy-модули продолжат работать без этих файлов.
+ */
+function readModuleRoot(rootPath: string, moduleId: string, fname: string): string {
+  const candidates = [
+    path.join(rootPath, 'docs', 'prompts', moduleId, fname),
+    path.join(rootPath, 'prompts', moduleId, fname),
+  ];
+  for (const p of candidates) {
+    try {
+      if (fs.existsSync(p)) return fs.readFileSync(p, 'utf8').trim();
+    } catch { /* ignore */ }
+  }
+  return '';
+}
+
 export async function buildHandoff(opts: HandoffOpts): Promise<BuiltHandoff> {
   const ROOT = opts.rootPath ?? process.cwd();
   const cfg = MODULE_MAP[opts.moduleId];
@@ -87,21 +108,31 @@ ${await sh('git log --oneline -10 --no-decorate', ROOT)}
 
   // 0. Intent — намерения, не код
   if (opts.includeIntent !== false) {
-    const intentFiles: Array<[string, string, 'module' | 'common']> = [
-      ['ban-pattern.md',  '## ⏱ Паттерн бана',              'common'],
-      ['next-steps.md',   '## 🚀 С чего начать',             'module'],
-      ['done.md',         '## ✅ Сделано / НЕ откатывать',    'module'],
-      ['roadmap.md',      '## 📋 Roadmap',                   'module'],
-      ['problems.md',     '## 🐞 Известные проблемы',        'module'],
-      ['architecture.md', '## 🏛 Архитектурные принципы',    'module'],
-      ['techdebt.md',     '## 🧹 Техдолг',                   'module'],
-      ['checklist.md',    '## ✅ Финальный чек-лист',         'common'],
+    const intentFiles: Array<[string, string, 'module' | 'module-root' | 'common']> = [
+      ['ban-pattern.md',     '## ⏱ Паттерн бана',              'common'],
+      // module-root — новые файлы стандарта HANDOFF_STRUCTURE (2026-11-20).
+      // Если файла нет — пропускается, legacy продолжает работать.
+      ['00_MASTER_INDEX.md', '## 📑 Индекс модуля',            'module-root'],
+      ['COMMON_CONTEXT.md',  '## 📘 Общий контекст модуля',    'module-root'],
+      ['PROJECT_STATE.md',   '## 📊 Состояние проекта',        'module-root'],
+      ['next-steps.md',      '## 🚀 С чего начать',             'module'],
+      ['done.md',            '## ✅ Сделано / НЕ откатывать',    'module'],
+      ['roadmap.md',         '## 📋 Roadmap',                   'module'],
+      ['problems.md',        '## 🐞 Известные проблемы',        'module'],
+      ['architecture.md',    '## 🏛 Архитектурные принципы',    'module'],
+      ['techdebt.md',        '## 🧹 Техдолг',                   'module'],
+      ['checklist.md',       '## ✅ Финальный чек-лист',         'common'],
     ];
     let intentAdded = false;
     for (const [fname, header, scope] of intentFiles) {
-      const content = scope === 'common'
-        ? readPrompt(ROOT, '_common', fname)
-        : readPrompt(ROOT, opts.moduleId, fname);
+      let content = '';
+      if (scope === 'common') {
+        content = readPrompt(ROOT, '_common', fname);
+      } else if (scope === 'module-root') {
+        content = readModuleRoot(ROOT, opts.moduleId, fname);
+      } else {
+        content = readPrompt(ROOT, opts.moduleId, fname);
+      }
       if (content) {
         parts.push(`${header}\n\n${content}\n`);
         intentAdded = true;
