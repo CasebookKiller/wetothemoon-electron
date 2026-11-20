@@ -133,6 +133,7 @@ recon-out/
 md-recon/
 captures/
 deepseek_cookies.json
+scripts/dumps/
 .env.local.bak-*
 scripts/recon-*.mjs
 scripts/md-*.mjs

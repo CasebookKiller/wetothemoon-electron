@@ -1,0 +1,487 @@
+{
+  "version": 1,
+  "providers": {
+    "gigachat": {
+      "name": "GigaChat",
+      "url": "https://giga.chat",
+      "kind": "web",
+      "auth": "session",
+      "note": "Сбер, вход по SberID/телефону",
+      "apiUrl": "https://api.giga.chat/v1",
+      "apiAuth": "key",
+      "reconAt": "2026-11-19T16:04:55.499Z",
+      "selectorsBefore": {
+        "url": "https://giga.chat/",
+        "title": "ГигаЧат — русскоязычная нейросеть от Сбера",
+        "textareas": [
+          {
+            "tag": "textarea",
+            "id": "chat-input-textarea",
+            "class": "ChatTextArea-styled__Textarea-sc-d135c4f9-2 hBsppi",
+            "name": null,
+            "role": null,
+            "ariaLabel": "Сообщение",
+            "placeholder": "Спросите ГигаЧат",
+            "dataTestId": null,
+            "type": null,
+            "visible": true
+          }
+        ],
+        "editables": [],
+        "inputs": [
+          {
+            "tag": "input",
+            "id": null,
+            "class": null,
+            "name": null,
+            "role": null,
+            "ariaLabel": null,
+            "placeholder": null,
+            "dataTestId": null,
+            "type": "file",
+            "visible": true
+          }
+        ],
+        "buttons": [],
+        "streaming": [],
+        "challenge": []
+      },
+      "selectorsAfterSend": {
+        "url": "https://giga.chat/sessions/01a1f48d-8b38-7079-847c-25be2c41e926",
+        "title": "ГигаЧат — русскоязычная нейросеть от Сбера",
+        "textareas": [
+          {
+            "tag": "textarea",
+            "id": "chat-input-textarea",
+            "class": "ChatTextArea-styled__Textarea-sc-d135c4f9-2 hBsppi",
+            "name": null,
+            "role": null,
+            "ariaLabel": "Сообщение",
+            "placeholder": "Спросите ГигаЧат",
+            "dataTestId": null,
+            "type": null,
+            "visible": true
+          }
+        ],
+        "editables": [],
+        "inputs": [
+          {
+            "tag": "input",
+            "id": null,
+            "class": null,
+            "name": null,
+            "role": null,
+            "ariaLabel": null,
+            "placeholder": null,
+            "dataTestId": null,
+            "type": "file",
+            "visible": true
+          }
+        ],
+        "buttons": [
+          {
+            "tag": "button",
+            "id": null,
+            "class": "button-stretching-auto button-item Suggests-styled__SuggestItemButton-sc-c16bbfaf-2 bctHaV b1j5igjb bm0du5f b1ebstjj b12",
+            "name": null,
+            "role": null,
+            "ariaLabel": null,
+            "placeholder": null,
+            "dataTestId": null,
+            "type": "button",
+            "visible": true
+          }
+        ],
+        "streaming": [],
+        "challenge": []
+      },
+      "cookiePatterns": [
+        {
+          "name": "gc_public",
+          "domain": "giga.chat",
+          "path": "/api",
+          "expires": 1826640515.985502,
+          "httpOnly": true,
+          "secure": true,
+          "sameSite": "Strict"
+        },
+        {
+          "name": "_sd_user_id",
+          "domain": "giga.chat",
+          "path": "/api",
+          "expires": 1826640515.985558,
+          "httpOnly": true,
+          "secure": true,
+          "sameSite": "Strict"
+        },
+        {
+          "name": "_sm_sess",
+          "domain": "giga.chat",
+          "path": "/api",
+          "expires": 1803053352.509706,
+          "httpOnly": true,
+          "secure": true,
+          "sameSite": "Lax"
+        },
+        {
+          "name": "_sm_user_id",
+          "domain": "giga.chat",
+          "path": "/api",
+          "expires": 1803053352.50992,
+          "httpOnly": true,
+          "secure": true,
+          "sameSite": "Lax"
+        },
+        {
+          "name": "aws-waf-token",
+          "domain": ".deepseek.com",
+          "path": "/",
+          "expires": 1795449560,
+          "httpOnly": false,
+          "secure": true,
+          "sameSite": "Lax"
+        },
+        {
+          "name": ".thumbcache_6b2e5483f9d858d7c661c5e276b6a6ae",
+          "domain": "chat.deepseek.com",
+          "path": "/",
+          "expires": 1829663962.038226,
+          "httpOnly": false,
+          "secure": false,
+          "sameSite": "Lax"
+        },
+        {
+          "name": "smidV2",
+          "domain": "chat.deepseek.com",
+          "path": "/",
+          "expires": 1829663962.545449,
+          "httpOnly": false,
+          "secure": false,
+          "sameSite": "Lax"
+        },
+        {
+          "name": "adtech_uid",
+          "domain": ".giga.chat",
+          "path": "/",
+          "expires": 1826640264,
+          "httpOnly": false,
+          "secure": true,
+          "sameSite": "Lax"
+        },
+        {
+          "name": "top100_id",
+          "domain": ".giga.chat",
+          "path": "/",
+          "expires": 1826640264.779762,
+          "httpOnly": false,
+          "secure": false,
+          "sameSite": "Lax"
+        },
+        {
+          "name": "ruid",
+          "domain": ".rambler.ru",
+          "path": "/",
+          "expires": 1829664212.343927,
+          "httpOnly": false,
+          "secure": true,
+          "sameSite": "None"
+        },
+        {
+          "name": "proto_uid",
+          "domain": ".rambler.ru",
+          "path": "/",
+          "expires": 1829664212.344003,
+          "httpOnly": false,
+          "secure": true,
+          "sameSite": "None"
+        },
+        {
+          "name": "tmr_lvid",
+          "domain": ".giga.chat",
+          "path": "/",
+          "expires": 1823875464,
+          "httpOnly": false,
+          "secure": false,
+          "sameSite": "Lax"
+        },
+        {
+          "name": "tmr_lvidTS",
+          "domain": ".giga.chat",
+          "path": "/",
+          "expires": 1823875464,
+          "httpOnly": false,
+          "secure": false,
+          "sameSite": "Lax"
+        },
+        {
+          "name": "domain_sid",
+          "domain": "giga.chat",
+          "path": "/",
+          "expires": 1795709013.137707,
+          "httpOnly": false,
+          "secure": false,
+          "sameSite": "Lax"
+        },
+        {
+          "name": "_ym_uid",
+          "domain": ".giga.chat",
+          "path": "/",
+          "expires": 1826640215,
+          "httpOnly": false,
+          "secure": true,
+          "sameSite": "None"
+        },
+        {
+          "name": "_ym_d",
+          "domain": ".giga.chat",
+          "path": "/",
+          "expires": 1826640215,
+          "httpOnly": false,
+          "secure": true,
+          "sameSite": "None"
+        },
+        {
+          "name": "ymex",
+          "domain": ".yandex.ru",
+          "path": "/",
+          "expires": 1826640215,
+          "httpOnly": false,
+          "secure": true,
+          "sameSite": "None"
+        },
+        {
+          "name": "receive-cookie-deprecation",
+          "domain": ".yandex.ru",
+          "path": "/",
+          "expires": 1826640280,
+          "httpOnly": true,
+          "secure": true,
+          "sameSite": "None"
+        },
+        {
+          "name": "yabs-sid",
+          "domain": "mc.yandex.ru",
+          "path": "/",
+          "expires": -1,
+          "httpOnly": false,
+          "secure": true,
+          "sameSite": "None"
+        },
+        {
+          "name": "i",
+          "domain": ".yandex.ru",
+          "path": "/",
+          "expires": 1829664215.739237,
+          "httpOnly": true,
+          "secure": true,
+          "sameSite": "None"
+        },
+        {
+          "name": "yandexuid",
+          "domain": ".yandex.ru",
+          "path": "/",
+          "expires": 1829664215.73929,
+          "httpOnly": false,
+          "secure": true,
+          "sameSite": "None"
+        },
+        {
+          "name": "yuidss",
+          "domain": ".yandex.ru",
+          "path": "/",
+          "expires": 1829664215.739332,
+          "httpOnly": false,
+          "secure": true,
+          "sameSite": "None"
+        },
+        {
+          "name": "_ym_isad",
+          "domain": ".giga.chat",
+          "path": "/",
+          "expires": 1795176215,
+          "httpOnly": false,
+          "secure": true,
+          "sameSite": "None"
+        },
+        {
+          "name": "adsrv_id",
+          "domain": "bs.serving-sys.ru",
+          "path": "/",
+          "expires": -1,
+          "httpOnly": false,
+          "secure": true,
+          "sameSite": "None"
+        },
+        {
+          "name": "mdd",
+          "domain": ".giga.chat",
+          "path": "/",
+          "expires": 1795190616,
+          "httpOnly": false,
+          "secure": true,
+          "sameSite": "None"
+        },
+        {
+          "name": "_gigachat_gdpr_accepted",
+          "domain": "giga.chat",
+          "path": "/",
+          "expires": 1829664223.584716,
+          "httpOnly": false,
+          "secure": false,
+          "sameSite": "Lax"
+        },
+        {
+          "name": "bid",
+          "domain": "id.sber.ru",
+          "path": "/",
+          "expires": 1829664228.522926,
+          "httpOnly": false,
+          "secure": true,
+          "sameSite": "Lax"
+        },
+        {
+          "name": "adtech_uid",
+          "domain": ".sber.ru",
+          "path": "/",
+          "expires": 1826640228,
+          "httpOnly": false,
+          "secure": true,
+          "sameSite": "Lax"
+        },
+        {
+          "name": "top100_id",
+          "domain": ".sber.ru",
+          "path": "/",
+          "expires": 1826640228.609694,
+          "httpOnly": false,
+          "secure": false,
+          "sameSite": "Lax"
+        },
+        {
+          "name": "_sa",
+          "domain": ".sber.ru",
+          "path": "/",
+          "expires": -1,
+          "httpOnly": false,
+          "secure": true,
+          "sameSite": "Strict"
+        },
+        {
+          "name": "sid_user",
+          "domain": "id.sber.ru",
+          "path": "/",
+          "expires": 1798560251.866537,
+          "httpOnly": true,
+          "secure": true,
+          "sameSite": "None"
+        },
+        {
+          "name": "TS019f4456",
+          "domain": ".id.sber.ru",
+          "path": "/",
+          "expires": -1,
+          "httpOnly": false,
+          "secure": false,
+          "sameSite": "Lax"
+        },
+        {
+          "name": "t3_sid_7736186",
+          "domain": ".sber.ru",
+          "path": "/",
+          "expires": 1826640252.042835,
+          "httpOnly": false,
+          "secure": false,
+          "sameSite": "Lax"
+        },
+        {
+          "name": "sticky_cookie_km",
+          "domain": "giga.chat",
+          "path": "/",
+          "expires": -1,
+          "httpOnly": false,
+          "secure": false,
+          "sameSite": "Lax"
+        },
+        {
+          "name": "sticky_cookie_dp",
+          "domain": "giga.chat",
+          "path": "/",
+          "expires": -1,
+          "httpOnly": false,
+          "secure": false,
+          "sameSite": "Lax"
+        },
+        {
+          "name": "tmr_detect",
+          "domain": "giga.chat",
+          "path": "/",
+          "expires": 1795190667,
+          "httpOnly": false,
+          "secure": false,
+          "sameSite": "Lax"
+        },
+        {
+          "name": "adsrv_u2",
+          "domain": "bs.serving-sys.ru",
+          "path": "/",
+          "expires": 1829664279.498828,
+          "httpOnly": false,
+          "secure": true,
+          "sameSite": "None"
+        },
+        {
+          "name": "adsrv_s_1087170183",
+          "domain": "bs.serving-sys.ru",
+          "path": "/",
+          "expires": 1795190679.498927,
+          "httpOnly": false,
+          "secure": true,
+          "sameSite": "None"
+        },
+        {
+          "name": "t3_sid_7751365",
+          "domain": ".giga.chat",
+          "path": "/",
+          "expires": 1826640279.786137,
+          "httpOnly": false,
+          "secure": false,
+          "sameSite": "Lax"
+        },
+        {
+          "name": "PVID",
+          "domain": "top-fwz1.mail.ru",
+          "path": "/",
+          "expires": 1826726679.956263,
+          "httpOnly": true,
+          "secure": true,
+          "sameSite": "None"
+        },
+        {
+          "name": "VID",
+          "domain": ".mail.ru",
+          "path": "/",
+          "expires": 1826726679.956382,
+          "httpOnly": true,
+          "secure": true,
+          "sameSite": "None"
+        },
+        {
+          "name": "bh",
+          "domain": ".yandex.ru",
+          "path": "/",
+          "expires": 1829664280,
+          "httpOnly": false,
+          "secure": true,
+          "sameSite": "None"
+        }
+      ],
+      "cookieCountBefore": 42,
+      "cookieCountAfter": 42,
+      "loginStateBefore": {
+        "url": "https://giga.chat/",
+        "hasInput": true,
+        "hasLoginForm": false
+      }
+    }
+  }
+}
