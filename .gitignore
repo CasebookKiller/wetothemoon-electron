@@ -105,6 +105,7 @@ docs/prompts/*
 !docs/prompts/_common/**
 !docs/prompts/gateway/
 !docs/prompts/gateway/**
+docs/prompts/gateway/directions/
 !docs/prompts/prana-bindu/handoff/
 !docs/prompts/prana-bindu/handoff/**
 !docs/prompts/prana-bindu/summary.md
