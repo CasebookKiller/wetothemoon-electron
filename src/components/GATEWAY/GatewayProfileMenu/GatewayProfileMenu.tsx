@@ -9,6 +9,7 @@ import {
   CloseIcon,
 } from '@/components/GATEWAY/GatewayIcons/GatewayIcons';
 
+
 const getApi = () =>
   (window as Window & typeof globalThis & { electronAPI?: any })?.electronAPI;
 
