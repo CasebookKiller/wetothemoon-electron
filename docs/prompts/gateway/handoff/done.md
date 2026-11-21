@@ -25,7 +25,11 @@
 | **Switch профиля без auto-launch** + кнопка «Запустить/Войти» в `GatewayAccountsDialog` | ✅ | (эта сессия) |
 | **cookieTracker.ts** + **probe-deepseek-cookies.mjs** — снимок куки по профилю (CDP) | ✅ | `e089c5e` |
 | **done.md / git log -10 / meta-instructions** в handoffBuilder | ✅ | (эта сессия) |
-| **Switch профиля без auto-launch** + кнопка «Запустить/Войти» в `GatewayAccountsDialog` | ✅ | (эта сессия) |
+| **HandoffTab.tsx** (369 строк) в `GatewayAccountsDialog` — module switcher + presets + per-profile v10 | ✅ | `cf20d47`, `e5ef5af` |
+| **v10 миграция** — `handoff_preferences` (profile_id unique, selection_json, preset) | ✅ | `cf20d47` |
+| **Topics миграция** — `topics/01-12.md` + `MODULE_MAP.structure:'topics'` + legacy DEPRECATED | ✅ | `8e35196`, `67aa498` |
+| **scripts/{mjs,bash}/** + `scripts-index.mjs` + `manifest.json` + headers (6 ключевых) | ✅ | `96454d9` |
+| **rate-limit fix** — `RATE_MARKS` += `'лимит будет восстановлен'` (для DeepSeek) | ✅ | (эта сессия) |
 
 ## Правила работы (не нарушать)
 

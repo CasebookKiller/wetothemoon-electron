@@ -14,13 +14,13 @@
 
 > **Browser-канал приоритетнее API.** См. `COMMON_CONTEXT.md` §«Цель» (принцип 0).
 
-### Приоритет 1 — HandoffAndSettingsDialog (сейчас, 1.5–2 ч)
+### Приоритет 1 — GigaChat (сейчас, окно до 22:00)
 
-Перенос «📋 Экспорт продолжения» из `TopControlPanel` в `HandoffAndSettingsDialog`: чекбоксы topics/файлов + presets (Всё / Минимум ~20 КБ / Topics only / Custom) + сохранение per-profile (миграция v10 `handoff_preferences`). См. Handoff #1 от 2026-11-21 §«🔥 Следующий важный этап» и Handoff #2 (rate-limit UI) и `topics/04_UI.md`.
+**P1 закрыт:** `HandoffTab.tsx` (369 строк) уже в `GatewayAccountsDialog` (вкладка «Handoff»), v10 `handoff_preferences` работает. Приоритет — **второй провайдер**.
 
-Шаги: (1) миграция v10 `handoff_preferences` (`profile_id` unique, `selection_json`, `preset`); (2) фильтрация в `handoffBuilder.buildHandoff`; (3) `gatewayHandlers.export-handoff` + новые поля; (4) `HandoffSettingsDialog.tsx`; (5) убрать кнопку из `TopControlPanel`; (6) вкладка «Handoff» в диалоге профилей.
+Шаги: (1) создать `gigachat-2` профиль (`ProfileService.create({name:'GigaChat 2', browserKind:'chrome'})`); (2) SberID-логин; (3) `node scripts/recon-dump-dom.mjs --provider gigachat --profile <gigachat-2-id>`; (4) проверить Enter-to-send; (5) `GigaChatAdapter v0` по образцу `deepseek/adapter.ts`. См. `topics/03_RECON.md`, `topics/01_PROVIDERS.md`.
 
-### Приоритет 2 — browser-канал (после HandoffDialog, ~2 ч)
+### Приоритет 2 — browser-канал (после GigaChat, ~2 ч)
 
 > ⚠️ **П7 blocker:** профиль `p_mwnqhvvi_rm0d` занят старым диалогом. Для recon — `ProfileService.create({name: 'GigaChat 2', browserKind: 'chrome'})`.
 
@@ -29,12 +29,13 @@
 3. **Recon П1b** — пустой сайдбар у новых профилей. Скрипт `scripts/recon-empty-sidebar.mjs` (см. `topics/02_BROWSER_POOL.md`).
 4. **`AlisaAdapter` v0** — `alice.yandex.ru` (проверить, чат ли), Yandex ID.
 
-### Приоритет 3 — завершить миграцию на topics/
+### Приоритет 3 — Alisa + cookieTracker
 
-1. **Фаза B.10:** `handoff/architecture.md` + принцип 0 (цель) + принцип 16 (Agent-роли, открытый список).
-2. **Фаза B.11:** `handoff/done.md` + строки из v9.
-3. **Фаза C** — переключение на `structure: 'topics'` (см. `handoff-system.md`).
-4. **Фаза D** — prana-bindu (та же схема).
+**P3 закрыт:** topics миграция завершена (Phase A/B/C). `structure: 'topics'` работает, legacy DEPRECATED.
+
+1. **Alisa recon** — `alice.yandex.ru` (проверить, чат или голосовой ассистент). Yandex ID. → `AlisaAdapter v0`.
+2. **cookieTracker + fingerprint** (P5): расширить `cookieTracker.ts` — canvas, WebGL, timezone, fonts. Цель — понять, как DeepSeek детектит (спросил возраст 2026-11-19). v11 миграция: `profile_cookies`, `cookie_events`.
+3. **P7 rate-limit detect:** фикс `RATE_MARKS` + `'лимит будет восстановлен'` применён (`injectedScript.ts:386`). **Проверить после `rs`:** для `request.tel` бейдж ⏸ появится при следующем RATE_LIMIT.
 
 ### Приоритет 4 — потом
 

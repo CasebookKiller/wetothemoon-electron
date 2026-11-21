@@ -34,3 +34,19 @@ scripts/
 - Timeout 30s
 
 ## Приоритет: высокий
+
+## Статус (2026-11-21)
+
+**Сделано:**
+- `scripts/{mjs,bash,python}/` — папки созданы
+- 6 ключевых скриптов **скопированы** (не перенесены) с headers:
+  - `mjs/`: `preflight-check`, `test-context-service`, `test-cont-source`, `gen-context-manifest`, `scripts-index`
+  - `bash/`: `sync-submodule`
+- `scripts-index.mjs` — генератор `manifest.json` из headers
+- `manifest.json` — сгенерирован, 6 скриптов
+- Оригиналы `scripts/*.mjs` **не тронуты** — приложение (`handoffBuilder.ts:274`, `package.json`) работает со старыми путями
+
+**TODO:**
+- Перенести остальные 40+ скриптов (recon-*, md-*, test-*, inject-*) — по мере касания
+- `scripts/README.md` — человеческий индекс
+- **Проверка вызовов:** приложение использует `scripts/preflight-check.mjs` (без `mjs/`) — не сломать при будущем `mv`
