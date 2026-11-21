@@ -97,7 +97,8 @@ function readTopics(
     path.join(rootPath, 'docs', 'prompts', moduleId, 'topics'),
     path.join(rootPath, 'prompts', moduleId, 'topics'),
   ];
-  const filterSet = (selectedTopics && selectedTopics.length > 0)
+  // undefined = все topics; [] = 0 topics (явно пустой выбор); [...] = только эти
+  const filterSet = (selectedTopics !== undefined)
     ? new Set(selectedTopics)
     : null;
   for (const dir of candidates) {
@@ -107,7 +108,7 @@ function readTopics(
         .filter(f => f.endsWith('.md'))
         .sort()
         .filter(f => {
-          if (!filterSet) return true;
+          if (filterSet === null) return true;
           return filterSet.has(f.replace(/\.md$/, ''));
         })
         .map(f => ({
@@ -153,7 +154,9 @@ ${await sh('git log --oneline -10 --no-decorate', ROOT)}
     let topicsContent: Array<{ name: string; content: string }> = [];
     if (effectiveStructure === 'topics') {
       topicsContent = readTopics(ROOT, opts.moduleId, opts.selectedTopics);
-      if (topicsContent.length === 0) {
+      // Fallback на legacy ТОЛЬКО если selectedTopics не задан (undefined = "все") и topics/ пуст.
+      // Если selectedTopics === [] (явно сняты все) — это нормальный пустой выбор, не fallback.
+      if (topicsContent.length === 0 && opts.selectedTopics === undefined) {
         console.warn(`[handoffBuilder] ${opts.moduleId}: structure='topics', но topics/ пуст → fallback на legacy`);
         effectiveStructure = 'legacy';
       }
@@ -176,11 +179,12 @@ ${await sh('git log --oneline -10 --no-decorate', ROOT)}
       ['techdebt.md',        '## 🧹 Техдолг',                   'legacy'],
     ];
     let intentAdded = false;
-    const selectedFilesSet = (opts.selectedFiles && opts.selectedFiles.length > 0)
+    // undefined = все intent-файлы; [] = 0 (явно пустой выбор); [...] = только эти
+    const selectedFilesSet = (opts.selectedFiles !== undefined)
       ? new Set(opts.selectedFiles)
       : null;
     for (const [fname, header, scope] of intentFiles) {
-      if (selectedFilesSet && !selectedFilesSet.has(fname)) continue;
+      if (selectedFilesSet !== null && !selectedFilesSet.has(fname)) continue;
       let content = '';
       if (scope === 'common') {
         content = readPrompt(ROOT, '_common', fname);
