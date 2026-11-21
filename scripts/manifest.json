@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-11-21T18:57:00.567Z",
-  "total": 8,
+  "generatedAt": "2026-11-21T19:02:53.151Z",
+  "total": 9,
   "byRuntime": {
-    "mjs": 7,
+    "mjs": 8,
     "bash": 1,
     "python": 0
   },
@@ -104,6 +104,24 @@
       "tool": false,
       "example": [
         "node scripts/mjs/recon-gigachat-adapter-test.mjs --profile p_mwnqhvvi_rm0d --text \"ping\""
+      ]
+    },
+    {
+      "path": "scripts/mjs/recon-gigachat-conversations.mjs",
+      "name": "recon-gigachat-conversations",
+      "purpose": "Разведка боковой панели GigaChat: селекторы тредов, href, title",
+      "input": "--profile <id>",
+      "output": "JSON в stdout (селекторы, href, title, кнопки)",
+      "args": {
+        "_raw": "--profile"
+      },
+      "result": {
+        "_raw": "структура списка чатов для getConversations"
+      },
+      "exit": {},
+      "tool": false,
+      "example": [
+        "node scripts/mjs/recon-gigachat-conversations.mjs --profile p_mwnqhvvi_rm0d"
       ]
     },
     {
