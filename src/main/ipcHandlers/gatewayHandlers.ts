@@ -927,7 +927,7 @@ export function registerGatewayHandlers(): void {
         if (kind === 'ACCOUNT_BANNED' || event.type === 'profile:banned') {
           ps.markBanned(activeId);
         } else {
-          ps.markRateLimited(activeId, untilMs);
+          ps.markRateLimited(activeId, untilMs, event.payload?.rawText);
         }
         const next = ps.getNextAvailableProfile(activeId);
         rateLimitInfo = { kind, untilMs, nextId: next?.id ?? null, activeId };

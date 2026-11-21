@@ -23,6 +23,8 @@ export interface GatewayProfile {
   notes?: string;
   /** P0.5: до какого момента (epoch ms) профиль в rate-limit. null/undefined — доступен. */
   rateLimitedUntil?: number;
+  /** Сырой текст баннера rate-limit (для диагностики RATE_RE) */
+  rateLimitedRawText?: string;
   /** P0.5: если установлено — профиль забанен. Снимается только вручную. */
   bannedAt?: string;
 }
@@ -270,14 +272,15 @@ export class ProfileService {
   }
 
   // ─── P0.5: rate-limit / ban ─────────────────────────────
-  markRateLimited(id: string, untilMs: number | null): GatewayProfile {
+  markRateLimited(id: string, untilMs: number | null, rawText?: string): GatewayProfile {
     const p = this.get(id);
     if (!p) throw new Error('Профиль не найден: ' + id);
     // если until не распарсился — ставим +24ч, чтобы не циклиться
     p.rateLimitedUntil = untilMs ?? (Date.now() + 24 * 60 * 60 * 1000);
+    p.rateLimitedRawText = rawText;
     delete p.bannedAt;
     this.save();
-    console.log(`[ProfileService] markRateLimited ${id} until=${new Date(p.rateLimitedUntil).toISOString()}`);
+    console.log(`[ProfileService] markRateLimited ${id} until=${new Date(p.rateLimitedUntil).toISOString()}${rawText ? ` raw="${rawText.slice(0, 200)}"` : ' (rawText пуст)'}`);
     return p;
   }
 
