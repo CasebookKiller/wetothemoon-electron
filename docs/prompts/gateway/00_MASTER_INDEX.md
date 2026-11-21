@@ -21,6 +21,13 @@
 | 03 | `topics/03_RECON.md` | GigaChat recon, Alice recon, Duck.ai (TD10), deepseek-harness (не используем), П6, TD6, TD14 | Фаза B.6 |
 | 04 | `topics/04_UI.md` | TopControlPanel, GatewayChatHeader, **два пути handoff**, П1-fix-B, перенос кнопки в диалог профилей, event bus | Фаза B.7 |
 | 05 | `topics/05_API_CHANNEL.md` | API как второй приоритет, tokenCounter отложен, изоляция каналов, `gateway:send-message-api` | Фаза B.8 |
+| 06 | `topics/06_INTENT_FILES.md` | Роль intent-файлов, DEPRECATED legacy (problems/roadmap/techdebt) | v13+ |
+| 07 | `topics/07_SCRIPTS_REORG.md` | `scripts/{bash,mjs,python}`, header-конвенция, `manifest.json`, реестр как основа tools | v13+ |
+| 08 | `topics/08_JSON_TOOLS.md` | Prompt-based tool calling: registry, parser, executor, audit; whitelist скриптов с `@tool true` | v13+ |
+| 09 | `topics/09_MD_EDITOR.md` | Редактор `.md` в UI (topics + handoff), IPC read/write, whitelist путей | v13+ |
+| 10 | `topics/10_COOKIE_TRACKER.md` | `profile_cookies`, `cookie_events` (v11), snapshot+diff, события `cookie:*` | v13+ |
+| 11 | `topics/11_EMAIL_MAILTM.md` | `EmailProviderAdapter`, `MailTmAdapter`, `email_accounts` (v11) | v13+ |
+| 12 | `topics/12_PIPELINE.md` | Оркестрация `tasks`, `allowAutoSwitch`, стадии; опирается на 08 | v13+ |
 
 ## Handoff (кросс-направленческое)
 
