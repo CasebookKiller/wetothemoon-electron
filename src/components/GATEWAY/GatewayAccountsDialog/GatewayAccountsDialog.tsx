@@ -8,6 +8,13 @@ import { CloseIcon } from '../GatewayIcons/GatewayIcons';
 const getApi = () =>
   (window as Window & typeof globalThis & { electronAPI?: any })?.electronAPI;
 
+const formatLockTime = (ts?: number | null): string => {
+  if (!ts) return '';
+  try {
+    return new Date(ts).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  } catch { return ''; }
+};
+
 interface ProfileInfo {
   id: string;
   name: string;
@@ -16,6 +23,8 @@ interface ProfileInfo {
   chromeCdpPort?: number;
   hasSession: boolean;
   lastActiveAt: string | null;
+  rateLimitedUntil?: number | null;   // ms timestamp, временный лимит
+  bannedAt?: number | null;           // ms timestamp, бан (нужен ручной разбан)
 }
 
 interface Payload {
@@ -126,6 +135,9 @@ export const GatewayAccountsDialog: React.FC<GatewayAccountsDialogProps> = ({
     if (!state) return;
     const activeProf = state.profiles.find(p => p.id === state.activeId);
     if (!activeProf) return;
+    // Защита: забаненный профиль не запускаем.
+    // Rate-limit — разрешено (можно открыть браузер и скопировать последние сообщения).
+    if (activeProf.bannedAt) return;
     setBusy('launch'); setError(null);
     try {
       const api = getApi();
@@ -284,6 +296,13 @@ export const GatewayAccountsDialog: React.FC<GatewayAccountsDialogProps> = ({
                     {!p.hasSession && (
                       <span style={{ marginLeft: 8, fontSize: 11, color: '#f59e0b' }}>⚠ нет сессии</span>
                     )}
+                    {p.bannedAt ? (
+                      <span style={{ marginLeft: 8, fontSize: 11, color: '#ef4444', fontWeight: 500 }}>⛔ забанен</span>
+                    ) : (p.rateLimitedUntil && p.rateLimitedUntil > Date.now()) ? (
+                      <span style={{ marginLeft: 8, fontSize: 11, color: '#f59e0b', fontWeight: 500 }}>
+                        ⏸ до {formatLockTime(p.rateLimitedUntil)}
+                      </span>
+                    ) : null}
                   </div>
                   <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>
                     {kind === 'chrome' ? 'Chrome (patchright)' : 'Yandex'}  ·  CDP :{port}
@@ -352,16 +371,51 @@ export const GatewayAccountsDialog: React.FC<GatewayAccountsDialogProps> = ({
             {state && `Всего: ${state.profiles.length}  ·  активный: ${active?.name ?? '—'}`}
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              onClick={onLaunch}
-              disabled={!active || !!busy}
-              className="pb"
-              title={active?.hasSession ? 'Запустить браузер для активного профиля' : 'Профиль без сессии — откроется окно входа'}
-            >
-              {busy === 'launch'
-                ? 'Запускаю…'
-                : (active?.hasSession ? 'Запустить' : 'Войти')}
-            </button>
+            {(() => {
+              const isRL = !!(active?.rateLimitedUntil && active.rateLimitedUntil > Date.now());
+              const isBanned = !!active?.bannedAt;
+              const amber = '#f59e0b';
+              const amberBg = 'rgba(245,158,11,0.18)';
+              return (
+                <button
+                  onClick={onLaunch}
+                  disabled={!active || !!busy || isBanned}
+                  className="pb"
+                  style={
+                    isRL
+                      ? {
+                          borderColor: 'rgba(245,158,11,0.7)',
+                          color: amber,
+                          background: 'transparent',
+                        }
+                      : undefined
+                  }
+                  onMouseEnter={(e) => {
+                    if (isRL) {
+                      e.currentTarget.style.background = amberBg;
+                      e.currentTarget.style.color = amber;
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (isRL) {
+                      e.currentTarget.style.background = 'transparent';
+                      e.currentTarget.style.color = amber;
+                    }
+                  }}
+                  title={
+                    isBanned
+                      ? 'Профиль забанен — нужен ручной разбан'
+                      : isRL
+                        ? `Временный лимит до ${formatLockTime(active?.rateLimitedUntil)} — браузер откроется для просмотра/копирования, но отправка сообщений будет недоступна`
+                        : (active?.hasSession ? 'Запустить браузер для активного профиля' : 'Профиль без сессии — откроется окно входа')
+                  }
+                >
+                  {busy === 'launch'
+                    ? 'Запускаю…'
+                    : (active?.hasSession ? 'Запустить' : 'Войти')}
+                </button>
+              );
+            })()}
             <button onClick={onClose} disabled={!!busy} className="pb-soft">
               Закрыть
             </button>
