@@ -16,7 +16,7 @@
 
 ### Приоритет 1 — HandoffAndSettingsDialog (сейчас, 1.5–2 ч)
 
-Перенос «📋 Экспорт продолжения» из `TopControlPanel` в `HandoffAndSettingsDialog`: чекбоксы topics/файлов + presets (Всё / Минимум ~20 КБ / Topics only / Custom) + сохранение per-profile (миграция v10 `handoff_preferences`). См. Handoff v12 §«🔥 Следующий важный этап» и `topics/04_UI.md`.
+Перенос «📋 Экспорт продолжения» из `TopControlPanel` в `HandoffAndSettingsDialog`: чекбоксы topics/файлов + presets (Всё / Минимум ~20 КБ / Topics only / Custom) + сохранение per-profile (миграция v10 `handoff_preferences`). См. Handoff #1 от 2026-11-21 §«🔥 Следующий важный этап» и Handoff #2 (rate-limit UI) и `topics/04_UI.md`.
 
 Шаги: (1) миграция v10 `handoff_preferences` (`profile_id` unique, `selection_json`, `preset`); (2) фильтрация в `handoffBuilder.buildHandoff`; (3) `gatewayHandlers.export-handoff` + новые поля; (4) `HandoffSettingsDialog.tsx`; (5) убрать кнопку из `TopControlPanel`; (6) вкладка «Handoff» в диалоге профилей.
 

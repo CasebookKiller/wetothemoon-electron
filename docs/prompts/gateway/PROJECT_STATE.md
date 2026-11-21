@@ -1,6 +1,6 @@
 # PROJECT_STATE — Gateway
 
-> Обновлено: 2026-11-20
+> Обновлено: 2026-11-21 #2
 > Снимок цифр/статуса на дату. Обновлять при переключении сессии.
 
 ## БД gateway.db (v9, 24 таблицы)
@@ -65,10 +65,12 @@ sqlite3 ~/.config/wetothemoon-electron/gateway.db "
 - cookieTracker (снимок куки по профилю)
 - Handoff `kindLimit` (module 2500, submodule 2000, project 1500, global 1000, direction 800)
 - `readModuleRoot` + `module-root` scope в intent (2026-11-20, `be84ecb`)
+- **Rate-limit UX (2026-11-21 #2):** бейдж `⏸ до HH:MM` в диалоге профилей, кнопка «Запустить» янтарная и кликабельна (для просмотра/копирования сообщений), ban → disabled. Real-time через `onGatewayBridgeEvent` + тикер 30 сек
+- **Switch без auto-launch (2026-11-21 #1):** `switchProfile(id, {launch:false})`, `gateway:profiles-activate(id, opts)`, кнопка «Запустить»/«Войти» отдельно от клика по строке
 
 ## Что сломано / не сделано
 
-- **П1a:** Chrome закрывается при switch профиля (архитектурная, BrowserPool)
+- **П1a:** частично смягчено (2026-11-21 #1): switch без auto-launch, браузер не рвётся. Архитектурная задача (BrowserPool) — открыта.
 - **П1b:** пустой список диалогов у новых профилей (нужен recon-скрипт)
 - **П2:** `global block present: false` в тесте
 - **П3:** submodule bump после каждого коммита (ручной)
@@ -88,4 +90,4 @@ sqlite3 ~/.config/wetothemoon-electron/gateway.db "
 
 ## Дата
 
-2026-11-20. Следующая проверка — при переключении сессии или крупном изменении.
+2026-11-21 #2. Следующая проверка — при переключении сессии или крупном изменении.

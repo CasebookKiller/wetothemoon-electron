@@ -48,3 +48,19 @@
 - `TopControlPanel.tsx` — dropdown модулей. **Кнопка handoff переезжает** в `HandoffAndSettingsDialog` (Приоритет 1 следующей сессии) — «не откатывать» относится к dropdown, не к кнопке.
 - v9-миграция — 4 таблицы, индексы, `PRAGMA foreign_keys = ON`.
 - `preflight-check.mjs` — 9 секций, ESM (`await import`).
+
+## 2026-11-21 #2 — rate-limit UI (бейдж + кликабельная кнопка)
+
+- **Диагноз:** main работал корректно, баг был в UI — find/replace
+  прижился частично (подписка + тикер), но `ProfileInfo` / JSX-бейдж /
+  disable-логика не применились.
+- `ProfileInfo`: `+ rateLimitedUntil?: number | null; + bannedAt?: number | null`
+- `formatLockTime(ts)` — HH:MM ru-RU
+- Бейдж: `⏸ до HH:MM` при rate-limit, `⛔ забанен` при ban
+- Кнопка «Запустить» при rate-limit: янтарная (`#f59e0b`), **кликабельна**
+  (браузер открывается для просмотра/копирования сообщений).
+  Hover `rgba(245,158,11,0.18)` через `onMouseEnter/onMouseLeave` — обход `.pb:hover`.
+- Кнопка при ban: `disabled`
+- `onLaunch`: guard только `bannedAt`, rate-limit разрешён
+- Real-time: `onGatewayBridgeEvent` (`rate-limited`/`banned`/`switched`) → `refresh()`
+- Тикер 30 сек: бейдж исчезает по истечении без переоткрытия диалога
