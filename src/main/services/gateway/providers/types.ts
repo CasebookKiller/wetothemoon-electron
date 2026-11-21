@@ -48,6 +48,8 @@ export interface CookiePattern {
 export interface MessageChunk {
   type: 'text' | 'reasoning' | 'usage' | 'done' | 'error';
   text?: string;
+  /** Для type='text': сигнал «очистить предыдущий буфер» (DOM-замена, не append) */
+  reset?: boolean;
   usage?: {
     promptTokens?: number;
     completionTokens?: number;
