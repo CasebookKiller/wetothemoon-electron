@@ -849,7 +849,12 @@ export function registerGatewayHandlers(): void {
   let activeConvId: string | undefined;
   let activeConvTitle: string | undefined;
 
-  // P0.5 Phase 2: авто-failover по rate-limit
+  // P0.5 Phase 2: авто-failover по rate-limit.
+  // ВКЛЮЧАЕТСЯ ТОЛЬКО ДЛЯ PIPELINE (batch, agents, постановка задач).
+  // В интерактивном чате — manual switch: юзер видит бан и решает сам.
+  // TODO(pipeline): когда появится pipeline — переключить на контекстную
+  // проверку `taskContext?.allowAutoSwitch`, а не глобальный флаг.
+  const AUTO_SWITCH_ENABLED: boolean = false;
   let autoSwitchCount = 0;
   let autoSwitching = false;
   const MAX_AUTO_SWITCH = 3;
@@ -929,7 +934,8 @@ export function registerGatewayHandlers(): void {
         console.log('[gatewayHandlers] profile-limit', rateLimitInfo);
 
         // Phase 2: auto-failover — только для RATE_LIMIT (бан = стоп)
-        if (kind === 'RATE_LIMIT' && !autoSwitching) {
+        // И только когда AUTO_SWITCH_ENABLED (pipeline). В интерактивном чате — manual.
+        if (AUTO_SWITCH_ENABLED && kind === 'RATE_LIMIT' && !autoSwitching) {
           const gwNow = getGatewayWindow();
           if (autoSwitchCount >= MAX_AUTO_SWITCH) {
             if (gwNow && !gwNow.isDestroyed()) {
