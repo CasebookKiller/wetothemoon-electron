@@ -383,7 +383,7 @@ export const INJECTED_SCRIPT = `
   // иначе JS съедает их и regex ищет буквы d/s/literal-dot.
   const RATE_RE = /Лимит будет (?:восстановлен|сброшен):?\\s*(\\d{2})\\.(\\d{2})\\.(\\d{4})[, ]+(?:в\\s+)?(\\d{2}):(\\d{2})/i;
   const BAN_MARKS  = ['заблокирован', 'banned', 'account_banned', '11140'];
-  const RATE_MARKS = ['сервер занят', 'лимит использования', 'лимит будет восстановлен', 'quota exceeded', 'rate limit'];
+  const RATE_MARKS = ['сервер занят', 'лимит использования', 'лимит будет восстановлен', 'quota exceeded', 'rate limit', 'limit reached'];
   let lastLimitSig = '';
 
   const parseUntil = (t) => {
