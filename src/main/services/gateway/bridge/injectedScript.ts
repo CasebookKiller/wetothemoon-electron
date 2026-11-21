@@ -381,16 +381,80 @@ export const INJECTED_SCRIPT = `
   // failover; ACCOUNT_BANNED → стоп и алерт, чтобы не связывать по device_id).
   // ВАЖНО: внутри template literal бэкслеши удваиваются (\\d, \\s, \\.),
   // иначе JS съедает их и regex ищет буквы d/s/literal-dot.
-  const RATE_RE = /Лимит будет (?:восстановлен|сброшен):?\\s*(\\d{2})\\.(\\d{2})\\.(\\d{4})[, ]+(?:в\\s+)?(\\d{2}):(\\d{2})/i;
+  // Парсер времени лимита. Поддерживает форматы DeepSeek:
+  //   21.11.2026 в 22:00 / 21.11.2026, 22:00 / 21.11.2026 22:00
+  //   21 ноября [2026] в 22:00
+  //   завтра в 22:00
+  //   в 22:00 (без даты — сегодня/завтра)
+  //   через 2 часа / через 15 минут
+  //   Try again at 22:00
+  // Возвращает мс UTC или null. TZ — локальный (МСК у нас).
+  // ВАЖНО: бэкслеши удвоены — это template literal.
+  const MONTHS_RU = { 'янв': 0, 'фев': 1, 'мар': 2, 'апр': 3, 'мая': 4, 'май': 4, 'июн': 5, 'июл': 6, 'авг': 7, 'сен': 8, 'окт': 9, 'ноя': 10, 'дек': 11 };
+  const RATE_FULL_RE = /(\\d{1,2})\\.(\\d{2})\\.(\\d{4})[, ]+(?:в\\s+)?(\\d{1,2}):(\\d{2})/i;
+  const RATE_MONTH_RE = /(\\d{1,2})\\s+(янв|фев|мар|апр|ма[йя]|июн|июл|авг|сен|окт|ноя|дек)[а-я]*\\s*(\\d{4})?[, ]+(?:в\\s+)?(\\d{1,2}):(\\d{2})/i;
+  const RATE_TOMORROW_RE = /завтра[^\\d]*(\\d{1,2}):(\\d{2})/i;
+  const RATE_TODAY_RE = /(?:сегодня[^\\d]*)?в\\s*(\\d{1,2}):(\\d{2})/i;
+  const RATE_RELATIVE_RE = /через\\s+(\\d+)\\s*(час|часа|часов|мин|минут|минуты)/i;
+  const RATE_TRY_AGAIN_RE = /(?:try\\s*again|retry|повторите)\\s+(?:at|в|после)?\\s*(\\d{1,2}):(\\d{2})/i;
+  // Английский формат DeepSeek: "Your limit will reset on Nov 22, 2026 at 20:00"
+  const RATE_EN_RE = /\\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\s+(\\d{1,2}),?\\s+(\\d{4})\\s+at\\s+(\\d{1,2}):(\\d{2})\\b/i;
+  const MONTHS_EN = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
   const BAN_MARKS  = ['заблокирован', 'banned', 'account_banned', '11140'];
-  const RATE_MARKS = ['сервер занят', 'лимит использования', 'лимит будет восстановлен', 'quota exceeded', 'rate limit', 'limit reached'];
+  const RATE_MARKS = [
+    'сервер занят', 'лимит использования', 'лимит будет восстановлен',
+    'quota exceeded', 'rate limit', 'limit reached', 'usage limit',
+    'server is busy', 'limit will reset', 'reset on',
+    'try again', 'повторите',
+  ];
   let lastLimitSig = '';
 
+  const atLocal = (y, mo, d, h, mi) => {
+    const dt = new Date(y, mo, d, h, mi, 0, 0);
+    return isNaN(dt.getTime()) ? null : dt.getTime();
+  };
+
   const parseUntil = (t) => {
-    const m = t.match(RATE_RE);
-    if (!m) return null;
-    const d = new Date(+m[3], +m[2] - 1, +m[1], +m[4], +m[5]);
-    return isNaN(d.getTime()) ? null : d.getTime();
+    const now = new Date();
+    const y = now.getFullYear(), mo = now.getMonth(), d = now.getDate();
+    let m;
+
+    if ((m = t.match(RATE_EN_RE))) {
+      const mi = MONTHS_EN[m[1].toLowerCase().slice(0, 3)];
+      if (mi == null) return null;
+      return atLocal(+m[3], mi, +m[2], +m[4], +m[5]);
+    }
+    if ((m = t.match(RATE_FULL_RE))) {
+      return atLocal(+m[3], +m[2] - 1, +m[1], +m[4], +m[5]);
+    }
+    if ((m = t.match(RATE_MONTH_RE))) {
+      const mi = MONTHS_RU[m[2].toLowerCase().slice(0, 3)];
+      if (mi == null) return null;
+      const yy = m[3] ? +m[3] : y;
+      return atLocal(yy, mi, +m[1], +m[4], +m[5]);
+    }
+    if ((m = t.match(RATE_TOMORROW_RE))) {
+      const t1 = atLocal(y, mo, d + 1, +m[1], +m[2]);
+      return t1;
+    }
+    if ((m = t.match(RATE_RELATIVE_RE))) {
+      const n = +m[1];
+      const unit = m[2].toLowerCase();
+      const addMs = unit.startsWith('час') ? n * 3600_000 : n * 60_000;
+      return Date.now() + addMs;
+    }
+    if ((m = t.match(RATE_TRY_AGAIN_RE))) {
+      // без даты: если время < now — считаем завтра
+      const t1 = atLocal(y, mo, d, +m[1], +m[2]);
+      if (t1 == null) return null;
+      return t1 > Date.now() ? t1 : atLocal(y, mo, d + 1, +m[1], +m[2]);
+    }
+    if ((m = t.match(RATE_TODAY_RE))) {
+      const t1 = atLocal(y, mo, d, +m[1], +m[2]);
+      if (t1 == null) return null;
+      return t1 > Date.now() ? t1 : atLocal(y, mo, d + 1, +m[1], +m[2]);
+    }
+    return null;
   };
 
   const classifyLimit = (t) => {
@@ -413,7 +477,7 @@ export const INJECTED_SCRIPT = `
       const sig = kind + '|' + (untilMs || 0) + '|' + text.slice(0, 100);
       if (sig === lastLimitSig) continue;
       lastLimitSig = sig;
-      console.warn('[injected] ' + kind + ':', text);
+      console.warn('[injected] ' + kind + (untilMs ? '' : ' (NO-TIME)') + ':', text);
       send('profile:' + (kind === 'ACCOUNT_BANNED' ? 'banned' : 'rate-limited'), {
         kind, untilMs, rawText: text,
       });
