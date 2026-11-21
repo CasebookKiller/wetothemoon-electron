@@ -98,8 +98,17 @@ async function profileMode(chromium, provider, profile, profilesRoot, outDir, st
   const pdir = profileDir(profile, profilesRoot);
   if (!fs.existsSync(pdir)) die('profile dir missing: '+pdir);
   try {
-    const pids = execSync(`pgrep -f "user-data-dir=${pdir}"`,{stdio:['ignore','pipe','ignore']}).toString().trim();
-    if (pids) die(`Chrome already running (pids=${pids.split('\n').join(',')}). Close UI browser.`);
+    // pgrep -f "user-data-dir=..." ловит и свой sh-родитель (execSync) → фильтруем по cmdname=chrome
+    const rawPids = execSync(`pgrep -f "user-data-dir=${pdir}"`,{stdio:['ignore','pipe','ignore']}).toString().trim();
+    const pids = rawPids
+      ? rawPids.split('\n').filter(Boolean).filter((pid) => {
+          try {
+            const comm = execSync(`ps -p ${pid} -o comm=`,{stdio:['ignore','pipe','ignore']}).toString().trim();
+            return comm.includes('chrome');
+          } catch { return false; }
+        })
+      : [];
+    if (pids.length) die(`Chrome already running for this profile (pids=${pids.join(',')}). Close only this profile.`);
   } catch {}
   const opts = {headless:false};
   if ((profile.browserKind||'yandex')==='chrome') opts.channel='chrome';
