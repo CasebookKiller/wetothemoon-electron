@@ -83,6 +83,32 @@ export const GatewayAccountsDialog: React.FC<GatewayAccountsDialogProps> = ({
 
   useEffect(() => { if (visible) refresh(); }, [visible, refresh]);
 
+  // P0.5: real-time обновление бейджей rate-limit/ban при открытом диалоге
+  useEffect(() => {
+    if (!visible) return;
+    const api = getApi();
+    if (!api?.onGatewayBridgeEvent) return;
+    const unsub = api.onGatewayBridgeEvent((event: { type: string }) => {
+      const t = event?.type;
+      if (
+        t === 'profile:rate-limited' ||
+        t === 'profile:banned' ||
+        t === 'profile:switched'
+      ) {
+        void refresh();
+      }
+    });
+    return () => { if (typeof unsub === 'function') unsub(); };
+  }, [visible, refresh]);
+
+  // Тикер: пере-рендер каждые 30 сек, чтобы бейдж «⏸ до HH:MM» исчезал по истечении
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!visible) return;
+    const t = setInterval(() => setTick((x) => x + 1), 30_000);
+    return () => clearInterval(t);
+  }, [visible]);
+
   const onSelect = async (id: string) => {
     if (!state || id === state.activeId) return;
     setBusy('select'); setError(null);
