@@ -150,8 +150,23 @@ export class GigaChatAdapter implements ProviderAdapter {
     yield { type: 'error', text: 'timeout' };
   }
 
-  async getConversations(_page: Page): Promise<Conversation[]> {
-    // TODO: селектор списка тредов не разведан (recon не покрывал боковую панель)
-    return [];
+  async getConversations(page: Page): Promise<Conversation[]> {
+    try {
+      return await page.evaluate(() => {
+        const links = Array.from(document.querySelectorAll('a[href^="/sessions/"]')) as HTMLAnchorElement[];
+        return links.map((el) => {
+          const href = el.getAttribute('href') || '';
+          const id = el.getAttribute('data-da_session_id') || href.replace('/sessions/', '');
+          const title = el.textContent?.trim() || 'Без названия';
+          return {
+            id,
+            title,
+            url: `https://giga.chat${href}`,
+          };
+        });
+      });
+    } catch {
+      return [];
+    }
   }
 }
