@@ -3,6 +3,19 @@
 // Запуск: node scripts/preflight-check.mjs
 // Возвращает exit code 0 если всё ок, 1 если есть расхождения.
 
+/**
+ * @name preflight-check
+ * @purpose Проверка состояния проекта: git, submodule, schema, БД, manifest, .env, бэкапы
+ * @input argv: --fast (пропустить tsc), --json (машинный вывод)
+ * @output stdout: 9 секций проверок
+ * @args { "type": "object", "properties": { "fast": { "type": "boolean" }, "json": { "type": "boolean" } } }
+ * @result { "type": "object", "properties": { "ok": {"type":"boolean"}, "sections": {"type":"array"} } }
+ * @exit 0 — всё готово
+ * @exit 1 — есть проблемы
+ * @tool false
+ * @example node scripts/mjs/preflight-check.mjs --fast
+ */
+
 import { execSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import fs from 'node:fs';

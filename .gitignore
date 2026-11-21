@@ -139,6 +139,7 @@ captures/
 deepseek_cookies.json
 scripts/dumps/
 .env.local.bak-*
+scripts/mjs/recon-*.mjs
 scripts/recon-*.mjs
 scripts/md-*.mjs
 scripts/inject-cookies.mjs
