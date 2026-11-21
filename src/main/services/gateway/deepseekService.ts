@@ -783,7 +783,10 @@ export class DeepSeekService {
     return { ok: true, killed: pids.length };
   }
 
-  async switchProfile(profileId: string): Promise<{
+  async switchProfile(
+    profileId: string,
+    opts: { launch?: boolean } = {},
+  ): Promise<{
     ok: boolean;
     status?: 'logged_in' | 'login_required';
     reason?: string;
@@ -794,6 +797,7 @@ export class DeepSeekService {
 
     const prevActiveId = ps.getActiveId();
     const hadSession = ps.hasSession(target);
+    const shouldLaunch = opts.launch !== false;
 
     // Отключаемся от текущего браузера, но НЕ убиваем процесс Yandex —
     // он остаётся жить со своим профилем.
@@ -808,6 +812,14 @@ export class DeepSeekService {
       profileId,
       cdpPort: target.cdpPort,
     });
+
+    // switch-only: не запускаем браузер и не открываем логин
+    if (!shouldLaunch) {
+      return {
+        ok: true,
+        status: hadSession ? 'logged_in' : 'login_required',
+      };
+    }
 
     // Если у профиля НЕТ сессии — запускаем Yandex БЕЗ CDP для ручного входа.
     // Капча проходится как на телефоне (без --remote-debugging-port).

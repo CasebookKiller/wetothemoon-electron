@@ -29,7 +29,7 @@ export interface GatewayAccountsDialogProps {
   onChanged?: () => void;
 }
 
-type BusyKind = null | 'list' | 'activate' | 'toggle' | 'create' | 'import' | 'delete';
+type BusyKind = null | 'list' | 'select' | 'launch' | 'toggle' | 'create' | 'import' | 'delete';
 
 // ─── Стили (inline, чтобы работало вне ShadowRoot) ───
 const overlayStyle: React.CSSProperties = {
@@ -83,18 +83,35 @@ export const GatewayAccountsDialog: React.FC<GatewayAccountsDialogProps> = ({
 
   useEffect(() => { if (visible) refresh(); }, [visible, refresh]);
 
-  const onActivate = async (id: string) => {
+  const onSelect = async (id: string) => {
     if (!state || id === state.activeId) return;
-    setBusy('activate'); setError(null);
+    setBusy('select'); setError(null);
     try {
       const api = getApi();
-      const r = await api.gatewayProfilesActivate(id);
+      const r = await api.gatewayProfilesActivate(id, { launch: false });
       if (!r.success) { setError(r.error || 'Не удалось переключить'); return; }
       await refresh();
       onChanged?.();
       window.dispatchEvent(new CustomEvent('gateway:profile-switched', { detail: { id } }));
-      if (r.status === 'login_required') {
-        window.dispatchEvent(new CustomEvent('gateway:need-login', { detail: { id } }));
+    } finally { setBusy(null); }
+  };
+
+  const onLaunch = async () => {
+    if (!state) return;
+    const activeProf = state.profiles.find(p => p.id === state.activeId);
+    if (!activeProf) return;
+    setBusy('launch'); setError(null);
+    try {
+      const api = getApi();
+      // С сессией — просто launch(); без сессии — полный switch с логином
+      const r = activeProf.hasSession
+        ? await api.gatewayLaunch()
+        : await api.gatewayProfilesActivate(activeProf.id, { launch: true });
+      if (!r.success) { setError(r.error || 'Не удалось запустить'); return; }
+      await refresh();
+      onChanged?.();
+      if (r.data?.status === 'login_required') {
+        window.dispatchEvent(new CustomEvent('gateway:need-login', { detail: { id: activeProf.id } }));
       }
     } finally { setBusy(null); }
   };
@@ -215,7 +232,7 @@ export const GatewayAccountsDialog: React.FC<GatewayAccountsDialogProps> = ({
             return (
               <div
                 key={p.id}
-                onClick={() => onActivate(p.id)}
+                onClick={() => onSelect(p.id)}
                 style={{
                   display: 'grid',
                   gridTemplateColumns: '24px 1fr auto auto auto',
@@ -304,13 +321,25 @@ export const GatewayAccountsDialog: React.FC<GatewayAccountsDialogProps> = ({
           </div>
         )}
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.1)', gap: 8 }}>
           <div style={{ fontSize: 12, color: '#888' }}>
             {state && `Всего: ${state.profiles.length}  ·  активный: ${active?.name ?? '—'}`}
           </div>
-          <button onClick={onClose} disabled={!!busy} className="pb-soft">
-            Закрыть
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={onLaunch}
+              disabled={!active || !!busy}
+              className="pb"
+              title={active?.hasSession ? 'Запустить браузер для активного профиля' : 'Профиль без сессии — откроется окно входа'}
+            >
+              {busy === 'launch'
+                ? 'Запускаю…'
+                : (active?.hasSession ? 'Запустить' : 'Войти')}
+            </button>
+            <button onClick={onClose} disabled={!!busy} className="pb-soft">
+              Закрыть
+            </button>
+          </div>
         </div>
       </div>
 

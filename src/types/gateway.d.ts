@@ -347,8 +347,8 @@ declare global {
         }>;
       gatewayProfilesCreate: (opts: { name: string; notes?: string; browserKind?: 'yandex' | 'chrome' }) =>
         Promise<{ success: boolean; data?: any; error?: string }>;
-      gatewayProfilesActivate: (id: string) =>
-        Promise<{ success: boolean; error?: string }>;
+      gatewayProfilesActivate: (id: string, opts?: { launch?: boolean }) =>
+        Promise<{ success: boolean; error?: string; data?: { status?: 'logged_in' | 'login_required' } }>;
       gatewayProfilesUpdate: (id: string, patch: { name?: string; notes?: string; browserKind?: 'yandex' | 'chrome' }) =>
         Promise<{ success: boolean; data?: any; error?: string }>;
       gatewayProfilesDelete: (id: string, opts: { deleteFiles?: boolean }) =>

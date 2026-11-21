@@ -1213,12 +1213,14 @@ export function registerGatewayHandlers(): void {
     }
   });
 
-  ipcMain.handle('gateway:profiles-activate', async (_e, id: string) => {
+  ipcMain.handle('gateway:profiles-activate', async (_e, id: string, opts: { launch?: boolean } = {}) => {
     try {
       // Ручной switch = сброс авто-счётчика (новый цикл failover)
       autoSwitchCount = 0;
-      const r = await service.switchProfile(id);
-      return r.ok ? { success: true } : { success: false, error: r.reason };
+      const r = await service.switchProfile(id, opts);
+      return r.ok
+        ? { success: true, data: { status: r.status } }
+        : { success: false, error: r.reason };
     } catch (e) {
       return { success: false, error: (e as Error).message };
     }

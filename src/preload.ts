@@ -441,8 +441,8 @@ try {
       ipcRenderer.invoke('gateway:profiles-list'),
     gatewayProfilesCreate: (opts: { name: string; notes?: string; browserKind?: 'yandex' | 'chrome' }) =>
       ipcRenderer.invoke('gateway:profiles-create', opts),
-    gatewayProfilesActivate: (id: string) =>
-      ipcRenderer.invoke('gateway:profiles-activate', id),
+    gatewayProfilesActivate: (id: string, opts?: { launch?: boolean }) =>
+      ipcRenderer.invoke('gateway:profiles-activate', id, opts ?? {}),
     gatewayProfilesImportCookies: (profileId: string, cookiesJson: string) =>
       ipcRenderer.invoke('gateway:profiles-import-cookies', profileId, cookiesJson),
     gatewayApiUsageSummary: (opts?: { sinceMs?: number; profileId?: string }) =>
