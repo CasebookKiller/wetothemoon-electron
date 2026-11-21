@@ -1,0 +1,5 @@
+/* Панель пресета Handoff — поверх оверлея диалога (overlay z=99999)
+   и поверх элементов GatewayPage (max z=99999999). */
+.p-dropdown-panel.handoff-preset-panel {
+  z-index: 2147483000 !important;
+}

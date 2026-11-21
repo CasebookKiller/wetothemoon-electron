@@ -51,8 +51,8 @@ try {
   const schema = fs.readFileSync(path.join(ROOT, 'src/main/services/gateway/cache/schema.ts'), 'utf8');
   const m = schema.match(/SCHEMA_VERSION\s*=\s*(\d+)/);
   const v = m ? parseInt(m[1], 10) : 0;
-  if (v === 9) ok('SCHEMA_VERSION = 9');
-  else err(`SCHEMA_VERSION = ${v}, ожидается 9`);
+  if (v === 10) ok('SCHEMA_VERSION = 10');
+  else err(`SCHEMA_VERSION = ${v}, ожидается 10`);
 } catch (e) { err('schema.ts: ' + e.message); }
 
 // ─── 4. Миграции ─────────────────────────────────────────────────────
@@ -61,14 +61,14 @@ try {
   const dir = path.join(ROOT, 'src/main/services/gateway/cache/migrations');
   const files = fs.readdirSync(dir).filter(f => f.match(/^v\d+\.ts$/)).sort();
   console.log('  ' + files.join(', '));
-  for (const want of ['v6.ts', 'v7.ts', 'v8.ts', 'v9.ts']) {
+  for (const want of ['v6.ts', 'v7.ts', 'v8.ts', 'v9.ts', 'v10.ts']) {
     if (files.includes(want)) ok(want);
     else err(want + ' отсутствует');
   }
 } catch (e) { err('migrations: ' + e.message); }
 
-// ─── 5. БД: v9 таблицы ──────────────────────────────────────────────
-section('5. БД: таблицы v9');
+// ─── 5. БД: v9/v10 таблицы ──────────────────────────────────────────
+section('5. БД: таблицы v9/v10');
 if (!fs.existsSync(DB_PATH)) {
   warn('БД ещё не создана (первый запуск): ' + DB_PATH);
 } else {
@@ -76,7 +76,9 @@ if (!fs.existsSync(DB_PATH)) {
     const { DatabaseSync } = require('node:sqlite');
     const db = new DatabaseSync(DB_PATH);
     const ver = db.prepare('PRAGMA user_version').get().user_version;
-    if (ver === 9) ok('user_version = 9'); else err('user_version = ' + ver);
+    if (ver === 10) ok('user_version = 10');
+    else if (ver === 9) warn('user_version = 9 — миграция v10 применится при следующем npm run dev');
+    else err('user_version = ' + ver);
 
     const tables = db.prepare(
       "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"

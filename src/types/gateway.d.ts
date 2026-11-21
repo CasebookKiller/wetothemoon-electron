@@ -358,11 +358,48 @@ declare global {
         moduleId?: string;
         workspaceKeys?: string[];
         taskTitle?: string;
+        selectedTopics?: string[];
+        selectedFiles?: string[];
+        fileName?: string;
       }): Promise<{
         success: boolean;
         data?: { path: string; bytes: number; sections: string[]; markdown: string };
         error?: string;
       }>;
+      gatewayHandoffListTopics(moduleId: string): Promise<{
+        success: boolean;
+        data?: { topics: Array<{ name: string; title: string; bytes: number }> };
+        error?: string;
+      }>;
+      gatewayHandoffListIntent(moduleId: string): Promise<{
+        success: boolean;
+        data?: { files: Array<{ name: string; title: string; bytes: number }> };
+        error?: string;
+      }>;
+      gatewayHandoffGetPreferences(profileId: string): Promise<{
+        success: boolean;
+        data?: {
+          moduleId?: string;
+          preset?: string;
+          selectedTopics?: string[];
+          selectedFiles?: string[];
+          includeGit?: boolean;
+          includePreflight?: boolean;
+          includeSchema?: boolean;
+          includeIntent?: boolean;
+        } | null;
+        error?: string;
+      }>;
+      gatewayHandoffSavePreferences(profileId: string, prefs: {
+        moduleId?: string;
+        preset?: string;
+        selectedTopics?: string[];
+        selectedFiles?: string[];
+        includeGit?: boolean;
+        includePreflight?: boolean;
+        includeSchema?: boolean;
+        includeIntent?: boolean;
+      }): Promise<{ success: boolean; error?: string }>;
     };
   }
 }

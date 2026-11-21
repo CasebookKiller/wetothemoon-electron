@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AppIcon } from '@/components/COMMON/AppIcon/AppIcon';
 import { CloseIcon } from '../GatewayIcons/GatewayIcons';
+import { HandoffTab } from './HandoffTab';
 
 const getApi = () =>
   (window as Window & typeof globalThis & { electronAPI?: any })?.electronAPI;
@@ -36,6 +37,8 @@ export interface GatewayAccountsDialogProps {
   visible: boolean;
   onClose: () => void;
   onChanged?: () => void;
+  initialTab?: 'profiles' | 'handoff';
+  handoffModuleId?: string;
 }
 
 type BusyKind = null | 'list' | 'select' | 'launch' | 'toggle' | 'create' | 'import' | 'delete';
@@ -46,7 +49,7 @@ const overlayStyle: React.CSSProperties = {
   background: 'rgba(0,0,0,0.6)',
   backdropFilter: 'blur(4px)',
   display: 'flex', alignItems: 'center', justifyContent: 'center',
-  zIndex: 99999,
+  zIndex: 1000,
 };
 
 const modalStyle: React.CSSProperties = {
@@ -54,17 +57,23 @@ const modalStyle: React.CSSProperties = {
   color: '#f5f5f5',
   padding: 24, borderRadius: 12,
   border: '1px solid rgba(255,255,255,0.1)',
-  width: 720, maxWidth: '92vw', maxHeight: '85vh',
+  width: 720, maxWidth: '92vw', height: '85vh',
   display: 'flex', flexDirection: 'column',
   boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+  overflow: 'hidden',
 };
 
 export const GatewayAccountsDialog: React.FC<GatewayAccountsDialogProps> = ({
-  visible, onClose, onChanged,
+  visible, onClose, onChanged, initialTab, handoffModuleId,
 }) => {
   const [state, setState] = useState<Payload | null>(null);
   const [busy, setBusy] = useState<BusyKind>(null);
   const [error, setError] = useState<string | null>(null);
+  const [tab, setTab] = useState<'profiles' | 'handoff'>(initialTab ?? 'profiles');
+
+  useEffect(() => {
+    if (visible) setTab(initialTab ?? 'profiles');
+  }, [visible, initialTab]);
 
   // create
   const [creating, setCreating] = useState<{ browserKind: 'yandex' | 'chrome' } | null>(null);
@@ -218,7 +227,14 @@ export const GatewayAccountsDialog: React.FC<GatewayAccountsDialogProps> = ({
       <div
         onClick={(e) => e.stopPropagation()}
         className="ds-modal-content ds-elevated ds-modal-content--dialog"
-        style={{ width: 720, maxWidth: '92vw', maxHeight: '85vh' }}
+        style={{
+          width: 720,
+          maxWidth: '92vw',
+          maxHeight: '85vh',
+          ...(tab === 'handoff'
+            ? { display: 'flex' as const, flexDirection: 'column' as const, minHeight: 0, overflow: 'hidden' as const }
+            : null),
+        }}
       >
         
         {/* Header */}
@@ -235,6 +251,29 @@ export const GatewayAccountsDialog: React.FC<GatewayAccountsDialogProps> = ({
           </button>
         </div>
 
+        {/* Tab bar */}
+        <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+          <button
+            onClick={() => setTab('profiles')}
+            style={{
+              background: 'transparent', border: 'none',
+              borderBottom: tab === 'profiles' ? '2px solid #4a9eff' : '2px solid transparent',
+              color: tab === 'profiles' ? '#fff' : '#888',
+              padding: '8px 16px', cursor: 'pointer', borderRadius: 0,
+            }}
+          >Профили</button>
+          <button
+            onClick={() => setTab('handoff')}
+            style={{
+              background: 'transparent', border: 'none',
+              borderBottom: tab === 'handoff' ? '2px solid #4a9eff' : '2px solid transparent',
+              color: tab === 'handoff' ? '#fff' : '#888',
+              padding: '8px 16px', cursor: 'pointer', borderRadius: 0,
+            }}
+          >Handoff</button>
+        </div>
+
+        {tab === 'profiles' && (<>
         {/* Toolbar */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
           <button
@@ -421,6 +460,14 @@ export const GatewayAccountsDialog: React.FC<GatewayAccountsDialogProps> = ({
             </button>
           </div>
         </div>
+        </>)}
+        {tab === 'handoff' && (
+          <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+            {state
+              ? <HandoffTab moduleId={handoffModuleId ?? 'gateway'} profileId={state.activeId} />
+              : <div style={{ padding: 20, textAlign: 'center', opacity: 0.6 }}>Загрузка…</div>}
+          </div>
+        )}
       </div>
 
       {/* Create modal */}
@@ -494,7 +541,7 @@ export const GatewayAccountsDialog: React.FC<GatewayAccountsDialogProps> = ({
       {/* Delete confirm */}
       {deleting && createPortal(
         <div onClick={() => !busy && setDeleting(null)} style={overlayStyle}>
-          <div onClick={e => e.stopPropagation()} style={{ ...modalStyle, width: 420, maxHeight: 'auto' }}>
+          <div onClick={e => e.stopPropagation()} style={{ ...modalStyle, width: 420, height: 'auto', maxHeight: '85vh' }}>
             <div style={{ marginBottom: 8, fontSize: 15, fontWeight: 600 }}>Удалить профиль «{deleting.name}»?</div>
             <div style={{ marginBottom: 20, fontSize: 12, color: '#888' }}>
               Профиль исчезнет из списка. Файлы сессии на диске останутся.

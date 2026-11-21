@@ -1316,6 +1316,15 @@ try {
 
     gatewayExportHandoff: (opts?: any) => ipcRenderer.invoke('gateway:export-handoff', opts),
 
+    gatewayHandoffListTopics: (moduleId: string) =>
+      ipcRenderer.invoke('gateway:handoff-list-topics', moduleId),
+    gatewayHandoffListIntent: (moduleId: string) =>
+      ipcRenderer.invoke('gateway:handoff-list-intent', moduleId),
+    gatewayHandoffGetPreferences: (profileId: string) =>
+      ipcRenderer.invoke('gateway:handoff-get-preferences', profileId),
+    gatewayHandoffSavePreferences: (profileId: string, prefs: any) =>
+      ipcRenderer.invoke('gateway:handoff-save-preferences', profileId, prefs),
+
   });
 
   // Отдельный fileAPI (пустой, но оставлен для обратной совместимости)

@@ -19,6 +19,8 @@ export interface HandoffOpts {
   includeRoadmap?: boolean;        // default true
   includeIntent?: boolean;         // default true — architecture/roadmap/problems/next-steps
   maxContextBytes?: number;        // default 60_000
+  selectedTopics?: string[];       // если задан — только эти topics (по basename без .md). Пустой = все
+  selectedFiles?: string[];        // если задан — только эти intent-файлы (по fname). Пустой = все
 }
 
 export interface BuiltHandoff {
@@ -86,17 +88,28 @@ function readModuleRoot(rootPath: string, moduleId: string, fname: string): stri
  * Сортирует по имени (NN_ — порядок). Возвращает [] если папки нет.
  * По стандарту _common/HANDOFF_STRUCTURE.md — 1 файл = 1 направление.
  */
-function readTopics(rootPath: string, moduleId: string): Array<{ name: string; content: string }> {
+function readTopics(
+  rootPath: string,
+  moduleId: string,
+  selectedTopics?: string[]
+): Array<{ name: string; content: string }> {
   const candidates = [
     path.join(rootPath, 'docs', 'prompts', moduleId, 'topics'),
     path.join(rootPath, 'prompts', moduleId, 'topics'),
   ];
+  const filterSet = (selectedTopics && selectedTopics.length > 0)
+    ? new Set(selectedTopics)
+    : null;
   for (const dir of candidates) {
     try {
       if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) continue;
       return fs.readdirSync(dir)
         .filter(f => f.endsWith('.md'))
         .sort()
+        .filter(f => {
+          if (!filterSet) return true;
+          return filterSet.has(f.replace(/\.md$/, ''));
+        })
         .map(f => ({
           name: f.replace(/\.md$/, ''),
           content: fs.readFileSync(path.join(dir, f), 'utf8').trim(),
@@ -139,7 +152,7 @@ ${await sh('git log --oneline -10 --no-decorate', ROOT)}
     let effectiveStructure: 'topics' | 'legacy' = cfg.structure ?? 'legacy';
     let topicsContent: Array<{ name: string; content: string }> = [];
     if (effectiveStructure === 'topics') {
-      topicsContent = readTopics(ROOT, opts.moduleId);
+      topicsContent = readTopics(ROOT, opts.moduleId, opts.selectedTopics);
       if (topicsContent.length === 0) {
         console.warn(`[handoffBuilder] ${opts.moduleId}: structure='topics', но topics/ пуст → fallback на legacy`);
         effectiveStructure = 'legacy';
@@ -163,7 +176,11 @@ ${await sh('git log --oneline -10 --no-decorate', ROOT)}
       ['techdebt.md',        '## 🧹 Техдолг',                   'legacy'],
     ];
     let intentAdded = false;
+    const selectedFilesSet = (opts.selectedFiles && opts.selectedFiles.length > 0)
+      ? new Set(opts.selectedFiles)
+      : null;
     for (const [fname, header, scope] of intentFiles) {
+      if (selectedFilesSet && !selectedFilesSet.has(fname)) continue;
       let content = '';
       if (scope === 'common') {
         content = readPrompt(ROOT, '_common', fname);

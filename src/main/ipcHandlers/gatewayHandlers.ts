@@ -1432,6 +1432,9 @@ export function registerGatewayHandlers(): void {
     moduleId?: string;
     workspaceKeys?: string[];
     taskTitle?: string;
+    selectedTopics?: string[];
+    selectedFiles?: string[];
+    fileName?: string;
   }) => {
     try {
       const api = await import('../services/gateway/handoffBuilder');
@@ -1474,11 +1477,17 @@ export function registerGatewayHandlers(): void {
         workspaceKeys: activeKeys.length > 0 ? activeKeys : undefined,
         taskTitle: opts?.taskTitle ?? 'Продолжение работы',
         rootPath: app.getAppPath(),
+        selectedTopics: opts?.selectedTopics,
+        selectedFiles: opts?.selectedFiles,
       });
 
       const dir = path.join(app.getPath('userData'), 'handoff');
       fs.mkdirSync(dir, { recursive: true });
-      const fname = `handoff-${new Date().toISOString().replace(/[:.]/g, '-')}.md`;
+      const baseName = (opts?.fileName ?? '').trim();
+      const safeName = baseName
+        ? baseName.replace(/[^a-zA-Z0-9._-]/g, '-').replace(/\.md$/i, '') + '.md'
+        : `handoff-${new Date().toISOString().replace(/[:.]/g, '-')}.md`;
+      const fname = safeName;
       const fpath = path.join(dir, fname);
       fs.writeFileSync(fpath, r.markdown, 'utf8');
 
@@ -1486,6 +1495,108 @@ export function registerGatewayHandlers(): void {
         success: true,
         data: { path: fpath, bytes: r.bytes, sections: r.sections, markdown: r.markdown },
       };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  // ─── Handoff preferences (v10) ──────────────────────────────────
+
+  ipcMain.handle('gateway:handoff-list-topics', async (_e, moduleId: string) => {
+    try {
+      const rootPath = app.getAppPath();
+      const candidates = [
+        path.join(rootPath, 'docs', 'prompts', moduleId, 'topics'),
+        path.join(rootPath, 'prompts', moduleId, 'topics'),
+      ];
+      for (const dir of candidates) {
+        try {
+          if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) continue;
+          const files = fs.readdirSync(dir).filter((f) => f.endsWith('.md')).sort();
+          const topics = files.map((f) => {
+            const fullPath = path.join(dir, f);
+            const raw = fs.readFileSync(fullPath, 'utf8');
+            const stat = fs.statSync(fullPath);
+            const firstLine = raw.split('\n').find((l) => l.trim().startsWith('# ')) ?? '';
+            const title = firstLine.replace(/^#\s+/, '').trim() || f.replace(/\.md$/, '');
+            return {
+              name: f.replace(/\.md$/, ''),
+              title,
+              bytes: stat.size,
+            };
+          });
+          return { success: true, data: { topics } };
+        } catch { /* try next candidate */ }
+      }
+      return { success: true, data: { topics: [] } };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('gateway:handoff-list-intent', async (_e, moduleId: string) => {
+    try {
+      const rootPath = app.getAppPath();
+      const candidates = [
+        path.join(rootPath, 'docs', 'prompts', moduleId, 'handoff'),
+        path.join(rootPath, 'prompts', moduleId, 'handoff'),
+      ];
+      for (const dir of candidates) {
+        try {
+          if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) continue;
+          const files = fs.readdirSync(dir).filter((f) => f.endsWith('.md')).sort();
+          const items = files.map((f) => {
+            const fullPath = path.join(dir, f);
+            const raw = fs.readFileSync(fullPath, 'utf8');
+            const stat = fs.statSync(fullPath);
+            const firstLine = raw.split('\n').find((l) => l.trim().startsWith('# ')) ?? '';
+            const title = firstLine.replace(/^#\s+/, '').trim() || f.replace(/\.md$/, '');
+            return { name: f, title, bytes: stat.size };
+          });
+          return { success: true, data: { files: items } };
+        } catch { /* try next */ }
+      }
+      return { success: true, data: { files: [] } };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('gateway:handoff-get-preferences', async (_e, profileId: string) => {
+    try {
+      const { getGatewayCache } = await import('../services/gateway/cache/db');
+      const db = getGatewayCache();
+      const row = db.prepare(
+        'SELECT selection_json, preset FROM handoff_preferences WHERE profile_id = ?'
+      ).get(profileId) as any;
+      if (!row) return { success: true, data: null };
+      let selection: any = {};
+      try { selection = JSON.parse(row.selection_json); } catch { /* ignore */ }
+      return {
+        success: true,
+        data: { ...selection, preset: row.preset ?? selection.preset ?? 'all' },
+      };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('gateway:handoff-save-preferences', async (_e, profileId: string, prefs: any) => {
+    try {
+      const { getGatewayCache } = await import('../services/gateway/cache/db');
+      const db = getGatewayCache();
+      const id = `hp_${profileId}`;
+      const selection = JSON.stringify(prefs ?? {});
+      const preset = prefs?.preset ?? 'custom';
+      db.prepare(`
+        INSERT INTO handoff_preferences (id, profile_id, selection_json, preset, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(profile_id) DO UPDATE SET
+          selection_json = excluded.selection_json,
+          preset = excluded.preset,
+          updated_at = excluded.updated_at
+      `).run(id, profileId, selection, preset, Date.now());
+      return { success: true };
     } catch (e) {
       return { success: false, error: (e as Error).message };
     }

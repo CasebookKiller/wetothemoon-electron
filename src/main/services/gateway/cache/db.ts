@@ -18,6 +18,7 @@ import { migrateToV6 } from './migrations/v6';
 import { migrateToV7 } from './migrations/v7';
 import { migrateToV8 } from './migrations/v8';
 import { migrateToV9 } from './migrations/v9';
+import { migrateToV10 } from './migrations/v10';
 
 let db: DatabaseSync | null = null;
 let gatewayFilesDir: string | null = null;
@@ -221,6 +222,14 @@ const migrations: readonly Migration[] = [
       console.log('[GatewayCache] Миграция v9: context_nodes, context_versions, context_workspaces, tasks');
       migrateToV9(database);
       console.log('[GatewayCache] Миграция v9 завершена');
+    },
+  },
+  {
+    version: 10,
+    apply: (database) => {
+      console.log('[GatewayCache] Миграция v10: handoff_preferences');
+      migrateToV10(database);
+      console.log('[GatewayCache] Миграция v10 завершена');
     },
   },
 ];
