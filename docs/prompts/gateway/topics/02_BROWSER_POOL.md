@@ -97,3 +97,25 @@ parallel<T>(tasks: Array<() => Promise<T>>): Promise<T[]>
 2. **IP-изоляция:** прокси / VPN / один IP?
 3. **Приоритет паралледности:** A) N аккаунтов одного провайдера / B) N разных провайдеров / C) N задач в одном аккаунте — что первое?
 4. **Recon П1b** — делать сейчас или после GigaChat recon?
+
+## TD: auto-switch — только для pipeline (2026-11-21)
+
+`gatewayHandlers.ts`: `AUTO_SWITCH_ENABLED: boolean = false` — failover-блок
+(переключение при `RATE_LIMIT`) сохранён, но отключён. В интерактивном чате —
+manual switch: юзер видит бейдж `⏸ до HH:MM` в диалоге аккаунтов и решает сам.
+
+**TODO(pipeline):** при появлении pipeline/agents переключить на контекстную
+проверку `taskContext?.allowAutoSwitch`, а не глобальный флаг. Тогда:
+- интерактивный чат → manual (как сейчас)
+- pipeline-задача → auto (конвейер не останавливается)
+
+**Real-time UI:** `GatewayAccountsDialog` подписан на `onGatewayBridgeEvent`
+(`profile:rate-limited`/`profile:banned`/`profile:switched`) + тикер 30 сек.
+Бейдж исчезает по истечении `rateLimitedUntil` без переоткрытия диалога.
+
+## TD: типизация `electronAPI` (pre-existing)
+`getApi(): any` в `GatewayAccountsDialog` — `onGatewayBridgeEvent`, `gatewayLaunch`
+и др. не проверяются TS. Добавить в `src/types/gateway.d.ts`:
+`gatewayLaunch: () => Promise<{ success: boolean; error?: string; data?: { status?: 'logged_in' | 'login_required' } }>`,
+`onGatewayBridgeEvent: (cb: (e: { type: string; payload: any; ts: number }) => void) => () => void`.
+Приоритет: низкий (не блокер).
