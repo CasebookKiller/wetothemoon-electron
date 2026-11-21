@@ -1,0 +1,163 @@
+{
+  "generatedAt": "2026-11-21T16:17:25.158Z",
+  "total": 6,
+  "byRuntime": {
+    "mjs": 5,
+    "bash": 1,
+    "python": 0
+  },
+  "tools": [],
+  "scripts": [
+    {
+      "path": "scripts/bash/sync-submodule.sh",
+      "name": "sync-submodule",
+      "purpose": "Bump submodule wetothemoon-electron в родительский репозиторий + push",
+      "input": "(нет аргументов)",
+      "output": "stdout: сообщение об успехе",
+      "args": null,
+      "result": null,
+      "exit": {
+        "0": "успех",
+        "1": "ошибка (нет git remote / submodule dirty)"
+      },
+      "tool": false,
+      "example": [
+        "bash scripts/bash/sync-submodule.sh"
+      ]
+    },
+    {
+      "path": "scripts/mjs/gen-context-manifest.mjs",
+      "name": "gen-context-manifest",
+      "purpose": "Генерация context.manifest.json из docs/prompts/<module>/ иерархии",
+      "input": "argv: --module <id> (опционально)",
+      "output": "context.manifest.json",
+      "args": {
+        "type": "object",
+        "properties": {
+          "module": {
+            "type": "string"
+          }
+        }
+      },
+      "result": null,
+      "exit": {
+        "0": "успех",
+        "1": "ошибка"
+      },
+      "tool": false,
+      "example": [
+        "node scripts/mjs/gen-context-manifest.mjs"
+      ]
+    },
+    {
+      "path": "scripts/mjs/preflight-check.mjs",
+      "name": "preflight-check",
+      "purpose": "Проверка состояния проекта: git, submodule, schema, БД, manifest, .env, бэкапы",
+      "input": "argv: --fast (пропустить tsc), --json (машинный вывод)",
+      "output": "stdout: 9 секций проверок",
+      "args": {
+        "type": "object",
+        "properties": {
+          "fast": {
+            "type": "boolean"
+          },
+          "json": {
+            "type": "boolean"
+          }
+        }
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "sections": {
+            "type": "array"
+          }
+        }
+      },
+      "exit": {
+        "0": "всё готово",
+        "1": "есть проблемы"
+      },
+      "tool": false,
+      "example": [
+        "node scripts/mjs/preflight-check.mjs --fast"
+      ]
+    },
+    {
+      "path": "scripts/mjs/scripts-index.mjs",
+      "name": "scripts-index",
+      "purpose": "Сканирует scripts/{mjs,bash,python}/, парсит headers, генерирует scripts/manifest.json",
+      "input": "argv: --verbose (опционально), --check (только проверка, без записи)",
+      "output": "stdout: JSON (при --check) или статистика; пишет scripts/manifest.json",
+      "args": {
+        "type": "object",
+        "properties": {
+          "verbose": {
+            "type": "boolean"
+          },
+          "check": {
+            "type": "boolean"
+          }
+        }
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "generatedAt": {
+            "type": "string"
+          },
+          "scripts": {
+            "type": "array"
+          }
+        }
+      },
+      "exit": {
+        "0": "успех",
+        "1": "ошибка парсинга"
+      },
+      "tool": false,
+      "example": [
+        "node scripts/mjs/scripts-index.mjs",
+        "node scripts/mjs/scripts-index.mjs --check",
+        "node scripts/mjs/scripts-index.mjs --verbose"
+      ]
+    },
+    {
+      "path": "scripts/mjs/test-cont-source.mjs",
+      "name": "test-cont-source",
+      "purpose": "Проверка buildContinuationSystemPrompt: DB-first vs FS fallback",
+      "input": "env: CONTEXT_MANIFEST (обязателен)",
+      "output": "stdout: source (db|fs), bytes, included, skipped, context теги",
+      "args": null,
+      "result": null,
+      "exit": {
+        "0": "успех",
+        "1": "ошибка (CONTEXT_MANIFEST не задан или DB не открыта)"
+      },
+      "tool": false,
+      "example": [
+        "node --import tsx scripts/mjs/test-cont-source.mjs"
+      ]
+    },
+    {
+      "path": "scripts/mjs/test-context-service.mjs",
+      "name": "test-context-service",
+      "purpose": "Регрессия contextService: syncManifestToDb, getChain, listVersions, getChildren",
+      "input": "(нет аргументов)",
+      "output": "stdout: 5 секций с результатами",
+      "args": null,
+      "result": null,
+      "exit": {
+        "0": "успех",
+        "1": "ошибка"
+      },
+      "tool": false,
+      "example": [
+        "node --import tsx scripts/mjs/test-context-service.mjs"
+      ]
+    }
+  ]
+}
