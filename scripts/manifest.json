@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-11-21T16:17:25.158Z",
-  "total": 6,
+  "generatedAt": "2026-11-21T18:57:00.567Z",
+  "total": 8,
   "byRuntime": {
-    "mjs": 5,
+    "mjs": 7,
     "bash": 1,
     "python": 0
   },
@@ -87,6 +87,26 @@
       ]
     },
     {
+      "path": "scripts/mjs/recon-gigachat-adapter-test.mjs",
+      "name": "recon-gigachat-adapter-test",
+      "purpose": "Smoke-тест GigaChatAdapter: fill → click/Enter → стрим ответа (с проверкой reset)",
+      "input": "--profile <id> (по умолчанию p_mwnqhvvi_rm0d), --text <string> (по умолчанию 'ping')",
+      "output": "dumps/gigachat-adapter-test-<timestamp>/{final.html,reply.txt}, лог в stdout",
+      "args": {
+        "_raw": "--profile, --text"
+      },
+      "result": {
+        "_raw": "reply.txt с финальным ответом, exit 0"
+      },
+      "exit": {
+        "0": "успех, 1 — ошибка"
+      },
+      "tool": false,
+      "example": [
+        "node scripts/mjs/recon-gigachat-adapter-test.mjs --profile p_mwnqhvvi_rm0d --text \"ping\""
+      ]
+    },
+    {
       "path": "scripts/mjs/scripts-index.mjs",
       "name": "scripts-index",
       "purpose": "Сканирует scripts/{mjs,bash,python}/, парсит headers, генерирует scripts/manifest.json",
@@ -157,6 +177,38 @@
       "tool": false,
       "example": [
         "node --import tsx scripts/mjs/test-context-service.mjs"
+      ]
+    },
+    {
+      "path": "scripts/mjs/test-parse-rate-limit.mjs",
+      "name": "test-parse-rate-limit",
+      "purpose": "Проверка парсера времени rate-limit DeepSeek (зеркало injectedScript.ts)",
+      "input": "argv: (нет)",
+      "output": "stdout: строки ✓/✗; exit 0 если все ✓",
+      "args": {
+        "type": "object",
+        "properties": {}
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "passed": {
+            "type": "number"
+          },
+          "failed": {
+            "type": "number"
+          }
+        }
+      },
+      "exit": {
+        "0": "все ok, 1 — есть провалы"
+      },
+      "tool": false,
+      "example": [
+        "node scripts/mjs/test-parse-rate-limit.mjs"
       ]
     }
   ]
