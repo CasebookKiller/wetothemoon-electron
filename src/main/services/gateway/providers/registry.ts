@@ -48,5 +48,13 @@ export function initProviders(): void {
   const { DeepSeekAdapter } = require('./deepseek/adapter') as typeof import('./deepseek/adapter');
   registerProvider(new DeepSeekAdapter());
 
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { GigaChatAdapter } = require('./gigachat/adapter') as typeof import('./gigachat/adapter');
+    registerProvider(new GigaChatAdapter());
+  } catch (e) {
+    console.warn('[ProviderRegistry] GigaChatAdapter не зарегистрирован:', (e as Error).message);
+  }
+
   console.log('[ProviderRegistry] Инициализировано провайдеров:', listProviderNames());
 }
