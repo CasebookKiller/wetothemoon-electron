@@ -15,7 +15,7 @@
 ## TD9 — `scripts/recon-*.mjs` под `.gitignore`
 
 **Проблема:** recon-скрипты ignored, при checkout потеряются.
-**Фикс:** `git add -f scripts/recon-*.mjs` (сделано в `b6485c2`). При новых recon — `-f`.
+**Фикс:** `git add -f scripts/mjs/recon-*.mjs` (сделано для `recon-gigachat-adapter-test` и `recon-gigachat-conversations`). При новых recon — `-f`.
 
 ## П2 — `global block present: false` в тесте
 

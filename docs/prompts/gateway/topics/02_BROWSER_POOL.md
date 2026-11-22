@@ -11,21 +11,28 @@
 
 Файл: `src/main/services/gateway/pool/BrowserPool.ts` (181 строка, создан в `b832aae`).
 
-**API (по скелету):**
+**Статус: скелет, нигде не подключён.** `grep "pool.acquire"` находит только комментарии в `deepseek/adapter.ts`. `deepseekService.ts` и `gatewayHandlers.ts` его не используют.
+
+**Спроектирован под вариант C** — конструктор принимает `Browser` (результат `chromium.launch()`), создаёт N `BrowserContext` через `browser.newContext()`. Для **persistent-профилей** (DeepSeek, GigaChat) это не работает: `launchPersistentContext` возвращает `BrowserContext`, а не `Browser`. **Будет переписан под вариант A** (никто не подключён — правим безболезненно).
+
+**Решение (принято):**
+- **DeepSeek:** N профилей = N браузеров (вариант A, N `launchPersistentContext`). Вкладки — нет: агрессивный антибот (1 fingerprint + 5 вкладок = сигнал бота), rate-limit общий.
+- **GigaChat:** 1 профиль + N вкладок (один Chrome, N `Page`). Мягче к антиботу, один аккаунт делит лимит. Throttle: активно 1–2 вкладки, остальные в очереди.
+
+**API для варианта A (новый пул):**
 ```ts
-acquire(profileId, opts?): Promise<BrowserContext>
-release(profileId): Promise<void>
-parallel<T>(tasks: Array<() => Promise<T>>): Promise<T[]>
+acquire(profileId): Promise<BrowserContext>  // launchPersistentContext, или вернуть существующий (guard)
+release(profileId): Promise<void>            // закрыть ТОЛЬКО этот профиль
+releaseAll(): Promise<void>
+list(): string[]
 ```
 
-**Что работает:** N BrowserContext, `acquire/release`, `parallel()`.
+**Guard в `acquire`:** если `profileId` уже в реестре — вернуть существующий контекст, не запускать второй. Снимает П7 и single-instance lock.
+
 **Что TODO:**
-- **TD13:** IP-изоляция. `AcquireOpts.proxy` объявлен, но не используется. `playwright-core` proxy — на уровне `launch`, не `newContext`. Нужен либо отдельный `launch` per-profile с proxy, либо один `launch` + `newContext({proxy})` (проверить, поддерживает ли patchright).
-- **П1a:** при switch профиля старый Chrome не должен закрываться. Сейчас `ProfileService`/`deepseekService` держат один persistent context → switch = закрытие. Нужен один из подходов:
-  - **(A)** N `launchPersistentContext` (N процессов Chrome) — просто, но RAM (3-5 × ~500MB = 1.5-2.5GB).
-  - **(B)** один Chrome с `--remote-debugging-port`, attach к нужному профилю через CDP — сложнее, но экономнее.
-  - **(C)** один Chrome, N BrowserContext (если patchright/persistent позволяет) — проверить.
-  - **Решение — за пользователем. Влияет на RAM и single-instance lock.**
+- Переписать `BrowserPool.ts` под вариант A (~60 строк).
+- Подключить: `deepseekService.ts` → `pool.acquire(activeProfileId)` вместо своего `launchPersistentContext`.
+- **TD13:** IP-изоляция. `AcquireOpts.proxy` — вариант A позволяет (launch per-profile).
 
 ## Профили
 
@@ -41,11 +48,30 @@ parallel<T>(tasks: Array<() => Promise<T>>): Promise<T[]>
 
 **Симптом:** при переключении профиля в UI текущий Chrome закрывается, новый открывается. Диалоги старого — недоступны (другой профиль).
 
-**Причина:** один persistent context на профиль + закрытие при switch.
+**Причина:** `deepseekService.ts` держит **один** `this.page` и **один** контекст — при switch закрывает старый.
 
-**Решение:** BrowserPool — N параллельных контекстов. При switch — старый **не закрывается**, новый открывается рядом. Детали (A/B/C) — выше.
+**Решение (вариант A):** BrowserPool — `Map<profileId, BrowserContext>`. `acquire('p_A')` и `acquire('p_B')` — два процесса Chrome. `release('p_A')` закрывает **только A**, `p_B` жив. `deepseekService.ts` переводится на `pool.acquire(activeProfileId)`.
 
 **Для Yandex:** решается внешним браузером (не Electron-процессом).
+
+## GigaChat — 1 профиль + N вкладок
+
+**Решение (принято):** для GigaChat один `BrowserContext` (один профиль, один Chrome) и **N `Page`** (вкладок). Каждая вкладка — свой URL `https://giga.chat/sessions/<uuid>`, свой стрим. Сессия (`_sm_sess`) общая.
+
+**Почему не N браузеров (как у DeepSeek):**
+- GigaChat мягче к антиботу: реальный пользователь с 3 вкладками — норма.
+- 1 аккаунт = 1 rate-limit, вкладки честно делят.
+- Экономия RAM: ~500MB + вкладки вместо 500MB × N.
+
+**Throttle (обязательно):** одновременно активно 1–2 вкладки, остальные — в очереди. Иначе rate-limit аккаунта.
+
+**`GigaChatAdapter` готов:** `sendMessage(page, msg)` принимает `page` — можно вызывать с разными вкладками без правок адаптера.
+
+**API пула (после MVP):**
+```ts
+acquirePage(profileId, slotId): Promise<Page>  // вкладка для направления/роли
+releasePage(profileId, slotId): Promise<void>  // закрыть вкладку, контекст жив
+```
 
 ## П1b — пустой список диалогов у новых профилей
 

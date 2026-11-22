@@ -7,30 +7,39 @@
 
 Цель Gateway (принцип 0): **сохранить бесплатный доступ к LLM**. Каждый провайдер может ввести ограничения. Recon — понять, что работает, где WAF, где send button, где стриминг.
 
-## GigaChat recon (второй инстанс, 2026-11-19)
+Заменить:
+## GigaChat recon (закрыт 2026-11-21)
 
-### Что известно
+### Селекторы
 - URL: `https://giga.chat`
 - Title: «ГигаЧат — русскоязычная нейросеть от Сбера»
-- Input: `textarea#chat-input-textarea`, aria-label «Сообщение», placeholder «Спросите ГигаЧат»
-- Send: ❌ **не найден** (только `Suggests-*` — кнопки-подсказки)
-- Streaming: ❌ не пойман
+- input: `#chat-input-textarea` (aria-label «Сообщение», placeholder «Спросите ГигаЧат»)
+- send: `button[aria-label="Отправить"]` — появляется **после fill**, type="submit"; fallback — Enter
+- response/streaming: `[class*="MessageItem-styled__AssistantContent"]`
+- threads: `a[href^="/sessions/"]`, id в `data-da_session_id`
 - Challenge: `aws-waf-token` (WAF), captcha в HTML нет
-- Cookies: 42 паттерна, ключ сессии `_sm_sess` (+ `_sm_user_id`, `_sd_user_id`)
+- Cookies: `_sm_sess` (critical), `_sm_user_id` (critical), `_sd_user_id` (warning), `aws-waf-token` (fingerprint)
 - Анонимно: `app-boot-error` (SPA не грузится без сессии)
 - API: `https://api.giga.chat/v1` (OpenAI-совместимый, OAuth)
-- Обход: Enter-to-send (гипотеза, требует проверки)
+
+### Стрим (reset-механика)
+- GigaChat сначала показывает «Думаю над ответом» → потом заменяет на реальный ответ.
+- `THINKING_PREFIXES = ['Думаю над ответом', 'Думаю…', 'Thinking']` — отбрасываются.
+- Если префикс сохранился → delta (append), `MessageChunk { type: 'text', text: delta }`.
+- Если текст заменён целиком → `MessageChunk { type: 'text', text: next, reset: true }`.
+- `stableTicks >= 10 × 300ms = 3s` → `done`.
+- Enter-to-send работает (fallback).
 
 ### Профиль
 - id: `p_mwnqhvvi_rm0d`, name: `GigaChat 1`, browserKind: `chrome`
 - dir: `~/.config/wetothemoon-electron/profiles/p_mwnqhvvi_rm0d/chrome-profile`
 - cdpPort: 9325, chromeCdpPort: 9425
+- **`gigachat-2` не нужен** — первый профиль работает.
 
-### Что делать (следующая сессия)
-1. Проверить гипотезу Enter-to-send (2 минуты в живом профиле).
-2. Recon сайдбара (для getConversations).
-3. Если профиль занят — создать `gigachat-2` через `ProfileService.create({name: 'GigaChat 2', browserKind: 'chrome'})`, залогиниться параллельно.
-4. После успешного recon — `GigaChatAdapter` v0 (по образцу `deepseek/adapter.ts`).
+### Сделано
+- `GigaChatAdapter v0` — connect / isLoggedIn / sendMessage (reset-стрим) / getConversations.
+- Recon-скрипты: `scripts/mjs/recon-gigachat-adapter-test.mjs`, `scripts/mjs/recon-gigachat-conversations.mjs`.
+- См. `done.md` (2026-11-21 вечер), Handoff v12.
 
 ## Alice recon (план)
 
@@ -52,9 +61,9 @@
 
 **Решение:** изучить на будущее (может, с другими настройками), **не используем сейчас**. Не возвращаться без явного решения.
 
-## TD6 — GigaChat recon stream
+## TD6 — GigaChat recon stream (закрыт)
 
-Recon streaming отложен, send button не найден. Профиль был занят (П7).
+Send-кнопка найдена (`button[aria-label="Отправить"]`, после fill), стрим снят (reset-механика). См. секцию GigaChat recon выше.
 
 ## TD14 — recon-duck-smoke упал
 

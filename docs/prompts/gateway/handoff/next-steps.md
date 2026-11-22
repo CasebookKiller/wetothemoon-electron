@@ -14,20 +14,24 @@
 
 > **Browser-канал приоритетнее API.** См. `COMMON_CONTEXT.md` §«Цель» (принцип 0).
 
-### Приоритет 1 — GigaChat (сейчас, окно до 22:00)
+### Приоритет 1 — Multi-provider UI (универсальный)
 
-**P1 закрыт:** `HandoffTab.tsx` (369 строк) уже в `GatewayAccountsDialog` (вкладка «Handoff»), v10 `handoff_preferences` работает. Приоритет — **второй провайдер**.
+**P1 закрыт:** `GigaChatAdapter v0` полностью готов (connect, sendMessage с reset-стримом, getConversations). `HandoffTab.tsx` в `GatewayAccountsDialog` работает.
 
-Шаги: (1) создать `gigachat-2` профиль (`ProfileService.create({name:'GigaChat 2', browserKind:'chrome'})`); (2) SberID-логин; (3) `node scripts/recon-dump-dom.mjs --provider gigachat --profile <gigachat-2-id>`; (4) проверить Enter-to-send; (5) `GigaChatAdapter v0` по образцу `deepseek/adapter.ts`. См. `topics/03_RECON.md`, `topics/01_PROVIDERS.md`.
+**Цель:** UI выбирает провайдера (DeepSeek / GigaChat / Alisa / Qwen), сообщения идут через `ProviderAdapter.sendMessage()`.
 
-### Приоритет 2 — browser-канал (после GigaChat, ~2 ч)
+**Шаги:**
+1. **IPC `gateway:list-providers`** → `[{ id, displayName, requiresAuth, baseUrl }]` (из `registry.listProviders()`).
+2. **IPC `gateway:send-via-provider(providerId, message, profileId?)`** → `getProvider(providerId).sendMessage(page, msg)` + стрим через event bus (`gateway:stream-chunk`).
+3. **`TopControlPanel.tsx`** — `<Dropdown>` провайдеров (из `gateway:list-providers`).
+4. **`gatewayHandlers.ts`** — новый handler `gateway:send-via-provider` (старый `gateway:send-message` не трогать).
+5. **`ChatInterface` / `InputArea`** — переключить вызов на `gateway:send-via-provider`.
 
-> ⚠️ **П7 blocker:** профиль `p_mwnqhvvi_rm0d` занят старым диалогом. Для recon — `ProfileService.create({name: 'GigaChat 2', browserKind: 'chrome'})`.
+### Приоритет 2 — Alisa + BrowserPool
 
-1. **GigaChat recon send button** — гипотеза Enter-to-send, 2 минуты в живом профиле `gigachat-2`.
-2. **`GigaChatAdapter` v0** — по образцу `deepseek/adapter.ts`. Input `#chat-input-textarea`, Enter-to-send, cookie `_sm_sess`.
-3. **Recon П1b** — пустой сайдбар у новых профилей. Скрипт `scripts/recon-empty-sidebar.mjs` (см. `topics/02_BROWSER_POOL.md`).
-4. **`AlisaAdapter` v0** — `alice.yandex.ru` (проверить, чат ли), Yandex ID.
+1. **`AlisaAdapter` v0** — `alice.yandex.ru` (проверить, чат ли), Yandex ID.
+2. **Recon П1b** — пустой сайдбар у новых профилей. Скрипт `scripts/recon-empty-sidebar.mjs` (см. `topics/02_BROWSER_POOL.md`).
+3. **BrowserPool** — реализация IP-изоляции (П4, TD13) и уход от single-instance lock.
 
 ### Приоритет 3 — Alisa + cookieTracker
 

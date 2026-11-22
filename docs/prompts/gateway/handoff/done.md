@@ -68,3 +68,14 @@
 - `onLaunch`: guard только `bannedAt`, rate-limit разрешён
 - Real-time: `onGatewayBridgeEvent` (`rate-limited`/`banned`/`switched`) → `refresh()`
 - Тикер 30 сек: бейдж исчезает по истечении без переоткрытия диалога
+
+## 2026-11-21 (вечер) — GigaChatAdapter v0 + скрипты
+
+- ✅ **GigaChatAdapter v0** (d9800e3, c6e3da9):
+  - connect / isLoggedIn (authGateRoot + textarea) / sendMessage с reset-стримом / getConversations
+  - Селекторы: `#chat-input-textarea`, `button[aria-label="Отправить"]`, `[class*="MessageItem-styled__AssistantContent"]`
+  - Стрим: THINKING_PREFIXES («Думаю над ответом») отфильтровываются, при полной замене DOM — `MessageChunk.reset: true`
+  - getConversations: `<a href="/sessions/<uuid>">`, id из `data-da_session_id`
+- ✅ **MessageChunk.reset** — новый флаг для замены буфера (c6e3da9)
+- ✅ **P8 fix** — RATE_MARKS + «лимит будет восстановлен» (a1b519d)
+- ✅ **scripts/mjs/** — recon-gigachat-adapter-test (ecf8386), recon-gigachat-conversations (manifest)

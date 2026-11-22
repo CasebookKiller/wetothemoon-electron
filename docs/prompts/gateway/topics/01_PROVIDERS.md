@@ -62,21 +62,32 @@ initProviders(): void;   // регистрация всех (сейчас — т
 
 **После стабилизации DeepSeekAdapter** — перевести `deepseekService.ts` на использование адаптера, чтобы не дублировать логику. Сейчас `deepseekService.ts` — рабочий, адаптер — параллельная заготовка.
 
-## GigaChatAdapter (v0, после recon)
+## GigaChatAdapter (v0, готов)
 
-**Статус:** recon (второй инстанс). Send button не найден, гипотеза Enter-to-send.
+**Статус:** ✅ v0 закрыт (`d9800e3`, `ca008c8`). connect / isLoggedIn / sendMessage (reset-стрим) / getConversations работают.
 
-**Что известно:**
+**Селекторы:**
 - URL: `https://giga.chat`
-- Input: `textarea#chat-input-textarea`
-- Placeholder: «Спросите ГигаЧат»
-- Send: ❌ не найден (только `Suggests-*` — подсказки)
-- Streaming: ❌ не пойман
-- Cookies: 42 паттерна, ключ сессии `_sm_sess`
-- WAF: `aws-waf-token`
-- Анонимно: `app-boot-error` (SPA требует сессию)
+- input: `#chat-input-textarea`
+- send: `button[aria-label="Отправить"]` (появляется после fill; fallback — Enter)
+- response/streaming: `[class*="MessageItem-styled__AssistantContent"]`
+- threads: `a[href^="/sessions/"]`, id из `data-da_session_id`
 
-**План v0:** `connect()` через `launchPersistentContext` с профилем `p_mwnqhvvi_rm0d` (или новым `gigachat-2`). `sendMessage` — через Enter-to-send. `getConversations` — TODO после recon сайдбара.
+**Стрим (reset-механика):**
+- `THINKING_PREFIXES = ['Думаю над ответом', 'Думаю…', 'Thinking']` — отбрасываются.
+- Если префикс сохранился → delta (append), `MessageChunk { type: 'text', text: delta }`.
+- Если текст заменён целиком (переход «Думаю» → реальный ответ) → `MessageChunk { type: 'text', text: next, reset: true }`.
+- `stableTicks >= 10 × 300ms = 3s` → `done`.
+
+**getConversations:**
+```ts
+links = a[href^="/sessions/"]
+→ { id: data-da_session_id, title: textContent.trim(), url: `https://giga.chat${href}` }
+```
+
+**Cookies:** `_sm_sess` (critical), `_sm_user_id` (critical), `_sd_user_id` (warning), `aws-waf-token` (fingerprint).
+
+**Анонимно:** `app-boot-error` (SPA требует сессию).
 
 **Детали recon** — `03_RECON.md`.
 
