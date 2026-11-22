@@ -1,79 +1,1093 @@
 {
   "version": 1,
   "root": "/home/ll/Документы/GitHub/wetothemoon-project/wetothemoon-electron",
-  "hint": "summaryFile — короткая версия для system prompt, file — полная для read_context_node tool.",
-  "workspaces": {
-    "gateway-sprint": {
-      "title": "Gateway: patchright + API fallback",
-      "keys": [
-        "wetothemoon-electron/gateway",
-        "wetothemoon-electron/gateway/patchright",
-        "wetothemoon-electron/gateway/api-channel"
-      ]
-    },
-    "prana-bindu-ai": {
-      "title": "Prana-Bindu: AI-тренер + Ollama",
-      "keys": [
-        "wetothemoon-electron/prana-bindu",
-        "wetothemoon-electron/prana-bindu/11-ai-coach",
-        "wetothemoon-electron/training/finetune-ollama"
-      ]
-    },
-    "osint-sietch": {
-      "title": "OSINT → SIETCH pipeline",
-      "keys": [
-        "wetothemoon-electron/osint",
-        "wetothemoon-electron/sietch"
-      ]
-    }
-  },
+  "generatedAt": "2026-11-22T18:36:50.474Z",
+  "hint": "Отредактируй kind/parent/title для нужной иерархии. Файлы можно перемещать между узлами.",
   "nodes": [
-    { "key": "global", "kind": "global", "title": "Global Context",
-      "parent": null, "file": "docs/prompts/_common/COMMON.md" },
-
-    { "key": "wetothemoon-project", "kind": "project", "title": "wetothemoon-project",
-      "parent": null, "file": "docs/prompts/_common/project.md" },
-
-    { "key": "wetothemoon-electron", "kind": "submodule", "title": "Electron Submodule",
-      "parent": "wetothemoon-project", "file": "docs/SUBMODULE_SUMMARY.md" },
-
-    { "key": "wetothemoon-electron/gateway", "kind": "module", "title": "Gateway (DeepSeek brain)",
-      "parent": "wetothemoon-electron", "file": "GATEWAY_ROADMAP.md",
-      "summaryFile": "docs/GATEWAY_SUMMARY.md" },
-
-    { "key": "wetothemoon-electron/gateway/patchright", "kind": "direction", "title": "Patchright + Chrome channel",
-      "parent": "wetothemoon-electron/gateway", "file": "GATEWAY_ROADMAP.md" },
-
-    { "key": "wetothemoon-electron/gateway/api-channel", "kind": "direction", "title": "API channel + context builder",
-      "parent": "wetothemoon-electron/gateway", "file": "GATEWAY_MULTI_ACCOUNT_ROADMAP.md" },
-
     {
-      "key": "wetothemoon-electron/prana-bindu",
+      "key": "global",
+      "kind": "global",
+      "title": "Global Context",
+      "parent": null,
+      "file": null
+    },
+    {
+      "key": "wetothemoon-project",
+      "kind": "project",
+      "title": "WeToTheMoon Project",
+      "parent": null,
+      "file": null
+    },
+    {
+      "key": "wetothemoon-electron",
+      "kind": "submodule",
+      "title": "Electron Submodule",
+      "parent": "wetothemoon-project",
+      "file": "README.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/GATEWAY_MULTI_ACCOUNT_ROADMAP",
+      "kind": "roadmap",
+      "title": "GATEWAY_MULTI_ACCOUNT_ROADMAP",
+      "parent": "wetothemoon-electron",
+      "file": "GATEWAY_MULTI_ACCOUNT_ROADMAP.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/GATEWAY_ROADMAP",
+      "kind": "roadmap",
+      "title": "GATEWAY_ROADMAP",
+      "parent": "wetothemoon-electron",
+      "file": "GATEWAY_ROADMAP.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/GATEWAY_ROADMAP_check",
+      "kind": "roadmap",
+      "title": "GATEWAY_ROADMAP_check",
+      "parent": "wetothemoon-electron",
+      "file": "GATEWAY_ROADMAP_check.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/OSINT_ROADMAP",
+      "kind": "roadmap",
+      "title": "OSINT_ROADMAP",
+      "parent": "wetothemoon-electron",
+      "file": "OSINT_ROADMAP.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/ROADMAP",
+      "kind": "roadmap",
+      "title": "ROADMAP",
+      "parent": "wetothemoon-electron",
+      "file": "ROADMAP.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/gateway",
       "kind": "module",
-      "title": "Prana-Bindu",
+      "title": "GATEWAY",
+      "parent": "wetothemoon-electron",
+      "file": null
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/gateway/GATEWAY_SUMMARY",
+      "kind": "module",
+      "title": "GATEWAY_SUMMARY",
+      "parent": "wetothemoon-project/wetothemoon-electron/gateway",
+      "file": "docs/GATEWAY_SUMMARY.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/SUBMODULE_SUMMARY",
+      "kind": "direction",
+      "title": "SUBMODULE_SUMMARY",
+      "parent": "wetothemoon-electron",
+      "file": "docs/SUBMODULE_SUMMARY.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/01_DATABASE_PANEL",
+      "kind": "direction",
+      "title": "01_DATABASE_PANEL",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/chats.bak/01_DATABASE_PANEL.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/01b_PAGINATION",
+      "kind": "direction",
+      "title": "01b_PAGINATION",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/chats.bak/01b_PAGINATION.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/01c_RUSPROFILE_ENRICH",
+      "kind": "direction",
+      "title": "01c_RUSPROFILE_ENRICH",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/chats.bak/01c_RUSPROFILE_ENRICH.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/01d_RAW_DUMPS_PANEL",
+      "kind": "direction",
+      "title": "01d_RAW_DUMPS_PANEL",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/chats.bak/01d_RAW_DUMPS_PANEL.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/01e_ENTITY_DEDUP",
+      "kind": "direction",
+      "title": "01e_ENTITY_DEDUP",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/chats.bak/01e_ENTITY_DEDUP.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/02_KAD_ARBITR",
+      "kind": "direction",
+      "title": "02_KAD_ARBITR",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/chats.bak/02_KAD_ARBITR.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/03_MOS_GORSUD",
+      "kind": "direction",
+      "title": "03_MOS_GORSUD",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/chats.bak/03_MOS_GORSUD.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/04_ISMYTEAM",
+      "kind": "direction",
+      "title": "04_ISMYTEAM",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/chats.bak/04_ISMYTEAM.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/05_REACT_FLOW",
+      "kind": "direction",
+      "title": "05_REACT_FLOW",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/chats.bak/05_REACT_FLOW.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/06_MALTEGO",
+      "kind": "direction",
+      "title": "06_MALTEGO",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/chats.bak/06_MALTEGO.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/07_P2P_TORRENT",
+      "kind": "direction",
+      "title": "07_P2P_TORRENT",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/chats.bak/07_P2P_TORRENT.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/08_JSON_PLUGINS",
+      "kind": "direction",
+      "title": "08_JSON_PLUGINS",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/chats.bak/08_JSON_PLUGINS.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/09_STANDALONE_APP",
+      "kind": "direction",
+      "title": "09_STANDALONE_APP",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/chats.bak/09_STANDALONE_APP.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/10_CASE_MODEL",
+      "kind": "direction",
+      "title": "10_CASE_MODEL",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/chats.bak/10_CASE_MODEL.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/11_DB_REFACTOR",
+      "kind": "direction",
+      "title": "11_DB_REFACTOR",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/chats.bak/11_DB_REFACTOR.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/12_EVENT_FILTERS",
+      "kind": "direction",
+      "title": "12_EVENT_FILTERS",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/chats.bak/12_EVENT_FILTERS.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/12a_HEARING_DATE",
+      "kind": "direction",
+      "title": "12a_HEARING_DATE",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/chats.bak/12a_HEARING_DATE.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/12b_KAD_DOCS",
+      "kind": "direction",
+      "title": "12b_KAD_DOCS",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/chats.bak/12b_KAD_DOCS.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/12c_KAD_REPRESENTATIVES",
+      "kind": "direction",
+      "title": "12c_KAD_REPRESENTATIVES",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/chats.bak/12c_KAD_REPRESENTATIVES.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/12d_KAD_PDF_ANALYSIS",
+      "kind": "direction",
+      "title": "12d_KAD_PDF_ANALYSIS",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/chats.bak/12d_KAD_PDF_ANALYSIS.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/13_ENTITY_TIMELINE",
+      "kind": "direction",
+      "title": "13_ENTITY_TIMELINE",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/chats.bak/13_ENTITY_TIMELINE.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/14_LANDSRAAD",
+      "kind": "direction",
+      "title": "14_LANDSRAAD",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/chats.bak/14_LANDSRAAD.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/00_MASTER_INDEX",
+      "kind": "global",
+      "title": "00_MASTER_INDEX",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/osint/00_MASTER_INDEX.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/01_COMMON_CONTEXT",
+      "kind": "global",
+      "title": "01_COMMON_CONTEXT",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/osint/01_COMMON_CONTEXT.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/PROJECT_STATE",
+      "kind": "state",
+      "title": "PROJECT_STATE",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/osint/PROJECT_STATE.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/01_DATABASE_PANEL--1",
+      "kind": "direction",
+      "title": "01_DATABASE_PANEL",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/osint/chats/01_DATABASE_PANEL.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/01b_PAGINATION--1",
+      "kind": "direction",
+      "title": "01b_PAGINATION",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/osint/chats/01b_PAGINATION.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/01c_RUSPROFILE_ENRICH--1",
+      "kind": "direction",
+      "title": "01c_RUSPROFILE_ENRICH",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/osint/chats/01c_RUSPROFILE_ENRICH.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/01d_RAW_DUMPS_PANEL--1",
+      "kind": "direction",
+      "title": "01d_RAW_DUMPS_PANEL",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/osint/chats/01d_RAW_DUMPS_PANEL.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/01e_ENTITY_DEDUP--1",
+      "kind": "direction",
+      "title": "01e_ENTITY_DEDUP",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/osint/chats/01e_ENTITY_DEDUP.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/02_KAD_ARBITR--1",
+      "kind": "direction",
+      "title": "02_KAD_ARBITR",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/osint/chats/02_KAD_ARBITR.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/03_MOS_GORSUD--1",
+      "kind": "direction",
+      "title": "03_MOS_GORSUD",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/osint/chats/03_MOS_GORSUD.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/04_ISMYTEAM--1",
+      "kind": "direction",
+      "title": "04_ISMYTEAM",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/osint/chats/04_ISMYTEAM.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/05_REACT_FLOW--1",
+      "kind": "direction",
+      "title": "05_REACT_FLOW",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/osint/chats/05_REACT_FLOW.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/06_MALTEGO--1",
+      "kind": "direction",
+      "title": "06_MALTEGO",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/osint/chats/06_MALTEGO.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/07_P2P_TORRENT--1",
+      "kind": "direction",
+      "title": "07_P2P_TORRENT",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/osint/chats/07_P2P_TORRENT.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/08_JSON_PLUGINS--1",
+      "kind": "direction",
+      "title": "08_JSON_PLUGINS",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/osint/chats/08_JSON_PLUGINS.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/09_STANDALONE_APP--1",
+      "kind": "direction",
+      "title": "09_STANDALONE_APP",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/osint/chats/09_STANDALONE_APP.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/10_CASE_MODEL--1",
+      "kind": "direction",
+      "title": "10_CASE_MODEL",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/osint/chats/10_CASE_MODEL.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/11_DB_REFACTOR--1",
+      "kind": "direction",
+      "title": "11_DB_REFACTOR",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/osint/chats/11_DB_REFACTOR.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/12_EVENT_FILTERS--1",
+      "kind": "direction",
+      "title": "12_EVENT_FILTERS",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/osint/chats/12_EVENT_FILTERS.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/12a_HEARING_DATE--1",
+      "kind": "direction",
+      "title": "12a_HEARING_DATE",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/osint/chats/12a_HEARING_DATE.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/12b_KAD_DOCS--1",
+      "kind": "direction",
+      "title": "12b_KAD_DOCS",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/osint/chats/12b_KAD_DOCS.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/12c_KAD_REPRESENTATIVES--1",
+      "kind": "direction",
+      "title": "12c_KAD_REPRESENTATIVES",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/osint/chats/12c_KAD_REPRESENTATIVES.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/12d_KAD_PDF_ANALYSIS--1",
+      "kind": "direction",
+      "title": "12d_KAD_PDF_ANALYSIS",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/osint/chats/12d_KAD_PDF_ANALYSIS.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/13_ENTITY_TIMELINE--1",
+      "kind": "direction",
+      "title": "13_ENTITY_TIMELINE",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/osint/chats/13_ENTITY_TIMELINE.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/14_LANDSRAAD--1",
+      "kind": "direction",
+      "title": "14_LANDSRAAD",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/osint/chats/14_LANDSRAAD.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/PRODUCT_NAME",
+      "kind": "direction",
+      "title": "PRODUCT_NAME",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/prana-bindu/PRODUCT_NAME.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/02_CORE",
+      "kind": "direction",
+      "title": "02_CORE",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/prana-bindu/chats/02_CORE.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/07_SPICE",
+      "kind": "direction",
+      "title": "07_SPICE",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/prana-bindu/chats/07_SPICE.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/07_SPICE_PLAN",
+      "kind": "direction",
+      "title": "07_SPICE_PLAN",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/prana-bindu/chats/07_SPICE_PLAN.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/08_MELANGE",
+      "kind": "direction",
+      "title": "08_MELANGE",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/prana-bindu/chats/08_MELANGE.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/09_ELECTRON_SHELL",
+      "kind": "direction",
+      "title": "09_ELECTRON_SHELL",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/prana-bindu/chats/09_ELECTRON_SHELL.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/16_GRAPH",
+      "kind": "direction",
+      "title": "16_GRAPH",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/prana-bindu/chats/16_GRAPH.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/17_SMITHRUN",
+      "kind": "direction",
+      "title": "17_SMITHRUN",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/prana-bindu/chats/17_SMITHRUN.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/18_MAP_EDITOR",
+      "kind": "direction",
+      "title": "18_MAP_EDITOR",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/prana-bindu/chats/18_MAP_EDITOR.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/18b_ATOM_CHAINS",
+      "kind": "direction",
+      "title": "18b_ATOM_CHAINS",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/prana-bindu/chats/18b_ATOM_CHAINS.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/CHARTS_CHAT_START",
+      "kind": "direction",
+      "title": "CHARTS_CHAT_START",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/prana-bindu/chats/CHARTS_CHAT_START.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/COMPONENTS_CHAT_START",
+      "kind": "direction",
+      "title": "COMPONENTS_CHAT_START",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/prana-bindu/chats/COMPONENTS_CHAT_START.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/last",
+      "kind": "direction",
+      "title": "last",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/prana-bindu/chats/last.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/2026-10_recovery",
+      "kind": "direction",
+      "title": "2026-10_recovery",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/prana-bindu/plans/2026-10_recovery.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/menu_template",
+      "kind": "direction",
+      "title": "menu_template",
+      "parent": "wetothemoon-electron",
+      "file": "docs/_old_prompts/prana-bindu/plans/menu_template.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/main",
+      "kind": "direction",
+      "title": "main",
+      "parent": "wetothemoon-electron",
+      "file": "docs/main.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/COMMON",
+      "kind": "direction",
+      "title": "COMMON",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/_common/COMMON.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/COMPONENTS_CONVENTION",
+      "kind": "direction",
+      "title": "COMPONENTS_CONVENTION",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/_common/COMPONENTS_CONVENTION.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/HANDOFF_STRUCTURE",
+      "kind": "direction",
+      "title": "HANDOFF_STRUCTURE",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/_common/HANDOFF_STRUCTURE.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/STYLES_CONVENTION",
+      "kind": "direction",
+      "title": "STYLES_CONVENTION",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/_common/STYLES_CONVENTION.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/ban-pattern",
+      "kind": "direction",
+      "title": "ban-pattern",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/_common/ban-pattern.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/checklist",
+      "kind": "direction",
+      "title": "checklist",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/_common/checklist.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/project",
+      "kind": "direction",
+      "title": "project",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/_common/project.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/00_MASTER_INDEX--1",
+      "kind": "global",
+      "title": "00_MASTER_INDEX",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/gateway/00_MASTER_INDEX.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/COMMON_CONTEXT",
+      "kind": "global",
+      "title": "COMMON_CONTEXT",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/gateway/COMMON_CONTEXT.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/PROJECT_STATE--1",
+      "kind": "state",
+      "title": "PROJECT_STATE",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/gateway/PROJECT_STATE.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/_HANDOFF-v10-2026-11-20",
+      "kind": "direction",
+      "title": "_HANDOFF-v10-2026-11-20",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/gateway/directions/_HANDOFF-v10-2026-11-20.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/_HANDOFF-v12-2026-11-20",
+      "kind": "direction",
+      "title": "_HANDOFF-v12-2026-11-20",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/gateway/directions/_HANDOFF-v12-2026-11-20.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/_HANDOFF-v13-2026-11-21-2-rate-limit-ui",
+      "kind": "direction",
+      "title": "_HANDOFF-v13-2026-11-21-2-rate-limit-ui",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/gateway/directions/_HANDOFF-v13-2026-11-21-2-rate-limit-ui.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/_HANDOFF-v13-2026-11-21-3",
+      "kind": "direction",
+      "title": "_HANDOFF-v13-2026-11-21-3",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/gateway/directions/_HANDOFF-v13-2026-11-21-3.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/_HANDOFF-v13-2026-11-21-4",
+      "kind": "direction",
+      "title": "_HANDOFF-v13-2026-11-21-4",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/gateway/directions/_HANDOFF-v13-2026-11-21-4.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/_HANDOFF-v13-2026-11-21-5",
+      "kind": "direction",
+      "title": "_HANDOFF-v13-2026-11-21-5",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/gateway/directions/_HANDOFF-v13-2026-11-21-5.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/_HANDOFF-v13-2026-11-21-6",
+      "kind": "direction",
+      "title": "_HANDOFF-v13-2026-11-21-6",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/gateway/directions/_HANDOFF-v13-2026-11-21-6.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/_HANDOFF-v13-2026-11-21",
+      "kind": "direction",
+      "title": "_HANDOFF-v13-2026-11-21",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/gateway/directions/_HANDOFF-v13-2026-11-21.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/_HANDOFF-v14-2026-11-22-2",
+      "kind": "direction",
+      "title": "_HANDOFF-v14-2026-11-22-2",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/gateway/directions/_HANDOFF-v14-2026-11-22-2.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/_HANDOFF-v14-2026-11-22",
+      "kind": "direction",
+      "title": "_HANDOFF-v14-2026-11-22",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/gateway/directions/_HANDOFF-v14-2026-11-22.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/_HANDOFF-v3-2026-11-18",
+      "kind": "direction",
+      "title": "_HANDOFF-v3-2026-11-18",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/gateway/directions/_HANDOFF-v3-2026-11-18.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/_HANDOFF-v4-2026-11-18",
+      "kind": "direction",
+      "title": "_HANDOFF-v4-2026-11-18",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/gateway/directions/_HANDOFF-v4-2026-11-18.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/_HANDOFF-v5-2026-11-18",
+      "kind": "direction",
+      "title": "_HANDOFF-v5-2026-11-18",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/gateway/directions/_HANDOFF-v5-2026-11-18.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/_HANDOFF-v6-2026-11-19",
+      "kind": "direction",
+      "title": "_HANDOFF-v6-2026-11-19",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/gateway/directions/_HANDOFF-v6-2026-11-19.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/_HANDOFF-v7-2026-11-19",
+      "kind": "direction",
+      "title": "_HANDOFF-v7-2026-11-19",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/gateway/directions/_HANDOFF-v7-2026-11-19.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/_HANDOFF-v8-2026-11-19-2200",
+      "kind": "direction",
+      "title": "_HANDOFF-v8-2026-11-19-2200",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/gateway/directions/_HANDOFF-v8-2026-11-19-2200.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/_HANDOFF-v9-2026-11-19-2200",
+      "kind": "direction",
+      "title": "_HANDOFF-v9-2026-11-19-2200",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/gateway/directions/_HANDOFF-v9-2026-11-19-2200.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/architecture",
+      "kind": "direction",
+      "title": "architecture",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/gateway/handoff/architecture.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/done",
+      "kind": "direction",
+      "title": "done",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/gateway/handoff/done.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/handoff-system",
+      "kind": "direction",
+      "title": "handoff-system",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/gateway/handoff/handoff-system.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/next-steps",
+      "kind": "direction",
+      "title": "next-steps",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/gateway/handoff/next-steps.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/problems",
+      "kind": "direction",
+      "title": "problems",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/gateway/handoff/problems.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/roadmap",
+      "kind": "roadmap",
+      "title": "roadmap",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/gateway/handoff/roadmap.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/techdebt",
+      "kind": "direction",
+      "title": "techdebt",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/gateway/handoff/techdebt.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/01_PROVIDERS",
+      "kind": "direction",
+      "title": "01_PROVIDERS",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/gateway/topics/01_PROVIDERS.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/02_BROWSER_POOL",
+      "kind": "direction",
+      "title": "02_BROWSER_POOL",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/gateway/topics/02_BROWSER_POOL.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/03_RECON",
+      "kind": "direction",
+      "title": "03_RECON",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/gateway/topics/03_RECON.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/04_UI",
+      "kind": "direction",
+      "title": "04_UI",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/gateway/topics/04_UI.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/05_API_CHANNEL",
+      "kind": "direction",
+      "title": "05_API_CHANNEL",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/gateway/topics/05_API_CHANNEL.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/06_INTENT_FILES",
+      "kind": "direction",
+      "title": "06_INTENT_FILES",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/gateway/topics/06_INTENT_FILES.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/07_SCRIPTS_REORG",
+      "kind": "direction",
+      "title": "07_SCRIPTS_REORG",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/gateway/topics/07_SCRIPTS_REORG.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/08_JSON_TOOLS",
+      "kind": "direction",
+      "title": "08_JSON_TOOLS",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/gateway/topics/08_JSON_TOOLS.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/09_MD_EDITOR",
+      "kind": "direction",
+      "title": "09_MD_EDITOR",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/gateway/topics/09_MD_EDITOR.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/10_COOKIE_TRACKER",
+      "kind": "direction",
+      "title": "10_COOKIE_TRACKER",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/gateway/topics/10_COOKIE_TRACKER.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/11_EMAIL_MAILTM",
+      "kind": "direction",
+      "title": "11_EMAIL_MAILTM",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/gateway/topics/11_EMAIL_MAILTM.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/12_PIPELINE",
+      "kind": "direction",
+      "title": "12_PIPELINE",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/gateway/topics/12_PIPELINE.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/navigator",
+      "kind": "module",
+      "title": "NAVIGATOR",
+      "parent": "wetothemoon-electron",
+      "file": null
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/navigator/00_MASTER_INDEX",
+      "kind": "module",
+      "title": "00_MASTER_INDEX",
+      "parent": "wetothemoon-project/wetothemoon-electron/navigator",
+      "file": "docs/prompts/navigator/00_MASTER_INDEX.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/navigator/COMMON_CONTEXT",
+      "kind": "module",
+      "title": "COMMON_CONTEXT",
+      "parent": "wetothemoon-project/wetothemoon-electron/navigator",
+      "file": "docs/prompts/navigator/COMMON_CONTEXT.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/next-steps--1",
+      "kind": "direction",
+      "title": "next-steps",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/navigator/handoff/next-steps.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/01_ARCHITECTURE",
+      "kind": "direction",
+      "title": "01_ARCHITECTURE",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/navigator/topics/01_ARCHITECTURE.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/03_TOOLS",
+      "kind": "direction",
+      "title": "03_TOOLS",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/navigator/topics/03_TOOLS.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/04_JSON_PROTOCOL",
+      "kind": "direction",
+      "title": "04_JSON_PROTOCOL",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/navigator/topics/04_JSON_PROTOCOL.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/00_MASTER_INDEX--2",
+      "kind": "global",
+      "title": "00_MASTER_INDEX",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/prana-bindu/00_MASTER_INDEX.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/COMMON_CONTEXT--1",
+      "kind": "global",
+      "title": "COMMON_CONTEXT",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/prana-bindu/COMMON_CONTEXT.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/COMPONENTS_CONVENTION--1",
+      "kind": "direction",
+      "title": "COMPONENTS_CONVENTION",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/prana-bindu/COMPONENTS_CONVENTION.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/PROJECT_STATE--2",
+      "kind": "state",
+      "title": "PROJECT_STATE",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/prana-bindu/PROJECT_STATE.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/STYLES_CONVENTION--1",
+      "kind": "direction",
+      "title": "STYLES_CONVENTION",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/prana-bindu/STYLES_CONVENTION.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/architecture--1",
+      "kind": "direction",
+      "title": "architecture",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/prana-bindu/handoff/architecture.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/done--1",
+      "kind": "direction",
+      "title": "done",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/prana-bindu/handoff/done.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/next-steps--2",
+      "kind": "direction",
+      "title": "next-steps",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/prana-bindu/handoff/next-steps.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/problems--1",
+      "kind": "direction",
+      "title": "problems",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/prana-bindu/handoff/problems.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/roadmap--1",
+      "kind": "roadmap",
+      "title": "roadmap",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/prana-bindu/handoff/roadmap.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/techdebt--1",
+      "kind": "direction",
+      "title": "techdebt",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/prana-bindu/handoff/techdebt.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/summary",
+      "kind": "direction",
+      "title": "summary",
       "parent": "wetothemoon-electron",
       "file": "docs/prompts/prana-bindu/summary.md"
     },
-
-    { "key": "wetothemoon-electron/prana-bindu/11-ai-coach", "kind": "direction", "title": "AI-тренер",
-      "parent": "wetothemoon-electron/prana-bindu", "file": null },
-
-    { "key": "wetothemoon-electron/training", "kind": "module", "title": "Ollama training (fine-tune)",
-      "parent": "wetothemoon-electron", "file": "docs/training.md" },
-
-    { "key": "wetothemoon-electron/training/finetune-ollama", "kind": "direction", "title": "Fine-tune small models",
-      "parent": "wetothemoon-electron/training", "file": null },
-
-    { "key": "wetothemoon-electron/osint", "kind": "module", "title": "OSINT (rusprofile/kad.arbitr)",
-      "parent": "wetothemoon-electron", "file": "OSINT_ROADMAP.md" },
-
-    { "key": "wetothemoon-electron/sietch", "kind": "module", "title": "SIETCH (data warehouse)",
-      "parent": "wetothemoon-electron", "file": null },
-
-    { "key": "wetothemoon-electron/trading", "kind": "module", "title": "Trading (T-Bank)",
-      "parent": "wetothemoon-electron", "file": null },
-
-    { "key": "wetothemoon-electron/tasks", "kind": "module", "title": "Tasks (scheduler)",
-      "parent": "wetothemoon-electron", "file": null }
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/02_CORE--1",
+      "kind": "direction",
+      "title": "02_CORE",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/prana-bindu/topics/02_CORE.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/03_MENTAT",
+      "kind": "direction",
+      "title": "03_MENTAT",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/prana-bindu/topics/03_MENTAT.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/07_SPICE--1",
+      "kind": "direction",
+      "title": "07_SPICE",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/prana-bindu/topics/07_SPICE.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/08_MELANGE--1",
+      "kind": "direction",
+      "title": "08_MELANGE",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/prana-bindu/topics/08_MELANGE.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/10_DUNA",
+      "kind": "direction",
+      "title": "10_DUNA",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/prana-bindu/topics/10_DUNA.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/11_AI_TRAINER",
+      "kind": "direction",
+      "title": "11_AI_TRAINER",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/prana-bindu/topics/11_AI_TRAINER.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/16_GRAPH--1",
+      "kind": "direction",
+      "title": "16_GRAPH",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/prana-bindu/topics/16_GRAPH.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/17_SMITHRUN--1",
+      "kind": "direction",
+      "title": "17_SMITHRUN",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/prana-bindu/topics/17_SMITHRUN.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/18_MAP_EDITOR--1",
+      "kind": "direction",
+      "title": "18_MAP_EDITOR",
+      "parent": "wetothemoon-electron",
+      "file": "docs/prompts/prana-bindu/topics/18_MAP_EDITOR.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/tokenization",
+      "kind": "direction",
+      "title": "tokenization",
+      "parent": "wetothemoon-electron",
+      "file": "docs/tokenize/tokenization.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/training",
+      "kind": "direction",
+      "title": "training",
+      "parent": "wetothemoon-electron",
+      "file": "docs/training.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/README",
+      "kind": "direction",
+      "title": "README",
+      "parent": "wetothemoon-electron",
+      "file": "src/components/PRANA_BINDU/README.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/README--1",
+      "kind": "direction",
+      "title": "README",
+      "parent": "wetothemoon-electron",
+      "file": "src/main/services/db/README.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/STRUCTURE",
+      "kind": "direction",
+      "title": "STRUCTURE",
+      "parent": "wetothemoon-electron",
+      "file": "src/main/services/pranaBindu/STRUCTURE.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/README--2",
+      "kind": "direction",
+      "title": "README",
+      "parent": "wetothemoon-electron",
+      "file": "src/main/services/pranaBindu/melange/README.md"
+    },
+    {
+      "key": "wetothemoon-project/wetothemoon-electron/fonts",
+      "kind": "direction",
+      "title": "fonts",
+      "parent": "wetothemoon-electron",
+      "file": "src/themes/deepseek-theme/fonts.md"
+    }
   ]
 }

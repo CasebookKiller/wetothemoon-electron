@@ -47,6 +47,14 @@ const files = walk(ROOT);
 // Эвристика: (rel, name) → { kind, parent_hint }
 function classify(rel, name) {
   const lower = name.toLowerCase();
+
+  // Спец-правило navigator (2026-11-22)
+  if (rel.startsWith('docs/prompts/navigator/')) {
+    if (/\/topics\//.test(rel) || /\/handoff\//.test(rel)) {
+      return { kind: 'direction', module: 'navigator' };
+    }
+    return { kind: 'module', module: 'navigator' };
+  }
   const inChats = rel.includes('docs/prompts/chats/') || rel.includes('/chats/');
   const inDocsPrompts = rel.includes('docs/prompts/');
 
