@@ -8,6 +8,7 @@ import './HandoffTab.css';
 
 const HANDOFF_MODULES = [
   { label: 'Gateway', value: 'gateway' },
+  { label: 'Navigator (Browser Hub)', value: 'navigator' },
   { label: 'Prana-Bindu', value: 'prana-bindu' },
   { label: 'OSINT', value: 'osint' },
   { label: 'Sietch', value: 'sietch' },

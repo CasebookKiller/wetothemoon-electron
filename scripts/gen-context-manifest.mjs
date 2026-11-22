@@ -47,7 +47,7 @@ function classify(rel, name) {
   if (/^master_index|^index/i.test(name)) return { kind: 'index' };
 
   // GATEWAY_* / OSINT_* / PRANA_* / SIETCH_* / TASKS_* / TRADING_*
-  const moduleMatch = lower.match(/^(gateway|osint|sietch|tasks|prana|trading|ai|ollama)/);
+  const moduleMatch = lower.match(/^(gateway|navigator|osint|sietch|tasks|prana|trading|ai|ollama)/);
   if (moduleMatch) return { kind: 'module', module: moduleMatch[1] };
 
   if (inChats) return { kind: 'direction', module: lower.replace(/^\d+_/, '').replace(/\.md$/, '') };
