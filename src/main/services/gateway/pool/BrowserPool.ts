@@ -1,182 +1,250 @@
-/**
- * BrowserPool — управление N BrowserContext для параллельной работы.
- *
- * Зачем: в окно бана (20:00–22:00) нужно максимизировать throughput.
- * Один браузер = один провайдер = один аккаунт. Несколько контекстов —
- * параллельные задачи.
- *
- * Принципы:
- * - Импортирует только playwright-core (не electron).
- * - Каждый BrowserContext — изолированная сессия (cookies, storage).
- * - Автоматическая очистка при close().
- * - Никакого глобального стейта — всё через Map.
- *
- * TODO (следующая сессия): IP-изоляция (прокси per-profile), TaskQueue.
- */
+// src/main/services/gateway/pool/BrowserPool.ts
+//
+// BrowserPool v2 — вариант A для persistent-профилей (DeepSeek, GigaChat).
+//
+// Модель: Map<profileId, BrowserContext>. Один профиль = один Chrome = один
+// --user-data-dir. Параллельные профили живут одновременно, release(profileId)
+// закрывает ТОЛЬКО один профиль.
+//
+// Почему не вариант C (один Chrome + N BrowserContext):
+//   launchPersistentContext() возвращает BrowserContext, а не Browser.
+//   N persistent-профилей в одном процессе невозможны.
+//
+// Guard в acquire(): если профиль уже запущен — вернуть существующий контекст,
+// не запускать второй. Снимает П7 (single-instance lock).
+//
+// Для GigaChat (1 профиль + N вкладок):
+//   acquirePage(profileId, slotId) / releasePage(profileId, slotId).
+//
+// Для DeepSeek (N профилей = N браузеров):
+//   acquire(profileId) на каждый профиль.
+//
+// Пример резолвера профиля (для ProfileService):
+//
+//   const ps = ProfileService.getInstance();
+//   const pool = new BrowserPool({
+//     resolveProfile: (id) => {
+//       const p = ps.get(id);
+//       if (!p) throw new Error(`profile ${id} not found`);
+//       if (p.browserKind === 'yandex') {
+//         throw new Error('Yandex profiles handled outside BrowserPool');
+//       }
+//       return {
+//         userDataDir: ps.browserProfileDir(p),
+//         browserKind: p.browserKind,
+//         cdpPort: p.cdpPort,
+//         chromeCdpPort: p.chromeCdpPort,
+//       };
+//     },
+//   });
+//
+//   // DeepSeek:
+//   const { context, page } = await pool.acquire('p_mwlvf2ym_mmej');
+//
+//   // GigaChat (несколько вкладок одного профиля):
+//   await pool.acquire('p_mwnqhvvi_rm0d'); // основной контекст
+//   const tab1 = await pool.acquirePage('p_mwnqhvvi_rm0d', 'coding');
+//   const tab2 = await pool.acquirePage('p_mwnqhvvi_rm0d', 'fitness');
 
-import type { BrowserContext, Browser } from 'playwright-core';
+import { chromium } from 'patchright';
+import type { BrowserContext, Page } from 'patchright';
+
+export interface PoolProfileInfo {
+  /** Абсолютный путь к --user-data-dir профиля. */
+  userDataDir: string;
+  /** chrome — через patchright; yandex — вне пула (внешний процесс). */
+  browserKind: 'chrome' | 'yandex';
+  /** Внутренний CDP (для attach к уже запущенному, если понадобится). */
+  cdpPort?: number;
+  /** Внешний CDP-порт (--remote-debugging-port). */
+  chromeCdpPort?: number;
+}
 
 export interface BrowserPoolOpts {
-  /** Максимум одновременных контекстов (default: 5) */
-  maxContexts?: number;
-  /** Логировать ли acquire/release (default: true) */
-  debug?: boolean;
+  /** Как резолвить профиль по id. Обычно — обёртка над ProfileService. */
+  resolveProfile: (profileId: string) => PoolProfileInfo | Promise<PoolProfileInfo>;
+  /** Канал Chromium. По умолчанию 'chrome' (stealth-канал). */
+  channel?: 'chrome' | 'msedge' | 'chromium';
+  /** Прокси per-profile. TD13, сейчас не используется. */
+  proxy?: (profileId: string) =>
+    | { server: string; username?: string; password?: string }
+    | undefined;
+  /** Логирование. По умолчанию console.log. */
+  log?: (msg: string) => void;
 }
 
-export interface AcquireOpts {
-  /** Прокси (SOCKS5/HTTP) — для IP-изоляции (пока не реализовано) */
-  proxy?: { server: string; username?: string; password?: string };
-  /** User-Agent override */
-  userAgent?: string;
-  /** Viewport */
-  viewport?: { width: number; height: number };
-}
-
-interface PoolEntry {
-  context: BrowserContext;
+export interface AcquiredContext {
   profileId: string;
-  createdAt: number;
-  lastUsedAt: number;
+  context: BrowserContext;
+  page: Page;
+  /** true — вернули существующий контекст, false — только что запустили. */
+  reused: boolean;
 }
 
 export class BrowserPool {
-  private browser: Browser | null = null;
-  private entries: Map<string, PoolEntry> = new Map();
-  private readonly maxContexts: number;
-  private readonly debug: boolean;
+  private contexts = new Map<string, BrowserContext>();
+  private mainPages = new Map<string, Page>();
+  private slotPages = new Map<string, Page>(); // "profileId::slotId" → Page
+  private launching = new Map<string, Promise<AcquiredContext>>(); // guard от race
+  private opts: BrowserPoolOpts;
 
-  constructor(browser: Browser, opts: BrowserPoolOpts = {}) {
-    this.browser = browser;
-    this.maxContexts = opts.maxContexts ?? 5;
-    this.debug = opts.debug ?? true;
+  constructor(opts: BrowserPoolOpts) {
+    this.opts = opts;
   }
 
-  /**
-   * Привязать Browser (из patchright). Вызывается после launch.
-   */
-  attach(browser: Browser): void {
-    if (this.browser && !this.browser.isConnected()) {
-      this.log('attach: старый Browser отключён, заменяем');
-    }
-    this.browser = browser;
+  private log(msg: string) {
+    (this.opts.log ?? console.log)(`[BrowserPool] ${msg}`);
   }
 
-  /**
-   * Получить или создать BrowserContext для profileId.
-   * Если контекст уже есть — обновить lastUsedAt и вернуть.
-   */
-  async acquire(profileId: string, opts: AcquireOpts = {}): Promise<BrowserContext> {
-    if (!this.browser || !this.browser.isConnected()) {
-      throw new Error('[BrowserPool] Browser не подключён. Вызови attach() после launch().');
-    }
+  // ─── Read-only ─────────────────────────────────────────────────
 
-    const existing = this.entries.get(profileId);
+  has(profileId: string): boolean {
+    return this.contexts.has(profileId);
+  }
+
+  list(): string[] {
+    return [...this.contexts.keys()];
+  }
+
+  getContext(profileId: string): BrowserContext | null {
+    return this.contexts.get(profileId) ?? null;
+  }
+
+  getPage(profileId: string): Page | null {
+    return this.mainPages.get(profileId) ?? null;
+  }
+
+  // ─── Acquire / Release (профиль) ───────────────────────────────
+
+  async acquire(profileId: string): Promise<AcquiredContext> {
+    // Guard П7: уже запущен — вернуть существующий
+    const existing = this.contexts.get(profileId);
     if (existing) {
-      existing.lastUsedAt = Date.now();
-      this.log(`acquire: reuse profileId=${profileId}`);
-      return existing.context;
+      const page = this.mainPages.get(profileId) ?? (await this.pickOrCreatePage(existing));
+      this.mainPages.set(profileId, page);
+      return { profileId, context: existing, page, reused: true };
     }
 
-    if (this.entries.size >= this.maxContexts) {
+    // Guard от race: параллельный acquire ждёт тот же promise
+    const pending = this.launching.get(profileId);
+    if (pending) return pending;
+
+    const promise = this.launch(profileId);
+    this.launching.set(profileId, promise);
+    try {
+      return await promise;
+    } finally {
+      this.launching.delete(profileId);
+    }
+  }
+
+  private async launch(profileId: string): Promise<AcquiredContext> {
+    const info = await this.opts.resolveProfile(profileId);
+    if (!info?.userDataDir) {
+      throw new Error(`[BrowserPool] resolveProfile вернул пустой userDataDir для ${profileId}`);
+    }
+    if (info.browserKind === 'yandex') {
       throw new Error(
-        `[BrowserPool] Достигнут лимит контекстов (${this.maxContexts}). ` +
-        `Освободи через release(profileId) перед acquire нового.`
+        `[BrowserPool] профиль ${profileId} имеет browserKind=yandex — ` +
+          `Yandex обрабатывается вне пула (внешний процесс).`
       );
     }
 
-    const context = await this.browser.newContext({
-      userAgent: opts.userAgent,
-      viewport: opts.viewport ?? { width: 1280, height: 800 },
-      // proxy в playwright-core — на уровне launch, не newContext,
-      // поэтому IP-изоляция пока не реализована (TODO следующая сессия)
+    const channel = this.opts.channel ?? 'chrome';
+    const args: string[] = [];
+    if (info.chromeCdpPort) args.push(`--remote-debugging-port=${info.chromeCdpPort}`);
+
+    const proxy = this.opts.proxy?.(profileId);
+
+    this.log(`launch ${profileId} (dir=${info.userDataDir})`);
+    const context = await chromium.launchPersistentContext(info.userDataDir, {
+      headless: false,
+      channel,
+      args,
+      proxy: proxy
+        ? { server: proxy.server, username: proxy.username, password: proxy.password }
+        : undefined,
     });
 
-    this.entries.set(profileId, {
-      context,
-      profileId,
-      createdAt: Date.now(),
-      lastUsedAt: Date.now(),
-    });
+    const page = await this.pickOrCreatePage(context);
 
-    this.log(`acquire: new profileId=${profileId} (total=${this.entries.size})`);
-    return context;
-  }
+    this.contexts.set(profileId, context);
+    this.mainPages.set(profileId, page);
 
-  /**
-   * Освободить контекст (закрыть).
-   */
-  async release(profileId: string): Promise<void> {
-    const entry = this.entries.get(profileId);
-    if (!entry) {
-      this.log(`release: profileId=${profileId} не найден (no-op)`);
-      return;
-    }
-    this.entries.delete(profileId);
-    try {
-      await entry.context.close();
-    } catch (e) {
-      this.log(`release: ошибка close для profileId=${profileId}: ${(e as Error).message}`);
-    }
-    this.log(`release: profileId=${profileId} (осталось=${this.entries.size})`);
-  }
-
-  /**
-   * Закрыть все контексты и отвязать Browser.
-   */
-  async closeAll(): Promise<void> {
-    const ids = Array.from(this.entries.keys());
-    this.log(`closeAll: закрываем ${ids.length} контекстов`);
-    for (const id of ids) {
-      await this.release(id);
-    }
-    this.browser = null;
-  }
-
-  /**
-   * Статус пула — для UI / диагностики.
-   */
-  status(): Array<{ profileId: string; ageMs: number; idleMs: number }> {
-    const now = Date.now();
-    return Array.from(this.entries.values()).map((e) => ({
-      profileId: e.profileId,
-      ageMs: now - e.createdAt,
-      idleMs: now - e.lastUsedAt,
-    }));
-  }
-
-  /**
-   * Параллельный запуск нескольких задач с ограничением concurrency.
-   * Полезно в окно бана: 3 задачи × 1 профиль → 3 параллельных context.
-   */
-  async parallel<T>(
-    tasks: Array<{ profileId: string; run: (ctx: BrowserContext) => Promise<T> }>,
-    concurrency = this.maxContexts,
-  ): Promise<T[]> {
-    const results: T[] = [];
-    const queue = [...tasks];
-
-    const workers = Array.from({ length: Math.min(concurrency, queue.length) }, async () => {
-      while (queue.length > 0) {
-        const task = queue.shift();
-        if (!task) break;
-        const ctx = await this.acquire(task.profileId);
-        try {
-          const r = await task.run(ctx);
-          results.push(r);
-        } catch (e) {
-          this.log(`parallel: ошибка profileId=${task.profileId}: ${(e as Error).message}`);
-          throw e;
+    // Пользователь закрыл браузер вручную — чистим реестр
+    context.on('close', () => {
+      if (this.contexts.get(profileId) === context) {
+        this.contexts.delete(profileId);
+        this.mainPages.delete(profileId);
+        // slot-вкладки этого профиля тоже мертвы
+        for (const key of [...this.slotPages.keys()]) {
+          if (key.startsWith(`${profileId}::`)) this.slotPages.delete(key);
         }
+        this.log(`context closed: ${profileId}`);
       }
     });
 
-    await Promise.all(workers);
-    return results;
+    return { profileId, context, page, reused: false };
   }
 
-  private log(msg: string): void {
-    if (this.debug) {
-      console.log(`[BrowserPool] ${msg}`);
+  private async pickOrCreatePage(context: BrowserContext): Promise<Page> {
+    const pages = context.pages();
+    return pages.length > 0 ? pages[0] : await context.newPage();
+  }
+
+  async release(profileId: string): Promise<void> {
+    const context = this.contexts.get(profileId);
+    if (!context) return;
+    this.contexts.delete(profileId);
+    this.mainPages.delete(profileId);
+    for (const key of [...this.slotPages.keys()]) {
+      if (key.startsWith(`${profileId}::`)) this.slotPages.delete(key);
     }
+    this.log(`release ${profileId}`);
+    try {
+      await context.close();
+    } catch (e) {
+      this.log(`release error ${profileId}: ${(e as Error).message}`);
+    }
+  }
+
+  async releaseAll(): Promise<void> {
+    const ids = [...this.contexts.keys()];
+    await Promise.all(ids.map((id) => this.release(id)));
+  }
+
+  // ─── Slot-вкладки (GigaChat: 1 профиль + N вкладок) ────────────
+
+  async acquirePage(profileId: string, slotId: string): Promise<Page> {
+    const key = `${profileId}::${slotId}`;
+    const existing = this.slotPages.get(key);
+    if (existing && !existing.isClosed()) return existing;
+
+    const { context } = await this.acquire(profileId);
+    const page = await context.newPage();
+    this.slotPages.set(key, page);
+    page.on('close', () => {
+      if (this.slotPages.get(key) === page) this.slotPages.delete(key);
+    });
+    return page;
+  }
+
+  async releasePage(profileId: string, slotId: string): Promise<void> {
+    const key = `${profileId}::${slotId}`;
+    const page = this.slotPages.get(key);
+    if (!page) return;
+    this.slotPages.delete(key);
+    try {
+      await page.close();
+    } catch (e) {
+      this.log(`releasePage error ${key}: ${(e as Error).message}`);
+    }
+  }
+
+  listPages(profileId: string): string[] {
+    const prefix = `${profileId}::`;
+    return [...this.slotPages.keys()]
+      .filter((k) => k.startsWith(prefix))
+      .map((k) => k.slice(prefix.length));
   }
 }
