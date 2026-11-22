@@ -91,6 +91,41 @@ export function registerGatewayHandlers(): void {
     }
   });
 
+  /**
+   * Запуск браузера по профилю с учётом provider (2026-11-22).
+   * DeepSeek → deepseekService.switchProfile (как раньше).
+   * GigaChat → BrowserPool.acquire + goto('https://giga.chat') + isLoggedIn.
+   * Возвращает { status: 'logged_in' | 'login_required', provider }.
+   */
+  ipcMain.handle('gateway:launch-by-profile', async (_e, profileId: string) => {
+    try {
+      const ps = ProfileService.getInstance();
+      const profile = ps.get(profileId);
+      if (!profile) return { success: false, error: 'Профиль не найден' };
+
+      if (profile.provider === 'gigachat') {
+        const pool = await getBrowserPool();
+        const { page } = await pool.acquire(profileId);
+        const { GigaChatAdapter } = await import('../services/gateway/providers/gigachat/adapter');
+        const adapter = new GigaChatAdapter();
+        await page.goto('https://giga.chat', { waitUntil: 'domcontentloaded', timeout: 30_000 });
+        const loggedIn = await adapter.isLoggedIn(page);
+        return {
+          success: true,
+          data: { status: loggedIn ? 'logged_in' : 'login_required', provider: 'gigachat' },
+        };
+      }
+
+      // DeepSeek (или профиль без provider — default 'deepseek')
+      const r = await service.switchProfile(profileId, { launch: true });
+      return r.ok
+        ? { success: true, data: { status: r.status, provider: 'deepseek' } }
+        : { success: false, error: r.reason };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
   ipcMain.handle('gateway:close', async () => {
     try {
       await service.close();

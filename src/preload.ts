@@ -419,6 +419,8 @@ try {
     
     openGatewayWindow: () => ipcRenderer.invoke('gateway:open-window'),
     gatewayLaunch: () => ipcRenderer.invoke('gateway:launch'),
+    gatewayLaunchByProfile: (profileId: string) =>
+      ipcRenderer.invoke('gateway:launch-by-profile', profileId),
     gatewayClose: () => ipcRenderer.invoke('gateway:close'),
     gatewayGetStatus: () => ipcRenderer.invoke('gateway:get-status'),
     gatewaySendMessage: (text: string) => ipcRenderer.invoke('gateway:send-message', text),
