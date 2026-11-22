@@ -168,3 +168,15 @@ src/main/services/gateway/deepseekService.ts:14
 (или `'patchright-core/types/types'`, если первый вариант не резолвится).
 
 **Приоритет:** низкий. Не блокер. Делать при касании файла.
+
+## TD: hasSession — expiry-проверка (2026-11-22)
+
+`ProfileService.hasSession`: добавлена проверка Chrome SQLite
+(`chrome-profile/Default/Cookies`) для `provider='gigachat'` (`_sm_sess`/`_sm_user_id`)
+и `provider='deepseek'` (`ds_session_id`). **Ограничение:** проверяется только
+наличие cookie `name`, без `expires_utc`. Просроченная cookie (если Chrome ещё
+не удалил её) даст ложный «есть сессия».
+
+**Фикс:** добавить `WHERE name IN (...) AND (expires_utc = 0 OR expires_utc > ?)`,
+`expires_utc` в Chrome — микросекунды с 1601-01-01 (WebKit epoch).
+Приоритет: низкий (при следующей чистке `hasSession`).
