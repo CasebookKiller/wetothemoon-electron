@@ -55,7 +55,32 @@ JSON-шаги: `[{tool, action, params}, ...]`. Оркестрация чере�
 
 `NavigatorPage` (sidebar + chat) — новое окно `navigatorWindow.ts`, route `/navigator`. **Не тянет `GatewayPage.tsx` (2908 строк).**
 
-## Что НЕ трогаем
+## Паттерн окна (по образцу gateway)
 
-- `GatewayPage.tsx`, `TopControlPanel.tsx`, `deepseekService.ts` — Gateway работает как есть
-- Правило: DeepSeek UI не трогаем до закрытия Navigator MVP
+**1 модуль = 1 окно = 1 файл хендлеров = 1 route = 1 menu template = 1 preload-секция = 1 кнопка в Dashboard.**
+
+| Слой | Файл Gateway | Файл Navigator |
+|---|---|---|
+| Окно | `src/main/windows/gatewayWindow.ts` (46 строк) | `navigatorWindow.ts` (копия) |
+| Меню | `gatewayWindowMenuTemplate` (`windowMenus.ts:308`) | `navigatorWindowMenuTemplate` |
+| Хендлеры | `src/main/ipcHandlers/gatewayHandlers.ts` | `navigatorHandlers.ts` |
+| Импорт окна | `main.ts:88` | `main.ts` (+1) |
+| Импорт хендлеров | `main.ts:87` | `main.ts` (+1) |
+| Пункт меню «Открыть» | `main.ts:17` + `click` (245) | `main.ts` (+1) |
+| Регистрация хендлеров | `main.ts:319` | `main.ts` (+1) |
+| Route | `routes.tsx:55` `{ path: '/gateway' }` | `routes.tsx` (+1) |
+| Preload | `preload.ts:420` `openGatewayWindow` | `preload.ts` (+секция) |
+| Кнопка Dashboard | `ButtonsWindows.tsx` `call('openGatewayWindow')` | `ButtonsWindows.tsx` (+1) |
+| IPC open-window | `gateway:open-window` | `navigator:open-window` |
+
+**Чек-лист регистрации модуля (8 мест):**
+1. `src/main/windows/navigatorWindow.ts` — окно.
+2. `src/main/menus/windowMenus.ts` — `navigatorWindowMenuTemplate`.
+3. `src/main/ipcHandlers/navigatorHandlers.ts` — `registerNavigatorHandlers()`, включая `navigator:open-window`.
+4. `src/main/main.ts` — импорт окна + импорт хендлеров + пункт меню + `registerNavigatorHandlers()` + `createNavigatorWindow()` (в меню).
+5. `src/navigation/routes.tsx` — `import { NavigatorPage }` + `{ path: '/navigator', ... }` + `routes.push(...)`.
+6. `src/preload.ts` — `navigator: { openWindow, listTools, send, onChunk, launch, ... }`.
+7. `src/types/navigator.d.ts` — типы `electronAPI.navigator`.
+8. `src/components/DASHBOARD/ButtonsWindows/ButtonsWindows.tsx` — кнопка «Navigator» → `call('openNavigatorWindow')`.
+
+**Что НЕ трогаем:** `GatewayPage.tsx`, `TopControlPanel.tsx`, `deepseekService.ts` — Gateway работает как есть.
