@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { AppIcon } from '@/components/COMMON/AppIcon/AppIcon';
 import { CloseIcon } from '../GatewayIcons/GatewayIcons';
 import { HandoffTab } from './HandoffTab';
+import { Dropdown } from 'primereact/dropdown';
 
 const getApi = () =>
   (window as Window & typeof globalThis & { electronAPI?: any })?.electronAPI;
@@ -63,6 +64,19 @@ const modalStyle: React.CSSProperties = {
   display: 'flex', flexDirection: 'column',
   boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
   overflow: 'hidden',
+};
+
+// Компактная модалка (create/edit/import/delete) — тот же визуальный язык,
+// но без фиксированной высоты. maxHeight вместо height, чтобы длинные
+// формы скроллились, а короткие не растягивались.
+// Фон, border, radius, shadow — из класса ds-modal-content (как главный диалог).
+// Оставляем только структурные размеры.
+const compactModalStyle: React.CSSProperties = {
+  color: '#f5f5f5',
+  padding: 24,
+  width: 420, maxWidth: '92vw',
+  maxHeight: '85vh',
+  overflowY: 'auto',
 };
 
 export const GatewayAccountsDialog: React.FC<GatewayAccountsDialogProps> = ({
@@ -381,15 +395,6 @@ export const GatewayAccountsDialog: React.FC<GatewayAccountsDialogProps> = ({
                   {kind === 'chrome' ? 'CHROME' : 'YANDEX'}
                 </span>
 
-                <button
-                  onClick={(e) => { e.stopPropagation(); onToggleKind(p); }}
-                  disabled={!!busy}
-                  className="pb-icon"
-                  title={kind === 'chrome' ? 'Переключить на Yandex' : 'Переключить на Chrome'}
-                >
-                  <AppIcon name="sync" set="material" size="sm" />
-                </button>
-
                 <div style={{ display: 'flex', gap: 2 }}>
                   <button
                     onClick={(e) => {
@@ -516,49 +521,71 @@ export const GatewayAccountsDialog: React.FC<GatewayAccountsDialogProps> = ({
       {/* Create modal */}
       {form && createPortal(
         <div onClick={() => !busy && setForm(null)} style={overlayStyle}>
-          <div onClick={e => e.stopPropagation()} style={{ ...modalStyle, width: 420, maxHeight: 'auto' }}>
+          <div
+            onClick={e => e.stopPropagation()}
+            className="ds-modal-content ds-elevated ds-modal-content--dialog"
+            style={compactModalStyle}
+          >
             <div style={{ marginBottom: 8, fontSize: 15, fontWeight: 600 }}>
               {form.mode === 'create' ? 'Новый профиль' : 'Редактировать профиль'}
-              {' · '}
-              {form.browserKind === 'chrome' ? 'Chrome (patchright)' : 'Yandex'}
             </div>
             <div style={{ marginBottom: 16, fontSize: 12, color: '#888' }}>
               {form.mode === 'edit'
-                ? 'Имя и провайдер можно изменить. Смена browserKind — через кнопку «sync» в списке (создаёт новый userData).'
+                ? 'Имя, браузер и провайдер можно изменить. Смена браузера использует отдельный userData (старая сессия сохраняется).'
                 : (form.browserKind === 'chrome'
                     ? 'При первом запуске потребуется вход в браузере. WAF выдаст новый токен.'
                     : 'Стандартный Yandex-профиль, порт CDP назначится автоматически.')}
             </div>
 
-            <label style={{ display: 'block', fontSize: 11, color: '#888', marginBottom: 4 }}>Имя</label>
+            <label style={{ display: 'block', fontSize: 12, color: '#888', marginBottom: 6 }}>Имя</label>
             <input
               autoFocus
+              className="p-inputtext p-component"
               value={form.name}
               onChange={e => setForm({ ...form, name: e.target.value })}
               onKeyDown={e => { if (e.key === 'Enter') submitForm(); if (e.key === 'Escape' && !busy) setForm(null); }}
               placeholder="Имя профиля"
               disabled={!!busy}
               style={{
-                width: '100%', padding: '8px 12px', marginBottom: 14, boxSizing: 'border-box',
-                background: '#1a1a1d', border: '1px solid #444', borderRadius: 8,
-                color: '#fff', fontSize: 13, outline: 'none'
+                width: '100%', padding: '6px 10px', marginBottom: 14, boxSizing: 'border-box',
+                background: '#1e1e20', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6,
+                color: '#f5f5f5', fontSize: 13, outline: 'none'
               }}
             />
 
-            <label style={{ display: 'block', fontSize: 11, color: '#888', marginBottom: 4 }}>Провайдер</label>
-            <select
-              value={form.provider}
-              onChange={e => setForm({ ...form, provider: e.target.value as 'deepseek' | 'gigachat' })}
+            <label style={{ display: 'block', fontSize: 12, color: '#888', marginBottom: 6 }}>Браузер</label>
+            <Dropdown
+              value={form.browserKind}
+              options={[
+                { label: 'Yandex', value: 'yandex' },
+                { label: 'Chrome (patchright)', value: 'chrome' },
+              ]}
+              onChange={(e) => setForm({ ...form, browserKind: e.value as 'yandex' | 'chrome' })}
               disabled={!!busy}
-              style={{
-                width: '100%', padding: '8px 12px', marginBottom: 20, boxSizing: 'border-box',
-                background: '#1a1a1d', border: '1px solid #444', borderRadius: 8,
-                color: '#fff', fontSize: 13, outline: 'none',
+              style={{ width: '100%', marginBottom: 14 }}
+              appendTo={document.body}
+              pt={{
+                root: { style: { zIndex: 2147483000 } },
+                panel: { style: { zIndex: 2147483000 } },
               }}
-            >
-              <option value="deepseek">DeepSeek (по умолчанию)</option>
-              <option value="gigachat">GigaChat</option>
-            </select>
+            />
+
+            <label style={{ display: 'block', fontSize: 12, color: '#888', marginBottom: 6 }}>Провайдер</label>
+            <Dropdown
+              value={form.provider}
+              options={[
+                { label: 'DeepSeek (по умолчанию)', value: 'deepseek' },
+                { label: 'GigaChat', value: 'gigachat' },
+              ]}
+              onChange={(e) => setForm({ ...form, provider: e.value as 'deepseek' | 'gigachat' })}
+              disabled={!!busy}
+              style={{ width: '100%', marginBottom: 20 }}
+              appendTo={document.body}
+              pt={{
+                root: { style: { zIndex: 2147483000 } },
+                panel: { style: { zIndex: 2147483000 } },
+              }}
+            />
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <button onClick={() => setForm(null)} disabled={!!busy} className="pb-soft">Отмена</button>
