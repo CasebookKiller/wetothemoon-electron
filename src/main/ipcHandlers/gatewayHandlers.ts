@@ -1268,7 +1268,12 @@ export function registerGatewayHandlers(): void {
     }
   });
 
-  ipcMain.handle('gateway:profiles-create', (_e, opts: { name: string; notes?: string; browserKind?: 'yandex' | 'chrome' }) => {
+  ipcMain.handle('gateway:profiles-create', (_e, opts: {
+    name: string;
+    notes?: string;
+    browserKind?: 'yandex' | 'chrome';
+    provider?: 'deepseek' | 'gigachat';
+  }) => {
     try {
       return { success: true, data: ProfileService.getInstance().create(opts) };
     } catch (e) {
@@ -1289,7 +1294,12 @@ export function registerGatewayHandlers(): void {
     }
   });
 
-  ipcMain.handle('gateway:profiles-update', (_e, id: string, patch: { name?: string; notes?: string; browserKind?: 'yandex' | 'chrome' }) => {
+  ipcMain.handle('gateway:profiles-update', (_e, id: string, patch: {
+    name?: string;
+    notes?: string;
+    browserKind?: 'yandex' | 'chrome';
+    provider?: 'deepseek' | 'gigachat';
+  }) => {
     try {
       return { success: true, data: ProfileService.getInstance().update(id, patch) };
     } catch (e) {
