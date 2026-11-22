@@ -26,6 +26,8 @@ interface ProfileInfo {
   lastActiveAt: string | null;
   rateLimitedUntil?: number | null;   // ms timestamp, временный лимит
   bannedAt?: number | null;           // ms timestamp, бан (нужен ручной разбан)
+  /** Multi-provider: 'deepseek' (default) | 'gigachat' */
+  provider?: 'deepseek' | 'gigachat';
 }
 
 interface Payload {
@@ -41,7 +43,7 @@ export interface GatewayAccountsDialogProps {
   handoffModuleId?: string;
 }
 
-type BusyKind = null | 'list' | 'select' | 'launch' | 'toggle' | 'create' | 'import' | 'delete';
+type BusyKind = null | 'list' | 'select' | 'launch' | 'toggle' | 'create' | 'edit' | 'import' | 'delete';
 
 // ─── Стили (inline, чтобы работало вне ShadowRoot) ───
 const overlayStyle: React.CSSProperties = {
@@ -76,8 +78,15 @@ export const GatewayAccountsDialog: React.FC<GatewayAccountsDialogProps> = ({
   }, [visible, initialTab]);
 
   // create
-  const [creating, setCreating] = useState<{ browserKind: 'yandex' | 'chrome' } | null>(null);
-  const [newName, setNewName] = useState('');
+  // Форма создания/редактирования (5.1): mode, поля, provider.
+  type FormState = {
+    mode: 'create' | 'edit';
+    id?: string;
+    name: string;
+    browserKind: 'yandex' | 'chrome';
+    provider: 'deepseek' | 'gigachat';
+  };
+  const [form, setForm] = useState<FormState | null>(null);
 
   // import cookies
   const [importing, setImporting] = useState<{ id: string; name: string } | null>(null);
@@ -150,10 +159,9 @@ export const GatewayAccountsDialog: React.FC<GatewayAccountsDialogProps> = ({
     setBusy('launch'); setError(null);
     try {
       const api = getApi();
-      // С сессией — просто launch(); без сессии — полный switch с логином
-      const r = activeProf.hasSession
-        ? await api.gatewayLaunch()
-        : await api.gatewayProfilesActivate(activeProf.id, { launch: true });
+      // Multi-provider: launch-by-profile роутит по provider
+      // (deepseek → legacy launch, gigachat → pool.acquire + adapter.connect)
+      const r = await api.gatewayLaunchByProfile(activeProf.id);
       if (!r.success) { setError(r.error || 'Не удалось запустить'); return; }
       await refresh();
       onChanged?.();
@@ -180,16 +188,26 @@ export const GatewayAccountsDialog: React.FC<GatewayAccountsDialogProps> = ({
     } finally { setBusy(null); }
   };
 
-  const submitCreate = async () => {
-    if (!creating) return;
-    const name = newName.trim();
+  const submitForm = async () => {
+    if (!form) return;
+    const name = form.name.trim();
     if (!name) return;
-    setBusy('create'); setError(null);
+    setBusy(form.mode === 'create' ? 'create' : 'edit'); setError(null);
     try {
       const api = getApi();
-      const r = await api.gatewayProfilesCreate({ name, browserKind: creating.browserKind });
-      if (!r.success) { setError(r.error || 'Не удалось создать'); return; }
-      setCreating(null); setNewName('');
+      const r = form.mode === 'create'
+        ? await api.gatewayProfilesCreate({
+            name,
+            browserKind: form.browserKind,
+            provider: form.provider,
+          })
+        : await api.gatewayProfilesUpdate(form.id!, {
+            name,
+            browserKind: form.browserKind,
+            provider: form.provider,
+          });
+      if (!r.success) { setError(r.error || 'Не удалось сохранить'); return; }
+      setForm(null);
       await refresh(); onChanged?.();
     } finally { setBusy(null); }
   };
@@ -277,14 +295,14 @@ export const GatewayAccountsDialog: React.FC<GatewayAccountsDialogProps> = ({
         {/* Toolbar */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
           <button
-            onClick={() => { setNewName(''); setCreating({ browserKind: 'yandex' }); }}
+            onClick={() => setForm({ mode: 'create', name: '', browserKind: 'yandex', provider: 'deepseek' })}
             disabled={!!busy}
             className="pb"
           >
             <AppIcon name="add" set="material" size="sm" /> Yandex
           </button>
           <button
-            onClick={() => { setNewName(''); setCreating({ browserKind: 'chrome' }); }}
+            onClick={() => setForm({ mode: 'create', name: '', browserKind: 'chrome', provider: 'deepseek' })}
             disabled={!!busy}
             className="pb"
           >
@@ -343,8 +361,15 @@ export const GatewayAccountsDialog: React.FC<GatewayAccountsDialogProps> = ({
                       </span>
                     ) : null}
                   </div>
-                  <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>
-                    {kind === 'chrome' ? 'Chrome (patchright)' : 'Yandex'}  ·  CDP :{port}
+                  <div style={{ fontSize: 11, color: '#888', marginTop: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span>{kind === 'chrome' ? 'Chrome (patchright)' : 'Yandex'}  ·  CDP :{port}</span>
+                    <span style={{
+                      fontSize: 10, fontWeight: 600, padding: '1px 5px', borderRadius: 3,
+                      background: p.provider === 'gigachat' ? 'rgba(16,185,129,0.15)' : 'rgba(77,107,254,0.15)',
+                      color: p.provider === 'gigachat' ? '#10b981' : '#4d6bfe',
+                    }}>
+                      {p.provider === 'gigachat' ? 'GG' : 'DS'}
+                    </span>
                   </div>
                 </div>
 
@@ -366,6 +391,24 @@ export const GatewayAccountsDialog: React.FC<GatewayAccountsDialogProps> = ({
                 </button>
 
                 <div style={{ display: 'flex', gap: 2 }}>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setError(null);
+                      setForm({
+                        mode: 'edit',
+                        id: p.id,
+                        name: p.name,
+                        browserKind: kind,
+                        provider: p.provider ?? 'deepseek',
+                      });
+                    }}
+                    disabled={!!busy}
+                    className="pb-icon"
+                    title="Редактировать"
+                  >
+                    <AppIcon name="mode_edit" set="material" size="sm" />
+                  </button>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -471,34 +514,56 @@ export const GatewayAccountsDialog: React.FC<GatewayAccountsDialogProps> = ({
       </div>
 
       {/* Create modal */}
-      {creating && createPortal(
-        <div onClick={() => !busy && setCreating(null)} style={overlayStyle}>
+      {form && createPortal(
+        <div onClick={() => !busy && setForm(null)} style={overlayStyle}>
           <div onClick={e => e.stopPropagation()} style={{ ...modalStyle, width: 420, maxHeight: 'auto' }}>
             <div style={{ marginBottom: 8, fontSize: 15, fontWeight: 600 }}>
-              Новый профиль · {creating.browserKind === 'chrome' ? 'Chrome (patchright)' : 'Yandex'}
+              {form.mode === 'create' ? 'Новый профиль' : 'Редактировать профиль'}
+              {' · '}
+              {form.browserKind === 'chrome' ? 'Chrome (patchright)' : 'Yandex'}
             </div>
             <div style={{ marginBottom: 16, fontSize: 12, color: '#888' }}>
-              {creating.browserKind === 'chrome'
-                ? 'При первом запуске потребуется вход в DeepSeek в окне Chrome. WAF выдаст новый токен.'
-                : 'Стандартный Yandex-профиль, порт CDP назначится автоматически.'}
+              {form.mode === 'edit'
+                ? 'Имя и провайдер можно изменить. Смена browserKind — через кнопку «sync» в списке (создаёт новый userData).'
+                : (form.browserKind === 'chrome'
+                    ? 'При первом запуске потребуется вход в браузере. WAF выдаст новый токен.'
+                    : 'Стандартный Yandex-профиль, порт CDP назначится автоматически.')}
             </div>
+
+            <label style={{ display: 'block', fontSize: 11, color: '#888', marginBottom: 4 }}>Имя</label>
             <input
               autoFocus
-              value={newName}
-              onChange={e => setNewName(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') submitCreate(); if (e.key === 'Escape' && !busy) setCreating(null); }}
+              value={form.name}
+              onChange={e => setForm({ ...form, name: e.target.value })}
+              onKeyDown={e => { if (e.key === 'Enter') submitForm(); if (e.key === 'Escape' && !busy) setForm(null); }}
               placeholder="Имя профиля"
               disabled={!!busy}
               style={{
-                width: '100%', padding: '8px 12px', marginBottom: 20, boxSizing: 'border-box',
+                width: '100%', padding: '8px 12px', marginBottom: 14, boxSizing: 'border-box',
                 background: '#1a1a1d', border: '1px solid #444', borderRadius: 8,
                 color: '#fff', fontSize: 13, outline: 'none'
               }}
             />
+
+            <label style={{ display: 'block', fontSize: 11, color: '#888', marginBottom: 4 }}>Провайдер</label>
+            <select
+              value={form.provider}
+              onChange={e => setForm({ ...form, provider: e.target.value as 'deepseek' | 'gigachat' })}
+              disabled={!!busy}
+              style={{
+                width: '100%', padding: '8px 12px', marginBottom: 20, boxSizing: 'border-box',
+                background: '#1a1a1d', border: '1px solid #444', borderRadius: 8,
+                color: '#fff', fontSize: 13, outline: 'none',
+              }}
+            >
+              <option value="deepseek">DeepSeek (по умолчанию)</option>
+              <option value="gigachat">GigaChat</option>
+            </select>
+
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-              <button onClick={() => setCreating(null)} disabled={!!busy} className="pb-soft">Отмена</button>
-              <button onClick={submitCreate} disabled={!!busy || !newName.trim()} className="pb">
-                {busy ? 'Создаю…' : 'Создать'}
+              <button onClick={() => setForm(null)} disabled={!!busy} className="pb-soft">Отмена</button>
+              <button onClick={submitForm} disabled={!!busy || !form.name.trim()} className="pb">
+                {busy ? (form.mode === 'create' ? 'Создаю…' : 'Сохраняю…') : (form.mode === 'create' ? 'Создать' : 'Сохранить')}
               </button>
             </div>
           </div>
