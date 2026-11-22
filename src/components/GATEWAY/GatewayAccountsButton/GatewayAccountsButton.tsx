@@ -17,7 +17,12 @@ interface ProfileInfo {
   hasSession: boolean;
 }
 
-export const GatewayAccountsButton: React.FC = () => {
+interface GatewayAccountsButtonProps {
+  /** Колбэк при открытии диалога — родитель скрывает TopControlPanel. */
+  onOpen?: () => void;
+}
+
+export const GatewayAccountsButton: React.FC<GatewayAccountsButtonProps> = ({ onOpen }) => {
   const [visible, setVisible] = useState(false);
   const [active, setActive] = useState<ProfileInfo | null>(null);
 
@@ -50,7 +55,7 @@ export const GatewayAccountsButton: React.FC = () => {
     <>
       <Button
         className="pb-soft"
-        onClick={() => setVisible(true)}
+        onClick={() => { onOpen?.(); setVisible(true); }}
         tooltip="Управление аккаунтами"
         tooltipOptions={{ position: 'bottom' }}
       >

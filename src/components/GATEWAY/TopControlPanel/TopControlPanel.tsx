@@ -62,7 +62,7 @@ export const TopControlPanel: React.FC<TopControlPanelProps> = (props) => {
           )}
         </span>
 
-        <GatewayAccountsButton />
+        <GatewayAccountsButton onOpen={props.onClose} />
 
         <Button
           label="Обновить диалоги"
