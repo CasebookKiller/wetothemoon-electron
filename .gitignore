@@ -103,6 +103,8 @@ docs/*
 docs/prompts/*
 !docs/prompts/_common/
 !docs/prompts/_common/**
+!docs/prompts/navigator/
+!docs/prompts/navigator/**
 !docs/prompts/gateway/
 !docs/prompts/gateway/**
 docs/prompts/gateway/directions/
