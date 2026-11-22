@@ -72,6 +72,8 @@ JSON-шаги: `[{tool, action, params}, ...]`. Оркестрация чере�
 | Preload | `preload.ts:420` `openGatewayWindow` | `preload.ts` (+секция) |
 | Кнопка Dashboard | `ButtonsWindows.tsx` `call('openGatewayWindow')` | `ButtonsWindows.tsx` (+1) |
 | IPC open-window | `gateway:open-window` | `navigator:open-window` |
+| **Два места создания** | `main.ts:245` (меню) + `main.ts:464` (IPC Dashboard) | те же 2 места для Navigator |
+| **`applyMenuToWindow`** | `applyMenuToWindow(win, gatewayWindowMenuTemplate)` в обоих местах | `applyMenuToWindow(win, navigatorWindowMenuTemplate)` |
 
 **Чек-лист регистрации модуля (8 мест):**
 1. `src/main/windows/navigatorWindow.ts` — окно.

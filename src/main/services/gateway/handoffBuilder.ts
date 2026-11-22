@@ -436,6 +436,13 @@ export const MODULE_MAP: Record<string, {
     db: 'gateway',
     grepPath: 'src/main/services/sietch/ src/main/ipcHandlers/sietchHandlers.ts',
   },
+  navigator: {
+    title: 'Navigator (Browser Hub)',
+    workspaceKeys: ['wetothemoon-electron/navigator'],
+    db: 'gateway',           // общая БД (контекст, задачи)
+    grepPath: 'src/main/services/navigator/ src/main/ipcHandlers/navigatorHandlers.ts src/pages/NAVIGATOR/',
+    structure: 'topics',     // стандарт topics/ (как gateway после миграции)
+  },
 };
 
 function readPrompt(rootPath: string, moduleId: string, fname: string): string {
