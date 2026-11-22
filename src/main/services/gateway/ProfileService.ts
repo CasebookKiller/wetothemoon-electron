@@ -221,6 +221,48 @@ export class ProfileService {
         }
       }
     }
+
+    // 3. Chrome SQLite — provider-aware.
+    //   GigaChat: _sm_sess / _sm_user_id (Sber)
+    //   DeepSeek: ds_session_id (если storage.json не сохранён)
+    //   Chrome хранит cookies в SQLite; name — plaintext (value шифрован,
+    //   но нам нужен только name → дешифровка не требуется).
+    const chromeDir = this.chromeProfileDir(p);
+    const chromeCandidates = [
+      path.join(chromeDir, 'Default', 'Network', 'Cookies'),
+      path.join(chromeDir, 'Default', 'Cookies'),
+    ];
+    const providerCookieNames = p.provider === 'gigachat'
+      ? ['_sm_sess', '_sm_user_id']
+      : ['ds_session_id'];
+    for (const c of chromeCandidates) {
+      if (!fs.existsSync(c)) continue;
+      const tmp = path.join(osMod.tmpdir(), `gw-hascheck-chrome-${Date.now()}.db`);
+      try {
+        fs.copyFileSync(c, tmp);
+        for (const ext of ['-wal', '-shm']) {
+          if (fs.existsSync(c + ext)) fs.copyFileSync(c + ext, tmp + ext);
+        }
+        const { DatabaseSync } = require('node:sqlite');
+        const db = new DatabaseSync(tmp);
+        try {
+          const placeholders = providerCookieNames.map(() => '?').join(',');
+          const r = db
+            .prepare(`SELECT count(*) AS c FROM cookies WHERE name IN (${placeholders})`)
+            .get(...providerCookieNames) as { c: number };
+          if (r?.c > 0) return true;
+        } finally {
+          db.close();
+        }
+      } catch { /* ignore */ }
+      finally {
+        try { fs.unlinkSync(tmp); } catch {}
+        for (const ext of ['-wal', '-shm']) {
+          try { fs.unlinkSync(tmp + ext); } catch {}
+        }
+      }
+    }
+
     return false;
   }
 
