@@ -27,6 +27,14 @@ export interface GatewayProfile {
   rateLimitedRawText?: string;
   /** P0.5: если установлено — профиль забанен. Снимается только вручную. */
   bannedAt?: string;
+  /**
+   * LLM-провайдер, к которому привязан профиль (2026-11-22).
+   * Additive: старые профили без поля получают default при чтении
+   * ('gigachat' для GigaChat-профиля по id/имени, иначе 'deepseek').
+   * Используется универсальным UI (`UniversalGatewayPage`) и `send-via-profile`.
+   * DeepSeek-профили в универсальном UI не показываются (правило: не ломать DeepSeek UI).
+   */
+  provider?: 'deepseek' | 'gigachat';
 }
 
 interface Registry {
@@ -62,7 +70,22 @@ export class ProfileService {
     if (fs.existsSync(this.registryPath)) {
       try {
         const r = JSON.parse(fs.readFileSync(this.registryPath, 'utf8'));
-        if (r?.version === 1 && Array.isArray(r.profiles)) return r;
+        if (r?.version === 1 && Array.isArray(r.profiles)) {
+          // Additive-миграция 2026-11-22: provider для старых профилей.
+          // GigaChat — по id или имени. Остальные — deepseek.
+          let mutated = false;
+          for (const p of r.profiles) {
+            if (!p.provider) {
+              const isGigaChat =
+                p.id === 'p_mwnqhvvi_rm0d' ||
+                /gigachat|гигачат/i.test(p.name ?? '');
+              p.provider = isGigaChat ? 'gigachat' : 'deepseek';
+              mutated = true;
+            }
+          }
+          if (mutated) this.save(r);
+          return r;
+        }
       } catch { /* rebuild */ }
     }
 
@@ -95,6 +118,7 @@ export class ProfileService {
       profiles: [{
         id: 'default',
         name: 'Основной',
+        provider: 'deepseek',
         cdpPort: DEFAULT_PORT_BASE,
         dirName: 'default',
         createdAt: new Date().toISOString(),
@@ -224,16 +248,23 @@ export class ProfileService {
     }
   }
 
-  create(opts: { name: string; notes?: string; browserKind?: 'yandex' | 'chrome' }): GatewayProfile {
+  create(opts: {
+    name: string;
+    notes?: string;
+    browserKind?: 'yandex' | 'chrome';
+    provider?: 'deepseek' | 'gigachat';
+  }): GatewayProfile {
     const id = 'p_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
     const dir = path.join(this.profilesRoot, id);
     fs.mkdirSync(dir, { recursive: true });
 
     const cdpPort = this.nextPort();
     const browserKind = opts.browserKind ?? 'yandex';
+    const provider = opts.provider ?? 'deepseek';
     const profile: GatewayProfile = {
       id,
       name: opts.name,
+      provider,
       cdpPort,
       browserKind,
       ...(browserKind === 'chrome' ? { chromeCdpPort: cdpPort + 100 } : {}),
@@ -247,7 +278,7 @@ export class ProfileService {
     return profile;
   }
 
-  update(id: string, patch: Partial<Pick<GatewayProfile, 'name' | 'notes' | 'browserKind'>>): GatewayProfile {
+  update(id: string, patch: Partial<Pick<GatewayProfile, 'name' | 'notes' | 'browserKind' | 'provider'>>): GatewayProfile {
     const p = this.get(id);
     if (!p) throw new Error('Профиль не найден: ' + id);
     Object.assign(p, patch);
