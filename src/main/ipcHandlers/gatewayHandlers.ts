@@ -57,6 +57,28 @@ function resolveActiveKeys(explicit?: string[]): string[] {
   return [];
 }
 
+let _browserPool: any = null;
+
+async function getBrowserPool(): Promise<any> {
+  if (_browserPool) return _browserPool;
+  const { BrowserPool } = await import('../services/gateway/pool/BrowserPool');
+  const { ProfileService } = await import('../services/gateway/ProfileService');
+  const ps: any = ProfileService.getInstance();
+  _browserPool = new BrowserPool({
+    resolveProfile: (id: string) => {
+      const p = ps.get(id);
+      if (!p) throw new Error(`profile ${id} not found`);
+      return {
+        userDataDir: ps.browserProfileDir(p),
+        browserKind: (p.browserKind ?? 'chrome') as 'chrome' | 'yandex',
+        cdpPort: p.cdpPort,
+        chromeCdpPort: p.chromeCdpPort,
+      };
+    },
+  });
+  return _browserPool;
+}
+
 export function registerGatewayHandlers(): void {
   const service = DeepSeekService.getInstance();
 
@@ -1500,6 +1522,72 @@ export function registerGatewayHandlers(): void {
     }
   });
 
+  // ─── Multi-provider (2026-11-22) ─────────────────────────────────
+
+  ipcMain.handle('gateway:list-providers', async () => {
+    try {
+      const { listProviders } = await import('../services/gateway/providers/registry');
+      return {
+        success: true,
+        data: listProviders().map((a: any) => ({
+          id: a.name,
+          displayName: a.displayName ?? a.name,
+          requiresAuth: true,
+        })),
+      };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('gateway:send-via-provider', async (
+    _e,
+    providerId: string,
+    message: string,
+    profileId?: string
+  ) => {
+    try {
+      // Guard: DeepSeek — старый путь (TD11: sendMessage — заглушка)
+      if (providerId === 'deepseek') {
+        const response = await service.sendMessage(message);
+        return {
+          success: true,
+          data: {
+            markdown: response?.fullHtml ?? '',
+            providerId: 'deepseek',
+            legacy: true,
+          },
+        };
+      }
+      const { getProvider } = await import('../services/gateway/providers/registry');
+      const adapter = getProvider(providerId);
+      if (!adapter) return { success: false, error: `Provider "${providerId}" не зарегистрирован` };
+      if (!profileId) return { success: false, error: 'profileId обязателен для не-DeepSeek провайдеров' };
+      const pool = await getBrowserPool();
+      const { context } = await pool.acquire(profileId);
+      // Открыть страницу провайдера + дождаться input (иначе page = about:blank)
+      const page = await (adapter as any).connect(context);
+      if (typeof (adapter as any).isLoggedIn === 'function' && !(adapter as any).isLoggedIn(page)) {
+        return {
+          success: false,
+          error: `Провайдер "${providerId}": профиль ${profileId} не залогинен (открой вкладку и войди)`,
+        };
+      }
+      const chunks: any[] = [];
+      for await (const chunk of adapter.sendMessage(page, message)) {
+        chunks.push(chunk);
+        if (chunk.type === 'done') break;
+      }
+      const markdown = chunks.map((c) => c.text ?? '').join('');
+      return {
+        success: true,
+        data: { markdown, providerId, chunks: chunks.length },
+      };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
   // ─── Handoff preferences (v10) ──────────────────────────────────
 
   ipcMain.handle('gateway:handoff-list-topics', async (_e, moduleId: string) => {
@@ -1601,4 +1689,12 @@ export function registerGatewayHandlers(): void {
       return { success: false, error: (e as Error).message };
     }
   });
+  
+  // Multi-provider: регистрируем адаптеры (DeepSeek, GigaChat).
+  // registerGatewayHandlers синхронный → await нельзя. initProviders
+  // завершится в микротаске, до первого IPC-вызова из UI.
+  void import('../services/gateway/providers/registry')
+    .then(({ initProviders }) => { initProviders(); })
+    .catch((e) => { console.error('[gatewayHandlers] initProviders failed:', e); });
+
 }

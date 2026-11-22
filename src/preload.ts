@@ -422,6 +422,9 @@ try {
     gatewayClose: () => ipcRenderer.invoke('gateway:close'),
     gatewayGetStatus: () => ipcRenderer.invoke('gateway:get-status'),
     gatewaySendMessage: (text: string) => ipcRenderer.invoke('gateway:send-message', text),
+    gatewayListProviders: () => ipcRenderer.invoke('gateway:list-providers'),
+    gatewaySendViaProvider: (providerId: string, message: string, profileId?: string) =>
+      ipcRenderer.invoke('gateway:send-via-provider', providerId, message, profileId),
     gatewaySendMessageWithFiles: (text: string, files: any[]) =>
       ipcRenderer.invoke('gateway:send-message-with-files', { text, files }),
     gatewayResourcesList: (opts?: { query?: string; kind?: string; limit?: number }) =>
