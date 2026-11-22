@@ -145,3 +145,26 @@ manual switch: юзер видит бейдж `⏸ до HH:MM` в диалоге
 `gatewayLaunch: () => Promise<{ success: boolean; error?: string; data?: { status?: 'logged_in' | 'login_required' } }>`,
 `onGatewayBridgeEvent: (cb: (e: { type: string; payload: any; ts: number }) => void) => () => void`.
 Приоритет: низкий (не блокер).
+
+## TD: playwright-core vs patchright в остальных файлах (2026-11-22)
+
+`BrowserPool.ts` — фикснут (import types из `patchright`). Остальные 4 файла
+всё ещё импортируют `playwright-core`:
+
+```
+src/main/services/gateway/providers/deepseek/adapter.ts:15
+src/main/services/gateway/providers/gigachat/adapter.ts:15
+src/main/services/gateway/providers/types.ts:14
+src/main/services/gateway/deepseekService.ts:14
+```
+
+**Почему не падает:** структурная совместимость многих методов `Page`
+покрывает практические вызовы. Но `BrowserContext` (return
+`launchPersistentContext`) уже несовместим — потенциальные баги при:
+- передаче `patchright.BrowserContext` в функцию, ожидающую `playwright.BrowserContext`
+- любом `instanceof` / сравнении references (как было в `BrowserPool.ts:176`)
+
+**Фикс (когда будем трогать файл):** `import type { ... } from 'patchright'`
+(или `'patchright-core/types/types'`, если первый вариант не резолвится).
+
+**Приоритет:** низкий. Не блокер. Делать при касании файла.
