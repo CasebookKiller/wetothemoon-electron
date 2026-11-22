@@ -1562,15 +1562,21 @@ export function registerGatewayHandlers(): void {
       const { getProvider } = await import('../services/gateway/providers/registry');
       const adapter = getProvider(providerId);
       if (!adapter) return { success: false, error: `Provider "${providerId}" не зарегистрирован` };
-      if (!profileId) return { success: false, error: 'profileId обязателен для не-DeepSeek провайдеров' };
+
+      // Fallback: активный профиль, если UI не передал profileId
+      let effectiveProfileId = profileId;
+      if (!effectiveProfileId) {
+        const { ProfileService } = await import('../services/gateway/ProfileService');
+        effectiveProfileId = (ProfileService.getInstance() as any).getActiveId();
+      }
+
       const pool = await getBrowserPool();
-      const { context } = await pool.acquire(profileId);
-      // Открыть страницу провайдера + дождаться input (иначе page = about:blank)
+      const { context } = await pool.acquire(effectiveProfileId);
       const page = await (adapter as any).connect(context);
       if (typeof (adapter as any).isLoggedIn === 'function' && !(adapter as any).isLoggedIn(page)) {
         return {
           success: false,
-          error: `Провайдер "${providerId}": профиль ${profileId} не залогинен (открой вкладку и войди)`,
+          error: `Провайдер "${providerId}": профиль ${effectiveProfileId} не залогинен`,
         };
       }
       const chunks: any[] = [];
@@ -1579,9 +1585,29 @@ export function registerGatewayHandlers(): void {
         if (chunk.type === 'done') break;
       }
       const markdown = chunks.map((c) => c.text ?? '').join('');
+
+      // UI (GatewayPage) ожидает fullHtml — оборачиваем markdown в простой HTML
+      const escapeHtml = (s: string) => s
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+      const fullHtml = '<p>' + escapeHtml(markdown)
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\n\n/g, '</p><p>')
+        .replace(/\n/g, '<br>') + '</p>';
+
       return {
         success: true,
-        data: { markdown, providerId, chunks: chunks.length },
+        data: {
+          markdown,
+          fullHtml,
+          id: `${providerId}-${Date.now()}`,
+          thinking: undefined,
+          blocks: [{ type: 'text', content: markdown }],
+          providerId,
+          profileId: effectiveProfileId,
+          chunks: chunks.length,
+        },
       };
     } catch (e) {
       return { success: false, error: (e as Error).message };

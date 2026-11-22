@@ -1479,6 +1479,12 @@ export const GatewayPage: React.FC = () => {
     const prevMessages = messages;
     const convIdAtStart = selectedConversationRef.current;
 
+    // Multi-provider (2026-11-22): провайдер из localStorage (см. TopControlPanel)
+    const providerId = (localStorage.getItem('gateway-provider') as string) || 'deepseek';
+    if (providerId !== 'deepseek' && files.length > 0) {
+      console.warn('[handleSend] Файлы поддерживаются только для DeepSeek (MVP), игнорирую');
+    }
+
     // ⚠️ СИНХРОННО ставим флаг ДО setSending (React setState асинхронный,
     // useEffect обновит sendingRef.current только через рендер + микротаск,
     // а bridge-события успевают прийти между ними → race).
@@ -1519,9 +1525,11 @@ export const GatewayPage: React.FC = () => {
     postSendIgnoreUntilRef.current = Date.now() + 5000;
 
     try {
-      const result = files.length > 0
-        ? await api.gatewaySendMessageWithFiles(userText, files)
-        : await api.gatewaySendMessage(userText);
+      const result = providerId !== 'deepseek'
+        ? await (api as any).gatewaySendViaProvider(providerId, userText)
+        : (files.length > 0
+            ? await api.gatewaySendMessageWithFiles(userText, files)
+            : await api.gatewaySendMessage(userText));
 
       if (!result?.success) {
         throw new Error(result?.error || 'Отправка не удалась (нет details от main)');
