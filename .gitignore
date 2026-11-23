@@ -143,6 +143,9 @@ scripts/dumps/
 .env.local.bak-*
 scripts/mjs/recon-*.mjs
 !scripts/mjs/recon-filter-discovered.mjs
+!scripts/mjs/recon-attach-test.mjs
+!scripts/mjs/recon-duck-smoke.mjs
+!scripts/mjs/recon-input-area.mjs
 scripts/recon-*.mjs
 scripts/md-*.mjs
 scripts/inject-cookies.mjs

@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-11-23T11:31:57.850Z",
-  "total": 28,
+  "generatedAt": "2026-11-23T11:48:31.031Z",
+  "total": 31,
   "byRuntime": {
-    "mjs": 25,
+    "mjs": 28,
     "bash": 3,
     "python": 0
   },
@@ -324,6 +324,48 @@
       ]
     },
     {
+      "path": "scripts/mjs/recon-attach-test.mjs",
+      "name": "recon-attach-test",
+      "purpose": "Тест attach файла в DeepSeek через setInputFiles: снимок input area до/после, чипы, скриншот, cleanup",
+      "input": "CDP :9222 (Yandex), вкладка chat.deepseek.com",
+      "output": "recon-output/attach-test-<ts>.{png,json}",
+      "args": null,
+      "result": null,
+      "exit": {
+        "0": "успех",
+        "1": "нет вкладки / нет input[type=file] / setInputFiles failed"
+      },
+      "tool": false,
+      "example": [
+        "node scripts/mjs/recon-attach-test.mjs"
+      ]
+    },
+    {
+      "path": "scripts/mjs/recon-duck-smoke.mjs",
+      "name": "recon-duck-smoke",
+      "purpose": "Smoke-test patchright + duck.ai: запуск Chrome, dump interactive elements, попытка отправки \"hello\"",
+      "input": "argv: [--headless]",
+      "output": "recon-output/duck-smoke-<ts>.json + скриншоты duck-{initial,after}-<ts>.png",
+      "args": {
+        "type": "object",
+        "properties": {
+          "headless": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "result": null,
+      "exit": {
+        "0": "успех",
+        "1": "patchright не найден / FATAL"
+      },
+      "tool": false,
+      "example": [
+        "node scripts/mjs/recon-duck-smoke.mjs --headless"
+      ]
+    },
+    {
       "path": "scripts/mjs/recon-filter-discovered.mjs",
       "name": "recon-filter-discovered",
       "purpose": "Фильтр discovered.json: blacklist (фреймворки/docs/соцсети/медиа), dedupe по домену, split chat/api",
@@ -376,6 +418,23 @@
       "tool": false,
       "example": [
         "node scripts/mjs/recon-gigachat-conversations.mjs --profile p_mwnqhvvi_rm0d"
+      ]
+    },
+    {
+      "path": "scripts/mjs/recon-input-area.mjs",
+      "name": "recon-input-area",
+      "purpose": "Recon input area DeepSeek: file inputs, attach buttons, drop zones, textarea + React handlers, существующие чипы",
+      "input": "CDP :9222 (Yandex), вкладка chat.deepseek.com",
+      "output": "recon-output/input-area-<ts>.json",
+      "args": null,
+      "result": null,
+      "exit": {
+        "0": "успех",
+        "1": "нет вкладки DeepSeek"
+      },
+      "tool": false,
+      "example": [
+        "node scripts/mjs/recon-input-area.mjs"
       ]
     },
     {
