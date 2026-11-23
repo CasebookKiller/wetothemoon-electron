@@ -1,30 +1,79 @@
-import React from 'react';
+// src/pages/NavigatorPage/NavigatorPage.tsx
+
+/**
+ * NavigatorPage — корневая страница модуля Navigator.
+ *
+ * Layout: sidebar (GigaChat-профили) + chat (стрим).
+ * Тема — neon cyan #00e5ff, активируется через `data-module="navigator"` (theme.css).
+ *
+ * @module pages/NavigatorPage
+ */
+
+import React, { useCallback, useEffect, useState } from 'react';
+import { NavigatorSidebar } from './NavigatorSidebar';
+import { NavigatorChat } from './NavigatorChat';
+
 import './NavigatorPage.css';
+// Prism CSS — подсветка кода в чате (GigaChat отдаёт уже подсвеченный HTML с токенами).
+// Тема tomorrow — тёмная, совместима с neon cyan. Не конфликтует с Gateway:
+// Gateway использует свои стили, а токены `.token` глобальны — но в Gateway
+// подсветка рендерится через свой CSS, и наши стили там просто не сработают
+// (у Gateway-компонентов нет класса .navigator-markdown).
+import 'prismjs/themes/prism-tomorrow.css';
 
 export const NavigatorPage: React.FC = () => {
+  const [selectedId, setSelectedId] = useState<string>('');
+  const [profileName, setProfileName] = useState<string>('');
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  const [chatKey, setChatKey] = useState(0);
+
+  // Обновляем имя профиля при смене selection (для шапки чата).
+  useEffect(() => {
+    let cancelled = false;
+    const api = (window as any).electronAPI;
+    if (!selectedId || !api?.gatewayProfilesList) { setProfileName(''); return; }
+    api.gatewayProfilesList().then((r: any) => {
+      if (cancelled || !r?.success) return;
+      const found = (r.data?.profiles ?? []).find((p: any) => p.id === selectedId);
+      setProfileName(found?.name ?? '');
+    }).catch(() => { if (!cancelled) setProfileName(''); });
+    return () => { cancelled = true; };
+  }, [selectedId]);
+
+  const handleSelect = useCallback((id: string) => setSelectedId(id), []);
+
   return (
     <div
       data-module="navigator"
-      className="navigator-page-root"
       style={{
-        padding: 32,
-        color: 'var(--tg-theme-text-color, #f5f5f5)',
-        background: 'var(--tg-theme-bg-color, #0f1419)',
-        minHeight: '100vh',
+        height: '100vh', width: '100%',
+        display: 'flex', overflow: 'hidden',
+        background: '#0f1419', color: '#f5f5f5',
       }}
     >
-      <h1
-        style={{
-          fontSize: 24,
-          marginBottom: 12,
-          color: 'var(--module-accent)',
+      <NavigatorSidebar
+        selectedId={selectedId}
+        onSelect={(id) => { setSelectedConversationId(null); handleSelect(id); }}
+        selectedConversationId={selectedConversationId}
+        onSelectConversation={async (convId) => {
+          setSelectedConversationId(convId);
+          if (selectedId) {
+            const url = `https://giga.chat/sessions/${convId}`;
+            // Ждём, пока синхронизация скачает и сохранит сообщения в БД
+            await (window as any).electronAPI.navigator.syncMessages(selectedId, convId, url).catch(console.error);
+          }
+          // Увеличиваем ключ, чтобы NavigatorChat заново прочитал БД (уже с сообщениями)
+          setChatKey((k) => k + 1);
         }}
-      >
-        Navigator
-      </h1>
-      <p style={{ color: 'var(--tg-theme-hint-color, #6b7a85)', fontSize: 14 }}>
-        Универсальный Browser Hub. В разработке — Этап 1 (MVP: GigaChat-чат).
-      </p>
+      />
+      <NavigatorChat
+        key={chatKey}
+        profileId={selectedId || null}
+        profileName={profileName}
+        conversationId={selectedConversationId}
+      />
     </div>
   );
 };
+
+export default NavigatorPage;

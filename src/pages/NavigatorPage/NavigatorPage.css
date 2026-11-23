@@ -1,9 +1,5 @@
 /* src/pages/NavigatorPage/NavigatorPage.css */
 
-.navigator-page-root {
-  /* Сюда — стили страницы (не компонентов). Компоненты — через --module-accent и общие классы. */
-}
-
 .navigator-markdown > :first-child { margin-top: 0; }
 .navigator-markdown > :last-child { margin-bottom: 0; }
 .navigator-markdown p { margin: 0 0 8px; line-height: 1.5; }
