@@ -149,6 +149,9 @@ scripts/mjs/recon-*.mjs
 !scripts/mjs/recon-free-llms.mjs
 !scripts/mjs/recon-gigachat-send.mjs
 !scripts/mjs/recon-send-files-test.mjs
+!scripts/mjs/recon-stream-formatting.mjs
+!scripts/mjs/recon-web-sources.mjs
+!scripts/mjs/recon-web-sources-deep.mjs
 scripts/recon-*.mjs
 scripts/md-*.mjs
 scripts/inject-cookies.mjs

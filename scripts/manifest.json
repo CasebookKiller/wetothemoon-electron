@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-11-23T12:02:26.309Z",
-  "total": 40,
+  "generatedAt": "2026-11-23T12:13:01.301Z",
+  "total": 43,
   "byRuntime": {
-    "mjs": 37,
+    "mjs": 40,
     "bash": 3,
     "python": 0
   },
@@ -698,6 +698,57 @@
       "tool": false,
       "example": [
         "node scripts/mjs/recon-send-files-test.mjs"
+      ]
+    },
+    {
+      "path": "scripts/mjs/recon-stream-formatting.mjs",
+      "name": "recon-stream-formatting",
+      "purpose": "Захват серии снапшотов стримингового ответа DeepSeek (answer vs reasoning) для последующего md-compare / compare-stream-formatting",
+      "input": "CDP_PORT (default 9324), PROMPT (default — структурированный hello world); вкладка chat.deepseek.com (пустой чат предпочтителен)",
+      "output": "ROOT/captures/<ts>/{prompt.txt, answer-NNN-<ms>.html, final.html, page-full.html, index.json}",
+      "args": null,
+      "result": null,
+      "exit": {
+        "0": "успех",
+        "1": "нет вкладки / textarea пуст после fill / ответ не начался / final.html не снят"
+      },
+      "tool": false,
+      "example": [
+        "CDP_PORT=9324 node scripts/mjs/recon-stream-formatting.mjs"
+      ]
+    },
+    {
+      "path": "scripts/mjs/recon-web-sources-deep.mjs",
+      "name": "recon-web-sources-deep",
+      "purpose": "Глубокий дамп фрагментов TOOL_SEARCH / TOOL_OPEN из IndexedDB deepseek-chat (для разбора источников web-search)",
+      "input": "CDP :9222 (Yandex), вкладка chat.deepseek.com в диалоге",
+      "output": "ROOT/recon-output/web-sources-deep-<ts>.json + samples в stdout",
+      "args": null,
+      "result": null,
+      "exit": {
+        "0": "успех",
+        "1": "нет вкладки / не в диалоге / IndexedDB пуст"
+      },
+      "tool": false,
+      "example": [
+        "node scripts/mjs/recon-web-sources-deep.mjs"
+      ]
+    },
+    {
+      "path": "scripts/mjs/recon-web-sources.mjs",
+      "name": "recon-web-sources",
+      "purpose": "Анализ IndexedDB deepseek-chat: fragment types, search/citation/source поля на уровне message и chat_session",
+      "input": "CDP :9222 (Yandex), вкладка chat.deepseek.com в диалоге (/a/chat/s/<id>)",
+      "output": "ROOT/recon-output/web-sources-<ts>.json + stdout report",
+      "args": null,
+      "result": null,
+      "exit": {
+        "0": "успех",
+        "1": "нет вкладки / не в диалоге / IndexedDB пуст"
+      },
+      "tool": false,
+      "example": [
+        "node scripts/mjs/recon-web-sources.mjs"
       ]
     },
     {
