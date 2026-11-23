@@ -193,6 +193,18 @@ export class IntervalsIcuProvider implements ZeppDataProvider {
         );
       }
       return (await res.json()) as T;
+    } catch (e) {
+      // AbortError от fetch (таймаут или внешний signal) —
+      // оборачиваем в IntervalsApiError, чтобы sync-цикл видел
+      // структурированную ошибку, а не сырой DOMException.
+      if (e instanceof Error && (e.name === 'AbortError' || /aborted/i.test(e.message))) {
+        throw new IntervalsApiError(
+          `intervals.icu: таймаут ${TIMEOUT_MS} мс (${path})`,
+          0,
+          'aborted'
+        );
+      }
+      throw e;
     } finally {
       clearTimeout(timer);
     }
@@ -227,6 +239,15 @@ export class IntervalsIcuProvider implements ZeppDataProvider {
 
       const arrayBuf = await res.arrayBuffer();
       return Buffer.from(arrayBuf);
+    } catch (e) {
+      if (e instanceof Error && (e.name === 'AbortError' || /aborted/i.test(e.message))) {
+        throw new IntervalsApiError(
+          'intervals.icu: таймаут скачивания файла 60000 мс',
+          0,
+          'aborted'
+        );
+      }
+      throw e;
     } finally {
       clearTimeout(timer);
     }
