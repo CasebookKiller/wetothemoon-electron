@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-11-23T11:57:43.158Z",
-  "total": 37,
+  "generatedAt": "2026-11-23T12:02:26.309Z",
+  "total": 40,
   "byRuntime": {
-    "mjs": 34,
+    "mjs": 37,
     "bash": 3,
     "python": 0
   },
@@ -515,6 +515,40 @@
       ]
     },
     {
+      "path": "scripts/mjs/recon-free-llms.mjs",
+      "name": "recon-free-llms",
+      "purpose": "Разведка бесплатных аналогов chat.deepseek.com: probe кандидатов + discovery из источников (JSON-API / markdown-raw)",
+      "input": "argv: [--only web|api] [--filter name1,name2] [--discover]; читает recon-free-llms.candidates.json (scripts/)",
+      "output": "stdout: таблица кандидатов; --discover → recon-free-llms.discovered.json (scripts/)",
+      "args": {
+        "type": "object",
+        "properties": {
+          "only": {
+            "enum": [
+              "web",
+              "api"
+            ]
+          },
+          "filter": {
+            "type": "string"
+          },
+          "discover": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "result": null,
+      "exit": {
+        "0": "успех",
+        "1": "не найден candidates.json"
+      },
+      "tool": false,
+      "example": [
+        "node scripts/mjs/recon-free-llms.mjs --discover"
+      ]
+    },
+    {
       "path": "scripts/mjs/recon-gigachat-adapter-test.mjs",
       "name": "recon-gigachat-adapter-test",
       "purpose": "Smoke-тест GigaChatAdapter: fill → click/Enter → стрим ответа (с проверкой reset)",
@@ -550,6 +584,33 @@
       "tool": false,
       "example": [
         "node scripts/mjs/recon-gigachat-conversations.mjs --profile p_mwnqhvvi_rm0d"
+      ]
+    },
+    {
+      "path": "scripts/mjs/recon-gigachat-send.mjs",
+      "name": "recon-gigachat-send",
+      "purpose": "Разведка отправки в GigaChat: ввод в textarea, поиск send-кнопки (по diff до/после fill), Enter, 30-сек серия снапшотов",
+      "input": "argv: --profile <id|name|dirName> (обязателен); env: gateway-profiles.json в ~/.config/wetothemoon-electron/",
+      "output": "recon-output/gigachat-send-<ts>/{buttons-state.json, final.html, snapshots.json, messages.json}",
+      "args": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "profile"
+        ]
+      },
+      "result": null,
+      "exit": {
+        "0": "успех",
+        "1": "нет --profile / профиля / userDataDir / textarea не найден"
+      },
+      "tool": false,
+      "example": [
+        "node scripts/mjs/recon-gigachat-send.mjs --profile p_mwnqhvvi_rm0d"
       ]
     },
     {
@@ -620,6 +681,23 @@
       "tool": false,
       "example": [
         "PROFILE_ID=p_mwnqhvvi_rm0d node scripts/mjs/recon-patchright-smoke.mjs"
+      ]
+    },
+    {
+      "path": "scripts/mjs/recon-send-files-test.mjs",
+      "name": "recon-send-files-test",
+      "purpose": "E2E тест отправки файла в DeepSeek: новый чат → setInputFiles → chip → send → ожидание ответа → сбор результата",
+      "input": "CDP :9222 (Yandex), вкладка chat.deepseek.com",
+      "output": "recon-output/send-files-<ts>.{png,json}",
+      "args": null,
+      "result": null,
+      "exit": {
+        "0": "успех",
+        "1": "нет вкладки / нет input[type=file] / chips не появились"
+      },
+      "tool": false,
+      "example": [
+        "node scripts/mjs/recon-send-files-test.mjs"
       ]
     },
     {

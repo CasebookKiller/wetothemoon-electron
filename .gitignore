@@ -146,6 +146,9 @@ scripts/mjs/recon-*.mjs
 !scripts/mjs/recon-attach-test.mjs
 !scripts/mjs/recon-duck-smoke.mjs
 !scripts/mjs/recon-input-area.mjs
+!scripts/mjs/recon-free-llms.mjs
+!scripts/mjs/recon-gigachat-send.mjs
+!scripts/mjs/recon-send-files-test.mjs
 scripts/recon-*.mjs
 scripts/md-*.mjs
 scripts/inject-cookies.mjs
