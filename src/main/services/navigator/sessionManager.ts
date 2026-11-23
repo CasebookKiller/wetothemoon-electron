@@ -77,3 +77,24 @@ export async function resolve(
 
   return { tool, page };
 }
+
+/**
+ * Разрешить только страницу профиля (без tool.send).
+ * Нужно для парсинга истории: syncConversations, syncMessages.
+ */
+export async function resolvePage(
+  profileId: string,
+  pool: BrowserPool,
+): Promise<Page> {
+  const profile = ProfileService.getInstance().get(profileId);
+  if (!profile) {
+    throw new Error(`[SessionManager] профиль '${profileId}' не найден`);
+  }
+
+  const acquired = await pool.acquire(profileId);
+  const page = (acquired as { page: unknown }).page as Page;
+  if (!page) {
+    throw new Error(`[SessionManager] pool.acquire не вернул page для '${profileId}'`);
+  }
+  return page;
+}

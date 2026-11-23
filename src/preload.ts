@@ -427,20 +427,30 @@ try {
      * - `onChunk`   — подписка на чанки стрима; возвращает функцию отписки.
      */
     navigator: {
-      listTools: () =>
-        ipcRenderer.invoke('navigator:list-tools'),
-
+      listTools: () => ipcRenderer.invoke('navigator:list-tools'),
       send: (profileId: string, message: string) =>
         ipcRenderer.invoke('navigator:send', profileId, message),
-
-      onChunk: (
-        cb: (data: { profileId: string; chunk: any }) => void,
-      ): (() => void) => {
-        const handler = (_e: unknown, data: { profileId: string; chunk: any }) =>
-          cb(data);
+      onChunk: (cb: (data: { profileId: string; chunk: any }) => void): (() => void) => {
+        const handler = (_e: unknown, data: { profileId: string; chunk: any }) => cb(data);
         ipcRenderer.on('navigator:chunk', handler as any);
         return () => ipcRenderer.removeListener('navigator:chunk', handler as any);
       },
+
+      /** Список диалогов профиля (из gateway.db). Мгновенно, без браузера. */
+      listConversations: (profileId: string) =>
+        ipcRenderer.invoke('navigator:list-conversations', profileId),
+
+      /** История сообщений диалога (из gateway.db). */
+      getMessages: (conversationId: string) =>
+        ipcRenderer.invoke('navigator:get-messages', conversationId),
+
+      /** Синхронизировать список диалогов из GigaChat DOM. */
+      syncConversations: (profileId: string) =>
+        ipcRenderer.invoke('navigator:sync-conversations', profileId),
+
+      /** Синхронизировать сообщения конкретного диалога. */
+      syncMessages: (profileId: string, convId: string, url: string) =>
+        ipcRenderer.invoke('navigator:sync-messages', profileId, convId, url),
     },
     gatewayLaunch: () => ipcRenderer.invoke('gateway:launch'),
     gatewayLaunchByProfile: (profileId: string) =>

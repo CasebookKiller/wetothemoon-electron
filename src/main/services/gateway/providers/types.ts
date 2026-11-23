@@ -45,11 +45,22 @@ export interface CookiePattern {
 
 // ─── Сообщения / чанки / conversation ───────────────────────────────────
 
+/**
+ * Формат содержимого чанка. Адаптер объявляет, что отдаёт:
+ *  - 'text'     — plain text (default, обратная совместимость)
+ *  - 'markdown' — markdown-строка (DeepSeek API, будущие HTTP-адаптеры)
+ *  - 'html'     — готовый HTML из DOM (GigaChat, DOM-scrape-адаптеры)
+ * UI рендерит по этому полю; адаптер его не «угадывает».
+ */
+export type ChunkFormat = 'text' | 'markdown' | 'html';
+
 export interface MessageChunk {
   type: 'text' | 'reasoning' | 'usage' | 'done' | 'error';
   text?: string;
   /** Для type='text': сигнал «очистить предыдущий буфер» (DOM-замена, не append) */
   reset?: boolean;
+  /** Формат содержимого `text`. По умолчанию 'text' (обратная совместимость). */
+  format?: ChunkFormat;
   usage?: {
     promptTokens?: number;
     completionTokens?: number;

@@ -96,12 +96,19 @@ export class GigaChatAdapter implements ProviderAdapter {
     };
 
     let lastText = '';
+    let lastHtml = '';
     let stableTicks = 0;
     let started = false;
     // Промежуточное «Думаю над ответом» — GigaChat's thinking indicator.
     // Не эмитим его как text; отдельный класс в response не нужен, т.к.
     // этот текст жил в ДРУГОМ элементе и в final DOM исчез.
-    const THINKING_PREFIXES = ['Думаю над ответом', 'Думаю…', 'Thinking'];
+    // Расширенный список: GigaChat в разных режимах показывает разные статусы.
+    // Не эмитим их как текст и не считаем «финальными».
+    const THINKING_PREFIXES = [
+      'Думаю над ответом', 'Думаю…', 'Thinking',
+      'Ищу информацию', 'Поиск', 'Searching', 'Looking',
+      'Анализирую', 'Готовлю ответ',
+    ];
 
     while (Date.now() - t0 < timeoutMs) {
       if (signal?.aborted) { yield { type: 'error', text: 'aborted' }; return; }
@@ -110,7 +117,15 @@ export class GigaChatAdapter implements ProviderAdapter {
       const snap = await page.evaluate((sel) => {
         const els = [...document.querySelectorAll(sel)];
         const last = els[els.length - 1];
-        return { count: els.length, text: last ? (last.textContent || '') : '' };
+        const mdRoot = last?.querySelector('[class*="MarkdownRoot"]') as HTMLElement | null;
+        return {
+          count: els.length,
+          // textContent — для stability-check и thinking-detection (быстро, без HTML-парсинга)
+          text: last ? (last.textContent || '') : '',
+          // innerHTML MarkdownRoot — готовый HTML от GigaChat, то что нужно отрендерить в UI.
+          // Пустая строка, если MarkdownRoot не найден — тогда fallback на text.
+          html: mdRoot ? (mdRoot.innerHTML || '') : '',
+        };
       }, this.selectors.response);
 
       if (!started && snap.count <= beforeCount) continue;
@@ -118,10 +133,17 @@ export class GigaChatAdapter implements ProviderAdapter {
 
       if (snap.text === lastText) {
         if (lastText) {
-          stableTicks++;
-          if (stableTicks >= 10) {           // 10 × 300ms = 3s стабильно → done
-            yield { type: 'done' };
-            return;
+          // Не считаем «стабильность», если текст похож на статус-заглушку:
+          // иначе premature done, пока GigaChat ещё «думает/ищет».
+          const stillThinking = THINKING_PREFIXES.some((p) =>
+            lastText.trimStart().startsWith(p),
+          );
+          if (!stillThinking) {
+            stableTicks++;
+            if (stableTicks >= 10) {         // 10 × 300ms = 3s стабильно → done
+              yield { type: 'done' };
+              return;
+            }
           }
         }
         continue;
@@ -129,23 +151,28 @@ export class GigaChatAdapter implements ProviderAdapter {
 
       // snapshot изменился
       stableTicks = 0;
-      const next = snap.text;
-      const thinking = THINKING_PREFIXES.some((p) => next.trimStart().startsWith(p));
+      const nextText = snap.text;
+      const nextHtml = snap.html;
+      const thinking = THINKING_PREFIXES.some((p) => nextText.trimStart().startsWith(p));
 
       if (thinking) {
-        // GigaChat ещё думает; AssistantContent временно содержит "Думаю над ответом"
-        lastText = next;
+        // GigaChat ещё думает/ищет; MarkdownRoot может содержать временный статус
+        lastText = nextText;
+        lastHtml = nextHtml;
         continue;
       }
 
-      if (lastText && next.startsWith(lastText)) {
-        const { added } = diff(lastText, next);
-        if (added) yield { type: 'text', text: added };
-      } else {
-        // DOM заменён целиком — сброс буфера
-        yield { type: 'text', text: next, reset: true };
+      // HTML при стриме перерисовывается целиком → всегда reset, UI заменяет буфер.
+      // LCP-diff для HTML не работает (innerHTML не монотонен из-за растущих тегов).
+      if (nextHtml && nextHtml !== lastHtml) {
+        yield { type: 'text', text: nextHtml, format: 'html', reset: true };
+      } else if (!nextHtml && nextText !== lastText) {
+        // Fallback: MarkdownRoot не найден (например, простой ответ без разметки)
+        // → отдаём plain text, как раньше.
+        yield { type: 'text', text: nextText, reset: true };
       }
-      lastText = next;
+      lastText = nextText;
+      lastHtml = nextHtml;
     }
     yield { type: 'error', text: 'timeout' };
   }
@@ -153,17 +180,57 @@ export class GigaChatAdapter implements ProviderAdapter {
   async getConversations(page: Page): Promise<Conversation[]> {
     try {
       return await page.evaluate(() => {
-        const links = Array.from(document.querySelectorAll('a[href^="/sessions/"]')) as HTMLAnchorElement[];
+        // Оригинальный GigaChat использует <a data-da_name="SessionListItem"> в сайдбаре.
+        // data-da_session_id содержит UUID сессии, href — /sessions/<uuid>.
+        const links = Array.from(document.querySelectorAll('a[data-da_name="SessionListItem"]')) as HTMLAnchorElement[];
         return links.map((el) => {
           const href = el.getAttribute('href') || '';
           const id = el.getAttribute('data-da_session_id') || href.replace('/sessions/', '');
-          const title = el.textContent?.trim() || 'Без названия';
+          // Заголовок лежит в span с классом ChatRow-styled__Title-...
+          const titleEl = el.querySelector('[class*="ChatRow-styled__Title"]');
+          const title = titleEl?.textContent?.trim() || 'Без названия';
           return {
             id,
             title,
-            url: `https://giga.chat${href}`,
+            url: href.startsWith('http') ? href : `https://giga.chat${href}`,
           };
         });
+      });
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Парсит сообщения ТЕКУЩЕГО открытого диалога.
+   * Используется для синхронизации истории (sync-messages).
+   */
+  async getCurrentMessages(page: Page): Promise<Array<{ id: string; role: 'user' | 'assistant'; contentHtml: string; contentPlain: string }>> {
+    try {
+      return await page.evaluate(() => {
+        const nodes = Array.from(document.querySelectorAll('[data-message-id]'));
+        const result: Array<{ id: string; role: 'user' | 'assistant'; contentHtml: string; contentPlain: string }> = [];
+
+        for (const node of nodes) {
+          const id = node.getAttribute('data-message-id');
+          if (!id) continue;
+
+          const isUser = node.className.includes('MessageItem-styled__UserRow');
+          const isAssistant = node.className.includes('MessageItem-styled__AssistantRow');
+          if (!isUser && !isAssistant) continue;
+
+          // Контент всегда внутри MarkdownRoot-styled__MarkdownRoot
+          const mdRoot = node.querySelector('[class*="MarkdownRoot-styled__MarkdownRoot"]') as HTMLElement | null;
+          if (!mdRoot) continue;
+
+          result.push({
+            id,
+            role: isUser ? 'user' : 'assistant',
+            contentHtml: mdRoot.innerHTML || '',
+            contentPlain: mdRoot.textContent || '',
+          });
+        }
+        return result;
       });
     } catch {
       return [];
