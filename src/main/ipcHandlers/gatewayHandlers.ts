@@ -59,7 +59,11 @@ function resolveActiveKeys(explicit?: string[]): string[] {
 
 let _browserPool: any = null;
 
-async function getBrowserPool(): Promise<any> {
+/**
+ * Ленивый синглтон BrowserPool. Экспортируется для переиспользования в Navigator
+ * (не создавать второй инстанс — иначе конфликт single-instance lock на одном профиле).
+ */
+export async function getBrowserPool(): Promise<any> {
   if (_browserPool) return _browserPool;
   const { BrowserPool } = await import('../services/gateway/pool/BrowserPool');
   const { ProfileService } = await import('../services/gateway/ProfileService');

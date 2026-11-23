@@ -419,6 +419,29 @@ try {
     
     openGatewayWindow: () => ipcRenderer.invoke('gateway:open-window'),
     openNavigatorWindow: () => ipcRenderer.invoke('navigator:open-window'),
+
+    /**
+     * Navigator (Этап 1 MVP).
+     * - `listTools` — список инструментов из ToolRegistry.
+     * - `send`      — отправить сообщение в LLM-инструмент профиля; ответ — чанками.
+     * - `onChunk`   — подписка на чанки стрима; возвращает функцию отписки.
+     */
+    navigator: {
+      listTools: () =>
+        ipcRenderer.invoke('navigator:list-tools'),
+
+      send: (profileId: string, message: string) =>
+        ipcRenderer.invoke('navigator:send', profileId, message),
+
+      onChunk: (
+        cb: (data: { profileId: string; chunk: any }) => void,
+      ): (() => void) => {
+        const handler = (_e: unknown, data: { profileId: string; chunk: any }) =>
+          cb(data);
+        ipcRenderer.on('navigator:chunk', handler as any);
+        return () => ipcRenderer.removeListener('navigator:chunk', handler as any);
+      },
+    },
     gatewayLaunch: () => ipcRenderer.invoke('gateway:launch'),
     gatewayLaunchByProfile: (profileId: string) =>
       ipcRenderer.invoke('gateway:launch-by-profile', profileId),
