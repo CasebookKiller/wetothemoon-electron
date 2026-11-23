@@ -1,11 +1,21 @@
 #!/usr/bin/env node
-// scripts/recon-login-llms.mjs
-// Recon session-провайдеров (GigaChat, Алиса AI) с ручным логином
-// и персистентной сессией через профили wetothemoon (как у DeepSeek).
-//
-// Запуск:
-//   node scripts/recon-login-llms.mjs --list
-//   node scripts/recon-login-llms.mjs --provider gigachat --profile gigachat-1
+// scripts/mjs/recon-login-llms.mjs
+/**
+ * @name recon-login-llms
+ * @purpose Recon session-провайдеров (GigaChat, Алиса AI): ручной логин + снимок selectors/cookies + merge в login-providers.json
+ * @input argv: --list | --provider {gigachat|alisa} --profile <id|name|dirName>; --profiles-root <path>
+ * @output stdout: selectors/cookies; файл: scripts/login-providers.json (merge по provider)
+ * @args { "type": "object", "properties": { "list": { "type": "boolean" }, "provider": { "enum": ["gigachat", "alisa"] }, "profile": { "type": "string" }, "profilesRoot": { "type": "string" } } }
+ * @result null
+ * @exit 0 — успех
+ * @exit 1 — нет profilesRoot / registry / профиля / patchright / поле ввода не найдено
+ * @tool false
+ * @example node scripts/mjs/recon-login-llms.mjs --provider gigachat --profile gigachat-1
+ *
+ * Запуск:
+ *   node scripts/mjs/recon-login-llms.mjs --list
+ *   node scripts/mjs/recon-login-llms.mjs --provider gigachat --profile gigachat-1
+ */
 //
 // Логика:
 //   1. Находит профиль в profilesRoot (--profiles-root или автоопределение)
@@ -23,7 +33,7 @@ import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const OUT_PATH = path.join(__dirname, 'login-providers.json');
+const OUT_PATH = path.join(__dirname, '..', 'login-providers.json');
 
 const PROVIDERS = {
   gigachat: {

@@ -1,10 +1,24 @@
 #!/usr/bin/env node
-// scripts/recon-dump-dom.mjs
+// scripts/mjs/recon-dump-dom.mjs
+/**
+ * @name recon-dump-dom
+ * @purpose Дамп raw DOM провайдера (GigaChat/Алиса): --anon / --profile / --stream серии снапшотов + селекторы
+ * @input argv: --provider {gigachat|alisa} (обязателен), --profiles-root <path>, --profile <id|name|dirName> (для profile), --anon, --stream
+ * @output recon-output/<provider>-<mode>-<ts>/{<label>.html, <label>.json}
+ * @args { "type": "object", "properties": { "provider": { "enum": ["gigachat", "alisa"] }, "profilesRoot": { "type": "string" }, "profile": { "type": "string" }, "anon": { "type": "boolean" }, "stream": { "type": "boolean" } }, "required": ["provider"] }
+ * @result null
+ * @exit 0 — успех
+ * @exit 1 — нет провайдера / профиля / patchright / textarea not found
+ * @tool false
+ * @example node scripts/mjs/recon-dump-dom.mjs --provider gigachat --profile "GigaChat 1" --stream
+ *
+ * NOTE: --anon падает (ReferenceError: browser is not defined). Pre-existing, не исправлено 2026-11-23.
+ */
 // Dump raw DOM: --anon (before auth), --profile (after auth), --stream (during response).
 // Usage:
-//   node scripts/recon-dump-dom.mjs --provider gigachat --anon
-//   node scripts/recon-dump-dom.mjs --provider gigachat --profile "GigaChat 1"
-//   node scripts/recon-dump-dom.mjs --provider gigachat --profile "GigaChat 1" --stream
+//   node scripts/mjs/recon-dump-dom.mjs --provider gigachat --anon
+//   node scripts/mjs/recon-dump-dom.mjs --provider gigachat --profile "GigaChat 1"
+//   node scripts/mjs/recon-dump-dom.mjs --provider gigachat --profile "GigaChat 1" --stream
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -13,6 +27,7 @@ import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.resolve(__dirname, '../..');
 const PROVIDERS = {
   gigachat: { name: 'GigaChat', url: 'https://giga.chat', inputSel: 'textarea#chat-input-textarea' },
   alisa:    { name: 'Алиса AI', url: 'https://alice.yandex.ru', inputSel: 'textarea' },
@@ -146,7 +161,7 @@ async function main(){
   const profilesRoot = findProfilesRoot(g('--profiles-root'));
   const mode = args.includes('--anon') ? 'anon' : 'profile';
   const ts = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
-  const outDir = path.join(__dirname, 'dumps', `${providerKey}-${mode}-${ts}`);
+  const outDir = path.join(ROOT, 'recon-output', `${providerKey}-${mode}-${ts}`);
   fs.mkdirSync(outDir, {recursive:true});
   console.log(`📁 ${outDir}`);
 

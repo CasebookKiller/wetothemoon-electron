@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-11-23T11:52:43.225Z",
-  "total": 34,
+  "generatedAt": "2026-11-23T11:57:43.158Z",
+  "total": 37,
   "byRuntime": {
-    "mjs": 31,
+    "mjs": 34,
     "bash": 3,
     "python": 0
   },
@@ -456,6 +456,48 @@
       ]
     },
     {
+      "path": "scripts/mjs/recon-dump-dom.mjs",
+      "name": "recon-dump-dom",
+      "purpose": "Дамп raw DOM провайдера (GigaChat/Алиса): --anon / --profile / --stream серии снапшотов + селекторы",
+      "input": "argv: --provider {gigachat|alisa} (обязателен), --profiles-root <path>, --profile <id|name|dirName> (для profile), --anon, --stream",
+      "output": "recon-output/<provider>-<mode>-<ts>/{<label>.html, <label>.json}",
+      "args": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "enum": [
+              "gigachat",
+              "alisa"
+            ]
+          },
+          "profilesRoot": {
+            "type": "string"
+          },
+          "profile": {
+            "type": "string"
+          },
+          "anon": {
+            "type": "boolean"
+          },
+          "stream": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "provider"
+        ]
+      },
+      "result": null,
+      "exit": {
+        "0": "успех",
+        "1": "нет провайдера / профиля / patchright / textarea not found"
+      },
+      "tool": false,
+      "example": [
+        "node scripts/mjs/recon-dump-dom.mjs --provider gigachat --profile \"GigaChat 1\" --stream"
+      ]
+    },
+    {
       "path": "scripts/mjs/recon-filter-discovered.mjs",
       "name": "recon-filter-discovered",
       "purpose": "Фильтр discovered.json: blacklist (фреймворки/docs/соцсети/медиа), dedupe по домену, split chat/api",
@@ -525,6 +567,59 @@
       "tool": false,
       "example": [
         "node scripts/mjs/recon-input-area.mjs"
+      ]
+    },
+    {
+      "path": "scripts/mjs/recon-login-llms.mjs",
+      "name": "recon-login-llms",
+      "purpose": "Recon session-провайдеров (GigaChat, Алиса AI): ручной логин + снимок selectors/cookies + merge в login-providers.json",
+      "input": "argv: --list | --provider {gigachat|alisa} --profile <id|name|dirName>; --profiles-root <path>",
+      "output": "stdout: selectors/cookies; файл: scripts/login-providers.json (merge по provider)",
+      "args": {
+        "type": "object",
+        "properties": {
+          "list": {
+            "type": "boolean"
+          },
+          "provider": {
+            "enum": [
+              "gigachat",
+              "alisa"
+            ]
+          },
+          "profile": {
+            "type": "string"
+          },
+          "profilesRoot": {
+            "type": "string"
+          }
+        }
+      },
+      "result": null,
+      "exit": {
+        "0": "успех",
+        "1": "нет profilesRoot / registry / профиля / patchright / поле ввода не найдено"
+      },
+      "tool": false,
+      "example": [
+        "node scripts/mjs/recon-login-llms.mjs --provider gigachat --profile gigachat-1"
+      ]
+    },
+    {
+      "path": "scripts/mjs/recon-patchright-smoke.mjs",
+      "name": "recon-patchright-smoke",
+      "purpose": "Smoke patchright + Chrome: запуск профиля, заход на chat.deepseek.com, PROBE stealth (webdriver, cdc keys, textarea, profileTrigger, /sign_in)",
+      "input": "env: PROFILE_ID (default \"default\")",
+      "output": "recon-output/patchright-smoke-<ts>.png; stdout: PROBE JSON",
+      "args": null,
+      "result": null,
+      "exit": {
+        "0": "успех",
+        "1": "patchright / профиль не запущен"
+      },
+      "tool": false,
+      "example": [
+        "PROFILE_ID=p_mwnqhvvi_rm0d node scripts/mjs/recon-patchright-smoke.mjs"
       ]
     },
     {
