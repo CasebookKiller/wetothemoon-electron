@@ -59,7 +59,14 @@ scripts/
 - `manifest.json` — сгенерирован, 6 скриптов
 - Оригиналы `scripts/*.mjs` **не тронуты** — приложение (`handoffBuilder.ts:274`, `package.json`) работает со старыми путями
 
-**TODO:**
-- Перенести остальные 40+ скриптов (recon-*, md-*, test-*, inject-*) — по мере касания
-- `scripts/README.md` — человеческий индекс
-- **Проверка вызовов (2026-11-23):** приложение использует `\scripts/mjs/preflight-check.mjs`. Root-версия → `scripts/_backup/`. Ссылка в `handoffBuilder.ts:278` обновлена.
+**Закрыто 2026-11-23:** см. «Итог 2026-11-23» выше. Все `.mjs`/`.sh` в root разобраны
+(mjs / bash / `_backup/`), manifest актуален (`mjs: 40, bash: 3`).
+
+**Осталось (не блокеры):**
+- `scripts/README.md` — человеческий индекс (пока `manifest.json` + `_backup/README.md`)
+- `scripts/kad-test/` (OSINT/SIETCH) и `scripts/zepp/` (prana-bindu) — перенести
+  в правильный модуль или удалить, при касании этих модулей
+- `scripts/test-intervals-abort.mjs` — prana-bindu, разобрать в сессии prana-bindu
+- Pre-existing баги (отмечены в headers, не чинились):
+  `recon-dump-dom --anon`, `recon-stream-formatting` (import 'playwright'),
+  `recon-web-sources` (`searchSearchFields` typo)

@@ -28,12 +28,13 @@ Root-версии устарели, канон — в подпапках.
   эксперимент закрыт. Документированы в `docs/prompts/gateway/topics/03_RECON.md:88`
   как «профиль-меню (5 версий)».
 
-### 4. Не Gateway (перенести в правильный модуль при касании)
-- `kad-test/` (5 файлов) — тестовый harness **Kad.Arbitr** (OSINT/SIETCH).
-  См. `src/main/services/osint/scrapers/kadArbitr/`. Перенести в `osint/scripts/`
-  или удалить, если устарел.
-- `zepp/` (2 файла) — probes клиента Zepp (prana-bindu). См.
-  `src/main/services/pranaBindu/melange/`. Перенести в `prana-bindu/scripts/`.
+### 4. Не Gateway (НЕ перенесены — остаются в `scripts/`, ждут решения)
+- `scripts/kad-test/` (5 файлов) — тестовый harness **Kad.Arbitr** (OSINT/SIETCH).
+  См. `src/main/services/osint/scrapers/kadArbitr/`. Кандидат на `osint/scripts/`
+  или удаление. **Не в `_backup/`** — Q2 отклонён 2026-11-23.
+- `scripts/zepp/` (2 файла) — probes клиента Zepp (prana-bindu). См.
+  `src/main/services/pranaBindu/melange/`. Кандидат на `prana-bindu/scripts/`.
+  **Не в `_backup/`** — Q2 отклонён 2026-11-23.
 
 > **Оставлено на месте (не в `_backup/`):** `test-intervals-abort.mjs` в `scripts/` —
 > prana-bindu, разбирается отдельной сессией.
