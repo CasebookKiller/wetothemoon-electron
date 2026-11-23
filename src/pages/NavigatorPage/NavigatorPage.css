@@ -3,3 +3,174 @@
 .navigator-page-root {
   /* Сюда — стили страницы (не компонентов). Компоненты — через --module-accent и общие классы. */
 }
+
+.navigator-markdown > :first-child { margin-top: 0; }
+.navigator-markdown > :last-child { margin-bottom: 0; }
+.navigator-markdown p { margin: 0 0 8px; line-height: 1.5; }
+.navigator-markdown h1 { font-size: 18px; margin: 12px 0 6px; font-weight: 600; }
+.navigator-markdown h2 { font-size: 16px; margin: 12px 0 6px; font-weight: 600; }
+.navigator-markdown h3 { font-size: 14px; margin: 10px 0 4px; font-weight: 600; color: #00e5ff; }
+.navigator-markdown h4 { font-size: 13px; margin: 8px 0 4px; font-weight: 600; }
+.navigator-markdown ul, .navigator-markdown ol { margin: 4px 0 8px; padding-left: 22px; }
+.navigator-markdown li { margin: 2px 0; }
+.navigator-markdown code {
+  background: rgba(0,229,255,0.08);
+  border: 1px solid rgba(0,229,255,0.15);
+  padding: 1px 5px; border-radius: 3px;
+  font-family: ui-monospace, monospace; font-size: 12px; color: #a6f0ff;
+}
+.navigator-markdown pre {
+  background: rgba(0,0,0,0.35);
+  border: 1px solid rgba(0,229,255,0.12);
+  padding: 10px 12px; border-radius: 6px;
+  overflow-x: auto; margin: 8px 0;
+}
+.navigator-markdown pre code { background: transparent; border: none; padding: 0; color: #d0f0f8; }
+.navigator-markdown blockquote {
+  border-left: 3px solid rgba(0,229,255,0.4);
+  margin: 8px 0; padding: 4px 12px; color: #a0a0a0;
+}
+.navigator-markdown a { color: #00e5ff; text-decoration: underline; }
+.navigator-markdown table { border-collapse: collapse; margin: 8px 0; font-size: 12px; }
+.navigator-markdown th, .navigator-markdown td { border: 1px solid rgba(0,229,255,0.15); padding: 4px 8px; text-align: left; }
+.navigator-markdown th { background: rgba(0,229,255,0.06); font-weight: 600; }
+.navigator-markdown strong, .navigator-markdown b { font-weight: 600; color: #fff; }
+
+/* ─── Prism-токены внутри .navigator-markdown ───
+   GigaChat отдаёт уже подсвеченный HTML (class="token keyword" и т.д.),
+   нужен только CSS. Палитра — One Dark Pro с cyan-акцентом под тему модуля.
+   Scoped через .navigator-markdown — не конфликтует с Gateway. */
+.navigator-markdown .token.comment,
+.navigator-markdown .token.prolog,
+.navigator-markdown .token.doctype,
+.navigator-markdown .token.cdata {
+  color: #6a7a8c;
+  font-style: italic;
+}
+.navigator-markdown .token.punctuation { color: #89ddff; }
+.navigator-markdown .token.property,
+.navigator-markdown .token.tag,
+.navigator-markdown .token.constant,
+.navigator-markdown .token.symbol,
+.navigator-markdown .token.deleted { color: #f78c6c; }
+.navigator-markdown .token.boolean,
+.navigator-markdown .token.number { color: #f78c6c; }
+.navigator-markdown .token.selector,
+.navigator-markdown .token.attr-name,
+.navigator-markdown .token.string,
+.navigator-markdown .token.char,
+.navigator-markdown .token.builtin,
+.navigator-markdown .token.inserted { color: #c3e88d; }
+.navigator-markdown .token.operator,
+.navigator-markdown .token.entity,
+.navigator-markdown .token.url { color: #89ddff; }
+.navigator-markdown .token.atrule,
+.navigator-markdown .token.attr-value,
+.navigator-markdown .token.keyword { color: #c792ea; }
+.navigator-markdown .token.function,
+.navigator-markdown .token.class-name { color: #ffcb6b; }
+.navigator-markdown .token.regex,
+.navigator-markdown .token.important,
+.navigator-markdown .token.variable { color: #f78c6c; }
+.navigator-markdown .token.important,
+.navigator-markdown .token.bold { font-weight: 600; }
+.navigator-markdown .token.italic { font-style: italic; }
+
+/* ─── GigaChat code blocks ───
+   GigaChat отдаёт HTML с классами CodeBlock-styled__* (styled-components).
+   sc-хеши меняются между версиями GigaChat, но префиксы стабильны.
+   Используем [class*="..."] — не привязаны к конкретному хешу.
+   Стили scoped внутри .navigator-markdown — не конфликтуют с Gateway. */
+
+/* Контейнер */
+.navigator-markdown [class*="CodeBlock-styled__Container"] {
+  margin: 12px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #1a1f26;
+  border: 1px solid rgba(0, 229, 255, 0.12);
+}
+
+/* Шапка: язык слева, кнопка справа */
+.navigator-markdown [class*="CodeBlock-styled__Header"] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(0, 229, 255, 0.1);
+  font-family: ui-monospace, 'Cascadia Code', monospace;
+}
+
+/* Язык */
+.navigator-markdown [class*="CodeBlock-styled__Header"] > span:first-child {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 500;
+  color: #7a8a9a;
+}
+
+/* Кнопка "Копировать" — сбрасываем глобальные стили */
+.navigator-markdown [class*="CodeBlock-styled__Action"] {
+  background: transparent !important;
+  border: 1px solid rgba(0, 229, 255, 0.25) !important;
+  color: #00e5ff !important;
+  font-size: 11px !important;
+  font-family: ui-monospace, monospace !important;
+  padding: 3px 10px !important;
+  border-radius: 4px !important;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  line-height: 1.2 !important;
+  min-width: 0 !important;
+  height: auto !important;
+}
+
+.navigator-markdown [class*="CodeBlock-styled__Action"]:hover {
+  background: rgba(0, 229, 255, 0.1) !important;
+  border-color: rgba(0, 229, 255, 0.6) !important;
+}
+
+.navigator-markdown [class*="CodeBlock-styled__Action"]:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Сам блок с кодом — убираем дублирование padding/border */
+.navigator-markdown [class*="CodeBlock-styled__StyledPre"] {
+  margin: 0 !important;
+  padding: 12px !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  overflow-x: auto;
+  font-size: 12px;
+  line-height: 1.5;
+  tab-size: 2;
+}
+
+/* Код внутри */
+.navigator-markdown [class*="CodeBlock-styled__StyledPre"] code {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  color: #d0f0f8 !important;
+  font-family: ui-monospace, 'Cascadia Code', 'Fira Code', monospace !important;
+  font-size: inherit !important;
+}
+
+.navigator-markdown [class*="CodeBlock-styled__Action"] {
+  font-size: 0 !important; /* скрыть текст */
+  padding: 4px !important;
+  width: 28px !important;
+  height: 24px !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+}
+.navigator-markdown [class*="CodeBlock-styled__Action"]::before {
+  content: '⧉'; /* или SVG через mask-image */
+  font-size: 13px;
+  line-height: 1;
+}
