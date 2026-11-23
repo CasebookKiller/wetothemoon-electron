@@ -418,6 +418,7 @@ try {
       ipcRenderer.invoke('osint:check-credentials', site),
     
     openGatewayWindow: () => ipcRenderer.invoke('gateway:open-window'),
+    openNavigatorWindow: () => ipcRenderer.invoke('navigator:open-window'),
     gatewayLaunch: () => ipcRenderer.invoke('gateway:launch'),
     gatewayLaunchByProfile: (profileId: string) =>
       ipcRenderer.invoke('gateway:launch-by-profile', profileId),

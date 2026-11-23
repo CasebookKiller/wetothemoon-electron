@@ -1,0 +1,5 @@
+/* src/pages/NavigatorPage/NavigatorPage.css */
+
+.navigator-page-root {
+  /* Сюда — стили страницы (не компонентов). Компоненты — через --module-accent и общие классы. */
+}

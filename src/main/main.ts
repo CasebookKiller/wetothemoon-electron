@@ -54,6 +54,7 @@ import {
   mdWindowMenuTemplate,
   osintWindowMenuTemplate,
   gatewayWindowMenuTemplate,
+  navigatorWindowMenuTemplate,
   databaseWindowMenuTemplate,
   pranaBinduWindowMenuTemplate
 } from './menus/windowMenus.ts';
@@ -85,7 +86,9 @@ import { setAutonomousTraderInstance } from './ipcHandlers/tradingAssistantHandl
 
 import { marketDataBus } from './services/marketDataBus';
 import { registerGatewayHandlers } from './ipcHandlers/gatewayHandlers';
+import { registerNavigatorHandlers } from './ipcHandlers/navigatorHandlers';
 import { createGatewayWindow, getGatewayWindow } from './windows/gatewayWindow.ts';
+import { createNavigatorWindow, getNavigatorWindow } from './windows/navigatorWindow.ts';
 
 import { createDatabaseWindow, getDatabaseWindow } from './windows/databaseWindow';
 import { createPranaBinduWindow, getPranaBinduWindow } from './windows/pranaBinduWindow.ts';
@@ -317,6 +320,7 @@ app.whenReady().then(() => {
     });
 
   registerGatewayHandlers();
+  registerNavigatorHandlers();
   
   // Melange: открываем БД ДО регистрации хендлеров,
   // чтобы репозитории сразу были доступны.
@@ -470,6 +474,18 @@ ipcMain.handle('gateway:open-window', () => {
   const win = createGatewayWindow();
   if (win) {
     applyMenuToWindow(win, gatewayWindowMenuTemplate);
+  }
+});
+
+ipcMain.handle('navigator:open-window', () => {
+  const existing = getNavigatorWindow();
+  if (existing && !existing.isDestroyed()) {
+    existing.focus();
+    return;
+  }
+  const win = createNavigatorWindow();
+  if (win) {
+    applyMenuToWindow(win, navigatorWindowMenuTemplate);
   }
 });
 

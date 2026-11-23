@@ -15,6 +15,7 @@ export const mainMenuTemplate: MenuItemConstructorOptions[] = [
       { label: 'Открыть Взгляд Фримена', id: 'open-osint' },
       { label: 'Открыть Ситч', id: 'open-database' },
       { label: 'Открыть Шлюз', id: 'open-gateway' },
+      { label: 'Открыть Navigator', id: 'open-navigator' },
       { label: 'Открыть Прана-Бинду', id: 'open-prana-bindu' },
       { type: 'separator' },
       { label: 'Выйти', click: () => app.quit(), accelerator: 'CmdOrCtrl+Q' }
@@ -344,6 +345,29 @@ export const databaseWindowMenuTemplate: MenuItemConstructorOptions[] = [
       { role: 'resetZoom' },
       { role: 'zoomIn' },
       { role: 'zoomOut' }
+    ]
+  }
+];
+
+export const navigatorWindowMenuTemplate: MenuItemConstructorOptions[] = [
+  {
+    label: 'Файл',
+    submenu: [
+      { role: 'close' }
+    ]
+  },
+  {
+    label: 'Вид',
+    submenu: [
+      { role: 'reload' },
+      { role: 'forceReload' },
+      { role: 'toggleDevTools' },
+      { type: 'separator' },
+      { role: 'resetZoom' },
+      { role: 'zoomIn' },
+      { role: 'zoomOut' },
+      { type: 'separator' },
+      { role: 'togglefullscreen' }
     ]
   }
 ];

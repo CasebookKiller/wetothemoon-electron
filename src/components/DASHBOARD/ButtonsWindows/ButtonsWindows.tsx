@@ -45,6 +45,8 @@ export const ButtonsWindows = () => {
     { label: 'Ситч', icon: 'inventory_2', action: call('openDatabaseWindow') },
     // Новая кнопка «Шлюз»
     { label: 'Шлюз', icon: 'router', action: call('openGatewayWindow') },
+    // Navigator — универсальный Browser Hub
+    { label: 'Навигатор', icon: 'explore', action: call('openNavigatorWindow') },
     { label: 'Прана-Бинду', icon: 'monitor_heart', action: callPb('openWindow') },
 
     // Заглушки
