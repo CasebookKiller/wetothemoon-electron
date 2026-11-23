@@ -35,6 +35,19 @@ scripts/
 
 ## Приоритет: высокий
 
+## Статус (2026-11-23, реорганизация завершена)
+
+**Итог:** `scripts/{mjs(40),bash(3),python(0), _backup/}`
+- **mjs/** (40): 6 базовых, 3 recon-gigachat, 2 test-context-*, 6 test-deepseek/*, 5 md-*, 4 handoff/context, 3 recon batch1, 3 cookies/profiles (tracked), 3 recon batch3 (tracked), 3 recon batch4, 3 recon batch5.
+- **bash/** (3): `sync-submodule`, `recon`, `recon-symbols`.
+- **root**: пусто (все `.mjs`/`.sh` разобраны).
+- **_backup/** (21): 5 root-дублей, 5 мёртвых утилит, 5 profile-menu, 1 inject-cookies, `kad-test/` (5, не Gateway), `zepp/` (2, не Gateway). См. `scripts/_backup/README.md`.
+- **Не тронуто:** `test-intervals-abort.mjs` (prana-bindu, отдельная сессия), `kad-test/`, `zepp/` — ждут решения по принадлежности модулю.
+
+**.gitignore** — whitelist `!scripts/mjs/recon-*.mjs` (12 имён) для документированных recon; `recon-*.candidates/discovered.json` остаются в `scripts/` и не трекаются.
+
+**Дальше:** прогон `node scripts/mjs/scripts-index.mjs` + `mjs/scripts-index.mjs` как основа `topics/08_JSON_TOOLS.md` (tool-calling).
+
 ## Статус (2026-11-21)
 
 **Сделано:**
