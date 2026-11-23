@@ -4,7 +4,7 @@
 > (два блока: что найти, на что заменить). Не давай diff, не давай «весь файл
 > заново», не давай «вставь после строки N» — только find/replace.
 
-1. `cd ~/Документы/GitHub/wetothemoon-project/wetothemoon-electron && node scripts/preflight-check.mjs` — 10 сек.
+1. `cd ~/Документы/GitHub/wetothemoon-project/wetothemoon-electron && node scripts/mjs/preflight-check.mjs` — 10 сек.
 2. Прочитать handoff (`.md`).
 3. Если HEAD ушёл вперёд — `git log --oneline -10` покажет diff.
 4. `git status --short` — что не закоммичено.

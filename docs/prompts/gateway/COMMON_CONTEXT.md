@@ -63,7 +63,7 @@
 
 В конце каждой сессии обязательно:
 1. `wm-backup`
-2. bump submodule (`bash scripts/sync-submodule.sh`)
+2. bump submodule (`bash scripts/bash/sync-submodule.sh`)
 3. `git push origin main` (submodule + parent)
 
 ## 🔌 Провайдеры

@@ -9,4 +9,4 @@
 - `.gitmodules` — submodule registration
 
 ## Bump submodule
-После коммитов в `wetothemoon-electron/` — `bash scripts/sync-submodule.sh`.
+После коммитов в `wetothemoon-electron/` — `bash scripts/bash/sync-submodule.sh`.

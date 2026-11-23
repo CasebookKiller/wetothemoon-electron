@@ -49,4 +49,4 @@ scripts/
 **TODO:**
 - Перенести остальные 40+ скриптов (recon-*, md-*, test-*, inject-*) — по мере касания
 - `scripts/README.md` — человеческий индекс
-- **Проверка вызовов:** приложение использует `scripts/preflight-check.mjs` (без `mjs/`) — не сломать при будущем `mv`
+- **Проверка вызовов (2026-11-23):** приложение использует `\scripts/mjs/preflight-check.mjs`. Root-версия → `scripts/_backup/`. Ссылка в `handoffBuilder.ts:278` обновлена.
