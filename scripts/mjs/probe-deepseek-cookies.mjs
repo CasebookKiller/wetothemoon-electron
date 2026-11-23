@@ -1,16 +1,22 @@
-// scripts/probe-deepseek-cookies.mjs
-//
-// Снимок куки профиля → таблица + JSON в /tmp/wm-cookie-snapshots/.
-// Запуск:
-//   node --import tsx scripts/probe-deepseek-cookies.mjs
-//   node --import tsx scripts/probe-deepseek-cookies.mjs --profile p_mwlvf2ym_mmej
-//   node --import tsx scripts/probe-deepseek-cookies.mjs --domains deepseek,giga,alice
+// scripts/mjs/probe-deepseek-cookies.mjs
+/**
+ * @name probe-deepseek-cookies
+ * @purpose Снимок куки профиля (через cookieTracker) → таблица в stdout + JSON в /tmp/wm-cookie-snapshots/
+ * @input argv: [--profile <id>] [--domains deepseek,giga,alice]; env: WM_USER_DATA (default ~/.config/wetothemoon-electron)
+ * @output stdout: таблица cookies (src/name/domain/hOnly/secure/hash/expires); файл: /tmp/wm-cookie-snapshots/cookies-<id>-<ts>.json
+ * @args { "type": "object", "properties": { "profile": { "type": "string" }, "domains": { "type": "string", "default": "deepseek" } } }
+ * @result null
+ * @exit 0 — успех
+ * @exit 1 — реестр не найден / профиль не найден
+ * @tool false
+ * @example node --import tsx scripts/mjs/probe-deepseek-cookies.mjs --domains deepseek,giga
+ */
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const USER_DATA = process.env.WM_USER_DATA
   ?? path.join(os.homedir(), '.config', 'wetothemoon-electron');
 const REGISTRY = path.join(USER_DATA, 'gateway-profiles.json');

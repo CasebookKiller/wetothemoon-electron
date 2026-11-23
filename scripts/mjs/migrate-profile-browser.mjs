@@ -1,12 +1,23 @@
-// scripts/migrate-profile-browser.mjs
+// scripts/mjs/migrate-profile-browser.mjs
+/**
+ * @name migrate-profile-browser
+ * @purpose Переключение профиля Gateway между yandex и chrome (browserKind/chromeCdpPort) + бэкап gateway-profiles.json
+ * @input argv: --to {chrome|yandex} (обязателен), --id <profileId> (default "default"), --dry-run
+ * @output изменение ~/.config/wetothemoon-electron/gateway-profiles.json + .bak-<ts>; stdout: before/after
+ * @args { "type": "object", "properties": { "to": { "enum": ["chrome", "yandex"] }, "id": { "type": "string", "default": "default" }, "dryRun": { "type": "boolean", "default": false } }, "required": ["to"] }
+ * @result null
+ * @exit 0 — успех / --help / --dry-run
+ * @exit 1 — нет --to / --to не из {chrome,yandex} / реестр не найден / профиль не найден
+ * @tool false
+ * @example node scripts/mjs/migrate-profile-browser.mjs --to chrome --id p_xxx --dry-run
+ */
 // Переводит профиль Gateway между yandex и chrome.
 // Использование:
-//   node scripts/migrate-profile-browser.mjs --to chrome --dry-run
-//   node scripts/migrate-profile-browser.mjs --to chrome            # default → chrome
-//   node scripts/migrate-profile-browser.mjs --to chrome --id p_xxx
-//   node scripts/migrate-profile-browser.mjs --to yandex            # откат
+//   node scripts/mjs/migrate-profile-browser.mjs --to chrome --dry-run
+//   node scripts/mjs/migrate-profile-browser.mjs --to chrome
+//   node scripts/mjs/migrate-profile-browser.mjs --to chrome --id p_xxx
+//   node scripts/mjs/migrate-profile-browser.mjs --to yandex
 // Делает бэкап gateway-profiles.json перед записью.
-
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';

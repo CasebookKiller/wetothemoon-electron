@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-11-23T11:48:31.031Z",
-  "total": 31,
+  "generatedAt": "2026-11-23T11:52:43.225Z",
+  "total": 34,
   "byRuntime": {
-    "mjs": 28,
+    "mjs": 31,
     "bash": 3,
     "python": 0
   },
@@ -156,6 +156,30 @@
       ]
     },
     {
+      "path": "scripts/mjs/inject-cookies-patchright.mjs",
+      "name": "inject-cookies-patchright",
+      "purpose": "Импорт cookies (Cookie-Editor JSON) в Chrome-профиль через patchright + проверка сессии на chat.deepseek.com",
+      "input": "argv[2]=path к JSON cookies (default ~/acc2-cookies.json); env: PROFILE_ID (default p_mwk7xx3i_nb4l), CDP_DEBUG (0|1)",
+      "output": "storage.json профиля; recon-output/inject-chrome-<ts>.png; stdout: PROBE JSON",
+      "args": {
+        "type": "object",
+        "properties": {
+          "cookiesJson": {
+            "type": "string"
+          }
+        }
+      },
+      "result": null,
+      "exit": {
+        "0": "успех",
+        "1": "нет JSON / не массив cookies / сессия не принята"
+      },
+      "tool": false,
+      "example": [
+        "node scripts/mjs/inject-cookies-patchright.mjs ~/acc2-cookies.json"
+      ]
+    },
+    {
       "path": "scripts/mjs/md-compare.mjs",
       "name": "md-compare",
       "purpose": "Сравнение 3 дампов (PW/DB/DOM) по metrics/classes/tags + первая различающаяся подстрока",
@@ -287,6 +311,44 @@
       ]
     },
     {
+      "path": "scripts/mjs/migrate-profile-browser.mjs",
+      "name": "migrate-profile-browser",
+      "purpose": "Переключение профиля Gateway между yandex и chrome (browserKind/chromeCdpPort) + бэкап gateway-profiles.json",
+      "input": "argv: --to {chrome|yandex} (обязателен), --id <profileId> (default \"default\"), --dry-run",
+      "output": "изменение ~/.config/wetothemoon-electron/gateway-profiles.json + .bak-<ts>; stdout: before/after",
+      "args": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "enum": [
+              "chrome",
+              "yandex"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "default": "default"
+          },
+          "dryRun": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "to"
+        ]
+      },
+      "result": null,
+      "exit": {
+        "0": "успех / --help / --dry-run",
+        "1": "нет --to / --to не из {chrome,yandex} / реестр не найден / профиль не найден"
+      },
+      "tool": false,
+      "example": [
+        "node scripts/mjs/migrate-profile-browser.mjs --to chrome --id p_xxx --dry-run"
+      ]
+    },
+    {
       "path": "scripts/mjs/preflight-check.mjs",
       "name": "preflight-check",
       "purpose": "Проверка состояния проекта: git, submodule, schema, БД, manifest, .env, бэкапы",
@@ -321,6 +383,34 @@
       "tool": false,
       "example": [
         "node scripts/mjs/preflight-check.mjs --fast"
+      ]
+    },
+    {
+      "path": "scripts/mjs/probe-deepseek-cookies.mjs",
+      "name": "probe-deepseek-cookies",
+      "purpose": "Снимок куки профиля (через cookieTracker) → таблица в stdout + JSON в /tmp/wm-cookie-snapshots/",
+      "input": "argv: [--profile <id>] [--domains deepseek,giga,alice]; env: WM_USER_DATA (default ~/.config/wetothemoon-electron)",
+      "output": "stdout: таблица cookies (src/name/domain/hOnly/secure/hash/expires); файл: /tmp/wm-cookie-snapshots/cookies-<id>-<ts>.json",
+      "args": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "type": "string"
+          },
+          "domains": {
+            "type": "string",
+            "default": "deepseek"
+          }
+        }
+      },
+      "result": null,
+      "exit": {
+        "0": "успех",
+        "1": "реестр не найден / профиль не найден"
+      },
+      "tool": false,
+      "example": [
+        "node --import tsx scripts/mjs/probe-deepseek-cookies.mjs --domains deepseek,giga"
       ]
     },
     {

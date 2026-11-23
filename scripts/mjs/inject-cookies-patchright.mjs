@@ -1,10 +1,24 @@
-// scripts/inject-cookies-patchright.mjs
-// Импорт cookies (Cookie-Editor JSON) в Chrome-профиль через patchright.
-
+// scripts/mjs/inject-cookies-patchright.mjs
+/**
+ * @name inject-cookies-patchright
+ * @purpose Импорт cookies (Cookie-Editor JSON) в Chrome-профиль через patchright + проверка сессии на chat.deepseek.com
+ * @input argv[2]=path к JSON cookies (default ~/acc2-cookies.json); env: PROFILE_ID (default p_mwk7xx3i_nb4l), CDP_DEBUG (0|1)
+ * @output storage.json профиля; recon-output/inject-chrome-<ts>.png; stdout: PROBE JSON
+ * @args { "type": "object", "properties": { "cookiesJson": { "type": "string" } } }
+ * @result null
+ * @exit 0 — успех
+ * @exit 1 — нет JSON / не массив cookies / сессия не принята
+ * @tool false
+ * @example node scripts/mjs/inject-cookies-patchright.mjs ~/acc2-cookies.json
+ */
 import { chromium } from 'patchright';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const ROOT = path.resolve(__dirname, '../..');
 
 const COOKIES_JSON = process.argv[2] || path.join(os.homedir(), 'acc2-cookies.json');
 const PROFILE_ID   = process.env.PROFILE_ID || 'p_mwk7xx3i_nb4l';
@@ -68,7 +82,7 @@ try {
   fs.writeFileSync(storageJson, JSON.stringify(state, null, 2));
   console.log('\n💾 storage.json: ' + storageJson + '  (cookies: ' + (state.cookies?.length || 0) + ')');
 
-  const shot = path.join(process.cwd(), 'recon-output', 'inject-chrome-' + Date.now() + '.png');
+  const shot = path.join(ROOT, 'recon-output', 'inject-chrome-' + Date.now() + '.png');
   fs.mkdirSync(path.dirname(shot), { recursive: true });
   await page.screenshot({ path: shot });
   console.log('📸 ' + shot);
