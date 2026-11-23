@@ -1,0 +1,9 @@
+.gateway-profiles-list::-webkit-scrollbar { width: 6px; }
+.gateway-profiles-list::-webkit-scrollbar-track { background: transparent; }
+.gateway-profiles-list::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.12);
+  border-radius: 4px;
+}
+.gateway-profiles-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.22);
+}

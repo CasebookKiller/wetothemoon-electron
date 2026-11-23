@@ -7,6 +7,8 @@ import { CloseIcon } from '../GatewayIcons/GatewayIcons';
 import { HandoffTab } from './HandoffTab';
 import { Dropdown } from 'primereact/dropdown';
 
+import './GatewayAccountsDialog.css'
+
 const getApi = () =>
   (window as Window & typeof globalThis & { electronAPI?: any })?.electronAPI;
 
@@ -262,10 +264,12 @@ export const GatewayAccountsDialog: React.FC<GatewayAccountsDialogProps> = ({
         style={{
           width: 720,
           maxWidth: '92vw',
+          height: '85vh',
           maxHeight: '85vh',
-          ...(tab === 'handoff'
-            ? { display: 'flex' as const, flexDirection: 'column' as const, minHeight: 0, overflow: 'hidden' as const }
-            : null),
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: 0,
+          overflow: 'hidden',
         }}
       >
         
@@ -329,7 +333,7 @@ export const GatewayAccountsDialog: React.FC<GatewayAccountsDialogProps> = ({
         </div>
 
         {/* List */}
-        <div style={{ flex: 1, overflowY: 'auto', marginBottom: 16, minHeight: 200, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div className="gateway-profiles-list" style={{ flex: 1, overflowY: 'auto', marginBottom: 16, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
           {!state && <div style={{ padding: 20, textAlign: 'center', opacity: 0.6 }}>Загрузка…</div>}
           {state && state.profiles.length === 0 && (
             <div style={{ padding: 20, textAlign: 'center', opacity: 0.6 }}>Нет профилей</div>
