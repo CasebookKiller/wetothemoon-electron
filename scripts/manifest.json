@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-11-23T11:17:26.103Z",
-  "total": 21,
+  "generatedAt": "2026-11-23T11:31:57.850Z",
+  "total": 28,
   "byRuntime": {
-    "mjs": 18,
+    "mjs": 25,
     "bash": 3,
     "python": 0
   },
@@ -153,6 +153,137 @@
       "tool": false,
       "example": [
         "node scripts/mjs/gen-context-manifest.mjs"
+      ]
+    },
+    {
+      "path": "scripts/mjs/md-compare.mjs",
+      "name": "md-compare",
+      "purpose": "Сравнение 3 дампов (PW/DB/DOM) по metrics/classes/tags + первая различающаяся подстрока",
+      "input": "argv: [pwPath] [dbPath] [domPath] (defaults md-recon/{pw,db,dom}-dump.json)",
+      "output": "stdout: metrics diff, потерянные/добавленные классы, теги, first-diff позиция",
+      "args": {
+        "type": "object",
+        "properties": {
+          "pwPath": {
+            "type": "string"
+          },
+          "dbPath": {
+            "type": "string"
+          },
+          "domPath": {
+            "type": "string"
+          }
+        }
+      },
+      "result": null,
+      "exit": {
+        "0": "всё совпадает",
+        "1": "есть расхождения / нет pw-dump"
+      },
+      "tool": false,
+      "example": [
+        "node scripts/mjs/md-compare.mjs md-recon/pw-dump.json md-recon/gw-db-dump.json md-recon/gw-dom-dump.json"
+      ]
+    },
+    {
+      "path": "scripts/mjs/md-dump-gw-db.mjs",
+      "name": "md-dump-gw-db",
+      "purpose": "Дамп content_html ассистентского сообщения из gateway.db + metrics",
+      "input": "env: OUT (default md-recon/gw-db-dump.json), MSG_KEY (опц.), GW_USER_DATA (опц.)",
+      "output": "<OUT>.json + <OUT>.html; stdout: путь, колонки, metrics",
+      "args": null,
+      "result": null,
+      "exit": {
+        "0": "успех",
+        "1": "БД не найдена / сообщение не найдено"
+      },
+      "tool": false,
+      "example": [
+        "MSG_KEY=abc123 node scripts/mjs/md-dump-gw-db.mjs"
+      ]
+    },
+    {
+      "path": "scripts/mjs/md-dump-gw-dom.mjs",
+      "name": "md-dump-gw-dom",
+      "purpose": "Дамп markdown-контейнера из GW renderer через CDP + metrics",
+      "input": "env: CDP_URL (default http://127.0.0.1:9223), OUT (default md-recon/gw-dom-dump.json), MSG_INDEX (default -1 = последнее)",
+      "output": "<OUT>.json + <OUT>.html; stdout: metrics",
+      "args": null,
+      "result": null,
+      "exit": {
+        "0": "успех",
+        "1": "renderer не найден / markdown-контейнер не найден"
+      },
+      "tool": false,
+      "example": [
+        "node scripts/mjs/md-dump-gw-dom.mjs"
+      ]
+    },
+    {
+      "path": "scripts/mjs/md-dump-pw.mjs",
+      "name": "md-dump-pw",
+      "purpose": "Дамп эталонного `.ds-markdown` из живого PW (deepseek.com) через CDP + metrics",
+      "input": "env: CDP_URL (default http://127.0.0.1:9222), OUT (default md-recon/pw-dump.json), MSG_INDEX (default -1)",
+      "output": "<OUT>.json + <OUT>.html; stdout: metrics",
+      "args": null,
+      "result": null,
+      "exit": {
+        "0": "успех",
+        "1": "нет вкладки deepseek.com / ds-markdown не найден"
+      },
+      "tool": false,
+      "example": [
+        "node scripts/mjs/md-dump-pw.mjs"
+      ]
+    },
+    {
+      "path": "scripts/mjs/md-live-probe.mjs",
+      "name": "md-live-probe",
+      "purpose": "Live-снапшоты стрима (длительность LIVE_MS) в recon-output/live-stream.jsonl — детект throttle/мерцания",
+      "input": "env: CDP_URL (default http://127.0.0.1:9222), LIVE_MS (default 60000)",
+      "output": "recon-output/live-stream.jsonl (append по каждому изменению .ds-markdown)",
+      "args": null,
+      "result": null,
+      "exit": {
+        "0": "успех (по таймауту)",
+        "1": "нет вкладки deepseek.com"
+      },
+      "tool": false,
+      "example": [
+        "LIVE_MS=30000 node scripts/mjs/md-live-probe.mjs"
+      ]
+    },
+    {
+      "path": "scripts/mjs/md-pipeline-compare.mjs",
+      "name": "md-pipeline-compare",
+      "purpose": "Сравнение 4 слоёв (IDB/PW/DB/GW-DOM) из md-recon/pipeline/ + первая точка разрыва по парам",
+      "input": "(нет аргументов; читает md-recon/pipeline/{A-indexeddb-raw,B-pw-fullhtml,C-db-html,D-gw-dom}.{json,html})",
+      "output": "stdout: таблица 4 слоёв, диффы по парам, позиции разрывов",
+      "args": null,
+      "result": null,
+      "exit": {
+        "0": "успех (даже при расхождениях)"
+      },
+      "tool": false,
+      "example": [
+        "node scripts/mjs/md-pipeline-compare.mjs"
+      ]
+    },
+    {
+      "path": "scripts/mjs/md-pipeline-probe.mjs",
+      "name": "md-pipeline-probe",
+      "purpose": "Полный probe пайплайна: IDB PW → PW DOM → gateway.db → GW DOM по MATCH_TEXT, дumps в md-recon/pipeline/",
+      "input": "env: MATCH_TEXT (обязателен), PROFILE_ID, PW_CDP (auto из gateway-profiles.json cdpPort), GW_CDP (default :9223), GW_DB (auto)",
+      "output": "md-recon/pipeline/{A-indexeddb-raw,B-pw-fullhtml,C-db-html,D-gw-dom}.{json,html}; stdout: цепочка",
+      "args": null,
+      "result": null,
+      "exit": {
+        "0": "успех",
+        "1": "нет gateway-profiles.json / MATCH_TEXT / нет вкладки deepseek.com"
+      },
+      "tool": false,
+      "example": [
+        "MATCH_TEXT=\"код\" node scripts/mjs/md-pipeline-probe.mjs"
       ]
     },
     {
