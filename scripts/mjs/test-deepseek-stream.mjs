@@ -1,4 +1,16 @@
-// scripts/test-deepseek-stream.mjs
+// scripts/mjs/test-deepseek-stream.mjs
+/**
+ * @name test-deepseek-stream
+ * @purpose Стриминг reasoning vs content на deepseek-flash/v4-pro при разных effort/max_tokens; timing первого чанка
+ * @input env: DEEPSEEK_API_KEY или VITE_DEEPSEEK_API_KEY
+ * @output stdout: reasoning/content/usage/timing по трём прогонам
+ * @args null
+ * @result null
+ * @exit 0 — успех
+ * @exit 1 — нет ключа / HTTP error
+ * @tool false
+ * @example node scripts/mjs/test-deepseek-stream.mjs
+ */
 // Стриминг: reasoning vs content, на обеих моделях.
 import fs from 'node:fs';
 import path from 'node:path';

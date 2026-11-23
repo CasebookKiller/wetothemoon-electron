@@ -1,11 +1,26 @@
-// scripts/test-api-usage.mjs
+// scripts/mjs/test-api-usage.mjs
+/**
+ * @name test-api-usage
+ * @purpose 1 запрос к DeepSeek API + эмуляция estimateCost + запись в api-usage.jsonl + summary/budget
+ * @input argv: [model] (default deepseek-flash), [effort] (default low); env: DEEPSEEK_API_KEY/VITE_DEEPSEEK_API_KEY, DEEPSEEK_BUDGET_USD (default 10.40)
+ * @output stdout: reasoning/content/usage/costs/SUMMARY/BUDGET; файл: ~/.config/wetothemoon-electron/api-usage.jsonl (append)
+ * @args { "type": "object", "properties": { "model": { "type": "string", "default": "deepseek-flash" }, "effort": { "type": "string", "default": "low" } } }
+ * @result null
+ * @exit 0 — успех
+ * @exit 1 — нет ключа / HTTP error
+ * @tool false
+ * @example node scripts/mjs/test-api-usage.mjs deepseek-flash low
+ */
 // Проверка учёта расхода: делает 1 запрос, показывает summary+budget.
 // DEEPSEEK_BUDGET_USD — задай в .env.local для проверки бюджета.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-
-const envPath = path.join(process.cwd(), '.env.local');
+import { fileURLToPath } from 'node:url';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const ROOT = path.resolve(__dirname, '../..');
+const envPath = path.join(ROOT, '.env.local');
 if (fs.existsSync(envPath)) {
   for (const line of fs.readFileSync(envPath, 'utf8').split('\n')) {
     const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/);

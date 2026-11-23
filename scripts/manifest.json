@@ -1,13 +1,63 @@
 {
-  "generatedAt": "2026-11-21T19:02:53.151Z",
-  "total": 9,
+  "generatedAt": "2026-11-23T11:17:26.103Z",
+  "total": 21,
   "byRuntime": {
-    "mjs": 8,
-    "bash": 1,
+    "mjs": 18,
+    "bash": 3,
     "python": 0
   },
   "tools": [],
   "scripts": [
+    {
+      "path": "scripts/bash/recon-symbols.sh",
+      "name": "recon-symbols",
+      "purpose": "Портативный поиск списка символов по проекту (rg или grep, без битых флагов)",
+      "input": "argv[1]: output_file (по умолчанию: recon-out/04-symbols.txt)",
+      "output": "указанный файл с результатами по списку SYMBOLS",
+      "args": {
+        "type": "object",
+        "properties": {
+          "output_file": {
+            "type": "string",
+            "default": "recon-out/04-symbols.txt"
+          }
+        }
+      },
+      "result": null,
+      "exit": {
+        "0": "успех (даже при 0 hits)",
+        "1": "ошибка записи"
+      },
+      "tool": false,
+      "example": [
+        "bash scripts/bash/recon-symbols.sh recon-out/04-symbols.txt"
+      ]
+    },
+    {
+      "path": "scripts/bash/recon.sh",
+      "name": "recon",
+      "purpose": "Снимок проекта GATEWAY для новой сессии: meta(git/toolchain), tree, manifests, inventory, symbols, recent, db-schema, entrypoints, key-sources, summary",
+      "input": "argv[1]: output_dir (по умолчанию: recon-out)",
+      "output": "<output_dir>/{00..07}-*.txt + key-sources/ + summary.txt",
+      "args": {
+        "type": "object",
+        "properties": {
+          "output_dir": {
+            "type": "string",
+            "default": "recon-out"
+          }
+        }
+      },
+      "result": null,
+      "exit": {
+        "0": "успех",
+        "1": "ошибка (set -euo pipefail)"
+      },
+      "tool": false,
+      "example": [
+        "bash scripts/bash/recon.sh recon-out"
+      ]
+    },
     {
       "path": "scripts/bash/sync-submodule.sh",
       "name": "sync-submodule",
@@ -23,6 +73,62 @@
       "tool": false,
       "example": [
         "bash scripts/bash/sync-submodule.sh"
+      ]
+    },
+    {
+      "path": "scripts/mjs/compare-stream-formatting.mjs",
+      "name": "compare-stream-formatting",
+      "purpose": "Сравнение snapshots живого стрима с финальным HTML: префикс-проверка + монотонный рост (детект регрессий форматирования)",
+      "input": "argv[2]=capture-dir (обязателен, содержит index.json + *.html)",
+      "output": "stdout: отчёт по каждому snapshot + итог; exit code = статус",
+      "args": {
+        "type": "object",
+        "properties": {
+          "captureDir": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "captureDir"
+        ]
+      },
+      "result": null,
+      "exit": {
+        "0": "все snapshots ok",
+        "1": "регрессии",
+        "2": "нет final.html в index.json"
+      },
+      "tool": false,
+      "example": [
+        "node scripts/mjs/compare-stream-formatting.mjs /tmp/capture-2026-11-17"
+      ]
+    },
+    {
+      "path": "scripts/mjs/export-continuation-prompt.mjs",
+      "name": "export-continuation-prompt",
+      "purpose": "Сборка промпта для продолжения разработки (Путь А): manifest + workspaceKeys → .md с бюджетами по kind",
+      "input": "argv[2]=workspaceKeys (CSV, default ACTIVE_WORKSPACE_KEYS), argv[3]=taskTitle (default \"Продолжение разработки\"); env: CONTEXT_MANIFEST",
+      "output": "stdout: сводка + путь файла; файл: recon-output/continuation-<slug>-<ts>.md",
+      "args": {
+        "type": "object",
+        "properties": {
+          "workspaceKeys": {
+            "type": "string"
+          },
+          "taskTitle": {
+            "type": "string",
+            "default": "Продолжение разработки"
+          }
+        }
+      },
+      "result": null,
+      "exit": {
+        "0": "успех",
+        "1": "нет CONTEXT_MANIFEST / пустые workspaceKeys / manifest не найден"
+      },
+      "tool": false,
+      "example": [
+        "node scripts/mjs/export-continuation-prompt.mjs \"wetothemoon-electron/gateway\" \"Задача\""
       ]
     },
     {
@@ -84,6 +190,23 @@
       "tool": false,
       "example": [
         "node scripts/mjs/preflight-check.mjs --fast"
+      ]
+    },
+    {
+      "path": "scripts/mjs/recon-filter-discovered.mjs",
+      "name": "recon-filter-discovered",
+      "purpose": "Фильтр discovered.json: blacklist (фреймворки/docs/соцсети/медиа), dedupe по домену, split chat/api",
+      "input": "recon-free-llms.discovered.json (в scripts/, рядом с родителем)",
+      "output": "recon-free-llms.filtered.json (в scripts/, рядом с родителем)",
+      "args": null,
+      "result": null,
+      "exit": {
+        "0": "успех",
+        "1": "ошибка (нет discovered.json / JSON parse)"
+      },
+      "tool": false,
+      "example": [
+        "node scripts/mjs/recon-filter-discovered.mjs"
       ]
     },
     {
@@ -164,6 +287,35 @@
       ]
     },
     {
+      "path": "scripts/mjs/test-api-usage.mjs",
+      "name": "test-api-usage",
+      "purpose": "1 запрос к DeepSeek API + эмуляция estimateCost + запись в api-usage.jsonl + summary/budget",
+      "input": "argv: [model] (default deepseek-flash), [effort] (default low); env: DEEPSEEK_API_KEY/VITE_DEEPSEEK_API_KEY, DEEPSEEK_BUDGET_USD (default 10.40)",
+      "output": "stdout: reasoning/content/usage/costs/SUMMARY/BUDGET; файл: ~/.config/wetothemoon-electron/api-usage.jsonl (append)",
+      "args": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "default": "deepseek-flash"
+          },
+          "effort": {
+            "type": "string",
+            "default": "low"
+          }
+        }
+      },
+      "result": null,
+      "exit": {
+        "0": "успех",
+        "1": "нет ключа / HTTP error"
+      },
+      "tool": false,
+      "example": [
+        "node scripts/mjs/test-api-usage.mjs deepseek-flash low"
+      ]
+    },
+    {
       "path": "scripts/mjs/test-cont-source.mjs",
       "name": "test-cont-source",
       "purpose": "Проверка buildContinuationSystemPrompt: DB-first vs FS fallback",
@@ -181,6 +333,30 @@
       ]
     },
     {
+      "path": "scripts/mjs/test-context-builder.mjs",
+      "name": "test-context-builder",
+      "purpose": "Сборка system-prompt из context.manifest.json для активного workspace (preview, без API)",
+      "input": "argv[2]=keys (CSV); env: CONTEXT_MANIFEST, ACTIVE_WORKSPACE_KEYS, ACTIVE_CONTEXT_KEY, CONTEXT_MAX_BYTES (default 60000)",
+      "output": "stdout: цепочка/сборка/первые 800 симв.; файл: recon-output/context-prompt-preview.txt",
+      "args": {
+        "type": "object",
+        "properties": {
+          "keys": {
+            "type": "string"
+          }
+        }
+      },
+      "result": null,
+      "exit": {
+        "0": "успех",
+        "1": "нет CONTEXT_MANIFEST / manifest не найден / пустые keys / пустая цепочка"
+      },
+      "tool": false,
+      "example": [
+        "node scripts/mjs/test-context-builder.mjs \"wetothemoon-electron/gateway\""
+      ]
+    },
+    {
       "path": "scripts/mjs/test-context-service.mjs",
       "name": "test-context-service",
       "purpose": "Регрессия contextService: syncManifestToDb, getChain, listVersions, getChildren",
@@ -195,6 +371,81 @@
       "tool": false,
       "example": [
         "node --import tsx scripts/mjs/test-context-service.mjs"
+      ]
+    },
+    {
+      "path": "scripts/mjs/test-continuation-e2e.mjs",
+      "name": "test-continuation-e2e",
+      "purpose": "E2E: свежий continuation-*.md → DeepSeek API как system prompt, проверка плана и ключевых слов контекста",
+      "input": "argv[2]=user question (default \"Продолжаем...\"); env: DEEPSEEK_API_KEY/VITE_DEEPSEEK_API_KEY; читает recon-output/continuation-*.md",
+      "output": "stdout: ответ модели + latency/usage + проверка ключевых слов",
+      "args": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "string"
+          }
+        }
+      },
+      "result": null,
+      "exit": {
+        "0": "успех (2+ ключевых слова найдено)",
+        "1": "нет ключа / нет continuation-*.md / HTTP error"
+      },
+      "tool": false,
+      "example": [
+        "node scripts/mjs/test-continuation-e2e.mjs \"Что делаем дальше?\""
+      ]
+    },
+    {
+      "path": "scripts/mjs/test-deepseek-api.mjs",
+      "name": "test-deepseek-api",
+      "purpose": "Смоук DeepSeek API: GET /models + POST /chat/completions (stream) + печать usage и latency",
+      "input": "env: DEEPSEEK_API_KEY или VITE_DEEPSEEK_API_KEY (через .env.local)",
+      "output": "stdout: список моделей, stream-вывод, usage, latency, статус",
+      "args": null,
+      "result": null,
+      "exit": {
+        "0": "успех",
+        "1": "нет ключа / HTTP error"
+      },
+      "tool": false,
+      "example": [
+        "node scripts/mjs/test-deepseek-api.mjs"
+      ]
+    },
+    {
+      "path": "scripts/mjs/test-deepseek-models.mjs",
+      "name": "test-deepseek-models",
+      "purpose": "Перебор всех моделей DeepSeek (non-stream ping) + aliases; печать текста, reasoning, usage, latency",
+      "input": "env: DEEPSEEK_API_KEY или VITE_DEEPSEEK_API_KEY",
+      "output": "stdout: /models JSON + результаты по каждой модели + aliases",
+      "args": null,
+      "result": null,
+      "exit": {
+        "0": "успех (ошибки по моделям — в stdout)",
+        "1": "нет ключа"
+      },
+      "tool": false,
+      "example": [
+        "node scripts/mjs/test-deepseek-models.mjs"
+      ]
+    },
+    {
+      "path": "scripts/mjs/test-deepseek-stream.mjs",
+      "name": "test-deepseek-stream",
+      "purpose": "Стриминг reasoning vs content на deepseek-flash/v4-pro при разных effort/max_tokens; timing первого чанка",
+      "input": "env: DEEPSEEK_API_KEY или VITE_DEEPSEEK_API_KEY",
+      "output": "stdout: reasoning/content/usage/timing по трём прогонам",
+      "args": null,
+      "result": null,
+      "exit": {
+        "0": "успех",
+        "1": "нет ключа / HTTP error"
+      },
+      "tool": false,
+      "example": [
+        "node scripts/mjs/test-deepseek-stream.mjs"
       ]
     },
     {
@@ -227,6 +478,23 @@
       "tool": false,
       "example": [
         "node scripts/mjs/test-parse-rate-limit.mjs"
+      ]
+    },
+    {
+      "path": "scripts/mjs/test-send-message-api.mjs",
+      "name": "test-send-message-api",
+      "purpose": "Имитация sendMessageViaApi: chat+onDelta-стриминг + запись usage в api-usage.jsonl",
+      "input": "env: DEEPSEEK_API_KEY или VITE_DEEPSEEK_API_KEY",
+      "output": "stdout: стриминг ping-ответа, usage, latency, cost off/peak; файл: api-usage.jsonl (append)",
+      "args": null,
+      "result": null,
+      "exit": {
+        "0": "успех",
+        "1": "нет ключа / HTTP error"
+      },
+      "tool": false,
+      "example": [
+        "node scripts/mjs/test-send-message-api.mjs"
       ]
     }
   ]

@@ -1,10 +1,24 @@
-// scripts/test-deepseek-api.mjs
-// Смоук официального DeepSeek API. Ключ из .env.local или env.
+// scripts/mjs/test-deepseek-api.mjs
+/**
+ * @name test-deepseek-api
+ * @purpose Смоук DeepSeek API: GET /models + POST /chat/completions (stream) + печать usage и latency
+ * @input env: DEEPSEEK_API_KEY или VITE_DEEPSEEK_API_KEY (через .env.local)
+ * @output stdout: список моделей, stream-вывод, usage, latency, статус
+ * @args null
+ * @result null
+ * @exit 0 — успех
+ * @exit 1 — нет ключа / HTTP error
+ * @tool false
+ * @example node scripts/mjs/test-deepseek-api.mjs
+ */// Смоук официального DeepSeek API. Ключ из .env.local или env.
 // Поддерживаем оба имени: DEEPSEEK_API_KEY и VITE_DEEPSEEK_API_KEY.
 import fs from 'node:fs';
 import path from 'node:path';
-
-const envPath = path.join(process.cwd(), '.env.local');
+import { fileURLToPath } from 'node:url';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const ROOT = path.resolve(__dirname, '../..');
+const envPath = path.join(ROOT, '.env.local');
 if (fs.existsSync(envPath)) {
   for (const line of fs.readFileSync(envPath, 'utf8').split('\n')) {
     const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/);

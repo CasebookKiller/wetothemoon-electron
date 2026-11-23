@@ -142,6 +142,7 @@ deepseek_cookies.json
 scripts/dumps/
 .env.local.bak-*
 scripts/mjs/recon-*.mjs
+!scripts/mjs/recon-filter-discovered.mjs
 scripts/recon-*.mjs
 scripts/md-*.mjs
 scripts/inject-cookies.mjs

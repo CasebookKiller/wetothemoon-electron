@@ -1,11 +1,26 @@
-// scripts/test-send-message-api.mjs
+// scripts/mjs/test-send-message-api.mjs
+/**
+ * @name test-send-message-api
+ * @purpose Имитация sendMessageViaApi: chat+onDelta-стриминг + запись usage в api-usage.jsonl
+ * @input env: DEEPSEEK_API_KEY или VITE_DEEPSEEK_API_KEY
+ * @output stdout: стриминг ping-ответа, usage, latency, cost off/peak; файл: api-usage.jsonl (append)
+ * @args null
+ * @result null
+ * @exit 0 — успех
+ * @exit 1 — нет ключа / HTTP error
+ * @tool false
+ * @example node scripts/mjs/test-send-message-api.mjs
+ */
 // Имитирует то, что делает sendMessageViaApi в main-процессе:
 // чат + onDelta-стриминг + запись usage в api-usage.jsonl.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-
-const envPath = path.join(process.cwd(), '.env.local');
+import { fileURLToPath } from 'node:url';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const ROOT = path.resolve(__dirname, '../..');
+const envPath = path.join(ROOT, '.env.local');
 if (fs.existsSync(envPath)) {
   for (const line of fs.readFileSync(envPath, 'utf8').split('\n')) {
     const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/);

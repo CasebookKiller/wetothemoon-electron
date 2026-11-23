@@ -275,7 +275,7 @@ ${diffstat}
 
   // 2. Preflight
   if (opts.includePreflight !== false) {
-    const pf = await sh('node scripts/preflight-check.mjs --fast 2>&1', ROOT, 60_000);
+    const pf = await sh('node scripts/mjs/preflight-check.mjs --fast 2>&1', ROOT, 60_000);
     parts.push(`## Preflight\n\n\`\`\`\n${pf}\n\`\`\`\n`);
     sections.push('preflight');
   }

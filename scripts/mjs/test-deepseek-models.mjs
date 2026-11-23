@@ -1,4 +1,16 @@
-// scripts/test-deepseek-models.mjs
+// scripts/mjs/test-deepseek-models.mjs
+/**
+ * @name test-deepseek-models
+ * @purpose Перебор всех моделей DeepSeek (non-stream ping) + aliases; печать текста, reasoning, usage, latency
+ * @input env: DEEPSEEK_API_KEY или VITE_DEEPSEEK_API_KEY
+ * @output stdout: /models JSON + результаты по каждой модели + aliases
+ * @args null
+ * @result null
+ * @exit 0 — успех (ошибки по моделям — в stdout)
+ * @exit 1 — нет ключа
+ * @tool false
+ * @example node scripts/mjs/test-deepseek-models.mjs
+ */
 // Проверяет какие модели реально отвечают и как ведут себя.
 import fs from 'node:fs';
 import path from 'node:path';
