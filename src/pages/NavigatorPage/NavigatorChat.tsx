@@ -66,10 +66,16 @@ export const NavigatorChat: React.FC<NavigatorChatProps> = ({ profileId, profile
     }
   }, []);
 
-  // Автоскролл к низу при новых сообщениях/чанках.
+  // Автоскролл к низу при новых сообщениях/чанках И при загрузке истории.
+  // rAF — чтобы scrollHeight учитывал уже отрендеренные Prism/code-блоки
+  // (dangerouslySetInnerHTML + Prism-разметка завершаются после мутации DOM).
   useEffect(() => {
     const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (!el) return;
+    const id = requestAnimationFrame(() => {
+      el.scrollTop = el.scrollHeight;
+    });
+    return () => cancelAnimationFrame(id);
   }, [messages]);
 
   // Сброс чата при смене профиля.
@@ -249,9 +255,7 @@ export const NavigatorChat: React.FC<NavigatorChatProps> = ({ profileId, profile
               color: '#eaeaea', fontSize: 13, wordBreak: 'break-word',
             }}
           >
-            {m.role === 'user' ? (
-              <span style={{ whiteSpace: 'pre-wrap' }}>{m.text}</span>
-            ) : m.format === 'html' ? (
+            {m.format === 'html' ? (
               <div
                 className="navigator-markdown"
                 dangerouslySetInnerHTML={{ __html: m.text }}
