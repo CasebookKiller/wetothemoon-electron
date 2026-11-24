@@ -69,6 +69,7 @@ export const NavigatorSidebar: React.FC<NavigatorSidebarProps> = ({
   const [launching, setLaunching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [launchStatus, setLaunchStatus] = useState<string | null>(null);
+  const [syncingConvId, setSyncingConvId] = useState<string | null>(null);
 
   // Профили
   const refresh = useCallback(async () => {
@@ -278,15 +279,26 @@ export const NavigatorSidebar: React.FC<NavigatorSidebarProps> = ({
             <button
               key={c.id}
               onClick={async () => {
-                // 1. Открываем диалог в UI (загрузит из БД)
+                // 1. Мгновенный отклик: показываем то, что уже есть в БД
                 onSelectConversation?.(c.id);
-                // 2. Запускаем синхронизацию из GigaChat (в фоне)
+
+                // 2. В фоне синхронизируем с GigaChat. URL backend восстановит из convId.
                 const api = (window as any).electronAPI;
-                if (api?.navigator?.syncMessages && selectedId) {
-                   // Находим URL диалога (или можно сконструировать)
-                   // Для этого нужно знать url. В БД он есть, но у нас в ConversationRow его нет.
-                   // Для MVP можно просто вызвать, передав пустой url (откроет текущий)
-                   // Или передать url из c.url (нужно добавить в ConversationRow и listConversations).
+                if (!api?.navigator?.syncMessages || !selectedId) return;
+                setSyncingConvId(c.id);
+                try {
+                  const r = await api.navigator.syncMessages(selectedId, c.id, '');
+                  if (r?.success) {
+                    await refreshConversations(selectedId);
+                    // Повторный триггер — Chat перечитает БД (chatKey++)
+                    onSelectConversation?.(c.id);
+                  } else if (r?.error) {
+                    setError(r.error);
+                  }
+                } catch (e: any) {
+                  setError(e?.message || String(e));
+                } finally {
+                  setSyncingConvId(null);
                 }
               }}
               style={{
@@ -299,7 +311,7 @@ export const NavigatorSidebar: React.FC<NavigatorSidebarProps> = ({
               }}
             >
               <div style={{ fontSize: 12, fontWeight: isSel ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {c.title || 'Без названия'}
+                {syncingConvId === c.id ? '⟳ ' : ''}{c.title || 'Без названия'}
               </div>
               <div style={{ fontSize: 10, color: '#888', display: 'flex', justifyContent: 'space-between' }}>
                 <span>{c.messageCount} сообщ.</span>
