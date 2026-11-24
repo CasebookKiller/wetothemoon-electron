@@ -19,6 +19,7 @@ import { migrateToV7 } from './migrations/v7';
 import { migrateToV8 } from './migrations/v8';
 import { migrateToV9 } from './migrations/v9';
 import { migrateToV10 } from './migrations/v10';
+import { migrateToV11 } from './migrations/v11';
 
 let db: DatabaseSync | null = null;
 let gatewayFilesDir: string | null = null;
@@ -230,6 +231,14 @@ const migrations: readonly Migration[] = [
       console.log('[GatewayCache] Миграция v10: handoff_preferences');
       migrateToV10(database);
       console.log('[GatewayCache] Миграция v10 завершена');
+    },
+  },
+  {
+    version: 11,
+    apply: (database) => {
+      console.log('[GatewayCache] Миграция v11: conversations.position');
+      migrateToV11(database);
+      console.log('[GatewayCache] Миграция v11 завершена');
     },
   },
 ];

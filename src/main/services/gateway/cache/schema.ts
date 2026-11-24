@@ -1,6 +1,6 @@
 // src/main/services/gateway/cache/schema.ts
 
-export const SCHEMA_VERSION = 10;
+export const SCHEMA_VERSION = 11;
 
 export const CREATE_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS conversations (
@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS conversations (
   message_count INTEGER NOT NULL DEFAULT 0,
   pinned INTEGER NOT NULL DEFAULT 0,
   archived INTEGER NOT NULL DEFAULT 0,
-  profile_id TEXT NOT NULL DEFAULT 'default'
+  profile_id TEXT NOT NULL DEFAULT 'default',
+  position INTEGER
 );
 
 CREATE INDEX IF NOT EXISTS idx_conversations_updated

@@ -445,13 +445,85 @@ export class GatewayCacheService {
     return { inserted, updated, total: incoming.length, hashedLegacy };
   }
 
+  /**
+   * Установить/снять pin (избранное) у диалога.
+   * Используется Navigator при синхронизации списка из GigaChat (data-da_favorite).
+   * listConversations() сортирует по pinned DESC — после этого избранные будут сверху.
+   */
+  /**
+   * Синхронизировать pinned + position (порядок в сайдбаре GigaChat).
+   * Вызывается из navigator:sync-conversations — pinned и position это один snapshot.
+   * position: 0..N — индекс в DOM GigaChat (favorites сначала, recent потом).
+   * listConversations сортирует: pinned DESC, position ASC, last_message_at DESC.
+   */
+  setConversationPositionAndPinned(
+    convId: string,
+    pinned: boolean,
+    position: number,
+  ): void {
+    try {
+      const r = this.db
+        .prepare('UPDATE conversations SET pinned = ?, position = ? WHERE id = ?')
+        .run(pinned ? 1 : 0, position, convId);
+      console.log(
+        `[GatewayCacheService] setConversationPositionAndPinned(${convId.slice(0, 8)}, pinned=${pinned}, pos=${position}) → rows changed: ${r.changes}`,
+      );
+    } catch (e) {
+      console.warn('[GatewayCacheService] setConversationPositionAndPinned failed:', e);
+    }
+  }
+
+  /** @deprecated Используй setConversationPositionAndPinned. Оставлен для обратной совместимости. */
+  setConversationPinned(convId: string, pinned: boolean): void {
+    try {
+      const r = this.db
+        .prepare('UPDATE conversations SET pinned = ? WHERE id = ?')
+        .run(pinned ? 1 : 0, convId);
+      console.log(
+        `[GatewayCacheService] setConversationPinned(${convId.slice(0, 8)}, ${pinned}) → rows changed: ${r.changes}`,
+      );
+    } catch (e) {
+      console.warn('[GatewayCacheService] setConversationPinned failed:', e);
+    }
+  }
+
+    /**
+   * Архивировать conversations профиля, которых нет в liveIds.
+   * Те, что GigaChat больше не отдаёт — phantom (удалены в GigaChat) или за пределами
+   * видимой пагинации. Скрываем из UI (archived=1), НЕ удаляем (данные целы).
+   * Порог в handler'е (>50) защищает от случайного массового архивирования при баге scroll.
+   */
+  archiveConversationsNotIn(profileId: string, liveIds: Set<string>): number {
+    try {
+      const all = this.db
+        .prepare('SELECT id FROM conversations WHERE profile_id = ? AND archived = 0')
+        .all(profileId) as Array<{ id: string }>;
+      const toArchive = all.filter((r) => !liveIds.has(r.id)).map((r) => r.id);
+      if (toArchive.length === 0) return 0;
+      const stmt = this.db.prepare('UPDATE conversations SET archived = 1 WHERE id = ?');
+      let changed = 0;
+      for (const id of toArchive) {
+        const r = stmt.run(id);
+        changed += Number(r.changes ?? 0);
+      }
+      console.log(`[GatewayCacheService] archiveConversationsNotIn(${profileId}): archived ${changed}/${all.length}`);
+      return changed;
+    } catch (e) {
+      console.warn('[GatewayCacheService] archiveConversationsNotIn failed:', e);
+      return 0;
+    }
+  }
+  
   listConversations(profileId = 'default'): ConversationListItem[] {
     const rows = this.db
       .prepare(`
-        SELECT id, title, message_count, updated_at, last_message_at, pinned
+        SELECT id, title, message_count, updated_at, last_message_at, pinned, position
         FROM conversations
         WHERE archived = 0 AND profile_id = ?
-        ORDER BY pinned DESC, COALESCE(last_message_at, updated_at) DESC
+        ORDER BY
+          pinned DESC,
+          COALESCE(position, 999999) ASC,
+          COALESCE(last_message_at, updated_at) DESC
       `)
       .all(profileId) as Array<{
         id: string;
@@ -460,12 +532,14 @@ export class GatewayCacheService {
         updated_at: number;
         last_message_at: number | null;
         pinned: number;
+        position: number | null;
       }>;
 
     return rows.map((r) => ({
       id: r.id,
       title: r.title,
       messageCount: r.message_count,
+      position: r.position,
       updatedAt: r.updated_at,
       lastMessageAt: r.last_message_at ?? undefined,
       pinned: r.pinned === 1,

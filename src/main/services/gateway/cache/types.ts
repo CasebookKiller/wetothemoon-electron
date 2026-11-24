@@ -94,6 +94,8 @@ export interface ConversationListItem {
   updatedAt: number;
   lastMessageAt?: number;
   pinned: boolean;
+  /** Порядок в сайдбаре GigaChat (0..N). NULL для legacy/новых записей. */
+  position?: number | null;
 }
 
 export interface SearchResult {
