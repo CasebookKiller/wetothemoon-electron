@@ -179,6 +179,32 @@ export class GigaChatAdapter implements ProviderAdapter {
 
   async getConversations(page: Page): Promise<Conversation[]> {
     try {
+      // 1. Раскрыть свёрнутые «Избранные» (кнопка «Показать ещё»).
+      try {
+        const showMore = await page.$('[data-da_name="SidebarFavoritesShowMore"]');
+        if (showMore) {
+          await showMore.click();
+          await page.waitForTimeout(300);
+        }
+      } catch { /* нет кнопки — ок */ }
+
+      // 2. Прокрутить виртуальный контейнер, чтобы GigaChat дорисовал все VirtualRow.
+      //    scrollIntoView на последнем VirtualRow — универсально (не зависит от того,
+      //    какой именно ancestor реально скроллируется).
+      await page.evaluate(async () => {
+        for (let i = 0; i < 40; i++) {
+          const rows = document.querySelectorAll('[class*="ChatSections-styled__VirtualRow"]');
+          if (rows.length === 0) break;
+          const last = rows[rows.length - 1] as HTMLElement;
+          last.scrollIntoView({ block: 'end' });
+          await new Promise((r) => setTimeout(r, 120));
+          const cnt = document.querySelectorAll('a[data-da_name="SessionListItem"]').length;
+          if (i > 0 && cnt === (window as any).__lastSidebarCount) break;
+          (window as any).__lastSidebarCount = cnt;
+        }
+        delete (window as any).__lastSidebarCount;
+      });
+
       return await page.evaluate(() => {
         // Оригинальный GigaChat использует <a data-da_name="SessionListItem"> в сайдбаре.
         // data-da_session_id содержит UUID сессии, href — /sessions/<uuid>.

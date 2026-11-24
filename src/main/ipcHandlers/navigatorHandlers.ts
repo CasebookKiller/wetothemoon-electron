@@ -213,20 +213,30 @@ export function registerNavigatorHandlers(): void {
       const page = await resolvePage(profileId, pool);
       console.log('[Navigator:sync-messages] page resolved, current URL:', page.url());
 
-      if (url) {
-        if (!page.url().includes(convId)) {
-          console.log('[Navigator:sync-messages] navigating to', url);
-          await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-        } else {
-          console.log('[Navigator:sync-messages] already on target URL');
-        }
-        console.log('[Navigator:sync-messages] waiting for [data-message-id]...');
+      // URL восстанавливаем из convId, если не передан (URL GigaChat предсказуем).
+      let targetUrl = url;
+      if (!targetUrl) {
         try {
-          await page.waitForSelector('[data-message-id]', { timeout: 15000 });
-          await page.waitForTimeout(1500); // даём SPA дорисовать
-        } catch (e) {
-          console.warn('[Navigator:sync-messages] timeout waiting for messages');
+          targetUrl = new URL(`/sessions/${convId}`, page.url() || 'https://giga.chat').href;
+        } catch {
+          targetUrl = `https://giga.chat/sessions/${convId}`;
         }
+      }
+
+      if (!page.url().includes(convId)) {
+        console.log('[Navigator:sync-messages] navigating to', targetUrl);
+        await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      } else {
+        console.log('[Navigator:sync-messages] already on target URL');
+      }
+
+      // Ждём отрисовки сообщений — ВСЕГДА (а не только когда был url)
+      console.log('[Navigator:sync-messages] waiting for [data-message-id]...');
+      try {
+        await page.waitForSelector('[data-message-id]', { timeout: 15000 });
+        await page.waitForTimeout(1500); // даём SPA дорисовать
+      } catch (e) {
+        console.warn('[Navigator:sync-messages] timeout waiting for messages');
       }
 
       const { GigaChatAdapter } = await import('../services/gateway/providers/gigachat/adapter');
@@ -251,6 +261,7 @@ export function registerNavigatorHandlers(): void {
 
       console.log('[Navigator:sync-messages] calling syncConversation with', incoming.length, 'messages');
       await cache.syncConversation(convId, title, incoming, { profileId });
+      try { _e.sender.send('navigator:conversation-saved', { profileId, convId, count: msgs.length }); } catch { /* окно закрыто */ }
       console.log('[Navigator:sync-messages] syncConversation OK');
 
       return { success: true, data: { count: msgs.length } };
@@ -259,5 +270,5 @@ export function registerNavigatorHandlers(): void {
       return { success: false, error: err?.message ?? String(err) };
     }
   });
-  
+
 }
