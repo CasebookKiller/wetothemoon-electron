@@ -273,53 +273,88 @@ export const NavigatorSidebar: React.FC<NavigatorSidebarProps> = ({
               : 'Выберите профиль.'}
           </div>
         )}
-        {conversations.map((c) => {
-          const isSel = c.id === selectedConversationId;
-          return (
-            <button
-              key={c.id}
-              onClick={async () => {
-                // 1. Мгновенный отклик: показываем то, что уже есть в БД
-                onSelectConversation?.(c.id);
+        {(() => {
+          const renderConv = (c: ConversationRow) => {
+            const isSel = c.id === selectedConversationId;
+            return (
+              <button
+                key={c.id}
+                onClick={async () => {
+                  // 1. Мгновенный отклик: показываем то, что уже есть в БД
+                  onSelectConversation?.(c.id);
 
-                // 2. В фоне синхронизируем с GigaChat. URL backend восстановит из convId.
-                const api = (window as any).electronAPI;
-                if (!api?.navigator?.syncMessages || !selectedId) return;
-                setSyncingConvId(c.id);
-                try {
-                  const r = await api.navigator.syncMessages(selectedId, c.id, '');
-                  if (r?.success) {
-                    await refreshConversations(selectedId);
-                    // Повторный триггер — Chat перечитает БД (chatKey++)
-                    onSelectConversation?.(c.id);
-                  } else if (r?.error) {
-                    setError(r.error);
+                  // 2. В фоне синхронизируем с GigaChat. URL backend восстановит из convId.
+                  const api = (window as any).electronAPI;
+                  if (!api?.navigator?.syncMessages || !selectedId) return;
+                  setSyncingConvId(c.id);
+                  try {
+                    const r = await api.navigator.syncMessages(selectedId, c.id, '');
+                    if (r?.success) {
+                      await refreshConversations(selectedId);
+                      onSelectConversation?.(c.id);
+                    } else if (r?.error) {
+                      setError(r.error);
+                    }
+                  } catch (e: any) {
+                    setError(e?.message || String(e));
+                  } finally {
+                    setSyncingConvId(null);
                   }
-                } catch (e: any) {
-                  setError(e?.message || String(e));
-                } finally {
-                  setSyncingConvId(null);
-                }
-              }}
-              style={{
-                textAlign: 'left', padding: '8px 10px', borderRadius: 6,
-                border: `1px solid ${isSel ? 'rgba(0,229,255,0.5)' : 'transparent'}`,
-                background: isSel ? 'rgba(0,229,255,0.12)' : 'rgba(255,255,255,0.02)',
-                color: isSel ? '#fff' : '#d0d0d0',
-                cursor: 'pointer', font: 'inherit',
-                display: 'flex', flexDirection: 'column', gap: 2,
-              }}
-            >
-              <div style={{ fontSize: 12, fontWeight: isSel ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {syncingConvId === c.id ? '⟳ ' : ''}{c.title || 'Без названия'}
+                }}
+                style={{
+                  textAlign: 'left', padding: '8px 10px', borderRadius: 6,
+                  border: `1px solid ${isSel ? 'rgba(0,229,255,0.5)' : 'transparent'}`,
+                  background: isSel ? 'rgba(0,229,255,0.12)' : 'rgba(255,255,255,0.02)',
+                  color: isSel ? '#fff' : '#d0d0d0',
+                  cursor: 'pointer', font: 'inherit',
+                  display: 'flex', flexDirection: 'column', gap: 2,
+                }}
+              >
+                <div style={{ fontSize: 12, fontWeight: isSel ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {syncingConvId === c.id ? '⟳ ' : ''}{c.title || 'Без названия'}
+                </div>
+                <div style={{ fontSize: 10, color: '#888', display: 'flex', justifyContent: 'space-between' }}>
+                  <span>{c.messageCount} сообщ.</span>
+                  <span>{formatDate(c.lastMessageAt ?? c.updatedAt)}</span>
+                </div>
+              </button>
+            );
+          };
+
+          const favorites = conversations.filter((c) => c.pinned);
+          const recent = conversations.filter((c) => !c.pinned);
+
+          if (conversations.length === 0) {
+            return (
+              <div style={{ padding: 16, textAlign: 'center', color: '#888', fontSize: 12 }}>
+                {selectedId
+                  ? 'Диалогов нет. Отправьте сообщение или нажмите Sync.'
+                  : 'Выберите профиль.'}
               </div>
-              <div style={{ fontSize: 10, color: '#888', display: 'flex', justifyContent: 'space-between' }}>
-                <span>{c.messageCount} сообщ.</span>
-                <span>{formatDate(c.lastMessageAt ?? c.updatedAt)}</span>
-              </div>
-            </button>
+            );
+          }
+
+          return (
+            <>
+              {favorites.length > 0 && (
+                <>
+                  <div style={{ padding: '6px 4px 2px', fontSize: 10, color: '#888', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    Избранные
+                  </div>
+                  {favorites.map(renderConv)}
+                </>
+              )}
+              {recent.length > 0 && (
+                <>
+                  <div style={{ padding: '6px 4px 2px', marginTop: favorites.length > 0 ? 6 : 0, fontSize: 10, color: '#888', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    Недавние чаты
+                  </div>
+                  {recent.map(renderConv)}
+                </>
+              )}
+            </>
           );
-        })}
+        })()}
       </div>
     </aside>
   );

@@ -1,5 +1,16 @@
 /* src/pages/NavigatorPage/NavigatorPage.css */
 
+/* GigaChat отдаёт inline SVG-иконки (стрелки, копирование) без width/height —
+   они наследуют размер контейнера и раздуваются. Ограничиваем до размера текста. */
+.navigator-markdown svg {
+  width: 1em !important;
+  height: 1em !important;
+  max-width: 1em;
+  max-height: 1em;
+  vertical-align: -0.125em;
+  display: inline-block;
+}
+
 .navigator-markdown > :first-child { margin-top: 0; }
 .navigator-markdown > :last-child { margin-bottom: 0; }
 .navigator-markdown p { margin: 0 0 8px; line-height: 1.5; }
