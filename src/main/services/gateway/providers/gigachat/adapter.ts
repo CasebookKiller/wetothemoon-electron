@@ -179,50 +179,163 @@ export class GigaChatAdapter implements ProviderAdapter {
 
   async getConversations(page: Page): Promise<Conversation[]> {
     try {
-      // 1. Раскрыть свёрнутые «Избранные» (кнопка «Показать ещё»).
-      try {
-        const showMore = await page.$('[data-da_name="SidebarFavoritesShowMore"]');
-        if (showMore) {
-          await showMore.click();
-          await page.waitForTimeout(300);
-        }
-      } catch { /* нет кнопки — ок */ }
-
-      // 2. Прокрутить виртуальный контейнер, чтобы GigaChat дорисовал все VirtualRow.
-      //    scrollIntoView на последнем VirtualRow — универсально (не зависит от того,
-      //    какой именно ancestor реально скроллируется).
+      // ── Фаза 1: раскрыть ВСЕ свёрнутые секции (Избранные, Архив) ────────
+      // В GigaChat «Архив» по умолчанию свёрнут — без клика adapter видит
+      // только Recent. Кликаем все collapsed toggle'ы с aria-expanded="false".
       await page.evaluate(async () => {
-        for (let i = 0; i < 40; i++) {
-          const rows = document.querySelectorAll('[class*="ChatSections-styled__VirtualRow"]');
-          if (rows.length === 0) break;
-          const last = rows[rows.length - 1] as HTMLElement;
-          last.scrollIntoView({ block: 'end' });
-          await new Promise((r) => setTimeout(r, 120));
-          const cnt = document.querySelectorAll('a[data-da_name="SessionListItem"]').length;
-          if (i > 0 && cnt === (window as any).__lastSidebarCount) break;
-          (window as any).__lastSidebarCount = cnt;
+        const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+        for (let round = 0; round < 5; round++) {
+          const collapsed = Array.from(
+            document.querySelectorAll('[data-da_name*="Toggle"][aria-expanded="false"]'),
+          ) as HTMLElement[];
+          if (collapsed.length === 0) break;
+          for (const b of collapsed) {
+            try { b.click(); } catch { /* ignore */ }
+            await wait(300);
+          }
         }
-        delete (window as any).__lastSidebarCount;
       });
 
-      return await page.evaluate(() => {
-        // Оригинальный GigaChat использует <a data-da_name="SessionListItem"> в сайдбаре.
-        // data-da_session_id содержит UUID сессии, href — /sessions/<uuid>.
-        const links = Array.from(document.querySelectorAll('a[data-da_name="SessionListItem"]')) as HTMLAnchorElement[];
-        return links.map((el) => {
-          const href = el.getAttribute('href') || '';
-          const id = el.getAttribute('data-da_session_id') || href.replace('/sessions/', '');
-          // Заголовок лежит в span с классом ChatRow-styled__Title-...
-          const titleEl = el.querySelector('[class*="ChatRow-styled__Title"]');
-          const title = titleEl?.textContent?.trim() || 'Без названия';
-          return {
-            id,
-            title,
-            url: href.startsWith('http') ? href : `https://giga.chat${href}`,
-          };
-        });
+      // ── Фаза 1b: докликать «Показать ещё» до стабилизации ───────────────
+      // GigaChat выдаёт по +2 за клик, кнопка появляется снова после подгрузки.
+      await page.evaluate(async () => {
+        const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+        const cnt = () => document.querySelectorAll('a[data-da_name="SessionListItem"]').length;
+
+        let lastCount = cnt();
+        let stableRounds = 0;
+        for (let i = 0; i < 30 && stableRounds < 3; i++) {
+          const btns = Array.from(
+            document.querySelectorAll('[data-da_name*="ShowMore"]'),
+          ) as HTMLElement[];
+          const clickable = btns.filter((b) => b.offsetParent !== null);
+          if (clickable.length === 0) {
+            // кнопок нет — дадим GigaChat ещё шанс (ленивая загрузка)
+            await wait(300);
+          } else {
+            for (const b of clickable) {
+              try { b.click(); } catch { /* ignore */ }
+            }
+            await wait(500); // ждём сетевой lazy-load
+          }
+          const now = cnt();
+          if (now === lastCount) stableRounds++;
+          else { stableRounds = 0; lastCount = now; }
+        }
       });
-    } catch {
+
+      // ── Фаза 2+4: скролл СО СБОРОМ (не в конце!) ────────────────────────
+      // Ключевое: GigaChat виртуализирует сайдбар — верхние строки размонтируются
+      // при скролле вниз. Если собирать в конце, favorites уже не в DOM → pinned=0.
+      // Решение: accumulate в Map по мере прохода сверху вниз.
+      const result = await page.evaluate(async () => {
+        const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+        const section = document.querySelector('section[aria-label="История чатов"]') as HTMLElement | null;
+        if (!section) return [];
+
+        // Найти реальный скроллер
+        let scroller: HTMLElement | null = section;
+        while (scroller && scroller !== document.body) {
+          if (scroller.scrollHeight > scroller.clientHeight + 10) break;
+          scroller = scroller.parentElement;
+        }
+        if (!scroller) scroller = section;
+
+        type Conv = { id: string; title: string; url: string; pinned: boolean; position: number };
+        const collected = new Map<string, Conv>();
+
+        const collectVisible = () => {
+          const links = document.querySelectorAll(
+            'a[data-da_name="SessionListItem"]',
+          ) as NodeListOf<HTMLAnchorElement>;
+          for (const el of links) {
+            const href = el.getAttribute('href') || '';
+            const id = el.getAttribute('data-da_session_id') || href.replace('/sessions/', '');
+            if (!id || collected.has(id)) continue;
+            const titleEl = el.querySelector('[class*="ChatRow-styled__Title"]');
+            const title = titleEl?.textContent?.trim() || 'Без названия';
+            const row =
+              el.closest('[class*="ChatRow-styled__Row-sc-"]') ?? el.parentElement;
+            const favEl = row?.querySelector('[data-da_favorite]');
+            const pinned = favEl?.getAttribute('data-da_favorite') === 'true';
+            collected.set(id, {
+              id,
+              title,
+              url: href.startsWith('http') ? href : `https://giga.chat${href}`,
+              pinned,
+              position: collected.size, // insertion order = DOM order = порядок GigaChat
+            });
+          }
+        };
+
+        // Сначала — сбор верхних строк (favorites здесь!)
+        console.log('[collect] initial scrollTop:', scroller.scrollTop,
+                    'scrollHeight:', scroller.scrollHeight);
+        scroller.scrollTop = 0;
+        scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
+        await wait(400); // было 200 — увеличили, чтобы favorites успели смонтироваться
+        collectVisible();
+        console.log('[collect] after top: collected', collected.size,
+                    'pinned:', Array.from(collected.values()).filter(c => c.pinned).length);
+
+        // Скроллим по шагам, собирая на каждой позиции
+        const step = Math.max(120, Math.floor(scroller.clientHeight * 0.6));
+        let lastCount = collected.size;
+        let stableRounds = 0;
+        let iterations = 0;
+
+        while (iterations < 100 && stableRounds < 8) {
+          const scrollH = scroller.scrollHeight;
+          for (let y = 0; y <= scrollH; y += step) {
+            scroller.scrollTop = y;
+            scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
+            await wait(100);
+            collectVisible();
+            iterations++;
+            if (iterations > 100) break;
+          }
+          scroller.scrollTop = scroller.scrollHeight;
+          scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
+          await wait(400);
+          collectVisible();
+
+          // Пробуем ShowMore снова — может появиться после подгрузки
+          const sm = Array.from(
+            document.querySelectorAll('[data-da_name*="ShowMore"]'),
+          ).filter((b) => (b as HTMLElement).offsetParent !== null) as HTMLElement[];
+          for (const b of sm) { try { b.click(); } catch { /* ignore */ } }
+          if (sm.length > 0) await wait(400);
+
+          if (collected.size === lastCount) stableRounds++;
+          else { stableRounds = 0; lastCount = collected.size; }
+        }
+
+        console.log('[collect] final collected:', collected.size,
+                    'pinned:', Array.from(collected.values()).filter(c => c.pinned).length);
+
+        return Array.from(collected.values());
+      });
+
+      const favCount = result.filter((c) => c.pinned).length;
+      console.log(`[GigaChatAdapter:getConversations] found ${result.length} conversations (${favCount} favorites)`);
+      // Диагностика 260-vs-220: сколько legacy, сколько synced
+      console.log('[collect] final detail:', {
+        total: result.length,
+        favorites: favCount,
+        pinnedPositions: result.filter((c) => c.pinned).map((c) => c.position).slice(0, 5),
+        recentPositions: result.filter((c) => !c.pinned).map((c) => c.position).slice(0, 5),
+        lastPosition: result.length > 0 ? result[result.length - 1].position : null,
+      });
+      // Диагностика: первые 3 элемента — что нашли по pinned
+      console.log('[GigaChatAdapter:getConversations] sample:', result.slice(0, 3).map((c) => ({
+        id: c.id.slice(0, 8),
+        title: c.title.slice(0, 20),
+        pinned: c.pinned,
+      })));
+      return result;
+    } catch (e) {
+      console.error('[GigaChatAdapter:getConversations] failed:', e);
       return [];
     }
   }

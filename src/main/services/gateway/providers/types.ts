@@ -76,6 +76,10 @@ export interface Conversation {
   updatedAt?: number;
   messageCount?: number;
   url?: string;
+  /** Избранное (pin). В GigaChat — data-da_favorite="true". */
+  pinned?: boolean;
+  /** Порядок в сайдбаре GigaChat (0..N). Используется для сортировки в Navigator. */
+  position?: number;
 }
 
 // ─── Опции sendMessage ───────────────────────────────────────────────────
