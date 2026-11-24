@@ -130,6 +130,8 @@ export function registerNavigatorHandlers(): void {
     },
   );
 
+
+  
   // ── navigator:list-conversations (из БД Gateway) ─────────────────────
   ipcMain.handle('navigator:list-conversations', async (_e, profileId: string) => {
     try {
@@ -189,12 +191,28 @@ export function registerNavigatorHandlers(): void {
 
       // Синкаем только заголовки. Сообщения подгрузим по клику.
       for (const c of convs) {
-        // Если диалог уже есть в БД — не перезаписываем его сообщения пустым массивом,
-        // просто обновляем заголовок, если он изменился.
+        // Если диалог уже есть в БД — не перезаписываем его сообщения пустым массивом.
         const existing = cache.getConversation(c.id);
         if (!existing) {
           await cache.syncConversation(c.id, c.title, [], { profileId });
         }
+        // Синхронизируем pinned + position (порядок из GigaChat DOM).
+        // listConversations сортирует: pinned DESC, position ASC, last_message_at DESC.
+        if (typeof c.pinned === 'boolean') {
+          cache.setConversationPositionAndPinned(
+            c.id,
+            c.pinned,
+            typeof c.position === 'number' ? c.position : 999999,
+          );
+        }
+      }
+
+      // Mirror: архивируем всё, чего GigaChat больше не отдаёт (phantom — удалены в GigaChat).
+      // Безопасно: archived=1 — не показывается в UI, но данные целы (можно вернуть).
+      // Порог 50 — защита от бага scroll (не выкосить всё за один глюк).
+      if (convs.length > 50) {
+        const liveIds = new Set(convs.map((c) => c.id));
+        cache.archiveConversationsNotIn(profileId, liveIds);
       }
 
       return { success: true, data: { synced: convs.length } };
@@ -225,7 +243,20 @@ export function registerNavigatorHandlers(): void {
 
       if (!page.url().includes(convId)) {
         console.log('[Navigator:sync-messages] navigating to', targetUrl);
-        await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+        // SPA-специфика: page.goto на клиентский роут часто даёт ERR_ABORTED,
+        // потому что старый документ ещё не отпустил фрейм. Это не сбой —
+        // страница, как правило, всё равно переходит. Используем 'commit'
+        // (минимум ожидания) и глушим именно ERR_ABORTED, остальное — пробрасываем.
+        try {
+          await page.goto(targetUrl, { waitUntil: 'commit', timeout: 30000 });
+        } catch (e: any) {
+          const msg = String(e?.message || e);
+          if (msg.includes('ERR_ABORTED')) {
+            console.warn('[Navigator:sync-messages] goto aborted (SPA), continuing');
+          } else {
+            throw e;
+          }
+        }
       } else {
         console.log('[Navigator:sync-messages] already on target URL');
       }
@@ -233,7 +264,7 @@ export function registerNavigatorHandlers(): void {
       // Ждём отрисовки сообщений — ВСЕГДА (а не только когда был url)
       console.log('[Navigator:sync-messages] waiting for [data-message-id]...');
       try {
-        await page.waitForSelector('[data-message-id]', { timeout: 15000 });
+        await page.waitForSelector('[data-message-id]', { timeout: 20000 });
         await page.waitForTimeout(1500); // даём SPA дорисовать
       } catch (e) {
         console.warn('[Navigator:sync-messages] timeout waiting for messages');
