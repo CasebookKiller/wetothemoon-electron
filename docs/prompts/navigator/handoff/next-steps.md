@@ -58,3 +58,42 @@ git status --short
 - **git commit по группам**, никогда `git add .`
 - **`wm-backup`** перед крупным шагом
 - **Gateway не трогаем** до закрытия MVP
+
+## 2026-11-24 — После фикса «диалоги не все показывают сообщения»
+
+### ✅ Сделано в этой сессии (коммит «Navigator: клик по диалогу синхронизирует историю»)
+
+- **Backend `navigator:sync-messages`** — URL восстанавливается из `convId` (если не передан), навигация и `waitForSelector('[data-message-id]')` выполняются **всегда**, а не только при явном URL. Эмит `navigator:conversation-saved` после `cache.syncConversation`.
+- **Sidebar `onClick`** — реально вызывает `syncMessages(profileId, convId, '')` в фоне, индикатор `⟳` в строке диалога, повторный `onSelectConversation(c.id)` для ремаунта Chat (`chatKey++`).
+- **Adapter `getConversations`** — перед парсингом: клик по `SidebarFavoritesShowMore` (если есть) + прокрутка виртуального контейнера (`VirtualRow.scrollIntoView({block:'end'})` в цикле до стабилизации счётчика). Теперь видны все ~38 диалогов, а не только 11 отрендеренных.
+
+### 🐞 Баг A (продолжение) — блокирующий IPC
+
+`syncMessages` ждёт `[data-message-id]` **15 с** синхронно. Если GigaChat тормозит — Sidebar висит в `⟳`, UI не респонсивен до возврата IPC.
+
+- **MVP:** ок, оставляем.
+- **Потом:** переделать на event-based — `navigator:sync-messages` возвращает сразу `{ started: true }`, а результат приходит событием `navigator:sync-finished` / `navigator:sync-error`. Триггерит `refreshConversations` через подписку.
+
+### 🐞 conversation-saved event — довести до конца
+
+- [ ] `preload.ts`: добавить `onConversationSaved(cb)` (аналог `onChunk`).
+- [ ] `navigator.d.ts`: тип `NavigatorConversationSaved { profileId, convId, count }`.
+- [ ] `NavigatorSidebar.tsx`: `useEffect`-подписка → `refreshConversations(selectedId)`.
+- [ ] Разблокирует автопоявление нового диалога после `navigator:send` без ручного **Sync**.
+
+~10 мин, следующий заход. Не блокер — фикс с ручным Sync уже работает.
+
+### 🐞 getCurrentMessages — virtual scroll для длинных чатов
+
+Если длинные чаты (>30 сообщений) тоже рендерятся виртуализированно — увидим только последние N. Симптом: в БД `message_count` меньше, чем реально в GigaChat. Не проверяли.
+
+- **Fix:** в `getCurrentMessages` перед парсингом — `scrollIntoView` на **первом** `[data-message-id]`, ждать стабилизации, повторять до тех пор, пока счётчик `[data-message-id]` не перестанет расти.
+- **Проверить на:** реальном длинном диалоге (>40 сообщений).
+- **Приоритет:** средний, только если реально режется история.
+
+### 📌 Смежное (не забыть при Этапе 1.5 — DeepSeek)
+
+- **DS cookies:** перед `DeepSeekAdapter.sendMessage` — проверить persistence `userDataDir` в `ProfileService` (patchright должен сохранять cookies DS-домена). Если не сохраняет — капчи будут чаще.
+- **WAF-rotate в середине стрима:** DS может ротировать WAF-cookie посреди ответа → стрим рвётся. Лечится retry в адаптере + safety-timer в UI (уже есть, 135 с).
+- **`hasSession(profileId, 'deepseek')`** должен проверять **домен** DS, а не «профиль авторизован где-то». Уже provider-aware — проверить в коде при реализации.
+- **CookieTracker (схема v11)** — **не делаем сейчас**. Отдельная фича, не блокер. `profile_cookies` / `cookie_events` в v10 нет, и не надо.
