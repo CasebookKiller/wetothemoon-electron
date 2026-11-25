@@ -451,6 +451,12 @@ try {
       /** Синхронизировать сообщения конкретного диалога. */
       syncMessages: (profileId: string, convId: string, url: string) =>
         ipcRenderer.invoke('navigator:sync-messages', profileId, convId, url),
+
+      onConversationSaved: (cb: (data: { profileId: string; convId: string; count: number }) => void): (() => void) => {
+        const handler = (_e: unknown, data: { profileId: string; convId: string; count: number }) => cb(data);
+        ipcRenderer.on('navigator:conversation-saved', handler as any);
+        return () => ipcRenderer.removeListener('navigator:conversation-saved', handler as any);
+      },
     },
     gatewayLaunch: () => ipcRenderer.invoke('gateway:launch'),
     gatewayLaunchByProfile: (profileId: string) =>

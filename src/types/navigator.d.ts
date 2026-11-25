@@ -87,6 +87,15 @@ export interface NavigatorAPI {
 
   syncConversations: (profileId: string) => Promise<{ success: boolean; data?: { synced: number }; error?: string }>;
   syncMessages: (profileId: string, convId: string, url: string) => Promise<{ success: boolean; data?: { count: number }; error?: string }>;
+
+  /** Событие: диалог сохранён/обновлён (после navigator:send или sync-messages). */
+  onConversationSaved: (cb: (data: NavigatorConversationSaved) => void) => () => void;
+}
+
+export interface NavigatorConversationSaved {
+  profileId: string;
+  convId: string;
+  count: number;
 }
 
 declare global {

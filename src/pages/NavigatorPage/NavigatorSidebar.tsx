@@ -12,7 +12,7 @@
  * @module pages/NavigatorPage/NavigatorSidebar
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 interface ProfileRow {
   id: string;
@@ -70,6 +70,8 @@ export const NavigatorSidebar: React.FC<NavigatorSidebarProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [launchStatus, setLaunchStatus] = useState<string | null>(null);
   const [syncingConvId, setSyncingConvId] = useState<string | null>(null);
+  // Debounce для sync после conversation-saved (не дёргать adapter на каждый send)
+  const syncDebounceRef = useRef<number | null>(null);
 
   // Профили
   const refresh = useCallback(async () => {
@@ -126,6 +128,28 @@ export const NavigatorSidebar: React.FC<NavigatorSidebarProps> = ({
   }, [refreshConversations]);
 
   useEffect(() => { void refresh(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Подписка на событие "диалог сохранён" — автопоявление нового диалога после send.
+  // Подписка в useEffect (не в onSend), чтобы не плодить listeners при ре-рендерах.
+  useEffect(() => {
+    const api = (window as any).electronAPI;
+    if (!api?.navigator?.onConversationSaved) return;
+    const unsub = api.navigator.onConversationSaved((data: { profileId: string; convId: string; count: number }) => {
+      if (data?.profileId !== selectedId) return;
+
+      // 1. Быстрый рефреш: updated_at, счётчик сообщений — мгновенно.
+      void refreshConversations(selectedId);
+
+      // 2. Полный sync в фоне: adapter перечитывает position из DOM (10-15 сек).
+      // Без этого диалог остаётся на старом position, пока не нажмёшь Sync вручную.
+      // Debounce: если несколько sends подряд — sync один раз на пачку.
+      if (syncDebounceRef.current) window.clearTimeout(syncDebounceRef.current);
+      syncDebounceRef.current = window.setTimeout(() => {
+        void syncConversations(selectedId);
+      }, 1500);
+    });
+    return () => { unsub?.(); };
+  }, [selectedId, refreshConversations, syncConversations]);
 
   // Перезагрузка диалогов при смене профиля
   useEffect(() => {
@@ -279,9 +303,14 @@ export const NavigatorSidebar: React.FC<NavigatorSidebarProps> = ({
             return (
               <button
                 key={c.id}
+                disabled={syncingConvId === c.id}
                 onClick={async () => {
                   // 1. Мгновенный отклик: показываем то, что уже есть в БД
                   onSelectConversation?.(c.id);
+
+                  // Guard: не запускаем новый sync, если уже идёт (UI кликается повторно,
+                  // потому что IPC блокирующий 15-20с)
+                  if (syncingConvId) return;
 
                   // 2. В фоне синхронизируем с GigaChat. URL backend восстановит из convId.
                   const api = (window as any).electronAPI;

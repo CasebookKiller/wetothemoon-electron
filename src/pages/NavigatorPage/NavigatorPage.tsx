@@ -55,14 +55,11 @@ export const NavigatorPage: React.FC = () => {
         selectedId={selectedId}
         onSelect={(id) => { setSelectedConversationId(null); handleSelect(id); }}
         selectedConversationId={selectedConversationId}
-        onSelectConversation={async (convId) => {
+        onSelectConversation={(convId) => {
+          // Синхронизацию делает Sidebar (единственный источник). Page только:
+          // 1) выбирает диалог, 2) ремаунтит Chat для перечитывания БД.
+          // Раньше Page дублировал syncMessages — 3 вызова на клик, race → порча данных.
           setSelectedConversationId(convId);
-          if (selectedId) {
-            const url = `https://giga.chat/sessions/${convId}`;
-            // Ждём, пока синхронизация скачает и сохранит сообщения в БД
-            await (window as any).electronAPI.navigator.syncMessages(selectedId, convId, url).catch(console.error);
-          }
-          // Увеличиваем ключ, чтобы NavigatorChat заново прочитал БД (уже с сообщениями)
           setChatKey((k) => k + 1);
         }}
       />
