@@ -4,7 +4,22 @@
 - Путь: `/home/ll/Документы/GitHub/wetothemoon-project/wetothemoon-electron`
 - Стек: Electron + TypeScript + Vite (Electron Forge), есть `src/`, `scripts/`, `docs/`
 - Git-репозиторий подключён через `.git` (gitdir-файл)
-- Основные документы: `ROADMAP.md`, `GATEWAY_ROADMAP.md`, `GATEWAY_MULTI_ACCOUNT_ROADMAP.md`, `OSINT_ROADMAP.md`
+
+## Документация разработки
+
+**Устаревшие документы (не использовать):** `ROADMAP.md`, `GATEWAY_ROADMAP.md`, `GATEWAY_MULTI_ACCOUNT_ROADMAP.md`, `OSINT_ROADMAP.md`.
+
+**Актуальные промпты — `docs/prompts/`:**
+
+| Папка | Что это |
+|---|---|
+| `_common/` | общие для проекта правила и стандарты структуры |
+| `gateway/` | модуль-окно «Шлюз» (legacy, не трогаем до закрытия Navigator MVP) |
+| `navigator/` | модуль-окно «Навигатор» — переработка Шлюза с внедрением pipeline JSON-запросов/ответов |
+| `prana-bindu/` | модуль-окно «Прана-Бинду» — беговой модуль, самое перспективное направление |
+| `osint/` | модуль-окно «Взгляд Фримена» — два окна: `osint` и `sietch`; md старые, к текущей структуре не приведены; важный рабочий инструмент юриста |
+
+Внутри каждого модуля: `00_MASTER_INDEX.md` (индекс), `COMMON_CONTEXT.md` (общий контекст), `PROJECT_STATE.md` (снимок состояния), `handoff/` (на случай ограничений провайдера / смены правил), `topics/` (направления разработки).
 
 ## Правило
 - Все задачи по коду этого проекта выполнять в каталоге `wetothemoon-electron`, а не в текущей рабочей папке.
