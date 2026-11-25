@@ -1,12 +1,23 @@
 {
-  "generatedAt": "2026-11-23T12:15:50.108Z",
-  "total": 43,
+  "generatedAt": "2026-11-25T07:34:07.123Z",
+  "total": 56,
   "byRuntime": {
-    "mjs": 40,
-    "bash": 3,
-    "python": 0
+    "mjs": 46,
+    "bash": 6,
+    "python": 4
   },
-  "tools": [],
+  "tools": [
+    "code-index",
+    "ctx-snapshot",
+    "db-inspect",
+    "handoff-digest",
+    "token-map",
+    "tsc-changed",
+    "db-query",
+    "diff-review",
+    "docs-tokens",
+    "log-digest"
+  ],
   "scripts": [
     {
       "path": "scripts/bash/recon-symbols.sh",
@@ -76,6 +87,144 @@
       ]
     },
     {
+      "path": "scripts/bash/wm-guard.sh",
+      "name": "wm-guard",
+      "purpose": "Pre-commit guard: блокирует «чужие» файлы в staged и ошибки tsc в изменённых TS-файлах",
+      "input": "argv: --no-tsc (пропустить проверку типов)",
+      "output": "stdout: результат проверок",
+      "args": {
+        "type": "object",
+        "properties": {
+          "no_tsc": {
+            "type": "boolean"
+          }
+        }
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        }
+      },
+      "exit": {
+        "0": "можно коммитить",
+        "1": "есть блокирующая проблема"
+      },
+      "tool": false,
+      "example": [
+        "bash scripts/bash/wm-guard.sh",
+        "bash scripts/bash/wm-guard.sh --no-tsc"
+      ]
+    },
+    {
+      "path": "scripts/bash/wm-preflight.sh",
+      "name": "wm-preflight",
+      "purpose": "Быстрый префлайт проекта: компактный снимок + проверка «чужих» staged-файлов; пишет .cache/ctx.md",
+      "input": "argv: --tsc (добавить tsc-changed, медленно)",
+      "output": "stdout: снимок состояния; файл .cache/ctx.md",
+      "args": {
+        "type": "object",
+        "properties": {
+          "tsc": {
+            "type": "boolean"
+          }
+        }
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "snapshot": {
+            "type": "string"
+          }
+        }
+      },
+      "exit": {
+        "0": "успех",
+        "1": "в staged есть «чужие» файлы"
+      },
+      "tool": false,
+      "example": [
+        "bash scripts/bash/wm-preflight.sh",
+        "bash scripts/bash/wm-preflight.sh --tsc"
+      ]
+    },
+    {
+      "path": "scripts/bash/wm-watch.sh",
+      "name": "wm-watch",
+      "purpose": "Живой фильтр лога приложения: только WARN/ERROR и ключевые модули, с записью в .cache/app.log",
+      "input": "argv[1]: путь к логу (default: самый свежий в ~/.config/wetothemoon-electron/logs/*.log); argv[2]: regex (опционально)",
+      "output": "stdout: отфильтрованные строки; файл .cache/app.log",
+      "args": {
+        "type": "object",
+        "properties": {
+          "log": {
+            "type": "string"
+          },
+          "pattern": {
+            "type": "string"
+          }
+        }
+      },
+      "result": null,
+      "exit": {
+        "0": "остановлено пользователем",
+        "1": "лог не найден"
+      },
+      "tool": false,
+      "example": [
+        "bash scripts/bash/wm-watch.sh",
+        "bash scripts/bash/wm-watch.sh ~/.config/wetothemoon-electron/logs/main.log"
+      ]
+    },
+    {
+      "path": "scripts/mjs/code-index.mjs",
+      "name": "code-index",
+      "purpose": "Индекс экспортов src/: file:line + имя + kind, без чтения файлов целиком",
+      "input": "argv: --filter <подстрока пути/имени>, --limit N (default 300), --dir <каталог>",
+      "output": "stdout: строки вида `src/path/file.ts:12  function  foo`",
+      "args": {
+        "type": "object",
+        "properties": {
+          "filter": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "default": 300
+          },
+          "dir": {
+            "type": "string",
+            "default": "src"
+          }
+        }
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "files": {
+            "type": "integer"
+          },
+          "symbols": {
+            "type": "integer"
+          }
+        }
+      },
+      "exit": {
+        "0": "успех",
+        "1": "каталог не найден"
+      },
+      "tool": true,
+      "example": [
+        "node scripts/mjs/code-index.mjs --filter navigator",
+        "node scripts/mjs/code-index.mjs --dir src/main/services/gateway --limit 100"
+      ]
+    },
+    {
       "path": "scripts/mjs/compare-stream-formatting.mjs",
       "name": "compare-stream-formatting",
       "purpose": "Сравнение snapshots живого стрима с финальным HTML: префикс-проверка + монотонный рост (детект регрессий форматирования)",
@@ -101,6 +250,96 @@
       "tool": false,
       "example": [
         "node scripts/mjs/compare-stream-formatting.mjs /tmp/capture-2026-11-17"
+      ]
+    },
+    {
+      "path": "scripts/mjs/ctx-snapshot.mjs",
+      "name": "ctx-snapshot",
+      "purpose": "Компактный снимок состояния проекта для LLM: git, «чужие» файлы, schema, ключевые counts БД, последний handoff",
+      "input": "argv: --json (машинный вывод), --tsc (добавить число ошибок tsc, медленно)",
+      "output": "stdout: ≤ 40 строк; при --json — один JSON-объект",
+      "args": {
+        "type": "object",
+        "properties": {
+          "json": {
+            "type": "boolean"
+          },
+          "tsc": {
+            "type": "boolean"
+          }
+        }
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "branch": {
+            "type": "string"
+          },
+          "head": {
+            "type": "string"
+          },
+          "dirty": {
+            "type": "array"
+          },
+          "schema": {
+            "type": "integer"
+          }
+        }
+      },
+      "exit": {
+        "0": "успех",
+        "1": "не удалось собрать снимок"
+      },
+      "tool": true,
+      "example": [
+        "node scripts/mjs/ctx-snapshot.mjs",
+        "node scripts/mjs/ctx-snapshot.mjs --json"
+      ]
+    },
+    {
+      "path": "scripts/mjs/db-inspect.mjs",
+      "name": "db-inspect",
+      "purpose": "Компактный снимок SQLite-БД: user_version, counts по таблицам, archived/position для conversations",
+      "input": "argv: --db gateway|prana|<путь>, --json, --limit N (сколько таблиц печатать, default 20)",
+      "output": "stdout: ≤ 30 строк; при --json — JSON",
+      "args": {
+        "type": "object",
+        "properties": {
+          "db": {
+            "type": "string",
+            "default": "gateway"
+          },
+          "json": {
+            "type": "boolean"
+          },
+          "limit": {
+            "type": "integer",
+            "default": 20
+          }
+        }
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "tables": {
+            "type": "object"
+          }
+        }
+      },
+      "exit": {
+        "0": "успех",
+        "1": "БД не найдена / ошибка чтения"
+      },
+      "tool": true,
+      "example": [
+        "node scripts/mjs/db-inspect.mjs",
+        "node scripts/mjs/db-inspect.mjs --db prana --json"
       ]
     },
     {
@@ -153,6 +392,49 @@
       "tool": false,
       "example": [
         "node scripts/mjs/gen-context-manifest.mjs"
+      ]
+    },
+    {
+      "path": "scripts/mjs/handoff-digest.mjs",
+      "name": "handoff-digest",
+      "purpose": "Дайджест handoff-документов: только секции «Приоритет / Открытые вопросы / Следующая сессия / Тест»",
+      "input": "argv: --module navigator|gateway|prana-bindu|all (default all), --lines N (default 25), --file <путь>",
+      "output": "stdout: markdown-дайджест ≤ 200 строк",
+      "args": {
+        "type": "object",
+        "properties": {
+          "module": {
+            "type": "string",
+            "default": "all"
+          },
+          "lines": {
+            "type": "integer",
+            "default": 25
+          },
+          "file": {
+            "type": "string"
+          }
+        }
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "files": {
+            "type": "array"
+          },
+          "sections": {
+            "type": "integer"
+          }
+        }
+      },
+      "exit": {
+        "0": "успех",
+        "1": "handoff не найден"
+      },
+      "tool": true,
+      "example": [
+        "node scripts/mjs/handoff-digest.mjs --module navigator",
+        "node scripts/mjs/handoff-digest.mjs --lines 15"
       ]
     },
     {
@@ -999,6 +1281,278 @@
       "tool": false,
       "example": [
         "node scripts/mjs/test-send-message-api.mjs"
+      ]
+    },
+    {
+      "path": "scripts/mjs/token-map.mjs",
+      "name": "token-map",
+      "purpose": "Карта «стоимости» файлов/каталогов в токенах (bytes/3.2) — что дорого читать",
+      "input": "argv: --top N (default 25), --dir a,b,c (default src,docs,scripts)",
+      "output": "stdout: топ файлов и сводка по каталогам",
+      "args": {
+        "type": "object",
+        "properties": {
+          "top": {
+            "type": "integer",
+            "default": 25
+          },
+          "dir": {
+            "type": "string",
+            "default": "src,docs,scripts"
+          }
+        }
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "files": {
+            "type": "integer"
+          },
+          "tokens": {
+            "type": "integer"
+          }
+        }
+      },
+      "exit": {
+        "0": "успех",
+        "1": "нет каталогов"
+      },
+      "tool": true,
+      "example": [
+        "node scripts/mjs/token-map.mjs --top 15"
+      ]
+    },
+    {
+      "path": "scripts/mjs/tsc-changed.mjs",
+      "name": "tsc-changed",
+      "purpose": "Ошибки TypeScript только по изменённым файлам (git diff + untracked), плюс общий счётчик",
+      "input": "argv: --all (показать все ошибки), --max N (default 40)",
+      "output": "stdout: summary + строки ошибок, относящиеся к изменённым файлам",
+      "args": {
+        "type": "object",
+        "properties": {
+          "all": {
+            "type": "boolean"
+          },
+          "max": {
+            "type": "integer",
+            "default": 40
+          }
+        }
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "changed": {
+            "type": "integer"
+          },
+          "errorsTotal": {
+            "type": "integer"
+          },
+          "errorsChanged": {
+            "type": "integer"
+          }
+        }
+      },
+      "exit": {
+        "0": "ошибок в изменённых файлах нет",
+        "1": "есть ошибки в изменённых файлах"
+      },
+      "tool": true,
+      "example": [
+        "node scripts/mjs/tsc-changed.mjs",
+        "node scripts/mjs/tsc-changed.mjs --all"
+      ]
+    },
+    {
+      "path": "scripts/python/db_query.py",
+      "name": "db-query",
+      "purpose": "Read-only SQL-запрос к gateway.db / prana_bindu.db с лимитом строк и обрезкой длинных полей",
+      "input": "argv: --db gateway|prana|<путь>, --sql \"SELECT ...\", --limit N (default 50), --json, --max-cell N (default 120)",
+      "output": "stdout: таблица или JSON; длинные значения обрезаются",
+      "args": {
+        "type": "object",
+        "properties": {
+          "db": {
+            "type": "string",
+            "default": "gateway"
+          },
+          "sql": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "default": 50
+          },
+          "json": {
+            "type": "boolean"
+          },
+          "max_cell": {
+            "type": "integer",
+            "default": 120
+          }
+        }
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "columns": {
+            "type": "array"
+          },
+          "rows": {
+            "type": "array"
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        }
+      },
+      "exit": {
+        "0": "успех",
+        "1": "ошибка БД/SQL"
+      },
+      "tool": true,
+      "example": [
+        "python3 scripts/python/db_query.py --db gateway --sql \"SELECT id,title FROM conversations LIMIT 5\"",
+        "python3 scripts/python/db_query.py --db prana --sql \"SELECT COUNT(*) FROM run_facts\" --json"
+      ]
+    },
+    {
+      "path": "scripts/python/diff_review.py",
+      "name": "diff-review",
+      "purpose": "Компактный обзор diff: файлы, ±строки и «точки касания» (hunk headers) без полного текста патча",
+      "input": "argv: --staged (индексированные), --base <ref> (default HEAD), --max-files N (default 30)",
+      "output": "stdout: сводка по файлам + hunk-заголовки",
+      "args": {
+        "type": "object",
+        "properties": {
+          "staged": {
+            "type": "boolean"
+          },
+          "base": {
+            "type": "string",
+            "default": "HEAD"
+          },
+          "max_files": {
+            "type": "integer",
+            "default": 30
+          }
+        }
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "files": {
+            "type": "integer"
+          },
+          "added": {
+            "type": "integer"
+          },
+          "removed": {
+            "type": "integer"
+          }
+        }
+      },
+      "exit": {
+        "0": "успех",
+        "1": "git ошибка"
+      },
+      "tool": true,
+      "example": [
+        "python3 scripts/python/diff_review.py",
+        "python3 scripts/python/diff_review.py --staged"
+      ]
+    },
+    {
+      "path": "scripts/python/docs_tokens.py",
+      "name": "docs-tokens",
+      "purpose": "Токен-бюджет docs/prompts: сколько «стоит» каждый модуль и самые тяжёлые файлы (контроль раздувания handoff)",
+      "input": "argv: --root docs/prompts, --top N (default 15), --warn N (default 15000)",
+      "output": "stdout: сводка по модулям + топ файлов; предупреждение при превышении порога",
+      "args": {
+        "type": "object",
+        "properties": {
+          "root": {
+            "type": "string",
+            "default": "docs/prompts"
+          },
+          "top": {
+            "type": "integer",
+            "default": 15
+          },
+          "warn": {
+            "type": "integer",
+            "default": 15000
+          }
+        }
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "files": {
+            "type": "integer"
+          },
+          "tokens": {
+            "type": "integer"
+          },
+          "modules": {
+            "type": "object"
+          }
+        }
+      },
+      "exit": {
+        "0": "успех",
+        "1": "каталог не найден"
+      },
+      "tool": true,
+      "example": [
+        "python3 scripts/python/docs_tokens.py",
+        "python3 scripts/python/docs_tokens.py --top 25 --warn 12000"
+      ]
+    },
+    {
+      "path": "scripts/python/log_digest.py",
+      "name": "log-digest",
+      "purpose": "Сжимает лог: нормализует сообщения и группирует ошибки/варнинги по частоте (топ-N вместо мегабайт текста)",
+      "input": "argv: путь к логу (опционально; иначе stdin), --top N (default 10), --json",
+      "output": "stdout: группы «count × шаблон» + пример строки",
+      "args": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "top": {
+            "type": "integer",
+            "default": 10
+          },
+          "json": {
+            "type": "boolean"
+          }
+        }
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "lines": {
+            "type": "integer"
+          },
+          "matched": {
+            "type": "integer"
+          },
+          "groups": {
+            "type": "array"
+          }
+        }
+      },
+      "exit": {
+        "0": "успех",
+        "1": "файл не найден"
+      },
+      "tool": true,
+      "example": [
+        "python3 scripts/python/log_digest.py .cache/app.log --top 5",
+        "tail -n 5000 src.log | python3 scripts/python/log_digest.py"
       ]
     }
   ]

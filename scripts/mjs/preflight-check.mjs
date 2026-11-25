@@ -1,5 +1,5 @@
 // scripts/mjs/preflight-check.mjs
-// Проверка состояния Gateway-проекта после разбана.
+// Проверка состояния проекта (Gateway / Navigator / Prana-Bindu). Актуально для schema v11.
 
 /**
  * @name preflight-check
@@ -23,12 +23,21 @@ import os from 'node:os';
 
 const require = createRequire(import.meta.url);
 
+// node:sqlite помечает себя ExperimentalWarning — не засоряем вывод
+const _emitWarning = process.emitWarning;
+process.emitWarning = (w, ...rest) => {
+  const msg = typeof w === 'string' ? w : (w && w.message) || '';
+  if (/SQLite is an experimental feature/.test(msg)) return;
+  return _emitWarning.call(process, w, ...rest);
+};
+
 const FAST = process.argv.includes('--fast');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, '../..');   // из scripts/mjs/ → корень проекта
 const DB_PATH = path.join(os.homedir(), '.config/wetothemoon-electron/gateway.db');
+const SCHEMA_EXPECTED = 11;
 const PARENT = path.resolve(ROOT, '..');
 
 let hasErrors = false;
@@ -65,8 +74,8 @@ try {
   const schema = fs.readFileSync(path.join(ROOT, 'src/main/services/gateway/cache/schema.ts'), 'utf8');
   const m = schema.match(/SCHEMA_VERSION\s*=\s*(\d+)/);
   const v = m ? parseInt(m[1], 10) : 0;
-  if (v === 10) ok('SCHEMA_VERSION = 10');
-  else err(`SCHEMA_VERSION = ${v}, ожидается 10`);
+  if (v === SCHEMA_EXPECTED) ok(`SCHEMA_VERSION = ${SCHEMA_EXPECTED}`);
+  else err(`SCHEMA_VERSION = ${v}, ожидается ${SCHEMA_EXPECTED}`);
 } catch (e) { err('schema.ts: ' + e.message); }
 
 // ─── 4. Миграции ─────────────────────────────────────────────────────
@@ -75,14 +84,18 @@ try {
   const dir = path.join(ROOT, 'src/main/services/gateway/cache/migrations');
   const files = fs.readdirSync(dir).filter(f => f.match(/^v\d+\.ts$/)).sort();
   console.log('  ' + files.join(', '));
-  for (const want of ['v6.ts', 'v7.ts', 'v8.ts', 'v9.ts', 'v10.ts']) {
+  for (const want of ['v9.ts', 'v10.ts', 'v11.ts']) {
     if (files.includes(want)) ok(want);
     else err(want + ' отсутствует');
   }
+  // Оркестратор: миграция должна быть в массиве db.ts, иначе пустой UI
+  const dbSrc = fs.readFileSync(path.join(ROOT, 'src/main/services/gateway/cache/db.ts'), 'utf8');
+  if (/migrateToV11/.test(dbSrc)) ok('migrateToV11 в оркестраторе db.ts');
+  else err('migrateToV11 не найден в db.ts (массив миграций)');
 } catch (e) { err('migrations: ' + e.message); }
 
-// ─── 5. БД: v9/v10 таблицы ──────────────────────────────────────────
-section('5. БД: таблицы v9/v10');
+// ─── 5. БД: schema + таблицы ────────────────────────────────────────
+section(`5. БД: v${SCHEMA_EXPECTED}`);
 if (!fs.existsSync(DB_PATH)) {
   warn('БД ещё не создана (первый запуск): ' + DB_PATH);
 } else {
@@ -90,8 +103,8 @@ if (!fs.existsSync(DB_PATH)) {
     const { DatabaseSync } = require('node:sqlite');
     const db = new DatabaseSync(DB_PATH);
     const ver = db.prepare('PRAGMA user_version').get().user_version;
-    if (ver === 10) ok('user_version = 10');
-    else if (ver === 9) warn('user_version = 9 — миграция v10 применится при следующем npm run dev');
+    if (ver === SCHEMA_EXPECTED) ok(`user_version = ${SCHEMA_EXPECTED}`);
+    else if (ver === SCHEMA_EXPECTED - 1) warn(`user_version = ${ver} — миграция v${SCHEMA_EXPECTED} применится при следующем запуске`);
     else err('user_version = ' + ver);
 
     const tables = db.prepare(
@@ -101,6 +114,11 @@ if (!fs.existsSync(DB_PATH)) {
       if (tables.includes(t)) ok(t); else err(t + ' отсутствует');
     }
 
+    // v11: conversations.position (порядок GigaChat)
+    const cols = db.prepare('PRAGMA table_info(conversations)').all().map(c => c.name);
+    if (cols.includes('position')) ok('conversations.position');
+    else err('conversations.position отсутствует (миграция v11 не применена)');
+
     if (tables.includes('context_nodes')) {
       const cnt = db.prepare('SELECT COUNT(*) AS c FROM context_nodes').get().c;
       if (cnt > 0) ok(`context_nodes: ${cnt} узлов`);
@@ -109,32 +127,28 @@ if (!fs.existsSync(DB_PATH)) {
       const versions = db.prepare('SELECT COUNT(*) AS c FROM context_versions').get().c;
       console.log(`    context_versions: ${versions} записей`);
     }
+
+    if (tables.includes('conversations')) {
+      const c = db.prepare(
+        'SELECT COUNT(*) AS total, SUM(archived = 1) AS archived, SUM(position IS NULL) AS pos_null, SUM(pinned = 1) AS pinned FROM conversations'
+      ).get();
+      console.log(`    conversations: ${c.total} (archived=${c.archived}, position=NULL: ${c.pos_null}, pinned=${c.pinned})`);
+    }
     db.close();
   } catch (e) { err('БД: ' + e.message); }
 }
 
-// ─── 6. tsc ─────────────────────────────────────────────────────────
-section('6. tsc по нашим файлам');
+// ─── 6. tsc по изменённым файлам ────────────────────────────────────
+section('6. tsc (изменённые файлы)');
 if (FAST) {
-  console.log('\n=== 6. tsc по нашим файлам ===');
   console.log('  ⏭ пропущено (--fast)');
-}
-try {
-  const out = execSync('npx tsc --noEmit 2>&1', { cwd: ROOT, encoding: 'utf8', timeout: 60000 });
-  const lines = out.split('\n').filter(l =>
-    l.includes('contextService') || l.includes('contextBuilder') ||
-    l.includes('GatewayCacheService') || l.includes('v9.ts') || l.includes('db.ts')
-  );
-  if (lines.length === 0) ok('чисто');
-  else lines.forEach(l => err(l));
-} catch (e) {
-  const out = (e.stdout || '') + (e.stderr || '');
-  const lines = out.split('\n').filter(l =>
-    l.includes('contextService') || l.includes('contextBuilder') ||
-    l.includes('GatewayCacheService') || l.includes('v9.ts')
-  );
-  if (lines.length === 0) ok('чисто (pre-existing ошибки не считаем)');
-  else lines.forEach(l => err(l));
+} else {
+  try {
+    execSync('node scripts/mjs/tsc-changed.mjs', { cwd: ROOT, stdio: 'inherit', timeout: 180000 });
+    ok('ошибок в изменённых файлах нет');
+  } catch {
+    err('есть ошибки TypeScript в изменённых файлах (см. вывод выше)');
+  }
 }
 
 // ─── 7. context.manifest.json ────────────────────────────────────────
