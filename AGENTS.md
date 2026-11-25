@@ -7,7 +7,7 @@
 
 ## Документация разработки
 
-**Устаревшие документы (не использовать):** `ROADMAP.md`, `GATEWAY_ROADMAP.md`, `GATEWAY_MULTI_ACCOUNT_ROADMAP.md`, `OSINT_ROADMAP.md`.
+**Устаревшие документы (не использовать):** в `archive/` — `ROADMAP.md`, `GATEWAY_ROADMAP.md`, `GATEWAY_ROADMAP_check.md`, `GATEWAY_MULTI_ACCOUNT_ROADMAP.md`, `OSINT_ROADMAP.md` (перенесены 2026-11-25).
 
 **Актуальные промпты — `docs/prompts/`:**
 

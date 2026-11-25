@@ -30,35 +30,35 @@
       "kind": "roadmap",
       "title": "GATEWAY_MULTI_ACCOUNT_ROADMAP",
       "parent": "wetothemoon-electron",
-      "file": "GATEWAY_MULTI_ACCOUNT_ROADMAP.md"
+      "file": "archive/GATEWAY_MULTI_ACCOUNT_ROADMAP.md"
     },
     {
       "key": "wetothemoon-project/wetothemoon-electron/GATEWAY_ROADMAP",
       "kind": "roadmap",
       "title": "GATEWAY_ROADMAP",
       "parent": "wetothemoon-electron",
-      "file": "GATEWAY_ROADMAP.md"
+      "file": "archive/GATEWAY_ROADMAP.md"
     },
     {
       "key": "wetothemoon-project/wetothemoon-electron/GATEWAY_ROADMAP_check",
       "kind": "roadmap",
       "title": "GATEWAY_ROADMAP_check",
       "parent": "wetothemoon-electron",
-      "file": "GATEWAY_ROADMAP_check.md"
+      "file": "archive/GATEWAY_ROADMAP_check.md"
     },
     {
       "key": "wetothemoon-project/wetothemoon-electron/OSINT_ROADMAP",
       "kind": "roadmap",
       "title": "OSINT_ROADMAP",
       "parent": "wetothemoon-electron",
-      "file": "OSINT_ROADMAP.md"
+      "file": "archive/OSINT_ROADMAP.md"
     },
     {
       "key": "wetothemoon-project/wetothemoon-electron/ROADMAP",
       "kind": "roadmap",
       "title": "ROADMAP",
       "parent": "wetothemoon-electron",
-      "file": "ROADMAP.md"
+      "file": "archive/ROADMAP.md"
     },
     {
       "key": "wetothemoon-project/wetothemoon-electron/gateway",
