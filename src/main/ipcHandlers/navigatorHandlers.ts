@@ -241,6 +241,11 @@ export function registerNavigatorHandlers(): void {
       // TD-NEW: patchright-core vs playwright-core. Каст локализован здесь.
       const convs = await adapter.getConversations(page as any);
 
+      console.log(
+        `[navigator:sync-conversations] profileId=${profileId}, provider=${provider}, ` +
+        `pageURL=${page.url()}, convs.length=${convs.length}`,
+      );
+
       const { GatewayCacheService } = await import('../services/gateway/cache/GatewayCacheService');
       const cache = GatewayCacheService.getInstance();
 

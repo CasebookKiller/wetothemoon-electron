@@ -145,6 +145,18 @@ export class DeepSeekAdapter implements ProviderAdapter {
   async getConversations(page: Page): Promise<Conversation[]> {
     // Селекторы портированы из legacy DeepSeekService.getConversations()
     // (deepseekService.ts:2194). Проверены работоспособностью /chat_session/delete.
+    //
+    // Ждём появления сайдбара: legacy вызывал getConversations на уже прогретой
+    // странице (this.page), а adapter получает page от resolvePage — сайдбар может
+    // быть ещё не отрендерен, если страница только что открыта.
+    try {
+      await page.waitForSelector('a._546d736', { state: 'attached', timeout: 10_000 });
+    } catch {
+      // Сайдбар не появился — либо не залогинен, либо DS сменил разметку.
+      // Продолжаем: evaluate вернёт [] (fallback-ветка), handler запишет пусто.
+      console.warn('[deepseek/adapter] getConversations: sidebar не найден за 10с');
+    }
+
     const rows = await page.evaluate(() => {
       const result: { id: string; title: string; group?: string }[] = [];
       const groupContainers = document.querySelectorAll('._3098d02');
