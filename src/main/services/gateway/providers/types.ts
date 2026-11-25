@@ -72,6 +72,8 @@ export interface MessageChunk {
 export interface Conversation {
   id: string;
   title: string;
+  /** Группа в сайдбаре (у DS — «Все диалоги», и т.п.). */
+  group?: string;
   createdAt?: number;
   updatedAt?: number;
   messageCount?: number;
