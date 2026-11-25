@@ -98,7 +98,7 @@ async function connectGigaChat(page: Page): Promise<void> {
  */
 export function registerLlmTools(): void {
   register(makeLlmTool('gigachat', 'GigaChat', { connect: connectGigaChat }));
-  // register(makeLlmTool('deepseek', 'DeepSeek')); // Этап 1.5
+  register(makeLlmTool('deepseek', 'DeepSeek'));
 }
 
 // Саморегистрация при первом initTools() — без циклического импорта в toolRegistry.

@@ -120,6 +120,7 @@ export const NavigatorSidebar: React.FC<NavigatorSidebarProps> = ({
     setLoadingConvs(true);
     try {
       const r = await api.navigator.syncConversations(profileId);
+      console.log('[Sidebar] syncConversations →', r);
       if (!r?.success) throw new Error(r?.error || 'Ошибка синхронизации');
       await refreshConversations(profileId);
     } catch (e: any) {

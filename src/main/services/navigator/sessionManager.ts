@@ -27,6 +27,7 @@ export interface ResolvedSession {
  */
 const PROVIDER_TO_TOOL: Record<string, string> = {
   gigachat: 'gigachat',
+  deepseek: 'deepseek',
 };
 
 /**
