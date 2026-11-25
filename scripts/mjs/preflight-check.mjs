@@ -159,6 +159,9 @@ try {
   else {
     const m = JSON.parse(fs.readFileSync(mp, 'utf8'));
     ok(`manifest: ${m.nodes.length} узлов`);
+    const missing = m.nodes.filter(n => n.file && !fs.existsSync(path.join(ROOT, n.file)));
+    if (missing.length) err(`битые file-ссылки: ${missing.length} (${missing.slice(0, 3).map(n => n.file).join(', ')}${missing.length > 3 ? ', …' : ''})`);
+    else ok('все file-ссылки существуют');
     const globalNode = m.nodes.find(n => n.key === 'global');
     if (globalNode) {
       console.log('  global → ' + (globalNode.file || globalNode.summaryFile || '(пусто)'));
