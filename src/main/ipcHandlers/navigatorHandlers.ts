@@ -26,6 +26,11 @@ import type { IncomingMessage } from '../services/gateway/cache/types';
  * Зарегистрировать все IPC-хендлеры Navigator.
  * Вызывается один раз из `main.ts`.
  */
+
+// Mutex: одна sync-messages за раз на профиль. Защита от race, если UI
+// случайно (или программно) вызовет параллельно.
+const activeSyncs = new Set<string>();
+
 export function registerNavigatorHandlers(): void {
   // ── navigator:list-tools ────────────────────────────────────────────
   ipcMain.handle('navigator:list-tools', () => {
@@ -117,6 +122,13 @@ export function registerNavigatorHandlers(): void {
               });
 
               await cache.syncConversation(convId, title, incoming, { profileId });
+              try {
+                event.sender.send('navigator:conversation-saved', {
+                  profileId,
+                  convId,
+                  count: incoming.length,
+                });
+              } catch { /* окно закрыто */ }
             }
           } catch (e) {
             console.error('[Navigator] sync to gateway.db failed:', e);
@@ -210,10 +222,13 @@ export function registerNavigatorHandlers(): void {
       // Mirror: архивируем всё, чего GigaChat больше не отдаёт (phantom — удалены в GigaChat).
       // Безопасно: archived=1 — не показывается в UI, но данные целы (можно вернуть).
       // Порог 50 — защита от бага scroll (не выкосить всё за один глюк).
-      if (convs.length > 50) {
-        const liveIds = new Set(convs.map((c) => c.id));
-        cache.archiveConversationsNotIn(profileId, liveIds);
-      }
+      // MIRROR отключён: adapter не видит ~70 диалогов (scroll cap GigaChat ~190).
+      // Они реальные (открываются в GigaChat), mirror их ошибочно архивировал.
+      // TODO: включить после решения scroll. Альтернатива — sync_miss_count.
+      // if (convs.length > 50) {
+      //   const liveIds = new Set(convs.map((c) => c.id));
+      //   cache.archiveConversationsNotIn(profileId, liveIds);
+      // }
 
       return { success: true, data: { synced: convs.length } };
     } catch (err: any) {
@@ -223,6 +238,11 @@ export function registerNavigatorHandlers(): void {
 
   // ── navigator:sync-messages (парсит открытый диалог) ─────────────────
   ipcMain.handle('navigator:sync-messages', async (_e, profileId: string, convId: string, url: string) => {
+    if (activeSyncs.has(profileId)) {
+      console.log('[Navigator:sync-messages] BUSY, skip', { profileId, convId });
+      return { success: false, error: 'Синхронизация уже идёт' };
+    }
+    activeSyncs.add(profileId);
     console.log('[Navigator:sync-messages] START', { profileId, convId, url });
     try {
       if (!profileId || !convId) throw new Error('profileId и convId обязательны');
@@ -270,6 +290,16 @@ export function registerNavigatorHandlers(): void {
         console.warn('[Navigator:sync-messages] timeout waiting for messages');
       }
 
+      // Verify: page должна быть на целевом диалоге. Иначе (race с параллельным sync)
+      // парсим чужие сообщения и пишем в этот convId — порча данных.
+      const currentUrl = page.url();
+      if (!currentUrl.includes(convId)) {
+        console.warn(
+          '[Navigator:sync-messages] URL mismatch: expected', convId, 'got', currentUrl, '— abort',
+        );
+        return { success: false, error: `Навигация не удалась (page на ${currentUrl})` };
+      }
+
       const { GigaChatAdapter } = await import('../services/gateway/providers/gigachat/adapter');
       const adapter = new GigaChatAdapter();
       const msgs = await adapter.getCurrentMessages(page as any);
@@ -297,8 +327,9 @@ export function registerNavigatorHandlers(): void {
 
       return { success: true, data: { count: msgs.length } };
     } catch (err: any) {
-      console.error('[Navigator:sync-messages] ERROR', err);
       return { success: false, error: err?.message ?? String(err) };
+    } finally {
+      activeSyncs.delete(profileId);
     }
   });
 
