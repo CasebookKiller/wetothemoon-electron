@@ -85,6 +85,7 @@ export interface NavigatorAPI {
     error?: string;
   }>;
 
+  launchProfile: (profileId: string) => Promise<{ success: boolean; data?: { status: string; provider: string }; error?: string }>;
   syncConversations: (profileId: string) => Promise<{ success: boolean; data?: { synced: number }; error?: string }>;
   syncMessages: (profileId: string, convId: string, url: string) => Promise<{ success: boolean; data?: { count: number }; error?: string }>;
 

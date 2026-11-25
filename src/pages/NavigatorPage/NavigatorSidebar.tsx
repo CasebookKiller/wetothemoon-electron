@@ -81,10 +81,12 @@ export const NavigatorSidebar: React.FC<NavigatorSidebarProps> = ({
     try {
       const r = await api.gatewayProfilesList();
       if (r?.success && r.data?.profiles) {
-        const gg = (r.data.profiles as ProfileRow[]).filter((p) => p.provider === 'gigachat');
-        setProfiles(gg);
-        if (gg.length > 0 && !gg.some((p) => p.id === selectedId)) {
-          onSelect(gg[0].id);
+        const supported = (r.data.profiles as ProfileRow[]).filter(
+          (p) => p.provider === 'gigachat' || p.provider === 'deepseek'
+        );
+        setProfiles(supported);
+        if (supported.length > 0 && !supported.some((p) => p.id === selectedId)) {
+          onSelect(supported[0].id);
         }
       } else {
         setError(r?.error || 'Не удалось загрузить профили');
@@ -163,7 +165,7 @@ export const NavigatorSidebar: React.FC<NavigatorSidebarProps> = ({
     if (!api?.gatewayLaunchByProfile) { setError('launch IPC не готов'); return; }
     setLaunching(true); setError(null); setLaunchStatus(null);
     try {
-      const r = await api.gatewayLaunchByProfile(selectedId);
+      const r = await api.navigator.launchProfile(selectedId);
       if (!r?.success) { setError(r?.error || 'Не удалось запустить'); return; }
       const status = r.data?.status as string | undefined;
       if (status === 'login_required') setLaunchStatus('Требуется вход в GigaChat (SberID)');
@@ -218,8 +220,11 @@ export const NavigatorSidebar: React.FC<NavigatorSidebarProps> = ({
                 <span style={{ fontSize: 12, fontWeight: isSel ? 600 : 400 }}>{p.name}</span>
                 <span style={{
                   fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3,
-                  background: 'rgba(16,185,129,0.15)', color: '#10b981',
-                }}>GG</span>
+                  background: p.provider === 'gigachat' ? 'rgba(16,185,129,0.15)' : 'rgba(77,107,254,0.15)',
+                  color: p.provider === 'gigachat' ? '#10b981' : '#4d6bfe',
+                }}>
+                  {p.provider === 'gigachat' ? 'GG' : 'DS'}
+                </span>
               </div>
               <div style={{ fontSize: 10, color: '#888', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {!p.hasSession && <span style={{ color: '#f59e0b' }}>⚠ нет сессии</span>}

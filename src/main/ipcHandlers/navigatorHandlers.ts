@@ -142,7 +142,39 @@ export function registerNavigatorHandlers(): void {
     },
   );
 
+  // ── navigator:launch-profile (через BrowserPool, параллельно с Gateway) ──
+  // Заменяет legacy DeepSeekService.switchProfile, который делает this.browser.close()
+  // и убивает все контексты (включая Gateway'шный). См. handoff 2026-11-25 вечер.
+  /*ipcMain.handle('navigator:launch-profile', async (_e, profileId: string) => {
+    try {
+      if (!profileId) throw new Error('profileId обязателен');
+      const pool = await getBrowserPool();
+      const { page } = await pool.acquire(profileId);
 
+      const { ProfileService } = await import('../services/gateway/ProfileService');
+      const profile = ProfileService.getInstance().get(profileId);
+      if (!profile) throw new Error(`Профиль не найден: ${profileId}`);
+
+      // GatewayProfile.provider опционален: legacy-профили без поля.
+      // Default из комментария к типу: 'deepseek' (gigachat резолвится по id/имени выше в ProfileService).
+      const provider = profile.provider ?? 'deepseek';
+
+      const URL_BY_PROVIDER: Record<string, string> = {
+        gigachat: 'https://giga.chat',
+        deepseek: 'https://chat.deepseek.com',
+      };
+      const url = URL_BY_PROVIDER[provider];
+      if (!url) throw new Error(`Нет URL для провайдера: ${provider}`);
+
+      if (!page.url().includes(new URL(url).hostname)) {
+        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+      }
+
+      return { success: true, data: { status: 'launched', provider: profile.provider } };
+    } catch (err: any) {
+      return { success: false, error: err?.message ?? String(err) };
+    }
+  });*/
   
   // ── navigator:list-conversations (из БД Gateway) ─────────────────────
   ipcMain.handle('navigator:list-conversations', async (_e, profileId: string) => {
@@ -330,6 +362,36 @@ export function registerNavigatorHandlers(): void {
       return { success: false, error: err?.message ?? String(err) };
     } finally {
       activeSyncs.delete(profileId);
+    }
+  });
+
+  // ── navigator:launch-profile (через BrowserPool, параллельно с Gateway) ──
+  ipcMain.handle('navigator:launch-profile', async (_e, profileId: string) => {
+    try {
+      if (!profileId) throw new Error('profileId обязателен');
+      const pool = await getBrowserPool();
+      const { page } = await pool.acquire(profileId);
+
+      const { ProfileService } = await import('../services/gateway/ProfileService');
+      const profile = ProfileService.getInstance().get(profileId);
+      if (!profile) throw new Error(`Профиль не найден: ${profileId}`);
+
+      const provider = profile.provider ?? 'deepseek';
+
+      const URL_BY_PROVIDER: Record<string, string> = {
+        gigachat: 'https://giga.chat',
+        deepseek: 'https://chat.deepseek.com',
+      };
+      const url = URL_BY_PROVIDER[provider];
+      if (!url) throw new Error(`Нет URL для провайдера: ${provider}`);
+
+      if (!page.url().includes(new URL(url).hostname)) {
+        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+      }
+
+      return { success: true, data: { status: 'launched', provider } };
+    } catch (err: any) {
+      return { success: false, error: err?.message ?? String(err) };
     }
   });
 

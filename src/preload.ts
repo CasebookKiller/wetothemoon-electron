@@ -444,6 +444,10 @@ try {
       getMessages: (conversationId: string) =>
         ipcRenderer.invoke('navigator:get-messages', conversationId),
 
+      /** Запустить браузер профиля через BrowserPool (параллельно с Gateway). */
+      launchProfile: (profileId: string) =>
+        ipcRenderer.invoke('navigator:launch-profile', profileId),
+
       /** Синхронизировать список диалогов из GigaChat DOM. */
       syncConversations: (profileId: string) =>
         ipcRenderer.invoke('navigator:sync-conversations', profileId),
