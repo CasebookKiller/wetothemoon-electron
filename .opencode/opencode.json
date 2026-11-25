@@ -1,0 +1,69 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  "model": "console-deepseek/deepseek-flash",
+  "providers": {
+    "console-deepseek": {
+      "models": {
+        "deepseek-flash": {
+          "limit": { "context": 1048576, "output": 393216 }
+        }
+      }
+    }
+  },
+
+  "compaction": {
+    "auto": true,
+    "keep": { "tokens": 12000 },
+    "buffer": "20%"
+  },
+  "tool_output": {
+    "max_lines": 600,
+    "max_bytes": 20480
+  },
+  "media": {
+    "image": {
+      "auto_resize": true,
+      "max_width": 1600,
+      "max_height": 1600,
+      "max_base64_bytes": 2097152
+    }
+  },
+
+  "permissions": [
+    { "action": "read", "resource": "node_modules/**", "effect": "deny" },
+    { "action": "read", "resource": "dist/**",         "effect": "deny" },
+    { "action": "read", "resource": "*.msgpack",       "effect": "deny" },
+    { "action": "read", "resource": "captures/**",     "effect": "ask"  },
+    { "action": "read", "resource": "recon-out/**",    "effect": "ask"  },
+    { "action": "read", "resource": "recon-output/**", "effect": "ask"  },
+    { "action": "read", "resource": "*.png",           "effect": "ask"  },
+
+    { "action": "shell", "resource": "*",                 "effect": "ask"   },
+    { "action": "shell", "resource": "git status *",      "effect": "allow" },
+    { "action": "shell", "resource": "git diff *",        "effect": "allow" },
+    { "action": "shell", "resource": "git log *",         "effect": "allow" },
+    { "action": "shell", "resource": "git show *",        "effect": "allow" },
+    { "action": "shell", "resource": "node scripts/*",    "effect": "allow" },
+    { "action": "shell", "resource": "npx tsc *",         "effect": "allow" },
+    { "action": "shell", "resource": "git push *",        "effect": "deny"  },
+    { "action": "shell", "resource": "rm -rf *",          "effect": "deny"  }
+  ],
+
+  "watcher": {
+    "ignore": [
+      "node_modules/**", "dist/**", "captures/**",
+      "recon-out/**", "recon-output/**", "md-recon/**",
+      "*.db", "*.db-*", "*.msgpack", "*.png", "*.jpg"
+    ]
+  },
+
+  "references": {
+    "handoffs": {
+      "path": "../docs/prompts",
+      "description": "Handoff/topics по модулям: navigator, gateway, prana-bindu"
+    }
+  },
+
+  "experimental": { "todo": true }
+}
