@@ -162,8 +162,7 @@ export const NavigatorSidebar: React.FC<NavigatorSidebarProps> = ({
   const onLaunch = async () => {
     if (!selectedId) return;
     const api = (window as any).electronAPI;
-    if (!api?.gatewayLaunchByProfile) { setError('launch IPC не готов'); return; }
-    setLaunching(true); setError(null); setLaunchStatus(null);
+    if (!api?.navigator?.launchProfile) { setError('launch IPC не готов'); return; }
     try {
       const r = await api.navigator.launchProfile(selectedId);
       if (!r?.success) { setError(r?.error || 'Не удалось запустить'); return; }

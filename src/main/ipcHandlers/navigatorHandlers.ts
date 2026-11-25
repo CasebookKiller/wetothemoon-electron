@@ -225,8 +225,19 @@ export function registerNavigatorHandlers(): void {
       const { resolvePage } = await import('../services/navigator/sessionManager');
       const page = await resolvePage(profileId, pool);
 
-      const { GigaChatAdapter } = await import('../services/gateway/providers/gigachat/adapter');
-      const adapter = new GigaChatAdapter();
+      // Выбор адаптера по провайдеру профиля (GigaChat / DeepSeek / ...).
+      const { ProfileService } = await import('../services/gateway/ProfileService');
+      const profile = ProfileService.getInstance().get(profileId);
+      if (!profile) throw new Error(`Профиль не найден: ${profileId}`);
+      const provider = profile.provider ?? 'deepseek';
+
+      const { getProvider } = await import('../services/gateway/providers/registry');
+      const adapter = getProvider(provider);
+      if (!adapter) throw new Error(`Провайдер не зарегистрирован: ${provider}`);
+      if (typeof adapter.getConversations !== 'function') {
+        throw new Error(`У провайдера '${provider}' нет getConversations()`);
+      }
+
       // TD-NEW: patchright-core vs playwright-core. Каст локализован здесь.
       const convs = await adapter.getConversations(page as any);
 
